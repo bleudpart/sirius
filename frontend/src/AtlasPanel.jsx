@@ -106,6 +106,15 @@ function KeyScreen({ onSave, onBack, hasKey, authFail }) {
 }
 
 export default function AtlasPanel({ onClose, onSpeak, keys, onSaveKeys, initialQuery, initialRoute }) {
+  const [char, setChar] = useState(null);
+  useEffect(() => {
+    fetch((process.env.REACT_APP_BACKEND_URL || "") + "/api/mythos/characters")
+      .then(r => r.json())
+      .then(d => {
+        const p = d.characters.find(c => c.module === "ATLAS#");
+        setChar(p);
+      });
+  }, []);
   const gmapsKey = (keys && keys.gmaps) || "";
   const [showKey, setShowKey] = useState(!gmapsKey);
   const [authFail, setAuthFail] = useState(false);
@@ -258,6 +267,14 @@ export default function AtlasPanel({ onClose, onSpeak, keys, onSaveKeys, initial
         )}
         <button className="atlas-icon-btn" onClick={onClose} data-testid="atlas-close-btn"><X size={14} /></button>
       </div>
+
+      {char && (
+        <img
+          src={char.image}
+          alt={char.character}
+          className="mythos-avatar"
+        />
+      )}
 
       {showKey ? (
         <KeyScreen onSave={saveKey} onBack={() => setShowKey(false)} hasKey={!!gmapsKey} authFail={authFail} />

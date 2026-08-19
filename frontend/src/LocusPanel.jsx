@@ -17,6 +17,15 @@ const WeatherChip = ({ w }) => w ? (
 ) : null;
 
 export default function LocusPanel({ onClose, onSpeak, keys, initialAddress, initialRoute }) {
+  const [char, setChar] = useState(null);
+  useEffect(() => {
+    fetch((process.env.REACT_APP_BACKEND_URL || "") + "/api/mythos/characters")
+      .then(r => r.json())
+      .then(d => {
+        const p = d.characters.find(c => c.module === "LOCUS#");
+        setChar(p);
+      });
+  }, []);
   const [tab, setTab] = useState(initialRoute ? "route" : "geo");
   const dragRef = useDraggableCards([tab]);
   const [address, setAddress] = useState(initialAddress || "");
@@ -98,6 +107,13 @@ export default function LocusPanel({ onClose, onSpeak, keys, initialAddress, ini
         <div className="oracle-title font-divine"><MapPin size={20} /> LOCUS# — GÉOLOCALISATION</div>
         <button className="setup-close zeus-close" onClick={onClose} data-testid="locus-close-btn"><X size={18} /></button>
       </header>
+      {char && (
+        <img
+          src={char.image}
+          alt={char.character}
+          className="mythos-avatar"
+        />
+      )}
       <div className="prime-sub">GÉOCODAGE · MÉTÉO LOCALE · ITINÉRAIRES · GOOGLE SI CLÉ, NOMINATIM/OSM EN SECOURS · RIEN N'EST STOCKÉ</div>
 
       <div className="argus-body">

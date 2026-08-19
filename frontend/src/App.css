@@ -404,8 +404,8 @@ body.hud-minimal .antique-jar { display: none; }
   left: 50%;
   top: 30%;
   transform: translate(-50%, -50%);
-  width: min(34vh, 320px);
-  height: min(34vh, 320px);
+  width: min(30vh, 280px);
+  height: min(30vh, 280px);
 }
 .reactor-canvas { width: 100%; height: 100%; display: block; }
 .reactor-text {
@@ -4088,17 +4088,6 @@ body.hud-minimal .medallion-halo { display: none; }
 /* Cercle or autour du noyau central du HUD (identique à la page de présentation) */
 /* (anneaux dorés du reactor-wrap supprimés : le noyau vivant est le médaillon du trône) */
 
-/* Bouton RECHERCHER (remplace l'icône loupe seule) */
-.profile-btn.search-labeled {
-  width: auto;
-  padding: 0 11px;
-  gap: 6px;
-  font-family: "Orbitron", sans-serif;
-  font-size: 9px;
-  letter-spacing: 0.09em;
-  white-space: nowrap;
-}
-
 /* ---------- THÈME OR GLOBAL : panneaux latéraux (HEURE, MÉTÉO, CPU/RAM, NOYAU) ---------- */
 .hud-panel {
   border: 1px solid rgba(245, 197, 66, 0.78);
@@ -4177,7 +4166,7 @@ body.hud-minimal .medallion-halo { display: none; }
   -webkit-mask-image: radial-gradient(ellipse 72% 70% at 50% 45%, #000 74%, transparent 97%);
   mask-image: radial-gradient(ellipse 72% 70% at 50% 45%, #000 74%, transparent 97%);
 }
-@media (max-width: 900px) { .antique-guardian { display: none; } }
+@media (max-width: 900px) { .antique-guardian { display: block; } }
 
 /* Halo doré au sol sous le gardien : ancre le personnage dans la scène */
 .guardian-halo {
@@ -4802,7 +4791,7 @@ body[data-phase="night"] .antique-guardian { filter: brightness(0.88) contrast(1
 /* ===== Gardien animé : inclinaison vers le curseur (rig) + balancement de cape (sway) ===== */
 .guardian-rig {
   position: absolute;
-  left: calc(8% + 110px); top: auto; bottom: 4vh;
+  left: calc(2% + 10px); top: auto; bottom: 19vh;
   height: 74vh;
   z-index: 3;
   pointer-events: none;
@@ -4872,7 +4861,20 @@ body[data-phase="night"] .antique-guardian { filter: brightness(0.88) contrast(1
   background: radial-gradient(ellipse at 50% 30%, transparent 45%, rgba(2, 6, 12, 0.55) 100%);
 }
 .guardian-rig .guardian-bolt-glow { z-index: 2; left: 13%; top: 3%; width: 30%; height: 80%; }
-@media (max-width: 900px) { .guardian-rig { display: none; } }
+@media (max-width: 900px) {
+  .reactor-wrap {
+    width: min(30vh, 240px);
+    height: min(30vh, 240px);
+  }
+  .guardian-rig {
+    display: block;
+    left: 2%;
+    bottom: 28vh;
+    height: min(56vh, 440px);
+    transform: perspective(1100px) rotateY(var(--gy, 0deg)) rotateX(var(--gx, 0deg));
+  }
+  .guardian-rig .antique-guardian { display: block; }
+}
 body.hud-minimal .guardian-rig { display: none; }
 
 /* ===== CALLIOPE# : bibliothèque audio ===== */
@@ -5364,6 +5366,7 @@ body[data-phase] .center-stage::before { content: none !important; }
 .hud-panel.stats-mini {
   flex-direction: row;
   left: 30px; bottom: 88px; top: auto;
+  width: fit-content;
   gap: 16px;
 }
 .hud-panel.stats-mini .stat-line { white-space: nowrap; gap: 6px; }

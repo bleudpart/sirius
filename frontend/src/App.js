@@ -2,12 +2,12 @@
 
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Mic, MicOff, Clock, Cpu, Wifi, Wind, Sun, Cloud, CloudRain, CloudSnow, CloudFog, CloudLightning, Thermometer, MapPin, Calendar, Activity, X, Leaf, UserCog, Brain, Plus, Trash2, Pencil, Check, Music, Youtube, Repeat, RotateCcw, BarChart3, Workflow, FolderOpen, Code2, Database, Sparkles, Eye, Landmark, Library, Orbit, Monitor, ShieldCheck, AudioLines, Radar, ShieldAlert, Camera, Fingerprint, Zap, Package, Clapperboard, Grip, Search, Radio, Wrench, FileCode, History, Maximize, Minimize, KeyRound, Home as HomeIcon, BadgeInfo, Globe2, Hammer, TrendingUp, Newspaper, Scale, Flame, BookOpen, Sigma, AlarmClock } from "lucide-react";
+import { Mic, MicOff, Clock, Cpu, Wifi, Wind, Sun, Cloud, CloudRain, CloudSnow, CloudFog, CloudLightning, Thermometer, MapPin, Calendar, Activity, X, Leaf, UserCog, Brain, Plus, Trash2, Pencil, Check, Music, Youtube, Repeat, RotateCcw, BarChart3, Workflow, FolderOpen, Code2, Database, Sparkles, Eye, Landmark, Library, Orbit, Monitor, ShieldCheck, AudioLines, Radar, ShieldAlert, Camera, Fingerprint, Zap, Package, Clapperboard, Grip, Radio, Wrench, FileCode, History, Maximize, Minimize, KeyRound, Home as HomeIcon, BadgeInfo, Globe2, Hammer, TrendingUp, Newspaper, Scale, Flame, BookOpen, Sigma, AlarmClock } from "lucide-react";
 import {
   ArchitectPanel, SpectatorView, FilesPanel, DevCompanion, ZeusCortex, SiriusPrime, OracleDivin,
   PantheonSystem, NexusCeleste, SiriusDisplay, EuropeanaViewer, HaccpModule, KeysStatus, KeraunosPanel,
   AboutPanel, EspacePanel, ArchiveGallery, MemoryManager, InstallWizard, ScriptInstaller, LocusPanel,
-  AtlasPanel, HeraclesPanel, HephaistosPanel, MythosGallery, ConsultPanel, CalliopePanel, CalendarPanel,
+  AtlasPanel, HeraclesPanel, HephaistosPanel, MythosGallery, ConsultPanel, PrometheePanel, CalliopePanel, CalendarPanel,
   FaceIdPanel, PythagorePanel, PackagerPanel, TrailerGallery, SiriusSetup, PromoPanel, ThemisPanel,
   AdminPanel, PortusNummarius, AgoraPipeline, NewsPanel, ReveilPanel, SpotifyPanel,
 } from "@/lazyModules";
@@ -284,6 +284,8 @@ function ReactorCore({ status, volume, color, eco }) {
     };
     resize();
     window.addEventListener("resize", resize);
+    const resizeObserver = new ResizeObserver(resize);
+    resizeObserver.observe(canvas);
 
     const hexToRgb = (hex) => {
       const n = parseInt(hex.slice(1), 16);
@@ -529,6 +531,7 @@ function ReactorCore({ status, volume, color, eco }) {
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
+      resizeObserver.disconnect();
     };
   }, []);
 
@@ -4480,7 +4483,7 @@ function App() {
       {showThemis && <ThemisPanel onClose={() => setShowThemis(false)} />}
       {showAgora && <AgoraPipeline onClose={() => setShowAgora(false)} onOpenThemis={() => { setShowAgora(false); setShowThemis(true); }} />}
       {showSolon && <ConsultPanel module="SOLON#" onClose={() => setShowSolon(false)} />}
-      {showPromethee && <ConsultPanel module="PROMÉTHÉE#" onClose={() => setShowPromethee(false)} />}
+      {showPromethee && <PrometheePanel onClose={() => setShowPromethee(false)} />}
       {showCalliope && <CalliopePanel onClose={() => setShowCalliope(false)} />}
       {showCalendar && <CalendarPanel onClose={() => setShowCalendar(false)} />}
       {showFaceId && (
@@ -4584,15 +4587,6 @@ function App() {
           {"IA CLOUD · GROQ / KIMI"}
           {mode === "brainstorm" && <span className="mode-badge" data-testid="brainstorm-badge">BRAINSTORM</span>}
           <button
-            className="profile-btn search-labeled"
-            onClick={() => setShowCmdPalette(true)}
-            data-testid="sirius-cmdpalette-btn"
-            title="Rechercher un module (Ctrl+K)"
-          >
-            <Search size={13} />
-            <span>RECHERCHER</span>
-          </button>
-          <button
             className={`profile-btn ${isFullscreen ? "on" : ""}`}
             onClick={toggleFullscreen}
             data-testid="sirius-fullscreen-btn"
@@ -4640,8 +4634,8 @@ function App() {
       {/* Pop-ups holographiques contextuels (gérés par Sirius) */}
       <HoloPopups popups={popups} onClose={closePopup} onImage={setArchiveView} />
 
-      {/* Suggestions proactives (désactivées en mode secours) */}
-      {sysMode !== "safe" && <ProactivePanel
+      {/* Suggestions proactives — désactivées : encarts système "SIRIUS est prêt..." / "Vérifiez les tâches..." supprimés au démarrage */}
+      {false && <ProactivePanel
         onAction={(a) => {
           if (!a || !a.type) return;
           if (a.type === "command") {

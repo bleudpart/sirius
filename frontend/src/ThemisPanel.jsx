@@ -84,6 +84,15 @@ function Lines({ lines, setLines }) {
 }
 
 export default function ThemisPanel({ onClose }) {
+  const [char, setChar] = useState(null);
+  useEffect(() => {
+    fetch((process.env.REACT_APP_BACKEND_URL || "") + "/api/mythos/characters")
+      .then(r => r.json())
+      .then(d => {
+        const p = d.characters.find(c => c.module === "THÉMIS#");
+        setChar(p);
+      });
+  }, []);
   const [tab, setTab] = useState("dash");
   const [stats, setStats] = useState(null);
   const [bilan, setBilan] = useState(null);
@@ -213,6 +222,13 @@ export default function ThemisPanel({ onClose }) {
         <div className="oracle-title font-divine"><img src="/holo/logo-themis.png" alt="" className="th-logo" data-testid="themis-logo" /> THÉMIS# — GESTION D’ENTREPRISE</div>
         <button className="setup-close zeus-close" onClick={onClose} data-testid="themis-close-btn"><X size={18} /></button>
       </header>
+      {char && (
+        <img
+          src={char.image}
+          alt={char.character}
+          className="mythos-avatar"
+        />
+      )}
       <div className="prime-sub">DEVIS · FACTURES · COMMANDES · CLIENTS · COMPTABILITÉ · PIÈCES PDF · STOCKS · MODÈLES · BYOK</div>
 
       <div className="th-tabs">

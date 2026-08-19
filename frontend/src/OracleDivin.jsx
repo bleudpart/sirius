@@ -7,6 +7,7 @@ import {
 import MythosBackdrop from "@/MythosBackdrop";
 import useDraggableCards from "@/useDraggableCards";
 import Analysis3D from "@/Analysis3D";
+import "./Oracle.css";
 
 const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
 const DAYS = ["DIM", "LUN", "MAR", "MER", "JEU", "VEN", "SAM"];
@@ -36,6 +37,15 @@ function MarketRow({ m, unit }) {
 }
 
 export default function OracleDivin({ onClose }) {
+  const [char, setChar] = useState(null);
+  useEffect(() => {
+    fetch((process.env.REACT_APP_BACKEND_URL || "") + "/api/mythos/characters")
+      .then(r => r.json())
+      .then(d => {
+        const p = d.characters.find(c => c.module === "ORACLE#");
+        setChar(p);
+      });
+  }, []);
   const [data, setData] = useState(null);
   const [show3D, setShow3D] = useState(false);
   const starsRef = useRef(null);
@@ -102,6 +112,13 @@ export default function OracleDivin({ onClose }) {
         <div className="oracle-title font-divine"><Eye size={20} /> ORACLE DIVIN</div>
         <button className="setup-close zeus-close" onClick={onClose} data-testid="oracle-close-btn"><X size={18} /></button>
       </header>
+      {char && (
+        <img
+          src={char.image}
+          alt={char.character}
+          className="mythos-avatar"
+        />
+      )}
       <div className="prime-sub">CENTRE DE PRÉDICTIONS — {data ? data.date : "CONSULTATION DES ASTRES..."}</div>
 
       <div className="prime-grid oracle-grid">

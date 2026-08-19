@@ -25,6 +25,17 @@ const phonetic = (text) =>
     .replace(/\bS\.I\.R\.I\.U\.S\b/gi, "Siriusse")
     .replace(/\bcortex\b/gi, "cortèxe");
 
+// Nettoyage du texte avant synthèse vocale : supprime la ponctuation, les parenthèses/crochets/accolades
+// et les barres obliques pour empêcher leur lecture littérale par le moteur TTS et sonner plus naturel.
+function cleanTextForSpeech(t) {
+  return String(t || "")
+    .replace(/[.,;:!?]/g, "")        // supprime ponctuation
+    .replace(/[()\[\]{}]/g, "")      // supprime parenthèses / crochets / accolades
+    .replace(/\/+/g, " ")            // supprime barres
+    .replace(/\s+/g, " ")            // normalise espaces
+    .trim();
+}
+
 // Ton adapté à l'urgence : plus rapide et tendu si le message est urgent
 const isUrgent = (text) => /!|\b(urgent|vite|attention|alerte|imm[ée]diatement|danger|grave)\b/i.test(text);
 
@@ -239,6 +250,7 @@ const _gToB = (g) => Math.max(0.4, Math.min(1.8, 1 + g / 15));
 // Voix distincte par personnage du Panthéon : profil Mythos (M1/M2/F1/F2) ou hauteur/débit hérités
 export function speakAsCharacter(message, { profile, module, pitch = 1, rate = 1, onstart, onend } = {}) {
   if (!message) { (onend || (() => {}))(); return; }
+  const safeText = cleanTextForSpeech(message);
   const cfg = getVoiceCfg();
   const prof = profile || (module && CHAR_PROFILES[module]);
   const p = prof && MYTHOS_VOICES[prof];
@@ -249,23 +261,23 @@ export function speakAsCharacter(message, { profile, module, pitch = 1, rate = 1
     const vRate = ov.rate ?? p.rate;
     const bPitch = ov.gPitch != null ? _gToB(ov.gPitch) : p.bPitch;
     if (cfg.name === "browser") {
-      speakBrowser(message, { rate: vRate, pitch: bPitch, gender: p.gender, onstart, onend });
+      speakBrowser(safeText, { rate: vRate, pitch: bPitch, gender: p.gender, onstart, onend });
       return;
     }
-    speakGoogle(message, { voice: p.google, rate: vRate, pitch: gPitch, onstart, onend }, seq).then((ok) => {
-      if (!ok && seq === speakSeq) speakBrowser(message, { rate: vRate, pitch: bPitch, gender: p.gender, onstart, onend });
+    speakGoogle(safeText, { voice: p.google, rate: vRate, pitch: gPitch, onstart, onend }, seq).then((ok) => {
+      if (!ok && seq === speakSeq) speakBrowser(safeText, { rate: vRate, pitch: bPitch, gender: p.gender, onstart, onend });
     });
     return;
   }
   const bp = Math.max(0.4, Math.min(1.8, pitch));
   const br = Math.max(0.55, Math.min(1.6, rate));
   if (cfg.name === "browser") {
-    speakBrowser(message, { rate: br, pitch: bp, onstart, onend });
+    speakBrowser(safeText, { rate: br, pitch: bp, onstart, onend });
     return;
   }
   const gPitch = Math.max(-14, Math.min(14, Math.round((pitch - 0.9) * 13)));
-  speakGoogle(message, { voice: cfg.name, rate: br, pitch: gPitch, onstart, onend }, seq).then((ok) => {
-    if (!ok && seq === speakSeq) speakBrowser(message, { rate: br, pitch: bp, onstart, onend });
+  speakGoogle(safeText, { voice: cfg.name, rate: br, pitch: gPitch, onstart, onend }, seq).then((ok) => {
+    if (!ok && seq === speakSeq) speakBrowser(safeText, { rate: br, pitch: bp, onstart, onend });
   });
 }
 // Alias d'exportation pour assurer la compatibilité avec App.js

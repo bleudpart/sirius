@@ -1,5 +1,11 @@
 /* © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France). */
 /* HÉPHAÏSTOS — auto-maintenance, thème or & cyan */
+.mythos-avatar {
+  width: 280px;
+  display: block;
+  margin: 0 auto;
+  filter: drop-shadow(0 0 34px var(--mythos-color, #ffffff88));
+}
 .heph-body {
   position: relative; z-index: 3;
   display: flex; flex-direction: column; gap: 14px;

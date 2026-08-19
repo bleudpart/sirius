@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { X, BookOpen, Search, Loader2, Play, Download, FolderOpen, Trash2, RefreshCw, SkipBack, SkipForward } from "lucide-react";
 import MythosBackdrop from "@/MythosBackdrop";
 import { ConfirmButton } from "@/ConfirmButton";
+import "./Calliope.css";
 
 const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
 const GENRES = ["Roman", "Policier", "Science-fiction", "Jeunesse", "Histoire", "Philosophie", "Poésie", "Théâtre", "Divers"];
@@ -99,6 +100,15 @@ function BookPlayer({ book }) {
 }
 
 export default function CalliopePanel({ onClose }) {
+  const [char, setChar] = useState(null);
+  useEffect(() => {
+    fetch((process.env.REACT_APP_BACKEND_URL || "") + "/api/mythos/characters")
+      .then(r => r.json())
+      .then(d => {
+        const p = d.characters.find(c => c.module === "CALLIOPE#");
+        setChar(p);
+      });
+  }, []);
   const [tab, setTab] = useState("search");
   const [q, setQ] = useState("");
   const [lang, setLang] = useState("");
@@ -183,6 +193,13 @@ export default function CalliopePanel({ onClose }) {
         <div className="oracle-title font-divine"><BookOpen size={20} /> CALLIOPE# — BIBLIOTHÈQUE AUDIO</div>
         <button className="setup-close zeus-close" onClick={onClose} data-testid="calliope-close-btn"><X size={18} /></button>
       </header>
+      {char && (
+        <img
+          src={char.image}
+          alt={char.character}
+          className="mythos-avatar"
+        />
+      )}
       <div className="prime-sub">LIVRES AUDIO LIBRES · LIBRIVOX & ARCHIVE.ORG · AUCUNE CLÉ REQUISE</div>
 
       <div className="cal-tabs">

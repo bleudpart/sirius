@@ -17,6 +17,15 @@ const GROUPS = [
 ];
 
 export default function HephaistosPanel({ onClose, onSpeak }) {
+  const [char, setChar] = useState(null);
+  useEffect(() => {
+    fetch((process.env.REACT_APP_BACKEND_URL || "") + "/api/mythos/characters")
+      .then(r => r.json())
+      .then(d => {
+        const p = d.characters.find(c => c.module === "HÉPHAÏSTOS#");
+        setChar(p);
+      });
+  }, []);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [phase, setPhase] = useState("");
@@ -102,6 +111,13 @@ export default function HephaistosPanel({ onClose, onSpeak }) {
         <div className="oracle-title font-divine"><Hammer size={20} /> HÉPHAÏSTOS — AUTO-MAINTENANCE</div>
         <button className="setup-close zeus-close" onClick={onClose} data-testid="hephaistos-close-btn"><X size={18} /></button>
       </header>
+      {char && (
+        <img
+          src={char.image}
+          alt={char.character}
+          className="mythos-avatar"
+        />
+      )}
       <div className="prime-sub">DIAGNOSTIC RÉEL · MODULES · SERVICES · INTÉGRATIONS · RAPPORT TÉLÉCHARGEABLE</div>
 
       <div className="heph-body">
