@@ -49,6 +49,32 @@ yarn start
 Dans `frontend/`, double-clique sur **BUILD.bat** (garde-le en CRLF / ASCII).
 L'exécutable est généré dans le dossier de sortie Electron.
 
+## 5. Sauvegarder la mémoire locale
+Depuis `backend/`, **Sirius Doctor** crée une copie SQLite cohérente de
+`sirius_local.db`, contrôle la base avant et après la copie, puis écrit un
+manifeste SHA-256 à côté de la sauvegarde :
+
+```
+python sirius_doctor.py backup
+```
+
+Les instantanés sont placés dans `backend/backups/sirius_doctor/` et ne sont
+pas ajoutés à Git. Pour un contrôle sans sauvegarde :
+
+```
+python sirius_doctor.py check
+```
+
+Pour revérifier plus tard un instantané et son manifeste :
+
+```
+python sirius_doctor.py verify backups\sirius_doctor\sirius_local-<horodatage>.db
+```
+
+Ajoute `--json` à chaque commande pour une sortie exploitable par un script.
+Cet outil couvre la mémoire SQLite locale ; les données MongoDB et le stockage
+objet doivent être sauvegardés avec les outils natifs du service concerné.
+
 ## Notes
 - La voix et le micro utilisent le navigateur (gratuit, instantané) : utilise **Chrome ou Edge** pour la reconnaissance vocale.
 - Sirius mémorise automatiquement ce que tu lui dis d'important (pop-up « Mémoire enregistrée »). Tout reste sur ton PC.
