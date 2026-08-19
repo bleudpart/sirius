@@ -1,0 +1,32 @@
+{
+  "summary": "Frontend-only ATLAS iteration 24 retest completed on the public preview. The exact native invalid-key flow passed without Google request interception: InvalidKeyMapError produced the non-blocking French banner, the toolbar remained usable, Lyon→Marseille returned 314 km, Tour Eiffel returned its address, key correction/back did not loop, and close/HUD regressions passed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/root/.emergent/automation_output/20260803_195804/console_20260803_195804.log"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AtlasPanel.jsx passed targeted ESLint. gm_authFailure now only sets authFail, the warning banner is non-blocking, and the updated key guidance correctly mentions billing and a free monthly per-API quota.",
+    "App.js remains 4,141 lines, above the 700-line maintainability threshold; future module extraction should be incremental. This did not affect the tested ATLAS behavior."
+  ],
+  "updated_files": [
+    "/app/test_reports/iteration_24.json"
+  ],
+  "success_rate": {
+    "backend": "Skipped per frontend-only request (iteration 23 backend was 4/4)",
+    "frontend": "100% (11/11 requested assertions/flow checkpoints passed)"
+  },
+  "seed_data_creation": "No backend data created. Browser-local sirius_profile, sirius_installed, and AIzaTest123 were used in an isolated Playwright context.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Exact flow passed without blocking Google: no sirius_keys initially; open ATLAS via command palette; save AIzaTest123; wait for atlas-authfail-banner; route and place search remain usable; fix-key/back does not loop. Google InvalidKeyMapError and its internal IntersectionObserver page error are expected with this fake key; the HUD had no 'is not defined' error.",
+  "rca_of_the_issue": "The iteration 23 loop was resolved by removing setShowKey(true) from gm_authFailure. Google rejection now only sets authFail, preserving the toolbar/map shell and exposing explicit key correction through atlas-fix-key-btn."
+}

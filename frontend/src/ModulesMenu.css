@@ -1,0 +1,53 @@
+/* © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France). */
+/* Menu déroulant Modules */
+.modmenu {
+  position: absolute;
+  top: 52px;
+  right: 12px;
+  width: 460px;
+  max-height: 72vh;
+  overflow-y: auto;
+  z-index: 9600;
+  background: rgba(4, 16, 26, 0.97);
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  border-radius: 10px;
+  box-shadow: 0 12px 44px rgba(0, 0, 0, 0.6), 0 0 24px rgba(34, 211, 238, 0.15);
+  backdrop-filter: blur(14px);
+  animation: modmenuIn 0.18s ease-out both;
+}
+@keyframes modmenuIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.modmenu-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-bottom: 1px solid rgba(34, 211, 238, 0.18);
+  font-family: "Orbitron", sans-serif; font-size: 11px; letter-spacing: 2px; color: #7df3ff;
+}
+.modmenu-head span { display: inline-flex; align-items: center; gap: 7px; }
+.modmenu-head button { background: none; border: none; color: #7df3ff; cursor: pointer; opacity: 0.7; }
+.modmenu-head button:hover { opacity: 1; }
+.modmenu-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; padding: 10px;
+}
+.modmenu-item {
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px; cursor: pointer;
+  background: rgba(0, 18, 30, 0.5); border: 1px solid rgba(34, 211, 238, 0.14);
+  border-radius: 7px; color: #b9d4de; font-family: "Rajdhani", sans-serif;
+  font-size: 13px; letter-spacing: 0.4px; text-align: left;
+  transition: background-color 0.18s, border-color 0.18s, transform 0.18s;
+}
+.modmenu-item:hover { background: rgba(34, 211, 238, 0.12); border-color: rgba(34, 211, 238, 0.5); transform: translateX(2px); color: #eaf7fb; }
+.modmenu-item.active { border-color: rgba(34, 211, 238, 0.6); color: #7df3ff; }
+.modmenu-item svg { color: #22d3ee; flex: 0 0 auto; }
+.modmenu-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+@media (max-width: 640px) {
+  .modmenu { width: calc(100vw - 24px); right: 12px; }
+  .modmenu-grid { grid-template-columns: 1fr; }
+}
+
+/* Groupes de modules (ergonomie : groupement logique) */
+.modmenu-group { margin-top: 4px; }
+.modmenu-group-title {
+  font-family: "Orbitron", sans-serif; font-size: 8.5px; letter-spacing: 2.4px;
+  color: #f0be50; padding: 7px 10px 3px; border-bottom: 1px solid rgba(240, 190, 80, 0.18);
+  margin-bottom: 4px;
+}

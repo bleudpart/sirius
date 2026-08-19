@@ -1,0 +1,191 @@
+/* © 2026 Daniel Partel – SIRIUS Assistant. THÉMIS# — gestion d'entreprise */
+.th-tabs {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  padding: 10px 26px 0;
+}
+.th-tab {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: "Orbitron", sans-serif; font-size: 10px; letter-spacing: 1.2px;
+  color: #9fc5d6; background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(245, 197, 66, 0.25); border-radius: 8px 8px 0 0;
+  padding: 8px 12px; cursor: pointer;
+  transition: color 0.2s, border-color 0.2s, background-color 0.2s;
+}
+.th-tab:hover { color: #ffe9a8; }
+.th-tab.active {
+  color: #f5c542; border-color: rgba(245, 197, 66, 0.65);
+  background: rgba(245, 197, 66, 0.09);
+  box-shadow: 0 0 12px rgba(245, 197, 66, 0.2);
+}
+.th-body { padding-top: 14px; }
+
+.th-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.th-card {
+  padding: 12px 14px; border: 1px solid rgba(34, 211, 238, 0.3); border-radius: 10px;
+  background: rgba(9, 16, 24, 0.8); display: flex; flex-direction: column; gap: 4px;
+}
+.th-card span { font-family: "Orbitron", sans-serif; font-size: 9px; letter-spacing: 1.4px; color: #7fb6cc; }
+.th-card b { font-family: "Orbitron", sans-serif; font-size: 18px; color: #8be1ff; }
+.th-card.gold { border-color: rgba(245, 197, 66, 0.55); box-shadow: 0 0 16px rgba(245, 197, 66, 0.12); }
+.th-card.gold b { color: #ffd75e; text-shadow: 0 0 12px rgba(245, 197, 66, 0.5); }
+
+.th-alert {
+  padding: 9px 14px; margin-bottom: 12px; border-radius: 8px; font-size: 13px;
+  color: #ffb4a2; background: rgba(180, 60, 30, 0.15); border: 1px solid rgba(255, 120, 80, 0.4);
+}
+.th-section-title {
+  font-family: "Orbitron", sans-serif; font-size: 11px; letter-spacing: 2px;
+  color: #f5c542; margin: 4px 0 10px; padding-bottom: 6px;
+  border-bottom: 1px solid rgba(245, 197, 66, 0.3);
+}
+.th-split { display: grid; grid-template-columns: 330px 1fr; gap: 18px; align-items: start; }
+@media (max-width: 900px) { .th-split { grid-template-columns: 1fr; } }
+.th-form-card {
+  padding: 14px; border: 1px solid rgba(245, 197, 66, 0.35); border-radius: 12px;
+  background: rgba(9, 16, 24, 0.8); display: flex; flex-direction: column; gap: 8px;
+}
+.th-row { display: flex; gap: 8px; }
+.th-input {
+  width: 100%; padding: 8px 10px; font-size: 13px; color: #eafaff;
+  background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(245, 197, 66, 0.3);
+  border-radius: 7px; font-family: "Rajdhani", sans-serif;
+}
+.th-input:focus { outline: none; border-color: #f5c542; box-shadow: 0 0 0 2px rgba(245, 197, 66, 0.15); }
+.th-input.th-qty { width: 84px; flex: none; }
+.th-input.th-status { width: auto; padding: 4px 6px; font-size: 12px; }
+select.th-input option { background: #0a1420; }
+.th-lines { display: flex; flex-direction: column; gap: 6px; }
+.th-line { display: flex; gap: 6px; align-items: center; }
+.th-total { font-size: 14px; color: #9fc5d6; }
+.th-total b { color: #ffd75e; font-family: "Orbitron", sans-serif; }
+.th-btn {
+  font-family: "Orbitron", sans-serif; font-size: 11px; letter-spacing: 2px;
+  padding: 10px; border-radius: 8px; cursor: pointer;
+  color: #ffe9a8; background: transparent; border: 1px solid rgba(245, 197, 66, 0.5);
+  transition: box-shadow 0.2s;
+}
+.th-btn.gold { color: #1a1206; background: linear-gradient(90deg, #f5c542, #ffd75e); border: none; }
+.th-btn:hover:not(:disabled) { box-shadow: 0 0 16px rgba(245, 197, 66, 0.4); }
+.th-btn:disabled { opacity: 0.5; cursor: default; }
+.th-mini-btn {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 4px;
+  font-family: "Orbitron", sans-serif; font-size: 9px; letter-spacing: 1px;
+  color: #8be1ff; background: transparent; border: 1px dashed rgba(34, 211, 238, 0.45);
+  border-radius: 6px; padding: 5px 9px; cursor: pointer;
+}
+.th-icon-btn {
+  display: inline-flex; padding: 5px; color: #9fc5d6; background: transparent;
+  border: 1px solid rgba(245, 197, 66, 0.3); border-radius: 6px; cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+.th-icon-btn:hover { color: #ffe9a8; border-color: #f5c542; }
+.th-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.th-table td { padding: 8px 10px; border-bottom: 1px solid rgba(245, 197, 66, 0.14); color: #cfe6f0; vertical-align: middle; }
+.th-table tr:hover td { background: rgba(245, 197, 66, 0.04); }
+.th-table small { color: #7fb6cc; }
+.th-gold { color: #ffd75e; }
+.th-cyan { color: #8be1ff; }
+.th-actions { display: flex; gap: 6px; }
+.th-badge {
+  font-family: "Orbitron", sans-serif; font-size: 9px; letter-spacing: 1px;
+  padding: 3px 8px; border-radius: 20px; border: 1px solid;
+}
+.s-brouillon { color: #9fc5d6; border-color: rgba(159, 197, 214, 0.5); }
+.s-envoyé { color: #8be1ff; border-color: rgba(34, 211, 238, 0.5); }
+.s-accepté, .s-payé { color: #ffd75e; border-color: rgba(245, 197, 66, 0.6); }
+.s-refusé { color: #ff9a9a; border-color: rgba(255, 120, 80, 0.5); }
+.th-low td { background: rgba(180, 60, 30, 0.08); }
+.th-stock-cell { display: flex; align-items: center; gap: 8px; }
+.th-stock-cell b { color: #ffe9a8; min-width: 24px; text-align: center; }
+.th-compta { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: #9fc5d6; }
+
+.th-templates { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.th-template {
+  border: 1px solid; border-radius: 12px; padding: 14px;
+  background: rgba(9, 16, 24, 0.8); display: flex; flex-direction: column; gap: 8px;
+}
+.th-template p { font-size: 12px; color: #9fc5d6; margin: 0; }
+.th-template-preview { border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 7px; }
+.th-tp-head { font-family: "Orbitron", sans-serif; font-size: 11px; letter-spacing: 2px; padding-bottom: 6px; border-bottom: 1px solid; }
+.th-tp-line { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.12); }
+.th-tp-line.short { width: 60%; }
+.th-tp-total { font-family: "Orbitron", sans-serif; font-size: 11px; text-align: right; }
+.th-byok { max-width: 480px; }
+.th-note { font-size: 12px; color: #8be1ff; margin: 0 0 4px; }
+.th-label { font-family: "Orbitron", sans-serif; font-size: 9px; letter-spacing: 1.4px; color: #d9c98a; display: block; margin-bottom: 4px; }
+
+
+/* Bandeau d'erreur */
+.th-error {
+  display: flex; align-items: center; gap: 8px;
+  margin: 10px 26px 0; padding: 9px 12px; border-radius: 8px;
+  font-size: 13px; color: #ffb4a2;
+  background: rgba(180, 60, 30, 0.16); border: 1px solid rgba(255, 120, 80, 0.45);
+}
+.th-error-close {
+  margin-left: auto; display: inline-flex; padding: 3px;
+  color: #ffb4a2; background: transparent; border: none; cursor: pointer;
+}
+
+/* Pièces comptables — dépôt PDF / OCR */
+.th-pieces { display: flex; flex-direction: column; gap: 14px; }
+.th-drop {
+  display: flex; align-items: center; gap: 14px;
+  padding: 22px 18px; border-radius: 12px; cursor: pointer;
+  color: #ffe9a8; font-size: 13px;
+  border: 1.5px dashed rgba(245, 197, 66, 0.5);
+  background: rgba(245, 197, 66, 0.05);
+  transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
+}
+.th-drop:hover { border-color: #f5c542; background: rgba(245, 197, 66, 0.1); box-shadow: 0 0 18px rgba(245, 197, 66, 0.15); }
+.th-drop.busy { cursor: wait; border-color: rgba(34, 211, 238, 0.6); color: #8be1ff; }
+.th-drop-busy { animation: thPulse 1.2s ease-in-out infinite; }
+@keyframes thPulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+.th-paid td { opacity: 0.55; }
+.th-empty { color: #7fb6cc; font-style: italic; }
+.th-alert-gold { color: #ffe9a8; background: rgba(245, 197, 66, 0.09); border-color: rgba(245, 197, 66, 0.45); }
+.th-alert svg { vertical-align: -2px; margin-right: 4px; }
+.th-section-title svg { vertical-align: -1px; margin-right: 4px; }
+
+/* Badges d'échéance */
+.th-ech {
+  font-family: "Orbitron", sans-serif; font-size: 9px; letter-spacing: 1px;
+  padding: 3px 8px; border-radius: 20px; border: 1px solid rgba(159, 197, 214, 0.5); color: #9fc5d6;
+}
+.th-ech.soon { color: #ffd75e; border-color: rgba(245, 197, 66, 0.6); }
+.th-ech.late { color: #ff9a9a; border-color: rgba(255, 120, 80, 0.6); background: rgba(180, 60, 30, 0.15); }
+/* Historique des envois & relance */
+.th-mailtrace { color: #7fb6cc; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; }
+.th-mailtrace svg { flex: none; }
+.th-late-btn { color: #ffb4a2; border-color: rgba(255, 120, 80, 0.5); }
+.th-late-btn:hover { color: #ff9a9a; border-color: #ff7a50; box-shadow: 0 0 10px rgba(255, 120, 80, 0.3); }
+a.th-icon-btn { text-decoration: none; }
+
+/* Logo holographique de panneau */
+.th-logo { width: 26px; height: 26px; object-fit: contain; filter: drop-shadow(0 0 6px rgba(245, 197, 66, 0.55)); }
+
+/* Courbe mensuelle encaissements / dépenses */
+.th-chart {
+  margin: 6px 0 16px; padding: 12px 14px;
+  border: 1px solid rgba(245, 197, 66, 0.3); border-radius: 12px;
+  background: rgba(9, 16, 24, 0.8);
+}
+.th-chart svg { width: 100%; height: 190px; display: block; }
+.th-chart-legend { display: flex; gap: 18px; margin-bottom: 6px; font-family: "Orbitron", sans-serif; font-size: 9px; letter-spacing: 1.2px; }
+
+/* Modale d'envoi e-mail */
+.th-modal-back {
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(2, 6, 12, 0.72); backdrop-filter: blur(6px);
+}
+.th-modal {
+  width: min(520px, 92vw); padding: 18px;
+  display: flex; flex-direction: column; gap: 9px;
+  border: 1px solid rgba(245, 197, 66, 0.5); border-radius: 14px;
+  background: rgba(9, 16, 24, 0.97);
+  box-shadow: 0 0 40px rgba(245, 197, 66, 0.18);
+}
+textarea.th-input { resize: vertical; min-height: 96px; font-family: "Rajdhani", sans-serif; }
+.th-dash-actions { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.th-dash-actions .th-btn { display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 10px; padding: 8px 14px; }

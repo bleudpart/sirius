@@ -1,0 +1,45 @@
+{
+  "summary": "Audit complet demandé terminé. BACKEND OK : Héphaïstos 19/19 à 100 %, PROMO (10 plans, JPG, ZIP, statut vidéo ready et MP4), MYTHOS (9 personnages, Atlas/Iris et images), DISPLAY/ask initial + suivi 40 minutes, TRAILER. FRONTEND OK : boot/HUD, ouverture Héphaïstos et Atlas depuis le boot, MYTHOS, PROMO, commandes d’ambiance/volume, ATLAS avec et sans clé, questions fichier contextuelles et configuration enregistrée. Aucun échec fonctionnel ni erreur JavaScript bloquante; seul bruit console non bloquant du WebSocket local a été observé.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Chargement du HUD sur la preview publique",
+        "issue": "Le navigateur journalise plusieurs échecs de connexion à ws://localhost:8765 avant de rester en mode démo. Tous les parcours testés restent fonctionnels, mais la console n’est pas propre et une connexion localhost ne peut pas fonctionner pour un utilisateur distant.",
+        "affected_selectors": ["[data-testid='sirius-hud']"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/iteration_25_complete_audit.xml"
+  ],
+  "action_items": [
+    "Rendre l’URL WebSocket configurable par variable d’environnement, ou ne pas tenter ws://localhost:8765 sur un hôte public afin d’éviter les erreurs console non bloquantes.",
+    "Nettoyer les erreurs ESLint ciblées dans PromoPanel.jsx (blocs catch vides) et SiriusSetup.jsx (apostrophes JSX non échappées)."
+  ],
+  "critical_code_review_comments": [
+    "App.js définit WS_URL en dur à ws://localhost:8765 (ligne 52), contrairement à la règle d’URL issue de l’environnement; la preview produit donc des erreurs de connexion répétées avant abandon après quatre tentatives.",
+    "App.js contient 4333 lignes, très au-dessus du seuil de 700 lignes; extraire progressivement BootScreen, le routeur de commandes, l’audio d’ambiance et les états de modules réduirait fortement le risque de régression.",
+    "Lint ciblé : PromoPanel.jsx a 2 erreurs no-empty; SiriusSetup.jsx a 5 erreurs react/no-unescaped-entities. MythosGallery.jsx et AtlasPanel.jsx sont propres.",
+    "Le test de régression historique MYTHOS attendait encore 6 personnages; il a été corrigé à 9 puis revalidé avec le nouvel audit."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/iteration_25.json"
+  ],
+  "success_rate": {
+    "backend": "100% (6/6 tests ciblés passés; diagnostic interne 19/19)",
+    "frontend": "100% fonctionnel (tous les parcours et assertions demandés passés); 1 bruit console WebSocket non bloquant"
+  },
+  "seed_data_creation": "Aucune donnée backend créée. Uniquement localStorage isolé Playwright : profil Daniel, flag installed, préférences audio et clé Google FAKE.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iteration 25 couvre tous les points de la demande. Le fichier backend_test.py contient TestSiriusCompleteAudit; ne pas appeler POST /api/promo/export?force=true. Pour le frontend, poser sirius_profile et sirius_installed avant reload, puis attendre que boot-screen soit hidden après le clic. InvalidKeyMapError est attendu avec gmaps=FAKE et n’empêche plus la recherche ATLAS. Les erreurs ws://localhost:8765 sont non bloquantes mais reproductibles sur la preview.",
+  "rca_of_the_issue": "Le seul défaut observé est le bruit WebSocket : App.js construit le backend HTTP depuis REACT_APP_BACKEND_URL, mais garde WS_URL='ws://localhost:8765'. Sur la preview HTTPS distante, le navigateur tente donc une socket locale inexistante et journalise ERR_CONNECTION_REFUSED jusqu’à la limite de quatre essais. Correction recommandée : variable REACT_APP_WS_URL ou désactivation explicite du connecteur local hors localhost."
+}

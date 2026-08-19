@@ -1,0 +1,37 @@
+{
+  "summary": "Full e2e + backend validation of the new first-launch SETUP screen (profile + per-user API keys). Backend regression + new tests all green (10/10). Frontend flows all pass: setup appears on first launch, fields persist to localStorage (sirius_profile + sirius_keys), HUD opens after submit, connection status correctly toggles between 'IA CLOUD · GROQ' and 'MODE DÉMO' based on the user's Groq key, panel-foot shows 'UTILISATEUR · <NAME>' uppercased, greeting personalises by name, the /api/chat brain returns a French answer that references the user's profession (Marc/pompier) within ~2-15s, edit-profile reopens the same modal pre-filled with a close button and 'ENREGISTRER' label, and demo gating verified by intercepting network: when keys.groq is empty the frontend NEVER hits /api/chat and returns a local canned answer ('Je fonctionne parfaitement...').",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_sirius_brain.py",
+    "/app/backend/tests/test_sirius_profile_and_tts.py",
+    "/app/test_reports/pytest/sirius_brain_results.xml",
+    "/app/test_reports/pytest/profile_tts_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "App.js (line 11): hard-coded WS_URL='ws://localhost:8765' produces console errors in cloud preview on every load (expected, fallback works). Same comment as iteration_2: consider gating with an env flag (e.g. process.env.REACT_APP_ENABLE_LOCAL_WS) to keep the console clean in distributed/cloud builds.",
+    "App.js handleSetupComplete (line 574-581) does NOT include keys in its useCallback dependency array; it captures setProfile/setKeys via useState setters which are stable, so this is OK in practice. No action needed.",
+    "App.js loadKeys/loadProfile at module top (lines 15-20) parse localStorage on every module evaluation; current usage as useState lazy initializers is correct. No action needed.",
+    "SiriusSetup.jsx submit (line 19-26) silently returns if name is empty (required attribute also blocks it). Consider showing a small inline error for accessibility, but not blocking.",
+    "server.py: /api/tts catches all exceptions and returns 500 with str(e). When OpenAI key is invalid the message may leak vendor error text; consider a generic 'Service vocal indisponible' wrapper. Low priority.",
+    "sirius_brain.build_system_prompt (line 42-69) does not sanitize profile fields (could include newlines or prompt-injection-style text from 'interests'). Low risk since the data is local to each user, but worth a comment for the distributor."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_sirius_profile_and_tts.py (new — 5 tests for /api/chat profile personalization and /api/tts EMERGENT fallback)"
+  ],
+  "success_rate": {"backend": "100% (10/10 pytest: 5 chat + 5 profile/tts)", "frontend": "100% (setup-first-run, persistence, personalization, edit-profile, demo-gating all pass)"},
+  "test_credentials": "N/A (no auth). Real Groq key from review_request used in one /api/chat test; left fallback to backend env when keys={}.",
+  "seed_data_creation": "MongoDB sessions prefixed with TEST_<hex> in db.sirius_chats (auto-trimmed to last 16 messages, no cleanup needed).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All localStorage keys in use: 'sirius_profile' (JSON: {name,age,profession,city,gender,interests}), 'sirius_keys' (JSON: {groq,serp,gemini,openai}), 'sirius_eco' ('0'|'1'). Demo gating is enforced FRONT-side in App.js processCommand (line 552: 'else if (keys.groq) { cloudAnswer } else { localAnswer }'); a request-interceptor test confirmed 0 /api/chat calls when keys.groq is empty. The boot screen lasts ~4-5s after the setup overlay closes — UI tests should wait ~5.5s before asserting on the subtitle. Connection status label is computed at App.js line 694: when keys.groq is truthy and not connected to local WS, shows 'IA CLOUD · GROQ'; otherwise 'MODE DÉMO'. /api/tts with empty openai_key DID return a valid base64 mp3 via the EMERGENT_LLM_KEY fallback in this environment.",
+  "rca of the issue": "No bugs — the feature is correctly implemented and integrated end-to-end. Profile + per-user keys flow through localStorage → useState → /api/chat body {keys, profile} → sirius_brain.build_system_prompt → Groq response that personalizes by name and profession (verified: 'Oui Marc, tu es pompier...')."
+}

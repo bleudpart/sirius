@@ -1,0 +1,27 @@
+// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import "./index.css";
+import App from "@/App";
+import AuthGate from "@/AuthGate";
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+// StrictMode retiré : il double l'exécution des effets en développement,
+// ce qui faisait parler chaque module deux fois (écho des voix de présentation).
+root.render(
+  <QueryClientProvider client={queryClient}>
+    <AuthGate>
+      <App />
+    </AuthGate>
+  </QueryClientProvider>,
+);

@@ -1,0 +1,65 @@
+MONGO_URL=mongodb://localhost:27017
+DB_NAME=sirius_db
+JWT_SECRET=sirius_cle_secrete_locale_12345
+EMERGENT_API_KEY=local_mock_key
+
+# ---------------------------------------------------------
+# COMPTE ADMIN & SÉCURITÉ JWT
+# ---------------------------------------------------------
+ADMIN_EMAIL=daniel@sirius.app
+ADMIN_PASSWORD=Sirius#2026!
+JWT_SECRET=10f9a37bd9e6c27efa9c79eb41a0adf31e6629e822cd49d7a89ab0ebc721f3fa
+
+# ---------------------------------------------------------
+# LLM & IA (GEMINI, GROQ, KIMI, EMERGENT, K3)
+# ---------------------------------------------------------
+GEMINI_API_KEY=AQ.Ab8RN6LlOc9UrNp4vDDJRjC0wW2FY5mhO_aZxMfHwo5v3P1ffA
+GROQ_API_KEY=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
+GROQ_KEY=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
+GROQ_LLM_MODEL=llama-3.3-70b-versatile
+GROQ_MODEL=llama-3.3-70b-versatile
+EMERGENT_LLM_KEY=sk-emergent-bF63aD25bB61016Ea5
+KIMI_KEY=sk-2yspzVoeSbyuOoyHo3XGIKcFOH9PyPd5YVnPb8UeaZMRkBYK
+FAL_KEY=outlook-voice-hub:871ba3adebb5e250b748b55113f0d942
+DANIEL_DEV_K3=sk-2yspzVoeSbyuOoyHo3XGIKcFOH9PyPd5YVnPb8UeaZMRkBYK
+K3_ENDPOINT=https://api.moonshot.cn/v1
+K3_MODEL=kimi-k3
+
+# ---------------------------------------------------------
+# SERVICES GOOGLE (AUTH, MAPS, TTS)
+# ---------------------------------------------------------
+GOOGLE_CLIENT_ID=864450514741-i6tmd5ind12k1gs5bctbqt0s9h284vt0.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=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
+GOOGLE_TTS_API_KEY=AIzaSyCg3yAoyUJXkVpfw7K8Qf0TWYVN20L-ANY
+MAPS_PLATFORM_API_KEY=AIzaSyCN6W0odUHI0ey2O3Zf_Wzb-bLBDEsaAA8
+
+# ---------------------------------------------------------
+# SERVICES MICROSOFT (AUTH OAUTH)
+# ---------------------------------------------------------
+MICROSOFT_CLIENT_ID=f4670509-f434-4a94-84de-7024671cc4b0
+MICROSOFT_CLIENT_SECRET=OgM8Q~QmpHPRhjn-24ijISzEs4LnLj-zFr3Y5aft
+MICROSOFT_REDIRECT_URI=https://sirius-hud-redesign.emergent.host/api/auth/callback/microsoft-entra-id
+MICROSOFT_TENANT_ID=a7835699-1a71-4153-915c-0d9d008d06d5
+MS_CLIENT_ID=outlook-voice-hub
+MS_CLIENT_SECRET=Xvb8Q~Xes0ZcDapmYS-k0g6mNLJklN3pnGdk5b4U
+MS_REDIRECT_URI=https://sirius-hud-redesign.emergent.host/api/oauth/outlook/callback
+MS_TOKEN_KEY=PK_kxOs2zaGPy54QOynh7Jss1ssBf4QV9LnLEdbZH8g=
+
+# ---------------------------------------------------------
+# SPOTIFY & SERVICES EXTERNES
+# ---------------------------------------------------------
+SPOTIFY_CLIENT_ID=164ce6c2921b4b4f8d06b012f4316801
+SPOTIFY_CLIENT_SECRET=84349baa9ba945c4bc278ace97d61c4b
+SPOTIFY_REDIRECT_URI=https://sirius-hud-redesign.emergent.host/api/spotify/callback
+ALPHA_VANTAGE_API_KEY=TQ0P349D8L4RS6R8
+EUROPEANA_API_KEY=hemetrick
+NEWS_API_KEY=0c4ee3e589214b59814f8d3a190b09a5
+OPENWEATHER_API_KEY=0877bfaec1a239f085d538f501387d88
+RESTCOUNTRIES_API_KEY=rc_live_ca3a7253ee8847edb1cd45231c7fc783
+SERP_API_KEY=32179df348bf050c18d112b89eb11cd076748356807bbf3b9d86e1007cfb531c
+
+# ---------------------------------------------------------
+# INFRASTRUCTURE & PROXY
+# ---------------------------------------------------------
+INTEGRATION_PROXY_URL=...
+PLAYWRIGHT_BROWSERS_PATH=...

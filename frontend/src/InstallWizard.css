@@ -1,0 +1,132 @@
+/* © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France). */
+/* SIRIUS — Assistant d'installation */
+.iw-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(0, 4, 10, 0.72);
+  display: grid;
+  place-items: center;
+  animation: iwFade 0.35s ease both;
+}
+@keyframes iwFade { from { opacity: 0; } to { opacity: 1; } }
+
+.iw-panel {
+  width: min(620px, 94vw);
+  max-height: 92vh;
+  overflow-y: auto;
+  background: rgba(0, 6, 14, 0.96);
+  border: 1px solid rgba(0, 240, 255, 0.55);
+  box-shadow: 0 0 34px rgba(0, 200, 255, 0.25), 0 24px 60px rgba(0, 0, 0, 0.6);
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+  padding: 18px 22px 16px;
+}
+
+.iw-head { display: flex; align-items: center; justify-content: space-between; }
+.iw-title {
+  font-family: "Orbitron", sans-serif;
+  font-size: 13px;
+  letter-spacing: 4px;
+  color: #aef3ff;
+  text-shadow: 0 0 12px rgba(0, 240, 255, 0.6);
+}
+.iw-icon-btn {
+  background: none;
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  color: #8be9ff;
+  padding: 4px 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.iw-icon-btn:hover { background: rgba(0, 240, 255, 0.14); }
+
+.iw-progress {
+  height: 4px;
+  background: rgba(0, 240, 255, 0.12);
+  margin: 14px 0 16px;
+  overflow: hidden;
+}
+.iw-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #00c8ff, #7dffd4);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.7);
+  transition: width 0.5s ease;
+}
+
+.iw-steps { display: flex; flex-direction: column; gap: 4px; }
+.iw-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  color: #6fa9be;
+  transition: border-color 0.25s, background-color 0.25s;
+}
+.iw-step.current { border-color: rgba(0, 240, 255, 0.45); background: rgba(0, 240, 255, 0.06); }
+.iw-step.ok { color: #9ff3d8; }
+.iw-step.error { color: #ff9d9d; }
+.iw-step-icon { display: grid; place-items: center; }
+.iw-step-label {
+  flex: 1;
+  font-family: "Orbitron", sans-serif;
+  font-size: 8.5px;
+  letter-spacing: 2.5px;
+}
+.iw-step-status .ok { color: #7dffd4; }
+.iw-step-status .err { color: #ff7a7a; }
+.iw-spin { animation: iwSpin 1s linear infinite; color: #67e8f9; }
+@keyframes iwSpin { to { transform: rotate(360deg); } }
+
+.iw-message {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-left: 2px solid #00c8ff;
+  background: rgba(0, 30, 48, 0.5);
+}
+.iw-message.error { border-left-color: #ff5a5a; background: rgba(60, 10, 10, 0.35); }
+.iw-message.ok { border-left-color: #33ffbb; }
+.iw-message p { color: #d5f6ff; font-size: 12.5px; line-height: 1.5; margin: 0; }
+
+.iw-actions { display: flex; gap: 8px; margin-top: 10px; }
+.iw-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(0, 24, 40, 0.85);
+  border: 1px solid rgba(0, 240, 255, 0.45);
+  color: #8be9ff;
+  font-family: "Orbitron", sans-serif;
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  padding: 6px 11px;
+  cursor: pointer;
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+.iw-btn:hover { background: rgba(0, 240, 255, 0.16); box-shadow: 0 0 12px rgba(0, 240, 255, 0.35); }
+.iw-btn.ghost { border-color: rgba(120, 160, 180, 0.4); color: #9fc4d4; }
+.iw-btn.activate {
+  border-color: rgba(0, 255, 170, 0.6);
+  color: #7dffd4;
+  box-shadow: 0 0 14px rgba(0, 255, 170, 0.25);
+}
+.iw-btn.activate:hover { background: rgba(0, 255, 170, 0.15); }
+
+.iw-json {
+  margin-top: 12px;
+  max-height: 150px;
+  overflow: auto;
+  background: rgba(0, 12, 20, 0.9);
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  color: #7de8c9;
+  font-size: 10.5px;
+  padding: 8px 10px;
+  white-space: pre-wrap;
+}
+
+.iw-foot {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 14px;
+}

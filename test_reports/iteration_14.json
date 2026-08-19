@@ -1,0 +1,93 @@
+{
+  "summary": "Retest ciblé SIRIUS sur l’URL publique. Backend: 13/13 tests passent, dont les 5 contrats corrigés Packager/Install/Locus/Heracles. Frontend: setup, menu install/scripts, Packager build, Install, Locus géocodage+météo, Heracles résultat+PDF, Argus, Mythos, Trailer, Memory Manager, Scripts bibliothèque, Suggestions, DISPLAY heure, PTT, HACCP et badge Groq passent. Quatre intégrations secondaires restent cassées: route LOCUS et analyse Scripts provoquent un écran runtime; téléchargement Packager est invalide; les results[] Heracles email ne sont pas rendus.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/packager/installer",
+        "issue": "Retourne 404 alors que PackagerPanel expose deux liens visibles vers cet installateur universel. Le ZIP fonctionnel reste disponible via /api/packager/download."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "LocusPanel — onglet ITINÉRAIRE",
+        "issue": "Paris → Lyon déclenche TypeError: Cannot read properties of undefined (reading 'from') et l’écran Uncaught runtime errors.",
+        "selector": "[data-testid='locus-route-btn']",
+        "priority": "CRITICAL"
+      },
+      {
+        "component": "ScriptInstaller — analyse",
+        "issue": "Après analyse d’un script valide, le rendu déclenche TypeError: Cannot read properties of undefined (reading 'riskLevel') et l’écran Uncaught runtime errors.",
+        "selector": "[data-testid='scripts-analyze-btn']",
+        "priority": "CRITICAL"
+      },
+      {
+        "component": "PackagerPanel — résultat",
+        "issue": "Le lien Télécharger SIRIUS_INSTALLER.zip pointe vers https://…undefined et la note affichée est vide.",
+        "selector": "[data-testid='packager-download-btn']",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "HERACLES email",
+        "issue": "L’API renvoie 3 entrées result.results mais aucune n’est affichée. Le panneau rend à la place les anciens champs domain/hasMX/disposable absents du contrat, avec DOMAINE vide et des valeurs NON non étayées.",
+        "affected_selectors": [
+          "[data-testid='heracles-check-btn']",
+          "[data-testid='heracles-email']",
+          "[data-testid='heracles-result']"
+        ]
+      },
+      {
+        "flow": "Packager téléchargement",
+        "issue": "PackagerPanel lit p.downloadUrl/p.note, absents de /api/packager/build; l’URL valide se trouve actuellement dans parameters.packages[0].url.",
+        "affected_selectors": [
+          "[data-testid='packager-download-btn']",
+          "[data-testid='packager-note']",
+          "[data-testid='packager-installer-btn-result']"
+        ]
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "Packager et Heracles desktop 1920x1080",
+        "issues": [
+          "Plusieurs métadonnées et libellés sont rendus très petits (environ 8–10 px), ce qui réduit la lisibilité malgré un contraste global correct."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/iteration_14_restored_modules.xml"
+  ],
+  "action_items": [
+    "Dans LocusPanel, afficher from_point.formatted/to_point.formatted ou ajouter parameters.from/to au contrat; ne jamais déréférencer routeOut.parameters sans garde.",
+    "Aligner ScriptInstaller sur la réponse actuelle {risk, summary, dangers, language, requiresConfirmation, actionToken}, ou restaurer parameters côté API.",
+    "Dans PackagerPanel, utiliser parameters.packages[0].url (ou renvoyer parameters.downloadUrl et note); retirer/implémenter les liens /api/packager/installer.",
+    "Adapter HeraclesPanel au contrat result{type,summary,results[],validFormat}; afficher results[] et ne pas présenter domain/MX/disposable sans données serveur."
+  ],
+  "critical_code_review_comments": [
+    "LocusPanel.jsx lignes 189–191 attend routeOut.parameters.from/to alors que modules_api.py /locus/route renvoie uniquement from_point/to_point et result; c’est la cause directe du crash reproduit.",
+    "ScriptInstaller.jsx définit p=analysis.parameters puis déréférence p.riskLevel/scriptType/script, mais /scripts/analyze renvoie ces informations au niveau racine avec des noms différents; le premier rendu post-analyse crashe.",
+    "PackagerPanel.jsx lit p.note et p.downloadUrl, absents de packager_build; les contrôles semblent disponibles mais mènent à une ressource invalide.",
+    "HeraclesPanel conserve un ancien modèle email (domain, hasMX, disposable, mxRecords) incompatible avec le contrat corrigé; il affiche des conclusions négatives par défaut sans preuve backend.",
+    "App.js compte environ 3969 lignes, bien au-delà du seuil de 700; extraire le registre/modules et les workflows réduirait les dérives de contrat inter-modules."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/iteration_14_restored_modules.xml",
+    "/app/test_reports/iteration_14.json"
+  ],
+  "success_rate": {
+    "backend": "100% (13/13)",
+    "frontend": "82% des parcours vérifiés; tous les smokes demandés passent, 4 défauts d’intégration/edge flows reproduits"
+  },
+  "seed_data_creation": "Un script TEST_restored_* a été créé puis supprimé par l’API. Les rapports ARGUS TEST_restored_modules (2, dont un ancien) ont été supprimés directement de MongoDB; aucune NC TEST_ ni script TEST_ résiduel. Suggestions restaurées à equilibre et mode système à normal.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Rejouer d’abord LOCUS itinéraire Paris→Lyon et Scripts analyse: les deux doivent produire un résultat sans pageerror ni overlay. Vérifier ensuite que packager-download-btn se termine par /api/packager/download et que le clic retourne un ZIP, puis comparer chaque result.results Heracles avec le texte UI. Le clic standard sur sirius-title est intercepté par le canvas; ce n’est pas requis pour PTT, tester Espace avec le focus sur un bouton/non-input. Bruit console connu: ws://localhost:8765.",
+  "rca_of_the_issue": "Les cinq réponses backend ciblées sont correctes, mais trois composants conservent des lectures de contrats antérieurs. LOCUS déréférence parameters.from/to inexistant; Scripts déréférence analysis.parameters inexistant; Packager utilise downloadUrl/note inexistants. HERACLES reçoit bien le nouveau results[] mais sa branche email continue de rendre l’ancien schéma. Reproductions: ouvrir le module depuis MODULES, lancer l’action correspondante, puis observer le pageerror/DOM décrit."
+}

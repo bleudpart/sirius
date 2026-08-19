@@ -1,0 +1,64 @@
+{
+  "summary": "Régression backend exécutée sur l’URL publique: 16/20 tests passent. Les corrections iteration_35 sont confirmées pour le lockout email-only, l’auth obligatoire et l’isolation PUT/DELETE de local-memory, le seed admin, ainsi que l’isolation A/B de /chat, /chat/stream et /chat/reset. Stripe test-mode, statut, PDF ReportLab et rappel SMTP passent. Quatre contrôles sécurité échouent: le GET public CORS reste wildcard, et chat reset, CRM Agora et transactions de paiement sont accessibles sans authentification.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "GET public /api/auth/me avec Origin",
+        "issue": "La réponse réelle publique retourne Access-Control-Allow-Origin: * avec Access-Control-Allow-Credentials: true au lieu de refléter l’origine. Le backend direct répond correctement; Cloudflare/ingress écrase donc aussi les GET réels, pas seulement OPTIONS. Cette combinaison est rejetée par les navigateurs en mode credentials.",
+        "priority": "HIGH"
+      },
+      {
+        "endpoint": "POST /api/chat/reset",
+        "issue": "Sans cookie, la route retourne 200. /chat, /chat/stream et /chat/reset utilisent resolve_user_id et son fallback partagé 'legacy' au lieu de require_user; les chats authentifiés A/B sont bien isolés, mais les routes restent publiquement utilisables.",
+        "priority": "HIGH"
+      },
+      {
+        "endpoint": "GET /api/agora/deals",
+        "issue": "Sans cookie, la route retourne 200 et expose le CRM existant. Les routes Agora n’appellent pas require_user et les documents ne sont pas filtrés par user_id; l’isolation CRM annoncée n’est pas implémentée.",
+        "priority": "CRITICAL"
+      },
+      {
+        "endpoint": "GET /api/payments/transactions et pipeline /api/payments/*",
+        "issue": "Sans cookie, GET transactions retourne 200 avec noms, emails, montants et checkout_url. Le test a aussi créé une session Stripe et envoyé un rappel via /payments/remind sans authentification. payments_api.py n’applique ni require_user ni filtre user_id.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration36_auth_payments.py",
+    "/app/test_reports/pytest/iteration_36_auth_payments.xml"
+  ],
+  "action_items": [
+    "Corriger la configuration Cloudflare/ingress afin que les réponses GET publiques conservent ACAO=<Origin> avec Allow-Credentials=true; le backend direct est déjà correct.",
+    "Remplacer resolve_user_id par require_user sur /chat, /chat/stream et /chat/reset si les chats anonymes legacy ne sont plus autorisés.",
+    "Ajouter require_user et user_id à toutes les opérations Agora/CRM; filtrer chaque lecture, création, mise à jour et suppression par propriétaire.",
+    "Ajouter require_user et user_id à toutes les transactions Stripe/PDF/rappels; vérifier l’appartenance du deal et de la session avant statut, reçu ou email.",
+    "Rejouer la suite iteration_36 après les corrections de sécurité et de proxy CORS."
+  ],
+  "critical_code_review_comments": [
+    "modules_api.py:1031-1079 manipule agora_deals globalement sans Request, require_user ni user_id; tout client public peut lire/modifier/supprimer le CRM.",
+    "payments_api.py:41-209 expose checkout, statuts, transactions, reçus et rappels sans authentification ni ownership; les documents payment_transactions ne stockent pas user_id.",
+    "server.py:86-198 et 688-693 conservent resolve_user_id, qui transforme un JWT absent/invalide en 'legacy'; ceci maintient un espace chat anonyme partagé et permet la consommation publique du LLM.",
+    "server.py dépasse 2300 lignes et modules_api.py 1700 lignes; scinder auth/chat/CRM/paiements faciliterait l’application cohérente des contrôles require_user.",
+    "allow_origin_regex='.*' avec cookies SameSite=None autorise conceptuellement toute origine si le proxy cesse de remplacer ACAO; préférer une liste d’origines frontend de confiance."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration36_auth_payments.py",
+    "/app/test_reports/iteration_36.json"
+  ],
+  "success_rate": {
+    "backend": "80% (16/20)",
+    "frontend": "Non testé (backend only demandé)"
+  },
+  "seed_data_creation": "Trois comptes TEST, faits SQLite, historiques chat A/B, un deal Stripe test, transactions PDF/rappel et compteurs de lockout ont été créés puis supprimés. MongoDB vérifié à 0 résidu TEST; aucune transaction réelle n’a été effectuée. Une session Stripe test reste uniquement côté Stripe, sans paiement.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Les cinq régressions iteration_35 sont vertes sauf le CORS public: curl prouve que localhost:8001 reflète l’origine, tandis que l’URL publique GET renvoie ACAO:* via Cloudflare/Google. Les chats A/B avec session_id identique restent séparés pour standard et SSE; reset B préserve A. Stripe a retourné une vraie URL cs_test, le PDF commence par %PDF et le rappel a été capturé par un SMTP local.",
+  "rca_of_the_issue": "CORS: l’ingress/Cloudflare remplace les en-têtes même sur les réponses GET réelles, contrairement à l’hypothèse limitée aux OPTIONS. Authz: les correctifs ont été appliqués à local-memory et au préfixage chat, mais chat conserve resolve_user_id et les routeurs Agora/paiements n’intègrent aucun contexte utilisateur; les collections sont donc globales."
+}

@@ -1,0 +1,52 @@
+/* © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France). */
+/* Bloc À propos / Informations légales — minimaliste, professionnel */
+.about-panel {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(440px, 92vw);
+  z-index: 96;
+  background: rgba(3, 14, 24, 0.96);
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  border-radius: 8px;
+  padding: 26px 28px 24px;
+  backdrop-filter: blur(12px);
+}
+.about-close {
+  position: absolute; top: 10px; right: 10px;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 6px; cursor: pointer;
+  color: #9fd3e8; background: transparent; border: 1px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+}
+.about-close:hover { color: #eafaff; border-color: rgba(34, 211, 238, 0.5); }
+.about-title {
+  margin: 0 0 12px;
+  font-family: "Orbitron", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: #eafaff;
+}
+.about-text {
+  margin: 0;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #bfd7e2;
+}
+
+/* Footer global — bandeau très fin, discret, non intrusif */
+.sirius-footer {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 4;
+  text-align: center;
+  padding: 3px 0 4px;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  color: rgba(159, 197, 214, 0.45);
+  pointer-events: none;
+}

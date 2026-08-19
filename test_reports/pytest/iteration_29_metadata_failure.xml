@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="0.536" timestamp="2026-08-07T16:00:43.301683+00:00" hostname="agent-env-2f24648e-0a4e-4f4a-8244-582e9ca6975c"><testcase classname="backend.tests.test_agora_news_mythos.TestMythosAgora" name="test_all_13_characters_have_bio_and_capacities" time="0.421"><failure message="AssertionError: Missing bio=['LOCUS#', 'HÉPHAÏSTOS#']; missing capacities=['LOCUS#', 'HÉPHAÏSTOS#']&#10;assert (not ['LOCUS#', 'HÉPHAÏSTOS#'])">backend/tests/test_agora_news_mythos.py:76: in test_all_13_characters_have_bio_and_capacities
+    assert not missing_bio and not missing_capacites, (
+E   AssertionError: Missing bio=['LOCUS#', 'HÉPHAÏSTOS#']; missing capacities=['LOCUS#', 'HÉPHAÏSTOS#']
+E   assert (not ['LOCUS#', 'HÉPHAÏSTOS#'])</failure></testcase></testsuite></testsuites>

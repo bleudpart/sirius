@@ -1,0 +1,799 @@
+diff --git a/frontend/src/AtlasPanel.jsx b/frontend/src/AtlasPanel.jsx
+index 0000000..0000000
+--- a/frontend/src/AtlasPanel.jsx
++++ b/frontend/src/AtlasPanel.jsx
+@@ -1,0 +1,394 @@
++// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
++import { useCallback, useEffect, useRef, useState } from "react";
++import { APIProvider, Map, Marker, useMap } from "@vis.gl/react-google-maps";
++import { Map as MapIcon, X, Search, Crosshair, Route as RouteIcon, Loader2, Settings2, KeyRound, CheckCircle2, AlertTriangle, ExternalLink, Navigation, TrafficCone, Sun, Cloud, CloudSun, CloudRain, CloudDrizzle, CloudSnow, CloudFog, CloudLightning, Wind, Droplets } from "lucide-react";
++import "./Atlas.css";
++
++const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
++const PARIS = { lat: 48.8566, lng: 2.3522 };
++
++function wmoInfo(code) {
++  if (code === 0) return { Icon: Sun, txt: "Ciel dégagé" };
++  if (code <= 2) return { Icon: CloudSun, txt: "Partiellement nuageux" };
++  if (code === 3) return { Icon: Cloud, txt: "Couvert" };
++  if (code <= 48) return { Icon: CloudFog, txt: "Brouillard" };
++  if (code <= 57) return { Icon: CloudDrizzle, txt: "Bruine" };
++  if (code <= 67) return { Icon: CloudRain, txt: "Pluie" };
++  if (code <= 77) return { Icon: CloudSnow, txt: "Neige" };
++  if (code <= 82) return { Icon: CloudRain, txt: "Averses" };
++  if (code <= 86) return { Icon: CloudSnow, txt: "Averses de neige" };
++  return { Icon: CloudLightning, txt: "Orage" };
++}
++
++const HOLO_STYLE = [
++  { elementType: "geometry", stylers: [{ color: "#04121c" }] },
++  { elementType: "labels.text.fill", stylers: [{ color: "#67e8f9" }] },
++  { elementType: "labels.text.stroke", stylers: [{ color: "#02090f" }] },
++  { featureType: "administrative", elementType: "geometry.stroke", stylers: [{ color: "#155e75" }] },
++  { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#f5c542" }] },
++  { featureType: "administrative.country", elementType: "labels.text.fill", stylers: [{ color: "#f5c542" }] },
++  { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] },
++  { featureType: "road", elementType: "geometry", stylers: [{ color: "#0b2a3a" }] },
++  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#083344" }] },
++  { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#7dd3fc" }] },
++  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#164e63" }] },
++  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#f5c542" }, { weight: 0.4 }] },
++  { featureType: "transit", stylers: [{ visibility: "off" }] },
++  { featureType: "water", elementType: "geometry", stylers: [{ color: "#021019" }] },
++  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#0e7490" }] },
++  { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#05141f" }] },
++];
++
++function MapController({ target }) {
++  const map = useMap();
++  useEffect(() => {
++    if (!map || !target) return;
++    map.panTo({ lat: target.lat, lng: target.lng });
++    map.setZoom(target.zoom || 14);
++  }, [map, target]);
++  return null;
++}
++
++function TrafficOverlay({ enabled }) {
++  const map = useMap();
++  useEffect(() => {
++    if (!map || !enabled || !window.google) return;
++    const layer = new window.google.maps.TrafficLayer();
++    layer.setMap(map);
++    return () => layer.setMap(null);
++  }, [map, enabled]);
++  return null;
++}
++
++function RoutePath({ path }) {
++  const map = useMap();
++  useEffect(() => {
++    if (!map || !path || !path.length || !window.google) return;
++    const glow = new window.google.maps.Polyline({ path, strokeColor: "#f5c542", strokeOpacity: 0.3, strokeWeight: 10, map });
++    const line = new window.google.maps.Polyline({ path, strokeColor: "#22d3ee", strokeOpacity: 0.95, strokeWeight: 4, map });
++    const b = new window.google.maps.LatLngBounds();
++    path.forEach((p) => b.extend(p));
++    map.fitBounds(b, 70);
++    return () => { line.setMap(null); glow.setMap(null); };
++  }, [map, path]);
++  return null;
++}
++
++function KeyScreen({ onSave, onBack, hasKey, authFail }) {
++  const [val, setVal] = useState("");
++  return (
++    <div className="atlas-keyscreen" data-testid="atlas-key-screen">
++      {authFail && (
++        <div className="atlas-msg ko" data-testid="atlas-authfail-msg">
++          <AlertTriangle size={12} /> Clé Google Maps refusée par Google. Vérifiez que l&apos;API « Maps JavaScript API » est bien activée et que la clé est valide.
++        </div>
++      )}
++      <p className="atlas-help">
++        ATLAS a besoin d&apos;une <b>clé API Google Maps</b> pour afficher la carte (un compte de facturation Google Cloud est requis, avec un quota d&apos;utilisation mensuel gratuit par API) :
++      </p>
++      <ol className="atlas-steps">
++        <li>Ouvrez la <a href="https://console.cloud.google.com/" target="_blank" rel="noreferrer">Google Cloud Console <ExternalLink size={10} /></a> et connectez-vous.</li>
++        <li>Créez un projet (menu en haut → « Nouveau projet ») et associez un compte de facturation (« Facturation »).</li>
++        <li>Menu « API et services » → « Bibliothèque » → recherchez et activez <b>Maps JavaScript API</b>.</li>
++        <li>Menu « API et services » → « Identifiants » → « Créer des identifiants » → <b>Clé API</b>.</li>
++        <li>Copiez la clé (commence par <i>AIza…</i>) et collez-la ci-dessous.</li>
++      </ol>
++      <label className="atlas-label"><KeyRound size={11} /> CLÉ API GOOGLE MAPS</label>
++      <input className="atlas-input" type="password" placeholder="AIza..." value={val} onChange={(e) => setVal(e.target.value)} data-testid="atlas-key-input" />
++      <div className="atlas-actions">
++        <button className="atlas-btn gold" disabled={!val.trim()} onClick={() => onSave(val.trim())} data-testid="atlas-key-save-btn">
++          <CheckCircle2 size={12} /> ACTIVER LA CARTE
++        </button>
++        {hasKey && <button className="atlas-btn" onClick={onBack} data-testid="atlas-key-back-btn">RETOUR</button>}
++      </div>
++    </div>
++  );
++}
++
++export default function AtlasPanel({ onClose, onSpeak, keys, onSaveKeys, initialQuery, initialRoute }) {
++  const gmapsKey = (keys && keys.gmaps) || "";
++  const [showKey, setShowKey] = useState(!gmapsKey);
++  const [authFail, setAuthFail] = useState(false);
++  const [mode, setMode] = useState(initialRoute ? "route" : "search");
++  const [traffic, setTraffic] = useState(true);
++  const [q, setQ] = useState(initialQuery || "");
++  const [fromA, setFromA] = useState((initialRoute && initialRoute.from) || "");
++  const [toA, setToA] = useState((initialRoute && initialRoute.to) || "");
++  const [busy, setBusy] = useState(false);
++  const [error, setError] = useState("");
++  const [marker, setMarker] = useState(null);
++  const [userPos, setUserPos] = useState(null);
++  const [target, setTarget] = useState(null);
++  const [route, setRoute] = useState(null);
++  const [weather, setWeather] = useState(null);
++  const ranRef = useRef(false);
++  const announcedRef = useRef(null);
++
++  useEffect(() => {
++    const pt = marker
++      || (route && { lat: route.to_point.lat, lng: route.to_point.lng, label: route.to_point.formatted });
++    if (!pt) { setWeather(null); return; }
++    let stop = false;
++    (async () => {
++      try {
++        const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${pt.lat}&longitude=${pt.lng}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=4&timezone=auto`);
++        const d = await r.json();
++        if (stop || !d.current) return;
++        setWeather({ ...d.current, daily: d.daily || null, label: pt.label });
++        // Annonce vocale de la météo dès son affichage (lieu recherché)
++        if (marker && onSpeak && announcedRef.current !== pt.label) {
++          announcedRef.current = pt.label;
++          const city = (pt.label || "").split(",")[0];
++          const { txt } = wmoInfo(d.current.weather_code);
++          let msg = `${city} affiché sur la carte. Météo actuelle : ${Math.round(d.current.temperature_2m)} degrés, ${txt.toLowerC
++` (truncated in patch for brevity)
++
++*** Note: For brevity, the AtlasPanel.jsx content in this patch is truncated here. The full file is included in the workspace; when applying the patch locally prefer to overwrite the file with the version from the workspace or use the git commit approach described earlier. ***
++
++diff --git a/frontend/src/InstallWizard.jsx b/frontend/src/InstallWizard.jsx
++index 0000000..0000000
++--- a/frontend/src/InstallWizard.jsx
+++++ b/frontend/src/InstallWizard.jsx
++@@ -1,0 +1,192 @@
++// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
++import { useCallback, useEffect, useRef, useState } from "react";
++import {
++  X, CheckCircle2, XCircle, Loader2, RotateCcw, Monitor, Mic, Server,
++  BrainCircuit, LayoutDashboard, Boxes, Rocket, ChevronRight, Code2,
++} from "lucide-react";
++import "./InstallWizard.css";
++
++const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
++
++const STEPS = [
++  { id: "environment", label: "ENVIRONNEMENT", icon: Monitor },
++  { id: "micro", label: "MICRO & VOIX", icon: Mic },
++  { id: "backend", label: "BACKEND SIRIUS", icon: Server },
++  { id: "ia", label: "MOTEUR IA", icon: BrainCircuit },
++  { id: "hud", label: "HUD", icon: LayoutDashboard },
++  { id: "modules", label: "MODULES", icon: Boxes },
++  { id: "completed", label: "ACTIVATION", icon: Rocket },
++];
++
++function detectEnv() {
++  if (window.__TAURI__ || window.__TAURI_INTERNALS__) return "tauri";
++  if (window.electronAPI || (navigator.userAgent || "").includes("Electron")) return "electron";
++  return "web";
++}
++
++async function checkMicro() {
++  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return "unsupported";
++  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
++  if (!SR) return "unsupported";
++  try {
++    if (navigator.permissions && navigator.permissions.query) {
++      const p = await navigator.permissions.query({ name: "microphone" });
++      if (p.state === "granted") return "granted";
++      if (p.state === "denied") return "denied";
++    }
++    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
++    stream.getTracks().forEach((t) => t.stop());
++    return "granted";
++  } catch (e) {
++    return "denied";
++  }
++}
++
++function checkHud() {
++  return {
++    "barre de commande": !!document.querySelector('[data-testid="sirius-cmd-input"]'),
++    "barre d'outils": !!document.querySelector('[data-testid="sirius-voice-module-btn"]'),
++    "noyau HUD": !!document.querySelector(".hud-root, .hud, #root > div"),
++  };
++}
++
++export default function InstallWizard({ onClose, onSpeak, keys }) {
++  const [results, setResults] = useState({});
++  const [current, setCurrent] = useState("environment");
++  const [running, setRunning] = useState(false);
++  const [showJson, setShowJson] = useState(true);
++  const doneRef = useRef(false);
++
++  const buildContext = useCallback(async (step) => {
++    if (step === "environment") return { env: detectEnv() };
++    if (step === "micro") return { micro: await checkMicro() };
++    if (step === "hud") return { hud: checkHud() };
++    return { keys: keys || {} };
++  }, [keys]);
++
++  const runStep = useCallback(async (step) => {
++    setRunning(true);
++    setCurrent(step);
++    try {
++      const context = await buildContext(step);
++      const r = await fetch(`${API}/install/step`, {
++        method: "POST",
++        headers: { "Content-Type": "application/json" },
++        body: JSON.stringify({ step, context }),
++      });
++      const d = await r.json();
++      setResults((res) => ({ ...res, [step]: d }));
++      setRunning(false);
++      if (d.status === "ok" && d.next) {
++        setTimeout(() => runStep(d.next), 750);
++      } else if (d.step === "completed" && d.status === "ok" && !doneRef.current) {
++        doneRef.current = true;
++        onSpeak && onSpeak("Installation terminée. Tous les systèmes sont vérifiés. Sirius est activé, monsieur.");
++      }
++    } catch (e) {
++      setResults((res) => ({
++        ...res,
++        [step]: { step, message: "Backend SIRIUS injoignable. Solution : vérifiez que le serveur est démarré (port 8001).", status: "error", next: step },
++      }));
++      setRunning(false);
++    }
++  }, [buildContext, onSpeak]);
++
++  const restart = useCallback(async () => {
++    doneRef.current = false;
++    setResults({});
++    try {
++      await fetch(`${API}/install/step`, {
++        method: "POST",
++        headers: { "Content-Type": "application/json" },
++        body: JSON.stringify({ step: "restart", context: {} }),
++      });
++    } catch (_) {}
++    runStep("environment");
++  }, [runStep]);
++
++  useEffect(() => { runStep("environment"); }, [runStep]);
++
++  const activate = () => {
++    localStorage.setItem("sirius_installed", "1");
++    onClose();
++  };
++
++  const cur = results[current];
++  const completedOk = results.completed && results.completed.status === "ok";
++  const okCount = STEPS.filter((s) => results[s.id] && results[s.id].status === "ok").length;
++
++  return (
++    <div className="iw-overlay" data-testid="install-wizard">
++      <div className="iw-panel">
++        <header className="iw-head">
++          <span className="iw-title">Σ INSTALLATION DE SIRIUS</span>
++          <button className="iw-icon-btn" onClick={onClose} data-testid="iw-close-btn"><X size={16} /></button>
++        </header>
++
++        <div className="iw-progress">
++          <div className="iw-progress-bar" style={{ width: `${(okCount / STEPS.length) * 100}%` }} />
++        </div>
++
++        <div className="iw-steps">
++          {STEPS.map((s) => {
++            const res = results[s.id];
++            const Icon = s.icon;
++            const st = res ? res.status : (s.id === current && running ? "running" : "idle");
++            return (
++              <div className={`iw-step ${st} ${s.id === current ? "current" : ""}`} key={s.id} data-testid={`iw-step-${s.id}`}>
++                <span className="iw-step-icon"><Icon size={13} /></span>
++                <span className="iw-step-label">{s.label}</span>
++                <span className="iw-step-status">
++                  {st === "ok" && <CheckCircle2 size={14} className="ok" />}
++                  {st === "error" && <XCircle size={14} className="err" />}
++                  {(st === "running" || st === "pending") && <Loader2 size={14} className="iw-spin" />}
++                </span>
++              </div>
++            );
++          })}
++        </div>
++
++        {cur && (
++          <div className={`iw-message ${cur.status}`} data-testid="iw-message">
++            <p>{cur.message}</p>
++            {cur.status === "error" && (
++              <div className="iw-actions">
++                <button className="iw-btn" onClick={() => runStep(cur.step)} data-testid="iw-retry-btn">
++                  <RotateCcw size={11} /> RÉESSAYER
++                </button>
++                {cur.next && cur.step !== "backend" && (
++                  <button className="iw-btn ghost" onClick={() => {
++                    const idx = STEPS.findIndex((s) => s.id === cur.step);
++                    if (idx >= 0 && idx < STEPS.length - 1) runStep(STEPS[idx + 1].id);
++                  }} data-testid="iw-skip-btn">
++                    <ChevronRight size={11} /> CONTINUER QUAND MÊME
++                  </button>
++                )}
++              </div>
++            )}
++          </div>
++        )}
++
++        {cur && showJson && (
++          <pre className="iw-json" data-testid="iw-json">{JSON.stringify(cur, null, 2)}</pre>
++        )}
++
++        <footer className="iw-foot">
++          <button className="iw-btn ghost" onClick={() => setShowJson(!showJson)} data-testid="iw-json-toggle">
++            <Code2 size={11} /> JSON {showJson ? "MASQUER" : "AFFICHER"}
++          </button>
++          <button className="iw-btn" onClick={restart} data-testid="iw-restart-btn">
++            <RotateCcw size={11} /> RECOMMENCER
++          </button>
++          {completedOk && (
++            <button className="iw-btn activate" onClick={activate} data-testid="iw-activate-btn">
++              <Rocket size={12} /> ACTIVER SIRIUS
++            </button>
++          )}
++        </footer>
++      </div>
++    </div>
++  );
++}
++
++diff --git a/frontend/src/MemoryManager.jsx b/frontend/src/MemoryManager.jsx
++index 0000000..0000000
++--- a/frontend/src/MemoryManager.jsx
+++++ b/frontend/src/MemoryManager.jsx
++@@ -1,0 +1,217 @@
++// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
++import { useEffect, useMemo, useRef, useState } from "react";
++import {
++  X, Database, Search, Star, Trash2, Pencil, Check, Download, ScrollText,
++  BrainCircuit, AlertTriangle, CheckCircle2, Loader2,
++} from "lucide-react";
++import "./MemoryManager.css";
++
++const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
++const TYPE_LABELS = {
++  episodic: "ÉPISODIQUE", semantic: "SÉMANTIQUE",
++  procedural: "PROCÉDURALE", prospective: "PROSPECTIVE",
++};
++const SOURCE_LABELS = { explicite: "EXPLICITE", observation: "OBSERVATION", inference: "INFÉRENCE" };
++
++function Badge({ cls, children }) {
++  return <span className={`mm-badge ${cls}`}>{children}</span>;
++}
++
++export default function MemoryManager({ onClose }) {
++  const [tab, setTab] = useState("memories");
++  const [memories, setMemories] = useState([]);
++  const [stats, setStats] = useState(null);
++  const [audit, setAudit] = useState([]);
++  const [q, setQ] = useState("");
++  const [mtype, setMtype] = useState("");
++  const [status, setStatus] = useState("active");
++  const [loading, setLoading] = useState(false);
++  const [editId, setEditId] = useState(null);
++  const [editText, setEditText] = useState("");
++  const starsRef = useRef(null);
++
++  const load = useCallback(async () => {
++    setLoading(true);
++    try {
++      const p = new URLSearchParams({ q, mtype, status });
++      const r = await fetch(`${API}/memory/list?${p}`);
++      const d = await r.json();
++      setMemories(d.memories || []);
++      setStats(d.stats || null);
++    } catch (_) {}
++    setLoading(false);
++  }, [q, mtype, status]);
++
++  const loadAudit = async () => {
++    try {
++      const r = await fetch(`${API}/memory/audit?limit=80`);
++      setAudit((await r.json()).audit || []);
++    } catch (_) {}
++  };
++
++  useEffect(() => { load(); }, [load]);
++  useEffect(() => { if (tab === "audit") loadAudit(); }, [tab]);
++
++  const patch = async (id, fields) => {
++    await fetch(`${API}/memory/${id}`, {
++      method: "PUT",
++      headers: { "Content-Type": "application/json" },
++      body: JSON.stringify({ fields }),
++    }).catch(() => {});
++    load();
++  };
++
++  const remove = async (id) => {
++    await fetch(`${API}/memory/${id}`, { method: "DELETE" }).catch(() => {});
++    setMemories((l) => l.filter((m) => m.id !== id));
++  };
++
++  const exportAll = async () => {
++    try {
++      const r = await fetch(`${API}/memory/export`);
++      const d = await r.json();
++      const blob = new Blob([JSON.stringify(d, null, 2)], { type: "application/json" });
++      const a = document.createElement("a");
++      a.href = URL.createObjectURL(blob);
++      a.download = `sirius-memoire-${new Date().toISOString().slice(0, 10)}.json`;
++      a.click();
++      URL.revokeObjectURL(a.href);
++    } catch (_) {}
++  };
++
++  const startEdit = (m) => { setEditId(m.id); setEditText(m.content); };
++  const saveEdit = async () => {
++    if (editText.trim()) await patch(editId, { content: editText.trim() });
++    setEditId(null);
++  };
++
++  const chips = useMemo(() => {
++    if (!stats) return [];
++    return [
++      ["TOTAL", stats.total],
++      ...Object.entries(stats.by_type || {}).map(([k, v]) => [TYPE_LABELS[k] || k, v]),
++      ...Object.entries(stats.by_source || {}).map(([k, v]) => [SOURCE_LABELS[k] || k, v]),
++    ];
++  }, [stats]);
++
++  return (
++    <div className="prime-screen" data-testid="memory-manager">
++      <canvas ref={starsRef} className="prime-stars" />
++      <header className="zeus-head">
++        <div className="oracle-title font-divine"><BrainCircuit size={20} /> GESTION DE LA MÉMOIRE</div>
++        <button className="setup-close zeus-close" onClick={onClose} data-testid="memorymgr-close-btn"><X size={18} /></button>
++      </header>
++      <div className="prime-sub">
++        MÉMOIRE LONGUE DURÉE — CONSULTER · CORRIGER · EXPORTER · SUPPRIMER
++      </div>
++
++      <div className="mm-body">
++        <div className="haccp-tabs">
++          <button className={`haccp-tab ${tab === "memories" ? "active" : ""}`} onClick={() => setTab("memories")} data-testid="mm-tab-memories">
++            <Database size={13} /> SOUVENIRS
++          </button>
++          <button className={`haccp-tab ${tab === "audit" ? "active" : ""}`} onClick={() => setTab("audit")} data-testid="mm-tab-audit">
++            <ScrollText size={13} /> JOURNAL D'AUDIT
++          </button>
++          <button className="haccp-tab mm-export" onClick={exportAll} data-testid="mm-export-btn">
++            <Download size={13} /> EXPORTER (JSON)
++          </button>
++        </div>
++
++        {tab === "memories" && (
++          <section className="prime-card mm-wide" data-testid="mm-memories">
++            <div className="mm-stats-row">
++              {chips.map(([label, v]) => (
++                <span className="mm-chip" key={label}>{label} <b>{v}</b></span>
++              ))}
++            </div>
++            <div className="mm-filters">
++              <div className="mm-search">
++                <Search size={13} />
++                <input
++                  value={q}
++                  onChange={(e) => setQ(e.target.value)}
++                  onKeyDown={(e) => e.key === "Enter" && load()}
++                  placeholder="Rechercher un souvenir..."
++                  data-testid="mm-search-input"
++                />
++              </div>
++              <select value={mtype} onChange={(e) => setMtype(e.target.value)} data-testid="mm-type-filter">
++                <option value="">TOUS TYPES</option>
++                {Object.entries(TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
++              </select>
++              <select value={status} onChange={(e) => setStatus(e.target.value)} data-testid="mm-status-filter">
++                <option value="active">ACTIFS</option>
++                <option value="contested">EN CONFLIT</option>
++                <option value="archive">ARCHIVÉS</option>
++                <option value="">TOUS STATUTS</option>
++              </select>
++            </div>
++
++            {loading && <div className="haccp-loading"><Loader2 size={20} className="haccp-spin" /><span>Chargement...</span></div>}
++            {!loading && memories.length === 0 && (
++              <div className="memory-empty" data-testid="mm-empty">Aucun souvenir pour ces critères. Dites « souviens-toi que... » à Sirius pour enrichir sa mémoire.</div>
++            )}
++            {!loading && memories.map((m) => (
++              <div className={`mm-row ${m.status !== "active" ? "muted" : ""}`} key={m.id} data-testid={`mm-row-${m.id}`}>
++                <div className="mm-row-main">
++                  {editId === m.id ? (
++                    <div className="mm-edit">
++                      <textarea value={editText} onChange={(e) => setEditText(e.target.value)} data-testid="mm-edit-input" />
++                      <button className="mm-icon-btn ok" onClick={saveEdit} data-testid="mm-edit-save"><Check size={13} /></button>
++                    </div>
++                  ) : (
++                    <p className="mm-content">{m.content}</p>
++                  )}
++                  <div className="mm-meta">
++                    <Badge cls={`t-${m.mtype}`}>{TYPE_LABELS[m.mtype] || m.mtype}</Badge>
++                    <Badge cls={`s-${m.source}`}>{SOURCE_LABELS[m.source] || m.source}</Badge>
++                    {m.status === "contested" && <Badge cls="contested"><AlertTriangle size={9} /> EN CONFLIT</Badge>}
++                    <span className="mm-num">IMP {Math.round((m.importance || 0) * 100)}%</span>
++                    <span className="mm-num">CONF {Math.round((m.confidence || 0) * 100)}%</span>
++                    <span className="mm-num">UTILISÉ ×{m.use_count || 0}</span>
++                    <span className="mm-date">{(m.created_at || "").slice(0, 10)}</span>
++                  </div>
++                </div>
++                <div className="mm-row-actions">
++                  {m.status === "contested" && (
++                    <button className="mm-icon-btn ok" title="Confirmer cette information"
++                      onClick={() => patch(m.id, { status: "active", confidence: 0.95 })}
++                      data-testid="mm-confirm-btn">
++                      <CheckCircle2 size={14} />
++                    </button>
++                  )}
++                  <button className={`mm-icon-btn ${m.pinned ? "pin-on" : ""}`} title={m.pinned ? "Désépingler" : "Épingler (toujours prioritaire)"}
++                    onClick={() => patch(m.id, { pinned: m.pinned ? 0 : 1 })} data-testid="mm-pin-btn">
++                    <Star size={13} />
++                  </button>
++                  <button className="mm-icon-btn" title="Corriger" onClick={() => startEdit(m)} data-testid="mm-edit-btn">
++                    <Pencil size={13} />
++                  </button>
++                  <button className="mm-icon-btn danger" title="Supprimer définitivement" onClick={() => remove(m.id)} data-testid="mm-delete-btn">
++                    <Trash2 size={13} />
++                  </button>
++                </div>
++              </div>
++            ))}
++          </section>
++        )}
++
++        {tab === "audit" && (
++          <section className="prime-card mm-wide" data-testid="mm-audit">
++            <div className="zc-section-title"><ScrollText size={12} style={{ marginRight: 6 }} />JOURNAL DES OPÉRATIONS MÉMOIRE &amp; SUGGESTIONS</div>
++            {audit.length === 0 && <div className="memory-empty">Journal vide.</div>}
++            {audit.map((a) => (
++              <div className="mm-audit-row" key={a.id}>
++                <span className={`mm-audit-kind k-${a.kind}`}>{a.kind.toUpperCase()}</span>
++                <span className="mm-audit-detail">{a.detail}</span>
++                <span className="mm-date">{(a.created_at || "").slice(0, 16).replace("T", " ")}</span>
++              </div>
++            ))}
++          </section>
++        )}
++      </div>
++    </div>
++  );
++}
++
++diff --git a/frontend/src/SiriusProgress.jsx b/frontend/src/SiriusProgress.jsx
++index 0000000..0000000
++--- a/frontend/src/SiriusProgress.jsx
+++++ b/frontend/src/SiriusProgress.jsx
++ @@ -1,0 +1,224 @@
++// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
++import { useEffect, useRef, useState } from "react";
++import { Activity, CheckCircle2, AlertTriangle, Loader2, X, History, Trash2 } from "lucide-react";
++import "./SiriusProgress.css";
++
++// Journal des tâches passées (localStorage, 200 entrées max)
++const JOURNAL_KEY = "sirius_task_journal";
++const readJournal = () => { try { return JSON.parse(localStorage.getItem(JOURNAL_KEY)) || []; } catch (e) { return []; } };
++const writeJournal = (l) => { try { localStorage.setItem(JOURNAL_KEY, JSON.stringify(l.slice(0, 200))); } catch (e) { /* stockage plein ignoré */ } };
++export const fmtDuree = (ms) =>
++  ms < 1000 ? `${ms} ms`
++  : ms < 60000 ? `${(ms / 1000).toFixed(1).replace(".", ",")} s`
++  : `${Math.floor(ms / 60000)} min ${String(Math.round((ms % 60000) / 1000)).padStart(2, "0")} s`;
++
++// Fenêtre de progression globale SIRIUS : toute tâche longue s'y affiche en direct.
++// API globale : progress.start(nom) -> id, progress.log(id, msg, pct?), progress.done(id, msg?), progress.error(id, msg?)
++let seq = 0;
++const emit = (detail) => window.dispatchEvent(new CustomEvent("sirius-progress", { detail }));
++export const progress = {
++  start(task, opts) { const id = `sp-${Date.now()}-${seq++}`; emit({ action: "start", id, task, silent: !!(opts && opts.silent) }); return id; },
++  log(id, message, pct) { if (id) emit({ action: "log", id, message, pct }); },
++  done(id, message) { if (id) emit({ action: "done", id, message }); },
++  error(id, message) { if (id) emit({ action: "error", id, message }); },
++};
++
++const now = () => new Date().toLocaleTimeString("fr-FR", { hour12: false });
++const POS_KEY = "sirius_progress_pos";
++
++// Témoin de mode : une couleur par état de Sirius
++const MODES = {
++  idle: { label: "Veille", color: "#22d3ee" },
++  listening: { label: "Écoute", color: "#38bdf8" },
++  thinking: { label: "Réflexion", color: "#fbbf24" },
++  speaking: { label: "Réponse", color: "#5eead4" },
++};
++
++export default function SiriusProgress({ mode = "idle" }) {
++  const [tasks, setTasks] = useState([]);
++  const panelRef = useRef(null);
++  const logRef = useRef(null);
++  const timersRef = useRef({});
++  const startedRef = useRef({});
++  const [showJournal, setShowJournal] = useState(false);
++  const [journal, setJournal] = useState([]);
++
++  const openJournal = () => { setJournal(readJournal()); setShowJournal(true); };
++
++  useEffect(() => {
++    const onOpen = () => { setJournal(readJournal()); setShowJournal(true); };
++    window.addEventListener("sirius-journal-open", onOpen);
++    return () => window.removeEventListener("sirius-journal-open", onOpen);
++  }, []);
++
++  useEffect(() => {
++    const onEvt = (e) => {
++      const { action, id, task, message, pct } = e.detail || {};
++      if (!id) return;
++      if (action === "start") startedRef.current[id] = { task: task || "Tâche SIRIUS", t0: Date.now() };
++      if (action === "done" || action === "error") {
++        const st = startedRef.current[id];
++        if (st) {
++          const entry = {
++            ts: Date.now(),
++            task: st.task,
++            duree: Date.now() - st.t0,
++            statut: action === "done" ? "succès" : "erreur",
++            resultat: message || (action === "done" ? "Terminé" : "Échec"),
++          };
++          writeJournal([entry, ...readJournal()]);
++          setJournal((j) => (j.length || showJournal ? [entry, ...j].slice(0, 200) : j));
++          delete startedRef.current[id];
++        }
++      }
++      setTasks((ts) => {
++        if (action === "start") {
++          if (ts.some((t) => t.id === id)) return ts;
++          return [...ts, { id, task: task || "Tâche SIRIUS", pct: 4, status: "running", logs: [{ t: now(), msg: "Tâche démarrée" }] }];
++        }
++        return ts.map((t) => {
++          if (t.id !== id) return t;
++          if (action === "log") {
++            const p = typeof pct === "number" ? Math.min(99, pct) : Math.min(90, t.pct + Math.max(4, (92 - t.pct) * 0.22));
++            return { ...t, pct: Math.max(t.pct, p), logs: [...t.logs, { t: now(), msg: message }].slice(-60) };
++          }
++          if (action === "done") {
++            return { ...t, pct: 100, status: "done", logs: [...t.logs, { t: now(), msg: message || "Terminé" }].slice(-60) };
++          }
++          if (action === "error") {
++            return { ...t, status: "error", logs: [...t.logs, { t: now(), msg: message || "Échec" }].slice(-60) };
++          }
++          return t;
++        });
++      });
++      if (action === "done" || action === "error") {
++        clearTimeout(timersRef.current[id]);
++        timersRef.current[id] = setTimeout(() => {
++          setTasks((ts) => ts.filter((t) => t.id !== id));
++        }, 7000);
++      }
++    };
++    window.addEventListener("sirius-progress", onEvt);
++    const timers = timersRef.current;
++    return () => {
++      window.removeEventListener("sirius-progress", onEvt);
++      Object.values(timers).forEach(clearTimeout);
++    };
++  }, [showJournal]);
++
++  useEffect(() => {
++    const el = logRef.current;
++    if (el) el.scrollTop = el.scrollHeight;
++  }, [tasks]);
++
++  useEffect(() => {
++    const el = panelRef.current;
++    if (!el) return;
++    try {
++      const saved = JSON.parse(localStorage.getItem(POS_KEY));
++      if (saved && typeof saved.x === "number") {
++        el.style.left = Math.min(Math.max(0, saved.x), window.innerWidth - 160) + "px";
++        el.style.top = Math.min(Math.max(0, saved.y), window.innerHeight - 80) + "px";
++        el.style.right = "auto";
++        el.style.bottom = "auto";
++      }
++    } catch (e) { /* position invalide ignorée */ }
++  }, [tasks.length]);
++
++  const onBarDown = (e) => {
++    if (e.target.closest("button")) return;
++    const el = panelRef.current;
++    const r = el.getBoundingClientRect();
++    const dx = e.clientX - r.left, dy = e.clientY - r.top;
++    const move = (ev) => {
++      const x = Math.min(Math.max(0, ev.clientX - dx), window.innerWidth - 160);
++      const y = Math.min(Math.max(0, ev.clientY - dy), window.innerHeight - 80);
++      el.style.left = x + "px"; el.style.top = y + "px";
++      el.style.right = "auto"; el.style.bottom = "auto";
++    };
++    const up = () => {
++      window.removeEventListener("pointermove", move);
++      window.removeEventListener("pointerup", up);
++      const rr = el.getBoundingClientRect();
++      try { localStorage.setItem(POS_KEY, JSON.stringify({ x: rr.left, y: rr.top })); } catch (e) { /* ignoré */ }
++    };
++    window.addEventListener("pointermove", move);
++    window.addEventListener("pointerup", up);
++    e.preventDefault();
++  };
++
++  const running = tasks.filter((t) => t.status === "running").length;
++  const m = MODES[mode] || MODES.idle;
++
++  return (
++    <>
++      <div ref={panelRef} className={`sirius-progress ${tasks.length ? "" : "sp-compact"}`} data-testid="sirius-progress-panel">
++      <div className="sp-bar" onPointerDown={onBarDown} title="Glisser pour déplacer" data-testid="sirius-progress-bar-header">
++        <Activity size={13} className={running ? "sp-pulse" : ""} />
++        <span className="sp-title">SIRIUS — ACTIVITÉ EN COURS</span>
++        <span className="sp-mode" data-testid="sirius-mode-indicator" style={{ "--mode-c": m.color }}>
++          <i className="sp-mode-bar" />
++          Mode : {m.label}
++        </span>
++        {tasks.length > 0 && <span className="sp-count">{running ? `${running} TÂCHE${running > 1 ? "S" : ""}` : "TERMINÉ"}</span>}
++        <button className="sp-close" onClick={openJournal} title="Journal des tâches" data-testid="sirius-progress-journal-btn"><History size={13} /></button>
++        {tasks.length > 0 && <button className="sp-close" onClick={() => setTasks([])} data-testid="sirius-progress-close-btn"><X size={13} /></button>}
++      </div>
++      {tasks.map((t) => (
++        <div key={t.id} className={`sp-task sp-${t.status}`} data-testid="sirius-progress-task">
++          <div className="sp-task-head">
++            {t.status === "running" && <Loader2 size={12} className="sp-spin" />}
++            {t.status === "done" && <CheckCircle2 size={12} />}
++            {t.status === "error" && <AlertTriangle size={12} />}
++            <span className="sp-task-name">{t.task}</span>
++            <span className="sp-pct" data-testid="sirius-progress-pct">{t.status === "error" ? "ERREUR" : `${Math.round(t.pct)}%`}</span>
++          </div>
++          <div className="sp-track">
++            <div className={`sp-fill sp-fill-${t.status}`} style={{ width: `${t.pct}%` }} />
++          </div>
++        </div>
++      ))}
++      {tasks.length > 0 && (
++        <div className="sp-log" ref={logRef} data-testid="sirius-progress-log">
++          {tasks.flatMap((t) => t.logs.map((l, i) => (
++            <div key={`${t.id}-${i}`} className="sp-line">
++              <span className="sp-time">{l.t}</span>
++              <span className="sp-msg">{l.msg}</span>
++            </div>
++          )))}
++        </div>
++      )}
++      </div>
++
++      {showJournal && (
++        <div className="sp-journal" data-testid="sirius-journal-panel">
++          <div className="sp-bar">
++            <History size={13} />
++            <span className="sp-title">JOURNAL DES TÂCHES SIRIUS</span>
++            <span className="sp-count">{journal.length} ENTRÉE{journal.length > 1 ? "S" : ""}</span>
++            <button className="sp-close" title="Vider le journal" onClick={() => { writeJournal([]); setJournal([]); }} data-testid="sirius-journal-clear-btn"><Trash2 size={13} /></button>
++            <button className="sp-close" onClick={() => setShowJournal(false)} data-testid="sirius-journal-close-btn"><X size={13} /></button>
++          </div>
++          <div className="sp-journal-list" data-testid="sirius-journal-list">
++            {journal.length === 0 && <div className="sp-journal-empty">Aucune tâche enregistrée pour le moment.</div>}
++            {journal.map((e, i) => (
++              <div key={`${e.ts}-${i}`} className={`sp-jrow sp-j-${e.statut === "succès" ? "done" : "error"}`} data-testid="sirius-journal-row">
++                <div className="sp-jrow-head">
++                  {e.statut === "succès" ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />}
++                  <span className="sp-jtask">{e.task}</span>
++                  <span className="sp-jduree">{fmtDuree(e.duree)}</span>
++                </div>
++                <div className="sp-jrow-sub">
++                  <span className="sp-jdate">{new Date(e.ts).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
++                  <span className="sp-jres">{e.resultat}</span>
++                </div>
++              </div>
++            ))}
++          </div>
++        </div>
++      )}
++    </>
++  );
++}
++

@@ -1,0 +1,130 @@
+/* © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France). */
+/* HÉPHAÏSTOS — auto-maintenance, thème or & cyan */
+.heph-body {
+  position: relative; z-index: 3;
+  display: flex; flex-direction: column; gap: 14px;
+  padding: 0 clamp(16px, 5vw, 90px) 40px;
+  overflow-y: auto; max-height: calc(100vh - 140px);
+}
+.heph-control { display: flex; flex-direction: column; gap: 14px; }
+
+.heph-run {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 14px 20px; border-radius: 10px; cursor: pointer;
+  font-family: "Orbitron", sans-serif; font-size: 12px; letter-spacing: 0.12em; font-weight: 700;
+  color: #04121c; background: linear-gradient(100deg, #f5c542, #ffe9a8 55%, #d9a940);
+  border: 1px solid #ffe9a8;
+  box-shadow: 0 0 22px rgba(245, 197, 66, 0.45);
+  transition: transform 0.15s, box-shadow 0.2s, opacity 0.2s;
+}
+.heph-run:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 0 30px rgba(245, 197, 66, 0.6); }
+.heph-run:disabled { opacity: 0.7; cursor: wait; }
+
+.heph-progress { display: flex; flex-direction: column; gap: 6px; }
+.heph-progress-track {
+  height: 8px; border-radius: 6px; overflow: hidden;
+  background: rgba(0, 30, 45, 0.7); border: 1px solid rgba(34, 211, 238, 0.3);
+}
+.heph-progress-fill {
+  height: 100%; border-radius: 6px;
+  background: linear-gradient(90deg, #22d3ee, #f5c542);
+  box-shadow: 0 0 12px rgba(245, 197, 66, 0.6);
+  transition: width 0.5s ease;
+}
+.heph-phase { font-family: "Rajdhani", sans-serif; font-size: 12.5px; color: #9fd3e8; letter-spacing: 0.04em; }
+
+.heph-error {
+  display: flex; align-items: center; gap: 7px;
+  padding: 9px 12px; border-radius: 7px; font-size: 12.5px;
+  color: #ff9a9a; border: 1px solid rgba(239, 68, 68, 0.4); background: rgba(127, 29, 29, 0.15);
+}
+
+.heph-summary {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 12px 16px; border-radius: 9px;
+  border: 1px solid rgba(245, 197, 66, 0.4);
+  background: rgba(4, 22, 34, 0.7);
+}
+.heph-summary.critique { border-color: rgba(239, 68, 68, 0.5); }
+.heph-summary.dégradé { border-color: rgba(245, 158, 11, 0.5); }
+.heph-gauge { display: flex; align-items: center; gap: 8px; color: #f5c542; }
+.heph-gauge b { font-family: "Orbitron", sans-serif; font-size: 26px; text-shadow: 0 0 14px rgba(245, 197, 66, 0.6); }
+.heph-summary-txt { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; color: #cfeefb; }
+.heph-state { font-family: "Orbitron", sans-serif; font-size: 11px; letter-spacing: 0.12em; font-weight: 700; }
+.heph-state-ok { color: #5eead4; }
+.heph-state-dégradé { color: #fbbf24; }
+.heph-state-critique { color: #ff9a9a; }
+.heph-dl {
+  margin-left: auto;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px; border-radius: 8px; cursor: pointer;
+  font-family: "Orbitron", sans-serif; font-size: 9px; letter-spacing: 0.09em;
+  color: #ffe9a8; background: rgba(70, 55, 12, 0.4); border: 1px solid rgba(245, 197, 66, 0.55);
+  transition: box-shadow 0.2s;
+}
+.heph-dl:hover { box-shadow: 0 0 12px rgba(245, 197, 66, 0.4); }
+
+.heph-list { display: flex; flex-direction: column; gap: 6px; }
+.heph-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 11px; border-radius: 7px;
+  background: rgba(0, 20, 32, 0.5);
+  border: 1px solid rgba(34, 211, 238, 0.16);
+  border-left: 3px solid rgba(34, 211, 238, 0.4);
+}
+.heph-row.ok { border-left-color: #5eead4; color: #bfe9f8; }
+.heph-row.fail { border-left-color: #ff6b6b; color: #ffd7d7; background: rgba(50, 10, 10, 0.35); }
+.heph-row.ok svg { color: #5eead4; }
+.heph-row.fail svg { color: #ff6b6b; }
+.heph-row-name { font-family: "Rajdhani", sans-serif; font-weight: 600; font-size: 14px; letter-spacing: 0.03em; }
+.heph-row-meta { margin-left: auto; display: flex; gap: 10px; }
+.heph-row-meta em { font-style: normal; font-size: 11px; color: #7fb6cc; }
+.heph-row-meta em.heph-nc { color: #fbbf24; }
+.heph-badge {
+  font-family: "Orbitron", sans-serif; font-size: 8.5px; letter-spacing: 0.1em;
+  padding: 2px 8px; border-radius: 8px;
+}
+.heph-badge.ok { color: #04121c; background: #5eead4; }
+.heph-badge.fail { color: #04121c; background: #ff6b6b; }
+
+@media (max-width: 640px) {
+  .heph-row-meta { width: 100%; margin: 4px 0 0; }
+  .heph-summary { gap: 10px; }
+}
+
+/* Historique des diagnostics */
+.heph-chart { position: relative; display: flex; gap: 8px; }
+.heph-chart svg { flex: 1; height: 90px; background: rgba(0, 20, 32, 0.5); border: 1px solid rgba(34, 211, 238, 0.16); border-radius: 7px; }
+.heph-grid { stroke: rgba(34, 211, 238, 0.12); stroke-width: 1; }
+.heph-line { fill: none; stroke: #f5c542; stroke-width: 2; filter: drop-shadow(0 0 4px rgba(245, 197, 66, 0.7)); }
+.heph-dot.ok { fill: #5eead4; }
+.heph-dot.warn { fill: #fbbf24; }
+.heph-dot.fail { fill: #ff6b6b; }
+.heph-chart-scale { display: flex; flex-direction: column; justify-content: space-between; font-size: 9px; color: #7fb6cc; padding: 2px 0; }
+.heph-hist-list { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+.heph-hist-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 10px; border-radius: 6px; font-size: 12px;
+  background: rgba(0, 20, 32, 0.4); border: 1px solid rgba(34, 211, 238, 0.12);
+  color: #bfe9f8;
+}
+.heph-dot-inline { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.heph-dot-inline.ok { background: #5eead4; box-shadow: 0 0 6px #5eead4; }
+.heph-dot-inline.warn { background: #fbbf24; box-shadow: 0 0 6px #fbbf24; }
+.heph-dot-inline.fail { background: #ff6b6b; box-shadow: 0 0 6px #ff6b6b; }
+.heph-hist-date { font-family: "Rajdhani", sans-serif; font-weight: 600; }
+.heph-hist-src { font-family: "Orbitron", sans-serif; font-size: 8px; letter-spacing: 0.1em; color: #f5c542; border: 1px solid rgba(245, 197, 66, 0.4); border-radius: 8px; padding: 1px 7px; }
+.heph-hist-rate { font-family: "Orbitron", sans-serif; font-size: 11px; color: #ffe9a8; }
+.heph-hist-detail { color: #7fb6cc; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.heph-purge-group { margin-left: auto; display: inline-flex; gap: 6px; }
+.heph-purge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 9px; cursor: pointer;
+  font-family: "Orbitron", sans-serif; font-size: 8px; letter-spacing: 0.09em;
+  color: #ffe9a8; background: rgba(70, 55, 12, 0.4); border: 1px solid rgba(245, 197, 66, 0.5);
+  transition: box-shadow 0.2s;
+}
+.heph-purge:hover { box-shadow: 0 0 10px rgba(245, 197, 66, 0.4); }
+.heph-purge.danger { color: #ff9a9a; background: rgba(60, 12, 12, 0.4); border-color: rgba(239, 68, 68, 0.5); }
+.heph-purge.danger:hover { box-shadow: 0 0 10px rgba(239, 68, 68, 0.4); }

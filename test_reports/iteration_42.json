@@ -1,0 +1,61 @@
+{
+  "summary": "Iteration 42 tested the new Web Agent, Neural2-F voice preset, protected Vision endpoint, Vision auto-capture, HUD title, and intent regressions against the public URL. All requested backend behaviors passed and all frontend flows rendered the expected results. Two additional defects were reproduced: the Médiathèque is globally readable/deletable without authentication or user scoping, and the setup window's perpetual transform animation prevents normal Playwright pointer clicks on its tabs, preset, and close control. The existing public CORS credential failure also remains.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "GET /api/files, DELETE /api/files/{file_id}",
+        "issue": "Anonymous GET returned HTTP 200 with the complete Médiathèque, including the newly created Web Agent screenshot; an anonymous DELETE of the test screenshot also returned 200. Web Agent records contain no user_id and list/delete queries are not scoped, so one user or an unauthenticated caller can read/delete other users' media metadata.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "OPTIONS /api/auth/me",
+        "issue": "Public preflight still returns Access-Control-Allow-Origin: * without Access-Control-Allow-Credentials; same-origin cookies work, but credentialed cross-origin auth does not."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "SiriusSetup floating window",
+        "issue": "Normal pointer clicks on VOIX, the Neural2-F preset, and setup-close time out because .setup-screen is decorated as .holo-win and its infinite holoWinFloat transform keeps every descendant geometrically unstable. DOM-dispatched clicks execute the handlers and the preset state/localStorage are correct.",
+        "selector": "[data-testid='sirius-setup'].holo-win [data-testid='setup-tab-voix'], [data-testid='setup-voice-preset-neural2f'], [data-testid='setup-close']",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration42_webagent_voice.py",
+    "/app/test_reports/pytest/iteration_42_webagent_voice.xml",
+    "/app/test_reports/pytest/iteration_42_auth_playbook.xml"
+  ],
+  "action_items": [
+    "Protect every Médiathèque read/download/update/delete endpoint with require_user, add user_id to Web Agent and upload records, and filter every file query/mutation by the authenticated user.",
+    "Stop applying an infinite transform animation to interactive setup containers, or pause the animation while interacting and honor prefers-reduced-motion so controls remain stable targets.",
+    "Add an outbound URL policy to /api/webagent/run URL mode: permit only http/https public destinations and reject loopback, private, link-local, metadata, and internal cluster addresses to prevent SSRF.",
+    "Correct credentialed CORS at the public ingress if frontend and API may run on different origins.",
+    "Fix the remaining react/no-unescaped-entities lint error in SystemModes.jsx line 170."
+  ],
+  "critical_code_review_comments": [
+    "server.py:323-330 and 616-621 expose file listing/deletion without require_user; server.py:490-500 creates Web Agent file records without user_id. Authentication on /webagent/run does not protect the persisted output afterward.",
+    "webagent.py accepts an arbitrary target URL and server-side Chromium navigation without destination validation, creating an SSRF path for any authenticated user.",
+    "App.css:4969 applies holoWinFloat forever to every .holo-win, while holoWindows.js decorates .setup-screen; animating an interactive window's transform continuously makes all descendants moving click targets.",
+    "App.js (5108 lines) and server.py (2460 lines) remain far above the 700-line review threshold; the file/media authorization gap is distributed across many ungrouped routes."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration42_webagent_voice.py",
+    "/app/test_reports/iteration_42.json"
+  ],
+  "success_rate": {
+    "backend": "84.6% overall (11/13 including security/auth-playbook checks); 100% of requested feature checks passed",
+    "frontend": "85.7% (6/7 requested flows fully actionable; voice preset state passed but normal pointer actionability failed)"
+  },
+  "seed_data_creation": "Created two transient web-*.jpg screenshots through backend/UI Web Agent tests and deleted both after verification. The lockout check used a disposable nonexistent email and created no account.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend Web Agent completed in about 14 seconds for météo Paris and returned a valid 1280x800 JPEG. UI Web Agent returned an EKOI page screenshot and task status TERMINÉ. Vision fake camera was 640x480 readyState 4; automatic POST fired and returned 200 with snapshot/description. HUD title bounding box was 612x182 and visible. Oracle open/range tout passed. Re-test anonymous file access/deletion and normal (non-forced) setup clicks after fixes.",
+  "rca_of_the_issue": "Médiathèque exposure is caused by file routes lacking require_user plus records/queries lacking user_id, so Web Agent authentication ends before storage access. Setup actionability is caused by holoWindows.js decorating .setup-screen with .holo-win and App.css applying an infinite transform animation; Playwright correctly waits for stability and times out, while direct DOM click dispatch proves handlers are functional. CORS headers are still overwritten or emitted as wildcard by the public routing layer."
+}

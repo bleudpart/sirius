@@ -1,0 +1,44 @@
+{
+  "summary": "Backend + frontend e2e validation of the new PERSONAL MEMORY and MUSIC/AMBIANCE commands (iteration 4). Backend 15/15 (5 new memory tests + 10 regression). Frontend: setup, memory save (regex catches 'souviens-toi que ...'), memory recall, memory persists across reload and is sent in /api/chat body (Groq references lasagnes), music generic (window.open to youtube.com/results?search_query=musique%20playlist%20tendance), music relax (-> ambiance%20relaxante%20lofi), and no-false-trigger on 'raconte une blague' all pass. ONE minor regex robustness bug found in the memory-RECALL client-side intent (apostrophe-only variant), see action_items.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Memory recall after 'oublie tout'",
+        "issue": "After clearing memory, asking 'qu est-ce que tu sais sur moi' (without apostrophe, as specified in the review request) does NOT hit the client-side memory-recall regex (which requires \"qu'est-ce\" with apostrophe). The query falls through to /api/chat which still has the prior conversation history in MongoDB (sirius_chats.history) containing the lasagnes fact, so the brain answers as if memory still existed. UX result: user just told Sirius to forget, but Sirius still references the old fact via chat history. Two complementary fixes recommended: (1) loosen recall regex to also match the apostrophe-less form (e.g. \"qu['\u2019 ]est[- ]ce que tu sais\", \"que sais tu\"); (2) on memory-clear, also POST /api/chat with a system-reset signal OR clear the per-session history server-side (e.g. DELETE /api/chat/session/{id}).",
+        "affected_selectors": ["[data-testid=\"sirius-cmd-input\"]", "[data-testid=\"sirius-subtitle\"]"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_sirius_memory.py",
+    "/app/backend/tests/test_sirius_brain.py",
+    "/app/backend/tests/test_sirius_profile_and_tts.py",
+    "/app/test_reports/pytest/memory_results.xml"
+  ],
+  "action_items": [
+    "App.js processCommand (line ~589): broaden memory-recall regex to also match apostrophe-less / hyphen-less variants: e.g. /qu['\u2019 ]?est[- ]?ce que tu sais (sur|de) moi|que sais[- ]?tu (sur|de) moi/i. Same hardening could be applied to the memory-clear and music regex families.",
+    "Optional: on memory-clear, also reset the backend session history. Add an endpoint like POST /api/chat/reset {session_id} that does db.sirius_chats.delete_one({session_id}); frontend calls it inside the saveMemory([]) branch. Otherwise old memory facts persist in MongoDB history and bleed into future answers."
+  ],
+  "critical_code_review_comments": [
+    "App.js (line 11): hard-coded WS_URL='ws://localhost:8765' still produces a console error on every load in the cloud preview. Gate behind an env flag (e.g. REACT_APP_ENABLE_LOCAL_WS) for distributed builds.",
+    "App.js processCommand (line ~589) memory-recall regex relies on a typed apostrophe; review_request and STT often drop it. See action_items.",
+    "server.py /api/chat persists every user+assistant pair (last 16) but exposes no reset endpoint, so 'oublie tout' is only client-side. The backend history (last 6 turns reinjected into the prompt) defeats the memory-clear illusion.",
+    "sirius_brain.build_system_prompt still does not sanitize newlines/markdown in profile.interests or memory entries — low-risk prompt-injection vector for a distributed app.",
+    "App.js cloudAnswer useCallback (line ~542) lists `memory` in its dep array but actually reads `memoryRef.current` — the dep is unused (no bug, just dead dep; could be removed for clarity).",
+    "App.js openMusic: window.open with `_blank` is correctly used; in browser preview popup blockers may suppress it silently — Electron build will not have this issue."
+  ],
+  "updated_files": ["/app/backend/tests/test_sirius_memory.py (NEW — 5 pytest cases for /api/chat memory payload)"],
+  "success_rate": {
+    "backend": "100% (15/15 pytest — 5 new memory + 5 brain + 5 profile/tts)",
+    "frontend": "87.5% (7/8 — memory save, recall, persist+brain, music generic, music relax, no-false-trigger, memory-clear erases localStorage and shows confirmation; FAIL: post-clear recall still references old fact via backend history + apostrophe regex)"
+  },
+  "test_credentials": "Groq key from review_request used end-to-end (gsk_NKnkx0...). No login.",
+  "seed_data_creation": "Pytest sessions prefixed TEST_<hex> in db.sirius_chats (auto-trimmed to 16 messages).",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "localStorage keys: sirius_profile, sirius_keys, sirius_memory (array of strings), sirius_eco. Memory/music/clear are CLIENT-side regex in App.js processCommand (lines 569-639) BEFORE any LLM call. Backend ChatRequest now has `memory: list = []` passed into sirius_brain.build_system_prompt under section 'CE QUE TU SAIS DÉJÀ SUR L'UTILISATEUR'. KEY GOTCHA for next tester: the subtitle goes through an intermediate state 'Vous : « <command> »' while thinking, so polling should ignore that prefix and wait for the real answer (up to ~15s for cloud calls). Use window.open stub + speechSynthesis.speak no-op to avoid popups/audio. The post-clear recall failure is a real UX bug, see action_items.",
+  "rca of the issue": "Step 1: enter setup with profile {name:Daniel} + groq key. Step 2: 'souviens-toi que j adore les lasagnes' -> regex catches, localStorage['sirius_memory']=['j adore les lasagnes'], subtitle 'C\u2019est noté : j adore les lasagnes.'. Step 3: 'oublie tout' -> regex catches, saveMemory([]), localStorage emptied, subtitle 'C\u2019est fait, j\u2019ai effacé tout ce que je savais sur vous.'. Step 4: 'qu est-ce que tu sais sur moi' (NO apostrophe per review_request spec) -> client recall regex /qu'est-ce que tu sais sur moi|.../ does NOT match because the literal ' is absent -> request falls through to keys.groq branch -> POST /api/chat with memory=[] BUT session_id unchanged -> server reads sirius_chats.history (still contains 'j adore les lasagnes' from earlier turns) -> Groq answers 'Daniel, je sais juste que ton plat préféré est les lasagnes...'. Mitigation: (a) loosen recall regex to accept ' or apostrophe variants, (b) reset server-side history when memory is cleared, or (c) include a session_id rotation on clear. The first two fixes are tiny and self-contained."
+}

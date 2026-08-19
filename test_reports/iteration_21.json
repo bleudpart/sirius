@@ -1,0 +1,58 @@
+{
+  "summary": "Tested KERAUNOS end to end against a local mock Home Assistant through the public preview. All requested connection, persistence, state mapping, control, polling, filtering, settings, close, and HUD regression flows passed. Two negative API validation cases failed, and the HA proxy is exposed without authentication, enabling remote config overwrite/control and SSRF-like outbound requests.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "/api/ha/*",
+        "issue": "All configuration and control routes are unauthenticated. Requests without credentials successfully saved/deleted the HA URL/token configuration, read entity states, toggled entities, and invoked arbitrary HA services. On a public deployment, any visitor can reconfigure or control the connected home. POST /api/ha/config also makes an outbound request to a caller-selected HTTP(S) URL, creating an SSRF surface.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "/api/ha/toggle",
+        "issue": "Blank entity_id is accepted and forwarded; POST {entity_id:''} returned 200 {ok:true} instead of request validation error."
+      },
+      {
+        "endpoint": "/api/ha/service",
+        "issue": "Blank domain/service are not rejected by Pydantic; the malformed upstream path was called and its 404 leaked back instead of returning a local 422 validation response."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_home_assistant.py",
+    "/app/tests_ha_mock/mock_ha.py",
+    "/app/test_reports/pytest/home_assistant_results.xml"
+  ],
+  "action_items": [
+    "Protect every /api/ha route with authenticated, owner-scoped access before public deployment; configuration mutation and device controls must not be anonymous.",
+    "Constrain and harden outbound HA URLs while preserving explicitly authorized LAN Home Assistant access; block unsafe destinations/redirects and prevent arbitrary anonymous SSRF.",
+    "Add non-empty/format validation for entity_id, domain, and service (for example constrained Pydantic strings and an entity_id domain.object_id pattern).",
+    "Resolve the two react/no-unescaped-entities lint errors in KeraunosPanel.jsx lines 58 and 208."
+  ],
+  "critical_code_review_comments": [
+    "HaService and HaToggle use unconstrained strings, so malformed commands pass local validation and are sent upstream; service also permits arbitrary domain/service combinations.",
+    "HaService.data uses a mutable default literal (data: dict = {}); use Field(default_factory=dict).",
+    "KeraunosPanel.jsx passes functional UI tests but currently fails ESLint at lines 58 and 208 for unescaped apostrophes.",
+    "App.js remains over 4,000 lines, but the KERAUNOS import, state, menu item, and conditional render were correctly integrated and the main HUD regression check passed."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_home_assistant.py",
+    "/app/tests_ha_mock/mock_ha.py",
+    "/app/test_reports/iteration_21.json"
+  ],
+  "success_rate": {
+    "backend": "75% (6/8 tests passed; every requested happy-path/contract check passed, 2 added blank-input validation checks failed)",
+    "frontend": "100% of requested KERAUNOS and HUD regression checks passed"
+  },
+  "seed_data_creation": "Used temporary HA config http://localhost:8199 with token testtoken123 and a temporary mock HA server. Final cleanup verified GET /api/ha/config == {configured:false, base_url:null}; mock process was killed.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Mock implementation is /app/tests_ha_mock/mock_ha.py. Start it before pytest and kill it afterward. The public preview backend can reach localhost:8199. UI was bootstrapped with sirius_profile={name:'Test',city:'Paris'}, sirius_installed=1 and sirius_wahou_done=1. Device UI, light/scene controls, 50% brightness service, filtering, settings/RETOUR, close, and two additional /states polls over 8.5s all passed. Expected preview console noise was limited to ws://localhost:8765 refusal and AudioContext autoplay warnings.",
+  "rca_of_the_issue": "The router is registered directly under the public /api router without an authentication/authorization dependency. HaToggle.entity_id and HaService.domain/service are plain str fields with no min_length or pattern constraints, so Pydantic accepts empty values and ha_request forwards malformed commands. Reproduction: configure the mock, then POST /api/ha/toggle with {entity_id:''} (returns 200) or POST /api/ha/service with blank domain/service (calls /api/services// and returns upstream 404)."
+}

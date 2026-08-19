@@ -1,0 +1,53 @@
+{
+  "summary": "Itération 27 THÉMIS testée sur l’URL publique. Backend: 19/19 tests réussis, incluant les 4 corrections de l’itération 26, PDF, pièces multipart/OCR en échec gracieux, bilan/échéances et régressions CRUD. Frontend: mobile BootScreen, création facture avec date française, PDF, paiements, pièces, dashboard, commande bilan, commandes/stocks/modèles/BYOK réussis. Deux défauts frontend subsistent: ouverture THÉMIS depuis MYTHOS plante, et le message d’un paiement négatif reste en anglais.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Galerie MYTHOS — bouton OUVRIR LE MODULE",
+        "issue": "Le clic sur OUVRIR LE MODULE THÉMIS# déclenche l’overlay React « setShowDisplay is not defined » et THÉMIS ne s’ouvre pas. L’objet map est évalué en entier et référence setShowDisplay, inexistant, avant de lire l’entrée THÉMIS#.",
+        "selector": "[data-testid='mythos-open-module-btn']",
+        "priority": "HIGH"
+      },
+      {
+        "component": "THÉMIS — formulaire de paiement",
+        "issue": "Pour le montant -5, le bandeau affiche « Input should be greater than 0 » au lieu d’un message français. Le bandeau est bien fermable et le formulaire conserve -5.",
+        "selector": "[data-testid='themis-error']",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_themis.py",
+    "/app/test_reports/pytest/iteration_27_themis.xml"
+  ],
+  "action_items": [
+    "Remplacer ou supprimer la référence App.js setShowDisplay dans la map MYTHOS (utiliser le setter réel du panneau DISPLAY), puis retester toutes les cartes de galerie.",
+    "Traduire les erreurs Pydantic de contrainte gt côté ThemisPanel, ou définir une validation backend avec message français pour PaymentIn.amount.",
+    "Faire échouer le build CI sur no-undef: ESLint détecte déjà setShowDisplay à App.js:3431."
+  ],
+  "critical_code_review_comments": [
+    "App.js:3431 contient une référence no-undef à setShowDisplay; ce défaut statique rend toutes les ouvertures de modules depuis MYTHOS susceptibles de planter, pas seulement THÉMIS.",
+    "App.js fait 4365 lignes; les maps d’ouverture de modules restent dupliquées (BootScreen, MYTHOS, menu, commandes), ce qui entretient les régressions de routage. Centraliser les métadonnées et setters de modules.",
+    "ThemisPanel.load() appelle r.json() sans vérifier response.ok; une réponse d’erreur JSON peut injecter undefined dans les listes et provoquer un crash de rendu plutôt qu’un état d’erreur français.",
+    "upload_piece lit le fichier entier en mémoire avant de vérifier 15 Mo; appliquer une lecture bornée/streamée pour limiter le risque d’épuisement mémoire sous uploads concurrents."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_themis.py",
+    "/app/test_reports/iteration_27.json"
+  ],
+  "success_rate": {
+    "backend": "100% (19/19)",
+    "frontend": "86% des parcours ciblés (12/14); 2 défauts reproduits"
+  },
+  "seed_data_creation": "Données TEST_ isolées créées pour clients, devis/factures, commandes, paiements, stocks et pièces PDF; toutes supprimées par fixtures/finally. Aucun compte ni donnée existante modifié.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Rejouer d’abord le parcours galerie MYTHOS: commande « galerie mythos » → vignette THÉMIS → OUVRIR LE MODULE; il échoue actuellement sur setShowDisplay no-undef. Vérifier ensuite que -5 produit un texte français tout en conservant la valeur. Le test backend étendu couvre PDF devis/facture, 4 formats de pièces, 400/413, statut/fichier/suppression, bilan et régressions. Le navigateur Chromium ouvre le lien PDF dans un popup/plugin dont l’URL reste parfois about:blank; la réponse HTTP du href a été validée application/pdf + %PDF et l’événement popup a bien été reçu.",
+  "rca_of_the_issue": "Galerie: la map construite dans onOpenModule contient « SIRIUS DISPLAY# : setShowDisplay », mais aucun identifiant setShowDisplay n’est déclaré; JavaScript lève ReferenceError lors de l’évaluation de l’objet avant d’exécuter setShowThemis. Paiement: PaymentIn.amount utilise Field(gt=0), FastAPI renvoie le message Pydantic anglais par défaut, et ThemisPanel reprend detail[0].msg sans traduction (seul le préfixe « Value error » est retiré)."
+}

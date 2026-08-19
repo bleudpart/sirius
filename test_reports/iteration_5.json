@@ -1,0 +1,34 @@
+{
+  "summary": "RETEST of the iteration_4 memory-clear bug. Both fixes are verified end-to-end. Backend: new POST /api/chat/reset works (4/4 new pytest cases pass + 5/5 memory regression = 9/9 backend tests). Frontend: full 'oublie tout' UX flow now succeeds — apostrophe-less recall is caught client-side, server history is wiped via /api/chat/reset, sessionId rotates, and the brain no longer confidently states the forgotten fact (lasagnes). Regression flows (memory save, apostrophe recall, music, no-false-trigger joke) all still pass.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_sirius_reset.py",
+    "/app/backend/tests/test_sirius_memory.py",
+    "/app/test_reports/pytest/reset_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Backend reset endpoint is correctly idempotent (delete_one on non-existing session returns 200/ok). Good.",
+    "Frontend processCommand (App.js L580-594) ordering is correct: memory-clear is matched BEFORE recall, so 'oublie tout' is consumed before the broadened recall regex could intercept it.",
+    "App.js L11 still hard-codes WS_URL='ws://localhost:8765' producing a benign websocket error on every cloud load (carryover from iter_4) — non-blocking.",
+    "Reset endpoint accepts an empty body and defaults session_id to 'default'; consider returning a 'deleted_count' alongside ok:true for observability (nice-to-have, not a bug)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_sirius_reset.py (NEW — 4 pytest cases incl. the full lasagnes seed→reset→no-confident-recall acceptance flow)"
+  ],
+  "success_rate": {
+    "backend": "100% (9/9 — 4 new reset + 5 memory regression; 5/5 brain + 5/5 profile_tts from earlier iterations untouched)",
+    "frontend": "100% (9/9 — setup, save, recall_with_memory, oublie tout + localStorage [], apostrophe-less recall (now caught client-side, no lasagnes), brain after clear (no confident lasagnes claim), music opens youtube, joke regression, apostrophe-full recall regression)"
+  },
+  "test_credentials": "Groq key gsk_NKnkx0...Eu5H6 used end-to-end per review_request. No login.",
+  "seed_data_creation": "Pytest sessions prefixed TEST_<hex> in db.sirius_chats; reset endpoint deletes them cleanly during the seed→reset test.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iteration_4's single failing flow is now green. Both root causes were addressed: (a) frontend processCommand recall regex was broadened to /qu['’ ]?est[- ]?ce que tu sais (sur|de) moi|que sais[- ]?tu (sur|de) moi|.../ so apostrophe-less variants are intercepted client-side; (b) on 'oublie tout' the frontend now POSTs /api/chat/reset {session_id} AND rotates sessionId.current to a new random id, so even if the user uses a brain query right after clearing, the server has no history and no memory is passed. Subtitle still passes through 'Vous : « ... »' while thinking — keep the wait_for_real_answer poll (~18s for Groq, ~5s for client-side branches). Stub window.open + speechSynthesis.speak.",
+  "rca of the issue": "RCA from iter_4: post-clear recall referenced lasagnes because (1) apostrophe-less 'qu est-ce que tu sais sur moi' missed the strict regex and fell through to /api/chat, and (2) /api/chat replayed the per-session history (still containing the lasagnes fact) into Groq. Verification this iteration: STEP recall_apostropheless now returns the client-side 'Je ne retiens encore rien sur vous...' template (no API call), and STEP recall_after_clear (which DOES go through /api/chat with empty memory + ROTATED session_id) returns 'Je ne connais pas encore ton plat préféré Daniel, mais je suis prêt à l'apprendre' — no confident lasagnes claim. Backend test test_full_lasagnes_reset_then_no_recall reproduces the same seed→reset→no-recall sequence at the API layer and passes (none of the 6 forbidden confident-claim phrases appear in the post-reset answer)."
+}

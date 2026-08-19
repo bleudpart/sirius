@@ -1,0 +1,46 @@
+{
+  "summary": "Validation complète du HUD SIRIUS et des modules récents sur l’URL publique. Backend: 32/33 tests ciblés et de régression réussis; catalogue MYTHOS 13/13, quatre JPEG, TTS F/G, consultations, Agora/Thémis/News/IA passent. Un défaut reste: la voix prétendument invalide Neural2-A est transmise à Google au lieu de retomber sur Neural2-G. Frontend: premier lancement, salutation/thème dusk, citations, mémoire HERMÈS, étincelles, galerie 13 images, SOLON/PROMÉTHÉE, historique, menus, panneaux existants et commande HUD passent. Le crash initial des panneaux de consultation dû à l’état history manquant a été reproduit, corrigé dans le périmètre autorisé, puis retesté avec succès.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "/api/tts/google",
+        "issue": "Le POST public avec voice='fr-FR-Neural2-A' retourne bien 200/audio, mais le test méthode prouve que le backend transmet Neural2-A à Google. La regex autorise toute lettre A-Z; le fallback contractuel vers fr-FR-Neural2-G n’est donc pas exécuté.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration32_sirius_hud.py",
+    "/app/test_reports/pytest/iteration_32_sirius_hud.xml",
+    "/app/test_reports/pytest/iteration_32_regressions.xml"
+  ],
+  "action_items": [
+    "Remplacer la whitelist TTS générique par une liste explicite de voix autorisées (au minimum Neural2-F et Neural2-G) et forcer toute autre valeur, dont Neural2-A, vers fr-FR-Neural2-G.",
+    "Rejouer test_invalid_google_tts_voice_is_replaced_with_neural2_g après correction; les 32 autres tests sont déjà verts."
+  ],
+  "critical_code_review_comments": [
+    "server.py:1982 valide fr-FR-(Neural2|Wavenet|Standard|Studio)-[A-Z], ce qui accepte Neural2-A et contredit le fallback annoncé; utiliser un ensemble explicite de noms autorisés.",
+    "ConsultPanel.jsx utilisait accidentellement window.history puis appelait history.map, et setHistory n’existait pas. L’ajout de l’état filtré par module corrige le crash plein écran et réactive chargement/suppression de l’historique.",
+    "App.js (4769 lignes), server.py (2263) et modules_api.py (1358) dépassent largement 700 lignes; extraire navigation/panneaux, TTS et routes MYTHOS réduirait le risque de nouvelles régressions."
+  ],
+  "updated_files": [
+    "/app/frontend/src/ConsultPanel.jsx",
+    "/app/backend/tests/test_iteration32_sirius_hud.py",
+    "/app/test_reports/iteration_32.json"
+  ],
+  "success_rate": {
+    "backend": "97.0% (32/33 tests uniques; 24/24 régressions et 8/9 ciblés)",
+    "frontend": "100% des parcours demandés après correction du crash ConsultPanel"
+  },
+  "seed_data_creation": "Les suites de régression ont créé des deals/clients/documents TEST_* puis les ont supprimés. Historique SOLON simulé uniquement dans le localStorage du contexte Playwright puis supprimé par double confirmation. Objectif Agora laissé à 5000 € conformément aux régressions existantes; données Restaurant Le Phare non modifiées.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Le seul échec restant est le test méthode TTS Neural2-A→Neural2-G. Les appels publics F, G et A rendent tous un audio non vide; il faut contrôler le payload sortant, pas seulement le statut. Tous les parcours UI demandés sont verts après ajout de useState(history) dans ConsultPanel.",
+  "rca_of_the_issue": "Crash SOLON/PROMÉTHÉE: l’historique a été rendu sans déclaration d’état; JavaScript résolvait history vers window.history, puis history.map levait TypeError et affichait l’écran d’erreur React. Correction appliquée: initialisation useState depuis sirius_consult_history filtrée par module. Défaut TTS restant: la regex de whitelist accepte n’importe quel suffixe A-Z, donc Neural2-A contourne le fallback G."
+}

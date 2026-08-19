@@ -1,0 +1,49 @@
+============================================================
+   S.I.R.I.U.S — Installer sur TÉLÉPHONE (Android / iPhone)
+============================================================
+
+⚠️ Pour le téléphone, il n'y a pas de fichier à installer
+   manuellement : SIRIUS s'installe directement depuis le
+   navigateur (technologie "PWA"). C'est encore plus simple.
+
+PRÉREQUIS : SIRIUS doit d'abord être DÉPLOYÉ en ligne
+(hébergement web de votre choix) → vous obtenez une URL de
+production, par exemple : https://sirius.....
+
+
+-------------------------------------------------
+📱 ANDROID (Chrome)
+-------------------------------------------------
+1. Ouvrez votre URL de production dans Chrome.
+2. Menu ⋮ (en haut à droite) → "Installer l'application"
+   (ou "Ajouter à l'écran d'accueil").
+3. L'icône bleue SIRIUS apparaît sur votre écran d'accueil.
+4. Ouvrez-la : plein écran, micro inclus. C'est prêt !
+
+
+-------------------------------------------------
+🍎 iPHONE (Safari)
+-------------------------------------------------
+1. Ouvrez votre URL de production dans Safari.
+2. Bouton Partager (carré avec flèche) → "Sur l'écran d'accueil".
+3. L'icône SIRIUS apparaît. Ouvrez-la.
+
+
+-------------------------------------------------
+🤖 BONUS — Générer un VRAI fichier .APK Android
+   (sans installer Android Studio)
+-------------------------------------------------
+Si vous voulez un fichier .apk à partager/distribuer :
+1. Allez sur https://www.pwabuilder.com
+2. Collez votre URL de production → "Start".
+3. Onglet "Android" → "Generate Package".
+4. Téléchargez le paquet (.apk / .aab) → c'est votre app
+   Android, installable et partageable.
+
+(iPhone : un fichier .ipa nécessite un Mac + un compte
+ développeur Apple. La méthode Safari ci-dessus reste la
+ plus simple pour iPhone.)
+
+============================================================
+   SIRIUS — par partel
+============================================================

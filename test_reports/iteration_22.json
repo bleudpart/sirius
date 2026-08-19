@@ -1,0 +1,53 @@
+{
+  "summary": "Frontend-only validation of the SIRIUS DISPLAY paste fix on the public preview. The six requested flows passed: focused image/text pastes render inside the display without automatic upload, outside paste still uploads globally, manual save works, clear restores prior content, and all test files were deleted. One added persistence edge case failed: a focus-only paste does not cancel the display's original 20-second response auto-close timer, so the pasted preview disappears unless the user also performs a pointer interaction inside the display.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "SiriusDisplay pasted preview",
+        "issue": "A paste claimed through display focus does not pin/cancel the existing message auto-close timer. Reproduced by opening a response, focusing the display via tabindex/focus, pasting note.txt, and waiting 21 seconds: the entire display and pasted preview disappear. A pointer click on the display bar before pasting prevents the close.",
+        "selector": "[data-testid='sirius-display-pasted']",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "SIRIUS DISPLAY pasted-file toolbar",
+        "issues": [
+          "The MÉDIATHÈQUE action uses 7.5px text, which is difficult to read at desktop resolution; increase the minimum control typography while preserving the HUD style."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/root/.emergent/automation_output/20260803_180449/console_20260803_180449.log",
+    "/root/.emergent/automation_output/20260803_180632/console_20260803_180632.log",
+    "/root/.emergent/automation_output/20260803_180804/console_20260803_180804.log"
+  ],
+  "action_items": [
+    "When SiriusDisplay accepts a pasted file, invoke onInteract (or otherwise cancel displayCloseTimer) so the pasted content remains available beyond the original response's 20-second timeout.",
+    "Add cleanup that revokes the active pasted object URL when SiriusDisplay unmounts.",
+    "Increase pasted toolbar button text from 7.5px to a legible desktop size."
+  ],
+  "critical_code_review_comments": [
+    "SiriusDisplay.onPaste updates local pasted state but never calls the supplied onInteract callback. The parent timer created by showOnDisplay therefore remains active and unmounts the component after 20 seconds; this is the root cause of the reproduced data-loss-like UI behavior.",
+    "Blob URLs are revoked only when replacing or clearing a preview. If the parent auto-closes or the user closes the display while an image/video/audio/PDF preview is active, the component unmounts without URL.revokeObjectURL, leaking the object URL until page unload.",
+    "The modified SiriusDisplay.jsx, GlobalDrop.jsx, and DropZone.jsx passed targeted ESLint with no errors."
+  ],
+  "updated_files": [
+    "/app/test_reports/iteration_22.json"
+  ],
+  "success_rate": {
+    "backend": "Not tested (frontend-only request)",
+    "frontend": "86% (6/6 requested flows passed; 1/1 added pasted-content persistence edge case failed)"
+  },
+  "seed_data_creation": "Temporarily uploaded hud-paste.png through global paste and display-paste.png through manual save. Both were deleted. Final GET /api/files confirmed display-paste.png, hud-paste.png, and note.txt are absent.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Use the focus path exactly: add tabindex=-1 to [data-testid='sirius-display'], focus it, then dispatch a ClipboardEvent on window. Core capture behavior, no-auto-upload, outside global upload, manual save, clear, and inline text all passed. To reproduce the remaining defect, do not click inside the display after the response opens; paste immediately by focus and wait 21 seconds. Clicking [data-testid='sirius-display-bar'] first calls parent onInteract and keeps the display open. Targeted source lint passed. Expected preview noise is limited to ws://localhost:8765 connection failures and AudioContext autoplay warnings.",
+  "rca_of_the_issue": "App.showOnDisplay schedules displayCloseTimer for message responses at 20 seconds. Pointer interactions reach SiriusDisplay's root onPointerDown and call onInteract/pinDisplay, but the capture-phase paste handler only sets pasted/minimized/save state. A keyboard/focus paste does not generate pointerdown and never clears the parent timer, so setDisplayOpen(false) unmounts the preview when the original timer fires. Mitigation: call onInteract from the accepted onPaste path and revoke any active object URL during effect cleanup/unmount."
+}

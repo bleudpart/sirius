@@ -1,0 +1,73 @@
+{
+  "summary": "Tested ATLAS backend and frontend on the public preview. All 4 backend contracts passed, including >100-point routes, GPS origin, French 404, and LOCUS geocode regression. The key setup UI and persistence work, but a fake/invalid Google key triggers gm_authFailure and repeatedly replaces the map/toolbar with the key screen, so the required route/search flow is not usable natively. Downstream ATLAS route, search, settings/back/close, geolocation error handling, HUD, and LOCUS passed in a diagnostic run with Google JavaScript requests blocked.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "ATLAS Google Maps key handling",
+        "issue": "After saving AIzaTest123, localStorage is correct and the map toolbar appears briefly, but Google InvalidKeyMapError invokes gm_authFailure and forces atlas-key-screen back over the toolbar. Clicking RETOUR remounts the map and the key screen returns again, making route/search controls unusable with the required fake-key scenario.",
+        "selector": "[data-testid='atlas-key-screen']",
+        "priority": "HIGH"
+      },
+      {
+        "component": "ATLAS key instructions",
+        "issue": "The copy promises a recurring Google credit of 200 USD/month and omits the billing-account requirement. Google replaced that pooled credit on March 1, 2025 with per-SKU free monthly usage thresholds, so the 2026 setup guidance is inaccurate/incomplete.",
+        "selector": "[data-testid='atlas-key-screen']",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Save fake Google key then use ATLAS route/search",
+        "issue": "The invalid-key callback creates a configuration-screen loop. Native TRACER and LIEU flows are blocked even though /api/atlas/route and /api/locus/geocode work. With Google JS blocked only for diagnostic isolation, Lyon to Marseille displayed 314 km / 3 h 27 and Tour Eiffel displayed its resolved address.",
+        "affected_selectors": [
+          "[data-testid='atlas-key-save-btn']",
+          "[data-testid='atlas-key-back-btn']",
+          "[data-testid='atlas-tab-route']",
+          "[data-testid='atlas-search-input']"
+        ]
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "ATLAS panel",
+        "issues": [
+          "Tab and action labels are only 8.5px and the title/key label are 9-11px, making important navigation text difficult to read on desktop."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/iteration_23_atlas.xml",
+    "/root/.emergent/automation_output/20260803_194708/console_20260803_194708.log",
+    "/root/.emergent/automation_output/20260803_195202/console_20260803_195202.log"
+  ],
+  "action_items": [
+    "Keep the ATLAS shell and route/search toolbar mounted when Google rejects a key; show a non-blocking French key warning instead of setShowKey(true), so invalid map tiles do not disable backend navigation features.",
+    "Prevent RETOUR from entering a gm_authFailure remount loop and retest the exact AIzaTest123 flow without request interception.",
+    "Update Google Maps setup copy for current per-SKU free usage and add the billing-account step.",
+    "Increase ATLAS navigation/action typography to a legible desktop size."
+  ],
+  "critical_code_review_comments": [
+    "AtlasPanel.jsx lines 100-102 assign window.gm_authFailure to setAuthFail(true) and setShowKey(true). This directly violates the required fake-key stability behavior; RETOUR unmounts KeyScreen, remounts APIProvider/Map, and the invalid key invokes the callback again.",
+    "AtlasPanel.jsx passed targeted ESLint and modules_api.py/backend_test.py passed Python lint.",
+    "App.js remains a 4,142-line component, far above the 700-line maintainability threshold; ATLAS integration is correct at the state/palette/render points, but future extraction should be incremental rather than rewriting the file."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/iteration_23.json"
+  ],
+  "success_rate": {
+    "backend": "100% (4/4 ATLAS/LOCUS tests passed)",
+    "frontend": "50% natively (4/8 requested frontend flow groups fully passed); downstream ATLAS controls/integrations passed only under diagnostic Google-JS blocking"
+  },
+  "seed_data_creation": "No backend seed data created. Browser-local test profile, installed flag, and AIzaTest123 gmaps key were created only in isolated Playwright contexts.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Retest with sirius_profile={name:'Test',prenom:'Test'}, sirius_installed=1, no sirius_keys initially, then save AIzaTest123. Do not block Google requests for the primary acceptance test. Current behavior: toolbar appears briefly, console logs InvalidKeyMapError, atlas-key-screen returns, and RETOUR loops. Backend pytest class TestAtlasNavigation is stable and generated iteration_23_atlas.xml. Diagnostic Google blocking proved route/search/settings/close/geolocation and LOCUS logic independently work; expected blocked-Google console noise in that diagnostic run must not be confused with the native defect.",
+  "rca_of_the_issue": "Reproduction: open ATLAS without a key, save AIzaTest123, wait for Google validation, then attempt ITINÉRAIRE. Google emits InvalidKeyMapError and calls the global gm_authFailure handler. AtlasPanel handles it by setting showKey=true, which removes the toolbar/map subtree. RETOUR sets showKey=false and remounts the invalid APIProvider, causing the callback to fire again. Mitigation: keep backend-powered ATLAS controls mounted and represent map authentication failure as a non-blocking error/status; reserve the settings screen for explicit user action. Also update the outdated pricing copy to Google's post-March-2025 billing model."
+}

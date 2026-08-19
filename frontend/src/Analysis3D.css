@@ -1,0 +1,51 @@
+/* © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France). */
+/* Projection 3D des analyses — style holographique or & cyan */
+.an3d-overlay {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(980px, 96vw);
+  height: min(680px, 88vh);
+  display: flex; flex-direction: column;
+  z-index: 120;
+  background: rgba(2, 10, 18, 0.96);
+  border: 1px solid rgba(245, 197, 66, 0.55);
+  border-radius: 10px;
+  box-shadow: 0 0 34px rgba(245, 197, 66, 0.25), 0 0 26px rgba(0, 190, 255, 0.18);
+  backdrop-filter: blur(14px);
+  overflow: hidden;
+  animation: an3dIn 0.25s ease-out;
+}
+@keyframes an3dIn { from { opacity: 0; transform: translate(-50%, -47%); } to { opacity: 1; transform: translate(-50%, -50%); } }
+
+.an3d-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px;
+  color: #f5c542;
+  border-bottom: 1px solid rgba(245, 197, 66, 0.3);
+}
+.an3d-title { font-family: "Orbitron", sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-shadow: 0 0 8px rgba(245, 197, 66, 0.4); }
+.an3d-hint { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; font-size: 10.5px; color: #7fb6cc; font-style: italic; }
+.an3d-close {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 6px; cursor: pointer;
+  color: #9fd3e8; background: transparent; border: 1px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+}
+.an3d-close:hover { color: #ffe9a8; border-color: rgba(245, 197, 66, 0.55); }
+
+.an3d-canvas { position: relative; flex: 1; cursor: grab; }
+.an3d-canvas:active { cursor: grabbing; }
+.an3d-canvas canvas { width: 100% !important; height: 100% !important; }
+.an3d-scan {
+  position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(34, 211, 238, 0.05), transparent 62%),
+    repeating-linear-gradient(0deg, rgba(34, 211, 238, 0.03) 0 1px, transparent 1px 4px);
+  mix-blend-mode: screen;
+}
+
+@media (max-width: 640px) {
+  .an3d-overlay { width: calc(100vw - 12px); height: 88vh; }
+  .an3d-hint { display: none; }
+}

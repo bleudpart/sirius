@@ -1,0 +1,130 @@
+/* © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France). */
+/* SIRIUS / ARGUS — surveillance & réparation */
+.argus-body {
+  max-width: 1020px;
+  margin: 18px auto 0;
+  padding: 0 22px;
+  position: relative;
+  z-index: 2;
+}
+.argus-wide { margin-top: 14px; }
+.argus-rescan { margin-left: auto; }
+.argus-spin { animation: argusSpin 1s linear infinite; }
+@keyframes argusSpin { to { transform: rotate(360deg); } }
+
+.argus-none {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #7dffd4;
+  font-size: 13px;
+  padding: 14px 6px;
+}
+
+.argus-row {
+  border-left: 2px solid rgba(0, 240, 255, 0.5);
+  background: rgba(0, 26, 42, 0.45);
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+.argus-row.sev-severe { border-left-color: #ff9500; }
+.argus-row.sev-critical { border-left-color: #ff4d4d; background: rgba(60, 8, 8, 0.3); }
+
+.argus-row-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.argus-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: "Orbitron", sans-serif;
+  font-size: 6.5px;
+  letter-spacing: 1.5px;
+  padding: 2px 7px;
+  border: 1px solid rgba(0, 240, 255, 0.45);
+  color: #67e8f9;
+}
+.argus-badge.sev-severe { border-color: #ff9500; color: #ffb347; }
+.argus-badge.sev-critical { border-color: #ff4d4d; color: #ff8a8a; }
+.argus-badge.repaired { border-color: #33ffbb; color: #7dffd4; }
+.argus-type {
+  font-family: "Orbitron", sans-serif;
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: #aef3ff;
+}
+.argus-msg { color: #e6faff; font-size: 12.5px; line-height: 1.45; margin: 6px 0 4px; }
+.argus-fix {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #8be9ff;
+  font-size: 11px;
+  margin: 0 0 7px;
+}
+.argus-result { color: #7dffd4; font-size: 11.5px; margin: 4px 0 2px; }
+
+.argus-actions { display: flex; gap: 6px; }
+.argus-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(0, 24, 40, 0.85);
+  border: 1px solid rgba(0, 240, 255, 0.45);
+  color: #8be9ff;
+  font-family: "Orbitron", sans-serif;
+  font-size: 7.5px;
+  letter-spacing: 1.5px;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+.argus-btn:hover { background: rgba(0, 240, 255, 0.15); box-shadow: 0 0 10px rgba(0, 240, 255, 0.35); }
+.argus-btn.confirm { border-color: #ff9500; color: #ffb347; }
+.argus-btn.ghost { border-color: rgba(120, 160, 180, 0.4); color: #9fc4d4; }
+.argus-btn:disabled { opacity: 0.5; cursor: wait; }
+
+.argus-hist-row {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.1);
+  padding: 6px 2px;
+  flex-wrap: wrap;
+}
+.argus-hist-label { color: #cdeefb; font-size: 11.5px; min-width: 220px; }
+.argus-hist-detail { flex: 1; color: #7fb8ca; font-size: 10.5px; }
+.argus-hist-date {
+  font-family: "Orbitron", sans-serif;
+  font-size: 7px;
+  letter-spacing: 1px;
+  color: #5fa8bd;
+}
+
+/* Alerte holographique temps réel */
+.argus-alert {
+  position: fixed;
+  right: 26px;
+  bottom: 120px;
+  width: 330px;
+  z-index: 80;
+  background: rgba(10, 2, 2, 0.94);
+  border: 1px solid rgba(255, 77, 77, 0.7);
+  box-shadow: 0 0 20px rgba(255, 60, 60, 0.3), 0 16px 36px rgba(0, 0, 0, 0.6);
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+  padding: 12px 14px;
+  animation: argusAlertIn 0.4s ease both;
+}
+@keyframes argusAlertIn {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.argus-alert-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #ff9d9d;
+  font-family: "Orbitron", sans-serif;
+  font-size: 9px;
+  letter-spacing: 2.5px;
+}
+.argus-alert p { color: #ffd9d9; font-size: 11.5px; line-height: 1.4; margin: 7px 0 9px; }
+.argus-alert-actions { display: flex; gap: 6px; }

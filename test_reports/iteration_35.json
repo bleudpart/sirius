@@ -1,0 +1,70 @@
+{
+  "summary": "Test complet de l’authentification sur l’URL publique. Backend: 11/16 tests passent; inscription, cookies httpOnly/Secure/SameSite=None, login admin, mauvais mot de passe, /me, profil persistant, logout, isolation GET A/B, calendrier et régressions passent. Cinq contrôles échouent: lockout contourné par les IP internes alternantes, mémoire accessible sans auth, suppression inter-utilisateurs, CORS credentialed invalide et seed admin non réconcilié. Frontend: inscription, boot, HUD, profil/préférences, confirmation, persistance, logout+reload, reconnexion et redirection Google Emergent passent.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "/api/auth/login",
+        "issue": "Le verrouillage ne se déclenche pas après 5 échecs: les 6 appels publics retournent 401. L’identifiant inclut request.client.host; les requêtes alternent entre 10.79.142.66 et 10.79.142.69, créant deux compteurs de 3 au lieu d’un compteur de 6.",
+        "priority": "CRITICAL"
+      },
+      {
+        "endpoint": "/api/local-memory",
+        "issue": "GET sans cookie retourne 200 et les données user_id='legacy' au lieu de 401; resolve_user_id transforme l’absence ou l’invalidité du JWT en utilisateur partagé 'legacy'.",
+        "priority": "CRITICAL"
+      },
+      {
+        "endpoint": "/api/local-memory/{fact_id}",
+        "issue": "Le compte B peut supprimer un fait du compte A: DELETE retourne 200. Les routes DELETE/PUT ne valident ni l’authentification ni le user_id propriétaire.",
+        "priority": "CRITICAL"
+      },
+      {
+        "endpoint": "OPTIONS /api/auth/me",
+        "issue": "Le préflight public credentialed retourne Access-Control-Allow-Origin: * et aucun Access-Control-Allow-Credentials, contrairement à l’exigence d’origines explicites. backend/.env configure aussi CORS_ORIGINS='*'.",
+        "priority": "HIGH"
+      },
+      {
+        "endpoint": "startup seed_admin_and_indexes",
+        "issue": "Le test méthode avec un admin existant et un mot de passe changé échoue: le hash reste ancien. Le seed ne met à jour que lors de la création initiale.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration35_auth.py",
+    "/app/test_reports/pytest/iteration_35_auth.xml"
+  ],
+  "action_items": [
+    "Construire le lockout sur email normalisé et IP cliente fiable issue d’un proxy de confiance, ou au minimum ne pas utiliser l’IP interne du pod ingress; créer un index TTL/expiration et retester 5 échecs puis 429.",
+    "Remplacer resolve_user_id par require_user sur toutes les données privées; supprimer le fallback legacy pour les API exposées et filtrer DELETE/PUT local-memory par user_id.",
+    "Configurer une liste CORS explicite incluant l’origine frontend et vérifier que l’ingress conserve ACAO=<origine> avec Allow-Credentials=true.",
+    "Rendre seed_admin_and_indexes idempotent: vérifier bcrypt.checkpw puis mettre à jour password_hash et attributs admin si la configuration change.",
+    "Corriger aussi /api/chat et /api/chat/reset: calculer uid avant toute lecture, préfixer session_id pour la route non-stream et filtrer reset par uid.",
+    "Rejouer les 16 tests backend après correction; les parcours UI demandés sont déjà verts."
+  ],
+  "critical_code_review_comments": [
+    "server.py:86-139 (/api/chat) utilise uid sans l’initialiser et lit/écrit sirius_chats avec le session_id brut; contrairement à /chat/stream, l’historique standard n’est pas séparé par utilisateur. /chat/reset supprime également par session_id brut.",
+    "auth_api.py:63-72 considère un JWT absent/invalide comme LEGACY_UID; ce comportement de compatibilité contourne l’authentification des données privées.",
+    "server.py:938-950 et local_memory.py:54-60,167-170 modifient/suppriment uniquement par fact_id sans propriétaire, permettant un accès horizontal entre comptes.",
+    "auth_api.py:239-246 n’a aucune branche de mise à jour pour un admin déjà présent; une rotation ADMIN_PASSWORD n’a donc aucun effet.",
+    "server.py dépasse 2300 lignes et App.js 4800 lignes; isoler auth/mémoire/chat et le HUD réduirait le risque de régressions de sécurité."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration35_auth.py",
+    "/app/test_reports/iteration_35.json"
+  ],
+  "success_rate": {
+    "backend": "68.8% (11/16)",
+    "frontend": "100% des parcours demandés"
+  },
+  "seed_data_creation": "Trois comptes API TEST et deux comptes UI TEST ont été créés puis supprimés. Les faits SQLite TEST_AUTH_* ont été supprimés. Les compteurs de login TEST et l’unique échec admin ont été nettoyés; aucune donnée admin/prod n’a été modifiée durablement.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Priorité au lockout via URL publique: le même email produit deux documents login_attempts, un par IP ingress interne. Vérifier ensuite GET local-memory sans cookie=401 et que B ne peut ni DELETE ni PUT un fact A. Le frontend est vert; Google réel n’a pas été testé, seul le redirect auth.emergentagent.com a été validé.",
+  "rca_of_the_issue": "Lockout: request.client.host correspond au pod ingress et alterne entre deux adresses, fragmentant le compteur. Mémoire: resolve_user_id retourne volontairement 'legacy' sans JWT et DELETE/PUT ignorent user_id. CORS: wildcard configuré et préflight public intercepté avec ACAO=* sans credentials. Seed: la fonction s’arrête implicitement lorsque l’utilisateur existe sans comparer ou réécrire le hash. Chat: seule la route stream préfixe uid; la route standard et reset utilisent un session_id global."
+}

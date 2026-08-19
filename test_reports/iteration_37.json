@@ -1,0 +1,45 @@
+{
+  "summary": "Régression backend sécurité/isolation exécutée sur l’URL publique, avec CORS testé directement sur localhost:8001 comme demandé. Suite principale: 34/36 tests passent; test seed-admin supplémentaire: 1/1 passe. Auth/cookies/lockout, local-memory A/B, chat A/B et reset, toutes les routes Agora/Payments avec payload valide, ownership, revendication legacy admin, coach/history, Stripe test et CORS direct sont verts. Deux edge cases échouent: /chat et /chat/stream anonymes avec texte vide retournent 400 avant l’auth au lieu de 401.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/chat et POST /api/chat/stream",
+        "issue": "Sans cookie et avec text vide, les deux routes retournent 400 {detail: 'Texte vide'} au lieu de 401. require_user est appelé après la validation du texte et après le rate limiter; un client anonyme avec payload valide consomme donc aussi le quota IP avant d’être rejeté, ce qui permet d’épuiser le quota partagé des utilisateurs authentifiés.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration37_security_isolation.py",
+    "/app/backend/tests/test_iteration36_auth_payments.py",
+    "/app/test_reports/pytest/iteration_37_security_isolation.xml",
+    "/app/test_reports/pytest/iteration_37_seed_admin.xml"
+  ],
+  "action_items": [
+    "Dans /chat et /chat/stream, appeler require_user immédiatement au début du handler, avant la validation de text et avant _rate_ok; rejouer les deux cas anonymes text vide et la suite complète."
+  ],
+  "critical_code_review_comments": [
+    "server.py:87-95 et 146-156 authentifient après la validation et le rate limiter. Cette séquence rompt le contrat 401 systématique et autorise les anonymes à consommer le quota IP; déplacer require_user en première opération métier.",
+    "payments_api.py:11 utilise un secret Stripe de secours codé en dur ('sk_test_emergent'). La configuration sensible doit venir uniquement de STRIPE_SECRET_KEY et échouer explicitement si elle manque.",
+    "server.py (2361 lignes) et modules_api.py (1817 lignes) dépassent largement 700 lignes; scinder chat/auth, Agora et les autres modules réduirait le risque de contrôles d’auth appliqués dans un ordre incohérent."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration37_security_isolation.py",
+    "/app/test_reports/iteration_37.json"
+  ],
+  "success_rate": {
+    "backend": "94.4% suite principale (34/36); seed-admin supplémentaire 100% (1/1)",
+    "frontend": "Non testé (backend only demandé)"
+  },
+  "seed_data_creation": "Deux comptes TEST A/B, deals/objectifs/historiques coach/transactions TEST, faits SQLite et chats A/B ont été créés. Tous les enregistrements MongoDB et SQLite ont été nettoyés et une recherche finale TEST_ITER37_* retourne zéro résidu. Des sessions Stripe cs_test ont été créées sans paiement réel et restent uniquement côté Stripe.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Tous les contrôles demandés passent avec des payloads valides: 401 anonyme pour chat/reset, 10 routes Agora et 6 routes Payments; isolation A/B, user_id persisté, coach debrief, legacy admin, checkout ownership, transaction filtering et webhook public invalide=400. Seule la priorité auth-versus-validation des deux routes chat reste à corriger. Le CORS direct GET et OPTIONS reflète exactement https://cybertech-panel.preview.emergentagent.com avec credentials=true.",
+  "rca_of_the_issue": "Dans server.py, chat() vérifie text puis _rate_ok avant require_user (lignes 89-94); chat_stream() suit le même ordre (lignes 149-155). Reproduction: POST anonyme avec {text:'', session_id:'x'} sur chacune des routes renvoie 400. Mitigation: résoudre l’utilisateur en première instruction du handler, puis valider et limiter le débit avec une clé incluant idéalement le user_id."
+}

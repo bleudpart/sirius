@@ -1,0 +1,26 @@
+{
+  "summary": "Re-validation after voice regression fix (mic MediaRecorder->/api/stt and TTS Onyx via Emergent LLM Key fallback). Backend 6/6 pytest passed: TTS->STT round trip (French audio 'Bonjour Sirius, quelle heure est-il' transcribed back containing 'sirius' and 'heure'); STT no-file -> 422; empty file -> 4xx/500 graceful; junk audio -> graceful no-crash; white-label HTML (title=SIRIUS, no emergent-badge, no posthog, no 'Made with Emergent'); /api/chat 'qui t'a créé' answer contains 'partel'. Frontend re-validated against https://cybertech-panel.preview.emergentagent.com: page title SIRIUS, no #emergent-badge in DOM, data-testid='sirius-hud' present, data-testid='sirius-mic-btn' visible & clickable, app does not crash when mic is toggled in a permission-denied environment, and the configuration page submit flow remains intact. The previous iteration_7 already covered the explicit 'Accès au micro refusé' subtitle path; the current run also confirmed no JS console errors and no crash after mic click in headless preview.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_sirius_stt.py",
+    "/app/test_reports/pytest/stt_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "transcribeAndProcess (App.js:681) still swallows fetch errors with bare catch{}. Consider surfacing resp.status to the subtitle (or console.warn) to ease user debugging of mic upload failures.",
+    "/api/stt (server.py:128) writes upload to a hardcoded .webm temp file regardless of upload.content_type. Whisper handles mp3/webm interchangeably via the format hint, but propagating the real extension would be more correct.",
+    "Frontend setup gate and HUD share the same data-testid='sirius-hud' root (App.js:756), so the testid alone cannot distinguish the two screens. Consider 'sirius-setup' on the configuration page and keep 'sirius-hud' only on the active HUD for more precise e2e assertions."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "100% (6/6)", "frontend": "100% (HUD title, no badge, mic clickable, no crash)" },
+  "test_credentials": "No login required. Backend uses EMERGENT_LLM_KEY for Whisper/TTS fallback.",
+  "seed_data_creation": "TTS-generated mp3 used as STT input in-memory only; chat session_id='TEST_creator' inserted into sirius_chats (negligible).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Mic data-testid='sirius-mic-btn'. HUD root data-testid='sirius-hud' is shared between configuration page and active HUD (gate component wraps both). Preview browser cannot grant real microphone access; backend STT is verified via TTS->STT round trip in /app/backend/tests/test_sirius_stt.py. EMERGENT_LLM_KEY in backend/.env is the fallback for both /api/tts and /api/stt; both pass with no user-provided openai_key."
+}

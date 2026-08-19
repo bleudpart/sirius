@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+motor
+python-dotenv
+pydantic
+httpx
+python-multipart
+groq
+requests
+psutil

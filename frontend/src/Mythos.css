@@ -1,0 +1,81 @@
+/* © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France). */
+/* SIRIUS#.MYTHOS — silhouette mythologique en arrière-plan (comme CORTEX#/Zeus) */
+.mythos-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mythos-silhouette {
+  max-height: 92%;
+  max-width: 60%;
+  object-fit: contain;
+  mix-blend-mode: screen;
+  user-select: none;
+  animation: mythos-breathe 7s ease-in-out infinite;
+}
+@keyframes mythos-breathe {
+  0%, 100% { transform: scale(1); opacity: var(--o, 0.15); }
+  50% { transform: scale(1.015); }
+}
+.mythos-name {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: "Cinzel", "Orbitron", serif;
+  font-size: 12px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  opacity: 0.4;
+}
+/* Le contenu des panneaux passe au-dessus de la silhouette */
+.prime-screen > *:not(.mythos-backdrop):not(.prime-stars) {
+  position: relative;
+  z-index: 1;
+}
+
+/* Éléments antiques décoratifs (colonne ionique gauche, amphore grecque droite) */
+.mythos-decor-left, .mythos-decor-right {
+  position: absolute;
+  bottom: 0;
+  height: 82%;
+  display: flex;
+  align-items: flex-end;
+  pointer-events: none;
+}
+.mythos-decor-left { left: 2.5%; }
+.mythos-decor-right { right: 3%; }
+.mythos-column { height: 100%; width: auto; filter: drop-shadow(0 0 12px currentColor); }
+.mythos-jug { height: 62%; width: auto; filter: drop-shadow(0 0 12px currentColor); align-self: center; }
+@media (max-width: 900px) {
+  .mythos-decor-left, .mythos-decor-right { display: none; }
+}
+
+/* Eau animée de l'amphore (jet qui s'écoule + gouttes) */
+.mythos-water .mw-stream {
+  stroke-dasharray: 10 14;
+  opacity: 0.75;
+  animation: mw-flow 1.1s linear infinite;
+}
+@keyframes mw-flow { to { stroke-dashoffset: -24; } }
+.mythos-water .mw-drop { opacity: 0; }
+.mythos-water .mw-drop1 { animation: mw-drop 1.6s ease-in infinite; }
+.mythos-water .mw-drop2 { animation: mw-drop 1.6s ease-in infinite 0.55s; }
+.mythos-water .mw-drop3 { animation: mw-drop 1.6s ease-in infinite 1.05s; }
+@keyframes mw-drop {
+  0% { transform: translateY(0); opacity: 0; }
+  15% { opacity: 0.85; }
+  80% { opacity: 0.6; }
+  100% { transform: translateY(60px); opacity: 0; }
+}
+
+/* Personnage solide (réaliste, non holographique) : Solon, Prométhée */
+.mythos-silhouette.solid {
+  mix-blend-mode: normal;
+  border-radius: 14px;
+}

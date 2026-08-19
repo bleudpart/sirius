@@ -1,0 +1,55 @@
+{
+  "summary": "Retest final ciblé sur l’URL publique. Backend: 13/13 tests passent avec validation des contrats LOCUS, Scripts, Packager et HERACLES (email, DNS MX, pseudo, PDF). Frontend: les crashes LOCUS et Scripts sont corrigés; Packager affiche une note et deux ZIP valides; HERACLES email et PDF passent. Régression rapide complète sans pageerror. Défaut restant: le pseudo HERACLES rend 3 cartes vides sans URL au lieu des liens renvoyés par l’API.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "HERACLES pseudo johndoe",
+        "issue": "L’API renvoie result.links avec 5 objets {platform,url,status}, mais l’écran parcourt result.results (chaînes) et attend it.platform/it.url/it.label. Il affiche 3 cartes vides 'INCERTAIN', sans href utilisable, et React signale des clés de liste manquantes.",
+        "affected_selectors": [
+          "[data-testid='heracles-input']",
+          "[data-testid='heracles-check-btn']",
+          "[data-testid='heracles-platforms']"
+        ]
+      },
+      {
+        "flow": "Connexion WebSocket HUD",
+        "issue": "La console répète net::ERR_CONNECTION_REFUSED vers ws://localhost:8765 sur l’URL publique; App.js utilise une URL WebSocket codée en dur. Cela ne provoque pas de pageerror ni de crash visible pendant ce retest.",
+        "affected_selectors": [
+          "[data-testid='sirius-hud']"
+        ]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/iteration_15_final_retest.xml"
+  ],
+  "action_items": [
+    "Dans HeraclesPanel, rendre res.links pour le type username et utiliser platform/url/status; ne pas parcourir res.results comme des objets de lien.",
+    "Remplacer WS_URL codé en dur par une URL issue de l’environnement ou désactiver proprement cette connexion dans le déploiement public."
+  ],
+  "critical_code_review_comments": [
+    "HeraclesPanel.jsx lignes 108–118 est encore aligné sur un ancien contrat: res.results.map traite des chaînes comme des objets, alors que modules_api.py fournit les liens exploitables dans res.links. C’est la cause directe des cartes vides et du warning React.",
+    "App.js dépasse 3900 lignes et WS_URL='ws://localhost:8765' viole la règle de configuration par environnement; ce couplage rend les dérives de contrat et erreurs de déploiement plus probables."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/iteration_15_final_retest.xml",
+    "/app/test_reports/iteration_15.json"
+  ],
+  "success_rate": {
+    "backend": "100% (13/13)",
+    "frontend": "96% des assertions/parcours exécutés; 3 fixes principaux et la branche email HERACLES passent, 1 sous-flux pseudo échoue"
+  },
+  "seed_data_creation": "Un script TEST_restored_* a été créé puis supprimé par le test API. Aucun script TEST_ persistant. Suggestions remises à equilibre et mode système remis à normal.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Retester uniquement HERACLES avec johndoe: chaque ancre de heracles-platforms doit avoir un libellé de plateforme et un href HTTP provenant de result.links. Les parcours LOCUS Paris→Lyon, Scripts echo hello, Packager build/download/installer, HERACLES email+PDF et les smokes restaurés ont tous passé sans pageerror.",
+  "rca_of_the_issue": "Reproduction: setup Testeur, ouvrir MODULES > HERACLES, saisir johndoe et enquêter. L’API 200 contient result.links (Twitter, GitHub, Reddit, Instagram, Stack Overflow) et result.results sous forme de constats texte. La branche username du frontend parcourt res.results mais déréférence it.platform, it.url, it.label et it.status; ces propriétés sont undefined sur des chaînes. Résultat: ancres sans href ni libellé et warning React de clés manquantes. Corriger la source de rendu vers res.links."
+}

@@ -1,0 +1,68 @@
+{
+  "summary": "Itération 30 testée sur l’URL publique. Backend: 7/7 tests passent pour Deal→Thémis (devis/facture, TVA 20 %, persistance client/doc/badge, erreurs 400/404), coaching Kimi K3 multi-tours + débrief, briefing Oracle avec titres NewsAPI, et régression MYTHOS 13/13. Frontend: création/mouvement d’un deal jusqu’à GAGNÉ, actions DEVIS/FACTURE, badge persistant, coaching complet, relance différée, galerie MYTHOS, actualités, Cortex et absence d’erreurs vocales passent. Défaut reproduit: après DEVIS, THÉMIS est monté derrière AGORA et reste inaccessible jusqu’à fermeture manuelle d’AGORA.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "AgoraPipeline — Deal vers Thémis",
+        "issue": "Cliquer DEVIS crée correctement le document et monte le panneau THÉMIS, mais AGORA reste au premier plan et intercepte les clics. Le bouton de fermeture THÉMIS est visible pour Playwright dans le DOM mais non actionnable; il faut fermer AGORA pour révéler THÉMIS.",
+        "selector": "[data-testid='themis-panel'], [data-testid='agora-pipeline']",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Deal GAGNÉ → DEVIS → ouverture THÉMIS",
+        "issue": "La génération backend et le badge réussissent, mais la transition de panneau n’est pas exclusive: showThemis et showAgora restent tous deux vrais.",
+        "affected_selectors": [
+          "[data-testid^='agora-devis-']",
+          "[data-testid='themis-panel']",
+          "[data-testid='themis-close-btn']"
+        ]
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "HERMÈS AGORA# — formulaire pipeline",
+        "issues": [
+          "Le champ Relance utilise encore input[type=date] natif et affiche mm/dd/yyyy sous Chromium dans l’interface française, au lieu d’un calendrier thémé/localisé."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration30_features.py",
+    "/app/backend/tests/test_agora_news_mythos.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/iteration_30_features.xml",
+    "/app/test_reports/pytest/iteration_30_mythos_regression.xml"
+  ],
+  "action_items": [
+    "Lors de toThemis, fermer AGORA avant d’ouvrir THÉMIS (ou utiliser un gestionnaire de panneau actif unique / des z-index explicites) afin que THÉMIS soit immédiatement interactif.",
+    "Remplacer/localiser le sélecteur de date natif du pipeline avec le calendrier thémé français.",
+    "Après correction de la superposition, rejouer le parcours Deal GAGNÉ → DEVIS → THÉMIS → retour pipeline → badge."
+  ],
+  "critical_code_review_comments": [
+    "RCA superposition: App.js rend ThemisPanel avant AgoraPipeline (lignes 3615-3616) alors que les deux utilisent .prime-screen avec le même z-index 900; le dernier nœud DOM, AGORA, recouvre donc THÉMIS et intercepte les événements.",
+    "themis_api.py:/from-deal ne vérifie ni que le deal est à l’étape GAGNÉ ni qu’un document a déjà été généré. Des appels API répétés peuvent créer des documents orphelins et écraser le badge du deal; ajouter une règle d’idempotence/validation métier si ce comportement n’est pas voulu.",
+    "AgoraPipeline.jsx prononce les deux réponses du prospect avec le profil M1, alors que HERMÈS AGORA# est assigné M2 dans CHAR_VOICES; harmoniser ce choix si toutes les prises de parole du personnage doivent respecter son profil Mythos.",
+    "App.js atteint 4556 lignes, largement au-delà du seuil de 700; extraire la gestion des panneaux et les effets de démarrage réduirait les régressions de superposition comme celle-ci.",
+    "Lint ciblé: AgoraPipeline passe; voice.js conserve 3 erreurs no-empty et NewsPanel.jsx 1 erreur react/no-unescaped-entities."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration30_features.py",
+    "/app/test_reports/iteration_30.json"
+  ],
+  "success_rate": {
+    "backend": "100% (7/7 tests exécutés)",
+    "frontend": "95% des parcours/assertions ciblés; toutes les fonctions passent sauf l’affichage interactif immédiat de THÉMIS au-dessus d’AGORA"
+  },
+  "seed_data_creation": "Deals TEST_ThemisDeal_*, TEST_UI_*, TEST_RELANCE_* ainsi que leurs clients/documents Thémis créés pour les tests puis supprimés. Vérification finale: 0 deal, 0 client et 0 document préfixé TEST_ restant. Restaurant Le Phare préservé.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Le backend est vert. Pour reproduire le seul défaut: ouvrir pipeline, créer un deal, avancer 5 fois jusqu’à GAGNÉ, cliquer DEVIS; themis-panel est attaché mais Agora reste au-dessus. Fermer agora-close-btn révèle THÉMIS; fermer THÉMIS, rouvrir pipeline et le badge DEV- est présent. Le coaching UI complet et la relance automatique différée de 24 s sont verts. Attendre environ 4 s après apparition du popup pour que son effet machine à écrire rende toute la date.",
+  "rca_of_the_issue": "ThemisPanel et AgoraPipeline sont simultanément montés avec position fixed et z-index 900. Comme AgoraPipeline est rendu après ThemisPanel dans App.js, l’ordre d’empilement place AGORA au-dessus; les hit-tests du bouton THÉMIS rencontrent un élément AGORA. La donnée et la navigation logique sont correctes, seul l’état de panneau/z-index est fautif."
+}

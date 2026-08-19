@@ -1,0 +1,55 @@
+SIRIUS Assistant – Liste des modules et dates de création
+© 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+
+NOTE : les dates proviennent de l'historique du projet. Les modules marqués
+« restauré le 31/07/2026 » existaient avant et ont été réintégrés à cette date.
+
+── CŒUR DU SYSTÈME ─────────────────────────────────────────────
+- SIRIUS SETUP (profil, clés API, voix)            : 25/06/2026
+- Compagnon Dev (analyse de code)                  : 19/07/2026
+- Médiathèque / FILES (fichiers, audio)            : 09/07/2026
+- Architecte visuel (diagrammes)                   : 09/07/2026
+
+── MODULES MYTHOS & SUPERVISION ────────────────────────────────
+- PANTHEON SYSTEM (supervision globale)            : 22/07/2026
+- NEXUS CÉLESTE (connexions inter-modules)         : 22/07/2026
+- ORACLE DIVIN (prédictions, marchés)              : 22/07/2026
+- SIRIUS PRIME (mémoire & apprentissage)           : 22/07/2026
+- ZEUS CORTEX (cerveau visuel, iris humain)        : 22/07/2026
+
+── AFFICHAGE & NAVIGATION ──────────────────────────────────────
+- Archives Europeana (galerie culturelle)          : 25/07/2026
+- Galerie des archives (souvenirs visuels)         : 25/07/2026
+- Fenêtres Web (navigation intégrée)               : 25/07/2026
+- Fenêtres de tâches (suivi en direct)             : 25/07/2026
+- SIRIUS DISPLAY (panneau média & web)             : 27/07/2026
+
+── MODULES SPÉCIALISÉS (restaurés le 31/07/2026) ───────────────
+- HACCP — hygiène & sécurité alimentaire           : 31/07/2026
+- Gestion de la mémoire (souvenirs longue durée)   : 31/07/2026
+- ARGUS# — surveillance & réparation système       : 31/07/2026
+- LOCUS# — géolocalisation & itinéraires           : 31/07/2026
+- HERACLES# — investigation OSINT                  : 31/07/2026
+- Galerie MYTHOS (personnages mythologiques)       : 31/07/2026
+- TRAILER# — clichés cinématiques                  : 31/07/2026
+- PACKAGER# — livrable multi-plateforme            : 31/07/2026
+- Assistant d'installation                         : 31/07/2026
+- Bibliothèque de scripts (installateur sécurisé)  : 31/07/2026
+- Séquence d'activation WAHOU                      : 31/07/2026
+- Palette de commandes                             : 31/07/2026
+- Veille proactive (suggestions intelligentes)     : 31/07/2026
+- Modes système (normal / frugal / secours)        : 31/07/2026
+
+── DERNIÈRES CRÉATIONS ─────────────────────────────────────────
+- Statut des clés API                              : 01/08/2026
+- Fenêtre de progression & journal des tâches      : 01/08/2026
+- Bannière d'installation PWA + notifications push : 01/08/2026
+- KERAUNOS# — domotique Home Assistant (+ voix)    : 01/08/2026
+
+── FONCTIONS INTÉGRÉES AU HUD (App.js) ─────────────────────────
+- Météo temps réel, horloge, statistiques CPU/RAM
+- Briefing matinal (recherche web + synthèse IA)
+- Commande vocale talkie-walkie (ESPACE) + TTS neural
+- Spotify (lecture en cours), Outlook (mails & agenda)
+- Vision caméra, documentaires, actualités, fiches pays
+- Mains holographiques 3D, fond antique, éclairs

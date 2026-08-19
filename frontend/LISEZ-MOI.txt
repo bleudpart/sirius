@@ -1,0 +1,101 @@
+============================================================
+   S.I.R.I.U.S  -  Assistant holographique  (partel)
+   Comment installer SIRIUS sur votre PC Windows
+============================================================
+
+Vous avez reçu un dossier "frontend" contenant tout le HUD Sirius.
+Pour transformer ce dossier en VRAIE application Windows (.exe),
+suivez ces étapes simples :
+
+
+-------------------------------------------------
+ÉTAPE 1 — Installer Node.js (une seule fois)
+-------------------------------------------------
+1. Allez sur : https://nodejs.org
+2. Téléchargez la version "LTS" (bouton de gauche).
+3. Installez-la en cliquant sur "Suivant" jusqu'à la fin.
+
+
+-------------------------------------------------
+ÉTAPE 2 — Lancer la compilation
+-------------------------------------------------
+⚠️ IMPORTANT : EXTRAYEZ d'abord le ZIP !
+   Faites un clic droit sur le fichier .zip > "Extraire tout..."
+   et choisissez un dossier (ex : le Bureau).
+   NE lancez PAS BUILD.bat directement depuis l'intérieur du
+   ZIP/WinRAR : ça ne fonctionnera pas (fichiers manquants).
+
+1. Ouvrez le dossier EXTRAIT.
+2. Double-cliquez sur le fichier  >>  BUILD.bat
+3. Patientez (la 1re fois prend quelques minutes :
+   téléchargement + compilation).
+4. À la fin, le dossier "dist" s'ouvre automatiquement.
+
+
+-------------------------------------------------
+ÉTAPE 3 — Installer / Lancer
+-------------------------------------------------
+Dans le dossier "dist" vous trouverez :
+
+   • "SIRIUS Setup 1.0.0.exe"
+       -> Installeur classique. Double-cliquez, ça installe
+          SIRIUS comme un vrai programme + raccourci bureau.
+
+   • "SIRIUS 1.0.0.exe"
+       -> Version PORTABLE. Aucune installation : double-cliquez
+          et SIRIUS se lance directement (clé USB compatible).
+
+Choisissez celle que vous préférez. L'icône Sirius bleue
+apparaîtra automatiquement.
+
+
+-------------------------------------------------
+PREMIER LANCEMENT — CONFIGURATION
+-------------------------------------------------
+Au tout premier démarrage, SIRIUS affiche un écran de
+configuration. Chaque personne y saisit :
+
+  • Son PROFIL : prénom, âge, profession, ville, genre,
+    centres d'intérêt. Sirius l'appellera par son prénom
+    et adaptera ses réponses à son profil.
+
+  • Ses CLÉS API (privées, stockées uniquement sur SON PC) :
+      - Groq      : le "cerveau" (obligatoire pour être
+                    intelligent). Gratuit : https://console.groq.com/keys
+      - SerpAPI   : recherche web en direct (optionnel)
+      - Gemini    : cerveau de secours (optionnel)
+      - OpenAI    : voix premium "Onyx" (optionnel ;
+                    sinon voix gratuite du PC)
+
+Sans clé Groq, Sirius répond en mode démonstration simple.
+On peut modifier le profil/les clés à tout moment via le
+petit bouton en haut à droite (icône engrenage).
+
+IMPORTANT : les clés ne sont JAMAIS partagées. Chaque
+utilisateur utilise son propre compte, donc ses propres
+quotas — vous (le créateur) ne payez rien pour eux.
+
+
+-------------------------------------------------
+À PROPOS DU MICRO ET DE LA VOIX
+-------------------------------------------------
+• Au 1er lancement, autorisez l'accès au microphone si demandé.
+• La voix premium "Onyx" fonctionne quand le serveur est en ligne ;
+  sinon SIRIUS bascule automatiquement sur la voix du système.
+• Pour relier SIRIUS à votre assistant Python local, démarrez
+  votre script WebSocket sur ws://localhost:8765 AVANT d'ouvrir
+  SIRIUS : le HUD se synchronisera tout seul ("RELIÉ AU NOYAU").
+
+
+-------------------------------------------------
+EN CAS DE PROBLÈME
+-------------------------------------------------
+• "Node n'est pas reconnu" -> Node.js n'est pas installé (Étape 1).
+• Antivirus qui bloque -> autorisez l'application (faux positif
+  fréquent pour les .exe non signés).
+• Pour tout relancer proprement : supprimez les dossiers
+  "node_modules", "build" et "dist", puis relancez BUILD.bat.
+
+============================================================
+   Bon vol, Daniel. SIRIUS est prêt.  —  partel
+============================================================

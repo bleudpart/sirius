@@ -1,0 +1,66 @@
+/* ACTUALITÉS — flux en direct */
+.news-screen { display: flex; flex-direction: column; overflow: hidden; }
+
+.np-bar {
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+  justify-content: space-between; padding: 10px 26px 0;
+}
+.np-search {
+  display: flex; align-items: center; gap: 8px; flex: 1 1 420px;
+  background: rgba(0, 14, 24, 0.7); border: 1px solid rgba(0, 240, 255, 0.22);
+  border-radius: 6px; padding: 4px 6px 4px 12px; color: #7fdcee;
+}
+.np-search input {
+  flex: 1; background: none; border: none; outline: none;
+  color: #d5f6ff; font-size: 13px; font-family: "Rajdhani", sans-serif;
+}
+.np-search button, .np-actions button {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  background: transparent; border: 1px solid rgba(0, 240, 255, 0.4); color: #7fdcee;
+  border-radius: 4px; padding: 5px 12px; font-size: 10px; letter-spacing: 1.5px;
+  font-family: "Orbitron", sans-serif; transition: background-color 0.2s;
+}
+.np-search button:hover, .np-actions button:hover:not(:disabled) { background: rgba(0, 240, 255, 0.12); }
+.np-actions button:disabled { opacity: 0.4; cursor: not-allowed; }
+.np-clear { border-color: rgba(240, 190, 80, 0.5) !important; color: #f0be50 !important; }
+.np-actions { display: flex; align-items: center; gap: 8px; }
+.np-updated { font-size: 11px; color: #7c98a2; }
+.np-err { padding: 10px 26px; color: #f43f5e; font-size: 13px; }
+.np-loading { padding: 24px 26px; color: #7fb6cc; font-size: 14px; }
+.spin { animation: npSpin 1s linear infinite; }
+@keyframes npSpin { to { transform: rotate(360deg); } }
+
+.np-feed {
+  flex: 1; overflow-y: auto; scrollbar-width: thin;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 14px; padding: 16px 26px 26px; align-content: start;
+}
+.np-card {
+  background: rgba(0, 14, 24, 0.6); border: 1px solid rgba(255, 255, 255, 0.07);
+  border-left: 3px solid #f0be50; border-radius: 10px; padding: 14px 16px;
+  animation: mgFade 0.4s ease-out both;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.np-card-meta { display: flex; justify-content: space-between; gap: 10px; }
+.np-source { font-family: "Orbitron", sans-serif; font-size: 9.5px; letter-spacing: 1.8px; color: #f0be50; }
+.np-date { font-size: 11px; color: #7c98a2; }
+.np-title { margin: 0; font-size: 15.5px; line-height: 1.35; color: #e6f7ff; font-weight: 600; }
+.np-desc { margin: 0; font-size: 12.5px; line-height: 1.5; color: #9fc0cc; }
+.np-link {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 6px;
+  margin-top: 4px; font-family: "Orbitron", sans-serif; font-size: 9.5px;
+  letter-spacing: 1.5px; color: #7fdcee; text-decoration: none;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.35); padding-bottom: 2px;
+}
+.np-link:hover { color: #bdf3ff; }
+
+/* Or véritable — actualités */
+.np-source {
+  background: linear-gradient(115deg, #b8811f 12%, #f5c542 38%, #fff3c4 52%, #f5c542 66%, #b8811f 88%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: goldSheen 6s linear infinite;
+}
+.np-card { border-left-color: #d9a53c; box-shadow: inset 3px 0 12px -6px rgba(245, 197, 66, 0.4); }

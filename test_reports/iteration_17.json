@@ -1,0 +1,29 @@
+{
+  "summary": "Frontend-only iteration 17 retest passed all requested fixes on the public URL. LOCUS and HERACLES used distinct namespaced drag keys without cross-module inheritance; both PANTHEON secondary headings dragged their cards; ORACLE and ARGUS grip positions persisted after close/reopen; and the localhost WebSocket loop produced exactly 5 failures at 0.4s, 1.8s, 3.8s, 7.9s, and 15.9s, with no later failures during the 65+ second five-module traversal.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Non-blocking cleanup: useDraggableCards.js line 82 retains an unused eslint-disable directive; targeted ESLint reports one warning and no errors."
+  ],
+  "updated_files": [
+    "/app/test_reports/iteration_17.json"
+  ],
+  "success_rate": {
+    "backend": "Not tested (frontend-only request)",
+    "frontend": "100% of requested iteration 17 flows passed"
+  },
+  "seed_data_creation": "No backend data created. Browser-local drag keys were cleared, then isolated LOCUS, HERACLES, PANTHEON, ORACLE, and ARGUS position keys were created in the test context.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All three iteration 16 defects are verified fixed. In the complete run, LOCUS saved {x:42,y:26}, HERACLES first opened with an empty transform and saved {x:31,y:19}, and LOCUS restored its original transform. PANTHEON's TABLEAU DE CONNECTIVITÉ and HISTORIQUE DES CONNEXIONS headings both had cursor:grab and moved their respective cards. ORACLE data should be allowed to settle before dragging because its drag hook rebinds when overview data arrives.",
+  "rca_of_the_issue": "The implemented fixes address the prior causes: storage keys now include the root panel namespace; querySelectorAll wires every matching heading; and the non-localhost reconnect guard stops after the initial connection plus four retries. Observed WebSocket failures followed exponential backoff and ceased after 15.9 seconds. No page errors or visible DOM errors occurred."
+}

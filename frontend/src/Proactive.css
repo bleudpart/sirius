@@ -1,0 +1,123 @@
+/* © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France). */
+/* SIRIUS — Suggestions proactives */
+.proactive-stack {
+  position: fixed;
+  left: 26px;
+  top: 120px;
+  width: 316px;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.pro-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #67e8f9;
+  font-family: "Orbitron", sans-serif;
+  font-size: 8px;
+  letter-spacing: 2px;
+}
+.pro-mode-label { margin-right: 4px; opacity: 0.85; }
+.pro-mode-btn {
+  background: rgba(0, 20, 34, 0.7);
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  color: #7dd3fc;
+  font-family: "Orbitron", sans-serif;
+  font-size: 7px;
+  letter-spacing: 1.5px;
+  padding: 3px 7px;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
+}
+.pro-mode-btn.on {
+  background: rgba(0, 240, 255, 0.22);
+  color: #e0fbff;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.45);
+}
+
+.sugg-card {
+  background: rgba(0, 5, 12, 0.9);
+  border: 1px solid rgba(0, 240, 255, 0.55);
+  box-shadow: 0 0 16px rgba(0, 200, 255, 0.22), 0 14px 30px rgba(0, 0, 0, 0.5);
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+  padding: 11px 13px;
+  animation: suggIn 0.4s ease both;
+}
+@keyframes suggIn {
+  from { opacity: 0; transform: translateX(-18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.sugg-card.urg-haute { border-color: rgba(255, 149, 0, 0.75); }
+
+.sugg-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.sugg-title {
+  color: #aef3ff;
+  font-family: "Orbitron", sans-serif;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  flex: 1;
+}
+.sugg-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: "Orbitron", sans-serif;
+  font-size: 7px;
+  letter-spacing: 1px;
+  padding: 2px 6px;
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  color: #67e8f9;
+}
+.sugg-badge.urg-haute { border-color: #ff9500; color: #ffb347; }
+.sugg-badge.risk-eleve { border-color: #ff4d4d; color: #ff7a7a; }
+.sugg-badge.risk-moyen { border-color: #ffd24d; color: #ffe08a; }
+
+.sugg-desc {
+  color: #d5f6ff;
+  font-size: 11.5px;
+  line-height: 1.45;
+  margin: 7px 0 9px;
+}
+.sugg-confirm {
+  color: #ffb347;
+  font-size: 10.5px;
+  margin: 0 0 8px;
+}
+.sugg-why {
+  border-left: 2px solid rgba(0, 240, 255, 0.5);
+  padding: 4px 8px;
+  margin: 0 0 9px;
+}
+.sugg-why p { color: #9fd8e8; font-size: 10px; margin: 2px 0; }
+.sugg-why b { color: #67e8f9; }
+
+.sugg-actions { display: flex; flex-wrap: wrap; gap: 5px; }
+.sugg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 24, 40, 0.8);
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  color: #8be9ff;
+  font-family: "Orbitron", sans-serif;
+  font-size: 7.5px;
+  letter-spacing: 1px;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: background-color 0.2s, box-shadow 0.2s, color 0.2s;
+}
+.sugg-btn:hover { background: rgba(0, 240, 255, 0.16); box-shadow: 0 0 10px rgba(0, 240, 255, 0.35); }
+.sugg-btn.exec { border-color: rgba(0, 255, 170, 0.55); color: #7dffd4; }
+.sugg-btn.exec:hover { background: rgba(0, 255, 170, 0.14); }
+.sugg-btn.danger { border-color: rgba(255, 90, 90, 0.5); color: #ff9d9d; }
+.sugg-btn.danger:hover { background: rgba(255, 90, 90, 0.12); }
+.sugg-btn.ghost { border-color: rgba(120, 160, 180, 0.4); color: #9fc4d4; }
+
+@media (max-width: 900px) {
+  .proactive-stack { width: 260px; left: 12px; top: 96px; }
+}

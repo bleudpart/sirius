@@ -1,0 +1,67 @@
+{
+  "summary": "Itération 29 testée sur l’URL publique: MYTHOS 13 personnages, consultation HERMÈS AGORA, CRUD pipeline MongoDB, NewsAPI et régressions de commandes. Backend: 7/8 tests ciblés réussis; consultation structurée, CRUD/validations/persistance/suppression et actualités sont conformes. Échec confirmé: LOCUS# et HÉPHAÏSTOS# n’ont ni bio ni capacites. Frontend: galerie, images, onglets, ouverture AGORA, CRUD kanban, actualités/recherche/actualisation, popup de vente et régressions actualités/Cortex fonctionnent; la fiche LOCUS affiche 0 capacité.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "/api/mythos/characters",
+        "issue": "Le tableau contient bien 13 personnages, mais LOCUS# et HÉPHAÏSTOS# omettent tous deux les champs bio et capacites exigés; le test agrégé reproduit les quatre omissions.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Galerie MYTHOS — onglet CAPACITÉS",
+        "issue": "Sur LOCUS#, CAPACITÉS affiche un conteneur vide (0 puce). Le payload omet aussi les capacités de HÉPHAÏSTOS#, donc sa fiche suit le même chemin de rendu vide.",
+        "selector": "[data-testid='mythos-detail-caps']",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "HERMÈS AGORA# — formulaire pipeline",
+        "issues": [
+          "La date de relance utilise le sélecteur natif input[type=date]; sous Chromium il affiche le format mm/dd/yyyy dans une interface française, au lieu d’un calendrier thémé/localisé."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_agora_news_mythos.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/iteration_29_agora_news_mythos.xml",
+    "/app/test_reports/pytest/iteration_29_metadata_failure.xml",
+    "/app/test_reports/pytest/iteration_29_mythos_regression_retry.xml"
+  ],
+  "action_items": [
+    "Ajouter une bio française non vide et une liste capacites non vide à LOCUS# et HÉPHAÏSTOS# dans MYTHOS_CHARACTERS, puis retester API et onglets.",
+    "Remplacer/localiser le champ date natif du pipeline avec le calendrier cohérent du design français.",
+    "Gérer response.ok et afficher agora-error pour les échecs PUT/DELETE/GET du pipeline au lieu de recharger silencieusement un état potentiellement obsolète."
+  ],
+  "critical_code_review_comments": [
+    "modules_api.py:50-55 et 98-103 sont les deux seules fiches historiques sans bio/capacites; MythosGallery masque l’absence de bio par sel.details mais n’a aucun fallback pour les capacités, d’où le panneau vide.",
+    "AgoraPipeline.jsx:18-24 ne signale pas les réponses GET non-2xx; move() et del() lignes 41-51 ignorent aussi le statut HTTP et ne placent jamais l’erreur dans agora-error.",
+    "App.js compte 4522 lignes, très au-delà du seuil de 700; les nouveaux patterns de commande et états de panneaux devraient être extraits dans un routeur d’intentions/hooks dédiés pour réduire les régressions.",
+    "ESLint ciblé passe pour MythosGallery, AgoraPipeline et NewsPanel; App.js conserve 41 problèmes existants, principalement des catch vides qui masquent les erreurs d’intégration."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_agora_news_mythos.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/iteration_29.json"
+  ],
+  "success_rate": {
+    "backend": "87.5% (7/8 tests fonctionnels ciblés; 2/2 régressions MYTHOS passent après un retry réseau)",
+    "frontend": "94% des parcours/assertions ciblés; toutes les fonctions passent sauf les capacités MYTHOS manquantes"
+  },
+  "seed_data_creation": "Deals TEST_Agora_*, TEST_Delete_* et TEST_UI_AGORA_2901 créés pour CRUD/persistance puis supprimés; vérification finale: 0 deal préfixé TEST_ restant. Le deal existant Restaurant Le Phare est resté intact.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Rejouer d’abord le test metadata agrégé, puis ouvrir LOCUS# et HÉPHAÏSTOS# dans la galerie et vérifier au moins une puce chacun. Les flux Agora CRUD, consultation IA, NewsAPI, popup sport et ZEUS CORTEX sont verts. La popup de consultation est rendue avec un effet machine à écrire: attendre le texte ACTIONS IMMÉDIATES avant d’asserter le contenu.",
+  "rca_of_the_issue": "Les objets LOCUS# et HÉPHAÏSTOS# ont conservé l’ancien schéma MYTHOS sans bio/capacites, contrairement aux 11 autres entrées. MythosGallery utilise sel.bio || sel.details pour BIOGRAPHIE, ce qui cache partiellement l’omission, mais mappe directement (sel.capacites || []), produisant 0 puce.",
+  "flaky_tests": [
+    "backend_test.py::TestStaticRestoredModules::test_mythos_characters_and_image: 1 timeout ingress sur 2 tentatives (50% observé); retry immédiat réussi en 0,27 s, aucun défaut fonctionnel reproduit."
+  ]
+}

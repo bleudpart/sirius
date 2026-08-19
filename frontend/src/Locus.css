@@ -1,0 +1,69 @@
+/* © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France). */
+/* SIRIUS LOCUS# — géolocalisation */
+.locus-searchrow { display: flex; gap: 8px; align-items: stretch; }
+.locus-input { flex: 1; margin: 0 !important; }
+.locus-go {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 0 16px; border-radius: 4px; cursor: pointer;
+  background: rgba(0, 240, 255, 0.12); color: #7df3ff;
+  border: 1px solid rgba(0, 240, 255, 0.5);
+  font-family: inherit; font-size: 11px; letter-spacing: 1.5px;
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+.locus-go:hover { background: rgba(0, 240, 255, 0.25); box-shadow: 0 0 14px rgba(0, 240, 255, 0.35); }
+.locus-go:disabled { opacity: 0.5; cursor: wait; }
+.locus-go .spin { animation: locus-spin 0.9s linear infinite; }
+@keyframes locus-spin { to { transform: rotate(360deg); } }
+
+.locus-error {
+  margin-top: 12px; padding: 9px 12px; font-size: 12px;
+  color: #ff9d9d; border: 1px solid rgba(255, 90, 90, 0.45);
+  background: rgba(255, 60, 60, 0.08); border-radius: 4px;
+}
+
+.locus-result { margin-top: 14px; }
+.locus-formatted { font-size: 13px; color: #d5f6ff; letter-spacing: 0.4px; margin-bottom: 8px; }
+.locus-coords { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 11px; color: #8fd8e8; letter-spacing: 1px; }
+.locus-coords b { color: #00f0ff; font-weight: 600; margin-left: 4px; }
+.locus-source {
+  padding: 2px 8px; border-radius: 3px; font-size: 9.5px; letter-spacing: 1.5px;
+  border: 1px solid rgba(0, 240, 255, 0.45); color: #7df3ff;
+}
+.locus-source.nominatim { border-color: rgba(140, 255, 170, 0.45); color: #a4ffbe; }
+.locus-copy {
+  display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
+  background: transparent; border: 1px solid rgba(0, 240, 255, 0.35);
+  color: #7df3ff; border-radius: 3px; padding: 3px 9px; font-size: 9.5px;
+  letter-spacing: 1.2px; font-family: inherit; transition: background-color 0.2s;
+}
+.locus-copy:hover { background: rgba(0, 240, 255, 0.15); }
+
+.locus-map {
+  width: 100%; height: 300px; margin-top: 12px; border: 1px solid rgba(0, 240, 255, 0.4);
+  border-radius: 6px; filter: saturate(0.85) hue-rotate(-8deg);
+  background: rgba(0, 18, 30, 0.9);
+}
+
+.locus-intent { margin-top: 12px; font-size: 11px; color: #8fd8e8; }
+.locus-intent summary { cursor: pointer; letter-spacing: 1.5px; font-size: 10px; color: #5fb9cc; }
+.locus-intent pre {
+  margin-top: 8px; padding: 10px; font-size: 11px; overflow-x: auto;
+  background: rgba(0, 18, 30, 0.9); border: 1px solid rgba(0, 240, 255, 0.3);
+  border-radius: 4px; color: #b9ecff;
+}
+
+.locus-weather {
+  display: inline-flex; align-items: center; gap: 7px; margin-top: 10px;
+  padding: 6px 12px; font-size: 11.5px; color: #b9ecff; letter-spacing: 0.6px;
+  border: 1px solid rgba(0, 240, 255, 0.35); border-radius: 4px;
+  background: rgba(0, 40, 60, 0.35);
+}
+.locus-weather b { color: #00f0ff; }
+.locus-wcond { text-transform: uppercase; font-size: 10px; letter-spacing: 1.3px; color: #7df3ff; }
+.locus-whum { font-size: 10px; color: #8fd8e8; }
+
+.locus-routerow .locus-input { flex: 1; }
+.locus-routestats { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; font-size: 11px; color: #8fd8e8; letter-spacing: 1px; margin-bottom: 10px; }
+.locus-routestats b { color: #00f0ff; font-weight: 600; margin-left: 4px; font-size: 13px; }
+.locus-routearrow { color: #00f0ff; font-size: 15px; margin: 2px 0 2px 8px; }
+

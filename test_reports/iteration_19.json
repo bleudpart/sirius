@@ -1,0 +1,27 @@
+{
+  "summary": "Frontend-only iteration 19 verification passed all requested title-animation-removal and HUD regression checks on the public URL. After boot was skipped, h1[data-testid='sirius-title'] was immediately visible as one plain ΣIRIUS text node with zero child elements/spans; no .sirius-title-letter nodes or letterIn keyframes existed. Its computed animation-name was exactly 'goldSheen, goldPulse'. Across seven samples over 13 seconds, title geometry changed by 0.000 px and opacity, transform, clip-path, and readability remained stable. Both hand assets were visible at mid-height, and the command bar accepted, submitted, and cleared input with a rendered response.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/test_reports/iteration_19.json"
+  ],
+  "success_rate": {
+    "backend": "Not tested (frontend-only request)",
+    "frontend": "100% of requested title and quick HUD regression checks passed"
+  },
+  "seed_data_creation": "No backend data created. Browser localStorage was populated with the requested Testeur/Paris profile, current briefing date and PWA dismissal timestamp; installed/hands flags and the session WAHOU flag suppressed unrelated overlays during the 13-second observation.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "At 1920x1080, the title innerHTML was exactly ΣIRIUS with a single text child node, zero spans globally, opacity 1, white-space nowrap, clip-path none, transform none, and animation-name 'goldSheen, goldPulse'. Its rect stayed x=606.47, y=284.25, width=723.08, height=264.00 for all samples at 2/4/6/8/10/12/13 seconds. Both 1024px hand assets loaded and centered near y=540. The command 'quelle heure est-il' cleared the input and returned a local spoken-time subtitle. There were no page errors, visible DOM errors, or title-related console errors. Six bounded ws://localhost:8765 connection failures were the previously documented public-preview behavior and unrelated to this change.",
+  "rca_of_the_issue": "The overlap risk was removed at its source: the title is rendered as one plain text node instead of independently animated per-letter spans, and the letterIn animation/class are absent. Runtime verification confirmed only the intentional goldSheen and goldPulse animations remain, so no animation modifies individual letter opacity or position."
+}

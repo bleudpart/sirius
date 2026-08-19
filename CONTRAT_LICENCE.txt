@@ -1,0 +1,38 @@
+CONTRAT DE LICENCE LOGICIEL – SIRIUS ASSISTANT
+
+Entre :
+Daniel Partel (éditeur du logiciel SIRIUS Assistant)
+et
+[Nom du client]
+
+1. Objet
+Le présent contrat accorde au client un droit d'usage du logiciel SIRIUS Assistant.
+
+2. Propriété
+Le logiciel, son code source, ses modules, son HUD 3D, ses interfaces et ses données structurelles restent la propriété exclusive de Daniel Partel.
+
+3. Droits accordés
+- Utilisation du logiciel sur [X] postes.
+- Accès aux mises à jour fournies par l'éditeur.
+- Support technique selon les modalités définies.
+
+4. Restrictions
+Le client ne peut :
+- copier, modifier, décompiler, redistribuer ou revendre le logiciel ;
+- fournir le logiciel à un tiers ;
+- utiliser le logiciel pour créer un produit concurrent.
+
+5. Responsabilité
+L'éditeur ne peut être tenu responsable des dommages indirects ou pertes de données.
+
+6. Durée
+Licence valable pour une durée illimitée sauf violation des conditions.
+
+7. Résiliation
+Toute violation entraîne la résiliation immédiate de la licence.
+
+Fait à [Ville], le [Date].
+
+Signature du client :
+
+Signature de l'éditeur :

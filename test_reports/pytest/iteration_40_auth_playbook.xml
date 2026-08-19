@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="4" time="2.440" timestamp="2026-08-09T10:23:11.854867+00:00" hostname="agent-env-2f24648e-0a4e-4f4a-8244-582e9ca6975c"><testcase classname="backend.tests.test_iteration35_auth.TestAuthenticationAPI" name="test_admin_login_and_wrong_password" time="0.688" /><testcase classname="backend.tests.test_iteration35_auth.TestAuthenticationAPI" name="test_five_failures_trigger_lockout_for_disposable_email" time="0.346" /><testcase classname="backend.tests.test_iteration35_auth.TestRequestedRegressions" name="test_credentialed_cors_preflight_uses_request_origin" time="0.067"><failure message="AssertionError: assert '*' == 'https://qa-auth.example.test'&#10;  &#10;  - https://qa-auth.example.test&#10;  + *">backend/tests/test_iteration35_auth.py:227: in test_credentialed_cors_preflight_uses_request_origin
+    assert response.headers.get("access-control-allow-origin") == origin
+E   AssertionError: assert '*' == 'https://qa-auth.example.test'
+E     
+E     - https://qa-auth.example.test
+E     + *</failure></testcase><testcase classname="backend.tests.test_iteration35_auth" name="test_seed_admin_updates_existing_stale_password" time="1.111" /></testsuite></testsuites>

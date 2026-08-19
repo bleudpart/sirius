@@ -1,0 +1,65 @@
+/* © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France). */
+/* Module ESPACE — système solaire 3D */
+.esp-panel {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(880px, 95vw);
+  height: min(620px, 88vh);
+  display: flex; flex-direction: column;
+  z-index: 96;
+  background: rgba(2, 8, 16, 0.97);
+  border: 1px solid rgba(34, 211, 238, 0.45);
+  border-top: 1px solid rgba(245, 197, 66, 0.55);
+  border-radius: 10px;
+  box-shadow: 0 0 30px rgba(0, 190, 255, 0.25), 0 0 38px rgba(245, 197, 66, 0.1);
+  overflow: hidden;
+  animation: espIn 0.3s ease-out;
+}
+@keyframes espIn { from { opacity: 0; transform: translate(-50%, -47%); } to { opacity: 1; transform: translate(-50%, -50%); } }
+
+.esp-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px;
+  color: #f5c542;
+  border-bottom: 1px solid rgba(245, 197, 66, 0.25);
+}
+.esp-title {
+  flex: 1;
+  font-family: "Orbitron", sans-serif; font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.12em;
+  text-shadow: 0 0 8px rgba(245, 197, 66, 0.4);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.esp-btn {
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  padding: 6px 10px; border-radius: 7px; cursor: pointer;
+  font-family: "Orbitron", sans-serif; font-size: 8px; letter-spacing: 0.08em;
+  color: #67e8f9; background: rgba(0, 50, 70, 0.5);
+  border: 1px solid rgba(34, 211, 238, 0.45);
+  transition: color 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+.esp-btn:hover { color: #ffe9a8; border-color: rgba(245, 197, 66, 0.55); box-shadow: 0 0 10px rgba(245, 197, 66, 0.25); }
+
+.esp-canvas { position: relative; flex: 1; min-height: 0; }
+.esp-canvas canvas { display: block; cursor: grab; }
+.esp-canvas canvas:active { cursor: grabbing; }
+
+.esp-legend {
+  position: absolute; left: 12px; bottom: 10px;
+  display: flex; align-items: center; gap: 14px;
+  font-size: 10.5px; color: #9fd3e8;
+  pointer-events: none;
+}
+.esp-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.esp-legend .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.esp-legend .dot.gold { background: #f5c542; box-shadow: 0 0 8px rgba(245, 197, 66, 0.8); }
+.esp-legend .dot.cyan { background: #22d3ee; box-shadow: 0 0 8px rgba(34, 211, 238, 0.8); }
+.esp-legend .dot.grey { background: #b8bcc4; }
+.esp-hint { color: rgba(159, 211, 232, 0.5); margin-left: 6px; }
+
+@media (max-width: 640px) {
+  .esp-panel { width: calc(100vw - 12px); height: 78vh; }
+  .esp-title { font-size: 8.5px; }
+  .esp-hint { display: none; }
+}

@@ -1,0 +1,66 @@
+{
+  "summary": "Validation des 8 fonctionnalités SIRIUS sur l’URL publique. Backend: 15/15 tests passent (historique cloud CRUD/tri, validations email SMTP, 4 géométries PNG, erreurs de forme, calcul, courbe et PDF). Frontend: setup/HUD/citation, historique Solon + PDF/email/suppression, migration nominale, géométrie/calcul/historique Pythagore et lecture continue/reprise Calliope passent. Trois défauts restent: perte de l’historique local si la migration cloud échoue, absence de message propre après erreur du micro, et fallback vocal navigateur silencieux à cause d’une variable volume non définie.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Pythagore — dictée vocale",
+        "issue": "En headless Chromium, le clic micro démarre puis échoue; après 1,2 s il n’affiche ni « Pythagore vous écoute » ni message d’indisponibilité, bien que le panneau reste stable. rec.onerror remet seulement listening à false et masque la cause.",
+        "selector": "[data-testid='pythagore-mic-btn']",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Migration localStorage vers historique cloud",
+        "issue": "Défaut de perte de données reproduit en abortant le POST /api/mythos/consult/history: la ligne n’est pas créée dans MongoDB mais sirius_consult_history est quand même supprimé. La migration ignore fetch rejeté et statuts HTTP puis efface inconditionnellement la seule copie locale.",
+        "affected_selectors": [
+          "[data-testid='solon-history']"
+        ]
+      },
+      {
+        "flow": "Voix navigateur / fallback Google, y compris profil nocturne",
+        "issue": "La vérification statique confirme isNight (22h–5h), rate ×0,87, pitch Google −1,5 et volume 0,72. Mais speakBrowser utilise volume sans le déclarer dans ses paramètres; le ReferenceError est avalé par catch, donc le profil voice='browser' et tout fallback Google échoué restent silencieux.",
+        "affected_selectors": [
+          "[data-testid='solon-speak-btn']",
+          "[data-testid='pythagore-mic-btn']"
+        ]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration33_new_features.py",
+    "/app/test_reports/pytest/iteration_33_new_features.xml"
+  ],
+  "action_items": [
+    "Ne supprimer sirius_consult_history qu’après confirmation r.ok pour toutes les entrées; conserver les échecs localement et afficher une notice de migration partielle/hors ligne.",
+    "Dans PythagorePanel, traiter rec.onerror avec un message utilisateur selon event.error (not-allowed, no-speech, audio-capture, network) et ajouter un data-testid à ce statut.",
+    "Ajouter volume = 1 au destructuring de speakBrowser afin que le profil navigateur et le fallback vocal fonctionnent; retester les profils jour/nuit.",
+    "Ajouter un data-testid et une sémantique bouton/clavier au .cal-book-main cliquable de Calliope.",
+    "Rejouer les parcours migration en échec, micro et voix navigateur après correction."
+  ],
+  "critical_code_review_comments": [
+    "ConsultPanel.jsx:79-85 transforme toute erreur réseau ou HTTP de migration en succès puis exécute localStorage.removeItem; conserver une file non migrée et ne retirer que les entrées confirmées.",
+    "PythagorePanel.jsx:108 rec.onerror = () => setListening(false) supprime tout retour utilisateur; le scénario demandé exige une indisponibilité propre.",
+    "voice.js:96 omet volume dans le paramètre destructuré alors que la ligne 108 l’utilise; le catch ligne 125 masque le ReferenceError et rend le fallback navigateur silencieux.",
+    "CalliopePanel.jsx:261 rend .cal-book-main cliquable sans bouton, rôle, clavier ni data-testid, ce qui réduit accessibilité et testabilité.",
+    "App.js (4804 lignes), server.py (2269) et modules_api.py (1795) dépassent largement 700 lignes; extraire navigation/panneaux et routes MYTHOS/Pythagore limiterait les régressions."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration33_new_features.py",
+    "/app/test_reports/iteration_33.json"
+  ],
+  "success_rate": {
+    "backend": "100% (15/15 tests ciblés)",
+    "frontend": "88% des parcours demandés; fonctionnalités principales opérationnelles, 3 défauts de robustesse/voix reproduits"
+  },
+  "seed_data_creation": "Création d’une consultation TEST_iteration33_* via API puis suppression et vérification d’absence. La ligne UI « Migration locale test » a été migrée puis supprimée par double confirmation. Le scénario d’échec a intercepté le POST et n’a rien créé côté serveur. « Test migration bail » et le livre Calliope ont été préservés.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Les 15 tests backend sont verts. Rejouer en priorité une migration avec POST aborté/500 et vérifier que le localStorage demeure, puis le micro headless avec message propre, et le fallback browser de voice.js. Les parcours Calliope sont verts: 45 pistes, next/prev, onEnded 2→3, sélection de piste et reprise piste 2. Solon nominal est vert: seed cloud, migration, téléchargement PDF, notice SMTP et suppression 2 clics.",
+  "rca_of_the_issue": "Migration: les fetch POST sont suivis de catch vides, aucun r.ok n’est validé, puis la clé entière est supprimée. Micro: SpeechRecognition existe mais l’erreur d’autorisation/capture n’est pas exposée, car onerror ne fait que désactiver listening. Voix: speakFr transmet volume, mais speakBrowser ne le destructure pas; la lecture de l’identifiant inexistant lève ReferenceError avant synth.speak, immédiatement absorbé par catch."
+}

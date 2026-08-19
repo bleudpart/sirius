@@ -1,0 +1,40 @@
+{
+  "summary": "Retest frontend ciblé sur l’URL publique. Les corrections migration localStorage→cloud et speakBrowser sont validées: l’échec réseau conserve l’entrée et affiche « Migration partielle », la reprise nominale migre puis supprime uniquement l’entrée de test, et le fallback navigateur produit une utterance avec volume borné. Pythagore affiche bien le message français lorsqu’un événement SpeechRecognition.onerror est déclenché et calcule sqrt(144)+3^4=93. Limite restante: dans Chromium headless réel, le clic micro n’a déclenché ni onstart ni onerror en 20 s, donc aucune notice n’est apparue sans erreur simulée.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Pythagore — dictée vocale",
+        "issue": "Le mapping rec.onerror est correct (not-allowed simulé → message français), mais le runtime Chromium headless peut laisser rec.start() sans callback: après 20 s, aucun état d’écoute ni data-testid='pythagore-mic-notice' n’était visible. Il manque un watchdog pour le cas où l’API ne déclenche aucun événement.",
+        "selector": "[data-testid='pythagore-mic-btn'], [data-testid='pythagore-mic-notice']",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Ajouter dans dictate() un délai de garde après rec.start() qui affiche une indisponibilité propre si ni onstart, ni onresult, ni onerror/onend ne survient, puis annuler ce délai dans tous les callbacks.",
+    "Rejouer le clic micro sans mock dans Chromium headless après correction du watchdog."
+  ],
+  "critical_code_review_comments": [
+    "PythagorePanel.jsx:129 gère seulement l’exception synchrone de rec.start(); certains moteurs retournent sans lever d’exception et sans émettre de callback. Un timeout explicite est nécessaire pour garantir le retour utilisateur demandé.",
+    "Les corrections ciblées sont présentes: ConsultPanel.jsx conserve uniquement les migrations échouées et ne supprime la clé qu’en réussite totale; voice.js destructure volume=1 et borne audio.volume/u.volume avec Math.max/Math.min."
+  ],
+  "updated_files": [
+    "/app/test_reports/iteration_34.json"
+  ],
+  "success_rate": {
+    "backend": "N/A — non retesté conformément au périmètre frontend-only",
+    "frontend": "90% — migrations, historique cloud, fallback vocal, handler d’erreur simulé, HUD et calcul sont verts; échec du feedback micro sur absence réelle de callback"
+  },
+  "seed_data_creation": "Entrée locale « Echec migration test » injectée dans deux contextes: conservée lors du POST aborté, puis migrée au cloud et supprimée par double confirmation. L’entrée cloud « Test migration bail » a été vérifiée et préservée.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Ne pas retester le backend (itération 33: 15/15). Migration échec et nominale sont vertes, tout comme le calcul 93 et le fallback voix. Pour le micro, un MockSpeechRecognition émettant error='not-allowed' valide le message; le navigateur headless réel est resté sans callback pendant 20 s. Tester spécifiquement le futur timeout sans mock. Ne pas supprimer « Test migration bail ».",
+  "rca_of_the_issue": "La correction micro dépend de rec.onerror. Dans l’exécution headless réelle observée, SpeechRecognition.start() n’a ni levé d’exception ni déclenché onstart/onerror/onend dans la fenêtre de 20 s; l’UI n’a donc aucun chemin garantissant une notice. La mitigation est un watchdog annulé dès qu’un callback valide survient."
+}

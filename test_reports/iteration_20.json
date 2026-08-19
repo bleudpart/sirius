@@ -1,0 +1,61 @@
+{
+  "summary": "Frontend-only gold-theme regression completed on the public preview. Boot animation, main HUD, command bar, Modules menu, HACCP, Keys, Install, Zeus and Setup were exercised. Core layout and primary gold/cyan treatment pass, but three intended gold accents are not applied at runtime and the mandated persisted profile shape leaves Setup with no close control.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "SiriusSetup",
+        "issue": "With the required localStorage profile {prenom:'Test', ville:'Paris'}, opening configuration shows an empty name and no close button, trapping the user unless they complete/save the form. Runtime: setup-name='', setup-close absent.",
+        "selector": "[data-testid='sirius-setup'] / [data-testid='setup-close']",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "HACCP module",
+        "issues": [
+          "Active HACCP tab remains cyan at runtime (border rgba(34,211,238,0.8), background rgba(34,211,238,0.2)); the gold rule targets .haccp-tab while the component renders .hc-tab."
+        ]
+      },
+      {
+        "screen": "Keys status module",
+        "issues": [
+          "The API-key counter remains cyan rgb(165,243,252), although the gold layer intends .keys-count to use --gold-light. The later component stylesheet wins at equal specificity."
+        ]
+      },
+      {
+        "screen": "Installation module",
+        "issues": [
+          "The title remains cyan rgb(174,243,255), so the intended .iw-title gold styling is overridden by the later component stylesheet."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Target the actual HACCP classes (.hc-tab/.hc-tab.on) in the gold theme.",
+    "Increase specificity or move gold overrides after component CSS for .keys-count and .iw-title; audit the other cross-component selectors in the same block for the same cascade problem.",
+    "Normalize persisted profile fields (prenom/ville versus name/city) before passing initialProfile to SiriusSetup, and always provide a close path when Setup is opened from the HUD."
+  ],
+  "critical_code_review_comments": [
+    "The appended theme relies on selector specificity against component-local CSS loaded later. Several equal-specificity overrides silently lose; use a stable theme layer/import order or intentionally scoped higher-specificity selectors rather than one-off duplication.",
+    "HACCP gold CSS uses .haccp-tab, but HaccpModule.jsx renders .hc-tab, making the entire intended tab override dead code.",
+    "App.js is 4,045 lines and mixes profile schemas: automation/setup effects inspect profile.prenom while userName and SiriusSetup inspect profile.name. This directly causes the unclosable blank Setup state reproduced here."
+  ],
+  "updated_files": [
+    "/app/test_reports/iteration_20.json"
+  ],
+  "success_rate": {
+    "backend": "Not tested (frontend-only request)",
+    "frontend": "82% of requested visual/interaction checks passed; core HUD and module layouts pass, with 4 documented UI/design defects"
+  },
+  "seed_data_creation": "No backend data created. Browser localStorage used the required sirius_profile={prenom:'Test',ville:'Paris'} and sirius_installed=1; today's briefing and the WAHOU session overlay were suppressed for repeatable visual checks.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Public preview returned HTTP 200. Boot progressed from 4% to 33% in 1.3s and completed normally; boot title shadow, percentage and bar used gold. At 1920x4000, four HUD panels had zero intersections and no horizontal overflow was found in HACCP, Install, Zeus or Setup. MÉTÉO/HEURE/NOYAU and stat icons computed gold; CPU/RAM/weather values remained cyan-white. Command focus border/send border computed gold and local command submission cleared/responded. Modules menu contained 29 clickable items; HACCP, Keys and Install opened. Zeus opened with 'montre-moi ton cortex'. Known ws://localhost:8765 failures and AudioContext autoplay warnings are expected preview behavior. Menu hover resolves to the intended gold border when transition is disabled for cascade diagnosis, so no hover defect was filed.",
+  "rca_of_the_issue": "Gold theme rules were appended to App.css, but component stylesheets can be injected later. Equal-specificity rules such as .keys-count and .iw-title are therefore overridden. HACCP uses an incorrect selector entirely (.haccp-tab instead of .hc-tab). Separately, persisted profile code consumes two incompatible schemas: setup/username checks name while installation/WAHOU checks prenom, so the required profile opens Setup as a new blank profile without its edit-mode close button."
+}

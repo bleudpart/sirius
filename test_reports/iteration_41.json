@@ -1,0 +1,70 @@
+{
+  "summary": "Tests ciblés backend/frontend sur l'URL publique terminés. Le JPEG lisible est correctement analysé avec description/OCR/synthèse, les 7 régressions d'intention passent, et le burst de 12 commandes ne renvoie aucun action:none (9 actions exécutables, 3 unavailable). En UI, le mode Vision manuel et l'ouverture naturelle de Nummarius passent. Trois défauts restent: l'auto-capture vocale ne démarre jamais malgré une caméra prête, le titre HUD img.sirius-title-img est chargé mais masqué, et le base64 invalide ressort publiquement en page HTML 502 au lieu d'un détail JSON français.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/vision/analyze",
+        "issue": "Avec data:image/jpeg;base64,%%%NOT-BASE64%%%, l'URL publique renvoie 502 text/html (page Cloudflare) au lieu d'un JSON avec détail français. Le backend envoie d'abord le payload invalide à Moonshot, reçoit 400, puis le convertit en 502; l'ingress remplace cette réponse par sa page HTML.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "OPTIONS /api/auth/me",
+        "issue": "Régression CORS toujours présente: l'URL publique répond Access-Control-Allow-Origin: * sans Access-Control-Allow-Credentials, malgré la configuration FastAPI credentialed. Le flux same-origin reste fonctionnel."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "VisionModule auto-capture",
+        "issue": "La commande « que vois-tu ? » ouvre bien vision-module et la caméra synthétique atteint readyState=4 en 640x480, mais aucun POST /api/vision/analyze ne part et vision-result reste absent après 70 s. Reproduit avec une caméra canvas fake prête.",
+        "selector": "[data-testid='vision-module'] [data-testid='vision-result']",
+        "priority": "HIGH"
+      },
+      {
+        "component": "Titre central ΣIRIUS",
+        "issue": "img.sirius-title-img charge correctement l'image (naturalWidth=1182) mais son rectangle rendu reste 0x0 et Playwright la considère cachée; .center-stage .reactor-text est forcé à display:none. Le titre du boot est visible et valide.",
+        "selector": "img.sirius-title-img",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration41_vision_intent.py",
+    "/app/test_reports/pytest/iteration_41_vision_intent.xml",
+    "/app/test_reports/pytest/iteration_41_auth_playbook.xml"
+  ],
+  "action_items": [
+    "Stabiliser l'effet auto-capture: ne pas positionner autoRanRef avant l'exécution effective, ou conserver le timer hors d'un effet dépendant d'une callback instable; mémoriser onSpeak côté App et retenter si le timer est nettoyé avant analyze().",
+    "Valider/décoder le base64 et le format image localement avant l'appel Kimi, puis retourner HTTP 400 avec un detail français pour toute image invalide.",
+    "Retirer ou surcharger .center-stage .reactor-text { display:none } afin que img.sirius-title-img soit réellement visible dans le HUD, comme demandé.",
+    "Protéger POST /api/vision/analyze avec require_user avant de consommer la clé Kimi serveur.",
+    "Corriger la couche ingress CORS si des origines frontend/API distinctes doivent utiliser les cookies httpOnly.",
+    "Relancer les scénarios auto-capture, image invalide et titre HUD après correction."
+  ],
+  "critical_code_review_comments": [
+    "SystemModes.jsx:139-145 met autoRanRef.current=true avant setTimeout. Comme analyze dépend de onSpeak et que App fournit une fonction inline, un rerender peut nettoyer le timer; autoRanRef reste alors true et interdit toute nouvelle tentative. C'est cohérent avec l'absence totale de POST vision observée.",
+    "server.py:444-456 ne valide pas le base64 et n'appelle pas require_user. Un endpoint coûteux utilisant la clé Kimi serveur est donc exposé sans authentification et les erreurs d'entrée sont mal classées en erreur upstream 502.",
+    "App.css:59-61 masque explicitement .center-stage .reactor-text, parent du nouveau img.sirius-title-img; l'image est téléchargée mais ne peut pas être affichée.",
+    "server.py démarre _push_watch_loop via asyncio.create_task sans conserver/annuler la tâche. Un hot reload déclenché pendant les tests est resté bloqué sur « Waiting for background tasks to complete » jusqu'au redémarrage supervisor.",
+    "Le lint de SystemModes.jsx échoue sur react/no-unescaped-entities à la ligne 169; corriger l'apostrophe JSX pour garder le fichier lint-clean.",
+    "App.js et server.py dépassent largement 700 lignes; séparer le pipeline Vision/intent réduirait les effets de dépendances instables et faciliterait les tests."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration41_vision_intent.py",
+    "/app/test_reports/iteration_41.json"
+  ],
+  "success_rate": {
+    "backend": "86.7% (13/15 contrôles finaux: 10/11 vision+intent, 3/4 auth playbook; burst 12/12 sans none)",
+    "frontend": "66.7% (4/6 contrôles ciblés: login/boot, Vision manuel, Nummarius naturel et chargement asset passent; auto-capture et visibilité titre HUD échouent)"
+  },
+  "seed_data_creation": "Aucune donnée métier créée. Le lockout auth utilise uniquement une adresse jetable inexistante; les images caméra/JPEG sont synthétiques et non persistées.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Le test backend final donne 10 passed/1 failed; le seul échec ciblé est le body HTML du base64 invalide. Le burst final a renvoyé 9 actions concrètes et 3 unavailable, jamais none. Pour l'UI caméra, l'outil ne permet pas de fournir des flags Chromium: un canvas.captureStream 640x480 avec texte SIRIUS CAMERA TEST/VISION 2026 a été injecté comme fake device; le mode manuel a obtenu un POST 200 et une description correcte. L'auto-mode a eu une caméra readyState=4 mais aucun POST après 70 s. Le backend a dû être redémarré une fois car le watcher est resté bloqué pendant le shutdown sur la tâche infinie _push_watch_loop; services finaux frontend/health sont 200.",
+  "rca_of_the_issue": "Auto-capture: le timer de 700 ms est nettoyé lors d'un rerender causé par la dépendance analyze instable, tandis que autoRanRef a déjà été verrouillé à true. Base64 invalide: aucune validation locale, erreur Moonshot 400 convertie en 502, puis body remplacé par l'ingress. Titre HUD: règle CSS explicite display:none sur le parent .reactor-text."
+}

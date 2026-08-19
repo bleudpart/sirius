@@ -1,0 +1,71 @@
+{
+  "summary": "Itération 31 testée sur l’URL publique. Backend: 10/11 tests passent; validations Google/Serp/K3/vide, chat RAPIDE/PROFOND, SSE RAPIDE, objectif 5000 €, historique coaching et relance sans e-mail sont conformes. Échec: la clé fal demandée abc123456789:secret est refusée. Frontend: onglets setup, resets à 2 clics, préférences IA/HUD, test de clé, soumission, presets HUD, groupes de modules, actualités, MYTHOS et confirmations Agora/Thémis passent. Trois défauts reproduits: les champs API perdent le focus après le premier caractère, aucun bouton Grip/Modules n’ouvre le menu sur desktop, et la commande Tokyo renvoie l’heure locale sans appeler l’IA.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "/api/keys/validate",
+        "issue": "{service:'fal', key:'abc123456789:secret'} renvoie ok:false et « Format attendu », alors que le contrat approuvé exige ok:true pour ce format.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "SiriusSetup — champs de clés API",
+        "issue": "Saisie clavier normale impossible: taper ABCDEF dans Google Maps ne conserve que « A », puis le champ perd le focus. Les cinq KeyField sont affectés; fill() masquait ce défaut, keyboard.type() le reproduit.",
+        "selector": "[data-testid='setup-key-gmaps'] (et setup-key-groq/serp/fal/alphavantage)",
+        "priority": "CRITICAL"
+      },
+      {
+        "component": "HUD — accès au menu Modules",
+        "issue": "Aucun bouton Grip/Modules interactif n’est rendu sur desktop. Le menu groupé fonctionne uniquement après un geste pinch-out synthétique; souris et clavier n’ont pas d’accès direct à ModulesMenu.",
+        "selector": "bouton attendu [data-testid='sirius-modules-btn'] absent",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Mode IA RAPIDE — question « quelle heure est-il à Tokyo »",
+        "issue": "La commande est interceptée comme heure locale: réponse « Il est 16 heures 59 », carte HEURE LOCALE, et aucun appel /api/chat/stream. La ville Tokyo est ignorée. Une question cloud non locale envoie bien ia_mode:'rapide' et répond en 0,2 s.",
+        "affected_selectors": [
+          "[data-testid='sirius-cmd-input']",
+          "[data-testid='sirius-subtitle']"
+        ]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration31_ergonomics.py",
+    "/app/test_reports/pytest/iteration_31_ergonomics.xml"
+  ],
+  "action_items": [
+    "Extraire KeyField hors de SiriusSetup (ou rendre directement la liste sans type de composant recréé) afin de préserver le DOM et le focus à chaque onChange; retester les cinq champs par saisie caractère par caractère.",
+    "Ajouter dans la top-bar un bouton Grip accessible avec data-testid sirius-modules-btn qui appelle setShowModulesMenu(true), tout en conservant le geste tactile.",
+    "Ne pas appliquer localAnswer/detectIntent d’heure locale aux requêtes contenant une destination/fuseau (ex. « à Tokyo »); les router vers le chat ou calculer explicitement le fuseau demandé.",
+    "Aligner la validation fal sur le contrat accepté abc123456789:secret; la condition len(k) > 20 rejette actuellement cette valeur de 19 caractères.",
+    "Rejouer les tests backend et les parcours setup/menu/Tokyo après corrections."
+  ],
+  "critical_code_review_comments": [
+    "SiriusSetup.jsx définit KeyField à l’intérieur du composant parent (ligne 151). React reçoit un nouveau type à chaque setKeys, démonte/remonte les inputs et perd le focus; ESLint react/no-unstable-nested-components signale précisément cette erreur.",
+    "App.js importe Grip mais ne rend aucun déclencheur ModulesMenu; setShowModulesMenu(true) n’existe que dans onPinchOut. La palette Rechercher ne remplace pas l’accès demandé au menu groupé.",
+    "App.js localAnswer/detectIntent matche toute phrase contenant « quelle heure » sans analyser la destination; processCommand court-circuite cloudAnswer, d’où l’heure locale erronée pour Tokyo.",
+    "server.py valide fal avec ':' in k and len(k) > 20; la valeur contractuelle mesure 19 caractères.",
+    "App.js atteint environ 4572 lignes, très au-delà du seuil de 700; les intentions locales et la navigation des panneaux devraient être extraites pour réduire les courts-circuits et régressions."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration31_ergonomics.py",
+    "/app/test_reports/iteration_31.json"
+  ],
+  "success_rate": {
+    "backend": "90.9% (10/11 tests ciblés)",
+    "frontend": "85% des parcours/assertions ciblés; trois défauts fonctionnels reproduits"
+  },
+  "seed_data_creation": "Deals TEST_NoEmail_* et TEST_UI_DELETE_31, client/document TEST_Confirm_31 créés puis supprimés. Vérification finale: 0 deal, 0 client et 0 document préfixé TEST_. Restaurant Le Phare non modifié. Objectif mensuel laissé à 5000 € conformément au scénario demandé.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Rejouer d’abord keyboard.type('ABCDEF') sur setup-key-gmaps, puis tester le nouveau bouton Modules sans geste synthétique et la commande Tokyo en vérifiant la bonne heure/fuseau ou le payload chat. Le backend IA est vert: RAPIDE classique ~0,5 s, PROFOND ~4,3 s, SSE RAPIDE stage formulation→delta→done. Les resets, presets HUD, confirmations Agora/Thémis, MYTHOS et actualités sont verts.",
+  "rca_of_the_issue": "Trois causes indépendantes: KeyField est un composant imbriqué recréé à chaque rendu, ce qui démonte l’input après le premier onChange; ModulesMenu n’a aucun déclencheur desktop, seulement onPinchOut; l’intention heure locale est trop large et court-circuite le pipeline IA avant prise en compte de Tokyo. Côté fal, une contrainte arbitraire de longueur >20 contredit l’exemple de format approuvé de 19 caractères."
+}

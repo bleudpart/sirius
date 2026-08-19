@@ -1,0 +1,76 @@
+{
+  "summary": "Frontend public testé avec le compte admin: login, boot, HUD, 7 modules menu, assistant d'installation, carte centrale, multi-fenêtres et SIRIUS DISPLAY. Les grands modules sont holographiques/flottants, se déplacent de 190–210 px, se redimensionnent, conservent leur contenu/scroll/en-tête sticky et se ferment; Recharts reste visible. Aucun NotFoundError/removeChild/erreur React n'a été observé. Trois régressions restent: la carte centrale saute hors écran au premier drag et sa poignée devient inaccessible, le menu modules passe derrière les fenêtres et bloque l'ouverture d'une 3e fenêtre, et la lecture à voix haute n'apparaît pas dans Nummarius/Calendar.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "CentralCard holographique",
+        "issue": "Après un drag de 180 px, la carte passe de x=835 à x=1815 alors que son style left vaut 1015; elle sort presque entièrement du viewport et la poignée resize se retrouve à x=2042, donc le resize utilisateur devient impossible. Le clic simple sans drag ferme correctement la carte.",
+        "selector": "[data-testid='central-card'] [data-testid='holo-pop-drag']",
+        "priority": "HIGH"
+      },
+      {
+        "component": "Menu Modules / multi-fenêtres",
+        "issue": "Avec Nummarius et Oracle ouverts, le clic normal sur ADMINISTRATION est intercepté par Oracle. Le menu est à z-index 1200 alors que les holo-win démarrent à 1501+, ce qui empêche d'ouvrir 2–3 modules simultanément via le menu selon leur recouvrement.",
+        "selector": "[data-testid='modules-menu']",
+        "priority": "HIGH"
+      },
+      {
+        "component": "Lecture à voix haute",
+        "issue": "La barre [data-testid='read-aloud-bar'] reste absente dans PORTUS NUMMARIUS après 2,5 s et dans Google Calendar déconnecté, alors qu'elle apparaît dans Zeus, Admin, Oracle, Thémis et Hermès Agora.",
+        "selector": "[data-testid='nummarius-panel'] .read-aloud-bar, [data-testid='calendar-panel'] .read-aloud-bar",
+        "priority": "MEDIUM"
+      },
+      {
+        "component": "Fenêtres holo-win redimensionnées",
+        "issue": "Le resize limite width à innerWidth sans tenir compte de x; après déplacement vers la droite puis agrandissement, le bouton fermer peut sortir du viewport (reproduit sur Thémis).",
+        "selector": "[data-testid='holo-win-resize']",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Multi-fenêtres",
+        "issues": [
+          "Les nouvelles fenêtres ne sont décalées que de 22 px; les panneaux 1240×830 se recouvrent presque entièrement. Le click-to-front fonctionne sur la bande exposée (z-index 1501→1503), mais la fenêtre arrière offre très peu de surface visible pour la sélectionner."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/frontend/src/holoWindows.js",
+    "/app/frontend/src/App.css",
+    "/app/frontend/src/ModulesMenu.css",
+    "/app/frontend/src/readAloud.js"
+  ],
+  "action_items": [
+    "Corriger decoratePopup/freeEl pour calculer les coordonnées dans le repère du containing block transformé, ou porter la carte sous document.body; retester drag sans saut et resize visible.",
+    "Placer ModulesMenu au-dessus de zTop des holo-win (ou dans un portal avec une couche dédiée) afin que toutes les entrées restent cliquables avec plusieurs fenêtres ouvertes.",
+    "Contraindre x + width et y + height pendant resize/drag afin de conserver au minimum l'en-tête et le bouton fermer dans le viewport.",
+    "Adapter readAloud/extractText ou ajouter une politique explicite par grand module pour que Nummarius et Calendar proposent bien la lecture.",
+    "Rejouer central-card, ouverture de trois modules, resize proche des bords et lecture à voix haute après correction."
+  ],
+  "critical_code_review_comments": [
+    "holoWindows.js:61-72 passe la central-card en position:fixed avec des coordonnées viewport, mais elle reste enfant de .reactor-wrap transform:translate(-50%,-50%); cet ancêtre crée le containing block fixe et ajoute environ 800 px au rendu.",
+    "ModulesMenu.css:10 fixe z-index:1200, inférieur à zTop=1500 de holoWindows.js; la fenêtre active intercepte donc les clics du menu.",
+    "holoWindows.js:52-53 borne seulement w/h; la borne doit intégrer la position courante pour éviter qu'un agrandissement pousse le chrome de fermeture hors écran.",
+    "readAloud.js exclut tout texte sous BUTTON/SVG et exige 160 caractères; le contenu principal de Nummarius étant largement porté par des boutons/cartes, le seuil n'est jamais atteint.",
+    "App.js (4920 lignes) et App.css (5003 lignes) dépassent largement 700 lignes; scinder HUD, fenêtres et modules réduirait le risque de régressions de couche/positionnement."
+  ],
+  "updated_files": [
+    "/app/test_reports/iteration_39.json"
+  ],
+  "success_rate": {
+    "backend": "Non testé (frontend only demandé)",
+    "frontend": "82% des contrôles fonctionnels ciblés; 9 types de fenêtres validés, 4 défauts regroupés"
+  },
+  "seed_data_creation": "Aucune donnée créée ou supprimée. localStorage de test uniquement: profil, sirius_installed, géométries réinitialisées.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Animations holo désactivées uniquement dans les scripts Playwright pour stabiliser les actions; le comportement métier n'a pas été modifié. Tests verts: Nummarius, Zeus, Admin, Oracle, Thémis, Hermès, Calendar, iw-panel et Display pour holo/floating/drag/resize/contenu/fermeture; Recharts; persistance Nummarius; click-to-front à deux fenêtres; clic simple central-card; absence d'erreurs React DOM. Priorité au retest central-card et z-index menu.",
+  "rca_of_the_issue": "Central-card: position fixed est relative à l'ancêtre .reactor-wrap transformé, pas au viewport, alors que freeEl réutilise getBoundingClientRect; la carte subit donc un double décalage. Multi-fenêtres: le menu (z=1200) est structurellement sous les fenêtres (z>=1501). Resize: les clamps ignorent x/y. Read-aloud: seuil MIN_CHARS=160 combiné à SKIP_TAGS qui exclut le texte des boutons empêche certains grands modules d'être reconnus."
+}

@@ -1,0 +1,60 @@
+{
+  "summary": "Frontend-only retest of the MODULES toolbar/menu and draggable inner cards on the public URL. MODULES renders fully at 106.56×34 px, all five requested modules open/close, every .prime-card has a visible grab handle, grip dragging changes position, and each tested card restores its position after close/reopen. Primary heading drag and interactive input/checkbox safety pass. Two drag defects remain: LOCUS and HERACLES share the fallback localStorage key, and secondary PANTHEON section headings are not draggable. The HUD has no page errors, but repeated hardcoded localhost WebSocket console errors remain.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "PANTHEON cards with multiple section headings",
+        "issue": "Only the first .zc-section-title in each .prime-card gets cursor:grab and a pointerdown listener. The secondary TABLEAU DE CONNECTIVITÉ and HISTORIQUE DES CONNEXIONS headings have cursor:auto and dragging them moves the card by 0 px.",
+        "selector": "[data-testid='pantheon-panel'] .prime-card .zc-section-title",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Per-module drag-position persistence",
+        "issue": "LOCUS and HERACLES cards lack data-testid, so both persist under sirius_card_pos_card-0. After moving LOCUS to translate(36px, 24px), opening HERACLES for the first time immediately inherited that position; moving HERACLES then overwrites LOCUS's saved position.",
+        "affected_selectors": [
+          "[data-testid='locus-panel'] .prime-card",
+          "[data-testid='heracles-panel'] .prime-card"
+        ]
+      },
+      {
+        "flow": "Main HUD console regression",
+        "issue": "No pageerror or visible error was found, but 18 console errors were captured during the complete module traversal because the public page repeatedly reconnects to ws://localhost:8765 and receives net::ERR_CONNECTION_REFUSED.",
+        "affected_selectors": [
+          "[data-testid='sirius-modules-btn']"
+        ]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Namespace each storage key by module/root test id, or add unique data-testid values to the LOCUS and HERACLES .prime-card elements so they cannot share sirius_card_pos_card-0.",
+    "Attach drag behavior and cursor:grab to every matching section heading in a card (querySelectorAll), not only querySelector's first match.",
+    "Replace or disable the hardcoded ws://localhost:8765 connection for the public deployment so the no-console-errors regression criterion passes.",
+    "Clean up useDraggableCards.js lint failures (two empty catch blocks and one unused eslint-disable directive)."
+  ],
+  "critical_code_review_comments": [
+    "useDraggableCards.js line 15 derives fallback keys only from card index. Without a module namespace, independently rendered modules collide whenever their cards omit data-testid; this was reproduced between LOCUS and HERACLES.",
+    "useDraggableCards.js line 69 uses card.querySelector(...), so cards containing multiple .zc-section-title nodes wire only the first heading. Use querySelectorAll and register/clean up each heading listener.",
+    "App.js still hardcodes WS_URL='ws://localhost:8765', producing repeated errors on the HTTPS public deployment.",
+    "ESLint on useDraggableCards.js reports two no-empty errors and one unused eslint-disable warning; the new hook does not currently pass lint."
+  ],
+  "updated_files": [
+    "/app/test_reports/iteration_16.json"
+  ],
+  "success_rate": {
+    "backend": "Not tested (frontend-only request)",
+    "frontend": "85% — core layout, menu, all 5 grip drags, close/reopen persistence, primary heading drag, and interactive controls pass; key isolation, all-heading drag, and clean console regressions fail"
+  },
+  "seed_data_creation": "No backend seed data. Browser localStorage was cleared and populated only with a temporary Testeur profile; drag keys were created in the isolated browser context.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Retest PANTHEON's second heading in pantheon-notifications and pantheon-connectivity, not only the first title. Then drag LOCUS, open HERACLES before dragging it, and assert HERACLES starts with an empty transform and uses a different localStorage key. Core grip dragging passed for ORACLE, PANTHEON, LOCUS, HERACLES, and ARGUS at 1920x1080.",
+  "rca_of_the_issue": "Heading defect: the hook selects one heading per card with querySelector, leaving later .zc-section-title nodes unwired. Persistence defect: key construction uses card data-testid or card-{index}; LOCUS and HERACLES cards have no data-testid and each is index 0, so both resolve to sirius_card_pos_card-0. Console defect: App.js opens a localhost-only WebSocket unconditionally on the public HTTPS site and retries with backoff."
+}

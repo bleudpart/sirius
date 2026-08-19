@@ -1,0 +1,63 @@
+{
+  "summary": "Tests backend/UI complets sur l’URL publique. Backend: 38/46 tests de la suite THÉMIS/admin passent, plus 1/1 régression A/B Agora/paiements. L’isolation clients, articles, documents, commandes, paiements, stats/bilan, from-deal, revendication legacy et l’API admin sont valides. Quatre routes THÉMIS restent globales et non authentifiées: PUT/GET file/DELETE des pièces et GET export; elles produisent 8 échecs couvrant auth et isolation. Frontend: parcours admin et non-admin entièrement validés (badge, menu, panneau, table, refresh, fermeture et masquage normal-user).",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "PUT /api/themis/pieces/{pid}",
+        "issue": "La route n’exige aucune authentification et filtre uniquement par id. Un compte B a modifié avec succès le fournisseur d’une pièce de A; une requête anonyme atteint également le handler au lieu de retourner 401.",
+        "priority": "CRITICAL"
+      },
+      {
+        "endpoint": "GET /api/themis/pieces/{pid}/file",
+        "issue": "La route n’exige aucune authentification et recherche uniquement par id. Le compte B a téléchargé le PDF comptable de A (200 au lieu de 404); sans cookie, un id inconnu retourne 404 au lieu de 401.",
+        "priority": "CRITICAL"
+      },
+      {
+        "endpoint": "DELETE /api/themis/pieces/{pid}",
+        "issue": "La route n’exige aucune authentification et supprime base + fichier uniquement par id. Le compte B a supprimé la pièce de A; sans cookie la route retourne 200.",
+        "priority": "CRITICAL"
+      },
+      {
+        "endpoint": "GET /api/themis/export",
+        "issue": "La route est publique (200 ZIP sans cookie) et exporte les collections entières sans filtre user_id. L’export demandé par B contenait les clients, documents, commandes et paiements de A ainsi que des données existantes.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration38_themis_admin.py",
+    "/app/test_reports/pytest/iteration_38_themis_admin.xml",
+    "/app/test_reports/pytest/iteration_38_regression_ab.xml"
+  ],
+  "action_items": [
+    "Ajouter request: Request et uid = await _uid(request) aux trois routes /themis/pieces/{pid}; inclure user_id: uid dans find/update/delete avant tout accès au fichier disque.",
+    "Ajouter request: Request et uid = await _uid(request) à /themis/export; filtrer clients/docs/orders/payments/pieces par user_id et ne joindre que les fichiers de pièces appartenant au demandeur.",
+    "Après correction, rejouer toute la suite iteration_38 afin de confirmer 401 anonyme, 404/no-op inter-utilisateurs et export ZIP strictement isolé."
+  ],
+  "critical_code_review_comments": [
+    "themis_api.py:499-529 omet Request/_uid sur edit_piece, piece_file et del_piece; toutes les opérations utilisent seulement {id: pid}, cause directe de lecture/modification/suppression horizontale.",
+    "themis_api.py:532-590 omet Request/_uid et exécute find({}) sur cinq collections, puis ajoute tous les fichiers au ZIP: fuite complète des données comptables multi-tenant.",
+    "modules_api.py:1127 recherche le client de relance par name sans user_id; si un deal sans email porte le même nom qu’un client d’un autre compte, l’adresse de cet autre compte peut être utilisée. Ajouter user_id: uid au fallback.",
+    "auth_api.py:262-280 effectue plusieurs requêtes Mongo et un accès SQLite synchrone par utilisateur (N+1); le panneau admin se dégradera avec le nombre de comptes. Préférer des agrégations et déplacer list_facts hors de la boucle/event loop.",
+    "App.js (~4900 lignes) et server.py (>2300 lignes) dépassent largement 700 lignes; scinder les modules réduit le risque d’oublier _uid sur certaines routes."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration38_themis_admin.py",
+    "/app/test_reports/iteration_38.json"
+  ],
+  "success_rate": {
+    "backend": "83.0% (39/47 contrôles exécutés; 8 échecs regroupés sur 4 routes)",
+    "frontend": "100% (2/2 parcours admin/non-admin)"
+  },
+  "seed_data_creation": "Deux comptes API A/B, un compte UI non-admin, clients/articles/devis/facture/commande/paiement/pièces/deals/transaction et six enregistrements legacy TEST ont été créés. Tous les comptes et enregistrements TEST, y compris fichiers de pièces, ont été supprimés; vérification finale MongoDB à zéro résidu.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Les routes clients/items/docs/orders/payments/list pieces/bilan/stats/from-deal sont vertes pour auth et isolation. Admin/users retourne 401/403/200 correctement, sans password_hash, avec role/activity; le frontend admin et non-admin est vert. Concentrer le retest sur les 4 handlers lignes 499-590 et vérifier qu’un export B ne contient aucun marqueur A.",
+  "rca_of_the_issue": "Les quatre routes défaillantes ont été ajoutées avant le helper multi-tenant mais n’ont pas été migrées: edit_piece, piece_file et del_piece n’acceptent pas Request et filtrent seulement par id; export_comptable n’accepte pas Request et utilise find({}) sur toutes les collections. Cela contourne à la fois require_user et le filtre user_id."
+}

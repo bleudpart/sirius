@@ -1,0 +1,87 @@
+{
+  "summary": "THÉMIS tested end-to-end on the public URL. All requested desktop happy paths work: Boot/command opening, 8 tabs, client, DEV→FAC conversion, order status, stock +/- and alert, payment→invoice payé, dashboard, 3 templates, BYOK, and 10-character MYTHOS gallery. Backend targeted suite: 6/10 passed; four validation/accounting-integrity defects remain.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "/api/themis/docs",
+        "issue": "Malformed line values such as qty='bad' return HTTP 500. Backend log RCA: _totals directly calls float() on an unvalidated raw list and raises ValueError.",
+        "priority": "HIGH"
+      },
+      {
+        "endpoint": "/api/themis/payments",
+        "issue": "Accepts a payment whose doc_id references a devis (HTTP 200), although payments must target a facture; it also mutates that devis paid amount.",
+        "priority": "HIGH"
+      },
+      {
+        "endpoint": "/api/themis/payments/{id}",
+        "issue": "Deleting a full payment removes the payment row but leaves the linked invoice paid=300 and status='payé', causing invoice/payment/accounting inconsistency.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "/api/themis/clients",
+        "issue": "Whitespace-only name is accepted and persisted even though client name is mandatory; missing name is correctly rejected with 422. Test-created blank record was deleted."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "MYTHOS gallery THÉMIS card",
+        "issue": "Clicking OUVRIR LE MODULE THÉMIS# closes the gallery but does not open the THÉMIS panel because App.js onOpenModule map omits THÉMIS#.",
+        "selector": "[data-testid='mythos-open-module-btn']",
+        "priority": "HIGH"
+      },
+      {
+        "component": "Mobile BootScreen",
+        "issue": "At 390x844, boot-module-themis and the entire module list are hidden, so THÉMIS cannot be opened directly from BootScreen; command opening after skipping boot still works.",
+        "selector": "[data-testid='boot-module-themis']",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "THÉMIS document form",
+        "issues": [
+          "The due-date control uses the browser-native input type=date rather than the application's styled calendar component."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_themis.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/iteration_26_themis.xml"
+  ],
+  "action_items": [
+    "Model document lines with a Pydantic schema and numeric constraints so invalid qty/unit_price returns 422 instead of 500.",
+    "Validate that payment doc_id exists and references kind='facture'; reject quotes, unknown IDs, zero, and negative amounts.",
+    "On payment deletion, recompute the linked invoice paid total and derived status transactionally.",
+    "Trim and validate ClientIn.name with a non-empty minimum length.",
+    "Add 'THÉMIS#': setShowThemis to the MYTHOS gallery module-opening map.",
+    "Provide a reachable responsive BootScreen module list below 980px instead of display:none."
+  ],
+  "critical_code_review_comments": [
+    "ThemisPanel post() ignores response.ok and response bodies, and load() silently swallows every exception; backend failures are invisible to users and forms reset as if successful.",
+    "themis_api.py uses raw list fields for document/order lines and unconstrained status/money strings; introduce typed nested models and enums before arithmetic or persistence.",
+    "Most THÉMIS interactive controls lack data-testid (quantity/price, status selectors, delete/minus buttons, payment method, item fields), reducing regression-test reliability.",
+    "ThemisPanel.jsx has one ESLint react/no-unescaped-entities error at line 85.",
+    "App.js remains a 4,347-line monolith; the newly missed THÉMIS gallery route is a concrete regression caused by duplicated module maps. Centralize module metadata/openers."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_themis.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/iteration_26.json"
+  ],
+  "success_rate": {
+    "backend": "60% targeted (6/10 passed; all requested happy paths passed, 4 validation/integrity tests failed)",
+    "frontend": "100% of requested desktop happy paths; 2 additional navigation/responsive defects found"
+  },
+  "seed_data_creation": "Created isolated TEST_ clients, items, documents, orders, and payments; all were deleted. Final API verification found 0 TEST_ records in all five collections. Existing Restaurant Le Zeus was untouched.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Re-run /app/backend/tests/test_themis.py after fixes. The four expected failures cover blank client names, malformed document lines, payment deletion reconciliation, and quote-payment rejection. Desktop E2E core flows passed. Recheck MYTHOS THÉMIS open button and mobile BootScreen at 390x844.",
+  "rca_of_the_issue": "Backend validation is too permissive: ClientIn.name is an unconstrained str, DocIn.lines is a raw list followed by direct float conversion, add_payment never checks document existence/kind, and payment deletion never recalculates invoice state. Frontend gallery routing duplicates a partial module map that omits THÉMIS#. App.css explicitly applies .boot-modules { display:none } below 980px."
+}

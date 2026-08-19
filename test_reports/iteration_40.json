@@ -1,0 +1,75 @@
+{
+  "summary": "Tests backend et frontend sur l’URL publique pour le routage d’intentions Groq. Les 16 tests ciblés /api/intent passent: auth cookie, 7 commandes requises, 4 questions sans action, payload vide/invalide et hash bcrypt. Le parcours UI passe pour login, ouverture/minimisation/fermeture naturelles, fast-path regex et conversation IA générique. Deux défauts fonctionnels et une fragilité ont été reproduits: la question ‘capitale du Japon’ est interceptée par l’ancien regex pays au lieu d’aller à l’IA; un premier essai d’ouverture naturelle n’a pas exécuté l’action avant le timeout frontend puis a réussi au retry; les bursts saturent Groq et sont silencieusement convertis en action:none. Le contrôle CORS public ne publie pas allow-credentials.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/intent",
+        "issue": "Après environ 10 appels rapprochés, Groq a retourné 429 TPM (prompt demandé ~1178 tokens, quota 12000 TPM). parse_intent capture l’erreur et retourne HTTP 200 {action:'none'}, indistinguable d’une vraie question; une commande UI peut donc être envoyée à la conversation au lieu d’être exécutée.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "OPTIONS /api/auth/me",
+        "issue": "Sur l’URL publique, le preflight retourne Access-Control-Allow-Origin: * sans Access-Control-Allow-Credentials malgré les cookies httpOnly et allow_credentials=True dans FastAPI. Le flux same-origin fonctionne, mais une origine frontend distincte ne pourrait pas envoyer les cookies."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Question normale ‘quelle est la capitale du Japon’",
+        "issue": "La commande ne passe ni par /api/intent ni par /api/chat/stream. App.js:2910 la capture avant le fallthrough, appelle REST Countries et ouvre une FICHE PAYS. Cela contredit la régression demandée qui exige action:none puis conversation IA. Une question générique non capturée a bien suivi /intent → /chat/stream et affiché une réponse.",
+        "affected_selectors": [
+          "[data-testid='sirius-cmd-input']",
+          "[data-testid='sirius-subtitle']"
+        ]
+      },
+      {
+        "flow": "Commande naturelle sous latence Groq",
+        "issue": "Au premier essai, ‘je veux consulter la bourse s’il te plaît’ n’a produit aucune réponse /api/intent dans les 12 s du test et Nummarius ne s’est pas ouvert; le backend a journalisé la bonne intention tardivement. Le retry a réussi. Le timeout frontend de 6 s est inférieur au timeout backend Groq de 8 s et transforme ce cas en conversation fallback.",
+        "affected_selectors": [
+          "[data-testid='sirius-cmd-form']",
+          "[data-testid='nummarius-panel']"
+        ]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration40_intent.py",
+    "/app/test_reports/pytest/iteration_40_intent_retest.xml",
+    "/app/test_reports/pytest/iteration_40_auth_playbook.xml"
+  ],
+  "action_items": [
+    "Retirer ou restreindre le fast-path capitale/population afin que les questions complètes comme ‘quelle est la capitale du Japon’ atteignent resolveIntent/cloudAnswer, conformément au comportement demandé.",
+    "Ne pas convertir les erreurs Groq 429/timeout de /api/intent en action:none: renvoyer un statut explicite/retryable ou prévoir un parseur de secours pour les commandes UI.",
+    "Dédupliquer la liste de modèles dans parse_intent lorsque GROQ_LLM_MODEL vaut déjà llama-3.3-70b-versatile; le retry actuel rappelle immédiatement le même modèle après erreur.",
+    "Réduire fortement le prompt d’intention ou utiliser un modèle de routage moins coûteux; aligner le timeout frontend sur le pire temps backend et annuler/nettoyer correctement le timer.",
+    "Configurer l’ingress/proxy pour une origine explicite et Access-Control-Allow-Credentials:true si le frontend et l’API doivent être servis sur des origines distinctes."
+  ],
+  "critical_code_review_comments": [
+    "sirius_brain.py:368 itère sur (GROQ_LLM_MODEL, GROQ_LLM_FALLBACK); avec la configuration actuelle les deux valeurs sont identiques, donc chaque 429 est immédiatement doublé sans fallback réel.",
+    "sirius_brain.py:384-386 absorbe toute exception fournisseur et renvoie action:none; ce contrat mélange panne NLU et absence légitime d’action.",
+    "App.js:2582 abandonne /api/intent après 6 s alors que le client backend autorise 8 s par tentative et peut effectuer deux tentatives; l’action correcte peut arriver après que l’UI a basculé vers cloudAnswer.",
+    "App.js:2909-2917 exécute le regex pays avant le nouveau routeur naturel, cause directe de la régression ‘capitale du Japon’.",
+    "server.py et App.js dépassent largement 700 lignes; l’ordre de dizaines de fast-path regex avant resolveIntent devient difficile à auditer et a directement causé ce conflit de routage."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration40_intent.py",
+    "/app/test_reports/iteration_40.json"
+  ],
+  "success_rate": {
+    "backend": "95% (19/20 contrôles finaux: 16/16 intent/bcrypt, 3/4 auth playbook; échec CORS public)",
+    "frontend": "87.5% (7/8 parcours ciblés; question Japon mal routée; ouverture naturelle flaky au premier essai puis verte au retry)"
+  },
+  "flaky_tests": [
+    "Ouverture Nummarius par phrase naturelle: 1 échec puis 1 succès (50% sur 2 essais), corrélé à la latence/saturation Groq et au timeout frontend de 6 s."
+  ],
+  "seed_data_creation": "Aucune donnée métier créée. Connexion au compte utilisateur de test existant uniquement; un identifiant jetable a servi au contrôle de lockout et ne crée aucun compte.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Rejouer d’abord la question Japon en observant le réseau: elle doit produire POST /api/intent action:none puis POST /api/chat/stream, sans FICHE PAYS. Ensuite lancer 12 commandes UI rapprochées et vérifier qu’aucune n’est silencieusement convertie en none; tester une réponse Groq >6 s. Les commandes naturelles open/minimize/close et les regex ouvre l’oracle/range tout étaient vertes au retry.",
+  "rca_of_the_issue": "Le conflit Japon vient du regex capM placé avant resolveIntent. La fragilité NLU vient du prompt d’intention volumineux (~1,1k tokens/appel) face au quota 12k TPM, du double essai sur le même modèle configuré, de l’absorption des 429 en action:none et du timeout UI de 6 s plus court que le budget backend. Le CORS public wildcard est injecté/maintenu par la configuration de déploiement malgré la politique FastAPI avec credentials."
+}

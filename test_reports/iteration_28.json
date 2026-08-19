@@ -1,0 +1,51 @@
+{
+  "summary": "Itération 28 testée sur l’URL publique. Backend THÉMIS: 24/24 tests réussis, incluant erreurs SMTP 422/400/404, série mensuelle, ZIP (6 CSV BOM UTF-8/point-virgule, écritures débit/crédit et pièce jointe), CRUD/PDF/bilan/conversion/paiement/pièces. Frontend: export téléchargé, courbe zéro/non-zéro, SMTP BYOK persistant, modale e-mail, trois logos, Ctrl+K, MYTHOS→THÉMIS, commande d’ouverture et régressions métier réussis. Un défaut frontend demeure: le bandeau d’erreur SMTP est rendu derrière le portail de la modale et n’est pas lisible/clicable.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "THÉMIS — modale d’envoi e-mail",
+        "issue": "Après l’échec SMTP 400, le texte français « Serveur SMTP injoignable… » existe dans [data-testid='themis-error'] et la modale reste ouverte, mais le bandeau est derrière le fond sombre du portail. Le hit-test au centre du bandeau retourne .th-modal-back, donc l’utilisateur ne peut ni lire clairement ni fermer l’erreur pendant que la modale est ouverte.",
+        "selector": "[data-testid='themis-error']",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Envoi d’une facture avec SMTP inaccessible",
+        "issue": "L’API renvoie correctement HTTP 400 avec un détail français, mais la couche modale masque le retour d’erreur côté UI.",
+        "affected_selectors": ["[data-testid='themis-email-modal']", "[data-testid='themis-error']"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_themis.py",
+    "/app/test_reports/pytest/iteration_28_themis.xml"
+  ],
+  "action_items": [
+    "Afficher l’erreur d’envoi à l’intérieur de .th-modal, ou placer le bandeau dans un portail/stacking context au-dessus de .th-modal-back; conserver la modale ouverte et le message français.",
+    "Retester le parcours SMTP inaccessible avec une vérification de hit-test/visibilité réelle, pas seulement la présence DOM."
+  ],
+  "critical_code_review_comments": [
+    "themis_api.py /export effectue zipfile, lectures disque et construction complète du ZIP en mémoire dans une route async; déplacer la génération vers un thread/streaming pour éviter de bloquer l’event loop et une forte consommation mémoire avec 2 000 pièces.",
+    "Le nom original non assaini est réutilisé dans le chemin ZIP pieces/{id}-{filename}; normaliser au basename et supprimer les segments '..' pour éviter des entrées ZIP dangereuses à l’extraction.",
+    "App.js reste un monolithe de 4 373 lignes et ESLint remonte 39 problèmes, surtout des blocs catch vides; les erreurs silencieuses compliquent le diagnostic et les régressions de routage de modules."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_themis.py",
+    "/app/test_reports/iteration_28.json"
+  ],
+  "success_rate": {
+    "backend": "100% (24/24)",
+    "frontend": "96% des parcours ciblés; toutes les fonctions passent sauf la visibilité réelle du bandeau d’erreur SMTP"
+  },
+  "seed_data_creation": "Clients, facture, paiement et pièces PDF TEST_ isolés créés via API/UI. Les fixtures/finally ont tout supprimé; vérification finale: 0 enregistrement TEST_ dans clients, docs, paiements, pièces, commandes et articles; série mensuelle revenue à zéro.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Le backend est entièrement vert. Rejouer seulement l’échec SMTP depuis la modale après configuration smtp.invalide.local et vérifier que document.elementFromPoint au centre de themis-error appartient au bandeau, puis que ANNULER fonctionne. Les erreurs AudioContext d’autoplay observées au boot sont des avertissements navigateur attendus.",
+  "rca_of_the_issue": "ThemisPanel rend globalement .th-error dans le panneau principal, tandis que la modale est créée via createPortal(document.body). .th-modal-back a position:fixed et z-index:60; .th-error n’a aucun z-index supérieur. Le backdrop recouvre donc le bandeau. Reproduction: configurer smtp.invalide.local, ouvrir une facture, ENVOYER, attendre HTTP 400; la modale reste ouverte mais le hit-test du bandeau retourne DIV.th-modal-back."
+}

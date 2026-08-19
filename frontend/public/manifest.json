@@ -1,0 +1,15 @@
+{
+  "short_name": "SIRIUS",
+  "name": "SIRIUS - Assistant holographique",
+  "description": "Assistant personnel holographique intelligent par partel",
+  "icons": [
+    { "src": "icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any maskable" },
+    { "src": "icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any maskable" }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#06121d",
+  "background_color": "#03060c",
+  "lang": "fr"
+}
