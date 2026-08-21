@@ -2,7 +2,7 @@
 
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Mic, MicOff, Clock, Cpu, Wifi, Wind, Sun, Cloud, CloudRain, CloudSnow, CloudFog, CloudLightning, Thermometer, MapPin, Calendar, Activity, X, Leaf, UserCog, Brain, Plus, Trash2, Pencil, Check, Music, Youtube, Repeat, RotateCcw, BarChart3, Workflow, FolderOpen, Code2, Database, Sparkles, Eye, Landmark, Library, Orbit, Monitor, ShieldCheck, AudioLines, Radar, ShieldAlert, Camera, Fingerprint, Zap, Package, Clapperboard, Grip, Radio, Wrench, FileCode, History, Maximize, Minimize, KeyRound, Home as HomeIcon, BadgeInfo, Globe2, Hammer, TrendingUp, Newspaper, Scale, Flame, BookOpen, Sigma, AlarmClock } from "lucide-react";
+import { Mic, MicOff, Clock, Cpu, Wifi, Wind, Sun, Cloud, CloudRain, CloudSnow, CloudFog, CloudLightning, Thermometer, MapPin, Calendar, Activity, X, Leaf, UserCog, Brain, Plus, Trash2, Pencil, Check, Music, Youtube, Repeat, RotateCcw, BarChart3, Workflow, FolderOpen, Code2, Database, Sparkles, Eye, Landmark, Library, Orbit, Monitor, ShieldCheck, AudioLines, Radar, ShieldAlert, Camera, Fingerprint, Zap, Package, Clapperboard, Grip, Radio, Wrench, FileCode, History, Maximize, Minimize, KeyRound, Home as HomeIcon, BadgeInfo, Globe2, Hammer, TrendingUp, Newspaper, Scale, Flame, BookOpen, Sigma, AlarmClock, Power } from "lucide-react";
 import {
   ArchitectPanel, SpectatorView, FilesPanel, DevCompanion, ZeusCortex, SiriusPrime, OracleDivin,
   PantheonSystem, NexusCeleste, SiriusDisplay, EuropeanaViewer, HaccpModule, KeysStatus, KeraunosPanel,
@@ -34,6 +34,7 @@ import { initUiSounds } from "@/uiSounds";
 import { initHoloFx } from "@/holoFx";
 import { initReadAloud } from "@/readAloud";
 import { initHoloWindows, minimizeAll } from "@/holoWindows";
+import { ConfirmButton } from "@/ConfirmButton";
 import "@/App.css";
 
 /* executeIntent moved into the real App component (see later in the file) */
@@ -52,6 +53,13 @@ const progressMap = {};
 // ⚡ FIX : Fallback explicite vers http://127.0.0.1:8001 si la variable d'env est vide
 const BACKEND_BASE = process.env.REACT_APP_BACKEND_URL || "http://127.0.0.1:8001";
 const API = BACKEND_BASE + "/api";
+
+const dispatchAutonomousVideoAction = (action) => {
+  const prompt = typeof action?.prompt === "string" ? action.prompt.trim() : "";
+  if (typeof window === "undefined" || action?.type !== "video_generation" || !prompt) return false;
+  window.dispatchEvent(new CustomEvent("sirius:video-generation", { detail: { ...action, prompt } }));
+  return true;
+};
 
 
 // Logos holographiques dédiés (or & cyan) — remplacent l'icône Landmark partagée
@@ -162,6 +170,7 @@ const STATES = {
   thinking: { label: "RÉFLEXION", color: "#fbbf24", glow: "#d97706" },
   speaking: { label: "EN RÉPONSE", color: "#5eead4", glow: "#14b8a6" },
 };
+const DAILY_BRIEFING_COMMAND = /^\s*(?:(?:mon|le)\s+)?(?:briefing(?:\s+(?:quotidien|du jour|matinal))?|r[ée]sum[ée]\s+du\s+jour)\s*[?.!]*\s*$/i;
 
 // (horloge isolée dans liveStats.js : LiveTime / LiveDate — évite un re-render global chaque seconde)
 
@@ -855,6 +864,11 @@ function App() {
     `${greetByPhase(userName)} Tous mes systèmes sont en ligne.`
   );
   const [connected, setConnected] = useState(false);
+  const [isShuttingDown, setIsShuttingDown] = useState(false);
+  const isLocalDevServer = typeof window !== "undefined"
+    && window.location.protocol === "http:"
+    && ["localhost", "127.0.0.1"].includes(window.location.hostname)
+    && window.location.port !== "8001";
   const [cpu, ram] = [undefined, undefined]; // → useLiveStats (liveStats.js), sans re-render global
   const [cmd, setCmd] = useState("");
   const wsRef = useRef(null);
@@ -1571,6 +1585,10 @@ function App() {
         }
 
         if (data) {
+          if (dispatchAutonomousVideoAction(data.action)) {
+            if (pid && progress?.done) progress.done(pid, "Action vidéo transmise");
+            return;
+          }
           if (pending.trim()) speakChunk(pending);
           const answer = (data.answer || full || "").trim();
           if (!spoken) { setText(answer); speakOut(answer); } else { setText(answer); }
@@ -1599,6 +1617,10 @@ function App() {
 
       if (resp.ok) {
         const data = await resp.json();
+        if (dispatchAutonomousVideoAction(data.action)) {
+          if (pid && progress?.done) progress.done(pid, "Action vidéo transmise");
+          return;
+        }
         const answer = data.answer || "Réponse reçue du serveur.";
         setText(answer);
         speakOut(answer);
@@ -2055,7 +2077,7 @@ function App() {
   // Tâche SIRIUS : agent web invisible (Playwright) — recherche Google/DuckDuckGo + capture pour le Display
   const launchWebAgent = useCallback(async (query) => {
     const id = openTask(`WEB — ${query.slice(0, 44).toUpperCase()}`, "image");
-    setStatus("processing");
+    setStatus("thinking");
     const m0 = `Très bien, je lance la recherche web : ${query}.`;
     setText(m0); speakOut(m0);
     pushStep(id, "Lancement du navigateur invisible");
@@ -2089,11 +2111,11 @@ function App() {
   // Tâche SIRIUS : génération de clip vidéo (fal.ai) — suivi en direct dans la fenêtre dédiée
   const launchVideoTask = useCallback(async (prompt) => {
     const id = openTask(`CLIP — ${prompt.slice(0, 44).toUpperCase()}`, "video");
-    setStatus("speaking");
-    const m = "Tâche lancée, fenêtre ouverte.";
-    setText(m); speakOut(m);
-    pushStep(id, "Initialisation du pipeline vidéo");
-    pushStep(id, "Analyse du prompt");
+    const technicalComment = "Analyse de la demande. Module vidéo requis.";
+    setStatus("thinking");
+    setText(technicalComment); speakOut(technicalComment);
+    pushStep(id, technicalComment);
+    pushStep(id, "Activation du moteur fal.ai. Construction du clip.");
     const durM = prompt.match(/(\d{1,2})\s*(?:s\b|sec\b|secondes?)/i);
     const wanted = durM ? parseInt(durM[1], 10) : 6;
     const dur = [6, 8, 10, 12, 14, 16, 18, 20].reduce((a, b) => (Math.abs(b - wanted) < Math.abs(a - wanted) ? b : a));
@@ -2108,12 +2130,14 @@ function App() {
       const d = await r.json().catch(() => ({}));
       if (!r.ok || !d.request_id) { failTask(id, d.detail || "Pipeline vidéo indisponible"); return; }
       reqId = d.request_id;
+      pushStep(id, d.technical_comment || "File de génération fal.ai activée.");
     } catch (e) {
       failTask(id, "Pipeline vidéo injoignable");
       return;
     }
-    pushStep(id, "Traitement — file de génération fal.ai");
+    pushStep(id, "Traitement — génération vidéo asynchrone");
     let renderStepDone = false;
+    let statusFailures = 0;
     for (let i = 0; i < 90; i++) {
       await new Promise((res) => setTimeout(res, 5000));
       try {
@@ -2124,21 +2148,38 @@ function App() {
         });
         const d = await r.json().catch(() => ({}));
         if (!r.ok) { failTask(id, d.detail || "Échec de la génération vidéo"); return; }
-        if (d.etat === "termine" && d.video_url) {
-          pushStep(id, "Finalisation");
-          finishTask(id, { kind: "video", src: d.video_url, legende: prompt });
-          showOnDisplay({ type: "video", src: d.video_url, legende: prompt });
-          archiveCreation(id, "video", prompt, { url: d.video_url });
+        statusFailures = 0;
+        const videoUrl = d.display_url || d.video_url;
+        if (d.etat === "termine" && videoUrl && !videoUrl.startsWith("data:")) {
+          pushStep(id, d.technical_comment || "Conversion du résultat. Préparation du fichier vidéo.");
+          pushStep(id, d.display_comment || "Affichage du fichier vidéo dans SIRIUS Display.");
+          finishTask(id, { kind: "video", src: videoUrl, legende: prompt });
+          showOnDisplay({ type: "video", src: videoUrl, legende: prompt });
+          archiveCreation(id, "video", prompt, { url: videoUrl });
           return;
         }
+        if (d.etat === "termine") { failTask(id, "Fichier vidéo exploitable introuvable"); return; }
         if (d.etat === "en_cours" && !renderStepDone) {
           renderStepDone = true;
-          pushStep(id, "Rendu — synthèse des images en cours");
+          pushStep(id, d.technical_comment || "Rendu — synthèse des images en cours");
         }
-      } catch (e) { /* réessai au prochain cycle */ }
+      } catch (e) {
+        statusFailures += 1;
+        if (statusFailures === 1) pushStep(id, "Contrôle technique du rendu interrompu. Nouvelle vérification.");
+        if (statusFailures >= 3) { failTask(id, "Contrôle du rendu vidéo indisponible"); return; }
+      }
     }
     failTask(id, "Délai de génération dépassé");
   }, [openTask, pushStep, finishTask, failTask, speakOut, keys, showOnDisplay, archiveCreation]);
+
+  useEffect(() => {
+    const onVideoGeneration = (event) => {
+      const prompt = typeof event.detail?.prompt === "string" ? event.detail.prompt.trim() : "";
+      if (prompt) launchVideoTask(prompt);
+    };
+    window.addEventListener("sirius:video-generation", onVideoGeneration);
+    return () => window.removeEventListener("sirius:video-generation", onVideoGeneration);
+  }, [launchVideoTask]);
 
 
   // Recherche une archive et propose son affichage
@@ -2844,6 +2885,12 @@ function App() {
       }));
     };
 
+    if (DAILY_BRIEFING_COMMAND.test(low) && runBriefingRef.current) {
+      mark("briefing · demande");
+      runBriefingRef.current(true);
+      return;
+    }
+
     mark("analyse...");
 
   // Lancement de la résolution d'intention
@@ -3081,7 +3128,7 @@ function App() {
       /(coupe|d[ée]sactive).{0,16}(lumi[èe]re|lampe|prise|ventilateur|chauffage|plafonnier|spot)/.test(low);
     if (domoVerb && !/(musique|ambiance|cam[ée]ra|vision|micro|[ée]cran|documentaire|mode )/.test(low)) {
       mark("domotique");
-      setStatus("processing");
+      setStatus("thinking");
       const pid = progress.start("Commande domotique", { silent: true });
       progress.log(pid, "Analyse de l'ordre et recherche de l'appareil…", 30);
       fetch(`${API}/ha/command`, {
@@ -3518,7 +3565,7 @@ function App() {
     if (/(refais|relance|redonne|repasse|refait)[- ]?(moi )?(le |mon )?(briefing|r[ée]sum[ée])|briefing du jour|(mon |le )?r[ée]sum[ée] du jour|donne[- ]moi (le |mon )?briefing/.test(low)) {
       mark("briefing · demande");
       const m = "Très bien monsieur, je vous prépare votre résumé du jour.";
-      setStatus("processing"); setText(m); speakOut(m);
+      setStatus("thinking"); setText(m); speakOut(m);
       if (runBriefingRef.current) runBriefingRef.current(true);
       return;
     }
@@ -3717,6 +3764,37 @@ function App() {
     setMicOn(false);
     try { recognitionRef.current && recognitionRef.current.stop(); } catch (e) {}
   }, []);
+
+  const shutdownSirius = useCallback(async () => {
+    if (isShuttingDown || !isLocalDevServer) return;
+
+    setIsShuttingDown(true);
+    cancelSpeech();
+    stopListening();
+    if (ambientRef.current) ambientRef.current.pause();
+    setStatus("idle");
+    setText("Extinction sécurisée de SIRIUS en cours...");
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    try {
+      const response = await fetch("/__sirius/shutdown", {
+        method: "POST",
+        headers: { "X-Sirius-Shutdown": "1" },
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        throw new Error(`Le contrôleur d'arrêt a répondu ${response.status}.`);
+      }
+      setText("SIRIUS s'éteint. Vous pourrez le relancer depuis l'icône du Bureau.");
+    } catch (error) {
+      console.error("Impossible d'éteindre SIRIUS.", error);
+      setIsShuttingDown(false);
+      setText("L'extinction automatique a échoué. Fermez les consoles SIRIUS Backend et SIRIUS Frontend.");
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }, [isLocalDevServer, isShuttingDown, stopListening]);
 
   // Démarre l'écoute via la reconnaissance vocale du navigateur (instantanée, gratuite)
   const startListening = useCallback(() => {
@@ -4086,10 +4164,9 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [booting, showSetup]);
 
-  // Briefing matinal parlé : Sirius lit le briefing de l'Oracle à la 1ère connexion du jour
-  // runBriefing(true) = briefing à la demande (« refais-moi le briefing »)
+  // Briefing matinal parlé et affiché dans SIRIUS Display.
   const briefingDoneRef = useRef(false);
-  const runBriefing = useCallback(async (force = false) => {
+  const runBriefingDisplay = useCallback(async (force = false) => {
     const pid = progress.start("Briefing du jour", { silent: true });
     progress.log(pid, "Collecte des actualités et de la veille…", 25);
     try {
@@ -4174,6 +4251,11 @@ function App() {
             })(),
           ]);
           const msg = `${salut}${meteoAtlas}${agendaTxt}${rappelsTxt} ${d.briefing}${objAgora}${bourseTxt}`;
+          showOnDisplay({
+            type: "message",
+            titre: "BRIEFING QUOTIDIEN",
+            contenu: msg,
+          });
           setStatus("speaking");
           setText(msg);
           speakOut(msg);
@@ -4182,15 +4264,15 @@ function App() {
           progress.done(pid, "Aucun briefing disponible");
         }
       } catch (e) { progress.error(pid, "Briefing indisponible"); }
-  }, [speakOut, userName, profile]);
-  useEffect(() => { runBriefingRef.current = runBriefing; }, [runBriefing]);
+  }, [showOnDisplay, speakOut, userName, profile]);
+  useEffect(() => { runBriefingRef.current = runBriefingDisplay; }, [runBriefingDisplay]);
   useEffect(() => {
     if (booting || showSetup || briefingDoneRef.current) return;
     if (localStorage.getItem("sirius_last_briefing") === new Date().toISOString().slice(0, 10)) return;
     briefingDoneRef.current = true;
-    const id = setTimeout(() => runBriefing(), 1800);
+    const id = setTimeout(() => runBriefingDisplay(), 1800);
     return () => clearTimeout(id);
-  }, [booting, showSetup, runBriefing]);
+  }, [booting, showSetup, runBriefingDisplay]);
 
   // Réveil matinal : à l'heure choisie, salut vocal puis briefing (météo incluse) puis lecture des mails
   useEffect(() => {
@@ -4208,7 +4290,7 @@ function App() {
         const salut = `Réveil ! Il est ${h} heure${h > 1 ? "s" : ""}${m ? ` ${String(m).padStart(2, "0")}` : ""}. Voici ton briefing du matin.`;
         setStatus("speaking"); setText(salut); speakOut(salut);
         await new Promise((r) => setTimeout(r, 5000));
-        await runBriefing(true);
+        await runBriefingDisplay(true);
         // attend la fin de la lecture du briefing avant de passer aux mails
         const t0 = Date.now();
         await new Promise((r) => setTimeout(r, 3000));
@@ -4219,7 +4301,7 @@ function App() {
     };
     const id = setInterval(tick, 20000);
     return () => clearInterval(id);
-  }, [runBriefing, readMailAloud, speakOut]);
+  }, [runBriefingDisplay, readMailAloud, speakOut]);
 
   const jours = undefined, mois = undefined, dateStr = undefined, timeStr = undefined; // → LiveTime/LiveDate (liveStats.js)
 
@@ -4610,6 +4692,17 @@ function App() {
           >
             <UserCog size={15} />
           </button>
+          {isLocalDevServer && (
+            <ConfirmButton
+              className={`profile-btn sirius-shutdown-btn ${isShuttingDown ? "is-shutting-down" : ""}`}
+              onConfirm={shutdownSirius}
+              testId="sirius-shutdown-btn"
+              title={isShuttingDown ? "Extinction de SIRIUS en cours" : "Éteindre SIRIUS"}
+              label="ÉTEINDRE ?"
+            >
+              <Power size={15} />
+            </ConfirmButton>
+          )}
         </div>
     </header>
       <ModulesMenu open={showModulesMenu} onClose={() => setShowModulesMenu(false)} items={moduleItems} />
@@ -4746,7 +4839,17 @@ function App() {
             onClick={speakQuote}
           />
           <div className={`reactor-text ${activeCard ? "dimmed" : ""}`}>
-            <h1 className="sirius-title" data-testid="sirius-title"><img src="/holo/sirius-title.png" alt="ΣIRIUS" className="sirius-title-img" draggable={false} /></h1>
+            <h1 className="sirius-title" data-testid="sirius-title">
+              <button
+                type="button"
+                className="sirius-title-button"
+                onClick={speakQuote}
+                aria-label="Écouter une citation philosophique"
+                title="Cliquez sur SIRIUS pour écouter une citation philosophique"
+              >
+                <img src="/holo/sirius-title.png" alt="ΣIRIUS" className="sirius-title-img" draggable={false} />
+              </button>
+            </h1>
             <div className="sirius-state" data-testid="sirius-state">{conf.label}</div>
           </div>
           {activeCard && (

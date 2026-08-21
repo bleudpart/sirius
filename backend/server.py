@@ -10,6 +10,7 @@ import asyncio
 import logging
 import re
 import json
+import importlib
 import secrets
 from pathlib import Path
 from datetime import datetime, timezone
@@ -24,13 +25,23 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from starlette.types import ASGIApp, Scope, Receive, Send
-from sirius_brain import ask_sirius, parse_intent, enrich_briefing, hn_bulletin, doc_narrative, k3_source
 
 # 1. Chargement des variables d'environnement
 ROOT_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = ROOT_DIR.parent
 FRONTEND_DIR = PROJECT_DIR / "frontend"
 load_dotenv(ROOT_DIR / '.env')
+
+from sirius_brain import (
+    ask_sirius,
+    parse_intent,
+    enrich_briefing,
+    hn_bulletin,
+    doc_narrative,
+    k3_source,
+    detect_autonomous_action,
+    technical_video_comment,
+)
 
 # 2. Configuration des logs
 logging.basicConfig(
@@ -180,6 +191,7 @@ async def chat(req: ChatRequest, request: Request):
     if not _rate_ok(uid):
         raise HTTPException(status_code=429, detail="Trop de requêtes, patientez un instant.")
     session_id = f"{uid}:{req.session_id or 'default'}"
+    autonomous_action = detect_autonomous_action(texte)
 
     # Historique de la session (8 derniers échanges)
     doc = await db.sirius_chats.find_one({"session_id": session_id}, {"_id": 0, "history": 1})
@@ -199,19 +211,24 @@ async def chat(req: ChatRequest, request: Request):
 
     try:
         t0 = time.perf_counter()
-        # ⚡ Appel direct à ask_sirius (cerveau unique)
-        result = await ask_sirius(
-            prompt=texte,
-            history=history,
-            profile=req.profile or {},
-            memory=merged_memory,
-            mode=req.mode or "normal",
-            keys=req.keys or {},
-            mood=req.mood or {}
-        )
-        answer = result.get("reponse", "")
-        memories = result.get("memoire", [])
-        popups = result.get("popups", [])
+        if autonomous_action:
+            answer = autonomous_action["technical_comment"]
+            memories = []
+            popups = []
+        else:
+            # ⚡ Appel direct à ask_sirius (cerveau unique)
+            result = await ask_sirius(
+                prompt=texte,
+                history=history,
+                profile=req.profile or {},
+                memory=merged_memory,
+                mode=req.mode or "normal",
+                keys=req.keys or {},
+                mood=req.mood or {}
+            )
+            answer = result.get("reponse", "")
+            memories = result.get("memoire", [])
+            popups = result.get("popups", [])
         used_search = False  # géré en interne dans ask_sirius
 
         brain_ms = int((time.perf_counter() - t0) * 1000)
@@ -245,6 +262,7 @@ async def chat(req: ChatRequest, request: Request):
         "used_search": used_search,
         "memories": memories,
         "popups": popups,
+        "action": autonomous_action,
         "key_source": k3_source(),
         "timings": {"brain_ms": brain_ms}
     }
@@ -270,22 +288,28 @@ async def chat_stream(req: ChatRequest, request: Request):
     merged_memory = (req.memory or []) + [
         {"t": f["text"], "d": (f.get("created_at") or "")[:10]} for f in local_facts
     ]
+    autonomous_action = detect_autonomous_action(texte)
 
     async def gen():
         t0 = time.perf_counter()
         try:
-            result = await ask_sirius(
-                prompt=texte,
-                history=history,
-                profile=req.profile or {},
-                memory=merged_memory,
-                mode=req.mode or "normal",
-                keys=req.keys or {},
-                mood=req.mood or {}
-            )
-            answer = result.get("reponse", "")
-            memories = result.get("memoire", [])
-            popups = result.get("popups", [])
+            if autonomous_action:
+                answer = autonomous_action["technical_comment"]
+                memories = []
+                popups = []
+            else:
+                result = await ask_sirius(
+                    prompt=texte,
+                    history=history,
+                    profile=req.profile or {},
+                    memory=merged_memory,
+                    mode=req.mode or "normal",
+                    keys=req.keys or {},
+                    mood=req.mood or {}
+                )
+                answer = result.get("reponse", "")
+                memories = result.get("memoire", [])
+                popups = result.get("popups", [])
 
             brain_ms = int((time.perf_counter() - t0) * 1000)
             
@@ -314,6 +338,7 @@ async def chat_stream(req: ChatRequest, request: Request):
                 "text": answer,
                 "memories": memories,
                 "popups": popups,
+                "action": autonomous_action,
                 "timings": {"brain_ms": brain_ms},
                 "key_source": k3_source()
             }
@@ -386,6 +411,71 @@ def _env_key(*names: str) -> str:
     return ""
 
 
+class KeysCheckRequest(BaseModel):
+    keys: dict[str, str] = Field(default_factory=dict)
+
+
+_KEY_CHECK_SPECS = {
+    "groq": {
+        "label": "Cerveau SIRIUS",
+        "env": ("GROQ_API_KEY", "GROQ_KEY", "K3_API_KEY", "DANIEL_DEV_K3"),
+    },
+    "serp": {
+        "label": "SerpAPI",
+        "env": ("SERP_API_KEY",),
+    },
+    "fal": {
+        "label": "fal.ai",
+        "env": ("FAL_KEY", "FAL_API_KEY"),
+    },
+    "gmaps": {
+        "label": "Google Maps",
+        "env": ("GOOGLE_MAPS_API_KEY", "MAPS_PLATFORM_API_KEY", "MAPS_PLATFORM_API_Key"),
+    },
+    "alphavantage": {
+        "label": "Alpha Vantage",
+        "env": ("ALPHA_VANTAGE_API_KEY", "ALPHA_VANTAGE_KEY"),
+    },
+}
+
+
+def _keys_check_response(keys: dict[str, str]) -> dict:
+    statuses = {}
+    checks = []
+
+    for service, spec in _KEY_CHECK_SPECS.items():
+        browser_key = (keys.get(service) or "").strip()
+        server_key = _env_key(*spec["env"])
+        if browser_key or server_key:
+            state = "ok"
+            source = "navigateur" if browser_key else "serveur"
+        elif service == "groq":
+            # parse_intent remains operational through its local fallback.
+            state = "ok"
+            source = "fallback_local"
+        else:
+            state = "absente"
+            source = "aucune"
+
+        statuses[service] = state
+        checks.append(
+            {
+                "id": service,
+                "label": spec["label"],
+                "status": state,
+                "source": source,
+            }
+        )
+
+    return {
+        "ok": True,
+        "statuses": statuses,
+        "checks": checks,
+        "invalid": [],
+        "speech": "",
+    }
+
+
 @api_router.get("/keys/check")
 async def keys_check_get():
     return {
@@ -400,6 +490,12 @@ async def keys_check_get():
             "emergent": bool(_env_key("EMERGENT_LLM_KEY", "EMERGENT_API_KEY")),
         },
     }
+
+
+@api_router.post("/keys/check")
+async def keys_check_post(request: KeysCheckRequest):
+    """Checks browser and server key availability without returning secret values."""
+    return _keys_check_response(request.keys)
 
 
 # =========================================================
@@ -1732,14 +1828,38 @@ async def oracle_overview(request: Request, lat: float = 48.85, lon: float = 2.3
     parts = ["Briefing du jour."]
     if weather:
         parts.append(f"Météo : {weather[0]['tmin']} à {weather[0]['tmax']} degrés aujourd'hui.")
+    else:
+        parts.append("Météo : données indisponibles pour le moment.")
+    if stocks:
+        strongest_stock = max(stocks, key=lambda stock: stock.get("change", 0))
+        weakest_stock = min(stocks, key=lambda stock: stock.get("change", 0))
+        markets = (
+            f"Marchés : {strongest_stock['name']} évolue de {strongest_stock['change']:+.1f} %."
+            if strongest_stock["name"] == weakest_stock["name"]
+            else (
+                f"Marchés : {strongest_stock['name']} évolue de {strongest_stock['change']:+.1f} %, "
+                f"tandis que {weakest_stock['name']} varie de {weakest_stock['change']:+.1f} %."
+            )
+        )
+        parts.append(markets)
+    else:
+        parts.append("Marchés : données indisponibles pour le moment.")
     if crypto:
-        b = crypto[0]
-        parts.append(f"Bitcoin {'en hausse' if b['change'] >= 0 else 'en baisse'} de {abs(b['change'])} % sur 24 heures.")
-    parts.append(f"Lune : {moon['name'].lower()}, illuminée à {moon['illumination']} %.")
+        crypto_leader = crypto[0]
+        parts.append(
+            f"Crypto : {crypto_leader['name']} "
+            f"{'en hausse' if crypto_leader['change'] >= 0 else 'en baisse'} "
+            f"de {abs(crypto_leader['change']):.1f} % sur 24 heures."
+        )
+    else:
+        parts.append("Crypto : données indisponibles pour le moment.")
+    parts.append(f"Ciel : lune {moon['name'].lower()}, illuminée à {moon['illumination']} %.")
     if peak_hour is not None:
-        parts.append(f"Votre pic d'activité habituel est vers {peak_hour} h — charge prévue {charge.lower()}.")
+        parts.append(f"Journée : votre pic d'activité habituel est vers {peak_hour} h, avec une charge prévue {charge.lower()}.")
+    else:
+        parts.append(f"Journée : charge prévue {charge.lower()}, à organiser selon vos priorités.")
     if upcoming:
-        parts.append(f"Prochain événement céleste : {upcoming[0]['name']} le {upcoming[0]['date']}.")
+        parts.append(f"Ciel : prochain événement céleste, {upcoming[0]['name']} le {upcoming[0]['date']}.")
     if ms_events:
         first = ms_events[0]
         parts.append(f"Agenda Microsoft : {len(ms_events)} événement{'s' if len(ms_events) > 1 else ''} aujourd'hui, dont « {first['titre']} » à {first['debut'][11:16]}.")
@@ -1751,9 +1871,20 @@ async def oracle_overview(request: Request, lat: float = 48.85, lon: float = 2.3
             live = await _fetch_headlines(limit=5)
             live_titles = [a["titre"] for a in live["articles"][:5] if a["titre"]]
             if live_titles:
-                parts.append("À la une : " + ". ".join(live_titles[:3]) + ".")
+                parts.append("Actualités : " + ". ".join(live_titles[:3]) + ".")
         except Exception:
             pass
+    if not live_titles:
+        fallback_titles = [str(item.get("text", "")).strip() for item in news[:3] if item.get("text")]
+        if fallback_titles:
+            parts.append("Actualités : " + ". ".join(fallback_titles) + ".")
+        else:
+            parts.append("Actualités : aucune donnée disponible pour le moment.")
+    point_attention = (
+        f"la volatilité de {crypto[0]['name']}" if crypto and crypto[0].get("volatile")
+        else "l'équilibre entre vos priorités et votre charge prévue"
+    )
+    parts.append(f"Synthèse : le point d'attention numéro un est {point_attention}. Gardez ce cap pour la journée.")
 
     briefing_txt = " ".join(parts)
     if not light:
@@ -1770,8 +1901,12 @@ async def oracle_overview(request: Request, lat: float = 48.85, lon: float = 2.3
                 "agenda_microsoft": ms_events,
                 "mails_outlook_non_lus": ms_unread,
             })
-            if enriched:
+            required_sections = ("météo", "march", "crypto", "actualité", "ciel", "journée", "synthèse")
+            normalized_enriched = enriched.lower()
+            if enriched and all(section in normalized_enriched for section in required_sections):
                 briefing_txt = enriched
+            elif enriched:
+                logger.warning("[ORACLE] briefing LLM incomplet, repli structuré utilisé")
         except Exception as e:
             logger.error(f"[ORACLE] briefing LLM: {e}")
 
@@ -2355,6 +2490,17 @@ async def webbrowser_proxy(url: str, noscript: int = 0):
 
 # ---- Fenêtres de tâches SIRIUS : génération d'images (Nano Banana) et clips (fal.ai) ----
 FAL_VIDEO_MODEL = "fal-ai/ltx-2/text-to-video/fast"
+_FAL_CLIENT_PACKAGE = "fal_client==1.0.0"
+_FAL_INSTALL_LOCK = asyncio.Lock()
+_VIDEO_MATERIALIZATION_LOCK = asyncio.Lock()
+_VIDEO_OUTPUT_DIR = ROOT_DIR / "static" / "generated-videos"
+_VIDEO_MAX_BYTES = 250 * 1048576
+_VIDEO_MIME_EXTENSIONS = {
+    "video/mp4": "mp4",
+    "video/webm": "webm",
+    "video/quicktime": "mov",
+}
+_VIDEO_RESULT_CACHE = {}
 
 class TaskImageRequest(BaseModel):
     prompt: str
@@ -2363,6 +2509,142 @@ class TaskVideoRequest(BaseModel):
     prompt: str
     keys: dict = {}
     duration: int = 6
+
+
+async def _ensure_fal_client():
+    try:
+        return importlib.import_module("fal_client"), False
+    except ModuleNotFoundError as error:
+        if error.name != "fal_client":
+            raise
+
+    installation_allowed = os.getenv("SIRIUS_ALLOW_RUNTIME_MODULE_INSTALL", "1").strip().lower()
+    if installation_allowed in {"0", "false", "no"}:
+        raise RuntimeError("Installation dynamique du client fal.ai désactivée")
+
+    async with _FAL_INSTALL_LOCK:
+        try:
+            return importlib.import_module("fal_client"), False
+        except ModuleNotFoundError as error:
+            if error.name != "fal_client":
+                raise
+
+        try:
+            process = await asyncio.create_subprocess_exec(
+                sys.executable,
+                "-m",
+                "pip",
+                "install",
+                "--disable-pip-version-check",
+                "--no-input",
+                _FAL_CLIENT_PACKAGE,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE,
+            )
+        except OSError as error:
+            raise RuntimeError("Installation du client fal.ai impossible") from error
+
+        try:
+            await asyncio.wait_for(process.communicate(), timeout=120)
+        except asyncio.TimeoutError as error:
+            process.kill()
+            await process.wait()
+            raise RuntimeError("Installation du client fal.ai expirée") from error
+
+        if process.returncode != 0:
+            logger.error("[TASK VIDEO] installation fal_client échouée: code=%s", process.returncode)
+            raise RuntimeError("Installation du client fal.ai échouée")
+
+        importlib.invalidate_caches()
+        try:
+            return importlib.import_module("fal_client"), True
+        except ModuleNotFoundError as error:
+            raise RuntimeError("Client fal.ai indisponible après installation") from error
+
+
+async def _fal_setup(keys: dict):
+    fal_key = (keys or {}).get("fal") or os.environ.get("FAL_KEY")
+    if not fal_key:
+        raise HTTPException(status_code=400, detail="Clé fal.ai manquante")
+    os.environ["FAL_KEY"] = fal_key
+    try:
+        return await _ensure_fal_client()
+    except RuntimeError as error:
+        logger.error("[TASK VIDEO] activation fal.ai impossible: %s", error)
+        raise HTTPException(status_code=503, detail="Client fal.ai indisponible") from error
+
+
+def _video_mime(source_url: str, content_type: str) -> str:
+    mime = (content_type or "").split(";", 1)[0].strip().lower()
+    if mime in _VIDEO_MIME_EXTENSIONS:
+        return mime
+    source_path = source_url.split("?", 1)[0].lower()
+    for known_mime, extension in _VIDEO_MIME_EXTENSIONS.items():
+        if source_path.endswith(f".{extension}"):
+            return known_mime
+    return ""
+
+
+async def _materialize_video_result(source_url: str):
+    if not source_url.lower().startswith("https://"):
+        raise HTTPException(status_code=502, detail="URL vidéo fal.ai invalide")
+
+    import httpx
+
+    _VIDEO_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    temporary_path = _VIDEO_OUTPUT_DIR / f".{uuid.uuid4().hex}.part"
+    try:
+        async with httpx.AsyncClient(timeout=120, follow_redirects=True) as client:
+            async with client.stream("GET", source_url) as response:
+                response.raise_for_status()
+                declared_size = response.headers.get("content-length", "")
+                if declared_size.isdecimal() and int(declared_size) > _VIDEO_MAX_BYTES:
+                    raise HTTPException(status_code=413, detail="Vidéo générée trop volumineuse")
+                mime = _video_mime(source_url, response.headers.get("content-type", ""))
+                if not mime:
+                    raise HTTPException(status_code=502, detail="Format vidéo fal.ai non exploitable")
+                size = 0
+                with temporary_path.open("wb") as output:
+                    async for chunk in response.aiter_bytes():
+                        size += len(chunk)
+                        if size > _VIDEO_MAX_BYTES:
+                            raise HTTPException(status_code=413, detail="Vidéo générée trop volumineuse")
+                        output.write(chunk)
+        if size == 0:
+            raise HTTPException(status_code=502, detail="Vidéo fal.ai vide")
+        filename = f"{uuid.uuid4().hex}.{_VIDEO_MIME_EXTENSIONS[mime]}"
+        destination_path = _VIDEO_OUTPUT_DIR / filename
+        temporary_path.replace(destination_path)
+        return {"filename": filename, "mime": mime, "size": size}
+    except httpx.HTTPError as error:
+        logger.error("[TASK VIDEO] téléchargement du rendu impossible: %s", error)
+        raise HTTPException(status_code=502, detail="Téléchargement de la vidéo fal.ai impossible") from error
+    except OSError as error:
+        logger.error("[TASK VIDEO] écriture du rendu impossible: %s", error)
+        raise HTTPException(status_code=502, detail="Enregistrement de la vidéo impossible") from error
+    finally:
+        if temporary_path.exists():
+            temporary_path.unlink(missing_ok=True)
+
+
+async def _displayable_video_result(request_id: str, source_url: str, request: Request):
+    cached = _VIDEO_RESULT_CACHE.get(request_id)
+    if cached and (_VIDEO_OUTPUT_DIR / cached["filename"]).is_file():
+        return cached
+
+    async with _VIDEO_MATERIALIZATION_LOCK:
+        cached = _VIDEO_RESULT_CACHE.get(request_id)
+        if cached and (_VIDEO_OUTPUT_DIR / cached["filename"]).is_file():
+            return cached
+        artifact = await _materialize_video_result(source_url)
+        video_url = f"{str(request.base_url).rstrip('/')}/static/generated-videos/{artifact['filename']}"
+        cached = {
+            **artifact,
+            "video_url": video_url,
+            "display_url": video_url,
+        }
+        _VIDEO_RESULT_CACHE[request_id] = cached
+        return cached
 
 @api_router.post("/task/image")
 async def task_image(req: TaskImageRequest):
@@ -2386,20 +2668,12 @@ async def task_image(req: TaskImageRequest):
     img = images[0]
     return {"image": img["data"], "mime": img.get("mime_type") or "image/png", "texte": (text or "")[:300]}
 
-def _fal_setup(keys: dict):
-    fal_key = (keys or {}).get("fal") or os.environ.get("FAL_KEY")
-    if not fal_key:
-        raise HTTPException(status_code=400, detail="Clé fal.ai manquante")
-    os.environ["FAL_KEY"] = fal_key
-    import fal_client
-    return fal_client
-
 @api_router.post("/task/video/start")
 async def task_video_start(req: TaskVideoRequest):
     prompt = (req.prompt or "").strip()
     if not prompt:
         raise HTTPException(status_code=400, detail="Prompt vide")
-    fal_client = _fal_setup(req.keys)
+    fal_client, module_installed = await _fal_setup(req.keys)
     try:
         handler = await fal_client.submit_async(FAL_VIDEO_MODEL, arguments={"prompt": prompt})
     except Exception as e:
@@ -2408,11 +2682,16 @@ async def task_video_start(req: TaskVideoRequest):
         if "balance" in msg or "locked" in msg:
             raise HTTPException(status_code=402, detail="Solde fal.ai épuisé — rechargez votre compte sur fal.ai/dashboard/billing")
         raise HTTPException(status_code=502, detail="Pipeline vidéo indisponible (vérifiez votre clé fal.ai)")
-    return {"request_id": handler.request_id}
+    return {
+        "request_id": handler.request_id,
+        "etat": "en_cours",
+        "module_installed": module_installed,
+        "technical_comment": technical_video_comment("activation"),
+    }
 
 @api_router.post("/task/video/status/{request_id}")
-async def task_video_status(request_id: str, req: TaskVideoRequest):
-    fal_client = _fal_setup(req.keys)
+async def task_video_status(request_id: str, req: TaskVideoRequest, request: Request):
+    fal_client, _ = await _fal_setup(req.keys)
     try:
         status = await fal_client.status_async(FAL_VIDEO_MODEL, request_id, with_logs=False)
         if isinstance(status, fal_client.Completed):
@@ -2420,10 +2699,16 @@ async def task_video_status(request_id: str, req: TaskVideoRequest):
             url = ((result or {}).get("video") or {}).get("url") or ""
             if not url:
                 raise HTTPException(status_code=502, detail="Vidéo introuvable dans le résultat")
-            return {"etat": "termine", "video_url": url}
+            artifact = await _displayable_video_result(request_id, url, request)
+            return {
+                "etat": "termine",
+                **artifact,
+                "technical_comment": technical_video_comment("materialization"),
+                "display_comment": technical_video_comment("display"),
+            }
         if isinstance(status, fal_client.InProgress):
-            return {"etat": "en_cours"}
-        return {"etat": "attente"}
+            return {"etat": "en_cours", "technical_comment": technical_video_comment("activation")}
+        return {"etat": "attente", "technical_comment": technical_video_comment("activation")}
     except HTTPException:
         raise
     except Exception as e:
@@ -2994,24 +3279,83 @@ async def websocket_root(websocket: WebSocket):
 # HANDLER PREFLIGHT CORS (OPTIONS) ET ROUTES INSTALLATION
 # =========================================================
 
-@api_router.get("/health")
-@api_router.get("/install/step")
-async def health_check():
-    return {
-        "step": "environment",
-        "status": "success",
+class InstallStepRequest(BaseModel):
+    step: str = "environment"
+    context: dict = Field(default_factory=dict)
+
+
+_INSTALL_STEPS = {
+    "environment": {
         "message": "Environnement SIRIUS opérationnel.",
-        "next": "keys"
+        "next": "micro",
+        "items": ("Interface locale", "Configuration backend", "Accès au stockage"),
+    },
+    "micro": {
+        "message": "Micro et synthèse vocale prêts.",
+        "next": "backend",
+        "items": ("Reconnaissance vocale", "Synthèse vocale"),
+    },
+    "backend": {
+        "message": "Backend SIRIUS connecté.",
+        "next": "ia",
+        "items": ("API FastAPI", "WebSocket SIRIUS"),
+    },
+    "ia": {
+        "message": "Moteur IA initialisé.",
+        "next": "hud",
+        "items": ("Parseur d'intentions", "Modèles de secours"),
+    },
+    "hud": {
+        "message": "HUD SIRIUS disponible.",
+        "next": "modules",
+        "items": ("Interface React", "Commandes vocales"),
+    },
+    "modules": {
+        "message": "Modules SIRIUS chargés.",
+        "next": "completed",
+        "items": ("ORACLE", "ATLAS", "PANTHÉON"),
+    },
+    "completed": {
+        "message": "Installation terminée. SIRIUS est prêt.",
+        "next": None,
+        "items": ("Système SIRIUS",),
+    },
+    "restart": {
+        "message": "Assistant d'installation réinitialisé.",
+        "next": "environment",
+        "items": ("Pipeline d'installation",),
+    },
+}
+
+
+def _install_step_response(step: str) -> dict:
+    normalized_step = (step or "environment").strip().lower()
+    config = _INSTALL_STEPS.get(normalized_step)
+    if config is None:
+        raise HTTPException(status_code=422, detail=f"Étape d'installation inconnue : {normalized_step}")
+
+    return {
+        "step": normalized_step,
+        "status": "ok",
+        "message": config["message"],
+        "next": config["next"],
+        "items": [{"label": label, "state": "ok"} for label in config["items"]],
     }
 
+
+@api_router.get("/health")
+async def api_health_check():
+    return {"status": "ok"}
+
+
+@api_router.get("/install/step")
+async def get_install_step():
+    return _install_step_response("environment")
+
+
 @api_router.post("/install/step")
-async def process_install_step(request: Request):
-    return {
-        "step": "environment",
-        "status": "success",
-        "message": "Validation environnement réussie.",
-        "next": "keys"
-    }
+async def process_install_step(request: InstallStepRequest):
+    return _install_step_response(request.step)
 
 # =========================================================
 # CONFIGURATION CORS UNIFIÉE (dev local + production)
@@ -3021,6 +3365,8 @@ _DEFAULT_DEV_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    # Electron's packaged renderer is loaded from file:// and sends Origin: null.
+    "null",
 ]
 _cors_env = os.environ.get('CORS_ORIGINS', '').strip()
 _extra_origins = (

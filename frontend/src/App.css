@@ -194,6 +194,29 @@ body.hud-minimal .antique-jar { display: none; }
   transition: color 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
 .profile-btn:hover { color: #eafaff; border-color: var(--accent); box-shadow: 0 0 12px var(--glow); }
+.profile-btn.sirius-shutdown-btn {
+  color: #f5c542;
+  border-color: rgba(245, 197, 66, 0.58);
+  box-shadow: 0 0 8px rgba(245, 197, 66, 0.15), inset 0 0 8px rgba(245, 197, 66, 0.08);
+}
+.profile-btn.sirius-shutdown-btn:hover {
+  color: #fff1c0;
+  border-color: #f5c542;
+  box-shadow: 0 0 14px rgba(245, 197, 66, 0.42);
+}
+.profile-btn.sirius-shutdown-btn.confirm-armed {
+  width: 96px;
+  padding: 0 8px;
+}
+.profile-btn.sirius-shutdown-btn.is-shutting-down {
+  cursor: wait;
+  pointer-events: none;
+  animation: sirius-shutdown-pulse 0.9s ease-in-out infinite;
+}
+@keyframes sirius-shutdown-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
 
 /* Bouton SIRIUS DISPLAY : mis en évidence dans la barre d'outils */
 .profile-btn.display-btn {
@@ -449,6 +472,18 @@ body.hud-minimal .antique-jar { display: none; }
   margin: 0 auto;
   user-select: none;
   pointer-events: none;
+}
+.sirius-title-button {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.sirius-title-button:focus-visible {
+  outline: 1px solid rgba(245, 197, 66, 0.75);
+  outline-offset: 6px;
 }
 @media (max-width: 900px) { .sirius-title-img { height: clamp(44px, 9vh, 80px); } }
 @keyframes goldPulse {

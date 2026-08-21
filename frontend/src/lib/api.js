@@ -1,7 +1,18 @@
 // © 2026 Daniel Partel – SIRIUS Assistant. Logiciel protégé.
 // Centralisation du pipeline réseau HTTP & Timeout de sécurité
 
-const API_BASE_URL = (process.env.REACT_APP_BACKEND_URL || "http://127.0.0.1:8001") + "/api";
+export const BACKEND_BASE_URL = (process.env.REACT_APP_BACKEND_URL || "http://127.0.0.1:8001")
+  .replace(/\/+$/, "");
+export const API_BASE_URL = `${BACKEND_BASE_URL}/api`;
+
+export const resolveBackendUrl = (url) => {
+  if (typeof url !== "string") return url;
+  if (/^\/api(?:\/|$)/.test(url)) return `${BACKEND_BASE_URL}${url}`;
+  if (/^undefined\/api(?:\/|$)/.test(url)) {
+    return `${BACKEND_BASE_URL}/${url.slice("undefined/".length)}`;
+  }
+  return url;
+};
 
 /**
  * Envoie une commande au serveur Cloud / Backend Sirius avec contrôle de timeout.

@@ -2,20 +2,25 @@
 // Porte d'authentification : connexion email/mot de passe + Google (Emergent), profil et déconnexion.
 import { useEffect, useRef, useState, createContext, useContext } from "react";
 import { LogIn, UserPlus, LogOut, User, Save } from "lucide-react";
+import { BACKEND_BASE_URL, resolveBackendUrl } from "@/lib/api";
 
-const API = process.env.REACT_APP_BACKEND_URL;
+const API = BACKEND_BASE_URL;
 export const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 
 // Toutes les requêtes vers notre backend portent les cookies de session
-const _fetch = window.fetch.bind(window);
-window.fetch = (u, o = {}) => {
-  try {
-    const url = typeof u === "string" ? u : u.url || "";
-    if (url.startsWith(API) || url.startsWith("/")) o = { credentials: "include", ...o };
-  } catch (e) { /* ignore */ }
-  return _fetch(u, o);
-};
+const SIRIUS_FETCH_PATCH_FLAG = "__siriusApiFetchPatched";
+if (!window[SIRIUS_FETCH_PATCH_FLAG]) {
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = (input, options = {}) => {
+    const url = typeof input === "string" ? input : input.url || "";
+    const resolvedUrl = resolveBackendUrl(url);
+    const isBackendRequest = resolvedUrl.startsWith(BACKEND_BASE_URL);
+    if (isBackendRequest) options = { credentials: "include", ...options };
+    return nativeFetch(typeof input === "string" ? resolvedUrl : input, options);
+  };
+  window[SIRIUS_FETCH_PATCH_FLAG] = true;
+}
 
 const fmtErr = (d) => {
   if (d == null) return "Une erreur est survenue. Réessaie.";

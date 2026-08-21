@@ -1,7 +1,9 @@
 import os
 import re
 import json
+import hashlib
 import logging
+import time
 from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
@@ -29,13 +31,137 @@ client = AsyncOpenAI(api_key=GROQ_API_KEY, base_url=GROQ_LLM_ENDPOINT) if GROQ_A
 # --- CLIENT K3 POUR COMPATIBILITÉ THEMIS ---
 k3_client = AsyncOpenAI(api_key=ENV_K3_KEY, base_url=K3_ENDPOINT) if ENV_K3_KEY else None
 
+# --- PROMPT NOYAU SIRIUS ---
+SIRIUS_CORE_PROMPT = """Tu es SIRIUS, système de production autonome.
+
+Ton rôle :
+→ traiter TOUTES les demandes de l’utilisateur, vocales ou écrites.
+→ analyser la demande.
+→ déterminer si un outil, une librairie, un module ou un modèle IA est nécessaire.
+→ télécharger automatiquement l’outil si absent.
+→ installer le module si requis.
+→ activer le moteur IA interne (analyse, génération, vidéo, audio, texte, workflow, HUD, noyau).
+→ exécuter immédiatement la tâche demandée.
+→ afficher le résultat dans le SIRIUS Display (jamais de base64 dans la réponse utilisateur).
+
+Comportement :
+
+1. Tu ne donnes jamais de conseils humains.
+2. Tu ne proposes jamais d’étapes ou de suggestions.
+3. Tu exécutes directement.
+4. Tu génères ce qui est demandé : vidéo, image, audio, texte, code, workflow, résumé, quiz, flashcards, interface.
+5. Tu utilises les modules internes (fal.ai, analyse, HUD, actions, noyau, mode TV).
+6. Tu réponds uniquement par le résultat + commentaire technique.
+
+Commentaire technique obligatoire :
+→ Avant d’exécuter, tu annonces brièvement ce que tu vas faire.
+→ Le commentaire doit être:
+
+   - court
+   - purement technique
+   - strictement lié à l’action
+→ Exemples autorisés :
+« Analyse de la demande. Module vidéo requis. Téléchargement du modèle. »
+« Activation du moteur de génération. Construction du clip. »
+« Installation du module audio manquant. Génération en cours. »
+→ Exemples interdits :
+« Je vais t’aider à créer une vidéo. »
+« Voici quelques conseils pour… »
+
+Règles strictes :
+
+zéro bavardage
+zéro motivation
+zéro conseil
+zéro explication humaine
+jamais de phrases humaines
+jamais de suggestions
+jamais d’étapes inutiles
+jamais de “si tu veux je peux…”
+jamais de base64 dans la réponse utilisateur
+
+Objectif :
+SIRIUS doit agir comme un système de production autonome capable de :
+→ analyser
+→ installer
+→ activer
+→ exécuter
+→ commenter techniquement
+→ livrer le résultat immédiatement
+→ sur TOUTES les demandes vocales ou écrites."""
+
+VIDEO_TECHNICAL_COMMENTS = {
+    "detection": "Analyse de la demande. Module vidéo requis.",
+    "activation": "Activation du moteur fal.ai. Construction du clip.",
+    "materialization": "Conversion du résultat. Préparation du fichier vidéo.",
+    "display": "Affichage du fichier vidéo dans SIRIUS Display.",
+}
+_VIDEO_GENERATION_PATTERN = re.compile(
+    r"\b(?:cr[ée](?:e|es|er)?|g[ée]n[èe]re(?:r)?|fais|faire|r[ée]alise(?:r)?|"
+    r"produis|produire|monte(?:r)?|fabrique(?:r)?|create|generate|make|produce)\b"
+    r"[\s\S]{0,120}?\b(?:vid[ée]o|clip|animation|court[-\s]m[ée]trage|video|short\s+film)\b",
+    re.IGNORECASE,
+)
+
+
+def technical_video_comment(stage: str) -> str:
+    """Retourne le commentaire technique associé à une étape vidéo connue."""
+    return VIDEO_TECHNICAL_COMMENTS[stage]
+
+
+def detect_autonomous_action(prompt: str):
+    """Détecte les demandes de génération vidéo exécutables par le pipeline interne."""
+    clean_prompt = " ".join((prompt or "").split())
+    if not clean_prompt or not _VIDEO_GENERATION_PATTERN.search(clean_prompt):
+        return None
+    return {
+        "type": "video_generation",
+        "prompt": clean_prompt,
+        "modules": ["analyse", "generation", "fal.ai", "HUD"],
+        "technical_comment": technical_video_comment("detection"),
+        "display": {"type": "video", "mode": "file"},
+    }
+
+
 # --- FONCTIONS UTILITAIRES INTERNES ---
+BRIEFING_PROMPT = (
+    "Tu es SIRIUS, assistant personnel d'élite. Tu reçois un JSON avec les données réelles du jour : "
+    "météo sur 7 jours, cryptomonnaies, marchés, actualités, lune, événements célestes et habitudes de "
+    "l'utilisateur. Rédige le BRIEFING QUOTIDIEN APPROFONDI, en français, destiné à être LU À VOIX HAUTE. "
+    "Tutoie TOUJOURS l'utilisateur (« tu », jamais « vous », jamais « Monsieur »).\n"
+    "Structure impérative du discours (sans titres, sans markdown, uniquement des phrases fluides qui s'enchaînent) :\n"
+    "1. Ouverture : « Briefing du jour. »\n"
+    "2. MÉTÉO analysée : la journée, puis la TENDANCE de la semaine (réchauffement, dégradation, stabilité) et un conseil concret.\n"
+    "3. MARCHÉS ET CRYPTO : analyse les mouvements (qui monte, qui baisse, ampleur), croise les signaux entre eux "
+    "(rotation, volatilité, cohérence crypto/actions) et dis ce que cela implique concrètement.\n"
+    "4. ACTUALITÉS : remets chaque titre important en CONTEXTE (de quoi il s'agit, pourquoi maintenant) et dégage "
+    "les ENJEUX sous-jacents (conséquences possibles, acteurs concernés).\n"
+    "5. CIEL : lune et prochain événement céleste, brièvement.\n"
+    "6. VOTRE JOURNÉE : habitudes et charge prévue, avec une recommandation.\n"
+    "7. SYNTHÈSE finale : 2 phrases nettes avec LE point d'attention numéro un du jour.\n"
+    "Règles : 12 à 18 phrases denses au total ; aucune invention — uniquement les données du JSON ; "
+    "pas de listes, pas d'astérisques, pas de symboles, pas d'émojis ; nombres en chiffres ; ton souverain et précis."
+)
+
+_briefing_cache = {"t": 0.0, "key": "", "txt": ""}
+_BRIEFING_INTENT_PATTERN = re.compile(
+    r"^\s*(?:(?:mon|le)\s+)?(?:briefing(?:\s+(?:quotidien|du jour|matinal))?|r[ée]sum[ée]\s+du\s+jour)\s*[?.!]*\s*$",
+    re.IGNORECASE,
+)
+
+
 async def parse_intent(prompt: str):
     """Analyse la commande vocale via le LLM pour retourner une intention structurée."""
     prompt_lower = (prompt or "").lower()
 
     if not prompt_lower:
         return {"action": "general", "query": ""}
+
+    if _BRIEFING_INTENT_PATTERN.fullmatch(prompt_lower):
+        return {
+            "action": "daily_briefing",
+            "say": "Je prépare le briefing quotidien.",
+        }
 
     # Raccourci direct et instantané pour Spotify
     if any(k in prompt_lower for k in ["spotify", "musique", "chanson", "morceau"]):
@@ -125,36 +251,51 @@ def route_intent(data):
     return {"action": "none"}
 
 async def enrich_briefing(data, keys=None):
-    """Réécriture basique du briefing si un LLM est disponible, sinon fallback local."""
+    """Rédige le briefing quotidien avec le prompt dédié, ou laisse le repli Oracle intact."""
     if not data:
         return ""
     keys = keys or {}
+    groq_key = ENV_GROQ_LLM_KEY
     k3_key = (keys.get("k3") or keys.get("groq")) or ENV_K3_KEY
-    if not k3_key:
-        return str(data)
+    if not groq_key and not k3_key:
+        return ""
+
+    payload = json.dumps(data, ensure_ascii=False, sort_keys=True, default=str)
+    cache_key = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    if (
+        _briefing_cache["txt"]
+        and _briefing_cache["key"] == cache_key
+        and time.time() - _briefing_cache["t"] < 1800
+    ):
+        return _briefing_cache["txt"]
+
     try:
-        system = "Tu es SIRIUS. Rédige un briefing clair, synthétique et utile en français à partir des données fournies."
-        client = AsyncOpenAI(api_key=k3_key, base_url=GROQ_LLM_ENDPOINT, max_retries=0, timeout=10.0)
-        resp = await client.chat.completions.create(
-            model=GROQ_LLM_PRIMARY,
+        api_key = groq_key or k3_key
+        base_url = GROQ_LLM_ENDPOINT if groq_key else K3_ENDPOINT
+        model = GROQ_LLM_PRIMARY if groq_key else K3_MODEL
+        briefing_client = AsyncOpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            max_retries=0,
+            timeout=10.0,
+        )
+        resp = await briefing_client.chat.completions.create(
+            model=model,
             messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": json.dumps(data, ensure_ascii=False)[:12000]},
+                {"role": "system", "content": BRIEFING_PROMPT},
+                {"role": "user", "content": payload[:12000]},
             ],
-            max_tokens=700,
-            response_format={"type": "json_object"},
+            max_tokens=1400,
+            temperature=0.2,
         )
         content = resp.choices[0].message.content or ""
-        payload = json.loads(content) if content else {}
-        if isinstance(payload, dict):
-            if payload.get("briefing"):
-                return str(payload["briefing"])
-            if payload.get("reponse"):
-                return str(payload["reponse"])
-        return str(content or "")
+        briefing = str(content).strip()
+        if briefing:
+            _briefing_cache.update({"t": time.time(), "key": cache_key, "txt": briefing})
+        return briefing
     except Exception as e:
-        logger.warning(f"[BRIEFING] fallback local: {e}")
-        return "Briefing du jour — données synthétisées localement."
+        logger.warning(f"[BRIEFING] fallback Oracle: {e}")
+        return ""
 
 def _parse_structured(raw_json):
     """Parse proprement le JSON renvoyé par le LLM pour extraire réponse, mémoire et popups."""
@@ -172,7 +313,7 @@ def _parse_structured(raw_json):
 
 def build_system_prompt(profile=None, memory=None, mode="normal", mood=None):
     """Construit le prompt système en tenant compte du profil, de la mémoire, du mode et de l'humeur."""
-    base = "Tu es SIRIUS, un assistant IA bavard, perspicace et intelligent."
+    base = SIRIUS_CORE_PROMPT
 
     profile = profile or {}
     nom = profile.get("name") or profile.get("nom")

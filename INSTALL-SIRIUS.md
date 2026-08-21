@@ -36,7 +36,7 @@ uvicorn server:app --host 0.0.0.0 --port 8001
 cd frontend
 yarn install
 ```
-Crée `frontend/.env` :
+Par défaut, le frontend utilise le backend local `http://127.0.0.1:8001`. Crée `frontend/.env` seulement pour le remplacer :
 ```
 REACT_APP_BACKEND_URL=http://localhost:8001
 ```
