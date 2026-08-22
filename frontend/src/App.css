@@ -286,6 +286,7 @@ body.hud-minimal .antique-jar { display: none; }
   letter-spacing: 4px;
 }
 .hud-date { font-size: 10px; letter-spacing: 2px; color: #8fb6c9; text-transform: uppercase; margin-top: 3px; }
+.hud-utc { font-family: "Orbitron", sans-serif; font-size: 10px; letter-spacing: 1.5px; color: #8fb6c9; white-space: nowrap; }
 
 .stat-line {
   display: flex;
@@ -3895,7 +3896,7 @@ body.hud-minimal .medallion-halo { display: none; }
   border-bottom: 1px solid var(--gold-dim);
 }
 .hud-panel-title svg { color: var(--gold); filter: drop-shadow(0 0 5px var(--gold-glow)); }
-.hud-date, .clock-date { color: var(--gold-soft); }
+.hud-date, .hud-utc, .clock-date { color: var(--gold-soft); }
 .panel-foot { color: rgba(245, 197, 66, 0.45); }
 .panel-title { border-bottom-color: var(--gold-dim); }
 
@@ -4112,7 +4113,7 @@ body.hud-minimal .medallion-halo { display: none; }
   color: #fff6dd;
   text-shadow: 0 0 20px rgba(245, 197, 66, 0.75), 0 0 50px rgba(245, 197, 66, 0.45);
 }
-.hud-date { color: #d9c184; }
+.hud-date, .hud-utc { color: #d9c184; }
 .stat-line { color: #cdb173; }
 .stat-line svg { color: #f5c542; }
 .stat-line b {
@@ -4615,7 +4616,7 @@ body.hud-minimal .guardian-halo { display: none; }
   text-shadow: none;
   filter: drop-shadow(0 0 10px rgba(255, 216, 120, 0.5));
 }
-.hud-date { color: #cfa952; }
+.hud-date, .hud-utc { color: #cfa952; }
 
 /* Marque SIRIUS : lettrage or liquide + point scintillant */
 .brand-tag {
@@ -5296,7 +5297,7 @@ body.hud-minimal .guardian-rig { display: none; }
 }
 .hud-panel-title { color: #f5c542; }
 .hud-panel .hud-time { color: #ffe9a8; text-shadow: 0 0 14px rgba(245, 197, 66, 0.45); }
-.hud-panel .hud-date { color: #b89a4e; }
+.hud-panel .hud-date, .hud-panel .hud-utc { color: #b89a4e; }
 .hud-panel .noyau-line { color: #e8d49a; }
 .hud-panel .mini-bar { color: #c9ab5f; }
 .float-card {
@@ -5442,18 +5443,37 @@ body[data-phase] .center-stage::before { content: none !important; }
 .spotify-device-btn { flex: 0 0 auto; }
 .spotify-hint { margin: 0; font-size: 11px; font-style: italic; color: #7c98a2; line-height: 1.5; }
 .sp-spin { animation: spPulse 1s linear infinite; }
-/* HEURE : heure + date sur une ligne */
+/* HEURE : heure locale, UTC et date sur une ligne */
+.hud-panel.bottom-left .hud-clock-values {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  align-items: center;
+}
 .hud-panel.bottom-left .hud-time {
+  grid-row: 1 / span 2;
   font-size: 17px;
   letter-spacing: 2px;
   white-space: nowrap;
 }
+.hud-panel.bottom-left .hud-utc {
+  grid-column: 2;
+  grid-row: 1;
+  font-size: 9px;
+  line-height: 1.2;
+}
 .hud-panel.bottom-left .hud-date {
+  grid-column: 2;
+  grid-row: 2;
   margin-top: 0;
   font-size: 9px;
   color: #b89a4e;
+  line-height: 1.2;
   white-space: nowrap;
 }
+.cc-clock { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.cc-utc { font-family: "Orbitron", sans-serif; font-size: 13px; letter-spacing: 2px; color: #cfa952; }
 /* NOYAU (mode) : ligne + badge ÉTAT doré, utilisateur masqué (affiché en haut à droite) */
 .hud-panel.bottom-right { top: calc(8% + 118px); right: 4%; bottom: auto; }
 .hud-panel.bottom-right .noyau-line {
