@@ -25,6 +25,7 @@ GROQ_MODEL=llama-3.3-70b-versatile
 SPOTIFY_CLIENT_ID=...       # « qu'est-ce qui joue »
 SPOTIFY_CLIENT_SECRET=...
 SPOTIFY_REDIRECT_URI=http://localhost:8001/api/spotify/callback
+MEDIA_EMBED_PARENT=localhost # optionnel · domaine autorise pour les lecteurs Twitch
 ```
 Lancer le backend :
 ```
@@ -74,6 +75,26 @@ python sirius_doctor.py verify backups\sirius_doctor\sirius_local-<horodatage>.d
 Ajoute `--json` à chaque commande pour une sortie exploitable par un script.
 Cet outil couvre la mémoire SQLite locale ; les données MongoDB et le stockage
 objet doivent être sauvegardés avec les outils natifs du service concerné.
+
+## 6. Module multimedia
+- Ouvre **MEDIA PROXY** depuis le menu `MEDIAS`, ou dis par exemple :
+  `Sirius, lance une musique lofi sur Spotify`.
+- Le HUD synchronise son etat entre ses fenetres avec `ws://localhost:8001/api/media/ws`.
+- YouTube, Spotify, Twitch, TikTok et Deezer utilisent uniquement leurs lecteurs ou liens
+  officiels. SIRIUS ne telecharge ni ne relaie leurs flux.
+- Netflix ne propose pas de lecteur iframe public : SIRIUS ouvre donc sa page officielle
+  dans le navigateur.
+- En deploiement hors de `localhost`, configure `MEDIA_EMBED_PARENT` avec le nom de
+  domaine du frontend afin que le lecteur Twitch puisse s'integrer correctement.
+
+## 7. Productivite & Travail
+- Ouvre **PRODUCTIVITE & TRAVAIL** depuis le menu `OUTILS`, ou utilise des commandes
+  comme `Sirius, ouvre mes notes`, `analyse ce document` ou `montre mes taches`.
+- Le module inclut DocAnalyzer, CodeAssist, SmartNotes, TaskMaster et ReportBuilder.
+- Les analyses de documents et de code sont locales : le code n'est jamais execute et
+  aucune cle API supplementaire n'est necessaire.
+- Les notes, taches et rapports sont enregistres dans la base SQLite locale de Sirius
+  et sont effaces lors de la suppression du compte correspondant.
 
 ## Notes
 - La voix et le micro utilisent le navigateur (gratuit, instantané) : utilise **Chrome ou Edge** pour la reconnaissance vocale.

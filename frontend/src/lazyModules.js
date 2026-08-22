@@ -55,3 +55,5 @@ export const AgoraPipeline = wrap(() => import("@/AgoraPipeline"));
 export const NewsPanel = wrap(() => import("@/NewsPanel"));
 export const ReveilPanel = wrap(() => import("@/ReveilPanel"));
 export const SpotifyPanel = wrap(() => import("@/SpotifyPanel"));
+export const MediaHUD = wrap(() => import("@/components/MediaHUD"));
+export const ProductivityPanel = wrap(() => import("@/ProductivityPanel"));

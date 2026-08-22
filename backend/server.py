@@ -2915,6 +2915,12 @@ api_router.include_router(make_themis_router(db))
 
 from home_assistant import make_ha_router
 api_router.include_router(make_ha_router(db))
+
+from media_routes import make_media_router
+api_router.include_router(make_media_router(db))
+
+from productivite.routes_productivite import make_productivity_router
+api_router.include_router(make_productivity_router(db))
 # ---- HÉPHAÏSTOS : diagnostic système réel (auto-maintenance) ----
 @api_router.get("/hephaistos/diagnostic")
 async def hephaistos_diagnostic(source: str = "manuel"):

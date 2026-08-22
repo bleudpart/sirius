@@ -64,7 +64,7 @@ echo.
 if "%PM%"=="yarn" (
     call yarn install
 ) else (
-    call npm install --legacy-peer-deps
+    call npm ci
 )
 if %errorlevel% neq 0 (
     echo.

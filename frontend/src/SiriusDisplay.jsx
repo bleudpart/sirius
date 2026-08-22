@@ -4,6 +4,7 @@ import { Monitor, RotateCw, ExternalLink, Globe, MessageSquare, Film, ImageIcon,
 import { progress } from "./SiriusProgress";
 import Analysis3D from "./Analysis3D";
 import ModulesMedia from "./ModulesMedia";
+import MediaPlayer from "@/components/MediaPlayer";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const GEO_KEY = "sirius_display_geo_v2";
@@ -392,6 +393,9 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
                 <video key={item.src} src={item.src} controls autoPlay className="sd-video" data-testid="sirius-display-video" />
                 {item.legende && <div className="sd-caption">{item.legende}</div>}
               </div>
+            )}
+            {!pasted && type === "media" && (
+              <MediaPlayer state={item.media || item} onControl={item.onMediaControl} />
             )}
             {!pasted && type === "image" && (
               <div className="sd-media">
