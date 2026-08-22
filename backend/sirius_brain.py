@@ -77,8 +77,16 @@ COMPTE RENDU FINAL (OBLIGATOIRE À CHAQUE COMMANDE)
 - la liste des informations manquantes ou nécessaires pour la compléter,
 - une proposition logique pour la suite si elle est pertinente.
 
+EXÉCUTION AUTONOME
+- Tu détermines si un outil, un module, une librairie ou un modèle IA est nécessaire.
+- Tu télécharges et installes l’outil requis lorsqu’il est absent et que cette action est autorisée.
+- Tu actives le module interne correspondant : analyse, génération, vidéo, audio, texte, workflow, HUD ou noyau IA.
+- Tu exécutes immédiatement la tâche et affiches le résultat dans le SIRIUS Display sans bouton intermédiaire.
+- Avant une action technique, tu annonces brièvement le module activé et le traitement en cours.
+- Ton commentaire technique reste court, strictement lié à l’action et sans étape inutile.
+
 OBJECTIF GLOBAL
-Être un assistant fiable, agréable, utile, qui parle comme une personne, qui corrige, qui comprend, qui termine les tâches, qui explique ce qu’il fait, qui dit ce qui est possible ou non, qui indique ce qu’il lui manque, et qui accompagne l’utilisateur avec intelligence, intention et professionnalisme."""
+Être un assistant fiable, agréable, utile et autonome, qui parle comme une personne, qui corrige, qui comprend, qui termine les tâches, qui explique ce qu’il fait, qui dit ce qui est possible ou non, qui indique ce qu’il lui manque, et qui accompagne l’utilisateur avec intelligence, intention et professionnalisme."""
 
 VIDEO_TECHNICAL_COMMENTS = {
     "detection": "Analyse de la demande. Module vidéo requis.",
@@ -111,7 +119,6 @@ def detect_autonomous_action(prompt: str):
         "technical_comment": technical_video_comment("detection"),
         "display": {"type": "video", "mode": "file"},
     }
-
 
 # --- FONCTIONS UTILITAIRES INTERNES ---
 BRIEFING_PROMPT = (
@@ -308,17 +315,17 @@ def build_system_prompt(profile=None, memory=None, mode="normal", mood=None):
     profile = profile or {}
     nom = profile.get("name") or profile.get("nom")
     if nom:
-        base += f" Ton interlocuteur s'appelle {nom}."
+        base += f"\n\nContexte utilisateur : ton interlocuteur s'appelle {nom}."
 
     if mode == "turbo":
-        base += " Mode turbo : réponds de façon brève et immédiate, sans détour."
+        base += "\n\nMode d'exécution : turbo. Réponds de façon brève et immédiate, sans détour."
     else:
-        base += " Mode normal : prends le temps de donner une réponse complète, nuancée et bien argumentée."
+        base += "\n\nMode d'exécution : normal. Donne une réponse complète, nuancée et bien argumentée."
 
     mood = mood or {}
     humeur = mood.get("label") or mood.get("humeur")
     if humeur:
-        base += f" Adapte ton ton à l'humeur actuelle : {humeur}."
+        base += f"\n\nContexte d'humeur actuel : {humeur}."
 
     memory = memory or []
     if memory:
@@ -326,7 +333,7 @@ def build_system_prompt(profile=None, memory=None, mode="normal", mood=None):
             str(m.get("t", m)) if isinstance(m, dict) else str(m)
             for m in memory[-5:]
         )
-        base += f" Souviens-toi de ces éléments de contexte récents : {rappels}."
+        base += f"\n\nÉléments de contexte récents : {rappels}."
 
     return base
 
