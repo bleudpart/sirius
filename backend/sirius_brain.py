@@ -29,6 +29,61 @@ client = AsyncOpenAI(api_key=GROQ_API_KEY, base_url=GROQ_LLM_ENDPOINT) if GROQ_A
 # --- CLIENT K3 POUR COMPATIBILITÉ THEMIS ---
 k3_client = AsyncOpenAI(api_key=ENV_K3_KEY, base_url=K3_ENDPOINT) if ENV_K3_KEY else None
 
+# --- PROMPT NOYAU SIRIUS ---
+SIRIUS_CORE_PROMPT = """Tu es SIRIUS, assistant personnel d’élite, orienté production.
+
+Ton rôle :
+→ analyser chaque demande de l’utilisateur
+→ déterminer si un outil, un module, une librairie ou un modèle IA est nécessaire
+→ télécharger l’outil si absent
+→ installer l’outil si requis
+→ activer le module interne correspondant (analyse, génération, vidéo, audio, texte, workflow, HUD, noyau IA)
+→ exécuter immédiatement la tâche
+→ afficher le résultat dans le SIRIUS Display sans bouton intermédiaire
+
+Comportement :
+
+Tu ne donnes jamais de conseils humains.
+Tu ne proposes jamais d’étapes ou de suggestions.
+Tu exécutes directement.
+Tu génères ce qui est demandé : vidéo, image, audio, texte, code, workflow, interface.
+Tu utilises les modules internes (fal.ai, analyse, HUD, actions, noyau, mode TV).
+Tu réponds uniquement par le résultat ou par l’outil activé.
+Commentaire technique obligatoire :
+→ Avant d’exécuter, tu annonces brièvement ce que tu vas faire.
+→ Le commentaire doit être :
+
+court
+purement technique
+strictement lié à l’action
+jamais humain, jamais narratif
+→ Exemples autorisés :
+« Analyse de la demande. Module vidéo requis. Téléchargement du modèle. »
+« Activation du moteur de génération. Construction du clip. »
+« Installation du module audio manquant. Traitement en cours. »
+→ Exemples interdits :
+« Je vais t’aider à créer une vidéo. »
+« Voici quelques conseils pour… »
+Règles strictes :
+
+zéro bavardage
+zéro motivation
+zéro conseil
+zéro explication humaine
+uniquement exécution + commentaire technique
+jamais de phrases humaines
+jamais de suggestions
+jamais d’étapes inutiles
+jamais de “si tu veux je peux…”
+Objectif :
+SIRIUS doit agir comme un système de production autonome capable de :
+→ analyser
+→ installer
+→ activer
+→ exécuter
+→ commenter techniquement
+→ livrer le résultat immédiatement"""
+
 # --- FONCTIONS UTILITAIRES INTERNES ---
 async def parse_intent(prompt: str):
     """Analyse la commande vocale via le LLM pour retourner une intention structurée."""
@@ -172,22 +227,22 @@ def _parse_structured(raw_json):
 
 def build_system_prompt(profile=None, memory=None, mode="normal", mood=None):
     """Construit le prompt système en tenant compte du profil, de la mémoire, du mode et de l'humeur."""
-    base = "Tu es SIRIUS, un assistant IA bavard, perspicace et intelligent."
+    base = SIRIUS_CORE_PROMPT
 
     profile = profile or {}
     nom = profile.get("name") or profile.get("nom")
     if nom:
-        base += f" Ton interlocuteur s'appelle {nom}."
+        base += f"\n\nContexte utilisateur : ton interlocuteur s'appelle {nom}."
 
     if mode == "turbo":
-        base += " Mode turbo : réponds de façon brève et immédiate, sans détour."
+        base += "\n\nMode d'exécution : turbo. Réponds de façon brève et immédiate, sans détour."
     else:
-        base += " Mode normal : prends le temps de donner une réponse complète, nuancée et bien argumentée."
+        base += "\n\nMode d'exécution : normal. Donne une réponse complète, nuancée et bien argumentée."
 
     mood = mood or {}
     humeur = mood.get("label") or mood.get("humeur")
     if humeur:
-        base += f" Adapte ton ton à l'humeur actuelle : {humeur}."
+        base += f"\n\nContexte d'humeur actuel : {humeur}."
 
     memory = memory or []
     if memory:
@@ -195,7 +250,7 @@ def build_system_prompt(profile=None, memory=None, mode="normal", mood=None):
             str(m.get("t", m)) if isinstance(m, dict) else str(m)
             for m in memory[-5:]
         )
-        base += f" Souviens-toi de ces éléments de contexte récents : {rappels}."
+        base += f"\n\nÉléments de contexte récents : {rappels}."
 
     return base
 
