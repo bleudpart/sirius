@@ -4802,7 +4802,7 @@ body[data-phase="night"] .antique-guardian { filter: brightness(0.88) contrast(1
 /* ===== Gardien animé : inclinaison vers le curseur (rig) + balancement de cape (sway) ===== */
 .guardian-rig {
   position: absolute;
-  left: calc(8% + 110px); top: auto; bottom: 4vh;
+  left: calc(2% + 10px); top: auto; bottom: 19vh;
   height: 74vh;
   z-index: 3;
   pointer-events: none;

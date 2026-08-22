@@ -2964,8 +2964,21 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     try:
         while True:
-            data = await websocket.receive_text()
-            await websocket.send_text(json.dumps({"status": "connected", "message": "Sirius WS actif"}))
+            raw = await websocket.receive_text()
+            try:
+                data = json.loads(raw)
+            except (TypeError, ValueError):
+                data = {}
+            action = data.get("action") if isinstance(data, dict) else None
+
+            if action == "open_app":
+                await websocket.send_json({
+                    "action": "open_app",
+                    "app": data["app"],
+                    "display": data["display"]
+                })
+            else:
+                await websocket.send_text(json.dumps({"status": "connected", "message": "Sirius WS actif"}))
     except WebSocketDisconnect:
         logger.info("Client Sirius déconnecté du WebSocket")
 

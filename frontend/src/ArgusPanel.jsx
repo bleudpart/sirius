@@ -124,6 +124,15 @@ function ErrorRow({ err, onClientAction, onDone, onRepaired }) {
 }
 
 export default function ArgusPanel({ onClose, onClientAction, onRepaired }) {
+  const [char, setChar] = useState(null);
+  useEffect(() => {
+    fetch((process.env.REACT_APP_BACKEND_URL || "") + "/api/mythos/characters")
+      .then(r => r.json())
+      .then(d => {
+        const p = d.characters.find(c => c.module === "ARGUS#");
+        setChar(p);
+      });
+  }, []);
   const [tab, setTab] = useState("scan");
   const dragRef = useDraggableCards([tab]);
   const [errors, setErrors] = useState([]);
@@ -157,6 +166,13 @@ export default function ArgusPanel({ onClose, onClientAction, onRepaired }) {
         <div className="oracle-title font-divine"><Radar size={20} /> ARGUS — SURVEILLANCE & RÉPARATION</div>
         <button className="setup-close zeus-close" onClick={onClose} data-testid="argus-close-btn"><X size={18} /></button>
       </header>
+      {char && (
+        <img
+          src={char.image}
+          alt={char.character}
+          className="mythos-avatar"
+        />
+      )}
       <div className="prime-sub">DÉTECTION CONTINUE · AUTO / SÉVÈRE / CRITIQUE · RÉPARATIONS SÉCURISÉES PAR JETON</div>
 
       <div className="argus-body">

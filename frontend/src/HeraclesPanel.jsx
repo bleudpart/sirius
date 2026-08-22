@@ -16,6 +16,15 @@ const TYPE_META = {
 };
 
 export default function HeraclesPanel({ onClose, onSpeak, initialInput }) {
+  const [char, setChar] = useState(null);
+  useEffect(() => {
+    fetch((process.env.REACT_APP_BACKEND_URL || "") + "/api/mythos/characters")
+      .then(r => r.json())
+      .then(d => {
+        const p = d.characters.find(c => c.module === "HERACLES#");
+        setChar(p);
+      });
+  }, []);
   const [input, setInput] = useState(initialInput || "");
   const [busy, setBusy] = useState(false);
   const [out, setOut] = useState(null);
@@ -81,6 +90,13 @@ export default function HeraclesPanel({ onClose, onSpeak, initialInput }) {
         <div className="oracle-title font-divine"><Fingerprint size={20} /> HERACLES# — INVESTIGATION OSINT</div>
         <button className="setup-close zeus-close" onClick={onClose} data-testid="heracles-close-btn"><X size={18} /></button>
       </header>
+      {char && (
+        <img
+          src={char.image}
+          alt={char.character}
+          className="mythos-avatar"
+        />
+      )}
       <div className="prime-sub">DONNÉES PUBLIQUES · PSEUDO / EMAIL / TÉLÉPHONE / NOM · RIEN N'EST STOCKÉ</div>
 
       <div className="argus-body">

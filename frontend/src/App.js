@@ -7,7 +7,7 @@ import {
   ArchitectPanel, SpectatorView, FilesPanel, DevCompanion, ZeusCortex, SiriusPrime, OracleDivin,
   PantheonSystem, NexusCeleste, SiriusDisplay, EuropeanaViewer, HaccpModule, KeysStatus, KeraunosPanel,
   AboutPanel, EspacePanel, ArchiveGallery, MemoryManager, InstallWizard, ScriptInstaller, LocusPanel,
-  AtlasPanel, HeraclesPanel, HephaistosPanel, MythosGallery, ConsultPanel, CalliopePanel, CalendarPanel,
+  AtlasPanel, HeraclesPanel, HephaistosPanel, MythosGallery, ConsultPanel, PrometheePanel, CalliopePanel, CalendarPanel,
   FaceIdPanel, PythagorePanel, PackagerPanel, TrailerGallery, SiriusSetup, PromoPanel, ThemisPanel,
   AdminPanel, PortusNummarius, AgoraPipeline, NewsPanel, ReveilPanel, SpotifyPanel,
 } from "@/lazyModules";
@@ -4480,7 +4480,7 @@ function App() {
       {showThemis && <ThemisPanel onClose={() => setShowThemis(false)} />}
       {showAgora && <AgoraPipeline onClose={() => setShowAgora(false)} onOpenThemis={() => { setShowAgora(false); setShowThemis(true); }} />}
       {showSolon && <ConsultPanel module="SOLON#" onClose={() => setShowSolon(false)} />}
-      {showPromethee && <ConsultPanel module="PROMÉTHÉE#" onClose={() => setShowPromethee(false)} />}
+      {showPromethee && <PrometheePanel onClose={() => setShowPromethee(false)} />}
       {showCalliope && <CalliopePanel onClose={() => setShowCalliope(false)} />}
       {showCalendar && <CalendarPanel onClose={() => setShowCalendar(false)} />}
       {showFaceId && (
@@ -4640,8 +4640,8 @@ function App() {
       {/* Pop-ups holographiques contextuels (gérés par Sirius) */}
       <HoloPopups popups={popups} onClose={closePopup} onImage={setArchiveView} />
 
-      {/* Suggestions proactives (désactivées en mode secours) */}
-      {sysMode !== "safe" && <ProactivePanel
+      {/* Suggestions proactives — désactivées : encarts système "SIRIUS est prêt..." / "Vérifiez les tâches..." supprimés au démarrage */}
+      {false && <ProactivePanel
         onAction={(a) => {
           if (!a || !a.type) return;
           if (a.type === "command") {

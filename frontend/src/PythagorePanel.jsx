@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { X, Sigma, Loader2, ArrowRight, LineChart, GraduationCap, Calculator, Shapes, Mic, History, Trash2 } from "lucide-react";
 import MythosBackdrop from "@/MythosBackdrop";
+import "./Pythagore.css";
 import { speakAsCharacter, cancelSpeech } from "@/voice";
 
 const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
@@ -43,6 +44,15 @@ const resultToSpeech = (r) => (r || "")
   .replace(/,/g, " ou ").replace(/\(|\)/g, " ").replace(/\s+/g, " ").trim();
 
 export default function PythagorePanel({ onClose }) {
+  const [char, setChar] = useState(null);
+  useEffect(() => {
+    fetch((process.env.REACT_APP_BACKEND_URL || "") + "/api/mythos/characters")
+      .then(r => r.json())
+      .then(d => {
+        const p = d.characters.find(c => c.module === "PYTHAGORE#");
+        setChar(p);
+      });
+  }, []);
   const [tab, setTab] = useState("calc");
   const [expr, setExpr] = useState("");
   const [mode, setMode] = useState("eval");
@@ -200,6 +210,13 @@ export default function PythagorePanel({ onClose }) {
         <div className="oracle-title font-divine"><Sigma size={20} /> PYTHAGORE# — MATHÉMATIQUES & GÉOMÉTRIE</div>
         <button className="setup-close zeus-close" onClick={onClose} data-testid="pythagore-close-btn"><X size={18} /></button>
       </header>
+      {char && (
+        <img
+          src={char.image}
+          alt={char.character}
+          className="mythos-avatar"
+        />
+      )}
       <div className="prime-sub">CALCUL EXACT · GÉOMÉTRIE · COURBES · EXPLICATIONS — TOUT EST NOMBRE</div>
 
       <div className="cal-tabs">

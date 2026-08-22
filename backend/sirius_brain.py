@@ -68,6 +68,62 @@ async def parse_intent(prompt: str):
     logging.error(f"Erreur parse_intent: {last_error}")
     return {"action": "general", "query": prompt}
 
+def route_intent(data):
+    """Convertit une intention structurée (intent/arguments), telle que produite par le
+    parser d'intent JSON, en action exécutable côté SIRIUS."""
+    intent = data.get("intent")
+
+    if intent == "open_app":
+        return {
+            "action": "open_app",
+            "app": data["arguments"]["app"],
+            "display": "SIRIUS_DISPLAY"
+        }
+
+    elif intent == "open_edge":
+        return {
+            "action": "open_app",
+            "app": "edge",
+            "display": "SIRIUS_DISPLAY"
+        }
+
+    elif intent == "open_facebook":
+        return {
+            "action": "open_app",
+            "app": "facebook",
+            "display": "SIRIUS_DISPLAY"
+        }
+
+    elif intent == "open_spotify":
+        return {
+            "action": "open_app",
+            "app": "spotify",
+            "display": "SIRIUS_DISPLAY"
+        }
+
+    elif intent == "open_youtube":
+        return {
+            "action": "open_app",
+            "app": "youtube",
+            "display": "SIRIUS_DISPLAY"
+        }
+
+    elif intent == "open_outlook":
+        return {
+            "action": "open_app",
+            "app": "outlook",
+            "display": "SIRIUS_DISPLAY"
+        }
+
+    elif intent == "open_gmail":
+        return {
+            "action": "open_app",
+            "app": "gmail",
+            "display": "SIRIUS_DISPLAY"
+        }
+
+    return {"action": "none"}
+
 async def enrich_briefing(data, keys=None):
     """Réécriture basique du briefing si un LLM est disponible, sinon fallback local."""
     if not data:

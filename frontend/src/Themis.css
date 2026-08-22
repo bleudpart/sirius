@@ -1,4 +1,10 @@
 /* © 2026 Daniel Partel – SIRIUS Assistant. THÉMIS# — gestion d'entreprise */
+.mythos-avatar {
+  width: 280px;
+  display: block;
+  margin: 0 auto;
+  filter: drop-shadow(0 0 34px var(--mythos-color, #ffffff88));
+}
 .th-tabs {
   display: flex; gap: 6px; flex-wrap: wrap;
   padding: 10px 26px 0;
