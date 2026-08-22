@@ -2,6 +2,7 @@
 // Horloge et stats système isolées : évite de re-rendre tout le HUD chaque seconde.
 import { useEffect, useState } from "react";
 import { Cpu, Activity } from "lucide-react";
+import { formatLocalDate, formatLocalTime, formatUtcTime } from "./dateTime";
 
 let stats = { cpu: 12, ram: 43 };
 const subs = new Set();
@@ -27,7 +28,7 @@ export function useLiveStats() {
   return s;
 }
 
-function useClockNow(intervalMs) {
+function useClockNow(intervalMs = 1000) {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     let timeoutId;
@@ -52,17 +53,47 @@ function useClockNow(intervalMs) {
   return now;
 }
 
-const JOURS = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
-const MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+function getClockValues() {
+  const nowLocal = new Date();
+  const nowUTC = new Date(Date.now());
+  return {
+    timeLocal: formatLocalTime(nowLocal),
+    timeUTC: formatUtcTime(nowUTC),
+    dayLocal: formatLocalDate(nowLocal),
+  };
+}
 
 export function LiveTime() {
-  const now = useClockNow(1000);
-  return now.toLocaleTimeString("fr-FR");
+  useClockNow();
+  return getClockValues().timeLocal;
 }
 
 export function LiveDate() {
-  const now = useClockNow(60000);
-  return `${JOURS[now.getDay()]} ${now.getDate()} ${MOIS[now.getMonth()]} ${now.getFullYear()}`;
+  useClockNow();
+  return getClockValues().dayLocal;
+}
+
+export function LiveClock({ variant = "hud" }) {
+  useClockNow();
+  const { timeLocal, timeUTC, dayLocal } = getClockValues();
+
+  if (variant === "card") {
+    return (
+      <div className="cc-clock" data-testid="sirius-clock-card">
+        <div className="cc-huge" data-testid="sirius-time">{timeLocal}</div>
+        <div className="cc-utc" data-testid="sirius-time-utc">UTC · {timeUTC}</div>
+        <div className="cc-date" data-testid="sirius-date">{dayLocal}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="hud-clock-values">
+      <div className="hud-time" data-testid="sirius-time">{timeLocal}</div>
+      <div className="hud-utc" data-testid="sirius-time-utc">UTC · {timeUTC}</div>
+      <div className="hud-date" data-testid="sirius-date">{dayLocal}</div>
+    </div>
+  );
 }
 
 export function CpuRamMini() {

@@ -11,7 +11,8 @@ import {
   FaceIdPanel, PythagorePanel, PackagerPanel, TrailerGallery, SiriusSetup, PromoPanel, ThemisPanel,
   AdminPanel, PortusNummarius, AgoraPipeline, NewsPanel, ReveilPanel, SpotifyPanel,
 } from "@/lazyModules";
-import { LiveTime, LiveDate, CpuRamMini, useLiveStats, pushStats, pushSimStats } from "@/liveStats";
+import { LiveClock, LiveDate, CpuRamMini, useLiveStats, pushStats, pushSimStats } from "@/liveStats";
+import { formatLocalDate, formatLocalTime, getLocalDateKey } from "@/dateTime";
 import OverlayApp from "@/OverlayApp";
 import HoloScene from "@/HoloScene";
 import SanctuaryAmbience from "@/SanctuaryAmbience";
@@ -162,13 +163,7 @@ const loadMemory = () => {
     return raw.map((m) => (typeof m === "string" ? { t: m, d: null } : m)).filter((m) => m && m.t);
   } catch { return []; }
 };
-const todayStr = () => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
+const todayStr = () => getLocalDateKey();
 
 const STATES = {
   idle: { label: "EN VEILLE", color: "#22d3ee", glow: "#0ea5b7" },
@@ -178,7 +173,7 @@ const STATES = {
 };
 const DAILY_BRIEFING_COMMAND = /^\s*(?:(?:mon|le)\s+)?(?:briefing(?:\s+(?:quotidien|du jour|matinal))?|r[ée]sum[ée]\s+du\s+jour)\s*[?.!]*\s*$/i;
 
-// (horloge isolée dans liveStats.js : LiveTime / LiveDate — évite un re-render global chaque seconde)
+// (horloge isolée dans liveStats.js : LiveClock / LiveDate — évite un re-render global chaque seconde)
 
 // Réponses locales instantanées (heure / date exactes uniquement)
 const CLOUD_RETRY_MSG = "Mon cerveau cloud est momentanément injoignable. Réessaie dans un instant — je reste connecté à Groq.";
@@ -193,11 +188,11 @@ const isLocalTimeQuestion = (command) => {
   return asksTime && !asksForeignTime;
 };
 function localAnswer(c) {
-  const now = new Date();
-  const heure = now.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }).replace(":", " heures ");
-  if (isLocalTimeQuestion(c)) return `Il est ${heure}.`;
+  const nowLocal = new Date();
+  const timeLocal = formatLocalTime(nowLocal);
+  if (isLocalTimeQuestion(c)) return `Il est ${timeLocal}.`;
   if (/(quel jour|quelle date|on est le|on est quel)/.test(c))
-    return `Nous sommes le ${now.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}.`;
+    return `Nous sommes le ${formatLocalDate(nowLocal)}.`;
   if (/(bonjour|bonsoir|salut|coucou|hello)/.test(c)) return `Bonjour. Tous mes systèmes sont en ligne.`;
   if (/(ça va|ca va|comment vas|comment tu vas|tu vas bien)/.test(c)) return `Je fonctionne parfaitement. Merci de demander.`;
   if (/(merci)/.test(c)) return `Je vous en prie. C'est un plaisir.`;
@@ -1255,7 +1250,7 @@ function App() {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  const now = undefined; // horloge déplacée dans <LiveTime/> / <LiveDate/>
+  const now = undefined; // horloge rendue par <LiveClock/> / <LiveDate/>
 
   // HÉPHAÏSTOS : diagnostic automatique au démarrage (1×/session), alerte vocale si module FAIL
   useEffect(() => {
@@ -2467,7 +2462,11 @@ function App() {
     const id = openTask("OUTLOOK — AGENDA (14 JOURS)", "outlook");
     pushStep(id, "Connexion à Microsoft Graph");
     try {
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (!tz) {
+        failTask(id, "Fuseau horaire local indisponible");
+        return;
+      }
       const r = await fetch(`${API}/outlook/events?tz=${encodeURIComponent(tz)}`);
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { failTask(id, d.detail || "Lecture impossible"); return; }
@@ -2491,7 +2490,13 @@ function App() {
       .replace(/(\d{1,2})\s*h\s*(\d{2})?/, "").replace(/^\s*[àa]\s+/, "").trim() || "Rendez-vous";
     const fin = new Date(d.getTime() + 3600000);
     const fmt = (x) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}T${String(x.getHours()).padStart(2, "0")}:${String(x.getMinutes()).padStart(2, "0")}:00`;
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (!tz) {
+      setStatus("speaking");
+      const m = "Fuseau horaire local indisponible.";
+      setText(m); speakOut(m);
+      return;
+    }
     setStatus("thinking");
     try {
       const r = await fetch(`${API}/outlook/events`, {
@@ -4314,10 +4319,10 @@ function App() {
       let cfg = null;
       try { cfg = JSON.parse(localStorage.getItem("sirius_reveil") || "null"); } catch (e) { /* config illisible */ }
       if (!cfg || !cfg.on || !cfg.time) return;
-      const now = new Date();
+      const nowLocal = new Date();
       const [h, m] = cfg.time.split(":").map(Number);
-      if (now.getHours() !== h || now.getMinutes() !== m) return;
-      const today = todayStr();
+      if (nowLocal.getHours() !== h || nowLocal.getMinutes() !== m) return;
+      const today = getLocalDateKey(nowLocal);
       if (localStorage.getItem("sirius_reveil_last") === today) return;
       localStorage.setItem("sirius_reveil_last", today);
       (async () => {
@@ -4337,7 +4342,7 @@ function App() {
     return () => clearInterval(id);
   }, [runBriefingDisplay, readMailAloud, speakOut]);
 
-  const jours = undefined, mois = undefined, dateStr = undefined, timeStr = undefined; // → LiveTime/LiveDate (liveStats.js)
+  const jours = undefined, mois = undefined, dateStr = undefined, timeStr = undefined; // → LiveClock/LiveDate (liveStats.js)
 
   statusPulseRef.current.status = status;
 
@@ -4844,9 +4849,8 @@ function App() {
 
       {/* Panneau bas-gauche : HEURE + CPU/RAM (style référence) */}
       <aside className="hud-panel bottom-left" data-testid="sirius-stats" data-hud-panel>
-        <div className="hud-panel-title"><Clock size={13} /> HEURE</div>
-        <div className="hud-time" data-testid="sirius-time"><LiveTime /></div>
-        <div className="hud-date"><LiveDate /></div>
+        <div className="hud-panel-title"><Clock size={13} /> HEURE LOCALE &amp; UTC</div>
+        <LiveClock />
       </aside>
       <div className="hud-panel stats-mini" data-testid="sirius-cpu-ram" data-hud-panel>
         <CpuRamMini />
@@ -5361,8 +5365,8 @@ function CentralCard({ card, weather, onClose }) {
   let title = "";
   let body = null;
   if (card.type === "time") {
-    title = "HEURE LOCALE";
-    body = <div className="cc-huge"><LiveTime /></div>;
+    title = "HEURE LOCALE & UTC";
+    body = <LiveClock variant="card" />;
   } else if (card.type === "date") {
     title = "DATE DU JOUR";
     body = <div className="cc-date"><LiveDate /></div>;

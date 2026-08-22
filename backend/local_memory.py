@@ -15,6 +15,17 @@ def _conn():
     return con
 
 
+def _local_datetime(timestamp: str):
+    """Convert stored timestamps to the PC's local date and time for SIRIUS PRIME."""
+    if not timestamp:
+        return None
+    try:
+        parsed = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed.astimezone().replace(tzinfo=None) if parsed.tzinfo else parsed
+
+
 def init_local_db():
     with _conn() as con:
         con.execute(
@@ -50,10 +61,11 @@ def log_event(text: str, intent: str = "", user_id: str = "legacy"):
     if not text:
         return None
     now = datetime.now(timezone.utc)
+    now_local = now.astimezone()
     with _conn() as con:
         con.execute(
             "INSERT INTO events (id, text, intent, hour, weekday, created_at, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (str(uuid.uuid4()), text, (intent or "")[:40], now.hour, now.weekday(), now.isoformat(), user_id),
+            (str(uuid.uuid4()), text, (intent or "")[:40], now_local.hour, now_local.weekday(), now.isoformat(), user_id),
         )
     return True
 
@@ -82,35 +94,42 @@ INTENT_SUGGESTIONS = {
 
 def prime_overview():
     """Synthèse apprentissage : journal du jour, habitudes, score de confiance, suggestions."""
-    today = datetime.now(timezone.utc).date().isoformat()
+    today = datetime.now().date()
     with _conn() as con:
         events = [dict(r) for r in con.execute(
             "SELECT * FROM events ORDER BY created_at DESC LIMIT 400").fetchall()]
         facts = [dict(r) for r in con.execute(
             "SELECT * FROM facts ORDER BY created_at DESC LIMIT 100").fetchall()]
 
-    today_events = [e for e in events if (e["created_at"] or "").startswith(today)]
-    today_facts = [f for f in facts if (f["created_at"] or "").startswith(today)]
+    dated_events = [(e, _local_datetime(e["created_at"])) for e in events]
+    dated_facts = [(f, _local_datetime(f["created_at"])) for f in facts]
+    today_events = [(e, timestamp) for e, timestamp in dated_events if timestamp and timestamp.date() == today]
+    today_facts = [(f, timestamp) for f, timestamp in dated_facts if timestamp and timestamp.date() == today]
 
     journal = (
-        [{"time": f["created_at"][11:16], "text": f"Souvenir appris : {f['text']}", "kind": "fact"} for f in today_facts]
-        + [{"time": e["created_at"][11:16], "text": f"Commande « {e['text']} » ({e['intent'] or 'libre'})", "kind": "event"}
-            for e in today_events[:25]]
+        [{"time": timestamp.strftime("%H:%M"), "text": f"Souvenir appris : {f['text']}", "kind": "fact"}
+         for f, timestamp in today_facts]
+        + [{"time": timestamp.strftime("%H:%M"), "text": f"Commande « {e['text']} » ({e['intent'] or 'libre'})", "kind": "event"}
+            for e, timestamp in today_events[:25]]
     )
     journal.sort(key=lambda j: j["time"], reverse=True)
 
     hours = [0] * 24
     weekdays = [0] * 7
     intents = {}
-    for e in events:
-        if e["hour"] is not None:
-            hours[int(e["hour"])] += 1
-        if e["weekday"] is not None:
-            weekdays[int(e["weekday"])] += 1
+    for e, timestamp in dated_events:
+        if timestamp:
+            hours[timestamp.hour] += 1
+            weekdays[timestamp.weekday()] += 1
+        else:
+            if e["hour"] is not None:
+                hours[int(e["hour"])] += 1
+            if e["weekday"] is not None:
+                weekdays[int(e["weekday"])] += 1
         key = e["intent"] or "libre"
         intents[key] = intents.get(key, 0) + 1
 
-    distinct_days = len({(e["created_at"] or "")[:10] for e in events})
+    distinct_days = len({timestamp.date() for _, timestamp in dated_events if timestamp})
     confidence = min(97, 18 + distinct_days * 6 + len(facts) * 3 + len(events) // 4)
 
     top_intents = sorted(intents.items(), key=lambda kv: -kv[1])

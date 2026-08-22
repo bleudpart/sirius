@@ -26,7 +26,7 @@ class CreateEventReq(BaseModel):
     titre: str
     start: str
     end: str
-    tz: str = "UTC"
+    tz: str
 
 
 def make_outlook_router(db):
@@ -132,7 +132,7 @@ def make_outlook_router(db):
         return {"ok": True}
 
     @router.get("/outlook/events")
-    async def events(tz: str = "UTC"):
+    async def events(tz: str):
         tok = await get_token()
         from datetime import datetime, timedelta, timezone as _tz
         now = datetime.now(_tz.utc)
