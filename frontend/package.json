@@ -7,6 +7,7 @@
   "description": "SIRIUS - Assistant holographique",
   "main": "public/electron.js",
   "homepage": "./",
+  "proxy": "http://127.0.0.1:8001",
   "dependencies": {
     "@hookform/resolvers": "5.0.1",
     "@monaco-editor/react": "^4.7.0",
