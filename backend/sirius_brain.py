@@ -3,6 +3,8 @@ import re
 import json
 import logging
 from openai import AsyncOpenAI
+from media_intent import parse_media_intent
+from productivite.intent_productivite import parse_productivity_intent
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +38,14 @@ async def parse_intent(prompt: str):
 
     if not prompt_lower:
         return {"action": "general", "query": ""}
+
+    productivity_intent = parse_productivity_intent(prompt)
+    if productivity_intent:
+        return productivity_intent
+
+    media_intent = parse_media_intent(prompt)
+    if media_intent:
+        return media_intent
 
     # Raccourci direct et instantané pour Spotify
     if any(k in prompt_lower for k in ["spotify", "musique", "chanson", "morceau"]):

@@ -36,6 +36,18 @@ def delete_user_data(user_id: str):
     with _conn() as con:
         con.execute("DELETE FROM facts WHERE user_id = ?", (user_id,))
         con.execute("DELETE FROM events WHERE user_id = ?", (user_id,))
+        media_events_exists = con.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'media_events'"
+        ).fetchone()
+        if media_events_exists:
+            con.execute("DELETE FROM media_events WHERE user_id = ?", (user_id,))
+        for table in ("productivity_notes", "productivity_tasks", "productivity_reports"):
+            table_exists = con.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+                (table,),
+            ).fetchone()
+            if table_exists:
+                con.execute(f"DELETE FROM {table} WHERE user_id = ?", (user_id,))
 
 
 def migrate_legacy_to_user(user_id: str):

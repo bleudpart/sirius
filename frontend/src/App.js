@@ -9,7 +9,7 @@ import {
   AboutPanel, EspacePanel, ArchiveGallery, MemoryManager, InstallWizard, ScriptInstaller, LocusPanel,
   AtlasPanel, HeraclesPanel, HephaistosPanel, MythosGallery, ConsultPanel, PrometheePanel, CalliopePanel, CalendarPanel,
   FaceIdPanel, PythagorePanel, PackagerPanel, TrailerGallery, SiriusSetup, PromoPanel, ThemisPanel,
-  AdminPanel, PortusNummarius, AgoraPipeline, NewsPanel, ReveilPanel, SpotifyPanel,
+  AdminPanel, PortusNummarius, AgoraPipeline, NewsPanel, ReveilPanel, SpotifyPanel, MediaHUD, ProductivityPanel,
 } from "@/lazyModules";
 import { LiveTime, LiveDate, CpuRamMini, useLiveStats, pushStats, pushSimStats } from "@/liveStats";
 import OverlayApp from "@/OverlayApp";
@@ -779,6 +779,18 @@ function App() {
       confirm(d.say || "J'ouvre le lecteur Spotify, monsieur.");
       return true;
     }
+    if (act === "media_control") {
+      setMediaIntent(d.media || {});
+      setShowMediaHud(true);
+      confirm(d.say || "J'ouvre le controle multimedia, monsieur.");
+      return true;
+    }
+    if (act === "productivity_control") {
+      setProductivityIntent(d.productivity || {});
+      setShowProductivity(true);
+      confirm(d.say || "J'ouvre le module Productivite et Travail, monsieur.");
+      return true;
+    }
     if (act === "open_module" && target) {
       const it = moduleItemsRef.current.find((m) => m.id === target);
       if (it) { it.run(); confirm(d.say || `J'ouvre ${it.label.split("—")[0].trim()}.`); return true; }
@@ -802,7 +814,8 @@ function App() {
         calliope: () => setShowCalliope(false), pythagore: () => setShowPythagore(false), news: () => setShowNews(false),
         packager: () => setShowPackager(false), install: () => setShowInstall(false), scripts: () => setShowScripts(false),
         vision: () => setShowVision(false), admin: () => setShowAdmin(false), setup: () => setShowSetup(false),
-        gallery: () => setShowGallery(false), spotify: () => setShowSpotifyWin(false),
+        gallery: () => setShowGallery(false), spotify: () => setShowSpotifyWin(false), media: () => setShowMediaHud(false),
+        productivity: () => setShowProductivity(false),
       };
       const fn = CLOSERS[target];
       if (fn) { fn(); confirm(d.say || "Fenêtre fermée, monsieur."); return true; }
@@ -1094,6 +1107,10 @@ function App() {
   const [showFaceId, setShowFaceId] = useState(false);
   const [showReveil, setShowReveil] = useState(false);
   const [showSpotifyWin, setShowSpotifyWin] = useState(false);
+  const [showMediaHud, setShowMediaHud] = useState(false);
+  const [mediaIntent, setMediaIntent] = useState(null);
+  const [showProductivity, setShowProductivity] = useState(false);
+  const [productivityIntent, setProductivityIntent] = useState(null);
   const [showPythagore, setShowPythagore] = useState(false);
   const [showNews, setShowNews] = useState(false);
   const [showModulesMenu, setShowModulesMenu] = useState(false);
@@ -4323,6 +4340,8 @@ function App() {
     { id: "install", group: "SYSTÈME", label: "Assistant d'installation", Icon: Wrench, run: () => setShowInstall(true) },
     { id: "scripts", group: "OUTILS", label: "Bibliothèque de scripts", Icon: FileCode, run: () => setShowScripts(true) },
     { id: "vision", group: "MÉDIAS", label: "Vision caméra", Icon: Camera, active: showVision, run: () => setShowVision(!showVision) },
+    { id: "productivity", group: "OUTILS", label: "PRODUCTIVITE & TRAVAIL — documents, code, notes, taches", Icon: Workflow, active: showProductivity, run: () => { setProductivityIntent(null); setShowProductivity(true); } },
+    { id: "media", group: "MÉDIAS", label: "MEDIA PROXY — lecteurs et controles", Icon: Radio, active: showMediaHud, run: () => { setMediaIntent(null); setShowMediaHud(true); } },
     { id: "spotify", group: "MÉDIAS", label: spotify ? "Spotify — lecteur intégré" : "Spotify — lecteur (connexion requise)", Icon: Music, active: spotify, run: () => setShowSpotifyWin(true) },
     ...(authUser?.role === "admin" ? [{ id: "admin", group: "SYSTÈME", label: "ADMINISTRATION — comptes & activité", Icon: ShieldCheck, run: () => setShowAdmin(true) }] : []),
   ];
@@ -4508,6 +4527,24 @@ function App() {
           onRemotePlay={(q) => launchMusic(q, "spotify")}
           onNowPlaying={fetchNowPlaying}
           onShowTrack={(t) => showOnDisplay({ type: "image", src: t.image_big || t.image, legende: `SPOTIFY — ${t.title} · ${t.artist}` })}
+        />
+      )}
+      {showMediaHud && (
+        <MediaHUD
+          initialIntent={mediaIntent}
+          onClose={() => { setShowMediaHud(false); setMediaIntent(null); }}
+          onShowOnDisplay={(media, onMediaControl) => showOnDisplay({
+            type: "media",
+            titre: `MEDIA — ${(media.provider || "").toUpperCase()}`,
+            media,
+            onMediaControl,
+          })}
+        />
+      )}
+      {showProductivity && (
+        <ProductivityPanel
+          initialTab={productivityIntent?.tab || "documents"}
+          onClose={() => { setShowProductivity(false); setProductivityIntent(null); }}
         />
       )}
       {showPythagore && <PythagorePanel onClose={() => setShowPythagore(false)} />}

@@ -1,0 +1,538 @@
+.productivity-screen {
+  position: fixed;
+  z-index: 105;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(0, 6, 15, 0.72);
+  backdrop-filter: blur(8px);
+}
+
+.productivity-card {
+  width: min(1120px, 100%);
+  max-height: min(860px, calc(100vh - 36px));
+  display: flex;
+  flex-direction: column;
+  color: #e6faff;
+  background: linear-gradient(145deg, rgba(5, 28, 46, 0.99), rgba(2, 11, 24, 0.99));
+  border: 1px solid rgba(77, 238, 255, 0.45);
+  box-shadow: 0 0 45px rgba(20, 178, 227, 0.22), inset 0 0 35px rgba(20, 178, 227, 0.06);
+  border-radius: 18px;
+  overflow: hidden;
+  font-family: "Orbitron", "Segoe UI", sans-serif;
+}
+
+.productivity-header,
+.productivity-tool-head,
+.productivity-form-footer,
+.productivity-task,
+.productivity-note,
+.productivity-report-form,
+.productivity-search,
+.productivity-diagnostic {
+  display: flex;
+  align-items: center;
+}
+
+.productivity-header {
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px;
+  background: rgba(0, 9, 20, 0.66);
+  border-bottom: 1px solid rgba(77, 238, 255, 0.22);
+}
+
+.productivity-header span {
+  color: #f5c542;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+}
+
+.productivity-header h2 {
+  margin: 5px 0;
+  font-size: 18px;
+  letter-spacing: 0.08em;
+}
+
+.productivity-header p,
+.productivity-tool-head p {
+  margin: 0;
+  color: #8db2bf;
+  font: 12px "Segoe UI", sans-serif;
+}
+
+.productivity-header > button,
+.productivity-note aside button,
+.productivity-task aside button {
+  display: grid;
+  place-items: center;
+  width: 31px;
+  height: 31px;
+  color: #dffbff;
+  background: transparent;
+  border: 1px solid rgba(77, 238, 255, 0.32);
+  cursor: pointer;
+}
+
+.productivity-tabs {
+  display: flex;
+  overflow-x: auto;
+  border-bottom: 1px solid rgba(77, 238, 255, 0.16);
+  background: rgba(1, 15, 28, 0.55);
+}
+
+.productivity-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 0 15px;
+  color: #8db2bf;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  font: 10px "Orbitron", sans-serif;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.productivity-tabs button.active {
+  color: #fff2bd;
+  border-bottom-color: #f5c542;
+  background: rgba(245, 197, 66, 0.08);
+}
+
+.productivity-content {
+  min-height: 0;
+  overflow: auto;
+  padding: 18px 22px 24px;
+}
+
+.productivity-tool-head {
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.productivity-tool-head > div {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.productivity-tool-head svg {
+  color: #f5c542;
+}
+
+.productivity-tool-head h3 {
+  margin: 0 0 3px;
+  font-size: 15px;
+}
+
+.productivity-form {
+  display: grid;
+  gap: 11px;
+}
+
+.productivity-form label {
+  display: grid;
+  gap: 5px;
+  color: #86b3c1;
+  font-size: 9px;
+  letter-spacing: 0.11em;
+}
+
+.productivity-form input,
+.productivity-form textarea,
+.productivity-form select,
+.productivity-task-form input,
+.productivity-task-form select,
+.productivity-task-description,
+.productivity-report-form input,
+.productivity-search input,
+.productivity-task aside select {
+  box-sizing: border-box;
+  width: 100%;
+  color: #ecfbff;
+  background: rgba(0, 7, 16, 0.76);
+  border: 1px solid rgba(77, 238, 255, 0.28);
+  border-radius: 7px;
+  outline: none;
+  padding: 8px 10px;
+  font: 13px "Segoe UI", sans-serif;
+}
+
+.productivity-form textarea {
+  min-height: 142px;
+  resize: vertical;
+}
+
+.productivity-code-input {
+  min-height: 240px !important;
+  font-family: Consolas, monospace !important;
+}
+
+.productivity-form input:focus,
+.productivity-form textarea:focus,
+.productivity-form select:focus,
+.productivity-task-form input:focus,
+.productivity-task-form select:focus,
+.productivity-task-description:focus,
+.productivity-report-form input:focus,
+.productivity-search input:focus {
+  border-color: #4deeff;
+  box-shadow: 0 0 12px rgba(77, 238, 255, 0.21);
+}
+
+.productivity-form-footer {
+  justify-content: space-between;
+  min-height: 34px;
+  color: #86a9b4;
+  font-size: 10px;
+}
+
+.productivity-primary-btn,
+.productivity-secondary-btn,
+.productivity-copy-btn,
+.productivity-search button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  color: #fff2be;
+  background: rgba(97, 70, 12, 0.5);
+  border: 1px solid rgba(245, 197, 66, 0.52);
+  border-radius: 6px;
+  padding: 0 11px;
+  font: 9px "Orbitron", sans-serif;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.productivity-secondary-btn,
+.productivity-copy-btn,
+.productivity-search button {
+  color: #d9faff;
+  background: rgba(11, 62, 84, 0.45);
+  border-color: rgba(77, 238, 255, 0.38);
+}
+
+.productivity-primary-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.productivity-error {
+  margin-top: 12px;
+  color: #ffd0d0;
+  background: rgba(106, 28, 36, 0.43);
+  border: 1px solid rgba(255, 116, 116, 0.4);
+  padding: 9px 11px;
+  font: 12px "Segoe UI", sans-serif;
+}
+
+.productivity-result,
+.productivity-list,
+.productivity-report-layout {
+  margin-top: 16px;
+  border: 1px solid rgba(77, 238, 255, 0.2);
+  background: rgba(0, 8, 18, 0.55);
+}
+
+.productivity-result {
+  padding: 14px;
+}
+
+.productivity-result-title {
+  color: #f5c542;
+  font-size: 13px;
+}
+
+.productivity-summary,
+.productivity-note p,
+.productivity-task p {
+  color: #cbe7ef;
+  font: 13px/1.5 "Segoe UI", sans-serif;
+}
+
+.productivity-result-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.productivity-result-grid > div {
+  min-height: 82px;
+  color: #93b5c0;
+  background: rgba(10, 50, 69, 0.35);
+  padding: 10px;
+  font: 12px "Segoe UI", sans-serif;
+}
+
+.productivity-result-grid b {
+  display: block;
+  margin-bottom: 7px;
+  color: #f5c542;
+  font: 9px "Orbitron", sans-serif;
+  letter-spacing: 0.09em;
+}
+
+.productivity-result-grid ul {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.productivity-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.productivity-tags span {
+  color: #c8f9ff;
+  border: 1px solid rgba(77, 238, 255, 0.27);
+  padding: 3px 6px;
+  font: 10px "Segoe UI", sans-serif;
+}
+
+.productivity-tags i {
+  color: #f5c542;
+  font-style: normal;
+}
+
+.productivity-code-summary,
+.productivity-diagnostic {
+  gap: 8px;
+}
+
+.productivity-code-summary {
+  display: inline-flex;
+  align-items: center;
+  color: #ffcf8f;
+  font-size: 11px;
+}
+
+.productivity-code-summary.clean {
+  color: #84f3d0;
+}
+
+.productivity-diagnostic {
+  align-items: flex-start;
+  margin-top: 9px;
+  padding: 9px;
+  border-left: 3px solid #f5c542;
+  background: rgba(24, 48, 62, 0.45);
+  font: 12px "Segoe UI", sans-serif;
+}
+
+.productivity-diagnostic.severity-high {
+  border-left-color: #ff736b;
+}
+
+.productivity-diagnostic span,
+.productivity-diagnostic em {
+  color: #f5c542;
+  font: 9px "Orbitron", sans-serif;
+}
+
+.productivity-diagnostic em {
+  margin-left: auto;
+  text-transform: uppercase;
+}
+
+.productivity-diagnostic p {
+  margin: 4px 0 0;
+  color: #a9c5cd;
+}
+
+.productivity-search {
+  gap: 7px;
+  margin-top: 15px;
+}
+
+.productivity-search input {
+  flex: 1;
+}
+
+.productivity-list {
+  max-height: 340px;
+  overflow: auto;
+}
+
+.productivity-note,
+.productivity-task {
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid rgba(77, 238, 255, 0.13);
+}
+
+.productivity-note.is-pinned {
+  background: rgba(245, 197, 66, 0.07);
+}
+
+.productivity-note h4,
+.productivity-task h4 {
+  margin: 0;
+  color: #f4fbff;
+  font-size: 13px;
+}
+
+.productivity-note p,
+.productivity-task p {
+  margin: 6px 0;
+  white-space: pre-wrap;
+}
+
+.productivity-note aside,
+.productivity-task aside {
+  display: flex;
+  gap: 5px;
+}
+
+.productivity-note aside button,
+.productivity-task aside button {
+  width: 27px;
+  height: 27px;
+}
+
+.productivity-task {
+  align-items: center;
+}
+
+.productivity-task-check {
+  color: #82f1d1;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.productivity-task.status-done h4 {
+  color: #85a3ad;
+  text-decoration: line-through;
+}
+
+.productivity-task > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.productivity-task > div > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #90adb7;
+  font: 10px "Segoe UI", sans-serif;
+}
+
+.productivity-task aside select {
+  width: auto;
+  min-width: 92px;
+  padding: 5px;
+  font-size: 11px;
+}
+
+.productivity-task-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 108px 190px auto;
+  gap: 8px;
+}
+
+.productivity-task-description {
+  min-height: 62px;
+  margin-top: 8px;
+  resize: vertical;
+}
+
+.productivity-report-form {
+  gap: 9px;
+}
+
+.productivity-report-form input {
+  flex: 1;
+}
+
+.productivity-report-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  min-height: 300px;
+}
+
+.productivity-report-list {
+  border-right: 1px solid rgba(77, 238, 255, 0.16);
+  overflow: auto;
+}
+
+.productivity-report-list button {
+  width: 100%;
+  display: grid;
+  gap: 5px;
+  padding: 11px;
+  text-align: left;
+  color: #b9d5dd;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid rgba(77, 238, 255, 0.1);
+  cursor: pointer;
+}
+
+.productivity-report-list button.active {
+  color: #fff3bd;
+  background: rgba(245, 197, 66, 0.1);
+}
+
+.productivity-report-list span {
+  font: 10px "Segoe UI", sans-serif;
+}
+
+.productivity-report-content {
+  position: relative;
+  min-width: 0;
+  padding: 13px;
+}
+
+.productivity-report-content pre {
+  max-height: 390px;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  color: #d6f2f7;
+  font: 12px/1.55 Consolas, monospace;
+}
+
+.productivity-copy-btn {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+}
+
+.productivity-empty {
+  padding: 16px;
+  color: #8ba7b1;
+  font: 12px "Segoe UI", sans-serif;
+  text-align: center;
+}
+
+.productivity-spin {
+  animation: productivity-spin 0.8s linear infinite;
+}
+
+@keyframes productivity-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 760px) {
+  .productivity-screen { padding: 0; }
+  .productivity-card { max-height: 100vh; border-radius: 0; }
+  .productivity-content { padding: 14px; }
+  .productivity-result-grid,
+  .productivity-task-form,
+  .productivity-report-layout { grid-template-columns: 1fr; }
+  .productivity-report-list { border-right: 0; border-bottom: 1px solid rgba(77, 238, 255, 0.16); max-height: 150px; }
+  .productivity-task { align-items: flex-start; }
+  .productivity-task aside { flex-wrap: wrap; }
+}

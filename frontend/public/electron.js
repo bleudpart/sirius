@@ -1,6 +1,11 @@
 // © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 const { app, BrowserWindow, session, shell, Menu, globalShortcut, ipcMain } = require("electron");
 const path = require("path");
+const {
+  closeMediaHudWindow,
+  sendMediaCommand,
+  toggleMediaHudWindow,
+} = require("./electron/hud_windows");
 
 // SIRIUS — Application de bureau Windows (Electron)
 // Charge le HUD React compilé (dossier build) et accorde l'accès au micro.
@@ -8,9 +13,30 @@ const path = require("path");
 const isDev = !app.isPackaged;
 let mainWindow = null;
 let overlayWindow = null;
+const mediaPreload = path.join(__dirname, "electron", "preload_media.js");
 
 function baseUrl() {
   return isDev ? "http://localhost:3000" : "file://" + path.join(__dirname, "..", "build", "index.html");
+}
+
+function mediaWindowOptions() {
+  const { screen } = require("electron");
+  return {
+    BrowserWindow,
+    screen,
+    baseUrl,
+    icon: path.join(__dirname, "icon.ico"),
+    openExternal: shell.openExternal,
+    preload: mediaPreload,
+  };
+}
+
+function toggleMediaHud() {
+  return toggleMediaHudWindow(mediaWindowOptions());
+}
+
+function sendMediaShortcut(action) {
+  sendMediaCommand({ action }, mainWindow);
 }
 
 function createWindow() {
@@ -26,6 +52,7 @@ function createWindow() {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      preload: mediaPreload,
       // Autorise l'accès aux ressources locales (ws://localhost:8765)
       webSecurity: true,
     },
@@ -115,10 +142,25 @@ app.whenReady().then(() => {
 
   // Raccourci global : Alt+Espace ouvre/ferme l'overlay (barre rapide type Spotlight)
   globalShortcut.register("Alt+Space", toggleOverlay);
+  // Le HUD media peut etre ouvert sans quitter l'application principale.
+  globalShortcut.register("Alt+Shift+M", toggleMediaHud);
+  for (const [accelerator, action] of [
+    ["MediaPlayPause", "toggle"],
+    ["MediaStop", "stop"],
+  ]) {
+    if (!globalShortcut.register(accelerator, () => sendMediaShortcut(action))) {
+      console.warn(`Raccourci media indisponible : ${accelerator}`);
+    }
+  }
   // L'overlay demande sa propre fermeture (touche Échap ou commande envoyée)
   ipcMain.on("sirius-close-overlay", () => {
     if (overlayWindow) { overlayWindow.close(); overlayWindow = null; }
   });
+  ipcMain.handle("sirius-media-toggle-hud", () => {
+    const window = toggleMediaHud();
+    return { visible: !!window };
+  });
+  ipcMain.handle("sirius-media-close-hud", () => ({ closed: closeMediaHudWindow() }));
 
   // Menu contextuel (clic droit) avec Copier / Coller
   if (mainWindow) {

@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   X, Eye, Sun, Cloud, CloudRain, CloudSnow, CloudFog, CloudLightning, CloudDrizzle,
-  TrendingUp, TrendingDown, AlertTriangle, Newspaper, UserRound, Moon, Sunrise, Boxes,
+  TrendingUp, TrendingDown, AlertTriangle, Newspaper, UserRound, Moon, Sunrise, Boxes, Radio, ListTodo,
 } from "lucide-react";
 import MythosBackdrop from "@/MythosBackdrop";
 import useDraggableCards from "@/useDraggableCards";
@@ -47,6 +47,8 @@ export default function OracleDivin({ onClose }) {
       });
   }, []);
   const [data, setData] = useState(null);
+  const [mediaOracle, setMediaOracle] = useState(null);
+  const [productivityOracle, setProductivityOracle] = useState(null);
   const [show3D, setShow3D] = useState(false);
   const starsRef = useRef(null);
 
@@ -67,6 +69,58 @@ export default function OracleDivin({ onClose }) {
         { timeout: 3500 }
       );
     } else go(48.85, 2.35);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const loadProductivityOracle = async () => {
+      try {
+        const response = await fetch(`${API}/productivity/oracle`, { credentials: "include" });
+        if (!response.ok) throw new Error("Le flux Productivite est indisponible.");
+        const payload = await response.json();
+        if (active) setProductivityOracle(payload);
+      } catch (error) {
+        if (active) {
+          setProductivityOracle({
+            status: "unavailable",
+            headline: error.message || "Le flux Productivite est indisponible.",
+            tasks: {},
+          });
+        }
+      }
+    };
+    void loadProductivityOracle();
+    const timer = window.setInterval(loadProductivityOracle, 15000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    let timer;
+    const loadMediaOracle = async () => {
+      try {
+        const response = await fetch(`${API}/media/oracle`, { credentials: "include" });
+        if (!response.ok) throw new Error("Le flux multimedia est indisponible.");
+        const payload = await response.json();
+        if (active) setMediaOracle(payload);
+      } catch (error) {
+        if (active) {
+          setMediaOracle({
+            status: "unavailable",
+            headline: error.message || "Le flux multimedia est indisponible.",
+          });
+        }
+      }
+    };
+    void loadMediaOracle();
+    timer = window.setInterval(loadMediaOracle, 15000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
   }, []);
 
   useEffect(() => {
@@ -159,6 +213,34 @@ export default function OracleDivin({ onClose }) {
           {data && data.crypto.length === 0 && <div className="memory-empty">Flux crypto indisponible.</div>}
           <div className="prime-hab-label">{data && data.stocks_live ? "ACTIONS — TEMPS RÉEL (ALPHA VANTAGE)" : "INDICES & ACTIONS — ESTIMATION DU JOUR"}</div>
           {data && data.stocks.map((m) => <MarketRow m={m} unit="%" key={m.name} />)}
+        </section>
+
+        <section className="prime-card oracle-media-oracle" data-testid="oracle-media">
+          <div className="zc-section-title"><Radio size={12} style={{ marginRight: 6 }} />FLUX MULTIMEDIA</div>
+          <div className={`oracle-media-state state-${mediaOracle?.status || "loading"}`}>
+            <i />
+            <span>{mediaOracle?.status === "playing" ? "LECTURE ACTIVE" : mediaOracle?.status === "unavailable" ? "FLUX INDISPONIBLE" : "ETAT DU LECTEUR"}</span>
+          </div>
+          <p>{mediaOracle?.headline || "Consultation du controle multimedia..."}</p>
+          {mediaOracle?.provider && (
+            <div className="prime-conf-note">
+              FOURNISSEUR {mediaOracle.provider.toUpperCase()} · {mediaOracle.recent_actions || 0} ACTION(S) RECENTE(S)
+            </div>
+          )}
+        </section>
+
+        <section className="prime-card oracle-productivity-oracle" data-testid="oracle-productivity">
+          <div className="zc-section-title"><ListTodo size={12} style={{ marginRight: 6 }} />PRODUCTIVITE &amp; TRAVAIL</div>
+          <div className={`oracle-productivity-state state-${productivityOracle?.status || "loading"}`}>
+            <i />
+            <span>{productivityOracle?.status === "focus" ? "FOCUS REQUIS" : productivityOracle?.status === "clear" ? "ESPACE A JOUR" : productivityOracle?.status === "unavailable" ? "FLUX INDISPONIBLE" : "LECTURE DES TACHES"}</span>
+          </div>
+          <p>{productivityOracle?.headline || "Consultation des priorites de travail..."}</p>
+          <div className="oracle-productivity-counts">
+            <span>A FAIRE <b>{productivityOracle?.tasks?.todo || 0}</b></span>
+            <span>EN COURS <b>{productivityOracle?.tasks?.in_progress || 0}</b></span>
+            <span>TERMINEES <b>{productivityOracle?.tasks?.done || 0}</b></span>
+          </div>
         </section>
 
         {/* Actualités */}

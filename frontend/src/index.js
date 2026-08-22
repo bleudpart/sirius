@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "./index.css";
 import App from "@/App";
 import AuthGate from "@/AuthGate";
+import MediaHudWindow from "@/MediaHudWindow";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -16,12 +17,13 @@ const queryClient = new QueryClient({
 });
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
+const isMediaHud = new URLSearchParams(window.location.search).has("mediaHud");
 // StrictMode retiré : il double l'exécution des effets en développement,
 // ce qui faisait parler chaque module deux fois (écho des voix de présentation).
 root.render(
   <QueryClientProvider client={queryClient}>
     <AuthGate>
-      <App />
+      {isMediaHud ? <MediaHudWindow /> : <App />}
     </AuthGate>
   </QueryClientProvider>,
 );
