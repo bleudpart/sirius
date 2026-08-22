@@ -1,12 +1,11 @@
 // © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useState, useRef } from "react";
 import { User, KeyRound, Sparkles, ExternalLink, X, Download, Upload, Music, Volume2, Brain, Monitor, RotateCcw, CheckCircle2, XCircle, Loader2, Zap, Layers, Rocket } from "lucide-react";
-import { speakFr, speakAsCharacter, CHAR_PROFILES, MYTHOS_VOICES, loadCharOverrides } from "@/voice";
+import { speakFr, speakAsCharacter, CHAR_PROFILES, MYTHOS_VOICES, loadCharOverrides, DEFAULT_VOICE, loadVoiceConfig } from "@/voice";
 import { HUD_DEFAULTS, loadHud, saveHud } from "@/hudPrefs";
 import { ConfirmButton } from "@/ConfirmButton";
 
 const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
-const DEFAULT_VOICE = { name: "fr-FR-Neural2-G", rate: 1.05, pitch: -2 };
 const TABS = [
   { id: "profil", label: "PROFIL", Icon: User },
   { id: "voix", label: "VOIX", Icon: Volume2 },
@@ -89,10 +88,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
   const [ambientTrack, setAmbientTrack] = useState(() => localStorage.getItem("sirius_ambient_track") || "epique");
 
   // Voix
-  const [voiceCfg, setVoiceCfg] = useState(() => {
-    try { return { ...DEFAULT_VOICE, ...(JSON.parse(localStorage.getItem("sirius_voice")) || {}) }; }
-    catch (e) { return { ...DEFAULT_VOICE }; }
-  });
+  const [voiceCfg, setVoiceCfg] = useState(loadVoiceConfig);
   const updateVoice = (patch) => setVoiceCfg((v) => {
     const nv = { ...v, ...patch };
     localStorage.setItem("sirius_voice", JSON.stringify(nv));
@@ -263,6 +259,28 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
             <label className="setup-label">Préréglage <span className="setup-tag opt">1 clic</span></label>
             <button
               type="button"
+              className={`setup-voice-preset ${voiceCfg.name === "browser-female" ? "active" : ""}`}
+              onClick={() => updateVoice({ name: "browser-female", rate: 1.0, pitch: 1.08 })}
+              data-testid="setup-voice-preset-browser-female"
+              title="Activer la voix féminine synthétique locale"
+            >
+              <b>Féminine synthétique — locale</b>
+              <span>Voix française Windows ou navigateur · Sans clé API · Disponible hors ligne</span>
+              {voiceCfg.name === "browser-female" && <i className="setup-preset-check">ACTIVE</i>}
+            </button>
+            <button
+              type="button"
+              className={`setup-voice-preset ${voiceCfg.name === "browser" ? "active" : ""}`}
+              onClick={() => updateVoice({ name: "browser", rate: 1.0, pitch: 0.85 })}
+              data-testid="setup-voice-preset-browser-male"
+              title="Activer la voix masculine synthétique locale"
+            >
+              <b>Masculine synthétique — locale</b>
+              <span>Voix française Windows ou navigateur · Timbre posé · Sans clé API · Disponible hors ligne</span>
+              {voiceCfg.name === "browser" && <i className="setup-preset-check">ACTIVE</i>}
+            </button>
+            <button
+              type="button"
               className={`setup-voice-preset ${voiceCfg.name === "fr-FR-Neural2-F" && voiceCfg.rate === 1 && voiceCfg.pitch === 2 ? "active" : ""}`}
               onClick={() => updateVoice({ name: "fr-FR-Neural2-F", rate: 1.0, pitch: 2 })}
               data-testid="setup-voice-preset-neural2f"
@@ -274,15 +292,16 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
             </button>
             <label className="setup-label">Voix</label>
             <select className="setup-input" value={voiceCfg.name} onChange={(e) => updateVoice({ name: e.target.value })} data-testid="setup-voice-name">
+              <option value="browser-female">Féminine synthétique — locale (recommandée)</option>
               <option value="fr-FR-Neural2-G">Neural2-G — neurale premium (recommandée)</option>
               <option value="fr-FR-Neural2-F">Neural2-F — féminine premium (claire & dynamique)</option>
               <option value="fr-FR-Wavenet-G">Wavenet-G — WaveNet</option>
-              <option value="browser">Voix du navigateur — gratuite</option>
+              <option value="browser">Masculine synthétique — locale</option>
             </select>
             <label className="setup-label">Débit <span className="setup-tag opt">{voiceCfg.rate.toFixed(2)}×</span></label>
             <input className="setup-range" type="range" min="0.7" max="1.4" step="0.05" value={voiceCfg.rate}
               onChange={(e) => updateVoice({ rate: parseFloat(e.target.value) })} data-testid="setup-voice-rate" />
-            {voiceCfg.name !== "browser" && (
+            {!voiceCfg.name.startsWith("browser") && (
               <>
                 <label className="setup-label">Gravité <span className="setup-tag opt">{voiceCfg.pitch <= -6 ? "très grave" : voiceCfg.pitch <= -2 ? "grave" : voiceCfg.pitch >= 2 ? "claire" : "naturelle"} ({voiceCfg.pitch > 0 ? `+${voiceCfg.pitch}` : voiceCfg.pitch})</span></label>
                 <input className="setup-range" type="range" min="-10" max="4" step="0.5" value={voiceCfg.pitch}

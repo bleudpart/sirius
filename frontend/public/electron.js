@@ -8,6 +8,18 @@ const path = require("path");
 const isDev = !app.isPackaged;
 let mainWindow = null;
 let overlayWindow = null;
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+
+if (!hasSingleInstanceLock) {
+  app.quit();
+}
+
+app.on("second-instance", () => {
+  if (!mainWindow) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+});
 
 function baseUrl() {
   return isDev ? "http://localhost:3000" : "file://" + path.join(__dirname, "..", "build", "index.html");
@@ -93,6 +105,8 @@ function toggleOverlay() {
 }
 
 app.whenReady().then(() => {
+  if (!hasSingleInstanceLock) return;
+
   // Active les raccourcis Couper/Copier/Coller/Tout sélectionner (Ctrl+X/C/V/A)
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([

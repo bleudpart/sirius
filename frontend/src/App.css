@@ -4471,7 +4471,14 @@ body.hud-minimal .guardian-halo { display: none; }
   position: absolute;
   inset: 0;
   z-index: 2;
+  opacity: 0;
+  transition: opacity 0.4s ease;
 }
+.reactor-wrap .core-pulse { opacity: 0; transition: opacity 0.4s ease; }
+.reactor-wrap.core-thinking .reactor-canvas,
+.reactor-wrap.core-speaking .reactor-canvas,
+.reactor-wrap.core-thinking .core-pulse,
+.reactor-wrap.core-speaking .core-pulse { opacity: 1; }
 
 /* Lettres grecques en orbite entre les anneaux */
 .core-orbit { position: absolute; inset: 7%; animation: coreSpin 14s linear infinite; }

@@ -45,7 +45,7 @@ async function checkMicro() {
 function checkHud() {
   return {
     "barre de commande": !!document.querySelector('[data-testid="sirius-cmd-input"]'),
-    "barre d'outils": !!document.querySelector('[data-testid="sirius-voice-module-btn"]'),
+    "commande vocale": !!document.querySelector('[data-testid="sirius-ptt-btn"]'),
     "noyau HUD": !!document.querySelector(".hud-root, .hud, #root > div"),
   };
 }

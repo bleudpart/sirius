@@ -30,8 +30,24 @@ export function useLiveStats() {
 function useClockNow(intervalMs) {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), intervalMs);
-    return () => clearInterval(id);
+    let timeoutId;
+    const update = () => {
+      setNow(new Date());
+      const delay = intervalMs - (Date.now() % intervalMs);
+      timeoutId = setTimeout(update, Math.max(10, delay));
+    };
+    const resync = () => {
+      clearTimeout(timeoutId);
+      update();
+    };
+    update();
+    window.addEventListener("focus", resync);
+    document.addEventListener("visibilitychange", resync);
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener("focus", resync);
+      document.removeEventListener("visibilitychange", resync);
+    };
   }, [intervalMs]);
   return now;
 }

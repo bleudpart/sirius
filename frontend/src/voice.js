@@ -1,5 +1,5 @@
 // © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
-// Voix de Sirius — Google Cloud TTS (voix neurale FR homme) avec basculement
+// Voix de Sirius — synthèse locale ou Google Cloud TTS avec basculement
 // automatique sur la synthèse du navigateur si la clé est absente ou l'API indisponible.
 const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
 const MALE = /(paul|henri|thomas|nicolas|claude|mathieu|guillaume|daniel|jerome|male|homme|man|wavenet-d|wavenet-b|standard-b|standard-d)/i;
@@ -54,9 +54,24 @@ function stopChannels() {
 }
 
 // Préférences de voix (écran Profil) : voix, débit, gravité
-const DEFAULT_VOICE = { name: "fr-FR-Neural2-G", rate: 1.05, pitch: -2 };
-const getVoiceCfg = () => {
-  try { return { ...DEFAULT_VOICE, ...(JSON.parse(localStorage.getItem("sirius_voice")) || {}) }; }
+export const DEFAULT_VOICE = { name: "browser-female", rate: 1.0, pitch: 1.08 };
+const LEGACY_DEFAULT_VOICE = { name: "fr-FR-Neural2-G", rate: 1.05, pitch: -2 };
+const isBrowserVoice = (name) => name === "browser" || name === "browser-female";
+const getBrowserGender = (name) => name === "browser" ? "male" : "female";
+
+export const loadVoiceConfig = () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem("sirius_voice")) || null;
+    const isLegacyDefault = saved
+      && saved.name === LEGACY_DEFAULT_VOICE.name
+      && saved.rate === LEGACY_DEFAULT_VOICE.rate
+      && saved.pitch === LEGACY_DEFAULT_VOICE.pitch;
+    if (!saved || isLegacyDefault) {
+      localStorage.setItem("sirius_voice", JSON.stringify(DEFAULT_VOICE));
+      return { ...DEFAULT_VOICE };
+    }
+    return { ...DEFAULT_VOICE, ...saved };
+  }
   catch (e) { return { ...DEFAULT_VOICE }; }
 };
 
@@ -124,7 +139,7 @@ async function speakGoogle(message, { voice, rate, pitch, volume = 1, onstart, o
 }
 
 // ---- Synthèse du navigateur (fallback gratuit) ----
-function speakBrowser(message, { rate = 1.05, pitch = 0.85, volume = 1, gender = "male", onstart, onend } = {}) {
+function speakBrowser(message, { rate = 1.0, pitch = 1.08, volume = 1, gender = "female", onstart, onend } = {}) {
   const synth = window.speechSynthesis;
   const end = onend || (() => {});
   if (!synth || !message) { end(); return; }
@@ -163,7 +178,7 @@ const isNight = () => { const h = new Date().getHours(); return h >= 22 || h < 5
 
 export function speakFr(message, { onstart, onend } = {}) {
   if (!message) { (onend || (() => {}))(); return; }
-  const cfg = getVoiceCfg();
+  const cfg = loadVoiceConfig();
   const urgent = isUrgent(message);
   const night = isNight();
   let rate = Math.max(0.5, Math.min(2, urgent ? cfg.rate + 0.13 : cfg.rate));
@@ -172,8 +187,8 @@ export function speakFr(message, { onstart, onend } = {}) {
   const seq = ++speakSeq;
   const fem = FEMALE.test(cfg.name);
   const bPitch = (fem ? 1.12 : (urgent ? 0.92 : 0.85)) * (night ? 0.95 : 1);
-  if (cfg.name === "browser") {
-    speakBrowser(message, { rate, pitch: bPitch, volume, onstart, onend });
+  if (isBrowserVoice(cfg.name)) {
+    speakBrowser(message, { rate, pitch: bPitch, volume, gender: getBrowserGender(cfg.name), onstart, onend });
     return;
   }
   speakGoogle(message, { voice: cfg.name, rate, pitch: night ? cfg.pitch - 1.5 : cfg.pitch, volume, onstart, onend }, seq).then((ok) => {
@@ -213,10 +228,10 @@ export function speakSeries(sentence, opts = {}) {
 // Présentation au démarrage : voix grave et posée, style bande-annonce de film
 export function speakCinematic(message, { onstart, onend } = {}) {
   if (!message) { (onend || (() => {}))(); return; }
-  const cfg = getVoiceCfg();
+  const cfg = loadVoiceConfig();
   const seq = ++speakSeq;
-  if (cfg.name === "browser") {
-    speakBrowser(message, { rate: 0.85, pitch: 0.62, onstart, onend });
+  if (isBrowserVoice(cfg.name)) {
+    speakBrowser(message, { rate: 0.85, pitch: 0.95, gender: getBrowserGender(cfg.name), onstart, onend });
     return;
   }
   speakGoogle(message, { voice: cfg.name, rate: 0.85, pitch: Math.max(-10, cfg.pitch - 3), onstart, onend }, seq).then((ok) => {
@@ -251,7 +266,7 @@ const _gToB = (g) => Math.max(0.4, Math.min(1.8, 1 + g / 15));
 export function speakAsCharacter(message, { profile, module, pitch = 1, rate = 1, onstart, onend } = {}) {
   if (!message) { (onend || (() => {}))(); return; }
   const safeText = cleanTextForSpeech(message);
-  const cfg = getVoiceCfg();
+  const cfg = loadVoiceConfig();
   const prof = profile || (module && CHAR_PROFILES[module]);
   const p = prof && MYTHOS_VOICES[prof];
   const seq = ++speakSeq;
@@ -260,7 +275,7 @@ export function speakAsCharacter(message, { profile, module, pitch = 1, rate = 1
     const gPitch = ov.gPitch ?? p.gPitch;
     const vRate = ov.rate ?? p.rate;
     const bPitch = ov.gPitch != null ? _gToB(ov.gPitch) : p.bPitch;
-    if (cfg.name === "browser") {
+    if (isBrowserVoice(cfg.name)) {
       speakBrowser(safeText, { rate: vRate, pitch: bPitch, gender: p.gender, onstart, onend });
       return;
     }
@@ -271,8 +286,8 @@ export function speakAsCharacter(message, { profile, module, pitch = 1, rate = 1
   }
   const bp = Math.max(0.4, Math.min(1.8, pitch));
   const br = Math.max(0.55, Math.min(1.6, rate));
-  if (cfg.name === "browser") {
-    speakBrowser(safeText, { rate: br, pitch: bp, onstart, onend });
+  if (isBrowserVoice(cfg.name)) {
+    speakBrowser(safeText, { rate: br, pitch: bp, gender: getBrowserGender(cfg.name), onstart, onend });
     return;
   }
   const gPitch = Math.max(-14, Math.min(14, Math.round((pitch - 0.9) * 13)));

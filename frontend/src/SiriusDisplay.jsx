@@ -3,6 +3,7 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import { Monitor, RotateCw, ExternalLink, Globe, MessageSquare, Film, ImageIcon, Minus, ChevronUp, ShieldCheck, X, Maximize2, Minimize2, ClipboardPaste, Save, FileText, UploadCloud, Sparkles, Loader2, Facebook, Instagram, MessageCircle } from "lucide-react";
 import { progress } from "./SiriusProgress";
 import Analysis3D from "./Analysis3D";
+import ModulesMedia from "./ModulesMedia";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const GEO_KEY = "sirius_display_geo_v2";
@@ -21,6 +22,7 @@ const TYPE_META = {
   web: { label: "WEB", Icon: Globe },
   video: { label: "VIDÉO", Icon: Film },
   image: { label: "IMAGE", Icon: ImageIcon },
+  media: { label: "MÉDIAS", Icon: Film },
 };
 
 // Réseaux sociaux : FB/IG/WA refusent l'iframe (X-Frame-Options), donc fenêtre dédiée pilotée par le display
@@ -396,6 +398,13 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
                 <img key={item.src} src={item.src} alt={item.legende || "affichage"} className="sd-image" data-testid="sirius-display-image" />
                 {item.legende && <div className="sd-caption">{item.legende}</div>}
               </div>
+            )}
+            {!pasted && type === "media" && (
+              <ModulesMedia
+                onOpenModule={(mediaModule) => {
+                  if (onSpeak) onSpeak(`${mediaModule.name} ouvert dans une nouvelle fenêtre.`);
+                }}
+              />
             )}
           </div>
 

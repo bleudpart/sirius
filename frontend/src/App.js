@@ -162,7 +162,13 @@ const loadMemory = () => {
     return raw.map((m) => (typeof m === "string" ? { t: m, d: null } : m)).filter((m) => m && m.t);
   } catch { return []; }
 };
-const todayStr = () => new Date().toISOString().slice(0, 10);
+const todayStr = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 const STATES = {
   idle: { label: "EN VEILLE", color: "#22d3ee", glow: "#0ea5b7" },
@@ -176,10 +182,20 @@ const DAILY_BRIEFING_COMMAND = /^\s*(?:(?:mon|le)\s+)?(?:briefing(?:\s+(?:quotid
 
 // Réponses locales instantanées (heure / date exactes uniquement)
 const CLOUD_RETRY_MSG = "Mon cerveau cloud est momentanément injoignable. Réessaie dans un instant — je reste connecté à Groq.";
+const isLocalTimeQuestion = (command) => {
+  const normalized = String(command || "")
+    .toLocaleLowerCase("fr-FR")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[’']/g, " ");
+  const asksTime = /\b(quelle heure|donne moi l heure|heure actuelle|il est quelle heure|il est combien|heure il est)\b/.test(normalized);
+  const asksForeignTime = /\bheure(?:\s+est il)?\s+a\s+\S+/.test(normalized);
+  return asksTime && !asksForeignTime;
+};
 function localAnswer(c) {
   const now = new Date();
-  const heure = `${now.getHours()} heures ${now.getMinutes() === 0 ? "" : now.getMinutes()}`.trim();
-  if (/(quelle heure|l'heure|il est combien)/.test(c) && !/heure\s+(est[- ]il\s+)?[àa]\s+\S/.test(c)) return `Il est ${heure}.`;
+  const heure = now.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }).replace(":", " heures ");
+  if (isLocalTimeQuestion(c)) return `Il est ${heure}.`;
   if (/(quel jour|quelle date|on est le|on est quel)/.test(c))
     return `Nous sommes le ${now.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}.`;
   if (/(bonjour|bonsoir|salut|coucou|hello)/.test(c)) return `Bonjour. Tous mes systèmes sont en ligne.`;
@@ -1509,6 +1525,14 @@ function App() {
   // Réponse intelligente via le cerveau cloud (Kimi K3 analyse → Groq formule, en flux avec fallbacks)
   const cloudAnswer = useCallback(async (command) => {
     setStatus("thinking");
+
+    if (isLocalTimeQuestion(command)) {
+      const answer = localAnswer(command);
+      setText(answer);
+      speakOut(answer);
+      showOnDisplay({ type: "message", titre: "SIRIUS — HEURE LOCALE", contenu: answer });
+      return;
+    }
 
     let pid = null;
     if (typeof progress !== "undefined" && progress?.start) {
@@ -3760,9 +3784,17 @@ function App() {
 
   // Arrête l'écoute en cours
   const stopListening = useCallback(() => {
+    const rec = recognitionRef.current;
+    recognitionRef.current = null;
     micOnRef.current = false;
+    window.__siriusMicOn = false;
     setMicOn(false);
-    try { recognitionRef.current && recognitionRef.current.stop(); } catch (e) {}
+    if (rec) {
+      rec.onend = null;
+      rec.onerror = null;
+      try { rec.stop(); } catch (e) {}
+    }
+    setStatus((current) => (current === "listening" ? "idle" : current));
   }, []);
 
   const shutdownSirius = useCallback(async () => {
@@ -3841,6 +3873,8 @@ function App() {
         }
       };
       rec.onend = () => {
+        if (recognitionRef.current && recognitionRef.current !== rec) return;
+        if (recognitionRef.current === rec) recognitionRef.current = null;
         micOnRef.current = false;
         window.__siriusMicOn = false;
         setMicOn(false);
@@ -4137,7 +4171,7 @@ function App() {
         const d = await r.json().catch(() => ({}));
         if (!d || !d.deals) return;
 
-        const jour = new Date().toISOString().slice(0, 10);
+        const jour = todayStr();
         const late = d.deals.filter((x) => x.relance && x.relance <= jour && !["GAGNÉ", "PERDU"].includes(x.etape));
         if (!late.length) return;
 
@@ -4174,7 +4208,7 @@ function App() {
       const d = await r.json();
       if (d.briefing) {
         progress.log(pid, "Briefing synthétisé, lecture vocale…", 80);
-        localStorage.setItem("sirius_last_briefing", new Date().toISOString().slice(0, 10));
+        localStorage.setItem("sirius_last_briefing", todayStr());
           const salut = greetByPhase(userName);
           // Météo Atlas détaillée de la ville du profil
           let meteoAtlas = "";
@@ -4205,7 +4239,7 @@ function App() {
                 const ra = await fetch(`${API}/calendar/events?max_results=8`, { credentials: "include" });
                 if (!ra.ok) return;
                 const a = await ra.json();
-                const todayIso = new Date().toISOString().slice(0, 10);
+                const todayIso = todayStr();
                 const evts = (a.events || []).filter((e) => (e.start || "").slice(0, 10) === todayIso);
                 if (evts.length) {
                   const fmt = (e) => {
@@ -4268,7 +4302,7 @@ function App() {
   useEffect(() => { runBriefingRef.current = runBriefingDisplay; }, [runBriefingDisplay]);
   useEffect(() => {
     if (booting || showSetup || briefingDoneRef.current) return;
-    if (localStorage.getItem("sirius_last_briefing") === new Date().toISOString().slice(0, 10)) return;
+    if (localStorage.getItem("sirius_last_briefing") === todayStr()) return;
     briefingDoneRef.current = true;
     const id = setTimeout(() => runBriefingDisplay(), 1800);
     return () => clearTimeout(id);
@@ -4283,7 +4317,7 @@ function App() {
       const now = new Date();
       const [h, m] = cfg.time.split(":").map(Number);
       if (now.getHours() !== h || now.getMinutes() !== m) return;
-      const today = now.toISOString().slice(0, 10);
+      const today = todayStr();
       if (localStorage.getItem("sirius_reveil_last") === today) return;
       localStorage.setItem("sirius_reveil_last", today);
       (async () => {
@@ -4363,6 +4397,7 @@ function App() {
   const moduleItems = [
     { id: "reload", group: "SYSTÈME", label: "Recharger SIRIUS", Icon: RotateCcw, run: () => { window.__siriusBootPlayed = false; window.location.reload(); } },
     { id: "display", group: "MÉDIAS", label: "SIRIUS DISPLAY", Icon: Monitor, active: displayOpen, run: () => { pinDisplay(); setDisplayOpen((o) => !o); } },
+    { id: "media-modules", group: "MÉDIAS", label: "Modules multimédia", Icon: Clapperboard, active: displayOpen && display.type === "media", run: () => showOnDisplay({ type: "media", titre: "MODULES MULTIMÉDIA" }) },
     { id: "files", group: "MÉDIAS", label: "Médiathèque", Icon: FolderOpen, run: () => setShowFiles(true) },
     { id: "architect", group: "OUTILS", label: "Architecte visuel", Icon: Workflow, run: () => { setArchitectPrompt(""); setShowArchitect(true); } },
     { id: "pantheon", group: "PANTHÉON", label: "PANTHEON SYSTEM", Icon: PantheonLogo, run: () => setShowPantheon(true) },
@@ -4372,7 +4407,7 @@ function App() {
     { id: "nummarius", group: "PANTHÉON", label: "PORTUS NUMMARIUS# — bourse & marchés", Icon: Landmark, run: () => setShowNummarius(true) },
     { id: "europeana", group: "MÉDIAS", label: "Archives Europeana", Icon: Library, run: () => setShowEuropeana(true) },
     { id: "haccp", group: "OUTILS", label: "HACCP — sécurité alimentaire", Icon: ShieldCheck, run: () => setHaccp({ sujet: "", auto: false }) },
-    { id: "voice", group: "SYSTÈME", label: "Module vocal SIRIUS", Icon: AudioLines, run: () => { window.location.href = "/?voice=1"; } },
+    { id: "voice", group: "SYSTÈME", label: micOn ? "Reconnaissance vocale — active" : "Reconnaissance vocale — inactive", Icon: AudioLines, active: micOn, run: toggleMic },
     { id: "prime", group: "OUTILS", label: "SIRIUS PRIME — mémoire", Icon: Sparkles, run: () => setShowPrime(true) },
     { id: "dev", group: "OUTILS", label: "Compagnon Dev", Icon: Code2, run: () => setShowDev(true) },
     { id: "analytics", group: "OUTILS", label: "Tableau analytique", Icon: BarChart3, run: () => setShowAnalytics(true) },
@@ -4830,7 +4865,7 @@ function App() {
               ))}
             </div>
           </div>
-          <ReactorCore status="thinking" volume={0.35} color="#22d3ee" eco={ecoMode} />
+          <ReactorCore status={status} volume={0.35} color="#22d3ee" eco={ecoMode} />
           <button
             className="core-quote-zone"
             data-testid="core-quote-btn"

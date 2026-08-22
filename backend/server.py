@@ -3386,6 +3386,12 @@ app.add_middleware(
 # Rattachement final du routeur /api à l'application (une seule fois, après les middlewares)
 app.include_router(api_router)
 
+# Catalogue public des plateformes multimedia. La route reste hors de /api pour
+# conserver le contrat frontend /modules/media et fonctionner avec le proxy CRA.
+from routes.media_modules import router as media_modules_router
+app.include_router(media_modules_router)
+logger.info("Included routes.media_modules")
+
 # Import et inclusion explicite des routers de compatibilité
 import routers.modules as modules_mod
 app.include_router(modules_mod.router)
@@ -3450,7 +3456,7 @@ if (BUILD_DIR / "static").exists():
 if HOLO_DIR.exists():
     app.mount("/holo", StaticFiles(directory=str(HOLO_DIR)), name="holo")
 
-@app.get("/{full_path:path}")
+@app.api_route("/{full_path:path}", methods=["GET", "HEAD"])
 async def serve_react_app(full_path: str):
     # Laisse passer les routes /api/ en 404 classique si elles n'existent pas
     if full_path.startswith("api/"):
