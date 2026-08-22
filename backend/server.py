@@ -24,13 +24,14 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from starlette.types import ASGIApp, Scope, Receive, Send
-from sirius_brain import ask_sirius, parse_intent, enrich_briefing, hn_bulletin, doc_narrative, k3_source
 
 # 1. Chargement des variables d'environnement
 ROOT_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = ROOT_DIR.parent
 FRONTEND_DIR = PROJECT_DIR / "frontend"
 load_dotenv(ROOT_DIR / '.env')
+
+from sirius_brain import ask_sirius, parse_intent, enrich_briefing, hn_bulletin, doc_narrative, k3_source
 
 # 2. Configuration des logs
 logging.basicConfig(
@@ -386,6 +387,71 @@ def _env_key(*names: str) -> str:
     return ""
 
 
+class KeysCheckRequest(BaseModel):
+    keys: dict[str, str] = Field(default_factory=dict)
+
+
+_KEY_CHECK_SPECS = {
+    "groq": {
+        "label": "Cerveau SIRIUS",
+        "env": ("GROQ_API_KEY", "GROQ_KEY", "K3_API_KEY", "DANIEL_DEV_K3"),
+    },
+    "serp": {
+        "label": "SerpAPI",
+        "env": ("SERP_API_KEY",),
+    },
+    "fal": {
+        "label": "fal.ai",
+        "env": ("FAL_KEY", "FAL_API_KEY"),
+    },
+    "gmaps": {
+        "label": "Google Maps",
+        "env": ("GOOGLE_MAPS_API_KEY", "MAPS_PLATFORM_API_KEY", "MAPS_PLATFORM_API_Key"),
+    },
+    "alphavantage": {
+        "label": "Alpha Vantage",
+        "env": ("ALPHA_VANTAGE_API_KEY", "ALPHA_VANTAGE_KEY"),
+    },
+}
+
+
+def _keys_check_response(keys: dict[str, str]) -> dict:
+    statuses = {}
+    checks = []
+
+    for service, spec in _KEY_CHECK_SPECS.items():
+        browser_key = (keys.get(service) or "").strip()
+        server_key = _env_key(*spec["env"])
+        if browser_key or server_key:
+            state = "ok"
+            source = "navigateur" if browser_key else "serveur"
+        elif service == "groq":
+            # parse_intent remains usable without a provider key through its local fallback.
+            state = "ok"
+            source = "fallback_local"
+        else:
+            state = "absente"
+            source = "aucune"
+
+        statuses[service] = state
+        checks.append(
+            {
+                "id": service,
+                "label": spec["label"],
+                "status": state,
+                "source": source,
+            }
+        )
+
+    return {
+        "ok": True,
+        "statuses": statuses,
+        "checks": checks,
+        "invalid": [],
+        "speech": "",
+    }
+
+
 @api_router.get("/keys/check")
 async def keys_check_get():
     return {
@@ -400,6 +466,12 @@ async def keys_check_get():
             "emergent": bool(_env_key("EMERGENT_LLM_KEY", "EMERGENT_API_KEY")),
         },
     }
+
+
+@api_router.post("/keys/check")
+async def keys_check_post(request: KeysCheckRequest):
+    """Checks browser and server key availability without returning secret values."""
+    return _keys_check_response(request.keys)
 
 
 # =========================================================
