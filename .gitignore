@@ -64,6 +64,9 @@ chainlit.md
 # Data and databases
 agenthub/agents/youtube/db
 
+# Local SIRIUS Doctor snapshots
+/backend/backups/sirius_doctor/
+
 # Archive files and large assets
 **/*.zip
 **/*.tar.gz

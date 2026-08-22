@@ -1,8 +1,9 @@
 // © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useEffect, useRef, useState } from "react";
 import {
-  X, Eye, Sun, Cloud, CloudRain, CloudSnow, CloudFog, CloudLightning, CloudDrizzle,
+  X, Eye, Sun,
   TrendingUp, TrendingDown, AlertTriangle, Newspaper, UserRound, Moon, Sunrise, Boxes,
+  Trophy, Lightbulb, Mail, MessageCircle,
 } from "lucide-react";
 import MythosBackdrop from "@/MythosBackdrop";
 import useDraggableCards from "@/useDraggableCards";
@@ -10,16 +11,107 @@ import Analysis3D from "@/Analysis3D";
 import "./Oracle.css";
 
 const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
-const DAYS = ["DIM", "LUN", "MAR", "MER", "JEU", "VEN", "SAM"];
-function WIcon({ code, size = 22 }) {
-  if (code === 0 || code === 1) return <Sun size={size} color="#ffd77a" />;
-  if (code === 2 || code === 3) return <Cloud size={size} color="#9fc5d6" />;
-  if (code >= 45 && code <= 48) return <CloudFog size={size} color="#9fc5d6" />;
-  if (code >= 51 && code <= 57) return <CloudDrizzle size={size} color="#38bdf8" />;
-  if (code >= 61 && code <= 82) return <CloudRain size={size} color="#38bdf8" />;
-  if (code >= 71 && code <= 86) return <CloudSnow size={size} color="#e0f2fe" />;
-  if (code >= 95) return <CloudLightning size={size} color="#ffe600" />;
-  return <Cloud size={size} color="#9fc5d6" />;
+const EXTERNAL_BRIEFING_RESOURCES = [
+  { key: "news", path: "/news/top", fallback: "/news/headlines?limit=4", normalize: normalizeItems },
+  { key: "worldNews", path: "/news/world", fallback: "/news/headlines?q=monde&limit=4", normalize: normalizeItems },
+  { key: "franceNews", path: "/news/france", fallback: "/news/headlines?q=France&limit=4", normalize: normalizeItems },
+  { key: "sport", path: "/sport/results", fallback: "/news/headlines?q=sport&limit=4", normalize: normalizeItems },
+  { key: "weather", path: "/weather/today", fallback: "/weather/current", normalize: normalizeWeather },
+  { key: "fact", path: "/system/fact_of_day", normalize: normalizeFact },
+  { key: "mails", path: "/mail/important", fallback: "/microsoft/mail?top=5", normalize: normalizeItems },
+  { key: "messages", path: "/messages/important", fallback: "/outlook/emails", normalize: normalizeItems },
+];
+
+function normalizeItems(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== "object") return [];
+  for (const key of ["articles", "news", "results", "items", "mails", "messages"]) {
+    if (Array.isArray(payload[key])) return payload[key];
+  }
+  return [];
+}
+
+function normalizeWeather(payload) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+  return payload.weather && !Array.isArray(payload.weather) ? payload.weather : payload;
+}
+
+function normalizeFact(payload) {
+  if (typeof payload === "string") return payload.trim();
+  if (!payload || typeof payload !== "object") return "";
+  for (const key of ["fact", "text", "content", "message", "description"]) {
+    if (typeof payload[key] === "string" && payload[key].trim()) return payload[key].trim();
+  }
+  return "";
+}
+
+async function fetchBriefingResource(path, fallback, signal) {
+  const request = async (endpoint) => {
+    const response = await fetch(`${API}${endpoint}`, {
+      credentials: "include",
+      signal,
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  };
+
+  try {
+    return await request(path);
+  } catch (error) {
+    if (error?.name === "AbortError" || !fallback) throw error;
+    return request(fallback);
+  }
+}
+
+function briefingItemTitle(item) {
+  if (typeof item === "string") return item;
+  if (!item || typeof item !== "object") return "";
+  return item.title || item.titre || item.subject || item.sujet || item.text || item.name || "";
+}
+
+function briefingItemDetail(item) {
+  if (!item || typeof item !== "object") return "";
+  return item.description || item.apercu || item.source || item.de || item.sender || "";
+}
+
+function BriefingItems({ items, error, emptyMessage }) {
+  if (error) return <div className="memory-empty">Flux externe indisponible.</div>;
+  if (!items.length) return <div className="memory-empty">{emptyMessage}</div>;
+  return items.slice(0, 4).map((item, index) => {
+    const title = briefingItemTitle(item);
+    const detail = briefingItemDetail(item);
+    const identifier = item && typeof item === "object" ? item.id || item.url : "";
+    return (
+      <div className="oracle-news-row" key={identifier || `${title}-${index}`}>
+        <span className="oracle-news-theme">{index + 1}</span>
+        <span className="oracle-news-text">{title || "Élément sans titre"}</span>
+        {detail && <span className="prime-conf-note">{detail}</span>}
+      </div>
+    );
+  });
+}
+
+function externalBriefingText(briefing) {
+  if (briefing.loading) return "Connexion aux flux externes du briefing...";
+
+  const headlines = [briefing.news, briefing.worldNews, briefing.franceNews]
+    .flat()
+    .map(briefingItemTitle)
+    .filter(Boolean);
+  const parts = [];
+  if (headlines.length) parts.push(`À la une : ${headlines[0]}.`);
+  if (briefing.weather) {
+    const temperature = briefing.weather.temp ?? briefing.weather.temperature ?? briefing.weather.temperature_2m;
+    const description = briefing.weather.description || briefing.weather.condition || "";
+    if (temperature != null || description) {
+      parts.push(`Météo : ${[temperature != null ? `${Math.round(temperature)} degrés` : "", description].filter(Boolean).join(", ")}.`);
+    }
+  }
+  if (briefing.sport.length) parts.push(`Sport : ${briefingItemTitle(briefing.sport[0])}.`);
+  if (briefing.fact) parts.push(`Fait du jour : ${briefing.fact}`);
+  if (briefing.mails.length) parts.push(`${briefing.mails.length} mail${briefing.mails.length > 1 ? "s" : ""} important${briefing.mails.length > 1 ? "s" : ""}.`);
+  if (briefing.messages.length) parts.push(`${briefing.messages.length} message${briefing.messages.length > 1 ? "s" : ""} important${briefing.messages.length > 1 ? "s" : ""}.`);
+  return parts.length ? parts.join(" ") : "Aucune donnée externe n'est disponible pour le moment.";
 }
 
 function MarketRow({ m, unit }) {
@@ -48,6 +140,18 @@ export default function OracleDivin({ onClose }) {
   }, []);
   const [data, setData] = useState(null);
   const [show3D, setShow3D] = useState(false);
+  const [briefing, setBriefing] = useState({
+    loading: true,
+    errors: {},
+    news: [],
+    worldNews: [],
+    franceNews: [],
+    sport: [],
+    weather: null,
+    fact: "",
+    mails: [],
+    messages: [],
+  });
   const starsRef = useRef(null);
 
   useEffect(() => {
@@ -67,6 +171,45 @@ export default function OracleDivin({ onClose }) {
         { timeout: 3500 }
       );
     } else go(48.85, 2.35);
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    Promise.allSettled(
+      EXTERNAL_BRIEFING_RESOURCES.map(async (resource) => [
+        resource.key,
+        resource.normalize(
+          await fetchBriefingResource(resource.path, resource.fallback, controller.signal)
+        ),
+      ])
+    ).then((results) => {
+      if (controller.signal.aborted) return;
+
+      const next = {
+        loading: false,
+        errors: {},
+        news: [],
+        worldNews: [],
+        franceNews: [],
+        sport: [],
+        weather: null,
+        fact: "",
+        mails: [],
+        messages: [],
+      };
+      results.forEach((result, index) => {
+        const resource = EXTERNAL_BRIEFING_RESOURCES[index];
+        if (result.status === "fulfilled") {
+          next[result.value[0]] = result.value[1];
+        } else {
+          next.errors[resource.key] = true;
+        }
+      });
+      setBriefing(next);
+    });
+
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
@@ -103,6 +246,7 @@ export default function OracleDivin({ onClose }) {
   }, []);
 
   const dragRef = useDraggableCards([data]);
+  const briefingText = externalBriefingText(briefing);
 
   return (
     <div className="prime-screen" data-testid="oracle-divin-panel" ref={dragRef}>
@@ -126,29 +270,34 @@ export default function OracleDivin({ onClose }) {
         <section className="prime-card oracle-wide" data-testid="oracle-briefing">
           <div className="zc-section-title">
             <Sunrise size={12} style={{ marginRight: 6 }} />BRIEFING DU MATIN
-            {data && data.briefing && (
+            {!briefing.loading && (
               <button className="oracle-3d-btn" onClick={() => setShow3D(true)} data-testid="oracle-3d-btn">
                 <Boxes size={11} /> VUE 3D
               </button>
             )}
           </div>
-          <p className="oracle-briefing-text">{data ? data.briefing : "Génération du briefing quotidien..."}</p>
+          <p className="oracle-briefing-text">{briefingText}</p>
         </section>
 
-        {/* Météo 7 jours */}
+        {/* Météo */}
         <section className="prime-card oracle-wide" data-testid="oracle-weather">
-          <div className="zc-section-title"><Sun size={12} style={{ marginRight: 6 }} />PRÉVISIONS MÉTÉO — 7 JOURS</div>
-          <div className="oracle-week">
-            {data && data.weather.map((d) => (
-              <div className="oracle-day" key={d.date}>
-                <span className="oracle-day-name">{DAYS[new Date(d.date + "T12:00:00").getDay()]}</span>
-                <WIcon code={d.code} />
-                <b>{d.tmax}°</b>
-                <span className="oracle-tmin">{d.tmin}°</span>
-              </div>
-            ))}
-            {data && data.weather.length === 0 && <div className="memory-empty">Météo indisponible.</div>}
-          </div>
+          <div className="zc-section-title"><Sun size={12} style={{ marginRight: 6 }} />MÉTÉO</div>
+          {briefing.loading && <div className="memory-empty">Chargement de la météo...</div>}
+          {!briefing.loading && briefing.errors.weather && <div className="memory-empty">Flux externe indisponible.</div>}
+          {!briefing.loading && !briefing.errors.weather && briefing.weather && (
+            <div className="oracle-news-row">
+              <span className="oracle-news-theme">{briefing.weather.ville || briefing.weather.city || "LOCAL"}</span>
+              <span className="oracle-news-text">
+                {briefing.weather.temp ?? briefing.weather.temperature ?? briefing.weather.temperature_2m ?? "—"}°
+              </span>
+              <span className="prime-conf-note">
+                {briefing.weather.description || briefing.weather.condition || "Conditions indisponibles"}
+              </span>
+            </div>
+          )}
+          {!briefing.loading && !briefing.errors.weather && !briefing.weather && (
+            <div className="memory-empty">Aucune météo disponible.</div>
+          )}
         </section>
 
         {/* Marchés */}
@@ -163,17 +312,51 @@ export default function OracleDivin({ onClose }) {
 
         {/* Actualités */}
         <section className="prime-card" data-testid="oracle-news">
-          <div className="zc-section-title"><Newspaper size={12} style={{ marginRight: 6 }} />ACTUALITÉS &amp; ÉVÉNEMENTS</div>
-          {data && data.news.map((n, i) => (
-            <div className="oracle-news-row" key={i}>
-              <span className="oracle-news-theme">{n.theme}</span>
-              <span className="oracle-news-text">{n.text}</span>
-              <div className="oracle-impact">
-                <div className="zc-bar-track"><div className="zc-bar-fill" style={{ width: `${n.impact}%`, background: n.impact > 70 ? "#ff9500" : "#22d3ee", boxShadow: `0 0 8px ${n.impact > 70 ? "#ff9500" : "#22d3ee"}` }} /></div>
-                <b>{n.impact}%</b>
-              </div>
-            </div>
-          ))}
+          <div className="zc-section-title"><Newspaper size={12} style={{ marginRight: 6 }} />ACTUALITÉS</div>
+          {briefing.loading ? <div className="memory-empty">Chargement des actualités...</div> : (
+            <>
+              <div className="prime-hab-label">À LA UNE</div>
+              <BriefingItems items={briefing.news} error={briefing.errors.news} emptyMessage="Aucune actualité à la une." />
+              <div className="prime-hab-label">MONDE</div>
+              <BriefingItems items={briefing.worldNews} error={briefing.errors.worldNews} emptyMessage="Aucune actualité mondiale." />
+              <div className="prime-hab-label">FRANCE</div>
+              <BriefingItems items={briefing.franceNews} error={briefing.errors.franceNews} emptyMessage="Aucune actualité française." />
+            </>
+          )}
+        </section>
+
+        {/* Sport */}
+        <section className="prime-card" data-testid="oracle-sport">
+          <div className="zc-section-title"><Trophy size={12} style={{ marginRight: 6 }} />SPORT</div>
+          {briefing.loading ? <div className="memory-empty">Chargement du sport...</div> : (
+            <BriefingItems items={briefing.sport} error={briefing.errors.sport} emptyMessage="Aucun résultat sportif disponible." />
+          )}
+        </section>
+
+        {/* Fait du jour */}
+        <section className="prime-card" data-testid="oracle-fact-of-day">
+          <div className="zc-section-title"><Lightbulb size={12} style={{ marginRight: 6 }} />FAIT DU JOUR</div>
+          {briefing.loading && <div className="memory-empty">Chargement du fait du jour...</div>}
+          {!briefing.loading && briefing.errors.fact && <div className="memory-empty">Flux externe indisponible.</div>}
+          {!briefing.loading && !briefing.errors.fact && (
+            <p className="oracle-briefing-text">{briefing.fact || "Aucun fait du jour disponible."}</p>
+          )}
+        </section>
+
+        {/* Mails importants */}
+        <section className="prime-card" data-testid="oracle-important-mail">
+          <div className="zc-section-title"><Mail size={12} style={{ marginRight: 6 }} />MAILS IMPORTANTS</div>
+          {briefing.loading ? <div className="memory-empty">Chargement des mails importants...</div> : (
+            <BriefingItems items={briefing.mails} error={briefing.errors.mails} emptyMessage="Aucun mail important." />
+          )}
+        </section>
+
+        {/* Messages importants */}
+        <section className="prime-card" data-testid="oracle-important-messages">
+          <div className="zc-section-title"><MessageCircle size={12} style={{ marginRight: 6 }} />MESSAGES IMPORTANTS</div>
+          {briefing.loading ? <div className="memory-empty">Chargement des messages importants...</div> : (
+            <BriefingItems items={briefing.messages} error={briefing.errors.messages} emptyMessage="Aucun message important." />
+          )}
         </section>
 
         {/* Prédictions personnelles */}
@@ -214,10 +397,10 @@ export default function OracleDivin({ onClose }) {
           ))}
         </section>
       </div>
-      {show3D && data && data.briefing && (
+      {show3D && !briefing.loading && (
         <Analysis3D
-          title={`BRIEFING · ${data.date || ""}`}
-          text={data.briefing}
+          title={`BRIEFING · ${(data && data.date) || ""}`}
+          text={briefingText}
           onClose={() => setShow3D(false)}
         />
       )}
