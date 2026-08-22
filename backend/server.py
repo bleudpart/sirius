@@ -450,7 +450,7 @@ def _keys_check_response(keys: dict[str, str]) -> dict:
             state = "ok"
             source = "navigateur" if browser_key else "serveur"
         elif service == "groq":
-            # parse_intent remains operational through its local fallback.
+            # parse_intent remains usable without a provider key through its local fallback.
             state = "ok"
             source = "fallback_local"
         else:
