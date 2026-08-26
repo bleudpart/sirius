@@ -7,6 +7,8 @@ import os
 
 import httpx
 
+from resilience import CircuitOpenError, resilient_call
+
 logger = logging.getLogger(__name__)
 
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
@@ -18,13 +20,27 @@ async def serp_results(query, serp_key=None):
     key = serp_key or ENV_SERP_KEY
     if not key:
         return []
-    try:
+
+    async def _fetch():
         async with httpx.AsyncClient(timeout=12.0) as client:
             r = await client.get(
                 "https://serpapi.com/search.json",
                 params={"q": query, "api_key": key, "hl": "fr", "gl": "fr", "num": 6},
             )
-            data = r.json()
+            r.raise_for_status()
+            return r.json()
+
+    try:
+        data = await resilient_call(
+            _fetch,
+            service="serpapi",
+            attempts=3,
+            timeout=15.0,
+            retry_on=(httpx.HTTPError, ValueError),
+        )
+    except CircuitOpenError as e:
+        logger.warning(f"[WEBAGENT SERP] {e}")
+        return []
     except Exception as e:
         logger.error(f"[WEBAGENT SERP] {repr(e)}")
         return []

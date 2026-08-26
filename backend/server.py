@@ -12,6 +12,10 @@ import re
 import json
 import importlib
 import secrets
+import hmac
+import binascii
+from collections import deque
+from contextlib import asynccontextmanager
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -19,18 +23,22 @@ from typing import List, Optional
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, ConfigDict
 
-from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Request, Depends, BackgroundTasks, status
+from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Request, Depends, Header, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from starlette.types import ASGIApp, Scope, Receive, Send
+from runtime_paths import SOURCE_DIR, data_dir, project_dir
 
 # 1. Chargement des variables d'environnement
 ROOT_DIR = Path(__file__).resolve().parent
-PROJECT_DIR = ROOT_DIR.parent
+PROJECT_DIR = project_dir()
 FRONTEND_DIR = PROJECT_DIR / "frontend"
 load_dotenv(ROOT_DIR / '.env')
+DATA_DIR = data_dir()
+if DATA_DIR != ROOT_DIR:
+    load_dotenv(DATA_DIR / ".env", override=True)
 
 from sirius_brain import (
     ask_sirius,
@@ -54,12 +62,49 @@ logger = logging.getLogger(__name__)
 # INITIALISATION UNIQUE DE L'APPLICATION ET INTERCEPTATION OPTIONS
 # =========================================================
 
-app = FastAPI(title="Sirius Backend API", version="1.0.0")
+_watch_task = None
+_omega_task = None
+
+
+@asynccontextmanager
+async def _lifespan(_app):
+    # --- Démarrage ---
+    global _watch_task, _omega_task
+    _watch_task = asyncio.create_task(_push_watch_loop())
+    _omega_task = asyncio.create_task(_omega_watch_loop())
+    from auth_api import seed_admin_and_indexes
+    try:
+        await seed_admin_and_indexes(db)
+        logger.info("[AUTH] Index et compte admin prêts")
+    except Exception as e:
+        logger.error(f"[AUTH] Init échouée: {e}")
+    if cloud_available():
+        try:
+            init_storage()
+            logger.info("[FILES] Stockage cloud initialisé")
+        except Exception as e:
+            logger.error(f"[FILES] Init stockage échouée: {e}")
+    try:
+        yield
+    finally:
+        # --- Arrêt ---
+        tasks = []
+        for task in (_watch_task, _omega_task):
+            if task:
+                task.cancel()
+                tasks.append(task)
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        client.close()
+
+
+app = FastAPI(title="Sirius Backend API", version="1.0.0", lifespan=_lifespan)
 
 # Imports des modules Sirius
 from storage import put_object, get_object, init_storage, cloud_available, APP_NAME
 from local_memory import list_facts, add_fact, delete_fact, update_fact, log_event, prime_overview, log_service, list_service_log
-from auth_api import resolve_user_id, require_user  # noqa: E402
+from auth_api import is_direct_local_request, resolve_user_id, require_user  # noqa: E402
+from omega_engine import OmegaEngine  # noqa: E402
 
 # 5. Connexion MongoDB
 mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
@@ -69,14 +114,118 @@ db = client[db_name]
 
 # 6. Initialisation du routeur principal pour /api
 api_router = APIRouter(prefix="/api")
+omega = OmegaEngine(PROJECT_DIR)
+SELF_PATCH_ENABLED = os.getenv("SIRIUS_ENABLE_SELF_PATCH", "").strip() == "1"
+ADMIN_TOKEN = (os.getenv("SIRIUS_ADMIN_TOKEN") or "").strip()
+def _require_local_control(request: Request) -> None:
+    if not is_direct_local_request(request):
+        raise HTTPException(status_code=403, detail="Contrôle Omega réservé à la machine locale.")
+
+
+def _admin_token_matches(candidate: str | None) -> bool:
+    return bool(
+        ADMIN_TOKEN
+        and candidate
+        and hmac.compare_digest(candidate.encode("utf-8"), ADMIN_TOKEN.encode("utf-8"))
+    )
 
 @app.get("/health")
 async def health_check():
-    return {"status": "ok"}
+    """Sonde de santé agrégée : liveness + état DB, tâches de fond et clés présentes.
+
+    N'expose jamais de valeur de secret — uniquement des booléens de présence.
+    """
+    checks = {}
+
+    try:
+        await asyncio.wait_for(client.admin.command("ping"), timeout=2.0)
+        checks["mongo"] = "ok"
+    except Exception:
+        checks["mongo"] = "down"
+
+    checks["push_watch"] = "running" if (_watch_task and not _watch_task.done()) else "stopped"
+    checks["omega_watch"] = "running" if (_omega_task and not _omega_task.done()) else "stopped"
+
+    keys = {
+        "llm": bool(os.getenv("OPENAI_API_KEY") or os.getenv("EMERGENT_LLM_KEY")),
+        "serpapi": bool(os.getenv("SERP_API_KEY")),
+        "spotify": bool(os.getenv("SPOTIFY_CLIENT_ID")),
+        "storage_cloud": cloud_available(),
+    }
+
+    try:
+        from push_notifications import subscriber_count
+        subscribers = subscriber_count()
+    except Exception:
+        subscribers = None
+
+    from resilience import breakers_snapshot
+
+    overall = "ok" if checks["mongo"] == "ok" else "degraded"
+    return {
+        "status": overall,
+        "service": "sirius-backend",
+        "checks": checks,
+        "keys": keys,
+        "breakers": breakers_snapshot(),
+        "push_subscribers": subscribers,
+    }
 
 @api_router.post("/argus/scan")
-async def argus_scan():
-    return {"errors": [], "history": []}
+async def argus_scan(request: Request):
+    _require_local_control(request)
+    await require_user(request, db)
+    return omega.scan()
+
+
+class ArgusReportRequest(BaseModel):
+    source: str = Field(default="runtime", max_length=40)
+    message: str = Field(min_length=1, max_length=300)
+    stack: str = Field(default="", max_length=500)
+
+
+class ArgusFixRequest(BaseModel):
+    fixId: str = Field(min_length=1, max_length=80)
+    confirmed: bool = False
+
+
+@api_router.get("/omega/status")
+async def omega_status(request: Request):
+    _require_local_control(request)
+    await require_user(request, db)
+    return omega.status()
+
+
+@api_router.get("/omega/skills")
+async def omega_skills(request: Request):
+    _require_local_control(request)
+    await require_user(request, db)
+    skills = omega.skills()
+    return {
+        "name": "OMEGA_SKILLS",
+        "state": "active" if all(skill["state"] == "active" for skill in skills) else "degraded",
+        "skills": skills,
+    }
+
+
+@api_router.post("/argus/report")
+async def argus_report(payload: ArgusReportRequest, request: Request):
+    _require_local_control(request)
+    await require_user(request, db)
+    return omega.report(payload.source, payload.message, payload.stack)
+
+
+@api_router.post("/argus/fix")
+async def argus_fix(
+    payload: ArgusFixRequest,
+    request: Request,
+    x_admin_token: str | None = Header(default=None),
+):
+    _require_local_control(request)
+    await require_user(request, db)
+    if payload.fixId == "clear_runtime_reports" and not _admin_token_matches(x_admin_token):
+        raise HTTPException(status_code=403, detail="Jeton administrateur requis pour acquitter les rapports.")
+    return omega.fix(payload.fixId, payload.confirmed)
 
 @api_router.post("/suggestions/evaluate")
 async def suggestions_evaluate():
@@ -145,16 +294,17 @@ class ChatRequest(BaseModel):
     mood: dict = {}
 
 # Limitation de débit simple (anti-abus des clés serveur)
-_RATE = {}
+_RATE: dict[str, deque[float]] = {}
 
 def _rate_ok(ip: str, limit: int = 30, window: int = 60) -> bool:
-    now = time.time()
-    q = [t for t in _RATE.get(ip, []) if now - t < window]
+    now = time.monotonic()
+    q = _RATE.setdefault(ip, deque())
+    cutoff = now - window
+    while q and q[0] <= cutoff:
+        q.popleft()
     if len(q) >= limit:
-        _RATE[ip] = q
         return False
     q.append(now)
-    _RATE[ip] = q
     return True
 
 class IntentRequest(BaseModel):
@@ -163,19 +313,14 @@ class IntentRequest(BaseModel):
 @api_router.post("/intent")
 async def ui_intent(req: IntentRequest, request: Request):
     """Compréhension naturelle d'une commande vocale → intention UI structurée (Groq)."""
-    print(">>> 1. Entrée dans /intent")
-    
     await require_user(request, db)
-    print(">>> 2. Utilisateur authentifié avec succès")
-    
+
     ip = request.client.host if request.client else "?"
     if not _rate_ok(ip, limit=60, window=60):
-        print(">>> 3. Rate limit dépassé")
+        logger.warning("Intent rate limit exceeded", extra={"client_ip": ip})
         return {"action": "none"}
-        
-    print(">>> 4. Appel de parse_intent...")
+
     result = await parse_intent((req.text or "").strip())
-    print(">>> 5. parse_intent terminé, retour au client.")
     return result
 
 class ResetRequest(BaseModel):
@@ -357,14 +502,28 @@ async def chat_stream(req: ChatRequest, request: Request):
 
 @api_router.post("/admin/patch_code")
 async def patch_code(request: Request):
+    # Sécurité : auto-patch désactivé par défaut (RCE si exposé). Exige explicitement
+    # le flag d'activation, une requête locale directe et une session authentifiée.
+    if not SELF_PATCH_ENABLED:
+        raise HTTPException(status_code=403, detail="Auto-patch désactivé (SIRIUS_ENABLE_SELF_PATCH).")
+    _require_local_control(request)
+    await require_user(request, db)
+
     data = await request.json()
     file_path = data.get("file_path") # Ex: "server.py"
     new_content = data.get("content")
-    
-    # Sécurité : On ne touche qu'aux fichiers autorisés
-    if file_path not in ["server.py", "sirius_brain.py"]:
+
+    if not isinstance(new_content, str):
+        raise HTTPException(status_code=400, detail="Contenu invalide.")
+
+    # Sécurité : On ne touche qu'aux fichiers autorisés, résolus sous le dossier backend.
+    if file_path not in ("server.py", "sirius_brain.py"):
         raise HTTPException(status_code=403, detail="Fichier non autorisé à la modification.")
-    
+    target = (SOURCE_DIR / file_path).resolve()
+    if target.parent != SOURCE_DIR or not target.exists():
+        raise HTTPException(status_code=403, detail="Fichier non autorisé à la modification.")
+    file_path = str(target)
+
     # Sauvegarde automatique avant d'écraser
     backup_path = f"{file_path}.bak"
     if os.path.exists(file_path):
@@ -2493,7 +2652,7 @@ FAL_VIDEO_MODEL = "fal-ai/ltx-2/text-to-video/fast"
 _FAL_CLIENT_PACKAGE = "fal_client==1.0.0"
 _FAL_INSTALL_LOCK = asyncio.Lock()
 _VIDEO_MATERIALIZATION_LOCK = asyncio.Lock()
-_VIDEO_OUTPUT_DIR = ROOT_DIR / "static" / "generated-videos"
+_VIDEO_OUTPUT_DIR = DATA_DIR / "generated-videos"
 _VIDEO_MAX_BYTES = 250 * 1048576
 _VIDEO_MIME_EXTENSIONS = {
     "video/mp4": "mp4",
@@ -2504,6 +2663,8 @@ _VIDEO_RESULT_CACHE = {}
 
 class TaskImageRequest(BaseModel):
     prompt: str
+    reference_image: Optional[str] = Field(default=None, max_length=14_000_000)
+    reference_mime: Optional[str] = Field(default=None, max_length=64)
 
 class TaskVideoRequest(BaseModel):
     prompt: str
@@ -2651,15 +2812,52 @@ async def task_image(req: TaskImageRequest):
     prompt = (req.prompt or "").strip()
     if not prompt:
         raise HTTPException(status_code=400, detail="Prompt vide")
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    file_contents = []
+    if req.reference_image:
+        allowed_mimes = {"image/jpeg", "image/png", "image/webp"}
+        reference_mime = (req.reference_mime or "").lower().strip()
+        if reference_mime not in allowed_mimes:
+            raise HTTPException(status_code=400, detail="Format de référence non accepté (PNG, JPEG ou WebP uniquement).")
+        try:
+            decoded_reference = _b64.b64decode(req.reference_image, validate=True)
+        except (ValueError, binascii.Error) as error:
+            raise HTTPException(status_code=400, detail="Image de référence invalide.") from error
+        if not decoded_reference:
+            raise HTTPException(status_code=400, detail="Image de référence vide.")
+        if len(decoded_reference) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="Image de référence trop volumineuse (10 Mo maximum).")
+        signatures = {
+            "image/png": decoded_reference.startswith(b"\x89PNG\r\n\x1a\n"),
+            "image/jpeg": decoded_reference.startswith(b"\xff\xd8\xff"),
+            "image/webp": (
+                decoded_reference.startswith(b"RIFF")
+                and len(decoded_reference) >= 12
+                and decoded_reference[8:12] == b"WEBP"
+            ),
+        }
+        if not signatures[reference_mime]:
+            raise HTTPException(status_code=400, detail="Le contenu ne correspond pas au format d'image annoncé.")
+
+    from emergentintegrations.llm.chat import FileContent, LlmChat, UserMessage
+    if req.reference_image:
+        file_contents.append(FileContent(
+            content_type=req.reference_mime.lower().strip(),
+            file_content_base64=req.reference_image,
+        ))
     api_key = os.environ.get("EMERGENT_LLM_KEY")
     if not api_key:
         raise HTTPException(status_code=500, detail="Clé Emergent absente")
     chat = LlmChat(api_key=api_key, session_id=f"task-img-{os.urandom(6).hex()}",
-                   system_message="Tu es le moteur de rendu visuel de SIRIUS. Génère des images de haute qualité.")
+                   system_message=(
+                       "Tu es le moteur de rendu visuel de SIRIUS. Génère des images de haute qualité. "
+                       "Lorsqu'une image de référence est fournie, respecte sa composition et applique précisément "
+                       "les transformations demandées sans ajouter d'éléments non sollicités."
+                   ))
     chat.with_model("gemini", "gemini-3.1-flash-image-preview").with_params(modalities=["image", "text"])
     try:
-        text, images = await chat.send_message_multimodal_response(UserMessage(text=prompt))
+        text, images = await chat.send_message_multimodal_response(
+            UserMessage(text=prompt, file_contents=file_contents)
+        )
     except Exception as e:
         logger.error(f"[TASK IMAGE] {e}")
         raise HTTPException(status_code=502, detail="Moteur de rendu indisponible")
@@ -2819,31 +3017,51 @@ async def tts(req: GoogleTTSRequest):
 # Simple STT endpoint (compatibility)
 @api_router.post("/stt")
 async def stt(file: UploadFile = File(...)):
-    """Server-side STT. If an external STT backend is configured via WHISPER_API_URL or STT_BACKEND_URL,
-    the uploaded file is proxied to that service. Otherwise returns an empty transcript (placeholder).
-    """
+    """Transcrit un fichier audio via le backend configuré ou Groq Whisper."""
     data = await file.read()
     if not data:
         raise HTTPException(status_code=400, detail="Audio vide")
     stt_url = os.environ.get("WHISPER_API_URL") or os.environ.get("STT_BACKEND_URL")
+    groq_key = (os.environ.get("GROQ_API_KEY") or "").strip()
+    fname = getattr(file, "filename", None) or "audio.webm"
+    ctype = getattr(file, "content_type", None) or "audio/webm"
     if stt_url:
         try:
             async with httpx.AsyncClient(timeout=90) as cx:
-                # preserve original filename and content-type when available
-                fname = getattr(file, 'filename', 'audio')
-                ctype = getattr(file, 'content_type', 'application/octet-stream')
                 files = {"file": (fname, data, ctype)}
                 r = await cx.post(stt_url, files=files)
-            if r.status_code == 200:
-                return r.json()
-            logger.error(f"[STT] backend returned {r.status_code}: {r.text[:200]}")
-            raise HTTPException(status_code=502, detail="STT backend error")
-        except Exception as e:
-            logger.error(f"[STT] proxy error: {e}")
-            raise HTTPException(status_code=502, detail="STT proxy failed")
+        except httpx.HTTPError as error:
+            logger.error("[STT] backend inaccessible: %s", error)
+            raise HTTPException(status_code=502, detail="Service de reconnaissance vocale injoignable.") from error
+        if r.status_code == 200:
+            return r.json()
+        logger.error("[STT] backend returned %s: %s", r.status_code, r.text[:200])
+        raise HTTPException(status_code=502, detail="Le service de reconnaissance vocale a refusé l'audio.")
 
-    # Fallback: no STT configured
-    return {"text": ""}
+    if groq_key:
+        try:
+            async with httpx.AsyncClient(timeout=90) as cx:
+                r = await cx.post(
+                    "https://api.groq.com/openai/v1/audio/transcriptions",
+                    headers={"Authorization": f"Bearer {groq_key}"},
+                    files={"file": (fname, data, ctype)},
+                    data={
+                        "model": "whisper-large-v3-turbo",
+                        "language": "fr",
+                        "response_format": "json",
+                        "temperature": "0",
+                    },
+                )
+        except httpx.HTTPError as error:
+            logger.error("[STT] Groq Whisper inaccessible: %s", error)
+            raise HTTPException(status_code=502, detail="Transcription SIRIUS temporairement injoignable.") from error
+        if r.status_code == 200:
+            payload = r.json()
+            return {"text": (payload.get("text") or "").strip(), "provider": "groq-whisper"}
+        logger.error("[STT] Groq Whisper returned %s: %s", r.status_code, r.text[:200])
+        raise HTTPException(status_code=502, detail="La transcription SIRIUS a refusé l'audio.")
+
+    raise HTTPException(status_code=503, detail="Aucun moteur de reconnaissance vocale serveur n'est configuré.")
 
 
 # ---- Téléchargement des archives source (contourne le cache PWA du frontend) ----
@@ -3128,123 +3346,185 @@ async def _push_watch_loop():
         await asyncio.sleep(60)
 
 
-_watch_task = None
-
-
-@app.on_event("startup")
-async def init_files_storage():
-    global _watch_task
-    _watch_task = asyncio.create_task(_push_watch_loop())
-    from auth_api import seed_admin_and_indexes
-    try:
-        await seed_admin_and_indexes(db)
-        logger.info("[AUTH] Index et compte admin prêts")
-    except Exception as e:
-        logger.error(f"[AUTH] Init échouée: {e}")
-    if cloud_available():
+async def _omega_watch_loop():
+    while True:
         try:
-            init_storage()
-            logger.info("[FILES] Stockage cloud initialisé")
-        except Exception as e:
-            logger.error(f"[FILES] Init stockage échouée: {e}")
+            result = await asyncio.to_thread(omega.scan)
+            anomalies = [
+                error for error in result["errors"]
+                if error.get("errorType") != "none"
+            ]
+            if anomalies:
+                logger.warning("[OMEGA] %d anomalie(s) active(s)", len(anomalies))
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("[OMEGA] Échec du cycle de supervision")
+        await asyncio.sleep(120)
 
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    if _watch_task:
-        _watch_task.cancel()
-    client.close()
-# =========================================================
-# MODULE AUTO-ÉVOLUTIF SIRIUS : MODIFICATION DU CODE LOCAL
-# =========================================================
-import ast
-import shutil
-import sys
-import os
-import time
-from fastapi import HTTPException, BackgroundTasks
-from pydantic import BaseModel
 
+# =========================================================
+# MODULE AUTO-ÉVOLUTIF SIRIUS : MODIFICATION LOCALE CONTRÔLÉE
+# =========================================================
 class PatchRequest(BaseModel):
-    file_path: str  # ex: "server.py" ou "sirius_brain.py"
-    content: str    # Nouveau code à installer
+    file_path: str = Field(min_length=1, max_length=80)
+    content: str = Field(min_length=1, max_length=2_000_000)
 
-BACKUP_DIR = os.path.join(os.getcwd(), "backups")
-os.makedirs(BACKUP_DIR, exist_ok=True)
 
-import ast
-import shutil
-import os
-import hmac
-from fastapi import Header, HTTPException
+class RollbackRequest(BaseModel):
+    backup: str = Field(min_length=1, max_length=160)
 
-# Configuration de la sécurité admin par token (comparaison en temps constant)
-ADMIN_TOKEN = os.getenv("SIRIUS_ADMIN_TOKEN", "change_me_secure_token")
 
-def verify_admin_token(x_admin_token: str = Header(...)):
-    if not hmac.compare_digest(x_admin_token.encode("utf-8"), ADMIN_TOKEN.encode("utf-8")):
-        raise HTTPException(status_code=403, detail="Accès refusé : Token administrateur invalide.")
+BACKUP_DIR = DATA_DIR / "backups"
+ALLOWED_FILES = {
+    "server.py": ROOT_DIR / "server.py",
+    "sirius_brain.py": ROOT_DIR / "sirius_brain.py",
+    "auth_api.py": ROOT_DIR / "auth_api.py",
+}
+
+
+def verify_admin_token_only(x_admin_token: str | None = Header(default=None)):
+    if not ADMIN_TOKEN:
+        raise HTTPException(status_code=503, detail="Jeton administrateur non configuré.")
+    if not _admin_token_matches(x_admin_token):
+        raise HTTPException(status_code=403, detail="Jeton administrateur invalide.")
     return True
 
-class PatchRequest(BaseModel):
-    file_path: str
-    content: str
 
-BACKUP_DIR = os.path.join(os.getcwd(), "backups")
-os.makedirs(BACKUP_DIR, exist_ok=True)
+def verify_admin_token(x_admin_token: str | None = Header(default=None)):
+    if not SELF_PATCH_ENABLED:
+        raise HTTPException(status_code=503, detail="Auto-évolution désactivée par configuration.")
+    return verify_admin_token_only(x_admin_token)
 
-# Chemins de fichiers strictement autorisés à la modification
-ALLOWED_FILES = ["server.py", "sirius_brain.py", "auth_api.py"]
 
 @app.post("/api/self/patch")
-async def self_patch(data: PatchRequest, authorized: bool = Depends(verify_admin_token)):
-    """
-    Analyse, valide la syntaxe, crée un backup et installe le nouveau code sur le PC 
-    de manière totalement sécurisée avec authentification par header et restriction de fichiers.
-    """
-    # 1. Vérification stricte des fichiers autorisés
-    filename = os.path.basename(data.file_path)
-    if filename not in ALLOWED_FILES:
-        raise HTTPException(status_code=403, detail=f"Modification interdite pour le fichier : {filename}")
+async def self_patch(
+    data: PatchRequest,
+    request: Request,
+    authorized: bool = Depends(verify_admin_token),
+):
+    _require_local_control(request)
+    user = await require_user(request, db)
+    if user.get("role") != "admin" or not authorized:
+        raise HTTPException(status_code=403, detail="Droits administrateur requis.")
+    if omega.scan()["engine"]["frozen"]:
+        raise HTTPException(
+            status_code=409,
+            detail="Chemins critiques gelés : effectuer un rollback validé avant tout nouveau patch.",
+        )
 
-    # 2. Validation de la syntaxe Python
+    filename = Path(data.file_path).name
+    if data.file_path.replace("\\", "/") != filename or filename not in ALLOWED_FILES:
+        raise HTTPException(status_code=403, detail="Fichier hors liste blanche.")
+
     try:
-        ast.parse(data.content)
-    except SyntaxError as e:
-        raise HTTPException(status_code=400, detail=f"Code invalide (Ligne {e.lineno}): {e.msg}")
+        ast.parse(data.content, filename=filename)
+    except SyntaxError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Code invalide (ligne {error.lineno}) : {error.msg}",
+        ) from error
 
-    # 3. Vérification du chemin et sécurisation contre le path traversal
-    target_path = os.path.abspath(os.path.join(os.getcwd(), data.file_path))
-    if not target_path.startswith(os.getcwd()):
-        raise HTTPException(status_code=400, detail="Chemin de fichier interdit")
+    target_path = ALLOWED_FILES[filename].resolve()
+    if target_path.parent != ROOT_DIR:
+        raise HTTPException(status_code=403, detail="Chemin de destination invalide.")
 
-    # 4. Sauvegarde de sécurité (.bak)
-    if os.path.exists(target_path):
-        shutil.copy2(target_path, os.path.join(BACKUP_DIR, f"{filename}.bak"))
-
-    # 5. Écriture du nouveau code
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    backup_path = BACKUP_DIR / f"{filename}.{int(time.time())}.{uuid.uuid4().hex[:8]}.bak"
+    temp_path = ROOT_DIR / f".{filename}.{uuid.uuid4().hex}.omega.tmp"
     try:
-        with open(target_path, "w", encoding="utf-8") as f:
-            f.write(data.content)
-        print(f"[SIRIUS SELF-PATCH] Le fichier {data.file_path} a été mis à jour et sécurisé avec succès !")
-        return {"status": "success", "message": f"Module {data.file_path} patché, validé et protégé par token admin !"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur d'écriture : {str(e)}")
+        shutil.copy2(target_path, backup_path)
+        with temp_path.open("w", encoding="utf-8", newline="\n") as stream:
+            stream.write(data.content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temp_path, target_path)
+    except OSError as error:
+        temp_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=500, detail="Échec de l'écriture atomique du correctif.") from error
+
+    omega.accept_path(f"backend/{filename}")
+    logger.warning("[OMEGA] Correctif administrateur appliqué à %s", filename)
+    return {
+        "status": "success",
+        "message": f"Module {filename} validé, sauvegardé et remplacé atomiquement.",
+        "backup": backup_path.name,
+    }
+
+
+@app.post("/api/self/rollback")
+async def self_rollback(
+    data: RollbackRequest,
+    request: Request,
+    authorized: bool = Depends(verify_admin_token_only),
+):
+    _require_local_control(request)
+    user = await require_user(request, db)
+    if user.get("role") != "admin" or not authorized:
+        raise HTTPException(status_code=403, detail="Droits administrateur requis.")
+
+    if Path(data.backup).name != data.backup:
+        raise HTTPException(status_code=403, detail="Chemin de sauvegarde invalide.")
+    pattern = r"^(server\.py|sirius_brain\.py|auth_api\.py)\.\d{9,12}\.[0-9a-f]{8}\.bak$"
+    match = re.fullmatch(pattern, data.backup)
+    if not match:
+        raise HTTPException(status_code=403, detail="Sauvegarde hors format Omega.")
+
+    filename = match.group(1)
+    target_path = ALLOWED_FILES[filename].resolve()
+    backup_root = BACKUP_DIR.resolve()
+    backup_path = (BACKUP_DIR / data.backup).resolve()
+    if backup_path.parent != backup_root or not backup_path.is_file():
+        raise HTTPException(status_code=404, detail="Sauvegarde Omega introuvable.")
+
+    try:
+        restored_content = backup_path.read_text(encoding="utf-8")
+        ast.parse(restored_content, filename=filename)
+    except (OSError, UnicodeError, SyntaxError) as error:
+        raise HTTPException(status_code=409, detail="Sauvegarde Omega invalide.") from error
+
+    safety_backup = BACKUP_DIR / f"{filename}.{int(time.time())}.{uuid.uuid4().hex[:8]}.bak"
+    temp_path = ROOT_DIR / f".{filename}.{uuid.uuid4().hex}.rollback.tmp"
+    try:
+        shutil.copy2(target_path, safety_backup)
+        with temp_path.open("w", encoding="utf-8", newline="\n") as stream:
+            stream.write(restored_content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temp_path, target_path)
+    except OSError as error:
+        temp_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=500, detail="Échec de la restauration atomique.") from error
+
+    omega.accept_path(f"backend/{filename}")
+    post_rollback_scan = omega.scan()
+    logger.warning("[OMEGA] Rollback administrateur appliqué à %s", filename)
+    return {
+        "status": "rolled_back",
+        "message": f"Module {filename} restauré depuis une sauvegarde validée.",
+        "restored_from": backup_path.name,
+        "safety_backup": safety_backup.name,
+        "frozen_paths": post_rollback_scan["engine"]["frozen_paths"],
+    }
 # =========================================================
 # ROUTES ET INCLUSION DU ROUTEUR API SIRIUS
 # =========================================================
 
 @api_router.post("/self/reload")
-async def self_reload(background_tasks: BackgroundTasks):
-    """
-    Redémarre le processus backend de Sirius pour appliquer les modifications à chaud.
-    """
-    def restart_process():
-        time.sleep(1)
-        python = sys.executable
-        os.execl(python, python, *sys.argv)
-
-    background_tasks.add_task(restart_process)
-    return {"status": "reloading", "message": "Redémarrage de Sirius en cours..."}
+async def self_reload(
+    request: Request,
+    authorized: bool = Depends(verify_admin_token),
+):
+    _require_local_control(request)
+    user = await require_user(request, db)
+    if user.get("role") != "admin" or not authorized:
+        raise HTTPException(status_code=403, detail="Droits administrateur requis.")
+    if omega.scan()["engine"]["frozen"]:
+        raise HTTPException(status_code=409, detail="Redémarrage refusé tant que les chemins critiques sont gelés.")
+    raise HTTPException(
+        status_code=409,
+        detail="Redémarrage automatique désactivé : redémarrer SIRIUS manuellement après vérification.",
+    )
 
 
 # Route WebSocket sur le routeur /api
@@ -3455,10 +3735,17 @@ PUBLIC_DIR = FRONTEND_DIR / "public"
 HOLO_DIR = PUBLIC_DIR / "holo"
 STATIC_DIR = ROOT_DIR / "static"
 
-if STATIC_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+GENERATED_VIDEO_DIR = DATA_DIR / "generated-videos"
+GENERATED_VIDEO_DIR.mkdir(parents=True, exist_ok=True)
+app.mount(
+    "/static/generated-videos",
+    StaticFiles(directory=str(GENERATED_VIDEO_DIR)),
+    name="generated_videos",
+)
 if (BUILD_DIR / "static").exists():
-    app.mount("/build-static", StaticFiles(directory=str(BUILD_DIR / "static")), name="build_static")
+    app.mount("/static", StaticFiles(directory=str(BUILD_DIR / "static")), name="frontend_static")
+if STATIC_DIR.exists():
+    app.mount("/backend-static", StaticFiles(directory=str(STATIC_DIR)), name="backend_static")
 if HOLO_DIR.exists():
     app.mount("/holo", StaticFiles(directory=str(HOLO_DIR)), name="holo")
 
@@ -3484,7 +3771,13 @@ async def serve_react_app(full_path: str):
 if __name__ == "__main__":
     import uvicorn
     # En désactivant reload=True en production, le CPU va redescendre instantanément à 1-5%
-    uvicorn.run("server:app", host="0.0.0.0", port=8001, reload=False)
+    uvicorn.run(
+        "server:app",
+        host="127.0.0.1",
+        port=8001,
+        reload=False,
+        proxy_headers=False,
+    )
 
 import os
 

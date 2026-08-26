@@ -10,10 +10,11 @@ from pydantic import BaseModel
 from py_vapid import Vapid
 from pywebpush import webpush, WebPushException
 from cryptography.hazmat.primitives import serialization
+from runtime_paths import data_dir, write_json_atomic
 
 logger = logging.getLogger("sirius.push")
 
-DATA_DIR = Path(__file__).parent
+DATA_DIR = data_dir()
 VAPID_PEM = DATA_DIR / "vapid_private.pem"
 SUBS_FILE = DATA_DIR / "push_subs.json"
 VAPID_CLAIMS = {"sub": "mailto:sirius@techenclair.fr"}
@@ -51,7 +52,7 @@ def _load_subs():
 
 
 def _save_subs(subs):
-    SUBS_FILE.write_text(json.dumps(subs, ensure_ascii=False))
+    write_json_atomic(SUBS_FILE, subs)
 
 
 def send_push_to_all(title: str, body: str, url: str = "/") -> dict:
@@ -106,7 +107,7 @@ def load_watch():
 
 
 def save_watch(w):
-    WATCH_FILE.write_text(json.dumps(w, ensure_ascii=False))
+    write_json_atomic(WATCH_FILE, w)
 
 
 def subscriber_count() -> int:
