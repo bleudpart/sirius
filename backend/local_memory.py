@@ -48,6 +48,17 @@ def init_local_db():
             con.execute("ALTER TABLE facts ADD COLUMN use_count INTEGER DEFAULT 0")
         if "last_used" not in fact_cols:
             con.execute("ALTER TABLE facts ADD COLUMN last_used TEXT")
+        # Mémoire épisodique : résumés de conversations condensés par le LLM.
+        con.execute(
+            "CREATE TABLE IF NOT EXISTS episodes ("
+            "id TEXT PRIMARY KEY, user_id TEXT NOT NULL, session_id TEXT, "
+            "summary TEXT NOT NULL, created_at TEXT NOT NULL)"
+        )
+        # Rappel sémantique : vecteurs d'embedding mis en cache localement.
+        con.execute(
+            "CREATE TABLE IF NOT EXISTS fact_vectors ("
+            "fact_id TEXT PRIMARY KEY, model TEXT NOT NULL, vector TEXT NOT NULL)"
+        )
 
 
 def delete_user_data(user_id: str):
@@ -233,13 +244,42 @@ _STOPWORDS = frozenset(
     "etre avoir fait faire plus tres bien tout tous toute toutes pas non oui the and for with".split()
 )
 
+# Rappel sémantique hors-ligne : mots ramenés à un concept commun (sans accents).
+# « bistrot » et « restaurant » partagent le même concept, donc se retrouvent.
+_SYN_CLUSTERS = (
+    ("restaurant", ("restaurant", "resto", "bistrot", "bistro", "brasserie", "cantine", "pizzeria", "creperie", "snack", "gargote")),
+    ("repas", ("repas", "dejeuner", "diner", "souper", "manger", "petit-dejeuner", "brunch", "gouter")),
+    ("boisson", ("cafe", "the", "expresso", "capuccino", "cappuccino", "boisson", "infusion")),
+    ("travail", ("travail", "boulot", "job", "bureau", "taf", "profession", "metier")),
+    ("voiture", ("voiture", "auto", "automobile", "bagnole", "vehicule", "caisse")),
+    ("maison", ("maison", "domicile", "appartement", "appart", "logement", "chez-moi", "foyer")),
+    ("enfant", ("enfant", "fils", "fille", "gamin", "gamine", "petit", "petite", "gosse")),
+    ("epouse", ("femme", "epouse", "epoux", "mari", "conjoint", "conjointe", "compagne", "compagnon")),
+    ("musique", ("musique", "chanson", "morceau", "titre", "playlist", "album", "spotify")),
+    ("film", ("film", "cinema", "serie", "documentaire", "video", "netflix")),
+    ("sport", ("sport", "footing", "course", "jogging", "musculation", "gym", "velo", "natation")),
+    ("sante", ("sante", "medecin", "docteur", "rendez-vous", "rdv", "pharmacie", "traitement")),
+    ("courses", ("courses", "achats", "magasin", "supermarche", "shopping", "commande")),
+    ("voyage", ("voyage", "vacances", "deplacement", "sejour", "week-end", "weekend", "trajet")),
+    ("horaire", ("heure", "horaire", "ouverture", "fermeture", "ouvre", "ferme", "planning", "agenda")),
+    ("hygiene", ("haccp", "hygiene", "sanitaire", "tracabilite", "temperature", "releve")),
+    ("animal", ("chat", "chien", "animal", "chaton", "chiot", "matou")),
+    ("anniversaire", ("anniversaire", "fete", "celebration")),
+)
+_SYN_INDEX = {}
+for _concept, _words in _SYN_CLUSTERS:
+    for _w in _words:
+        _SYN_INDEX[_w] = _concept
+
 
 def _tokens(text: str) -> set:
-    """Découpe un texte en mots-clés normalisés (minuscules, sans accents, sans mots vides)."""
+    """Découpe un texte en mots-clés normalisés, enrichis de leurs concepts sémantiques."""
     normalized = unicodedata.normalize("NFD", (text or "").lower())
     normalized = "".join(c for c in normalized if unicodedata.category(c) != "Mn")
     words = re.findall(r"[a-z0-9]{3,}", normalized)
-    return {w for w in words if w not in _STOPWORDS}
+    tokens = {w for w in words if w not in _STOPWORDS}
+    concepts = {_SYN_INDEX[w] for w in tokens if w in _SYN_INDEX}
+    return tokens | concepts
 
 
 _CATEGORY_HINTS = (
@@ -319,6 +359,67 @@ def recall_facts(query: str, user_id: str = "legacy", limit: int = 8):
                 [(stamp, fact["id"]) for fact in selected],
             )
     return selected
+
+
+# =========================================================
+# MÉMOIRE ÉPISODIQUE : résumés de conversations passées
+# =========================================================
+
+def add_episode(user_id: str, summary: str, session_id: str = ""):
+    """Enregistre un épisode (résumé condensé d'une conversation)."""
+    summary = (summary or "").strip()[:1200]
+    if not summary:
+        return None
+    episode = {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "session_id": session_id or "",
+        "summary": summary,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    with _conn() as con:
+        con.execute(
+            "INSERT INTO episodes (id, user_id, session_id, summary, created_at) VALUES (?, ?, ?, ?, ?)",
+            (episode["id"], episode["user_id"], episode["session_id"], episode["summary"], episode["created_at"]),
+        )
+    return episode
+
+
+def recent_episodes(user_id: str, limit: int = 3):
+    """Derniers épisodes condensés, du plus récent au plus ancien."""
+    with _conn() as con:
+        rows = con.execute(
+            "SELECT * FROM episodes WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
+            (user_id, limit),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+# =========================================================
+# CACHE LOCAL DES VECTEURS D'EMBEDDING
+# =========================================================
+
+def get_cached_vector(fact_id: str, model: str):
+    with _conn() as con:
+        row = con.execute(
+            "SELECT vector FROM fact_vectors WHERE fact_id = ? AND model = ?", (fact_id, model)
+        ).fetchone()
+    if not row:
+        return None
+    try:
+        import json as _json
+        return _json.loads(row["vector"])
+    except Exception:
+        return None
+
+
+def store_vector(fact_id: str, model: str, vector):
+    import json as _json
+    with _conn() as con:
+        con.execute(
+            "INSERT OR REPLACE INTO fact_vectors (fact_id, model, vector) VALUES (?, ?, ?)",
+            (fact_id, model, _json.dumps([round(float(v), 6) for v in vector])),
+        )
 
 
 init_local_db()

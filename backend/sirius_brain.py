@@ -419,6 +419,57 @@ DOC_PROMPT = "Tu es SIRIUS, assistant documentaire."
 async def doc_narrative(sujet, data, keys=None):
     return f"Documentaire sur {sujet}"
 
+
+# =========================================================
+# MÉMOIRE ÉPISODIQUE : condensation d'une conversation
+# =========================================================
+EPISODE_PROMPT = (
+    "Tu es le module de mémoire de SIRIUS. On te donne l'historique d'une conversation entre "
+    "l'utilisateur et SIRIUS. Condense-la pour la mémoire à long terme.\n"
+    "Réponds UNIQUEMENT en JSON valide, sans markdown : "
+    '{"resume": "...", "faits": []}\n'
+    "- resume : 2 à 4 phrases denses, en français, à la troisième personne (« l'utilisateur a demandé… », "
+    "« SIRIUS a fait… ») : sujets abordés, décisions prises, tâches en attente.\n"
+    "- faits : jusqu'à 3 faits durables nouvellement appris sur l'utilisateur, chacun au format "
+    "« categorie: fait » avec categorie ∈ {preference, projet, souvenir}. Liste vide si rien de durable.\n"
+    "N'invente rien : uniquement ce qui figure dans l'historique."
+)
+
+
+async def summarize_episode(history):
+    """Condense un historique de conversation en {resume, faits}. None si impossible."""
+    turns = [
+        f"{'Utilisateur' if t.get('role') == 'user' else 'SIRIUS'} : {(t.get('content') or '').strip()[:500]}"
+        for t in (history or [])
+        if isinstance(t, dict) and (t.get("content") or "").strip()
+    ]
+    if len(turns) < 2 or not ENV_GROQ_LLM_KEY:
+        return None
+    transcript = "\n".join(turns[-24:])
+    episode_client = AsyncOpenAI(
+        api_key=ENV_GROQ_LLM_KEY, base_url=GROQ_LLM_ENDPOINT, max_retries=0, timeout=20.0
+    )
+    try:
+        resp = await episode_client.chat.completions.create(
+            model=GROQ_LLM_PRIMARY,
+            messages=[
+                {"role": "system", "content": EPISODE_PROMPT},
+                {"role": "user", "content": transcript[:9000]},
+            ],
+            max_tokens=500,
+            temperature=0.2,
+            response_format={"type": "json_object"},
+        )
+        data = json.loads(resp.choices[0].message.content or "{}")
+        resume = str(data.get("resume") or "").strip()
+        faits = [str(f).strip() for f in (data.get("faits") or []) if str(f).strip()][:3]
+        if not resume:
+            return None
+        return {"resume": resume, "faits": faits}
+    except Exception as e:
+        logger.warning(f"[EPISODE] condensation échouée: {repr(e)}")
+        return None
+
 # ==========================================
 # BOUCLE PRINCIPALE D'EXÉCUTION (ASK_SIRIUS)
 # ==========================================

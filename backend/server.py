@@ -64,14 +64,19 @@ logger = logging.getLogger(__name__)
 
 _watch_task = None
 _omega_task = None
+_episodic_task = None
 
 
 @asynccontextmanager
 async def _lifespan(_app):
     # --- Démarrage ---
-    global _watch_task, _omega_task
+    global _watch_task, _omega_task, _episodic_task
     _watch_task = asyncio.create_task(_push_watch_loop())
     _omega_task = asyncio.create_task(_omega_watch_loop())
+    # Mémoire épisodique : condensation des conversations pendant les temps morts.
+    from episodic import episodic_loop
+    from sirius_brain import summarize_episode
+    _episodic_task = asyncio.create_task(episodic_loop(db, summarize_episode))
     from auth_api import seed_admin_and_indexes
     try:
         await seed_admin_and_indexes(db)
@@ -89,7 +94,7 @@ async def _lifespan(_app):
     finally:
         # --- Arrêt ---
         tasks = []
-        for task in (_watch_task, _omega_task):
+        for task in (_watch_task, _omega_task, _episodic_task):
             if task:
                 task.cancel()
                 tasks.append(task)
@@ -342,15 +347,26 @@ async def chat(req: ChatRequest, request: Request):
     doc = await db.sirius_chats.find_one({"session_id": session_id}, {"_id": 0, "history": 1})
     history = (doc or {}).get("history", [])
 
-    # Mémoire locale SQLite : rappel par PERTINENCE (mots-clés + renforcement),
-    # injecté dans le cerveau en plus de la mémoire du navigateur.
+    # Mémoire locale SQLite : rappel par PERTINENCE (mots-clés + synonymes + renforcement),
+    # affiné par similarité sémantique (embeddings en cache local) quand disponible.
+    local_facts = []
     try:
-        local_facts = recall_facts(texte, user_id=uid)
+        local_facts = recall_facts(texte, user_id=uid, limit=16)
+        from semantic_vectors import semantic_rerank
+        local_facts = await semantic_rerank(texte, local_facts, top_k=8)
     except Exception:
-        local_facts = []
+        local_facts = local_facts[:8]
+    try:
+        from local_memory import recent_episodes
+        episodes = recent_episodes(uid, limit=2)
+    except Exception:
+        episodes = []
     merged_memory = (req.memory or []) + [
         {"t": f["text"], "c": f.get("category") or "", "d": (f.get("created_at") or "")[:10]}
         for f in local_facts
+    ] + [
+        {"t": e["summary"], "c": "épisode", "d": (e.get("created_at") or "")[:10]}
+        for e in episodes
     ]
 
     mode_ia_effectif = req.ia_mode or "rapide"
@@ -428,14 +444,25 @@ async def chat_stream(req: ChatRequest, request: Request):
     session_id = f"{uid}:{req.session_id or 'default'}"
     doc = await db.sirius_chats.find_one({"session_id": session_id}, {"_id": 0, "history": 1})
     history = (doc or {}).get("history", [])
+    local_facts = []
     try:
-        local_facts = recall_facts(texte, user_id=uid)
+        local_facts = recall_facts(texte, user_id=uid, limit=16)
+        from semantic_vectors import semantic_rerank
+        local_facts = await semantic_rerank(texte, local_facts, top_k=8)
     except Exception:
-        local_facts = []
+        local_facts = local_facts[:8]
+    try:
+        from local_memory import recent_episodes
+        episodes = recent_episodes(uid, limit=2)
+    except Exception:
+        episodes = []
 
     merged_memory = (req.memory or []) + [
         {"t": f["text"], "c": f.get("category") or "", "d": (f.get("created_at") or "")[:10]}
         for f in local_facts
+    ] + [
+        {"t": e["summary"], "c": "épisode", "d": (e.get("created_at") or "")[:10]}
+        for e in episodes
     ]
     autonomous_action = detect_autonomous_action(texte)
 
