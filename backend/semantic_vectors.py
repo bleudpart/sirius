@@ -37,17 +37,22 @@ def _cosine(a, b) -> float:
 
 
 async def _embed_batch(texts):
-    """Vectorise un lot de textes via l'API, protégé par la couche de résilience."""
+    """Vectorise un lot de textes via l'API, protégé par la couche de résilience.
+
+    Réglages serrés : le rerank est un bonus de pertinence, jamais un goulot —
+    au pire ~2,5 s puis repli mots-clés, et disjoncteur après 3 échecs (60 s).
+    """
     from openai import AsyncOpenAI
 
-    client = AsyncOpenAI(api_key=_EMBED_API_KEY, max_retries=0, timeout=8.0)
+    client = AsyncOpenAI(api_key=_EMBED_API_KEY, max_retries=0, timeout=2.0)
 
     async def _call():
         response = await client.embeddings.create(model=EMBED_MODEL, input=list(texts))
         return [item.embedding for item in response.data]
 
     return await resilient_call(
-        _call, service="embeddings", attempts=2, timeout=10.0, base_delay=0.3
+        _call, service="embeddings", attempts=1, timeout=2.5,
+        failure_threshold=3, reset_timeout=60.0,
     )
 
 
