@@ -179,7 +179,6 @@ let webpackConfig = {
       '@': path.resolve(__dirname, 'src'),
     },
     configure: (webpackConfig) => {
-
       // Add ignored patterns to reduce watched directories
         webpackConfig.watchOptions = {
           ...webpackConfig.watchOptions,
@@ -198,6 +197,14 @@ let webpackConfig = {
         webpackConfig.plugins.push(healthPluginInstance);
       }
       return webpackConfig;
+    },
+  },
+  jest: {
+    configure: {
+      // Aligne Jest sur l'alias webpack '@' → src
+      moduleNameMapper: {
+        "^@/(.*)$": "<rootDir>/src/$1",
+      },
     },
   },
 };
