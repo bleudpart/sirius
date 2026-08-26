@@ -1,11 +1,13 @@
 # © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 """Mémoire locale persistante de SIRIUS (SQLite) : préférences, projets, souvenirs."""
+import re
 import sqlite3
+import unicodedata
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
+from runtime_paths import data_file
 
-DB_PATH = Path(__file__).parent / "sirius_local.db"
+DB_PATH = data_file("sirius_local.db")
 CATEGORIES = ("preference", "projet", "souvenir")
 
 
@@ -40,6 +42,12 @@ def init_local_db():
             cols = [r[1] for r in con.execute(f"PRAGMA table_info({table})").fetchall()]
             if "user_id" not in cols:
                 con.execute(f"ALTER TABLE {table} ADD COLUMN user_id TEXT DEFAULT 'legacy'")
+        # Renforcement : chaque rappel d'un fait augmente sa priorité future.
+        fact_cols = [r[1] for r in con.execute("PRAGMA table_info(facts)").fetchall()]
+        if "use_count" not in fact_cols:
+            con.execute("ALTER TABLE facts ADD COLUMN use_count INTEGER DEFAULT 0")
+        if "last_used" not in fact_cols:
+            con.execute("ALTER TABLE facts ADD COLUMN last_used TEXT")
 
 
 def delete_user_data(user_id: str):
@@ -212,6 +220,105 @@ def delete_fact(fact_id: str, user_id: str = None) -> bool:
         else:
             cur = con.execute("DELETE FROM facts WHERE id = ?", (fact_id,))
     return cur.rowcount > 0
+
+
+# =========================================================
+# APPRENTISSAGE RAPIDE : rappel par pertinence + renforcement
+# =========================================================
+
+_STOPWORDS = frozenset(
+    "le la les un une des de du au aux et ou mais donc car ni or que qui quoi dont ce cette ces "
+    "mon ton son mes tes ses notre votre leur nos vos leurs je tu il elle on nous vous ils elles "
+    "me te se moi toi lui eux en dans par pour sur avec sans sous chez vers est sont suis es "
+    "etre avoir fait faire plus tres bien tout tous toute toutes pas non oui the and for with".split()
+)
+
+
+def _tokens(text: str) -> set:
+    """Découpe un texte en mots-clés normalisés (minuscules, sans accents, sans mots vides)."""
+    normalized = unicodedata.normalize("NFD", (text or "").lower())
+    normalized = "".join(c for c in normalized if unicodedata.category(c) != "Mn")
+    words = re.findall(r"[a-z0-9]{3,}", normalized)
+    return {w for w in words if w not in _STOPWORDS}
+
+
+_CATEGORY_HINTS = (
+    ("preference", ("j'aime", "je prefere", "je préfère", "je deteste", "je déteste",
+                    "ma couleur", "mon plat", "favori", "favorite", "preference", "préférence")),
+    ("projet", ("projet", "objectif", "je travaille sur", "je prépare", "je prepare",
+                "je veux construire", "je developpe", "je développe", "deadline", "échéance")),
+)
+
+
+def classify_fact(text: str) -> str:
+    """Devine la catégorie d'un fait libre : preference, projet, sinon souvenir."""
+    lowered = (text or "").lower()
+    explicit = lowered.split(":", 1)[0].strip()
+    if explicit in CATEGORIES:
+        return explicit
+    for category, hints in _CATEGORY_HINTS:
+        if any(h in lowered for h in hints):
+            return category
+    return "souvenir"
+
+
+def learn_fact(text: str, user_id: str = "legacy"):
+    """Apprentissage direct : classe puis enregistre un fait exprimé librement.
+
+    Accepte aussi le format explicite « categorie: texte » produit par le LLM.
+    """
+    text = (text or "").strip()
+    if not text:
+        return None
+    category = classify_fact(text)
+    head, sep, tail = text.partition(":")
+    if sep and head.strip().lower() in CATEGORIES and tail.strip():
+        text = tail.strip()
+    return add_fact(category, text, user_id=user_id)
+
+
+def recall_facts(query: str, user_id: str = "legacy", limit: int = 8):
+    """Rappelle les faits les plus pertinents pour la requête, avec renforcement.
+
+    Score = recouvrement de mots-clés (dominant) + fraîcheur + fréquence d'usage.
+    Les faits rappelés voient leur use_count/last_used mis à jour : plus un fait
+    sert, plus il remonte vite — c'est le mécanisme d'apprentissage par renforcement.
+    Sans recouvrement, renvoie les faits les plus récents (comportement antérieur).
+    """
+    query_tokens = _tokens(query)
+    now = datetime.now(timezone.utc)
+    with _conn() as con:
+        rows = [dict(r) for r in con.execute(
+            "SELECT * FROM facts WHERE user_id = ? ORDER BY created_at DESC LIMIT 400", (user_id,)
+        ).fetchall()]
+
+    scored = []
+    for fact in rows:
+        fact_tokens = _tokens(fact["text"])
+        overlap = len(query_tokens & fact_tokens)
+        score = float(overlap) * 3.0
+        created = _local_datetime(fact.get("created_at") or "")
+        if created:
+            age_days = max(0.0, (now.replace(tzinfo=None) - created).total_seconds() / 86400.0)
+            score += max(0.0, 1.5 - age_days / 30.0)  # bonus fraîcheur (30 jours)
+        score += min(int(fact.get("use_count") or 0), 5) * 0.4  # bonus renforcement
+        if fact.get("category") == "preference":
+            score += 0.3  # les préférences guident les réponses : léger avantage
+        scored.append((score, overlap, fact))
+
+    relevant = [item for item in scored if item[1] > 0]
+    pool = relevant if relevant else scored
+    pool.sort(key=lambda item: -item[0])
+    selected = [fact for _, _, fact in pool[:limit]]
+
+    if relevant and selected:
+        stamp = now.isoformat()
+        with _conn() as con:
+            con.executemany(
+                "UPDATE facts SET use_count = COALESCE(use_count, 0) + 1, last_used = ? WHERE id = ?",
+                [(stamp, fact["id"]) for fact in selected],
+            )
+    return selected
 
 
 init_local_db()

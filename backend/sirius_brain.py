@@ -148,6 +148,35 @@ _BRIEFING_INTENT_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# --- APPRENTISSAGE INSTANTANÉ ---
+# « souviens-toi que… », « retiens que… », « mémorise… », « note que… » :
+# le fait est enregistré immédiatement, sans aller-retour LLM (latence ≈ 0).
+_MEMORIZE_PATTERN = re.compile(
+    r"^\s*(?:sirius[,\s]+)?"
+    r"(?:souviens[-\s]toi|retiens|m[ée]morise|note)\s*"
+    r"(?:bien\s+)?(?:que\s+|qu'|:\s*)?(?P<fact>.+?)\s*$",
+    re.IGNORECASE,
+)
+# Correction explicite : « non, en fait… », « c'est faux, … », « je t'ai déjà dit que… »
+_CORRECTION_PATTERN = re.compile(
+    r"^\s*(?:non[,!\s]+(?:en fait|c'est|je)|c'est (?:faux|pas ça)[,\s]+|je t'ai (?:déjà|deja) dit (?:que\s+|qu')?)(?P<fact>.+?)\s*$",
+    re.IGNORECASE,
+)
+
+
+def detect_memorize_request(prompt: str):
+    """Détecte une demande de mémorisation explicite ou une correction. Retourne le fait, sinon None."""
+    text = " ".join((prompt or "").split())
+    match = _MEMORIZE_PATTERN.match(text)
+    if match:
+        fact = match.group("fact").strip(" .!")
+        return {"fact": fact, "kind": "explicit"} if len(fact) >= 3 else None
+    match = _CORRECTION_PATTERN.match(text)
+    if match:
+        fact = match.group("fact").strip(" .!")
+        return {"fact": fact, "kind": "correction"} if len(fact) >= 3 else None
+    return None
+
 
 async def parse_intent(prompt: str):
     """Analyse la commande vocale via le LLM pour retourner une intention structurée."""
@@ -339,11 +368,20 @@ def build_system_prompt(profile=None, memory=None, mode="normal", mood=None):
 
     memory = memory or []
     if memory:
-        rappels = "; ".join(
-            str(m.get("t", m)) if isinstance(m, dict) else str(m)
-            for m in memory[-5:]
+        lignes = []
+        for m in memory[:12]:
+            if isinstance(m, dict):
+                texte = str(m.get("t") or m.get("text") or m)
+                categorie = str(m.get("c") or m.get("category") or "").strip()
+                lignes.append(f"- [{categorie}] {texte}" if categorie else f"- {texte}")
+            else:
+                lignes.append(f"- {m}")
+        base += (
+            "\n\nMÉMOIRE PERSISTANTE (ce que tu as appris sur l'utilisateur, à utiliser activement) :\n"
+            + "\n".join(lignes)
+            + "\nRègles mémoire : appuie-toi sur ces faits sans les répéter inutilement ; "
+            "si l'utilisateur contredit un fait, la nouvelle information prime et tu la retiens."
         )
-        base += f"\n\nÉléments de contexte récents : {rappels}."
 
     return base
 
@@ -395,6 +433,16 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
     serp_key = keys.get("serp") or ENV_SERP_KEY
     is_turbo = (mode or "normal").lower() == "turbo"
 
+    # ⚡ APPRENTISSAGE INSTANTANÉ : mémorisation/correction sans aller-retour LLM.
+    memorize = detect_memorize_request(prompt)
+    if memorize:
+        fact = memorize["fact"]
+        if memorize["kind"] == "correction":
+            confirmation = f"Bien noté, je corrige immédiatement : {fact}. C'est retenu."
+        else:
+            confirmation = f"C'est mémorisé instantanément : {fact}."
+        return {"reponse": confirmation, "memoire": [fact], "popups": []}
+
     file_snippets = ""
     web_snippets = ""
 
@@ -408,20 +456,34 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
         timeout = 10.0 if is_turbo else 30.0
         max_tokens = 512 if is_turbo else 4096
         client_groq = AsyncOpenAI(api_key=ENV_GROQ_LLM_KEY, base_url=GROQ_LLM_ENDPOINT, max_retries=0, timeout=timeout)
+
+        # Continuité : l'historique récent est réellement fourni au modèle.
+        history_messages = []
+        for turn in (history or [])[-8:]:
+            role = turn.get("role") if isinstance(turn, dict) else None
+            content = (turn.get("content") or "").strip() if isinstance(turn, dict) else ""
+            if role in ("user", "assistant") and content:
+                history_messages.append({"role": role, "content": content[:2000]})
+
+        json_instruction = (
+            '\n\nRéponds UNIQUEMENT avec un objet JSON valide, sans markdown, au format exact : '
+            '{"reponse": "...", "memoire": [], "popups": []}'
+            "\nAPPRENTISSAGE AUTOMATIQUE — champ memoire : à CHAQUE échange, extrais les faits durables "
+            "nouvellement appris sur l'utilisateur (identité, préférences, projets, habitudes, corrections). "
+            'Formate chacun « categorie: fait » avec categorie ∈ {preference, projet, souvenir}, '
+            'ex. ["preference: il aime le café serré", "projet: prépare une certification HACCP"]. '
+            "Maximum 3 faits, uniquement s'ils sont nouveaux et durables ; sinon liste vide []."
+        )
+
         last_error = None
         for model_name in models_to_try:
             try:
                 resp = await client_groq.chat.completions.create(
                     model=model_name,
                     messages=[
-                        {
-                            "role": "system", 
-                            "content": sys_prompt + '\n\nRéponds UNIQUEMENT avec un objet JSON valide, sans markdown, au format exact : {"reponse": "...", "memoire": [], "popups": []}'
-                        },
-                        {
-                            "role": "user", 
-                            "content": prompt
-                        }
+                        {"role": "system", "content": sys_prompt + json_instruction},
+                        *history_messages,
+                        {"role": "user", "content": prompt},
                     ],
                     max_tokens=max_tokens,
                     temperature=0.8,

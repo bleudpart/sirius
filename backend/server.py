@@ -102,7 +102,7 @@ app = FastAPI(title="Sirius Backend API", version="1.0.0", lifespan=_lifespan)
 
 # Imports des modules Sirius
 from storage import put_object, get_object, init_storage, cloud_available, APP_NAME
-from local_memory import list_facts, add_fact, delete_fact, update_fact, log_event, prime_overview, log_service, list_service_log
+from local_memory import list_facts, add_fact, delete_fact, update_fact, log_event, prime_overview, log_service, list_service_log, recall_facts, learn_fact
 from auth_api import is_direct_local_request, resolve_user_id, require_user  # noqa: E402
 from omega_engine import OmegaEngine  # noqa: E402
 
@@ -342,13 +342,15 @@ async def chat(req: ChatRequest, request: Request):
     doc = await db.sirius_chats.find_one({"session_id": session_id}, {"_id": 0, "history": 1})
     history = (doc or {}).get("history", [])
 
-    # Mémoire locale SQLite : injectée dans le cerveau en plus de la mémoire du navigateur
+    # Mémoire locale SQLite : rappel par PERTINENCE (mots-clés + renforcement),
+    # injecté dans le cerveau en plus de la mémoire du navigateur.
     try:
-        local_facts = list_facts(user_id=uid)
+        local_facts = recall_facts(texte, user_id=uid)
     except Exception:
         local_facts = []
     merged_memory = (req.memory or []) + [
-        {"t": f["text"], "d": (f.get("created_at") or "")[:10]} for f in local_facts
+        {"t": f["text"], "c": f.get("category") or "", "d": (f.get("created_at") or "")[:10]}
+        for f in local_facts
     ]
 
     mode_ia_effectif = req.ia_mode or "rapide"
@@ -382,10 +384,11 @@ async def chat(req: ChatRequest, request: Request):
         logger.error(f"[CHAT] Erreur lors de ask_sirius: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur cerveau: {e}")
 
-    # Persistance des nouveaux souvenirs dans la base locale (entre les sessions)
+    # Persistance des nouveaux souvenirs dans la base locale (entre les sessions),
+    # avec classement automatique en preference / projet / souvenir.
     for m in memories:
         try:
-            add_fact("souvenir", m, user_id=uid)
+            learn_fact(m, user_id=uid)
         except Exception as e:
             logger.error(f"[LOCAL-MEM] Persistance échouée: {e}")
 
@@ -426,12 +429,13 @@ async def chat_stream(req: ChatRequest, request: Request):
     doc = await db.sirius_chats.find_one({"session_id": session_id}, {"_id": 0, "history": 1})
     history = (doc or {}).get("history", [])
     try:
-        local_facts = list_facts(user_id=uid)
+        local_facts = recall_facts(texte, user_id=uid)
     except Exception:
         local_facts = []
-    
+
     merged_memory = (req.memory or []) + [
-        {"t": f["text"], "d": (f.get("created_at") or "")[:10]} for f in local_facts
+        {"t": f["text"], "c": f.get("category") or "", "d": (f.get("created_at") or "")[:10]}
+        for f in local_facts
     ]
     autonomous_action = detect_autonomous_action(texte)
 
@@ -460,7 +464,7 @@ async def chat_stream(req: ChatRequest, request: Request):
             
             for m in memories:
                 try:
-                    add_fact("souvenir", m, user_id=uid)
+                    learn_fact(m, user_id=uid)
                 except Exception as e:
                     logger.error(f"[LOCAL-MEM] Persistance échouée: {e}")
 
