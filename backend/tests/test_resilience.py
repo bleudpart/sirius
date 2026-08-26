@@ -80,12 +80,12 @@ def test_breaker_opens_and_short_circuits():
 
 
 def test_breaker_half_open_then_recovers():
-    breaker = get_breaker("svc-recover", failure_threshold=1, reset_timeout=0.05)
+    breaker = get_breaker("svc-recover", failure_threshold=1, reset_timeout=0.2)
     breaker.record_failure()
     assert not breaker.allow()
 
     import time
-    time.sleep(0.06)
+    time.sleep(0.3)
     assert breaker.allow()  # demi-ouvert : appel d'essai autorisé
 
     async def works():
