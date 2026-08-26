@@ -233,30 +233,34 @@ async def argus_fix(
     return omega.fix(payload.fixId, payload.confirmed)
 
 @api_router.post("/suggestions/evaluate")
-async def suggestions_evaluate():
-    return {
-        "settings": {"mode": "equilibre"},
-        "suggestions": [
-            {
-                "urgency": "faible",
-                "risk_level": "faible",
-                "description": "SIRIUS est prêt à vous assister sans intervention supplémentaire."
-            },
-            {
-                "urgency": "moyenne",
-                "risk_level": "moyenne",
-                "description": "Vérifiez les tâches prioritaires avant de lancer un nouveau workflow."
-            }
-        ]
-    }
+async def suggestions_evaluate(request: Request):
+    """Suggestions proactives issues de la mémoire réelle (projets, épisodes, habitudes)."""
+    uid = (await require_user(request, db))["user_id"]
+    import proactive
+    return proactive.evaluate(uid)
 
-@api_router.get("/suggestions/undefined/action")
-async def suggestions_undefined_action_get():
-    return {"ok": True, "mode": "noop", "message": "Aucune action suggérée pour ce cas."}
 
-@api_router.post("/suggestions/undefined/action")
-async def suggestions_undefined_action_post():
-    return {"ok": True, "mode": "noop", "message": "Aucune action suggérée pour ce cas."}
+@api_router.post("/suggestions/settings")
+async def suggestions_settings(payload: dict, request: Request):
+    uid = (await require_user(request, db))["user_id"]
+    import proactive
+    mode = ((payload or {}).get("settings") or {}).get("mode") or "equilibre"
+    return {"mode": proactive.set_mode(uid, mode)}
+
+
+@api_router.get("/suggestions/{suggestion_id}/why")
+async def suggestions_why(suggestion_id: str, request: Request):
+    uid = (await require_user(request, db))["user_id"]
+    import proactive
+    return proactive.suggestion_why(uid, suggestion_id)
+
+
+@api_router.post("/suggestions/{suggestion_id}/action")
+async def suggestions_action(suggestion_id: str, payload: dict, request: Request):
+    uid = (await require_user(request, db))["user_id"]
+    import proactive
+    action = (payload or {}).get("action") or ""
+    return proactive.suggestion_action(uid, suggestion_id, action)
 
 @api_router.get("/atlas/route")
 async def atlas_route_get():

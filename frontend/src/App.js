@@ -33,9 +33,12 @@ import { speakFr, cancelSpeech, speakCinematic, speakSeries, speakAsCharacter } 
 import { loadHud, applyHud } from "@/hudPrefs";
 import { initUiSounds } from "@/uiSounds";
 import { initHoloFx } from "@/holoFx";
+import { getDisplayAutoCloseDelay } from "@/displayTiming";
 import { initReadAloud } from "@/readAloud";
 import { initHoloWindows, minimizeAll } from "@/holoWindows";
 import { ConfirmButton } from "@/ConfirmButton";
+import { getHUDStyleVariables, renderHUD } from "@/theme";
+import HolographicGlobe from "@/HolographicGlobe";
 import "@/App.css";
 
 /* executeIntent moved into the real App component (see later in the file) */
@@ -735,6 +738,17 @@ const isAbortError = (error) => {
   return /abort/i.test(String(error.message || ""));
 };
 
+const imageFileToBase64 = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onerror = () => reject(new Error("Lecture de l'image de référence impossible."));
+  reader.onload = () => {
+    const encoded = String(reader.result || "").split(",", 2)[1];
+    if (!encoded) reject(new Error("Image de référence vide."));
+    else resolve(encoded);
+  };
+  reader.readAsDataURL(file);
+});
+
 function App() {
   function speakOut(message) {
     if (!message) {
@@ -895,8 +909,16 @@ function App() {
     && window.location.port !== "8001";
   const [cpu, ram] = [undefined, undefined]; // → useLiveStats (liveStats.js), sans re-render global
   const [cmd, setCmd] = useState("");
+  const [imageReference, setImageReference] = useState(null);
+  const imageReferenceRef = useRef(null);
+  const imageReferenceInputRef = useRef(null);
   const wsRef = useRef(null);
   const recognitionRef = useRef(null);
+  const serverRecorderRef = useRef(null);
+  const serverRecorderStreamRef = useRef(null);
+  const serverRecorderTimerRef = useRef(null);
+  const discardServerRecordingRef = useRef(false);
+  const preferServerSttRef = useRef(false);
   const micOnRef = useRef(false);
   // Push-to-talk (talkie-walkie) : maintenir Espace ou le bouton dédié
   const [pttActive, setPttActive] = useState(false);
@@ -904,6 +926,8 @@ function App() {
   const speakingRef = useRef(false);
   const isBusy = useRef(false); // ⚡ Verrou anti-surchauffe / anti-doublon (partagé entre resolveIntent et handleCommand)
   const [micOn, setMicOn] = useState(false);
+  const [showVoicePanel, setShowVoicePanel] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState("");
   const [ecoMode, setEcoMode] = useState(() => localStorage.getItem("sirius_eco") === "1");
   useEffect(() => { localStorage.setItem("sirius_eco", ecoMode ? "1" : "0"); }, [ecoMode]);
   const [autoMic, setAutoMic] = useState(false); // micro jamais déclenché automatiquement (fonction retirée)
@@ -950,15 +974,17 @@ function App() {
   const [displayOpen, setDisplayOpen] = useState(false);
   const displayCloseTimer = useRef(null);
   const pinDisplay = useCallback(() => { clearTimeout(displayCloseTimer.current); }, []);
+  useEffect(() => () => clearTimeout(displayCloseTimer.current), []);
   const showOnDisplay = useCallback((item) => {
     const entry = { ...item, id: Date.now() + Math.random() };
     setDisplay(entry);
     setDisplayHistory((h) => [entry, ...h].slice(0, 8));
     setDisplayOpen(true);
     clearTimeout(displayCloseTimer.current);
-    // Fermeture auto : messages 20 s, images 45 s — web et vidéos restent affichés
-    if (item.type === "message") displayCloseTimer.current = setTimeout(() => setDisplayOpen(false), 20000);
-    else if (item.type === "image") displayCloseTimer.current = setTimeout(() => setDisplayOpen(false), 45000);
+    const closeDelay = getDisplayAutoCloseDelay(item);
+    if (closeDelay) {
+      displayCloseTimer.current = setTimeout(() => setDisplayOpen(false), closeDelay);
+    }
   }, []);
   const openWebWindow = useCallback((url, titre, iframeOk, noscript) => {
     showOnDisplay({ type: "web", url, titre, iframeOk, noscript: !!noscript });
@@ -1371,6 +1397,11 @@ function App() {
   const isThinking = status === "thinking";
   const accentColor = isThinking ? thinkColor : conf.color;
   const glowColor = isThinking ? thinkColor : conf.glow;
+  const hudTheme = renderHUD({
+    coreActive: status !== "idle",
+    guardianActive: true,
+    infoPanels: true,
+  });
 
   // Stats simulées (remplacées par le backend si connecté) — via bus liveStats, sans re-render du HUD
   useEffect(() => {
@@ -1565,13 +1596,15 @@ function App() {
     });
 
     // -------------------------------------------------------------
-    // NIVEAU 1 : VOIE FLUX STREAM (SSE) avec Timeout 30s
+    // NIVEAU 1 : VOIE FLUX STREAM (SSE) avec timeout global de 60 s
     // -------------------------------------------------------------
+    let streamTimeoutId;
+    let streamProducedOutput = false;
     try {
       if (pid && progress?.log) progress.log(pid, "Interrogation du cerveau (voie stream)...", 30);
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // ⚡ Timeout strict 30s
+      streamTimeoutId = setTimeout(() => controller.abort(), 60000);
 
       const resp = await fetch(`${API}/chat/stream`, {
         method: "POST",
@@ -1579,8 +1612,6 @@ function App() {
         body: payload,
         signal: controller.signal,
       });
-
-      clearTimeout(timeoutId);
 
       if (resp.ok && resp.body && (resp.headers.get("content-type") || "").includes("text/event-stream")) {
         const reader = resp.body.getReader();
@@ -1595,29 +1626,34 @@ function App() {
           speakSeries(ph);
         };
 
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buf += dec.decode(value, { stream: true });
-          let cut;
-          while ((cut = buf.indexOf("\n\n")) >= 0) {
-            const line = buf.slice(0, cut).trim();
-            buf = buf.slice(cut + 2);
-            if (!line.startsWith("data:")) continue;
-            let ev;
-            try { ev = JSON.parse(line.slice(5)); } catch (e) { continue; }
-            if (ev.type === "delta") {
-              full += ev.text; pending += ev.text;
-              setText(full);
-              let m;
-              while ((m = /^([\s\S]*?[.!?…])(?:\s+|$)/.exec(pending)) && m[1].trim().length > 1) {
-                speakChunk(m[1]);
-                pending = pending.slice(m[0].length);
+        try {
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += dec.decode(value, { stream: true });
+            let cut;
+            while ((cut = buf.indexOf("\n\n")) >= 0) {
+              const line = buf.slice(0, cut).trim();
+              buf = buf.slice(cut + 2);
+              if (!line.startsWith("data:")) continue;
+              let ev;
+              try { ev = JSON.parse(line.slice(5)); } catch (e) { continue; }
+              if (ev.type === "delta") {
+                streamProducedOutput = true;
+                full += ev.text; pending += ev.text;
+                setText(full);
+                let m;
+                while ((m = /^([\s\S]*?[.!?…])(?:\s+|$)/.exec(pending)) && m[1].trim().length > 1) {
+                  speakChunk(m[1]);
+                  pending = pending.slice(m[0].length);
+                }
+              } else if (ev.type === "done") {
+                data = ev;
               }
-            } else if (ev.type === "done") {
-              data = ev;
             }
           }
+        } finally {
+          await reader.cancel().catch(() => {});
         }
 
         if (data) {
@@ -1635,8 +1671,14 @@ function App() {
       }
     } catch (e) {
       if (!isAbortError(e)) {
-        console.warn("⚠️ Stream interrompu ou timeout (30s) -> Passage en voie classique...", e);
+        console.warn("⚠️ Stream interrompu ou timeout (60s) -> Passage en voie classique...", e);
       }
+      if (streamProducedOutput) {
+        if (pid && progress?.error) progress.error(pid, "Réponse interrompue après restitution partielle");
+        return;
+      }
+    } finally {
+      if (streamTimeoutId) clearTimeout(streamTimeoutId);
     }
 
     // -------------------------------------------------------------
@@ -2056,16 +2098,35 @@ function App() {
   }, [patchTask, speakOut]);
 
   // Tâche SIRIUS : génération d'image (Nano Banana) — tout s'affiche dans la fenêtre dédiée, jamais dans le chat
-  const launchImageTask = useCallback(async (prompt) => {
+  const launchImageTask = useCallback(async (prompt, requireReference = false) => {
     const id = openTask(`IMAGE — ${prompt.slice(0, 42).toUpperCase()}`, "image");
     pushStep(id, "Initialisation du moteur de rendu");
     setTimeout(() => pushStep(id, "Analyse du prompt"), 1000);
     setTimeout(() => pushStep(id, "Traitement — génération neuronale"), 2600);
     try {
+      const displayReference = window.__siriusDisplayFile?.kind === "image"
+        ? window.__siriusDisplayFile.file
+        : null;
+      const referenceFile = imageReferenceRef.current?.file || displayReference;
+      if (requireReference && !referenceFile) {
+        failTask(id, "Ajoutez d'abord une image de référence avec le bouton image.");
+        const message = "Ajoutez d'abord l'image de référence avec le bouton situé dans la barre de commande.";
+        setText(message);
+        return;
+      }
+      const request = { prompt };
+      if (referenceFile) {
+        if (referenceFile.size > 10 * 1024 * 1024) {
+          throw new Error("L'image de référence dépasse 10 Mo.");
+        }
+        pushStep(id, `Analyse de la référence — ${referenceFile.name || "image"}`);
+        request.reference_image = await imageFileToBase64(referenceFile);
+        request.reference_mime = referenceFile.type;
+      }
       const r = await fetch(`${API}/task/image`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify(request),
       });
       const d = await r.json().catch(() => ({}));
       if (r.ok && d.image) {
@@ -2079,9 +2140,39 @@ function App() {
       }
       failTask(id, d.detail || "Échec de la génération");
     } catch (e) {
-      failTask(id, "Moteur de rendu injoignable");
+      failTask(id, e.message || "Moteur de rendu injoignable");
     }
   }, [openTask, pushStep, finishTask, failTask, archiveCreation]);
+
+  const selectImageReference = useCallback((file) => {
+    if (!file) return;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      const message = "Format non accepté. Utilisez une image PNG, JPEG ou WebP.";
+      setText(message);
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      const message = "Cette image dépasse la limite de 10 mégaoctets.";
+      setText(message);
+      return;
+    }
+    if (imageReferenceRef.current?.url) URL.revokeObjectURL(imageReferenceRef.current.url);
+    const next = { file, name: file.name, url: URL.createObjectURL(file) };
+    imageReferenceRef.current = next;
+    setImageReference(next);
+    setText(`Image de référence prête : ${file.name}. Décrivez maintenant la transformation souhaitée.`);
+  }, []);
+
+  const clearImageReference = useCallback(() => {
+    if (imageReferenceRef.current?.url) URL.revokeObjectURL(imageReferenceRef.current.url);
+    imageReferenceRef.current = null;
+    setImageReference(null);
+    if (imageReferenceInputRef.current) imageReferenceInputRef.current.value = "";
+  }, []);
+
+  useEffect(() => () => {
+    if (imageReferenceRef.current?.url) URL.revokeObjectURL(imageReferenceRef.current.url);
+  }, []);
 
   const openArchiveWindow = useCallback((file) => {
     lastArchiveRef.current = file;
@@ -2358,7 +2449,7 @@ function App() {
 
   // ---- Outlook (Microsoft Graph) : emails + calendrier dans des fenêtres HUD ----
   const connectOutlook = useCallback(() => {
-    window.open(`${API}/oauth/outlook/login`, "_blank");
+    window.open(`${API}/auth/microsoft/login`, "_blank", "noopener,noreferrer");
     setStatus("speaking");
     const m = "Connexion Outlook lancée dans un nouvel onglet. Authentifiez-vous, puis revenez ici.";
     setText(m); speakOut(m);
@@ -2371,26 +2462,27 @@ function App() {
     let mails = null, nonLus = 0;
     try {
       const r = await fetch(`${API}/microsoft/mail?top=5`);
+      const d = await r.json().catch(() => ({}));
       if (r.ok) {
-        const d = await r.json();
         mails = (d.mails || []).map((m) => ({ de: m.de, sujet: m.sujet, apercu: m.apercu, lu: m.lu, date: m.recu }));
         nonLus = mails.filter((m) => !m.lu).length;
+      } else if (r.status === 401 || r.status === 409) {
+        failTask(id, "Compte Microsoft non connecté");
+        setStatus("speaking");
+        const m = "Ton compte Outlook n'est pas encore connecté. Dis « connecte Outlook », authentifie-toi avec Microsoft, puis demande-moi de lire tes emails.";
+        setText(m); speakOut(m);
+        return;
+      } else {
+        throw new Error(d.detail || `Microsoft Graph a répondu avec le code ${r.status}`);
       }
-    } catch (e) {}
-    if (!mails) {
-      try {
-        const r = await fetch(`${API}/outlook/emails`);
-        const d = await r.json().catch(() => ({}));
-        if (r.ok) { mails = (d.messages || []).slice(0, 5); nonLus = d.non_lus || 0; }
-      } catch (e) {}
-    }
-    setStatus("speaking");
-    if (!mails) {
-      failTask(id, "Compte Microsoft non connecté");
-      const m = "Je ne peux pas lire tes mails : connecte d'abord ton compte Microsoft — bouton « Continuer avec Microsoft » à la connexion, ou dis « connecte Outlook ».";
+    } catch (e) {
+      failTask(id, e.message || "Microsoft Graph injoignable");
+      setStatus("speaking");
+      const m = "Je n'arrive pas à joindre Microsoft Graph pour le moment.";
       setText(m); speakOut(m);
       return;
     }
+    setStatus("speaking");
     if (!mails.length) {
       finishTask(id, { kind: "text", texte: "Boîte de réception vide.", legende: "Outlook · aucun mail" });
       const m = "Ta boîte de réception Outlook est vide.";
@@ -2462,15 +2554,25 @@ function App() {
   const launchOutlookMail = useCallback(async () => {    const id = openTask("OUTLOOK — BOÎTE DE RÉCEPTION", "outlook");
     pushStep(id, "Connexion à Microsoft Graph");
     try {
-      const r = await fetch(`${API}/outlook/emails`);
+    const r = await fetch(`${API}/microsoft/mail?top=12`);
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) { failTask(id, d.detail || "Lecture impossible"); return; }
+      if (!r.ok) {
+        failTask(id, d.detail || "Lecture impossible");
+        setStatus("speaking");
+        const m = r.status === 401 || r.status === 409
+          ? "Ton compte Outlook n'est pas encore connecté. Dis « connecte Outlook », puis authentifie-toi avec Microsoft."
+          : (d.detail || "Je n'arrive pas à lire Outlook pour le moment.");
+        setText(m); speakOut(m);
+        return;
+      }
       pushStep(id, "Analyse de la boîte de réception");
-      const lignes = (d.messages || []).map((m) =>
-        `${m.lu ? "  " : "● "}${m.date} — ${m.de}\n   ${m.sujet}\n   ${m.apercu}`).join("\n\n") || "Boîte de réception vide.";
-      finishTask(id, { kind: "text", texte: `NON LUS : ${d.non_lus}\n\n${lignes}`, legende: `Outlook · ${d.non_lus} non lu(s)` });
+      const mails = d.mails || [];
+      const nonLus = mails.filter((mail) => !mail.lu).length;
+      const lignes = mails.map((m) =>
+        `${m.lu ? "  " : "● "}${m.recu || ""} — ${m.de}\n   ${m.sujet}\n   ${m.apercu || ""}`).join("\n\n") || "Boîte de réception vide.";
+      finishTask(id, { kind: "text", texte: `NON LUS : ${nonLus}\n\n${lignes}`, legende: `Outlook · ${nonLus} non lu(s)` });
       setStatus("speaking");
-      const m = d.non_lus > 0 ? `Vous avez ${d.non_lus} email${d.non_lus > 1 ? "s" : ""} non lu${d.non_lus > 1 ? "s" : ""}. Détails dans la fenêtre.` : "Aucun email non lu. Boîte affichée dans la fenêtre.";
+      const m = nonLus > 0 ? `Vous avez ${nonLus} email${nonLus > 1 ? "s" : ""} non lu${nonLus > 1 ? "s" : ""}. Détails dans la fenêtre.` : "Aucun email non lu. Boîte affichée dans la fenêtre.";
       setText(m); speakOut(m);
     } catch (e) { failTask(id, "Microsoft Graph injoignable"); }
   }, [openTask, pushStep, finishTask, failTask, speakOut]);
@@ -3322,6 +3424,9 @@ function App() {
     if (/connect(?:e|er|ion)?(?:[- ]moi)?\s*(?:à\s+)?outlook/.test(low)) {
       mark("outlook · connexion"); connectOutlook(); return;
     }
+    if (/^(?:microsoft\s+)?outlook[\s?!.]*$/.test(low)) {
+      mark("outlook · ouverture"); launchOutlookMail(); return;
+    }
     const sendM = low.match(/envoie (?:un )?(?:e-?mail|mail|courriel|message) [àa]\s+(.+)/);
     if (sendM) {
       mark("outlook · envoi"); launchOutlookIntent(command); return;
@@ -3393,8 +3498,14 @@ function App() {
       return;
     }
     // 0terdecies) Fenêtres de tâches SIRIUS : créations d'images et de clips vidéo
+    const imgEditM = low.match(/(?:transforme|modifie|retouche|adapte|recr[ée]e|refais)(?:[- ]moi)?\s+(?:cette\s+|l['’])?(?:image|photo|illustration)\s*(?:pour|en|avec|afin de|comme)?\s*(.*)/);
     const vidTaskM = low.match(/(?:cr[ée]{1,2}|g[ée]n[èe]re|fais|r[ée]alise|produis|monte)(?:[- ]moi)?\s+(?:une?\s+|le\s+|la\s+)?(?:clip|vid[ée]o|animation|court[- ]m[ée]trage)\s*(?:de|d'|du|des|sur|avec|repr[ée]sentant|montrant)?\s*(.*)/);
     const imgTaskM = low.match(/(?:cr[ée]{1,2}|g[ée]n[èe]re|fais|dessine|imagine|produis)(?:[- ]moi)?\s+(?:une?\s+|l')?(?:image|photo|illustration|logo|affiche|dessin)\s*(?:de|d'|du|des|sur|avec|repr[ée]sentant|montrant)?\s*(.*)/);
+    if (imgEditM) {
+      mark("tâche · transformation image");
+      launchImageTask((imgEditM[1] || "").replace(/[?!.]+$/, "").trim() || command, true);
+      return;
+    }
     if (vidTaskM) {
       mark("tâche · clip");
       launchVideoTask((vidTaskM[1] || "").replace(/[?!.]+$/, "").trim() || command);
@@ -3776,6 +3887,7 @@ function App() {
   // ---- Reconnaissance vocale navigateur (Web Speech API) ----
   const handleTranscript = useCallback((transcript, isFinal) => {
     if (speakingRef.current) return; // Sirius parle → on ignore (évite l'écho)
+    setVoiceTranscript(transcript.trim());
     const t = transcript.toLowerCase().trim();
     if (!isFinal) {
       setStatus("listening");
@@ -3804,10 +3916,109 @@ function App() {
   const handleTranscriptRef = useRef(null);
   handleTranscriptRef.current = handleTranscript;
 
+  const startServerListening = useCallback(async () => {
+    if (serverRecorderRef.current || micOnRef.current || speakingRef.current) return;
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      setText("L'enregistrement vocal n'est pas disponible sur cet appareil.");
+      setStatus("idle");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (speakingRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      const preferredType = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"]
+        .find((type) => MediaRecorder.isTypeSupported(type));
+      const recorder = new MediaRecorder(stream, preferredType ? { mimeType: preferredType } : undefined);
+      const chunks = [];
+      discardServerRecordingRef.current = false;
+      serverRecorderRef.current = recorder;
+      serverRecorderStreamRef.current = stream;
+      recorder.ondataavailable = (event) => {
+        if (event.data?.size) chunks.push(event.data);
+      };
+      recorder.onstop = async () => {
+        clearTimeout(serverRecorderTimerRef.current);
+        serverRecorderTimerRef.current = null;
+        serverRecorderRef.current = null;
+        serverRecorderStreamRef.current = null;
+        stream.getTracks().forEach((track) => track.stop());
+        micOnRef.current = false;
+        window.__siriusMicOn = false;
+        setMicOn(false);
+        if (discardServerRecordingRef.current) {
+          setStatus((current) => (current === "listening" ? "idle" : current));
+          return;
+        }
+        const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+        if (blob.size < 800) {
+          setText("Je n'ai pas reçu assez de son. Rapprochez-vous du microphone et réessayez.");
+          setStatus("idle");
+          return;
+        }
+        setStatus("thinking");
+        setText("Transcription vocale SIRIUS en cours...");
+        try {
+          const form = new FormData();
+          const extension = blob.type.includes("mp4") ? "m4a" : "webm";
+          form.append("file", blob, `sirius-voice.${extension}`);
+          const response = await fetch(`${API}/stt`, { method: "POST", body: form });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(payload.detail || "Transcription vocale impossible.");
+          const transcript = (payload.text || payload.transcript || "").trim();
+          if (!transcript) {
+            setText("Je n'ai pas distingué de parole. Réessayez plus près du microphone.");
+            setStatus("idle");
+            return;
+          }
+          handleTranscriptRef.current(transcript, true);
+        } catch (error) {
+          console.error("Erreur transcription SIRIUS :", error);
+          setText(error.message || "La transcription vocale SIRIUS est indisponible.");
+          setStatus("idle");
+        }
+      };
+      recorder.onerror = () => {
+        discardServerRecordingRef.current = true;
+        setText("L'enregistrement du microphone a été interrompu.");
+        setStatus("idle");
+      };
+      recorder.start(250);
+      setVoiceTranscript("");
+      micOnRef.current = true;
+      window.__siriusMicOn = true;
+      setMicOn(true);
+      setStatus("listening");
+      setText("Je t'écoute — transcription SIRIUS...");
+      serverRecorderTimerRef.current = setTimeout(() => {
+        if (serverRecorderRef.current?.state === "recording") serverRecorderRef.current.stop();
+      }, 15000);
+    } catch (error) {
+      console.error("Impossible d'ouvrir le microphone :", error);
+      setText(error?.name === "NotAllowedError"
+        ? "Accès au micro refusé. Autorisez le microphone dans les paramètres de SIRIUS."
+        : "Impossible d'ouvrir le microphone sur cet appareil.");
+      setStatus("idle");
+    }
+  }, []);
+
   // Arrête l'écoute en cours
   const stopListening = useCallback(() => {
     const rec = recognitionRef.current;
     recognitionRef.current = null;
+    const serverRecorder = serverRecorderRef.current;
+    if (serverRecorder) {
+      discardServerRecordingRef.current = true;
+      if (serverRecorder.state !== "inactive") serverRecorder.stop();
+    }
+    clearTimeout(serverRecorderTimerRef.current);
+    serverRecorderTimerRef.current = null;
+    if (!serverRecorder && serverRecorderStreamRef.current) {
+      serverRecorderStreamRef.current.getTracks().forEach((track) => track.stop());
+      serverRecorderStreamRef.current = null;
+    }
     micOnRef.current = false;
     window.__siriusMicOn = false;
     setMicOn(false);
@@ -3853,9 +4064,14 @@ function App() {
   // Démarre l'écoute via la reconnaissance vocale du navigateur (instantanée, gratuite)
   const startListening = useCallback(() => {
     if (micOnRef.current || speakingRef.current) return;
+    if (preferServerSttRef.current) {
+      startServerListening();
+      return;
+    }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) {
-      setText("La reconnaissance vocale n'est pas disponible sur ce navigateur. Utilisez Chrome ou Edge.");
+      preferServerSttRef.current = true;
+      startServerListening();
       return;
     }
     try {
@@ -3866,6 +4082,7 @@ function App() {
       rec.maxAlternatives = 1;
       let gotFinal = false;
       let hadError = false;
+      let useServerFallback = false;
       rec.onresult = (e) => {
         let interim = "";
         let final = "";
@@ -3889,8 +4106,21 @@ function App() {
         micOnRef.current = false;
         window.__siriusMicOn = false;
         setMicOn(false);
-        if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+        if (e.error === "not-allowed") {
           setText("Accès au micro refusé. Autorisez le microphone pour parler à Sirius.");
+          setStatus("idle");
+        } else if (e.error === "network" || e.error === "service-not-allowed") {
+          preferServerSttRef.current = true;
+          useServerFallback = true;
+          setText("Le service vocal du navigateur est indisponible. Le mode transcription SIRIUS prend le relais.");
+          setStatus("idle");
+        } else if (e.error === "audio-capture") {
+          setText("Aucun microphone utilisable n'a été détecté.");
+          setStatus("idle");
+        } else if (e.error === "no-speech") {
+          setText("Je n'ai rien entendu. Parlez plus près du microphone.");
+        } else {
+          setText(`Reconnaissance vocale interrompue (${e.error || "erreur inconnue"}).`);
           setStatus("idle");
         }
       };
@@ -3900,6 +4130,10 @@ function App() {
         micOnRef.current = false;
         window.__siriusMicOn = false;
         setMicOn(false);
+        if (useServerFallback && !speakingRef.current) {
+          setTimeout(() => startServerListening(), 150);
+          return;
+        }
         if (!gotFinal && !speakingRef.current) {
           setStatus((s) => (s === "listening" ? "idle" : s));
           // Mode conversation : si rien n'a été dit, on relance l'écoute
@@ -3916,6 +4150,7 @@ function App() {
       recognitionRef.current = rec;
       sttT0Ref.current = null;
       rec.start();
+      setVoiceTranscript("");
       micOnRef.current = true;
       window.__siriusMicOn = true;
       setMicOn(true);
@@ -3925,15 +4160,19 @@ function App() {
       setText("Impossible de démarrer le micro sur cet appareil.");
       setStatus("idle");
     }
-  }, []);
+  }, [startServerListening]);
 
   // Référence pour relancer l'écoute depuis onSpeechEnd (mode conversation)
   startListenRef.current = startListening;
 
-  const toggleMic = useCallback(() => {
-    if (micOnRef.current) stopListening();
-    else startListening();
-  }, [startListening, stopListening]);
+  const finishVoiceCapture = useCallback(() => {
+    try {
+      if (serverRecorderRef.current?.state === "recording") serverRecorderRef.current.stop();
+      else if (recognitionRef.current) recognitionRef.current.stop();
+    } catch (error) {
+      console.error("Impossible de terminer la capture vocale :", error);
+    }
+  }, []);
 
   // ---- Talkie-walkie (push-to-talk) : maintenir = micro actif, relâcher = envoi ----
   const pttDown = useCallback(() => {
@@ -3959,7 +4198,10 @@ function App() {
     setPttActive(false);
     pttBeep(true);
     // stop() finalise la reconnaissance → le transcript final part vers l'assistant IA
-    try { recognitionRef.current && recognitionRef.current.stop(); } catch (e) {}
+    try {
+      if (serverRecorderRef.current?.state === "recording") serverRecorderRef.current.stop();
+      else if (recognitionRef.current) recognitionRef.current.stop();
+    } catch (e) {}
   }, []);
 
   useEffect(() => {
@@ -4429,7 +4671,17 @@ function App() {
     { id: "nummarius", group: "PANTHÉON", label: "PORTUS NUMMARIUS# — bourse & marchés", Icon: Landmark, run: () => setShowNummarius(true) },
     { id: "europeana", group: "MÉDIAS", label: "Archives Europeana", Icon: Library, run: () => setShowEuropeana(true) },
     { id: "haccp", group: "OUTILS", label: "HACCP — sécurité alimentaire", Icon: ShieldCheck, run: () => setHaccp({ sujet: "", auto: false }) },
-    { id: "voice", group: "SYSTÈME", label: micOn ? "Reconnaissance vocale — active" : "Reconnaissance vocale — inactive", Icon: AudioLines, active: micOn, run: toggleMic },
+    {
+      id: "voice",
+      group: "SYSTÈME",
+      label: micOn ? "Reconnaissance vocale — écoute" : "Reconnaissance vocale",
+      Icon: AudioLines,
+      active: showVoicePanel,
+      run: () => {
+        setShowVoicePanel(true);
+        if (!micOnRef.current) startListening();
+      },
+    },
     { id: "prime", group: "OUTILS", label: "SIRIUS PRIME — mémoire", Icon: Sparkles, run: () => setShowPrime(true) },
     { id: "dev", group: "OUTILS", label: "Compagnon Dev", Icon: Code2, run: () => setShowDev(true) },
     { id: "analytics", group: "OUTILS", label: "Tableau analytique", Icon: BarChart3, run: () => setShowAnalytics(true) },
@@ -4470,9 +4722,19 @@ function App() {
   moduleItemsRef.current = moduleItems;
 
   return (
-    <div className={`sirius-root ${ecoMode ? "eco" : ""} mode-${sysMode}`} style={{ "--accent": accentColor, "--glow": glowColor }} data-testid="sirius-hud">
+    <div
+      className={`sirius-root ${ecoMode ? "eco" : ""} mode-${sysMode}`}
+      style={{ ...getHUDStyleVariables(), "--accent": accentColor, "--glow": glowColor }}
+      data-core-active={hudTheme.core.active}
+      data-guardian-active={hudTheme.guardian.visible}
+      data-testid="sirius-hud"
+    >
       <div className="grid-bg" />
-      <div className="antique-bg presentation-bg" data-testid="sirius-antique-bg" />
+      <div
+        className="antique-bg presentation-bg"
+        style={{ "--guardian-backdrop-image": 'url("/holo/zeus-boot.jpg")' }}
+        data-testid="sirius-antique-bg"
+      />
       <div className="guardian-rig" data-testid="sirius-guardian-rig">
         <img src="/holo/zeus-boot.jpg" alt="" className={`antique-guardian holo-full ${status === "speaking" ? "speaking" : status === "listening" ? "listening" : ""}`} draggable={false} data-testid="sirius-guardian" />
         <span className="guardian-bolt-glow" aria-hidden="true" data-testid="guardian-bolt-glow" />
@@ -4804,8 +5066,9 @@ function App() {
       {/* Pop-ups holographiques contextuels (gérés par Sirius) */}
       <HoloPopups popups={popups} onClose={closePopup} onImage={setArchiveView} />
 
-      {/* Suggestions proactives — désactivées : encarts système "SIRIUS est prêt..." / "Vérifiez les tâches..." supprimés au démarrage */}
-      {false && <ProactivePanel
+      {/* Suggestions proactives issues de la mémoire réelle (projets, épisodes, habitudes).
+          Le panneau reste invisible tant que le moteur n'a rien de pertinent à proposer. */}
+      <ProactivePanel
         onAction={(a) => {
           if (!a || !a.type) return;
           if (a.type === "command") {
@@ -4821,7 +5084,7 @@ function App() {
           }
         }}
         onSpeak={(m) => speakRef.current(m)}
-      />}
+      />
 
       {/* SIRIUS WebBrowser : fenêtres web indépendantes, déplaçables, redimensionnables */}
       <WebWindows windows={webWindows} onClose={closeWebWindow} />
@@ -4836,6 +5099,62 @@ function App() {
           onInteract={pinDisplay}
           onSpeak={(m) => { setStatus("speaking"); setText(m); speakOut(m); }}
         />
+      )}
+
+      {showVoicePanel && (
+        <section className="voice-capture-panel" role="dialog" aria-label="Reconnaissance vocale SIRIUS" data-testid="sirius-voice-panel" data-hud-panel>
+          <header className="voice-capture-header">
+            <div>
+              <span className="voice-capture-kicker">SIRIUS · AUDIO LINK</span>
+              <strong>RECONNAISSANCE VOCALE</strong>
+            </div>
+            <button
+              type="button"
+              className="voice-capture-close"
+              onClick={() => {
+                stopListening();
+                setShowVoicePanel(false);
+              }}
+              aria-label="Fermer la reconnaissance vocale"
+            >
+              <X size={17} />
+            </button>
+          </header>
+
+          <div className={`voice-capture-core ${micOn ? "listening" : status === "thinking" ? "processing" : ""}`}>
+            <div className="voice-capture-rings" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </div>
+            <Mic size={30} />
+          </div>
+
+          <div className="voice-capture-state">
+            <span className={`voice-capture-dot ${micOn ? "on" : ""}`} />
+            {micOn ? "ÉCOUTE EN COURS" : status === "thinking" ? "TRANSCRIPTION EN COURS" : "PRÊT À ÉCOUTER"}
+          </div>
+
+          <div className="voice-capture-wave" aria-hidden="true">
+            {Array.from({ length: 18 }, (_, index) => <span key={index} />)}
+          </div>
+
+          <div className="voice-capture-transcript" aria-live="polite">
+            <span>TRANSCRIPTION</span>
+            <p>{voiceTranscript || (micOn ? "Parlez maintenant…" : "Votre dernière prise de voix apparaîtra ici.")}</p>
+          </div>
+
+          <div className="voice-capture-actions">
+            <button
+              type="button"
+              className={`voice-capture-primary ${micOn ? "recording" : ""}`}
+              onClick={micOn ? finishVoiceCapture : startListening}
+            >
+              {micOn ? <><MicOff size={16} /> TERMINER ET ENVOYER</> : <><Mic size={16} /> DÉMARRER L’ÉCOUTE</>}
+            </button>
+            <span>Maintenez aussi <b>ESPACE</b> pour parler</span>
+          </div>
+        </section>
       )}
 
       {/* Fenêtres de tâches pilotées par SIRIUS (créations, rendus, étapes en direct) */}
@@ -4886,7 +5205,7 @@ function App() {
 
       {/* Panneau bas-gauche : HEURE + CPU/RAM (style référence) */}
       <aside className="hud-panel bottom-left" data-testid="sirius-stats" data-hud-panel>
-        <div className="hud-panel-title"><Clock size={13} /> HEURE LOCALE &amp; UTC</div>
+        <div className="hud-panel-title"><Clock size={13} /> HEURE &amp; UTC</div>
         <LiveClock />
       </aside>
       <div className="hud-panel stats-mini" data-testid="sirius-cpu-ram" data-hud-panel>
@@ -4896,6 +5215,10 @@ function App() {
       {/* Coeur central */}
       <main className="center-stage">
         <div className={`reactor-wrap core-${status}`}>
+          <div className="core-globe" aria-hidden="true">
+            <HolographicGlobe />
+          </div>
+          <div className="core-equator" aria-hidden="true" />
           <div className="core-rings" aria-hidden="true">
             <img src="/holo/ring-gold.png" alt="" className="core-ring outer" draggable={false} />
             <img src="/holo/ring-gold.png" alt="" className="core-ring inner" draggable={false} />
@@ -4904,6 +5227,11 @@ function App() {
               {["Σ", "Δ", "Ω", "Θ", "Φ"].map((l, i) => (
                 <span key={l} className="core-letter" style={{ "--i": i }}><i>{l}</i></span>
               ))}
+            </div>
+            <div className="holo-platform" aria-hidden="true">
+              <span className="holo-platform-ring ring-a" />
+              <span className="holo-platform-ring ring-b" />
+              <span className="holo-platform-ring ring-c" />
             </div>
           </div>
           <ReactorCore status={status} volume={0.35} color="#22d3ee" eco={ecoMode} />
@@ -4926,7 +5254,6 @@ function App() {
                 <img src="/holo/sirius-title.png" alt="ΣIRIUS" className="sirius-title-img" draggable={false} />
               </button>
             </h1>
-            <div className="sirius-state" data-testid="sirius-state">{conf.label}</div>
           </div>
           {activeCard && (
             <CentralCard
@@ -4948,8 +5275,36 @@ function App() {
 
         {/* Zone de réponse supprimée : Sirius répond uniquement dans SIRIUS DISPLAY */}
 
+        {imageReference && (
+          <div className="image-reference-chip" data-testid="sirius-image-reference">
+            <img src={imageReference.url} alt="" />
+            <span><b>RÉFÉRENCE NANO BANANA</b>{imageReference.name}</span>
+            <button type="button" onClick={clearImageReference} aria-label="Retirer l'image de référence">
+              <X size={13} />
+            </button>
+          </div>
+        )}
+
         <form className="cmd-bar" onSubmit={sendCommand} data-testid="sirius-cmd-form">
           <span className="cmd-prompt">SIRIUS&gt;</span>
+          <input
+            ref={imageReferenceInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            hidden
+            onChange={(event) => selectImageReference(event.target.files?.[0])}
+            data-testid="sirius-image-reference-input"
+          />
+          <button
+            type="button"
+            className={`image-reference-btn ${imageReference ? "active" : ""}`}
+            onClick={() => imageReferenceInputRef.current?.click()}
+            title="Ajouter une image de référence pour Nano Banana"
+            aria-label="Ajouter une image de référence"
+            data-testid="sirius-image-reference-btn"
+          >
+            <Camera size={15} />
+          </button>
           <input
             className="cmd-input"
             type="text"
@@ -4989,8 +5344,10 @@ function App() {
 
       {/* Panneau bas-droit : NOYAU (style référence) */}
       <aside className="hud-panel bottom-right" data-testid="sirius-clock" data-hud-panel>
-        <div className="hud-panel-title"><Brain size={13} /> NOYAU</div>
-        <div className="noyau-line" data-testid="noyau-mode">{connected ? "Noyau local relié" : "IA Cloud active"}</div>
+        <div className="noyau-status-row">
+          <div className="hud-panel-title"><Brain size={13} /> NOYAU</div>
+          <div className="noyau-line" data-testid="noyau-mode">{connected ? "Noyau local relié" : "IA Cloud active"}</div>
+        </div>
         <div className="noyau-state">ÉTAT : <b data-testid="noyau-state">{conf.label}</b></div>
         <div className="noyau-user">UTILISATEUR · {(userName || "INVITÉ").toUpperCase()}</div>
       </aside>
