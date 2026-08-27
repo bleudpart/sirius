@@ -1,5 +1,7 @@
 // © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useRef, useState, useEffect, useCallback } from "react";
+import { gsap } from "gsap";
+import { animateWindowOpen, animateWindowClose, animateResizeSettle } from "./gsapAnimations";
 import { Monitor, RotateCw, ExternalLink, Globe, MessageSquare, Film, ImageIcon, Minus, ChevronUp, ShieldCheck, X, Maximize2, Minimize2, ClipboardPaste, Save, FileText, UploadCloud, Sparkles, Loader2, Facebook, Instagram, MessageCircle } from "lucide-react";
 import { progress } from "./SiriusProgress";
 import Analysis3D from "./Analysis3D";
@@ -105,7 +107,7 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
     setMinimized(false);
     setSaveMsg("");
     if (onInteract) onInteract();
-    window.__siriusDisplayFile = { name, kind };
+    window.__siriusDisplayFile = { name, kind, file };
     window.__siriusDisplayChat = [];
     analyzeFile(file, kind);
   }, [onInteract, analyzeFile]);
@@ -214,6 +216,10 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
     el.style.top = Math.min(Math.max(0, y), window.innerHeight - 60) + "px";
   }, [minimized, full]);
 
+  useEffect(() => {
+    if (ref.current) animateWindowOpen(ref.current);
+  }, []);
+
   const saveGeo = (patch) => {
     try { localStorage.setItem(GEO_KEY, JSON.stringify({ ...readGeo(), ...patch })); } catch (e) {}
   };
@@ -221,6 +227,7 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
   const onBarDown = (e) => {
     if (e.target.closest("button") || full) return;
     const el = ref.current;
+    gsap.killTweensOf(el);
     const r = el.getBoundingClientRect();
     const dx = e.clientX - r.left;
     const dy = e.clientY - r.top;
@@ -243,6 +250,7 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
   const onResizeDown = (e) => {
     if (full) return;
     const el = ref.current;
+    gsap.killTweensOf(el);
     const r = el.getBoundingClientRect();
     const sx = e.clientX, sy = e.clientY, sw = r.width, sh = r.height;
     el.classList.add("dragging");
@@ -253,6 +261,7 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
     const up = () => {
       el.classList.remove("dragging");
       saveGeo({ w: parseFloat(el.style.width) || 440, h: parseFloat(el.style.height) || 460 });
+      animateResizeSettle(el);
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
     };
@@ -266,6 +275,11 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
     setFull(false);
     setMinimized((m) => { saveGeo({ min: !m }); return !m; });
   };
+
+  const handleClose = useCallback(() => {
+    if (ref.current) animateWindowClose(ref.current, onClose);
+    else onClose();
+  }, [onClose]);
 
   const type = (item && item.type) || "idle";
   const { label, Icon } = TYPE_META[type] || TYPE_META.idle;
@@ -304,7 +318,7 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
         <button onClick={toggleMin} title={minimized ? "Déployer" : "Réduire"} data-testid="sirius-display-minimize">
           {minimized ? <ChevronUp size={12} /> : <Minus size={12} />}
         </button>
-        <button onClick={onClose} title="Fermer" data-testid="sirius-display-close">
+        <button onClick={handleClose} title="Fermer" data-testid="sirius-display-close">
           <X size={12} />
         </button>
       </div>

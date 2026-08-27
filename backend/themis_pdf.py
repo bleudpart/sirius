@@ -4,7 +4,7 @@ import io
 import json
 import re
 
-import fitz
+import pymupdf as fitz
 
 from reportlab.lib.colors import HexColor, white
 from reportlab.lib.pagesizes import A4

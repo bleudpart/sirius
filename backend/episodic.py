@@ -65,6 +65,7 @@ async def condense_idle_sessions(db, summarize, now=None) -> int:
         )
         created += 1
         logger.info("[EPISODIC] Épisode condensé pour %s (%d tours)", session_id, len(fresh))
+        await asyncio.sleep(2.0)  # espace les appels Groq pour rester sous la limite TPM
 
     return created
 

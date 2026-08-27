@@ -1,10 +1,11 @@
+import asyncio
 import os
 import re
 import json
 import hashlib
 import logging
 import time
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, BadRequestError, RateLimitError
 from media_intent import parse_media_intent
 from productivite.intent_productivite import parse_productivity_intent
 
@@ -445,30 +446,46 @@ async def summarize_episode(history):
     ]
     if len(turns) < 2 or not ENV_GROQ_LLM_KEY:
         return None
-    transcript = "\n".join(turns[-24:])
+    transcript = "\n".join(turns[-24:])[:5000]
     episode_client = AsyncOpenAI(
         api_key=ENV_GROQ_LLM_KEY, base_url=GROQ_LLM_ENDPOINT, max_retries=0, timeout=20.0
     )
-    try:
-        resp = await episode_client.chat.completions.create(
-            model=GROQ_LLM_PRIMARY,
-            messages=[
-                {"role": "system", "content": EPISODE_PROMPT},
-                {"role": "user", "content": transcript[:9000]},
-            ],
-            max_tokens=500,
-            temperature=0.2,
-            response_format={"type": "json_object"},
-        )
-        data = json.loads(resp.choices[0].message.content or "{}")
-        resume = str(data.get("resume") or "").strip()
-        faits = [str(f).strip() for f in (data.get("faits") or []) if str(f).strip()][:3]
-        if not resume:
+    for attempt in range(3):
+        try:
+            resp = await episode_client.chat.completions.create(
+                model=GROQ_LLM_PRIMARY,
+                messages=[
+                    {"role": "system", "content": EPISODE_PROMPT},
+                    {"role": "user", "content": transcript},
+                ],
+                max_tokens=1000,
+                temperature=0.2,
+                response_format={"type": "json_object"},
+                extra_body={"reasoning_effort": "low"},
+            )
+            data = json.loads(resp.choices[0].message.content or "{}")
+            resume = str(data.get("resume") or "").strip()
+            faits = [str(f).strip() for f in (data.get("faits") or []) if str(f).strip()][:3]
+            if not resume:
+                return None
+            return {"resume": resume, "faits": faits}
+        except RateLimitError as e:
+            if attempt >= 2:
+                logger.warning("[EPISODE] condensation échouée: %s", repr(e))
+                return None
+            delay = 6.0 * (attempt + 1)
+            logger.debug("[EPISODE] rate limit (essai %d/3), reprise dans %.0fs", attempt + 1, delay)
+            await asyncio.sleep(delay)
+        except BadRequestError as e:
+            # json_validate_failed est stochastique (gpt-oss consomme parfois tout le budget en raisonnement)
+            if "json_validate_failed" not in str(e) or attempt >= 2:
+                logger.warning("[EPISODE] condensation échouée: %s", repr(e))
+                return None
+            await asyncio.sleep(1.0)
+        except Exception as e:
+            logger.warning("[EPISODE] condensation échouée: %s", repr(e))
             return None
-        return {"resume": resume, "faits": faits}
-    except Exception as e:
-        logger.warning(f"[EPISODE] condensation échouée: {repr(e)}")
-        return None
+    return None
 
 # ==========================================
 # BOUCLE PRINCIPALE D'EXÉCUTION (ASK_SIRIUS)
