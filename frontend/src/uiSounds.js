@@ -57,7 +57,7 @@ export function initUiSounds() {
   document.addEventListener("click", (e) => {
     if (e.target.closest && e.target.closest("button, a, select, [role='button']")) playClick();
   }, { capture: true, passive: true });
-  const PANEL_CLASSES = ["prime-screen", "setup-screen", "modmenu", "zeus-screen", "central-card", "holo-popup", "hud-panel"];
+  const PANEL_CLASSES = ["prime-screen", "setup-screen", "modmenu", "zeus-screen", "central-card", "holo-popup", "hud-panel", "atlas-panel", "kr-panel"];
   const isPanel = (n) => n.nodeType === 1 && n.classList && PANEL_CLASSES.some((c) => n.classList.contains(c));
   const obs = new MutationObserver((muts) => {
     for (const m of muts) {
