@@ -1,7 +1,7 @@
 # © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 """Backend tests for iteration_3:
 - /api/chat now accepts {keys, profile} and personalizes answer (profile.name, profession)
-- /api/tts accepts {openai_key:""} and must fall back to EMERGENT key (audio) or return clear error (no crash)
+- /api/tts accepts {openai_key:""} and must fall back to a configured TTS backend (audio) or return clear error (no crash)
 """
 import os
 import uuid
@@ -68,7 +68,7 @@ def test_chat_empty_still_400_with_new_schema():
 
 # -- /api/tts fallback --
 def test_tts_empty_openai_key_falls_back_or_clear_error():
-    """With empty openai_key, server must use EMERGENT fallback OR return a clear HTTP error (no crash)."""
+    """With empty openai_key, server must fall back to a configured TTS backend OR return a clear HTTP error (no crash)."""
     r = requests.post(TTS, json={"text": "Bonjour Marc.", "openai_key": ""}, timeout=45)
     # Must not 5xx-crash without a clear message; either 200 (fallback worked) or 4xx/5xx with detail
     assert r.status_code in (200, 400, 500, 502), f"Unexpected status: {r.status_code} {r.text}"

@@ -517,13 +517,13 @@ class TestPaymentsIsolation:
             mongo_db.payment_transactions.delete_many({"session_id": {"$in": [sid_a, sid_b]}})
 
 
-# Direct backend CORS is the source of truth; public ingress headers are intentionally out of scope.
-def test_direct_backend_cors_allows_preview_origin_with_credentials():
+# La CORS-liste de confiance ne référence plus le domaine d'hébergement Emergent : seules les
+# origines de dev locales (et celles explicitement ajoutées via CORS_ORIGINS) sont acceptées.
+def test_direct_backend_cors_rejects_emergent_preview_origin():
     origin = "https://cybertech-panel.preview.emergentagent.com"
     response = requests.get(f"{DIRECT_URL}/api/auth/me", headers={"Origin": origin}, timeout=30)
     assert response.status_code == 401
-    assert response.headers.get("access-control-allow-origin") == origin
-    assert response.headers.get("access-control-allow-credentials") == "true"
+    assert response.headers.get("access-control-allow-origin") != origin
 
     preflight = requests.options(
         f"{DIRECT_URL}/api/chat",
@@ -534,6 +534,12 @@ def test_direct_backend_cors_allows_preview_origin_with_credentials():
         },
         timeout=30,
     )
-    assert preflight.status_code == 200
-    assert preflight.headers.get("access-control-allow-origin") == origin
-    assert preflight.headers.get("access-control-allow-credentials") == "true"
+    assert preflight.headers.get("access-control-allow-origin") != origin
+
+
+def test_direct_backend_cors_allows_local_dev_origin_with_credentials():
+    origin = "http://localhost:3000"
+    response = requests.get(f"{DIRECT_URL}/api/auth/me", headers={"Origin": origin}, timeout=30)
+    assert response.status_code == 401
+    assert response.headers.get("access-control-allow-origin") == origin
+    assert response.headers.get("access-control-allow-credentials") == "true"

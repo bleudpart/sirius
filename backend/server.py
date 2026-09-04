@@ -17,7 +17,7 @@ import binascii
 from collections import deque
 from contextlib import asynccontextmanager
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 
 from dotenv import load_dotenv
@@ -58,6 +58,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+_FACT_MAX_AGE_DAYS = 90
+_EPISODE_POOL = 5    # how many recent episodes to fetch
+_EPISODE_TOP  = 3    # how many to inject after thematic reranking
+
+
+def _score_episodes(prompt: str, episodes: list, top_k: int = _EPISODE_TOP) -> list:
+    """Return top_k episodes most relevant to prompt by keyword overlap (no LLM)."""
+    words = {w for w in re.sub(r"[^\w\s]", "", prompt.lower()).split() if len(w) > 3}
+    scored = []
+    for ep in episodes:
+        text = (ep.get("summary") or "").lower()
+        overlap = sum(1 for w in words if w in text)
+        scored.append((overlap, ep))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [ep for _, ep in scored[:top_k]]
+
 # =========================================================
 # INITIALISATION UNIQUE DE L'APPLICATION ET INTERCEPTATION OPTIONS
 # =========================================================
@@ -83,12 +99,7 @@ async def _lifespan(_app):
         logger.info("[AUTH] Index et compte admin prêts")
     except Exception as e:
         logger.error(f"[AUTH] Init échouée: {e}")
-    if cloud_available():
-        try:
-            init_storage()
-            logger.info("[FILES] Stockage cloud initialisé")
-        except Exception as e:
-            logger.error(f"[FILES] Init stockage échouée: {e}")
+    # (Stockage 100% local — plus d'initialisation cloud à faire ici.)
     try:
         yield
     finally:
@@ -106,7 +117,7 @@ async def _lifespan(_app):
 app = FastAPI(title="Sirius Backend API", version="1.0.0", lifespan=_lifespan)
 
 # Imports des modules Sirius
-from storage import put_object, get_object, init_storage, cloud_available, APP_NAME
+from storage import put_object, get_object, APP_NAME
 from local_memory import list_facts, add_fact, delete_fact, update_fact, log_event, prime_overview, log_service, list_service_log, recall_facts, learn_fact
 from auth_api import is_direct_local_request, resolve_user_id, require_user  # noqa: E402
 from omega_engine import OmegaEngine  # noqa: E402
@@ -152,10 +163,9 @@ async def health_check():
     checks["omega_watch"] = "running" if (_omega_task and not _omega_task.done()) else "stopped"
 
     keys = {
-        "llm": bool(os.getenv("OPENAI_API_KEY") or os.getenv("EMERGENT_LLM_KEY")),
+        "llm": bool(os.getenv("GROQ_API_KEY") or os.getenv("K3_API_KEY") or os.getenv("DANIEL_DEV_K3") or os.getenv("GEMINI_API_KEY")),
         "serpapi": bool(os.getenv("SERP_API_KEY")),
         "spotify": bool(os.getenv("SPOTIFY_CLIENT_ID")),
-        "storage_cloud": cloud_available(),
     }
 
     try:
@@ -259,9 +269,11 @@ async def chat(req: ChatRequest, request: Request):
         local_facts = await semantic_rerank(texte, local_facts, top_k=8)
     except Exception:
         local_facts = local_facts[:8]
+    fact_cutoff = (datetime.now(timezone.utc) - timedelta(days=_FACT_MAX_AGE_DAYS)).date().isoformat()
+    local_facts = [f for f in local_facts if not f.get("created_at") or f["created_at"][:10] >= fact_cutoff]
     try:
         from local_memory import recent_episodes
-        episodes = recent_episodes(uid, limit=2)
+        episodes = _score_episodes(texte, recent_episodes(uid, limit=_EPISODE_POOL))
     except Exception:
         episodes = []
     merged_memory = (req.memory or []) + [
@@ -271,8 +283,6 @@ async def chat(req: ChatRequest, request: Request):
         {"t": e["summary"], "c": "épisode", "d": (e.get("created_at") or "")[:10]}
         for e in episodes
     ]
-
-    mode_ia_effectif = req.ia_mode or "rapide"
     logger.info(f"[CHAT] Début génération - Mode reçu: '{req.ia_mode}' | Mode appliqué: '{mode_ia_effectif}'")
 
     try:
@@ -354,9 +364,11 @@ async def chat_stream(req: ChatRequest, request: Request):
         local_facts = await semantic_rerank(texte, local_facts, top_k=8)
     except Exception:
         local_facts = local_facts[:8]
+    fact_cutoff = (datetime.now(timezone.utc) - timedelta(days=_FACT_MAX_AGE_DAYS)).date().isoformat()
+    local_facts = [f for f in local_facts if not f.get("created_at") or f["created_at"][:10] >= fact_cutoff]
     try:
         from local_memory import recent_episodes
-        episodes = recent_episodes(uid, limit=2)
+        episodes = _score_episodes(texte, recent_episodes(uid, limit=_EPISODE_POOL))
     except Exception:
         episodes = []
 
@@ -580,7 +592,6 @@ async def keys_check_get():
             "newsapi": bool(_env_key("NEWS_API_KEY", "NEWSAPI_KEY")),
             "alphavantage": bool(_env_key("ALPHA_VANTAGE_API_KEY", "ALPHA_VANTAGE_KEY")),
             "serpapi": bool(_env_key("SERP_API_KEY")),
-            "emergent": bool(_env_key("EMERGENT_LLM_KEY", "EMERGENT_API_KEY")),
         },
     }
 
@@ -683,7 +694,7 @@ async def diagram(req: DiagramRequest, request: Request):
         logger.error(f"[DIAGRAM] Erreur: {e}")
         raise HTTPException(status_code=500, detail="Sirius n'a pas pu dessiner ce diagramme, réessayez.")
 
-# ---- Médiathèque : fichiers & médias (Emergent Object Storage / disque local) ----
+# ---- Médiathèque : fichiers & médias (stockage disque local) ----
 from fastapi.responses import Response as RawResponse
 
 MAX_FILE_MB = 20
@@ -1694,7 +1705,7 @@ async def task_image(req: TaskImageRequest):
     prompt = (req.prompt or "").strip()
     if not prompt:
         raise HTTPException(status_code=400, detail="Prompt vide")
-    file_contents = []
+    input_parts: list = [{"type": "text", "text": prompt}]
     if req.reference_image:
         allowed_mimes = {"image/jpeg", "image/png", "image/webp"}
         reference_mime = (req.reference_mime or "").lower().strip()
@@ -1719,34 +1730,40 @@ async def task_image(req: TaskImageRequest):
         }
         if not signatures[reference_mime]:
             raise HTTPException(status_code=400, detail="Le contenu ne correspond pas au format d'image annoncé.")
+        input_parts.append({
+            "type": "image",
+            "mime_type": reference_mime,
+            "data": req.reference_image,
+        })
 
-    from emergentintegrations.llm.chat import FileContent, LlmChat, UserMessage
-    if req.reference_image:
-        file_contents.append(FileContent(
-            content_type=req.reference_mime.lower().strip(),
-            file_content_base64=req.reference_image,
-        ))
-    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
-        raise HTTPException(status_code=500, detail="Clé Emergent absente")
-    chat = LlmChat(api_key=api_key, session_id=f"task-img-{os.urandom(6).hex()}",
-                   system_message=(
-                       "Tu es le moteur de rendu visuel de SIRIUS. Génère des images de haute qualité. "
-                       "Lorsqu'une image de référence est fournie, respecte sa composition et applique précisément "
-                       "les transformations demandées sans ajouter d'éléments non sollicités."
-                   ))
-    chat.with_model("gemini", "gemini-3.1-flash-image-preview").with_params(modalities=["image", "text"])
+        raise HTTPException(status_code=500, detail="Clé Gemini absente")
+    from google import genai
+    client = genai.Client(api_key=api_key)
     try:
-        text, images = await chat.send_message_multimodal_response(
-            UserMessage(text=prompt, file_contents=file_contents)
+        interaction = await client.aio.interactions.create(
+            model="gemini-3.1-flash-image",
+            input=input_parts,
         )
     except Exception as e:
         logger.error(f"[TASK IMAGE] {e}")
         raise HTTPException(status_code=502, detail="Moteur de rendu indisponible")
-    if not images:
+    output_image = getattr(interaction, "output_image", None)
+    if output_image is None and isinstance(interaction, dict):
+        output_image = interaction.get("output_image")
+    if output_image is None:
         raise HTTPException(status_code=502, detail="Aucune image produite")
-    img = images[0]
-    return {"image": img["data"], "mime": img.get("mime_type") or "image/png", "texte": (text or "")[:300]}
+    image_data = getattr(output_image, "data", None)
+    if image_data is None and isinstance(output_image, dict):
+        image_data = output_image.get("data")
+    image_mime = getattr(output_image, "mime_type", None)
+    if image_mime is None and isinstance(output_image, dict):
+        image_mime = output_image.get("mime_type")
+    if not image_data:
+        raise HTTPException(status_code=502, detail="Aucune image produite")
+    text = getattr(interaction, "output_text", None) or ""
+    return {"image": image_data, "mime": image_mime or "image/png", "texte": text[:300]}
 
 @api_router.post("/task/video/start")
 async def task_video_start(req: TaskVideoRequest):
@@ -1904,6 +1921,7 @@ from routes.infos import make_infos_router  # noqa: E402
 from routes.pantheon_oracle import make_pantheon_oracle_router  # noqa: E402
 from routes.voice_io import make_voice_io_router  # noqa: E402
 from routes.hephaistos import make_hephaistos_router  # noqa: E402
+from routes.feedback import make_feedback_router  # noqa: E402
 api_router.include_router(
     make_supervision_router(db, omega, require_user, _require_local_control, _admin_token_matches)
 )
@@ -1915,6 +1933,7 @@ api_router.include_router(make_infos_router())
 api_router.include_router(make_pantheon_oracle_router(db, _rate_ok))
 api_router.include_router(make_voice_io_router())
 api_router.include_router(make_hephaistos_router(db))
+api_router.include_router(make_feedback_router())
 
 # ---- Veille push proactive : Sirius prévient des actus tout seul ----
 async def _push_watch_loop():
@@ -2258,7 +2277,6 @@ _extra_origins = (
 app.add_middleware(
     CORSMiddleware,
     allow_origins=list(dict.fromkeys(_DEFAULT_DEV_ORIGINS + _extra_origins)),
-    allow_origin_regex=r"https://([a-z0-9-]+\.)*(emergentagent\.com|emergent\.host)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

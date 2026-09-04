@@ -1,23 +1,76 @@
 // © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
-// Porte d'authentification : connexion email/mot de passe + Google (Emergent), profil et déconnexion.
-import { useEffect, useRef, useState, createContext, useContext } from "react";
-import { LogIn, UserPlus, LogOut, User, Save } from "lucide-react";
+// Porte d'authentification : connexion email/mot de passe + Microsoft, profil et déconnexion.
+import { useEffect, useState, createContext, useContext } from "react";
+import { LogIn, LogOut, User, Save } from "lucide-react";
 import { BACKEND_BASE_URL, resolveBackendUrl } from "@/lib/api";
 
 const API = BACKEND_BASE_URL;
+const BACKEND_URL_PREFIX = `${BACKEND_BASE_URL.replace(/\/$/, "")}/`;
 export const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 
 // Toutes les requêtes vers notre backend portent les cookies de session
 const SIRIUS_FETCH_PATCH_FLAG = "__siriusApiFetchPatched";
+let localSessionBootstrap = null;
+// Fallback Bearer : le cookie SameSite=Strict n'est pas rejoué quand la page
+// (localhost:3000) et l'API (127.0.0.1:8001) sont des sites différents.
+let siriusAccessToken = null;
+
+function rememberAccessToken(payload) {
+  if (payload && typeof payload.access_token === "string" && payload.access_token) {
+    siriusAccessToken = payload.access_token;
+  }
+}
+
+function requestLocalSession() {
+  if (!localSessionBootstrap) {
+    localSessionBootstrap = window.fetch(`${BACKEND_URL_PREFIX}api/auth/local-session`, {
+      method: "POST",
+      credentials: "include",
+    }).then(async (response) => {
+      const user = response.ok ? await response.json() : null;
+      rememberAccessToken(user);
+      return { response, user };
+    }).finally(() => {
+      localSessionBootstrap = null;
+    });
+  }
+  return localSessionBootstrap;
+}
+
 if (!window[SIRIUS_FETCH_PATCH_FLAG]) {
   const nativeFetch = window.fetch.bind(window);
-  window.fetch = (input, options = {}) => {
+  window.fetch = async (input, options = {}) => {
     const url = typeof input === "string" ? input : input.url || "";
     const resolvedUrl = resolveBackendUrl(url);
-    const isBackendRequest = resolvedUrl.startsWith(BACKEND_BASE_URL);
-    if (isBackendRequest) options = { credentials: "include", ...options };
-    return nativeFetch(typeof input === "string" ? resolvedUrl : input, options);
+    const isBackendRequest = resolvedUrl.startsWith(BACKEND_URL_PREFIX);
+    const isAuthRequest = resolvedUrl.startsWith(`${BACKEND_URL_PREFIX}api/auth/`);
+    const resolvedInput = typeof input === "string"
+      ? resolvedUrl
+      : resolvedUrl === url
+        ? input
+        : new Request(resolvedUrl, input);
+    const requestOptions = isBackendRequest
+      ? { ...options, credentials: "include" }
+      : options;
+    const applyBearer = () => {
+      if (!isBackendRequest || !siriusAccessToken) return;
+      const headers = new Headers(
+        options.headers || (resolvedInput instanceof Request ? resolvedInput.headers : undefined)
+      );
+      if (!headers.has("Authorization")) headers.set("Authorization", `Bearer ${siriusAccessToken}`);
+      requestOptions.headers = headers;
+    };
+    applyBearer();
+    const retryInput = resolvedInput instanceof Request ? resolvedInput.clone() : resolvedInput;
+    const response = await nativeFetch(resolvedInput, requestOptions);
+
+    if (!isBackendRequest || isAuthRequest || response.status !== 401) return response;
+
+    const bootstrap = await requestLocalSession();
+    if (!bootstrap.response.ok) return response;
+    applyBearer();
+    return nativeFetch(retryInput, requestOptions);
   };
   window[SIRIUS_FETCH_PATCH_FLAG] = true;
 }
@@ -38,8 +91,7 @@ function syncLocalProfile(user) {
 }
 
 function AuthScreen({ onAuth }) {
-  const [mode, setMode] = useState("login");
-  const [form, setForm] = useState({ email: "", password: "", name: "" });
+  const [form, setForm] = useState({ email: "", password: "" });
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -47,20 +99,16 @@ function AuthScreen({ onAuth }) {
     e.preventDefault();
     setBusy(true); setErr("");
     try {
-      const r = await fetch(`${API}/api/auth/${mode === "login" ? "login" : "register"}`, {
+      const r = await fetch(`${API}/api/auth/login`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(mode === "login" ? { email: form.email, password: form.password } : form),
+        body: JSON.stringify({ email: form.email, password: form.password }),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(fmtErr(data.detail));
+      rememberAccessToken(data);
       syncLocalProfile(data);
       onAuth(data);
     } catch (e2) { setErr(e2.message); setBusy(false); }
-  };
-
-  const googleLogin = () => {
-    const redirectUrl = window.location.origin;
-    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
   };
 
   const microsoftLogin = () => {
@@ -72,31 +120,20 @@ function AuthScreen({ onAuth }) {
       <div className="auth-card">
         <img src="/holo/sirius-title.png" alt="SIRIUS" className="auth-logo" onError={(e) => { e.target.style.display = "none"; e.target.nextSibling.style.display = "block"; }} />
         <h1 className="auth-title font-divine" style={{ display: "none" }}>ΣIRIUS</h1>
-        <p className="auth-sub">{mode === "login" ? "Identifie-toi pour accéder au sanctuaire" : "Crée ton compte pour rejoindre le sanctuaire"}</p>
+        <p className="auth-sub">Identifie-toi pour accéder au sanctuaire</p>
         <form onSubmit={submit} className="auth-form" data-testid="auth-form">
-          {mode === "register" && (
-            <input type="text" placeholder="Ton prénom" value={form.name} autoComplete="name"
-              onChange={(e) => setForm({ ...form, name: e.target.value })} data-testid="auth-name-input" />
-          )}
           <input type="email" placeholder="Email" value={form.email} required autoComplete="email"
             onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="auth-email-input" />
-          <input type="password" placeholder="Mot de passe" value={form.password} required autoComplete={mode === "login" ? "current-password" : "new-password"}
+          <input type="password" placeholder="Mot de passe" value={form.password} required autoComplete="current-password"
             onChange={(e) => setForm({ ...form, password: e.target.value })} data-testid="auth-password-input" />
           {err && <div className="auth-error" data-testid="auth-error">{err}</div>}
           <button type="submit" className="auth-submit" disabled={busy} data-testid="auth-submit-btn">
-            {mode === "login" ? <><LogIn size={15} /> SE CONNECTER</> : <><UserPlus size={15} /> CRÉER MON COMPTE</>}
+            <LogIn size={15} /> SE CONNECTER
           </button>
         </form>
-        <button className="auth-google" onClick={googleLogin} data-testid="auth-google-btn">
-          <svg width="16" height="16" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 5.04c1.62 0 3.06.56 4.2 1.64l3.12-3.12C17.46 1.8 14.96.75 12 .75 7.44.75 3.5 3.36 1.58 7.18l3.64 2.82C6.14 7.15 8.84 5.04 12 5.04z"/><path fill="#4285F4" d="M23.25 12.27c0-.93-.08-1.6-.26-2.3H12v4.35h6.44c-.13 1.08-.83 2.7-2.4 3.79l3.55 2.75c2.13-1.96 3.66-4.85 3.66-8.59z"/><path fill="#FBBC05" d="M5.23 14.27a6.98 6.98 0 0 1-.38-2.27c0-.79.14-1.56.36-2.27L1.58 6.91A11.24 11.24 0 0 0 .75 12c0 1.81.43 3.52 1.2 5.04l3.28-2.77z"/><path fill="#34A853" d="M12 23.25c3.04 0 5.6-1 7.46-2.72l-3.55-2.75c-.95.66-2.23 1.12-3.91 1.12-3.16 0-5.86-2.11-6.8-4.96l-3.62 2.78c1.91 3.9 5.9 6.53 10.42 6.53z"/></svg>
-          CONTINUER AVEC GOOGLE
-        </button>
         <button className="auth-google" onClick={microsoftLogin} data-testid="auth-microsoft-btn">
           <svg width="15" height="15" viewBox="0 0 24 24"><path fill="#f35325" d="M1 1h10v10H1z"/><path fill="#81bc06" d="M13 1h10v10H13z"/><path fill="#05a6f0" d="M1 13h10v10H1z"/><path fill="#ffba08" d="M13 13h10v10H13z"/></svg>
           CONTINUER AVEC MICROSOFT
-        </button>
-        <button className="auth-switch" onClick={() => { setMode(mode === "login" ? "register" : "login"); setErr(""); }} data-testid="auth-switch-btn">
-          {mode === "login" ? "Pas encore de compte ? Inscris-toi" : "Déjà un compte ? Connecte-toi"}
         </button>
       </div>
     </div>
@@ -138,16 +175,39 @@ export function ProfilePanel({ user, onClose, onUpdate, onLogout }) {
 }
 
 export default function AuthGate({ children }) {
-  // Session locale automatique pour contourner le blocage
-  const [user, setUser] = useState({
-    email: "daniel@sirius.local",
-    name: "Daniel",
-    role: "admin"
-  });
-  const [checking, setChecking] = useState(false);
+  const [user, setUser] = useState(null);
+  const [checking, setChecking] = useState(true);
   const [showProfile, setShowProfile] = useState(false);
 
+  useEffect(() => {
+    let cancelled = false;
+    const authenticate = async () => {
+      try {
+        const bootstrap = await requestLocalSession();
+        let authenticatedUser = bootstrap.user;
+        if (!bootstrap.response.ok) {
+          const response = await fetch(`${API}/api/auth/me`);
+          if (!response.ok) throw new Error("Session SIRIUS indisponible.");
+          authenticatedUser = await response.json();
+        }
+        if (!cancelled) {
+          syncLocalProfile(authenticatedUser);
+          setUser(authenticatedUser);
+        }
+      } catch (error) {
+        console.warn("Authentification SIRIUS interrompue.", error);
+        if (!cancelled) setUser(null);
+      } finally {
+        if (!cancelled) setChecking(false);
+      }
+    };
+    void authenticate();
+    return () => { cancelled = true; };
+  }, []);
+
   const logout = async () => {
+    await fetch(`${API}/api/auth/logout`, { method: "POST" });
+    siriusAccessToken = null;
     setShowProfile(false);
     setUser(null);
   };

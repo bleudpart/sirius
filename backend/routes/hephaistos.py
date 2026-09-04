@@ -192,8 +192,7 @@ def make_hephaistos_router(db):
             {"id": "spotify", "service": "Spotify (musique)", "configured": ok("SPOTIFY_CLIENT_ID") and ok("SPOTIFY_CLIENT_SECRET")},
             {"id": "fal", "service": "Fal.ai (images / vidéos)", "configured": ok("FAL_KEY")},
             {"id": "outlook", "service": "Microsoft Outlook (Graph)", "configured": ok("MS_CLIENT_ID") and ok("MS_CLIENT_SECRET")},
-            {"id": "gemini", "service": "Google Gemini (optionnel)", "configured": ok("GEMINI_API_KEY")},
-            {"id": "emergent", "service": "Clé universelle Emergent", "configured": ok("EMERGENT_LLM_KEY")},
+            {"id": "gemini", "service": "Google Gemini (génération d'images)", "configured": ok("GEMINI_API_KEY")},
         ]}
 
     return router

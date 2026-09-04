@@ -101,7 +101,7 @@ async def _gather_documentary_data(sujet: str):
     import asyncio as _aio
     from urllib.parse import quote
     data = {}
-    ua = {"User-Agent": "SIRIUS-HUD/1.0 (https://sirius-hud-redesign.emergent.host; contact: daniel.partel@sirius-hud.fr) python-httpx"}
+    ua = {"User-Agent": "SIRIUS-HUD/1.0 (contact: daniel.partel@sirius-hud.fr) python-httpx"}
     async with httpx.AsyncClient(timeout=12, follow_redirects=True, headers=ua) as cx:
         async def wiki():
             # Résolution du titre exact (insensible à la casse) puis résumé
