@@ -74,6 +74,44 @@ def _score_episodes(prompt: str, episodes: list, top_k: int = _EPISODE_TOP) -> l
     scored.sort(key=lambda x: x[0], reverse=True)
     return [ep for _, ep in scored[:top_k]]
 
+
+async def _gather_memory_context(texte: str, uid: str, extra_memory: list) -> list:
+    """Construit le contexte mémoire (faits + épisodes) à injecter dans le prompt.
+
+    Les deux branches (faits sémantiques, épisodes condensés) sont indépendantes l'une de
+    l'autre : exécutées en parallèle via asyncio.gather plutôt qu'en série, elles se recouvrent
+    dans le temps au lieu de s'additionner — gain de latence avant même l'appel au cerveau.
+    """
+    async def _facts():
+        try:
+            facts = recall_facts(texte, user_id=uid, limit=16)
+            from semantic_vectors import semantic_rerank
+            facts = await semantic_rerank(texte, facts, top_k=8)
+        except Exception:
+            facts = recall_facts(texte, user_id=uid, limit=8)
+        fact_cutoff = (datetime.now(timezone.utc) - timedelta(days=_FACT_MAX_AGE_DAYS)).date().isoformat()
+        # Les préférences (identité, goûts durables) ne s'effacent jamais par simple ancienneté —
+        # seuls les faits liés à un projet ou un souvenir ponctuel expirent après _FACT_MAX_AGE_DAYS.
+        return [
+            f for f in facts
+            if f.get("category") == "preference" or not f.get("created_at") or f["created_at"][:10] >= fact_cutoff
+        ]
+
+    async def _episodes():
+        try:
+            return _score_episodes(texte, recent_episodes(uid, limit=_EPISODE_POOL))
+        except Exception:
+            return []
+
+    local_facts, episodes = await asyncio.gather(_facts(), _episodes())
+    return (extra_memory or []) + [
+        {"t": f["text"], "c": f.get("category") or "", "d": (f.get("created_at") or "")[:10]}
+        for f in local_facts
+    ] + [
+        {"t": e["summary"], "c": "épisode", "d": (e.get("created_at") or "")[:10]}
+        for e in episodes
+    ]
+
 # =========================================================
 # INITIALISATION UNIQUE DE L'APPLICATION ET INTERCEPTATION OPTIONS
 # =========================================================
@@ -118,7 +156,7 @@ app = FastAPI(title="Sirius Backend API", version="1.0.0", lifespan=_lifespan)
 
 # Imports des modules Sirius
 from storage import put_object, get_object, APP_NAME
-from local_memory import list_facts, add_fact, delete_fact, update_fact, log_event, prime_overview, log_service, list_service_log, recall_facts, learn_fact
+from local_memory import list_facts, add_fact, delete_fact, update_fact, log_event, prime_overview, log_service, list_service_log, recall_facts, learn_fact, recent_episodes
 from auth_api import is_direct_local_request, resolve_user_id, require_user  # noqa: E402
 from omega_engine import OmegaEngine  # noqa: E402
 
@@ -260,34 +298,9 @@ async def chat(req: ChatRequest, request: Request):
     doc = await db.sirius_chats.find_one({"session_id": session_id}, {"_id": 0, "history": 1})
     history = (doc or {}).get("history", [])
 
-    # Mémoire locale SQLite : rappel par PERTINENCE (mots-clés + synonymes + renforcement),
-    # affiné par similarité sémantique (embeddings en cache local) quand disponible.
-    local_facts = []
-    try:
-        local_facts = recall_facts(texte, user_id=uid, limit=16)
-        from semantic_vectors import semantic_rerank
-        local_facts = await semantic_rerank(texte, local_facts, top_k=8)
-    except Exception:
-        local_facts = local_facts[:8]
-    fact_cutoff = (datetime.now(timezone.utc) - timedelta(days=_FACT_MAX_AGE_DAYS)).date().isoformat()
-    # Les préférences (identité, goûts durables) ne s'effacent jamais par simple ancienneté —
-    # seuls les faits liés à un projet ou un souvenir ponctuel expirent après _FACT_MAX_AGE_DAYS.
-    local_facts = [
-        f for f in local_facts
-        if f.get("category") == "preference" or not f.get("created_at") or f["created_at"][:10] >= fact_cutoff
-    ]
-    try:
-        from local_memory import recent_episodes
-        episodes = _score_episodes(texte, recent_episodes(uid, limit=_EPISODE_POOL))
-    except Exception:
-        episodes = []
-    merged_memory = (req.memory or []) + [
-        {"t": f["text"], "c": f.get("category") or "", "d": (f.get("created_at") or "")[:10]}
-        for f in local_facts
-    ] + [
-        {"t": e["summary"], "c": "épisode", "d": (e.get("created_at") or "")[:10]}
-        for e in episodes
-    ]
+    # Mémoire locale (faits + épisodes condensés), rappel par pertinence sémantique/mots-clés —
+    # les deux branches sont récupérées en parallèle (voir _gather_memory_context).
+    merged_memory = await _gather_memory_context(texte, uid, req.memory)
     logger.info(f"[CHAT] Début génération - Mode reçu: '{req.ia_mode}' | Mode appliqué: '{mode_ia_effectif}'")
 
     try:
@@ -362,33 +375,7 @@ async def chat_stream(req: ChatRequest, request: Request):
     session_id = f"{uid}:{req.session_id or 'default'}"
     doc = await db.sirius_chats.find_one({"session_id": session_id}, {"_id": 0, "history": 1})
     history = (doc or {}).get("history", [])
-    local_facts = []
-    try:
-        local_facts = recall_facts(texte, user_id=uid, limit=16)
-        from semantic_vectors import semantic_rerank
-        local_facts = await semantic_rerank(texte, local_facts, top_k=8)
-    except Exception:
-        local_facts = local_facts[:8]
-    fact_cutoff = (datetime.now(timezone.utc) - timedelta(days=_FACT_MAX_AGE_DAYS)).date().isoformat()
-    # Les préférences (identité, goûts durables) ne s'effacent jamais par simple ancienneté —
-    # seuls les faits liés à un projet ou un souvenir ponctuel expirent après _FACT_MAX_AGE_DAYS.
-    local_facts = [
-        f for f in local_facts
-        if f.get("category") == "preference" or not f.get("created_at") or f["created_at"][:10] >= fact_cutoff
-    ]
-    try:
-        from local_memory import recent_episodes
-        episodes = _score_episodes(texte, recent_episodes(uid, limit=_EPISODE_POOL))
-    except Exception:
-        episodes = []
-
-    merged_memory = (req.memory or []) + [
-        {"t": f["text"], "c": f.get("category") or "", "d": (f.get("created_at") or "")[:10]}
-        for f in local_facts
-    ] + [
-        {"t": e["summary"], "c": "épisode", "d": (e.get("created_at") or "")[:10]}
-        for e in episodes
-    ]
+    merged_memory = await _gather_memory_context(texte, uid, req.memory)
     autonomous_action = detect_autonomous_action(texte)
 
     async def gen():
@@ -396,10 +383,11 @@ async def chat_stream(req: ChatRequest, request: Request):
         try:
             if autonomous_action:
                 answer = autonomous_action["technical_comment"]
-                memories = []
-                popups = []
+                yield f"data: {json.dumps({'type': 'delta', 'text': answer}, ensure_ascii=False)}\n\n"
             else:
-                result = await ask_sirius(
+                from sirius_brain import ask_sirius_stream
+                parts = []
+                async for delta in ask_sirius_stream(
                     prompt=texte,
                     history=history,
                     profile=req.profile or {},
@@ -407,24 +395,18 @@ async def chat_stream(req: ChatRequest, request: Request):
                     mode=req.mode or "normal",
                     keys=req.keys or {},
                     mood=req.mood or {}
-                )
-                answer = result.get("reponse", "")
-                memories = result.get("memoire", [])
-                popups = result.get("popups", [])
+                ):
+                    parts.append(delta)
+                    yield f"data: {json.dumps({'type': 'delta', 'text': delta}, ensure_ascii=False)}\n\n"
+                answer = "".join(parts).strip()
 
             brain_ms = int((time.perf_counter() - t0) * 1000)
-            
-            for m in memories:
-                try:
-                    learn_fact(m, user_id=uid)
-                except Exception as e:
-                    logger.error(f"[LOCAL-MEM] Persistance échouée: {e}")
 
             new_history = (history + [
                 {"role": "user", "content": texte},
                 {"role": "assistant", "content": answer},
             ])[-16:]
-            
+
             await db.sirius_chats.update_one(
                 {"session_id": session_id},
                 {"$set": {"session_id": session_id, "history": new_history,
@@ -432,13 +414,28 @@ async def chat_stream(req: ChatRequest, request: Request):
                 upsert=True,
             )
 
+            # Apprentissage automatique différé : n'ajoute AUCUNE latence à la réponse déjà
+            # restituée (voix + affichage) — s'exécute en tâche de fond après coup.
+            if not autonomous_action:
+                async def _learn_later():
+                    try:
+                        from sirius_brain import extract_memory_background
+                        for m in await extract_memory_background(texte, answer):
+                            try:
+                                learn_fact(m, user_id=uid)
+                            except Exception as e:
+                                logger.error(f"[LOCAL-MEM] Persistance échouée: {e}")
+                    except Exception as e:
+                        logger.warning(f"[LOCAL-MEM] Extraction différée échouée: {e}")
+                asyncio.create_task(_learn_later())
+
             ev = {
                 "type": "done",
                 "answer": answer,
                 "response": answer,
                 "text": answer,
-                "memories": memories,
-                "popups": popups,
+                "memories": [],
+                "popups": [],
                 "action": autonomous_action,
                 "timings": {"brain_ms": brain_ms},
                 "key_source": k3_source()

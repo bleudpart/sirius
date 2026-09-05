@@ -528,19 +528,23 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
         # de repli disponibles et un délai plus généreux, pour privilégier la qualité de réponse.
         models_to_try = GROQ_FALLBACK_MODELS[:1] if is_turbo else GROQ_FALLBACK_MODELS
         timeout = 10.0 if is_turbo else 30.0
-        max_tokens = 512 if is_turbo else 4096
+        # Réponse conversationnelle : 4096 tokens (~3000 mots) n'a jamais de sens à l'oral et ne
+        # fait qu'allonger le pire cas de génération pour rien. Ce chemin classique (voie de
+        # secours HTTP simple, sans flux) reste couvert par un plafond bien plus réaliste.
+        max_tokens = 512 if is_turbo else 1200
         # Réutilise le client HTTP partagé (pool de connexions conservé entre requêtes) plutôt
         # que d'en recréer un neuf à chaque appel — évite le handshake TLS répété et réduit la
         # latence perçue. Le timeout reste ajustable par appel (turbo vs normal).
         client_groq = client or AsyncOpenAI(api_key=ENV_GROQ_LLM_KEY, base_url=GROQ_LLM_ENDPOINT, max_retries=0)
 
-        # Continuité : l'historique récent est réellement fourni au modèle.
+        # Historique resserré : 10 tours à 800 caractères (au lieu de 20 tours à 2000) — la
+        # mémoire épisodique condensée prend déjà le relais pour le contexte plus ancien.
         history_messages = []
-        for turn in (history or [])[-20:]:
+        for turn in (history or [])[-10:]:
             role = turn.get("role") if isinstance(turn, dict) else None
             content = (turn.get("content") or "").strip() if isinstance(turn, dict) else ""
             if role in ("user", "assistant") and content:
-                history_messages.append({"role": role, "content": content[:2000]})
+                history_messages.append({"role": role, "content": content[:800]})
 
         json_instruction = (
             '\n\nRéponds UNIQUEMENT avec un objet JSON valide, sans markdown, au format exact : '
@@ -591,6 +595,125 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
         "memoire": [],
         "popups": []
     }
+
+
+async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mode="normal", keys=None, mood=None):
+    """Variante EN FLUX du cerveau central : produit la réponse morceau par morceau (texte brut,
+    sans habillage JSON) dès que le modèle les génère.
+
+    Contrairement à `ask_sirius` (qui attend la réponse JSON complète avant de la retourner),
+    cette version permet à la synthèse vocale de commencer à parler phrase par phrase pendant
+    que le modèle génère encore la suite — gain de latence perçue majeur pour un assistant vocal.
+
+    L'apprentissage automatique de faits (auparavant extrait du même appel JSON) est déplacé
+    vers `extract_memory_background`, appelée séparément et en tâche de fond par l'appelant,
+    pour ne jamais retarder la réponse parlée.
+    """
+    is_turbo = (mode or "normal").lower() == "turbo"
+
+    # ⚡ APPRENTISSAGE INSTANTANÉ : mémorisation/correction sans aller-retour LLM.
+    memorize = detect_memorize_request(prompt)
+    if memorize:
+        fact = memorize["fact"]
+        if memorize["kind"] == "correction":
+            yield f"Bien noté, je corrige immédiatement : {fact}. C'est retenu."
+        else:
+            yield f"C'est mémorisé instantanément : {fact}."
+        return
+
+    if not ENV_GROQ_LLM_KEY:
+        logger.warning("[SIRIUS:STREAM] GROQ_API_KEY absente, retour local.")
+        yield "Je n'ai pas pu générer de réponse pour le moment. Réessaie dans un instant."
+        return
+
+    sys_prompt = build_system_prompt(profile=profile, memory=memory, mode=mode, mood=mood)
+    plain_instruction = (
+        "\n\nRéponds directement en langage naturel, sans JSON, sans habillage, sans listes à puces "
+        "sauf si explicitement demandé — uniquement le texte de ta réponse, prêt à être lu à voix haute."
+    )
+    models_to_try = GROQ_FALLBACK_MODELS[:1] if is_turbo else GROQ_FALLBACK_MODELS
+    timeout = 10.0 if is_turbo else 30.0
+    # Réponse conversationnelle parlée : pas besoin de 4096 tokens (~3000 mots) par défaut,
+    # ça n'a jamais de sens à l'oral et ça ne fait qu'allonger le pire cas de génération.
+    max_tokens = 512 if is_turbo else 1200
+    client_groq = client or AsyncOpenAI(api_key=ENV_GROQ_LLM_KEY, base_url=GROQ_LLM_ENDPOINT, max_retries=0)
+
+    # Historique resserré : 10 tours (au lieu de 20) à 800 caractères (au lieu de 2000) — la
+    # mémoire épisodique condensée prend déjà le relais pour le contexte plus ancien, inutile
+    # de renvoyer un historique brut aussi volumineux à chaque message.
+    history_messages = []
+    for turn in (history or [])[-10:]:
+        role = turn.get("role") if isinstance(turn, dict) else None
+        content = (turn.get("content") or "").strip() if isinstance(turn, dict) else ""
+        if role in ("user", "assistant") and content:
+            history_messages.append({"role": role, "content": content[:800]})
+
+    last_error = None
+    for model_name in models_to_try:
+        try:
+            stream = await client_groq.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": sys_prompt + plain_instruction},
+                    *history_messages,
+                    {"role": "user", "content": prompt},
+                ],
+                max_tokens=max_tokens,
+                temperature=0.8,
+                top_p=0.95,
+                presence_penalty=0.9,
+                frequency_penalty=0.4,
+                timeout=timeout,
+                stream=True,
+            )
+            async for chunk in stream:
+                delta = chunk.choices[0].delta.content if chunk.choices else None
+                if delta:
+                    yield delta
+            return
+        except Exception as e:
+            last_error = e
+            logger.warning(f"[SIRIUS:STREAM] {model_name} refusé : {repr(e)}")
+    if last_error:
+        logger.warning(f"[SIRIUS:STREAM] Repli suite à : {repr(last_error)}")
+    yield "Je n'ai pas pu générer de réponse pour le moment. Réessaie dans un instant."
+
+
+async def extract_memory_background(prompt, answer):
+    """Extraction différée des faits durables (identité, préférences, projets) après coup.
+
+    Appelée en tâche de fond APRÈS que la réponse a déjà été restituée (voix + affichage) :
+    n'ajoute donc aucune latence perçue. Best-effort — toute erreur est avalée silencieusement.
+    """
+    if not ENV_GROQ_LLM_KEY or not prompt or not answer:
+        return []
+    try:
+        client_groq = client or AsyncOpenAI(api_key=ENV_GROQ_LLM_KEY, base_url=GROQ_LLM_ENDPOINT, max_retries=0)
+        resp = await client_groq.chat.completions.create(
+            model=GROQ_LLM_PRIMARY,
+            messages=[
+                {"role": "system", "content": (
+                    "Tu extrais les faits durables nouvellement appris sur l'utilisateur à partir d'un "
+                    "échange (identité, préférences, projets, habitudes, corrections). Réponds UNIQUEMENT "
+                    'avec un objet JSON valide : {"memoire": []}. Formate chacun « categorie: fait » avec '
+                    "categorie parmi preference, projet, souvenir. Maximum 3 faits, uniquement s'ils sont "
+                    "nouveaux et durables ; sinon liste vide []."
+                )},
+                {"role": "user", "content": f"Utilisateur : {prompt}\nSirius : {answer}"},
+            ],
+            max_tokens=200,
+            temperature=0.2,
+            response_format={"type": "json_object"},
+            timeout=8.0,
+        )
+        raw = (resp.choices[0].message.content or "").strip()
+        data = json.loads(raw)
+        memories = data.get("memoire", []) if isinstance(data, dict) else []
+        return memories if isinstance(memories, list) else []
+    except Exception as e:
+        logger.warning(f"[SIRIUS:MEMORY-BG] extraction différée échouée: {repr(e)}")
+        return []
+
 
 # --- Compatibilité TOTALE pour server.py ---
 async def generate_answer(prompt, history=None, profile=None, memory=None, mode="normal", keys=None, mood=None, ia_mode=None):
