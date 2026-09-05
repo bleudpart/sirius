@@ -2568,11 +2568,81 @@ function App() {
       return;
     }
 
+    // Outlook : connexion, lecture des mails, agenda, envoi, création de rendez-vous.
+    // Gmail : ouverture, lecture. Traité ICI (avant l'intent Groq) pour les mêmes raisons que
+    // la musique d'ambiance : ces phrases contiennent des mots (« mail », « outlook »...) que la
+    // détection média/intent générique côté serveur pourrait mal classer.
+    if (/gmail|bo[îi]te google|mails? google/.test(low)) {
+      if (/\b(?:lis|lis-moi|lire|lecture)\b/.test(low)) {
+        mark("gmail · lecture");
+        readGmailAloud(false);
+        return;
+      }
+      if (/(montre|affiche|liste)/.test(low)) {
+        mark("gmail · boîte HUD");
+        readGmailAloud(true);
+        return;
+      }
+      if (/(ouvre|acc[èe]de|va sur|lance)/.test(low)) {
+        mark("gmail · onglet");
+        try { window.open("https://mail.google.com", "_blank"); } catch (e) { /* popup bloquée */ }
+        const m = "J'ouvre ta boîte Gmail dans un nouvel onglet.";
+        setStatus("speaking"); setText(m); speakOut(m);
+        return;
+      }
+    }
+    if (/connect(?:e|er|ion)?(?:[- ]moi)?\s*(?:à\s+)?outlook/.test(low)) {
+      mark("outlook · connexion"); connectOutlook(); return;
+    }
+    if (/^(?:microsoft\s+)?outlook[\s?!.]*$/.test(low)) {
+      mark("outlook · ouverture"); launchOutlookMail(); return;
+    }
+    const sendM = low.match(/envoie (?:un )?(?:e-?mail|mail|courriel|message) [àa]\s+(.+)/);
+    if (sendM) {
+      mark("outlook · envoi"); launchOutlookIntent(command); return;
+    }
+    if (/(?:supprime|efface|d[ée]truis)\w*\s+(?:le\s|ce\s|la\s)?(?:dernier\s)?(?:e-?mail|mail|courriel)/.test(low)) {
+      mark("outlook · suppression"); launchOutlookIntent(command); return;
+    }
+    if (/(?:cherche|recherche|trouve)\w*\s+(?:les\s|des\s|mes\s)?(?:e-?mails?|mails?|courriels?)/.test(low)) {
+      mark("outlook · recherche"); launchOutlookIntent(command); return;
+    }
+    if (/(?:lis|ouvre|affiche|montre)\w*(?:[- ]moi)?\s+(?:le\s|ce\s)?(?:dernier\s)?(?:e-?mail|mail|courriel)\s+(?:de|d')/.test(low)) {
+      mark("outlook · lecture mail"); launchOutlookIntent(command); return;
+    }
+    if (/(?:liste|affiche|montre)\w*(?:[- ]moi)?\s+(?:mes\s|les\s)?dossiers(?:\s+(?:outlook|mails?|e-?mails?|de messagerie))/.test(low)) {
+      mark("outlook · dossiers"); launchOutlookIntent(command); return;
+    }
+    const rdvM = low.match(/ajoute (?:un )?rendez-vous\s+(.+)/);
+    if (rdvM) {
+      mark("outlook · rendez-vous"); launchOutlookCreateEvent(rdvM[1].replace(/[?!.]+$/, "").trim()); return;
+    }
+    // Ouverture directe d'Outlook (jamais Google Calendar) : agenda Outlook d'abord, sinon boîte mail
+    if (/(?:ouvre|lance|affiche|montre)[\wàâéèêëîïôùûç' -]*\b(?:agenda|calendrier)[\wàâéèêëîïôùûç' -]*\boutlook|outlook[\wàâéèêëîïôùûç' -]*\b(?:agenda|calendrier)/.test(low)) {
+      mark("outlook · agenda"); launchOutlookAgenda(); return;
+    }
+    if (/(?:ouvre|lance|affiche|montre|acc[èe]de à)\s+(?:le\s+|la\s+|mon\s+|ma\s+)?(?:module\s+|messagerie\s+)?outlook/.test(low)) {
+      mark("outlook · ouverture"); launchOutlookMail(); return;
+    }
+    // Lecture vocale des mails : « lis mes mails », « lis-moi mes derniers mails outlook »...
+    if (/\b(?:lis|lis-moi|lire|lecture)\b[\wàâéèêëîïôùûç' -]*\b(?:e-?mails?|mails?|courriels?)/.test(low)) {
+      mark("outlook · lecture vocale"); readMailAloud(); return;
+    }
+    if (/(?:mes|les)\s+(?:e-?mails?|mails?|courriels?)|emails? non lus?|bo[îi]te de r[ée]ception/.test(low)) {
+      mark("outlook · emails"); launchOutlookMail(); return;
+    }
+    if (/(?:mes|mon)\s+(?:rendez-vous|agenda|calendrier)|prochains? rendez-vous/.test(low)) {
+      mark("outlook · agenda"); launchOutlookAgenda(); return;
+    }
+
     mark("analyse...");
 
   // Lancement de la résolution d'intention
     resolveIntent(command);
-  }, [resolveIntent, speakOut]);
+  }, [
+    resolveIntent, speakOut, readGmailAloud, connectOutlook, launchOutlookMail,
+    launchOutlookIntent, launchOutlookCreateEvent, launchOutlookAgenda, readMailAloud,
+  ]);
 
 // ⚡ PIPELINE DE COMMANDE SÉCURISÉ (Inclus : Archives, Proactivité & Sécurité)
   const handleCommand = async (command, intent = null) => {

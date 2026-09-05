@@ -14,7 +14,10 @@ from cryptography.fernet import Fernet
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 
-from auth_api import create_access_token, create_refresh_token, _set_cookies, require_user, resolve_user_id, LEGACY_UID
+from auth_api import (
+    create_access_token, create_refresh_token, _set_cookies, require_user,
+    resolve_user_id, LEGACY_UID, is_direct_local_request,
+)
 
 logger = logging.getLogger("sirius.microsoft")
 
@@ -26,12 +29,21 @@ SCOPES = "openid profile email offline_access User.Read Mail.Read Calendars.Read
 
 
 def _conf():
-    cid = os.environ.get("MICROSOFT_CLIENT_ID", "")
-    secret = os.environ.get("MICROSOFT_CLIENT_SECRET", "")
-    redirect = os.environ.get("MICROSOFT_REDIRECT_URI", "")
-    if not cid or not secret or not redirect:
-        raise HTTPException(status_code=503, detail="Microsoft non configuré (variables MICROSOFT_* manquantes).")
+    cid = os.environ.get("MICROSOFT_CLIENT_ID", "").strip()
+    secret = os.environ.get("MICROSOFT_CLIENT_SECRET", "").strip()
+    redirect = os.environ.get("MICROSOFT_REDIRECT_URI", "").strip()
+    if not cid or not redirect:
+        raise HTTPException(status_code=503, detail="Microsoft non configuré (MICROSOFT_CLIENT_ID ou MICROSOFT_REDIRECT_URI manquant).")
+    if secret in {"******", "changeme", "change-me"}:
+        secret = ""
     return cid, secret, redirect
+
+
+def _token_request_data(cid: str, secret: str, **values):
+    data = {"client_id": cid, **values}
+    if secret:
+        data["client_secret"] = secret
+    return data
 
 
 def _fernet() -> Fernet:
@@ -76,10 +88,10 @@ async def _access_token(db, user_id: str) -> str:
         raise HTTPException(status_code=401, detail="Session Microsoft expirée — reconnecte ton compte.")
     cid, secret, _ = _conf()
     async with httpx.AsyncClient(timeout=15) as cx:
-        r = await cx.post(TOKEN_URL, data={
-            "client_id": cid, "client_secret": secret, "grant_type": "refresh_token",
-            "refresh_token": _dec(doc["refresh_token"]), "scope": SCOPES,
-        })
+        r = await cx.post(TOKEN_URL, data=_token_request_data(
+            cid, secret, grant_type="refresh_token",
+            refresh_token=_dec(doc["refresh_token"]), scope=SCOPES,
+        ))
     data = r.json()
     if r.is_error or "access_token" not in data:
         if data.get("error") == "invalid_grant":
@@ -153,7 +165,17 @@ def make_microsoft_router(db):
         cid, _, redirect = _conf()
         state = secrets.token_urlsafe(32)
         verifier, challenge = _pkce()
-        uid = await resolve_user_id(request, db)
+        # La fenêtre de connexion Microsoft est ouverte via window.open() dans un nouvel onglet,
+        # qui navigue directement vers l'API (127.0.0.1) : ni le cookie de session (SameSite,
+        # différent de l'origine localhost:3000 du SPA) ni l'en-tête Authorization (impossible à
+        # injecter dans une navigation brute) ne sont disponibles ici. Sur la machine locale de
+        # confiance, on retombe donc sur l'utilisateur par défaut plutôt que de renvoyer 401.
+        try:
+            uid = await resolve_user_id(request, db)
+        except HTTPException:
+            if not is_direct_local_request(request):
+                raise
+            uid = LEGACY_UID
         await db.oauth_states.insert_one({
             "_id": state, "code_verifier": verifier,
             "uid": uid if uid != LEGACY_UID else None,
@@ -177,11 +199,11 @@ def make_microsoft_router(db):
             return RedirectResponse("/?ms=state", status_code=302)
         cid, secret, redirect = _conf()
         async with httpx.AsyncClient(timeout=20) as cx:
-            r = await cx.post(TOKEN_URL, data={
-                "client_id": cid, "client_secret": secret, "grant_type": "authorization_code",
-                "code": code, "redirect_uri": redirect, "scope": SCOPES,
-                "code_verifier": st["code_verifier"],
-            })
+            r = await cx.post(TOKEN_URL, data=_token_request_data(
+                cid, secret, grant_type="authorization_code",
+                code=code, redirect_uri=redirect, scope=SCOPES,
+                code_verifier=st["code_verifier"],
+            ))
             token = r.json()
             if r.is_error or "access_token" not in token:
                 logger.error("[MICROSOFT] échange de code échoué: %s", token.get("error_description", "")[:200])

@@ -204,7 +204,7 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans markdown, correspondant à l
 cortex, admin, gcal, display, memorymgr, keraunos, locus, heracles, hephaistos, mythos, trailer, promo,
 agora, solon, promethee, calliope, pythagore, news, packager, install, scripts, vision, setup, gallery,
 espace, faceid, keys, argus, about, europeana, haccp, prime, dev, analytics, memory, files, architect,
-pantheon, nexus.
+pantheon, nexus, outlook (boîte mail Outlook), outlook_agenda (agenda Outlook).
 
 Si la phrase n'est clairement ni une ouverture/fermeture/réduction de module, ni l'une des actions ci-dessus,
 réponds TOUJOURS par {"action": "general", "query": "<texte original>"} — ne force jamais une action qui ne
