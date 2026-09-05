@@ -185,6 +185,32 @@ def detect_memorize_request(prompt: str):
     return None
 
 
+_INTENT_SYSTEM_PROMPT = """Tu analyses une commande vocale destinée à SIRIUS et tu détermines si elle correspond
+à une ACTION D'INTERFACE précise, ou s'il s'agit d'une simple question/conversation.
+
+Réponds UNIQUEMENT avec un objet JSON valide, sans markdown, correspondant à l'un de ces formats exacts :
+- Ouvrir un module/fenêtre : {"action": "open_module", "target": "<id>", "say": "<confirmation courte>"}
+- Fermer un module/fenêtre : {"action": "close_module", "target": "<id>", "say": "<confirmation courte>"}
+- Réduire un module en pastille : {"action": "minimize_module", "target": "<id>", "say": "<confirmation courte>"}
+- Tout réduire en pastilles : {"action": "minimize_all"}
+- Arrêter la lecture à voix haute en cours : {"action": "stop_reading"}
+- Couper la musique d'ambiance : {"action": "stop_music", "say": "<confirmation courte>"}
+- Relancer la musique d'ambiance : {"action": "play_music", "say": "<confirmation courte>"}
+- Ouvrir Spotify : {"action": "spotify", "say": "<confirmation courte>"}
+- Briefing du jour : {"action": "daily_briefing", "say": "<confirmation courte>"}
+- Aucune action d'interface, simple question/conversation : {"action": "general", "query": "<texte original>"}
+
+<id> est l'identifiant du module en minuscules sans accent, par exemple : themis, atlas, oracle, nummarius,
+cortex, admin, gcal, display, memorymgr, keraunos, locus, heracles, hephaistos, mythos, trailer, promo,
+agora, solon, promethee, calliope, pythagore, news, packager, install, scripts, vision, setup, gallery,
+espace, faceid, keys, argus, about, europeana, haccp, prime, dev, analytics, memory, files, architect,
+pantheon, nexus.
+
+Si la phrase n'est clairement ni une ouverture/fermeture/réduction de module, ni l'une des actions ci-dessus,
+réponds TOUJOURS par {"action": "general", "query": "<texte original>"} — ne force jamais une action qui ne
+correspond pas clairement à la demande."""
+
+
 async def parse_intent(prompt: str):
     """Analyse la commande vocale via le LLM pour retourner une intention structurée."""
     prompt_lower = (prompt or "").lower()
@@ -220,11 +246,13 @@ async def parse_intent(prompt: str):
             response = await client.chat.completions.create(
                 model=model,
                 messages=[
-                    {"role": "system", "content": "Analyse l'intention de l'utilisateur."},
+                    {"role": "system", "content": _INTENT_SYSTEM_PROMPT},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=512,
+                max_tokens=200,
                 temperature=0.2,
+                response_format={"type": "json_object"},
+                timeout=8.0,
             )
             content = response.choices[0].message.content
             data = json.loads(content)

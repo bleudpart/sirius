@@ -11,11 +11,11 @@ import {
   FaceIdPanel, PythagorePanel, PackagerPanel, TrailerGallery, SiriusSetup, PromoPanel, ThemisPanel,
   AdminPanel, PortusNummarius, AgoraPipeline, NewsPanel, ReveilPanel, SpotifyPanel, MediaHUD, ProductivityPanel,
 } from "@/lazyModules";
-import { LiveClock, LiveDate, CpuRamMini, useLiveStats, pushStats, pushSimStats } from "@/liveStats";
+import { pushStats, pushSimStats } from "@/liveStats";
 import { formatLocalDate, formatLocalTime, getLocalDateKey } from "@/dateTime";
 import { STATES, isLocalTimeQuestion, localAnswer, weatherInfo, pttBeep } from "@/appLogic";
 import { MedallionRing, ReactorCore, Waveform } from "@/components/ReactorVisuals";
-import { MemoryPanel, HoloPopups, AnalyticsPanel, MusicChoice, FloatingPanels, CentralCard, BootScreen } from "@/components/HudPanels";
+import { MemoryPanel, HoloPopups, AnalyticsPanel, MusicChoice, CentralCard, BootScreen } from "@/components/HudPanels";
 import OverlayApp from "@/OverlayApp";
 import HoloScene from "@/HoloScene";
 import SanctuaryAmbience from "@/SanctuaryAmbience";
@@ -41,8 +41,9 @@ import { initReadAloud } from "@/readAloud";
 import { initHoloWindows, minimizeAll } from "@/holoWindows";
 import { ConfirmButton } from "@/ConfirmButton";
 import { getHUDStyleVariables, renderHUD } from "@/theme";
-import HolographicGlobe from "@/HolographicGlobe";
+import { SiriusLeftColumn, SiriusRightColumn, SiriusNextAction } from "@/hud/SiriusHudPanels";
 import "@/App.css";
+import { AmbientEngine } from "@/ambientAudio";
 
 /* executeIntent moved into the real App component (see later in the file) */
 
@@ -71,7 +72,7 @@ const dispatchAutonomousVideoAction = (action) => {
 
 // Logos holographiques dédiés (or & cyan) — remplacent l'icône Landmark partagée
 const HoloLogo = ({ src, size = 16 }) => (
-  <img src={src} width={size} height={size} alt="" style={{ objectFit: "contain", filter: "drop-shadow(0 0 5px rgba(245, 197, 66, 0.55))" }} />
+  <img src={src} width={size} height={size} alt="" style={{ objectFit: "contain", filter: "drop-shadow(0 0 5px rgba(216, 184, 117, 0.55))" }} />
 );
 const ThemisLogo = ({ size = 16 }) => <HoloLogo src="/holo/logo-themis.png" size={size} />;
 const PantheonLogo = ({ size = 16 }) => <HoloLogo src="/holo/logo-pantheon.png" size={size} />;
@@ -829,7 +830,7 @@ function App() {
   const [thinkColor, setThinkColor] = useState(STATES.thinking.color);
   useEffect(() => {
     if (status !== "thinking") return;
-    const palette = ["#fbbf24", "#fb7185", "#f472b6", "#a78bfa", "#818cf8", "#38bdf8", "#34d399"];
+    const palette = ["#d8b875", "#fb7185", "#f472b6", "#a78bfa", "#818cf8", "#38bdf8", "#91e6f2"];
     let i = 0;
     setThinkColor(palette[0]);
     const id = setInterval(() => {
@@ -1011,7 +1012,9 @@ function App() {
   }, []);
 
   // Réponse intelligente via le cerveau cloud (Kimi K3 analyse → Groq formule, en flux avec fallbacks)
-  const cloudAnswer = useCallback(async (command) => {
+  // externalSignal : permet à resolveIntent d'annuler proprement ce flux si une action UI est
+  // détectée entre-temps (les deux partent en parallèle pour ne pas s'additionner en latence).
+  const cloudAnswer = useCallback(async (command, { signal: externalSignal } = {}) => {
     setStatus("thinking");
 
     if (isLocalTimeQuestion(command)) {
@@ -1050,6 +1053,12 @@ function App() {
 
       const controller = new AbortController();
       streamTimeoutId = setTimeout(() => controller.abort(), 60000);
+      // Relie l'annulation externe (ex: une action UI a été détectée en parallèle par
+      // resolveIntent) au contrôleur interne, pour couper proprement la requête et le flux.
+      if (externalSignal) {
+        if (externalSignal.aborted) controller.abort();
+        else externalSignal.addEventListener("abort", () => controller.abort(), { once: true });
+      }
 
       const resp = await fetch(`${API}/chat/stream`, {
         method: "POST",
@@ -1118,13 +1127,18 @@ function App() {
       if (!isAbortError(e)) {
         console.warn("⚠️ Stream interrompu ou timeout (60s) -> Passage en voie classique...", e);
       }
-      if (streamProducedOutput) {
+      if (streamProducedOutput || externalSignal?.aborted) {
         if (pid && progress?.error) progress.error(pid, "Réponse interrompue après restitution partielle");
         return;
       }
     } finally {
       if (streamTimeoutId) clearTimeout(streamTimeoutId);
     }
+
+    // Une action UI a été détectée entre-temps par resolveIntent (annulation externe) : on ne
+    // bascule surtout pas sur les voies de repli, qui parleraient/afficheraient une réponse en
+    // plus de l'action déjà exécutée.
+    if (externalSignal?.aborted) return;
 
     // -------------------------------------------------------------
     // NIVEAU 2 : VOIE CLASSIQUE HTTP (Repli si le Stream échoue/expire)
@@ -1136,6 +1150,7 @@ function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: payload,
+        signal: externalSignal,
       });
 
       if (resp.ok) {
@@ -1154,6 +1169,9 @@ function App() {
     } catch (e) {
       console.warn("⚠️ Échec voie classique -> Passage en réponse locale...", e);
     }
+
+    // Idem : si l'annulation externe a eu lieu pendant NIVEAU 2, pas de repli local non plus.
+    if (externalSignal?.aborted) return;
 
     // -------------------------------------------------------------
     // NIVEAU 3 : RÉPONSE LOCALE (Mode Secours si le serveur est hors-ligne)
@@ -2424,6 +2442,15 @@ function App() {
     setStatus("thinking");
     isBusy.current = true;
 
+    // Les deux appels partent désormais EN PARALLÈLE (au lieu de l'un après l'autre) : la
+    // classification d'intention (Groq) et la réponse conversationnelle (Groq, en flux) tournent
+    // en même temps. Cas le plus fréquent (pas d'action UI) : la réponse déjà en cours continue
+    // normalement, sans le temps d'attente supplémentaire de l'intent. Si une action UI réelle
+    // est détectée, on annule proprement le flux de réponse déjà lancé (fetch + synthèse vocale)
+    // pour éviter que Sirius parle ET exécute une action en même temps.
+    const chatController = new AbortController();
+    const cloudAnswerPromise = cloudAnswer(command, { signal: chatController.signal }).catch(() => {});
+
     try {
       const ctrl = new AbortController();
       const to = setTimeout(() => ctrl.abort(), 90000);
@@ -2438,14 +2465,16 @@ function App() {
       clearTimeout(to);
       const d = await r.json().catch(() => null);
 
-      // Si une intention UI est détectée et exécutée, on s'arrête là
+      // Si une intention UI est détectée et exécutée, on annule le flux de réponse parallèle.
       if (r.ok && d && d.action && d.action !== "none" && executeIntent(d)) {
+        chatController.abort();
+        cancelSpeech();
         setMetrics((m) => ({ ...m, nlu: { intent: `groq · ${d.action}`, count: m.nlu.count } }));
         return;
       }
 
-      // Sinon, on bascule sur la réponse classique du cerveau (cloudAnswer)
-      await cloudAnswer(command);
+      // Sinon (pas d'action, ou action non reconnue) : la réponse déjà en cours va à son terme.
+      await cloudAnswerPromise;
 
     } catch (e) {
       if (isAbortError(e)) {
@@ -2453,8 +2482,8 @@ function App() {
         return;
       }
       console.error("[SIRIUS NLU] Erreur intent :", e);
-      // En cas de pépin sur l'intent, fallback de secours sur cloudAnswer
-      await cloudAnswer(command).catch(() => {});
+      // En cas de pépin sur l'intent, on s'appuie sur la réponse déjà en cours en parallèle.
+      await cloudAnswerPromise;
     } finally {
       // ⚡ SECURITE ABSOLUE : Débloque le réacteur et ferme le flou visuel dans 100% des cas
       isBusy.current = false;
@@ -2680,8 +2709,7 @@ function App() {
       const choice = /gr[ée]gorien/.test(low) ? "gregorien" : "epique";
       localStorage.setItem("sirius_ambient_track", choice);
       if (ambientRef.current) { try { ambientRef.current.pause(); ambientRef.current.src = ""; } catch (e) {} }
-      const na = new Audio(choice === "gregorien" ? "/audio/gregorien.mp3" : "/audio/ambiance.mp3");
-      na.loop = true;
+      const na = new AmbientEngine(choice);
       const sv = parseFloat(localStorage.getItem("sirius_ambient_volume") || "0.12");
       na.volume = isNaN(sv) ? 0.12 : sv;
       na.play().catch(() => {});
@@ -2959,6 +2987,14 @@ function App() {
     if (imgTaskM) {
       mark("tâche · image");
       launchImageTask((imgTaskM[1] || "").replace(/[?!.]+$/, "").trim() || command);
+      return;
+    }
+    // Météo temps réel : « météo à Rosny », « quel temps fait-il à Lyon », « météo »...
+    const meteoM = low.match(/(?:(?:quel(?:le)?\s+)?temps(?:\s+fait[- ]il)?|m[ée]t[ée]o|pr[ée]vision(?:s)?(?:\s+m[ée]t[ée]o)?|bulletin\s+m[ée]t[ée]o)(?:\s+(?:[àa]\s+|pour\s+|sur\s+|de\s+|proche\s+de\s+))?(.+)?/);
+    if (meteoM || /^m[ée]t[ée]o[\s?!.]*$/.test(low)) {
+      mark("météo");
+      const rawCity = (meteoM && meteoM[1] && meteoM[1].replace(/[?!.]+$/, "").trim()) || "";
+      launchWeather(rawCity || undefined);
       return;
     }
     // DISPLAY ASK : questions vocales (avec suivi de conversation) sur le fichier affiché dans le SIRIUS DISPLAY
@@ -3699,23 +3735,21 @@ function App() {
     }
   }, [autoMic]);
 
-  // Musique d'ambiance libre de droits : volume 12 %, en boucle, démarrage au chargement de la scène
+  // Musique d'ambiance procédurale (Web Audio API) : volume 12 %, démarrage au chargement de la scène
   useEffect(() => {
     if (booting || showSetup) return;
     const track = localStorage.getItem("sirius_ambient_track") || "epique";
     if (track === "none") return;
-    const audio = new Audio(track === "gregorien" ? "/audio/gregorien.mp3" : "/audio/ambiance.mp3");
-    audio.loop = true;
+    const engine = new AmbientEngine(track === "gregorien" ? "gregorien" : "epique");
     const storedVol = parseFloat(localStorage.getItem("sirius_ambient_volume") || "0.12");
-    audio.volume = isNaN(storedVol) ? 0.12 : storedVol;
-    audio.preload = "auto";
-    ambientRef.current = audio;
-    window.__siriusAmbient = audio;
-    const unlockers = [];
-    const clearUnlockers = () => { unlockers.forEach(([e, f]) => window.removeEventListener(e, f)); unlockers.length = 0; };
-    const tryPlay = () => audio.play().then(clearUnlockers).catch(() => {});
+    engine.volume = isNaN(storedVol) ? 0.12 : storedVol;
+    ambientRef.current = engine;
+    window.__siriusAmbient = engine;
+    const tryPlay = () => engine.play().catch(() => {});
     tryPlay();
     // Autoplay bloqué par le navigateur → démarre au premier geste utilisateur
+    const unlockers = [];
+    const clearUnlockers = () => { unlockers.forEach(([e, f]) => window.removeEventListener(e, f)); unlockers.length = 0; };
     ["click", "keydown", "touchstart"].forEach((e) => {
       const f = () => tryPlay();
       unlockers.push([e, f]);
@@ -3723,11 +3757,18 @@ function App() {
     });
     return () => {
       clearUnlockers();
-      audio.pause();
-      audio.src = "";
+      engine.pause();
+      engine.src = "";
       ambientRef.current = null;
     };
   }, [booting, showSetup]);
+
+  // Ambiance réactive : filtre + LFO s'adaptent au statut de SIRIUS
+  useEffect(() => {
+    if (ambientRef.current && ambientRef.current.setMood) {
+      ambientRef.current.setMood(status);
+    }
+  }, [status]);
 
   // Panneaux flottants (HEURE, CPU/RAM, NOYAU, MÉTÉO) déplaçables à la souris, position mémorisée
   useEffect(() => {
@@ -4175,16 +4216,15 @@ function App() {
       data-testid="sirius-hud"
     >
       <div className="grid-bg" />
-      <div
-        className="antique-bg presentation-bg"
-        style={{ "--guardian-backdrop-image": 'url("/holo/zeus-boot.jpg")' }}
-        data-testid="sirius-antique-bg"
-      />
-      <div className="guardian-rig" data-testid="sirius-guardian-rig">
-        <img src="/holo/zeus-boot.jpg" alt="" className={`antique-guardian holo-full ${status === "speaking" ? "speaking" : status === "listening" ? "listening" : ""}`} draggable={false} data-testid="sirius-guardian" />
-        <span className="guardian-bolt-glow" aria-hidden="true" data-testid="guardian-bolt-glow" />
+      <div className="city-backdrop" data-testid="sirius-antique-bg" aria-hidden="true">
+        <div className="city-glow" />
+        <div className="city-skyline far" />
+        <div className="city-skyline near" />
+        <div className="city-bokeh">
+          <i /><i /><i /><i /><i /><i /><i /><i />
+        </div>
+        <div className="city-floor" />
       </div>
-      <img src="/holo/jarre.png" alt="" className="antique-jar" draggable={false} data-testid="sirius-jar" />
       {/* Noyau de présentation compact rendu dans center-stage (MedallionRing géant retiré) */}
       <div className="scanline" />
       <div className="vignette" />
@@ -4648,46 +4688,48 @@ function App() {
         </div>
       )}
 
-      {/* Panneau bas-gauche : HEURE + CPU/RAM (style référence) */}
-      <aside className="hud-panel bottom-left" data-testid="sirius-stats" data-hud-panel>
-        <div className="hud-panel-title"><Clock size={13} /> HEURE &amp; UTC</div>
-        <LiveClock />
-      </aside>
-      <div className="hud-panel stats-mini" data-testid="sirius-cpu-ram" data-hud-panel>
-        <CpuRamMini />
-      </div>
-
-      {/* Coeur central */}
-      <main className="center-stage">
-        <div className={`reactor-wrap core-${status}`}>
-          <div className="core-globe" aria-hidden="true">
-            <HolographicGlobe />
-          </div>
-          <div className="core-equator" aria-hidden="true" />
-          <div className="core-rings" aria-hidden="true">
-            <img src="/holo/ring-gold.png" alt="" className="core-ring outer" draggable={false} />
-            <img src="/holo/ring-gold.png" alt="" className="core-ring inner" draggable={false} />
-            <div className="core-pulse" />
-            <div className="core-orbit">
-              {["Σ", "Δ", "Ω", "Θ", "Φ"].map((l, i) => (
-                <span key={l} className="core-letter" style={{ "--i": i }}><i>{l}</i></span>
-              ))}
-            </div>
-            <div className="holo-platform" aria-hidden="true">
-              <span className="holo-platform-ring ring-a" />
-              <span className="holo-platform-ring ring-b" />
-              <span className="holo-platform-ring ring-c" />
-            </div>
-          </div>
-          <ReactorCore status={status} volume={0.35} color="#22d3ee" eco={ecoMode} />
-          <button
-            className="core-quote-zone"
-            data-testid="core-quote-btn"
-            aria-label="Écouter une citation philosophique"
-            title="Citation philosophique"
-            onClick={speakQuote}
+      {/* Tableau de bord principal SIRIUS — grille 3 colonnes */}
+      <main className="sirius-dashboard">
+        <aside className="sirius-column sirius-column--left">
+          <SiriusLeftColumn
+            weather={weather}
+            connected={connected}
+            onOpenThemis={() => setShowThemis(true)}
           />
-          <div className={`reactor-text ${activeCard ? "dimmed" : ""}`}>
+        </aside>
+
+        <section className="sirius-center">
+          <div className="sirius-stage">
+            <div className={`reactor-wrap core-${status}`}>
+              {/* Même noyau que la page de démarrage : deux anneaux d'or (rotation inverse
+                  l'un de l'autre), pulsation cyan/or et lettres grecques en orbite — voir
+                  BootScreen dans HudPanels.jsx pour le balisage identique. */}
+              <div className="core-rings" aria-hidden="true">
+                <img src="/holo/ring-gold.png" alt="" className="core-ring outer" draggable={false} />
+                <img src="/holo/ring-gold.png" alt="" className="core-ring inner" draggable={false} />
+                <div className="core-pulse" />
+                <div className="core-orbit">
+                  {["Σ", "Δ", "Ω", "Θ", "Φ"].map((l, i) => (
+                    <span key={l} className="core-letter" style={{ "--i": i }}><i>{l}</i></span>
+                  ))}
+                </div>
+              </div>
+              <ReactorCore status={status} volume={0.35} color="#91e6f2" eco={ecoMode} />
+              <button
+                className="core-quote-zone"
+                data-testid="core-quote-btn"
+                aria-label="Écouter une citation philosophique"
+                title="Citation philosophique"
+                onClick={speakQuote}
+              />
+            </div>
+            <Waveform status={status} color={accentColor} />
+            {activeCard && (
+              <CentralCard card={activeCard} weather={weather} onClose={() => setActiveCard(null)} />
+            )}
+          </div>
+          <div className="sirius-identity">
+            <SiriusNextAction connected={connected} />
             <h1 className="sirius-title" data-testid="sirius-title">
               <button
                 type="button"
@@ -4696,27 +4738,25 @@ function App() {
                 aria-label="Écouter une citation philosophique"
                 title="Cliquez sur SIRIUS pour écouter une citation philosophique"
               >
-                <img src="/holo/sirius-title.png" alt="ΣIRIUS" className="sirius-title-img" draggable={false} />
+                <span className="sirius-wordmark">ΣIRIUS</span>
+                <span className="sirius-tagline">SIRIUS : VOTRE ASSISTANT PRIVILÉGIÉ</span>
               </button>
             </h1>
           </div>
-          {activeCard && (
-            <CentralCard
-              card={activeCard}
-              weather={weather}
-              onClose={() => setActiveCard(null)}
-            />
-          )}
-        </div>
+        </section>
 
-        <FloatingPanels
-          weather={weather}
-          connected={connected}
-          status={status}
-          hasBrain={!!keys.groq}
-        />
+        <aside className="sirius-column sirius-column--right">
+          <SiriusRightColumn
+            ecoMode={ecoMode}
+            setEcoMode={setEcoMode}
+            onOpenOracle={() => setShowOracle(true)}
+            onOpenThemis={() => setShowThemis(true)}
+            onOpenAgora={() => setShowAgora(true)}
+          />
+        </aside>
+      </main>
 
-        <Waveform status={status} color={accentColor} />
+      <div className="sirius-command-area">
 
         {/* Zone de réponse supprimée : Sirius répond uniquement dans SIRIUS DISPLAY */}
 
@@ -4783,19 +4823,7 @@ function App() {
             </div>
           </>
         )}
-
-        {/* Contrôles d'état retirés — le mode est affiché dans la barre d'activité SIRIUS */}
-      </main>
-
-      {/* Panneau bas-droit : NOYAU (style référence) */}
-      <aside className="hud-panel bottom-right" data-testid="sirius-clock" data-hud-panel>
-        <div className="noyau-status-row">
-          <div className="hud-panel-title"><Brain size={13} /> NOYAU</div>
-          <div className="noyau-line" data-testid="noyau-mode">{connected ? "Noyau local relié" : "IA Cloud active"}</div>
-        </div>
-        <div className="noyau-state">ÉTAT : <b data-testid="noyau-state">{conf.label}</b></div>
-        <div className="noyau-user">UTILISATEUR · {(userName || "INVITÉ").toUpperCase()}</div>
-      </aside>
+      </div>
 
       <footer className="sirius-footer" data-testid="sirius-footer">© 2026 SIRIUS Assistant – Daniel Partel</footer>
       <GlobalDrop />
