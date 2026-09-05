@@ -18,6 +18,11 @@ SPOTIFY_CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET")
 SPOTIFY_REDIRECT_URI = os.environ.get("SPOTIFY_REDIRECT_URI")
 SPOTIFY_SCOPE = "user-read-currently-playing user-read-playback-state user-modify-playback-state streaming user-read-email user-read-private"
 
+# Origine du SPA (localhost:3000 en dev), PAS celle de l'API qui sert cette popup elle-même
+# (127.0.0.1:8001) : postMessage() n'est délivré que si targetOrigin correspond à l'origine
+# réelle de window.opener, qui est le SPA — voir le même correctif dans microsoft_graph.py.
+FRONTEND_URL = (os.environ.get("FRONTEND_URL") or "http://localhost:3000").rstrip("/")
+
 # États OAuth anti-CSRF (usage unique, expiration 10 min)
 _OAUTH_STATES = {}
 
@@ -34,7 +39,7 @@ def _new_oauth_state() -> str:
 
 def _app_origin() -> str:
     from urllib.parse import urlparse
-    u = urlparse(SPOTIFY_REDIRECT_URI or "")
+    u = urlparse(FRONTEND_URL)
     return f"{u.scheme}://{u.netloc}" if u.scheme and u.netloc else ""
 
 

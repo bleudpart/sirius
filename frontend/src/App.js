@@ -2251,8 +2251,13 @@ function App() {
 
   // Réception des tokens Spotify renvoyés par la popup
   useEffect(() => {
+    // La popup est une page HTML servie par l'API (BACKEND_BASE), pas par le SPA : son
+    // window.opener.postMessage() a donc pour origine réelle celle de l'API, pas la nôtre
+    // (localhost:3000 vs 127.0.0.1:8001 en dev = deux origines distinctes).
+    let backendOrigin = "";
+    try { backendOrigin = new URL(BACKEND_BASE).origin; } catch { /* ignore */ }
     const onMsg = (e) => {
-      if (e.origin !== window.location.origin) return; // sécurité : n'accepte que notre propre popup
+      if (e.origin !== window.location.origin && e.origin !== backendOrigin) return; // sécurité : n'accepte que notre SPA ou notre API
       const data = e.data;
       if (!data || data.type !== "spotify-auth") return;
       if (data.error || !data.access_token) {
