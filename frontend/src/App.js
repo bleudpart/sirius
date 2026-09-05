@@ -2513,11 +2513,66 @@ function App() {
       return;
     }
 
+    // Musique d'ambiance (moteur procédural local) : traité ICI en priorité, AVANT l'intent
+    // Groq, car « musique d'ambiance » contient le mot « musique » et serait sinon intercepté
+    // par la détection média/Spotify côté serveur (qui ouvrirait le mauvais panneau).
+    if (/(coupe|arr[êe]te|stoppe?|[ée]teins|enl[èe]ve).{0,12}(musique|ambiance|fond sonore)/.test(low)) {
+      mark("ambiance off");
+      if (ambientRef.current) ambientRef.current.pause();
+      const m = "Musique d'ambiance coupée, monsieur.";
+      setStatus("speaking"); setText(m); speakOut(m);
+      return;
+    }
+    if (/(remets?|relance|reprends?|rallume|r[ée]active).{0,12}(musique|ambiance|fond sonore)/.test(low)) {
+      mark("ambiance on");
+      if (ambientRef.current) ambientRef.current.play().catch(() => {});
+      const m = "Musique d'ambiance relancée.";
+      setStatus("speaking"); setText(m); speakOut(m);
+      return;
+    }
+    if (/(mets?|joue|passe|lance|active|remets?).{0,24}(chant\s+)?gr[ée]gorien/.test(low) ||
+        /(mets?|joue|passe|lance|active|remets?).{0,20}(musique|ambiance)\s+[ée]pique/.test(low) ||
+        /(mets?|joue|passe|lance|active|remets?).{0,20}(ambiance|musique d'ambiance).{0,12}(normale|habituelle|[ée]pique)/.test(low)) {
+      mark("ambiance · piste");
+      const choice = /gr[ée]gorien/.test(low) ? "gregorien" : "epique";
+      localStorage.setItem("sirius_ambient_track", choice);
+      if (ambientRef.current) { try { ambientRef.current.pause(); ambientRef.current.src = ""; } catch (e) {} }
+      const na = new AmbientEngine(choice);
+      const sv = parseFloat(localStorage.getItem("sirius_ambient_volume") || "0.12");
+      na.volume = isNaN(sv) ? 0.12 : sv;
+      na.play().catch(() => {});
+      ambientRef.current = na;
+      window.__siriusAmbient = na;
+      const m = choice === "gregorien" ? "Chant grégorien en ambiance, monsieur." : "Musique épique en ambiance, monsieur.";
+      setStatus("speaking"); setText(m); speakOut(m);
+      return;
+    }
+    const ambVolPct = low.match(/(?:musique|ambiance|fond sonore).{0,24}?(\d{1,3})\s*(?:%|pour ?cent)/) ||
+                      low.match(/volume.{0,18}(?:musique|ambiance).{0,14}?(\d{1,3})/);
+    if (ambVolPct ||
+        /(baisse|diminue|r[ée]duis|monte|augmente).{0,18}(la |le |du |de la )?(musique|ambiance|fond sonore)/.test(low) ||
+        /(musique|ambiance|fond sonore).{0,14}(plus fort|moins fort|[àa] fond)/.test(low)) {
+      mark("ambiance · volume");
+      const stored = parseFloat(localStorage.getItem("sirius_ambient_volume") || "0.12");
+      const cur = ambientRef.current ? ambientRef.current.volume : (isNaN(stored) ? 0.12 : stored);
+      let nv;
+      if (ambVolPct) nv = Math.min(100, Math.max(0, parseInt(ambVolPct[1], 10))) / 100;
+      else if (/[àa] fond/.test(low)) nv = 1;
+      else if (/(baisse|diminue|r[ée]duis|moins fort)/.test(low)) nv = Math.max(0.02, cur - 0.08);
+      else nv = Math.min(1, cur + 0.12);
+      nv = Math.round(nv * 100) / 100;
+      localStorage.setItem("sirius_ambient_volume", String(nv));
+      if (ambientRef.current) ambientRef.current.volume = nv;
+      const m = `Volume de l'ambiance réglé à ${Math.round(nv * 100)} pour cent.`;
+      setStatus("speaking"); setText(m); speakOut(m);
+      return;
+    }
+
     mark("analyse...");
 
   // Lancement de la résolution d'intention
     resolveIntent(command);
-  }, [resolveIntent]);
+  }, [resolveIntent, speakOut]);
 
 // ⚡ PIPELINE DE COMMANDE SÉCURISÉ (Inclus : Archives, Proactivité & Sécurité)
   const handleCommand = async (command, intent = null) => {
