@@ -570,6 +570,10 @@ function App() {
   const [showOracle, setShowOracle] = useState(false);
   const [showMemoryMgr, setShowMemoryMgr] = useState(false);
   const [outlookChoice, setOutlookChoice] = useState(null);
+  // Assistant e-mails Outlook (classement, actions confirmées, configuration unique)
+  const [pendingEmailAction, setPendingEmailAction] = useState(null); // { action, id, label, text? }
+  const [pendingEmailSetup, setPendingEmailSetup] = useState(false); // question de préférences en attente de réponse
+  const lastEmailBriefingRef = useRef([]); // liste plate ordonnée du dernier "Mes e-mails" (pour "le message 2")
   const [showInstall, setShowInstall] = useState(false);
   const [showArgus, setShowArgus] = useState(false);
   const [argusAlert, setArgusAlert] = useState(null);
@@ -2062,6 +2066,293 @@ function App() {
     } catch (e) { failTask(id, "Microsoft Graph injoignable"); }
   }, [openTask, pushStep, finishTask, failTask, speakOut]);
 
+  // ── Assistant e-mails Outlook : classement par importance, résumé quotidien, actions confirmées ──
+  const askEmailSetupQuestion = useCallback(() => {
+    setPendingEmailSetup(true);
+    setStatus("speaking");
+    const m = "Avant de commencer, dis-moi en une phrase : à quels horaires et à quelle fréquence "
+      + "veux-tu être notifié (par exemple « le matin et le soir »), quels expéditeurs sont VIP pour toi, "
+      + "comment veux-tu trier tes mails (importance, date, expéditeur ou catégorie), et si tu veux un "
+      + "résumé court ou détaillé. Tu peux aussi juste dire « par défaut ».";
+    setText(m); speakOut(m);
+  }, [speakOut]);
+
+  const applyEmailSetupAnswer = useCallback(async (text) => {
+    const low = (text || "").toLowerCase();
+    const frequency = /(chaque heure|chaque heures|chaque heur|toutes les heures|horaire)/.test(low) ? "horaire"
+      : /(jamais|manuel|aucune notification|ne me pr[ée]viens pas)/.test(low) ? "manuel"
+      : "quotidien";
+    const times = [];
+    if (/matin/.test(low)) times.push("08:00");
+    if (/midi/.test(low)) times.push("12:00");
+    if (/(soir|apr[èe]s[- ]midi)/.test(low)) times.push("18:00");
+    if (!times.length) times.push("08:00");
+    const defaultSort = /\bdate\b/.test(low) ? "date"
+      : /exp[ée]diteur/.test(low) ? "expediteur"
+      : /cat[ée]gorie/.test(low) ? "categorie"
+      : /action/.test(low) ? "action"
+      : "importance";
+    const summaryLevel = /d[ée]taill[ée]/.test(low) ? "detaille" : "court";
+    const vipMatches = [...low.matchAll(/vip\s*:?\s*([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})/gi)].map((m) => m[1]);
+    try {
+      await fetch(`${API}/email/preferences`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          notification_times: times, notification_frequency: frequency,
+          default_sort: defaultSort, summary_level: summaryLevel,
+        }),
+      });
+      for (const email of vipMatches) {
+        await fetch(`${API}/email/preferences/sender-rule`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sender: email, rule: "vip" }),
+        }).catch(() => {});
+      }
+    } catch (e) { /* préférences non enregistrées, on continue quand même avec les défauts */ }
+    setPendingEmailSetup(false);
+    const m = `Préférences enregistrées : notifications ${frequency}${times.length ? ` à ${times.join(" et ")}` : ""}, `
+      + `tri par ${defaultSort}, résumé ${summaryLevel}${vipMatches.length ? `, ${vipMatches.length} VIP ajouté(s)` : ""}. `
+      + "Voici tes e-mails.";
+    setStatus("speaking"); setText(m); speakOut(m);
+  }, [speakOut]);
+
+  const fetchEmailBriefing = useCallback(async () => {
+    const id = openTask("OUTLOOK — MES E-MAILS", "outlook");
+    pushStep(id, "Vérification des préférences");
+    let prefs;
+    try {
+      const rp = await fetch(`${API}/email/preferences`);
+      prefs = await rp.json().catch(() => ({}));
+    } catch (e) {
+      failTask(id, "Microsoft Graph injoignable"); setStatus("speaking");
+      const m = "Je n'arrive pas à joindre le service e-mail pour le moment.";
+      setText(m); speakOut(m); return;
+    }
+    if (!prefs.configured) {
+      finishTask(id, { kind: "text", texte: "Première configuration de l'assistant e-mails en cours.", legende: "Outlook · configuration" });
+      askEmailSetupQuestion();
+      return;
+    }
+    pushStep(id, "Connexion à Microsoft Graph");
+    let data;
+    try {
+      const r = await fetch(`${API}/microsoft/mail/briefing?top=25`);
+      data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        if (r.status === 401 || r.status === 409) {
+          failTask(id, "Compte Microsoft non connecté");
+          setStatus("speaking");
+          const m = "Ton compte Outlook n'est pas encore connecté. Dis « connecte Outlook », authentifie-toi, puis redemande-moi tes e-mails.";
+          setText(m); speakOut(m);
+          return;
+        }
+        throw new Error(data.detail || `Microsoft Graph a répondu avec le code ${r.status}`);
+      }
+    } catch (e) {
+      failTask(id, e.message || "Microsoft Graph injoignable");
+      setStatus("speaking");
+      const m = "Je n'arrive pas à joindre Microsoft Graph pour le moment.";
+      setText(m); speakOut(m);
+      return;
+    }
+    pushStep(id, "Classement par importance");
+
+    const ordered = [
+      ...data.urgences, ...data.reponses_attendues, ...data.actions, ...data.a_lire, ...data.reste,
+    ];
+    lastEmailBriefingRef.current = ordered;
+
+    const SENSIBLE_RE = /confidentiel|sensible|priv[ée]|mot de passe|iban|coordonn[ée]es bancaires/i;
+    const detaille = prefs.summary_level === "detaille";
+
+    const describe = (m, n) => {
+      const sensible = SENSIBLE_RE.test(`${m.sujet} ${m.apercu}`);
+      let line = `${n}. [${m.categorie}] ${m.de} — ${m.sujet} (${m.recu || ""})`;
+      line += `\n   Action : ${m.action_attendue}`;
+      if (m.echeance) line += ` — Échéance : ${m.echeance}`;
+      line += `\n   Pourquoi : ${m.raison}`;
+      if (sensible) line += "\n   ⚠ Contenu sensible — dites « lis le message " + n + " » pour l'entendre.";
+      else if (m.apercu) line += `\n   Aperçu : ${m.apercu}`;
+      return line;
+    };
+
+    const sections = [
+      ["URGENCES", data.urgences],
+      ["RÉPONSES ATTENDUES", data.reponses_attendues],
+      ["ACTIONS À FAIRE", data.actions],
+      ["À LIRE", data.a_lire],
+      ["RESTE (faible priorité)", data.reste],
+    ];
+    let n = 0;
+    const texte = sections.map(([titre, list]) => {
+      if (!list.length) return null;
+      const lignes = list.map((m) => describe(m, ++n)).join("\n\n");
+      return `── ${titre} (${list.length}) ──\n${lignes}`;
+    }).filter(Boolean).join("\n\n") || "Aucun nouvel e-mail.";
+
+    finishTask(id, {
+      kind: "text", texte,
+      legende: `Outlook · ${data.total_nouveaux} nouveau(x) sur ${data.total}`,
+    });
+
+    setStatus("speaking");
+    let spoken;
+    if (!ordered.length) {
+      spoken = "Aucun nouvel e-mail à te signaler.";
+    } else if (!detaille) {
+      const parts = [];
+      if (data.urgences.length) parts.push(`${data.urgences.length} urgent${data.urgences.length > 1 ? "s" : ""}`);
+      if (data.reponses_attendues.length) parts.push(`${data.reponses_attendues.length} en attente de réponse`);
+      if (data.actions.length) parts.push(`${data.actions.length} à traiter`);
+      if (data.a_lire.length) parts.push(`${data.a_lire.length} à lire`);
+      if (data.reste.length) parts.push(`${data.reste.length} de faible priorité`);
+      spoken = `Tu as ${data.total_nouveaux} nouveau${data.total_nouveaux > 1 ? "x" : ""} e-mail${data.total_nouveaux > 1 ? "s" : ""} : ${parts.join(", ")}. Détails dans la fenêtre.`;
+    } else {
+      spoken = `Tu as ${data.total_nouveaux} nouveaux e-mails. `;
+      if (data.urgences.length) {
+        spoken += `En urgence : ${data.urgences.map((m) => `${m.de}, ${m.sujet}`).join(" ; ")}. `;
+      }
+      if (data.reponses_attendues.length) {
+        spoken += `Réponses attendues : ${data.reponses_attendues.map((m) => `${m.de}, ${m.sujet}`).join(" ; ")}. `;
+      }
+      spoken += "Le reste est détaillé dans la fenêtre.";
+    }
+    setText(spoken); speakOut(spoken);
+  }, [openTask, pushStep, finishTask, failTask, speakOut, askEmailSetupQuestion]);
+
+  // Résout « le message 2 », « le premier », « le dernier » vers l'ID réel du dernier "Mes e-mails"
+  const resolveEmailOrdinal = useCallback((text) => {
+    const list = lastEmailBriefingRef.current || [];
+    if (!list.length) return null;
+    const low = (text || "").toLowerCase();
+    if (/dernier/.test(low)) return list[list.length - 1];
+    if (/premier/.test(low)) return list[0];
+    const numWords = { un: 1, une: 1, deux: 2, trois: 3, quatre: 4, cinq: 5, six: 6, sept: 7, huit: 8, neuf: 9, dix: 10 };
+    let idx = null;
+    const digit = low.match(/\b(\d{1,2})\b/);
+    if (digit) idx = parseInt(digit[1], 10);
+    else {
+      for (const [w, v] of Object.entries(numWords)) { if (new RegExp(`\\b${w}\\b`).test(low)) { idx = v; break; } }
+    }
+    if (!idx || idx < 1 || idx > list.length) return null;
+    return list[idx - 1];
+  }, []);
+
+  const runEmailAction = useCallback(async (action, mail, extraText) => {
+    if (!mail || !mail.id) {
+      setStatus("speaking");
+      const m = "Je ne sais pas à quel message tu fais référence. Redemande « mes e-mails » d'abord.";
+      setText(m); speakOut(m);
+      return;
+    }
+    setStatus("thinking");
+    try {
+      if (action === "read") {
+        await fetch(`${API}/microsoft/mail/${mail.id}/read`, { method: "POST" }).catch(() => {});
+        setStatus("speaking");
+        const m = `${mail.de} — ${mail.sujet}. ${mail.apercu || "Aucun aperçu disponible."}`;
+        setText(m); speakOut(m);
+        return;
+      }
+      if (action === "summarize") {
+        const r = await fetch(`${API}/microsoft/mail/${mail.id}/summary`);
+        const d = await r.json().catch(() => ({}));
+        setStatus("speaking");
+        const m = d.resume || "Je n'ai pas pu résumer ce message.";
+        setText(m); speakOut(m);
+        return;
+      }
+      if (action === "mark_done") {
+        await fetch(`${API}/microsoft/mail/${mail.id}/read`, { method: "POST" });
+        setStatus("speaking");
+        const m = `Message de ${mail.de} marqué comme traité.`;
+        setText(m); speakOut(m);
+        return;
+      }
+      if (action === "postpone") {
+        setStatus("speaking");
+        const m = `D'accord, je te reparlerai du message de ${mail.de} plus tard.`;
+        setText(m); speakOut(m);
+        return;
+      }
+      if (action === "ignore") {
+        setStatus("speaking");
+        const m = "Compris, j'ignore ce message.";
+        setText(m); speakOut(m);
+        return;
+      }
+      if (action === "archive" || action === "delete" || action === "reply") {
+        const label = action === "archive" ? "archiver" : action === "delete" ? "supprimer" : "envoyer la réponse à";
+        const path = action === "reply" ? `reply` : action;
+        const body = action === "reply" ? { text: extraText || "", confirm: false } : { confirm: false };
+        const r = await fetch(`${API}/microsoft/mail/${mail.id}/${path}`, {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+        });
+        const d = await r.json().catch(() => ({}));
+        setPendingEmailAction({ action, id: mail.id, label: `${mail.de} — ${mail.sujet}`, text: extraText || "" });
+        setStatus("speaking");
+        const m = `Confirmes-tu vouloir ${label} le message de ${mail.de}, « ${mail.sujet} » ? Dis « oui » ou « non ».`;
+        setText(m); speakOut(m);
+        return;
+      }
+    } catch (e) {
+      setStatus("speaking");
+      const m = "Microsoft Graph injoignable pour cette action.";
+      setText(m); speakOut(m);
+    }
+  }, [speakOut]);
+
+  const confirmPendingEmailAction = useCallback(async (confirmed) => {
+    const pending = pendingEmailAction;
+    setPendingEmailAction(null);
+    if (!pending) return;
+    if (!confirmed) {
+      setStatus("speaking");
+      const m = "Action annulée.";
+      setText(m); speakOut(m);
+      return;
+    }
+    setStatus("thinking");
+    try {
+      const path = pending.action === "reply" ? "reply" : pending.action;
+      const body = pending.action === "reply" ? { text: pending.text, confirm: true } : { confirm: true };
+      const r = await fetch(`${API}/microsoft/mail/${pending.id}/${path}`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      });
+      const ok = r.ok;
+      setStatus("speaking");
+      const verb = pending.action === "archive" ? "archivé" : pending.action === "delete" ? "supprimé" : "envoyée";
+      const m = ok
+        ? `C'est fait : ${pending.action === "reply" ? "la réponse a été " + verb : "le message a été " + verb}.`
+        : "Microsoft Graph a refusé l'action, monsieur.";
+      setText(m); speakOut(m);
+    } catch (e) {
+      setStatus("speaking");
+      const m = "Microsoft Graph injoignable, action non effectuée.";
+      setText(m); speakOut(m);
+    }
+  }, [pendingEmailAction, speakOut]);
+
+  const setEmailSenderRule = useCallback(async (sender, rule) => {
+    setStatus("thinking");
+    try {
+      await fetch(`${API}/email/preferences/sender-rule`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sender, rule }),
+      });
+      setStatus("speaking");
+      const labels = { vip: "VIP", prioritaire: "prioritaire", normal: "normal", indesirable: "indésirable" };
+      const m = `D'accord, ${sender} est maintenant classé ${labels[rule] || rule}.`;
+      setText(m); speakOut(m);
+    } catch (e) {
+      setStatus("speaking");
+      const m = "Je n'ai pas pu enregistrer cette préférence.";
+      setText(m); speakOut(m);
+    }
+  }, [speakOut]);
+
   const launchOutlookCreateEvent = useCallback(async (rest) => {
     const d = new Date();
     if (/apr[èe]s[- ]demain/.test(rest)) d.setDate(d.getDate() + 2);
@@ -2518,6 +2809,53 @@ function App() {
       return;
     }
 
+    // Assistant e-mails : réponse à la question de préférences posée une seule fois
+    if (pendingEmailSetup) {
+      mark("email · préférences");
+      applyEmailSetupAnswer(command).then(() => fetchEmailBriefing());
+      return;
+    }
+
+    // Assistant e-mails : confirmation d'une action sensible (archiver/supprimer/répondre)
+    if (pendingEmailAction) {
+      if (/\b(oui|ouais|vas[- ]y|ok|d'accord|confirme|je confirme|bien s[ûu]r)\b/.test(low)) {
+        mark("email · confirmation");
+        confirmPendingEmailAction(true);
+        return;
+      }
+      if (/\b(non|annule|laisse|pas maintenant|surtout pas)\b/.test(low)) {
+        mark("email · annulation");
+        confirmPendingEmailAction(false);
+        return;
+      }
+    }
+
+    // Assistant e-mails Outlook (classement, résumé quotidien, actions) — commande exacte du
+    // cahier des charges : traité en priorité, avant tout autre routage.
+    if (/^\s*mes\s+e[- ]?mails?\s*[?!.]*\s*$/.test(low) || /r[ée]sume?\s+mes\s+e[- ]?mails?/.test(low)) {
+      mark("email · mes e-mails"); fetchEmailBriefing(); return;
+    }
+    const emailOrdinalRe = /\b(?:message|mail|e-?mail|courriel)\s+((?:\d{1,2}|premier|dernier|un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix))\b/;
+    const ordinalMatch = low.match(emailOrdinalRe);
+    if (ordinalMatch && /\b(lis|r[ée]sume?|archive|supprime|efface|marque|reporte|ignore|r[ée]ponds?|r[ée]pond)\b/.test(low)) {
+      const mail = resolveEmailOrdinal(ordinalMatch[1]);
+      if (/r[ée]sume?/.test(low)) { mark("email · résumé"); runEmailAction("summarize", mail); return; }
+      if (/\blis\b/.test(low)) { mark("email · lecture"); runEmailAction("read", mail); return; }
+      if (/archive/.test(low)) { mark("email · archive"); runEmailAction("archive", mail); return; }
+      if (/(supprime|efface)/.test(low)) { mark("email · suppression"); runEmailAction("delete", mail); return; }
+      if (/marque/.test(low)) { mark("email · traité"); runEmailAction("mark_done", mail); return; }
+      if (/reporte/.test(low)) { mark("email · report"); runEmailAction("postpone", mail); return; }
+      if (/ignore/.test(low)) { mark("email · ignore"); runEmailAction("ignore", mail); return; }
+      const replyM = command.match(/r[ée]ponds?(?:\s+au\s+\S+\s+\S+)?\s*[:,]?\s*(.+)/i);
+      if (/r[ée]ponds?/.test(low)) { mark("email · réponse"); runEmailAction("reply", mail, replyM ? replyM[1].trim() : ""); return; }
+    }
+    const senderRuleM = low.match(/classe\s+(?:l['’]exp[ée]diteur\s+)?([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})\s+(?:comme\s+)?(vip|prioritaire|normal|ind[ée]sirable)/);
+    if (senderRuleM) {
+      mark("email · classement expéditeur");
+      setEmailSenderRule(senderRuleM[1], senderRuleM[2].replace("é", "e"));
+      return;
+    }
+
     // Musique d'ambiance (moteur procédural local) : traité ICI en priorité, AVANT l'intent
     // Groq, car « musique d'ambiance » contient le mot « musique » et serait sinon intercepté
     // par la détection média/Spotify côté serveur (qui ouvrirait le mauvais panneau).
@@ -2647,6 +2985,8 @@ function App() {
   }, [
     resolveIntent, speakOut, readGmailAloud, connectOutlook, launchOutlookMail,
     launchOutlookIntent, launchOutlookCreateEvent, launchOutlookAgenda, readMailAloud,
+    pendingEmailSetup, pendingEmailAction, applyEmailSetupAnswer, fetchEmailBriefing,
+    confirmPendingEmailAction, resolveEmailOrdinal, runEmailAction, setEmailSenderRule,
   ]);
 
 // ⚡ PIPELINE DE COMMANDE SÉCURISÉ (Inclus : Archives, Proactivité & Sécurité)
