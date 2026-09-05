@@ -28,11 +28,17 @@ GROQ_LLM_FALLBACK = MODELS[1]
 GROQ_FALLBACK_MODELS = MODELS
 K3_MODEL = "moonshot-v1-8k"
 
-# Initialisation du client Groq / OpenAI
+# Initialisation du client Groq / OpenAI (réutilisé entre requêtes : connexions HTTP conservées
+# en pool, évite l'aller-retour TLS/handshake d'une création par appel).
 client = AsyncOpenAI(api_key=GROQ_API_KEY, base_url=GROQ_LLM_ENDPOINT) if GROQ_API_KEY else None
 
-# --- CLIENT K3 POUR COMPATIBILITÉ THEMIS ---
-k3_client = AsyncOpenAI(api_key=ENV_K3_KEY, base_url=K3_ENDPOINT) if ENV_K3_KEY else None
+# --- CLIENT K3 (Kimi / Moonshot), fabrique réutilisable pour Thémis (OCR factures) et les
+# modules internes : chaque appelant peut fournir sa propre clé (BYOK) ou utiliser la clé serveur.
+def k3_client(key: str | None = None):
+    api_key = (key or ENV_K3_KEY or "").strip()
+    if not api_key:
+        return None
+    return AsyncOpenAI(api_key=api_key, base_url=K3_ENDPOINT)
 
 # --- PROMPT NOYAU SIRIUS ---
 SIRIUS_CORE_PROMPT = """Tu es SIRIUS, un assistant vocal intelligent. Tu sais exactement pourquoi tu es là : aider l’utilisateur, exécuter ses commandes, les terminer, fournir un compte rendu clair, et l’accompagner avec un style naturel, amical et professionnel.
@@ -523,11 +529,14 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
         models_to_try = GROQ_FALLBACK_MODELS[:1] if is_turbo else GROQ_FALLBACK_MODELS
         timeout = 10.0 if is_turbo else 30.0
         max_tokens = 512 if is_turbo else 4096
-        client_groq = AsyncOpenAI(api_key=ENV_GROQ_LLM_KEY, base_url=GROQ_LLM_ENDPOINT, max_retries=0, timeout=timeout)
+        # Réutilise le client HTTP partagé (pool de connexions conservé entre requêtes) plutôt
+        # que d'en recréer un neuf à chaque appel — évite le handshake TLS répété et réduit la
+        # latence perçue. Le timeout reste ajustable par appel (turbo vs normal).
+        client_groq = client or AsyncOpenAI(api_key=ENV_GROQ_LLM_KEY, base_url=GROQ_LLM_ENDPOINT, max_retries=0)
 
         # Continuité : l'historique récent est réellement fourni au modèle.
         history_messages = []
-        for turn in (history or [])[-8:]:
+        for turn in (history or [])[-20:]:
             role = turn.get("role") if isinstance(turn, dict) else None
             content = (turn.get("content") or "").strip() if isinstance(turn, dict) else ""
             if role in ("user", "assistant") and content:
@@ -558,7 +567,8 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
                     top_p=0.95,
                     presence_penalty=0.9,
                     frequency_penalty=0.4,
-                    response_format={"type": "json_object"}
+                    response_format={"type": "json_object"},
+                    timeout=timeout,
                 )
                 raw_json = resp.choices[0].message.content.strip()
                 answer, memories, popups = _parse_structured(raw_json)

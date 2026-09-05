@@ -270,7 +270,12 @@ async def chat(req: ChatRequest, request: Request):
     except Exception:
         local_facts = local_facts[:8]
     fact_cutoff = (datetime.now(timezone.utc) - timedelta(days=_FACT_MAX_AGE_DAYS)).date().isoformat()
-    local_facts = [f for f in local_facts if not f.get("created_at") or f["created_at"][:10] >= fact_cutoff]
+    # Les préférences (identité, goûts durables) ne s'effacent jamais par simple ancienneté —
+    # seuls les faits liés à un projet ou un souvenir ponctuel expirent après _FACT_MAX_AGE_DAYS.
+    local_facts = [
+        f for f in local_facts
+        if f.get("category") == "preference" or not f.get("created_at") or f["created_at"][:10] >= fact_cutoff
+    ]
     try:
         from local_memory import recent_episodes
         episodes = _score_episodes(texte, recent_episodes(uid, limit=_EPISODE_POOL))
@@ -365,7 +370,12 @@ async def chat_stream(req: ChatRequest, request: Request):
     except Exception:
         local_facts = local_facts[:8]
     fact_cutoff = (datetime.now(timezone.utc) - timedelta(days=_FACT_MAX_AGE_DAYS)).date().isoformat()
-    local_facts = [f for f in local_facts if not f.get("created_at") or f["created_at"][:10] >= fact_cutoff]
+    # Les préférences (identité, goûts durables) ne s'effacent jamais par simple ancienneté —
+    # seuls les faits liés à un projet ou un souvenir ponctuel expirent après _FACT_MAX_AGE_DAYS.
+    local_facts = [
+        f for f in local_facts
+        if f.get("category") == "preference" or not f.get("created_at") or f["created_at"][:10] >= fact_cutoff
+    ]
     try:
         from local_memory import recent_episodes
         episodes = _score_episodes(texte, recent_episodes(uid, limit=_EPISODE_POOL))

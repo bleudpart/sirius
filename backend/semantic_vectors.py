@@ -1,9 +1,10 @@
 """Rappel sémantique SIRIUS : reclassement des souvenirs par similarité d'embeddings.
 
-Les vecteurs sont calculés via une API d'embeddings compatible OpenAI quand une
-clé est disponible (OPENAI_API_KEY), puis MIS EN CACHE LOCALEMENT en SQLite :
-chaque fait n'est vectorisé qu'une seule fois. Sans clé ou hors-ligne, le module
-se retire silencieusement — le rappel par mots-clés + synonymes reste actif.
+Les vecteurs sont calculés via l'API d'embeddings Gemini (google-genai) quand une clé
+est disponible (GEMINI_API_KEY — déjà utilisée par SIRIUS pour la génération d'images,
+aucune clé supplémentaire à configurer), puis MIS EN CACHE LOCALEMENT en SQLite : chaque
+fait n'est vectorisé qu'une seule fois. Sans clé ou hors-ligne, le module se retire
+silencieusement — le rappel par mots-clés + synonymes reste actif.
 """
 
 import logging
@@ -15,8 +16,8 @@ from resilience import resilient_call
 
 logger = logging.getLogger("sirius.semantic")
 
-EMBED_MODEL = os.getenv("SIRIUS_EMBED_MODEL", "text-embedding-3-small")
-_EMBED_API_KEY = (os.getenv("OPENAI_API_KEY") or "").strip()
+EMBED_MODEL = os.getenv("SIRIUS_EMBED_MODEL", "gemini-embedding-001")
+_EMBED_API_KEY = (os.getenv("GEMINI_API_KEY") or "").strip()
 _QUERY_CACHE_MAX = 128
 _query_cache = {}
 
@@ -37,18 +38,18 @@ def _cosine(a, b) -> float:
 
 
 async def _embed_batch(texts):
-    """Vectorise un lot de textes via l'API, protégé par la couche de résilience.
+    """Vectorise un lot de textes via l'API Gemini, protégé par la couche de résilience.
 
     Réglages serrés : le rerank est un bonus de pertinence, jamais un goulot —
     au pire ~2,5 s puis repli mots-clés, et disjoncteur après 3 échecs (60 s).
     """
-    from openai import AsyncOpenAI
+    from google import genai
 
-    client = AsyncOpenAI(api_key=_EMBED_API_KEY, max_retries=0, timeout=2.0)
+    client = genai.Client(api_key=_EMBED_API_KEY)
 
     async def _call():
-        response = await client.embeddings.create(model=EMBED_MODEL, input=list(texts))
-        return [item.embedding for item in response.data]
+        response = await client.aio.models.embed_content(model=EMBED_MODEL, contents=list(texts))
+        return [item.values for item in response.embeddings]
 
     return await resilient_call(
         _call, service="embeddings", attempts=1, timeout=2.5,
