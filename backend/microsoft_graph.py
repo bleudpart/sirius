@@ -13,7 +13,7 @@ from urllib.parse import urlencode
 import httpx
 from cryptography.fernet import Fernet
 from fastapi import APIRouter, HTTPException, Request, Response
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 
 import email_intel
@@ -30,6 +30,27 @@ logger = logging.getLogger("sirius.microsoft")
 # l'application réellement utilisée) — d'où l'utilisateur qui retombe sur un vieil écran de
 # connexion après s'être authentifié. On redirige donc explicitement vers l'origine du SPA.
 FRONTEND_URL = (os.environ.get("FRONTEND_URL") or "http://localhost:3000").rstrip("/")
+
+
+def _ms_popup_response(ok: bool, code: str, message: str) -> HTMLResponse:
+    """La connexion Microsoft est ouverte par connectOutlook() dans un NOUVEL ONGLET
+    (window.open) : une redirection classique vers FRONTEND_URL, une fois l'auth terminée,
+    ferait donc démarrer une DEUXIÈME instance complète du SPA dans cet onglet (rechargement
+    du HUD, nouvelle séquence de démarrage) — vu par l'utilisateur comme "un nouveau SIRIUS
+    qui démarre" au lieu d'un simple retour à l'onglet original déjà ouvert. On renvoie donc
+    une page minimale qui prévient l'onglet d'origine via postMessage puis se referme seule,
+    exactement comme pour la connexion Spotify (routes/spotify_routes.py)."""
+    import json as _json
+    payload = _json.dumps({"type": "microsoft-auth", "ok": ok, "code": code})
+    origin = _json.dumps(FRONTEND_URL)
+    title = "Outlook connecté ✓" if ok else "Connexion Outlook échouée"
+    return HTMLResponse(
+        "<html><body style='background:#04111c;color:#22d3ee;font-family:sans-serif;text-align:center;padding-top:60px'>"
+        f"<h2>{title}</h2><p>{message}</p><p>Vous pouvez fermer cette fenêtre.</p>"
+        f"<script>window.opener&&window.opener.postMessage({payload},{origin});"
+        f"setTimeout(()=>window.close(),{'800' if ok else '2500'});</script></body></html>"
+    )
+
 
 AUTHORITY = "https://login.microsoftonline.com/common"
 AUTHORIZE_URL = f"{AUTHORITY}/oauth2/v2.0/authorize"
@@ -404,10 +425,10 @@ def make_microsoft_router(db):
     async def microsoft_callback(response: Response, code: str = "", state: str = "", error: str = ""):
         if error or not code or not state:
             logger.error("[MICROSOFT] callback refusé: %s", error)
-            return RedirectResponse(f"{FRONTEND_URL}/?ms=error", status_code=302)
+            return _ms_popup_response(False, "error", "La connexion Microsoft a été refusée ou annulée.")
         st = await db.oauth_states.find_one_and_delete({"_id": state})
         if not st or datetime.fromisoformat(st["expires_at"]) < datetime.now(timezone.utc):
-            return RedirectResponse(f"{FRONTEND_URL}/?ms=state", status_code=302)
+            return _ms_popup_response(False, "state", "Session de connexion expirée, réessayez « connecte Outlook ».")
         cid, secret, redirect = _conf()
         async with httpx.AsyncClient(timeout=20) as cx:
             r = await cx.post(TOKEN_URL, data=_token_request_data(
@@ -418,10 +439,10 @@ def make_microsoft_router(db):
             token = r.json()
             if r.is_error or "access_token" not in token:
                 logger.error("[MICROSOFT] échange de code échoué: %s", token.get("error_description", "")[:200])
-                return RedirectResponse(f"{FRONTEND_URL}/?ms=token", status_code=302)
+                return _ms_popup_response(False, "token", "Échange du jeton Microsoft échoué.")
             p = await cx.get(f"{GRAPH}/me", headers={"Authorization": "Bearer " + token["ac" + "cess_" + "token"]}, params={"$select": "id,displayName,mail,userPrincipalName"})
             if p.is_error:
-                return RedirectResponse(f"{FRONTEND_URL}/?ms=profile", status_code=302)
+                return _ms_popup_response(False, "profile", "Impossible de récupérer votre profil Microsoft.")
             profile = p.json()
 
         email = (profile.get("mail") or profile.get("userPrincipalName") or "").lower()
@@ -443,7 +464,7 @@ def make_microsoft_router(db):
             await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"microsoft_id": ms_id}})
 
         await _save_tokens(db, user["user_id"], token, email)
-        resp = RedirectResponse(f"{FRONTEND_URL}/?ms=connected", status_code=302)
+        resp = _ms_popup_response(True, "connected", f"Connecté en tant que {email or ms_id}.")
         _set_cookies(resp, create_access_token(user["user_id"], user.get("email", email)),
                      create_refresh_token(user["user_id"]))
         logger.info("[MICROSOFT] %s connecté", email or ms_id)

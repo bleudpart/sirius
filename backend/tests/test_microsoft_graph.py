@@ -127,12 +127,17 @@ def test_login_from_local_machine_redirects_without_a_session(monkeypatch):
     )
 
 
-def test_callback_links_local_login_to_legacy_user_and_redirects_to_frontend(monkeypatch):
+def test_callback_links_local_login_to_legacy_user_and_notifies_opener(monkeypatch):
     """Le /login de secours (machine locale, sans session) enregistre l'état OAuth sous
     LEGACY_UID. Le callback doit rattacher le compte Microsoft à ce MÊME identifiant — sinon
     /api/microsoft/mail (qui résout l'utilisateur via le Bearer token du SPA, donc LEGACY_UID)
     ne retrouverait jamais le jeton et répondrait toujours "Compte Microsoft non connecté".
-    Il doit aussi rediriger vers l'origine du SPA (FRONTEND_URL), pas l'API (ancien build figé)."""
+
+    Le callback doit renvoyer une page qui prévient la fenêtre d'origine (postMessage vers
+    FRONTEND_URL) puis se ferme, PAS une redirection classique : connectOutlook() ouvre la
+    connexion dans une popup (window.open), et une redirection vers FRONTEND_URL ferait
+    démarrer une deuxième instance complète du SPA dans cette popup au lieu de simplement
+    revenir à l'onglet original déjà ouvert ("un nouveau SIRIUS qui démarre")."""
     import asyncio
     from urllib.parse import urlparse, parse_qs
     from fastapi import Response as FastAPIResponse
@@ -198,8 +203,14 @@ def test_callback_links_local_login_to_legacy_user_and_redirects_to_frontend(mon
         callback_resp = await endpoints["/auth/callback/microsoft-entra-id"](
             FastAPIResponse(), code="fake-code", state=state, error="",
         )
-        assert callback_resp.status_code == 302
-        assert callback_resp.headers["location"] == "http://localhost:3000/?ms=connected"
+        assert callback_resp.status_code == 200
+        assert "location" not in callback_resp.headers  # pas de redirection : page popup
+        body = callback_resp.body.decode()
+        assert "window.opener" in body and "postMessage" in body
+        assert "window.close()" in body
+        assert '"http://localhost:3000"' in body  # targetOrigin = le SPA, jamais l'API
+        assert '"type": "microsoft-auth"' in body or '"type":"microsoft-auth"' in body
+        assert '"ok": true' in body or '"ok":true' in body
 
         doc = await db.microsoft_oauth.find_one({"_id": LEGACY_UID})
         assert doc is not None, "le jeton Microsoft doit être enregistré sous LEGACY_UID"
