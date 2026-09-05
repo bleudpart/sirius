@@ -14,6 +14,12 @@ CAL_API = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
 SCOPE = "https://www.googleapis.com/auth/calendar"
 DOC_ID = "default"
 
+# Le SPA (localhost:3000 en dev) et l'API sont deux serveurs distincts : une redirection
+# relative "/?gcal=..." émise par l'API se résout par rapport à l'API elle-même (un ancien
+# build React figé), pas l'application réellement utilisée. On redirige donc explicitement
+# vers l'origine du SPA — voir le même correctif dans microsoft_graph.py.
+FRONTEND_URL = (os.environ.get("FRONTEND_URL") or "http://localhost:3000").rstrip("/")
+
 
 def _client_conf():
     cid = os.environ.get("GOOGLE_CLIENT_ID")
@@ -93,7 +99,7 @@ def make_gcal_router(db):
     @router.get("/oauth/calendar/callback")
     async def gcal_callback(request: Request, code: str = "", error: str = "", state: str = ""):
         if error or not code:
-            return RedirectResponse("/?gcal=error")
+            return RedirectResponse(f"{FRONTEND_URL}/?gcal=error")
         cid, csec = _client_conf()
         async with httpx.AsyncClient(timeout=20) as cx:
             r = await cx.post(
@@ -107,7 +113,7 @@ def make_gcal_router(db):
                 },
             )
             if r.status_code != 200:
-                return RedirectResponse("/?gcal=error")
+                return RedirectResponse(f"{FRONTEND_URL}/?gcal=error")
             tokens = r.json()
             u = await cx.get(
                 "https://www.googleapis.com/oauth2/v2/userinfo",
@@ -120,7 +126,7 @@ def make_gcal_router(db):
             {"$set": {"tokens": tokens, "email": email, "expires_at": expires_at, "connected_at": datetime.now(timezone.utc).isoformat()}},
             upsert=True,
         )
-        return RedirectResponse("/?gcal=connected")
+        return RedirectResponse(f"{FRONTEND_URL}/?gcal=connected")
 
     @router.get("/calendar/status")
     async def gcal_status(request: Request):

@@ -21,6 +21,13 @@ from auth_api import (
 
 logger = logging.getLogger("sirius.microsoft")
 
+# Le SPA (localhost:3000 en dev) et l'API (127.0.0.1:8001) sont deux serveurs distincts.
+# Une redirection relative "/?ms=..." émise depuis un handler de l'API se résout par rapport
+# à l'API elle-même (qui sert bien une page à "/", mais un ancien build React figé, pas
+# l'application réellement utilisée) — d'où l'utilisateur qui retombe sur un vieil écran de
+# connexion après s'être authentifié. On redirige donc explicitement vers l'origine du SPA.
+FRONTEND_URL = (os.environ.get("FRONTEND_URL") or "http://localhost:3000").rstrip("/")
+
 AUTHORITY = "https://login.microsoftonline.com/common"
 AUTHORIZE_URL = f"{AUTHORITY}/oauth2/v2.0/authorize"
 TOKEN_URL = f"{AUTHORITY}/oauth2/v2.0/token"
@@ -178,7 +185,7 @@ def make_microsoft_router(db):
             uid = LEGACY_UID
         await db.oauth_states.insert_one({
             "_id": state, "code_verifier": verifier,
-            "uid": uid if uid != LEGACY_UID else None,
+            "uid": uid,
             "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
         })
         params = urlencode({
@@ -193,10 +200,10 @@ def make_microsoft_router(db):
     async def microsoft_callback(response: Response, code: str = "", state: str = "", error: str = ""):
         if error or not code or not state:
             logger.error("[MICROSOFT] callback refusé: %s", error)
-            return RedirectResponse("/?ms=error", status_code=302)
+            return RedirectResponse(f"{FRONTEND_URL}/?ms=error", status_code=302)
         st = await db.oauth_states.find_one_and_delete({"_id": state})
         if not st or datetime.fromisoformat(st["expires_at"]) < datetime.now(timezone.utc):
-            return RedirectResponse("/?ms=state", status_code=302)
+            return RedirectResponse(f"{FRONTEND_URL}/?ms=state", status_code=302)
         cid, secret, redirect = _conf()
         async with httpx.AsyncClient(timeout=20) as cx:
             r = await cx.post(TOKEN_URL, data=_token_request_data(
@@ -207,10 +214,10 @@ def make_microsoft_router(db):
             token = r.json()
             if r.is_error or "access_token" not in token:
                 logger.error("[MICROSOFT] échange de code échoué: %s", token.get("error_description", "")[:200])
-                return RedirectResponse("/?ms=token", status_code=302)
+                return RedirectResponse(f"{FRONTEND_URL}/?ms=token", status_code=302)
             p = await cx.get(f"{GRAPH}/me", headers={"Authorization": "Bearer " + token["ac" + "cess_" + "token"]}, params={"$select": "id,displayName,mail,userPrincipalName"})
             if p.is_error:
-                return RedirectResponse("/?ms=profile", status_code=302)
+                return RedirectResponse(f"{FRONTEND_URL}/?ms=profile", status_code=302)
             profile = p.json()
 
         email = (profile.get("mail") or profile.get("userPrincipalName") or "").lower()
@@ -223,7 +230,7 @@ def make_microsoft_router(db):
         if not user and email:
             user = await db.users.find_one({"email": email})
         if not user:
-            user = {"user_id": f"user_{uuid.uuid4().hex[:12]}", "email": email,
+            user = {"user_id": st.get("uid") or f"user_{uuid.uuid4().hex[:12]}", "email": email,
                     "name": profile.get("displayName") or (email.split("@")[0] if email else "Invité Microsoft"),
                     "provider": "microsoft", "microsoft_id": ms_id, "preferences": {},
                     "created_at": datetime.now(timezone.utc).isoformat()}
@@ -232,7 +239,7 @@ def make_microsoft_router(db):
             await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"microsoft_id": ms_id}})
 
         await _save_tokens(db, user["user_id"], token, email)
-        resp = RedirectResponse("/?ms=connected", status_code=302)
+        resp = RedirectResponse(f"{FRONTEND_URL}/?ms=connected", status_code=302)
         _set_cookies(resp, create_access_token(user["user_id"], user.get("email", email)),
                      create_refresh_token(user["user_id"]))
         logger.info("[MICROSOFT] %s connecté", email or ms_id)
