@@ -255,9 +255,10 @@
   width: 32px;
   height: 32px;
   padding: 0;
-  color: #bca25f;
-  background: rgba(35, 25, 6, 0.72);
-  border: 1px solid rgba(216, 184, 117, 0.34);
+  color: #f2d99a;
+  /* Fond bleu foncé cohérent avec le HUD (au lieu d'un brun qui tranchait) + liseré or renforcé */
+  background: rgba(6, 16, 28, 0.78);
+  border: 1px solid rgba(216, 184, 117, 0.5);
   border-radius: 8px;
   place-items: center;
   cursor: pointer;
@@ -1276,7 +1277,8 @@ body.hud-minimal .medallion-halo { display: none; }
 .auth-chip > span:first-of-type { overflow: hidden; text-overflow: ellipsis; }
 .auth-chip:hover { box-shadow: 0 0 14px rgba(216, 184, 117, 0.4); }
 .auth-chip img { width: 20px; height: 20px; border-radius: 50%; }
-.auth-admin-badge { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 9px; background: rgba(216, 184, 117, 0.16); border: 1px solid rgba(216, 184, 117, 0.65); color: #d8b875; font-size: 8px; letter-spacing: 0.14em; font-family: "Orbitron", sans-serif; vertical-align: middle; }
+/* Fond bleu foncé (cohérent avec le HUD, au lieu d'un brun délavé) + or renforcé pour le texte/liseré */
+.auth-admin-badge { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 9px; background: rgba(6, 16, 28, 0.75); border: 1px solid rgba(216, 184, 117, 0.85); color: #f2d99a; font-size: 8px; letter-spacing: 0.14em; font-family: "Orbitron", sans-serif; vertical-align: middle; text-shadow: 0 0 6px rgba(216, 184, 117, 0.45); }
 .admin-total { font-family: "Orbitron", sans-serif; font-size: 11px; color: #f2d99a; letter-spacing: 0.08em; margin-bottom: 10px; }
 .admin-loading { color: #9fb4c4; font-size: 12px; padding: 18px 0; }
 .admin-table-wrap { overflow-x: auto; }
@@ -4162,9 +4164,10 @@ body.hud-minimal .medallion-halo { display: none; }
   height: 34px;
   border-radius: 9px;
   cursor: pointer;
-  color: #ffb84d;
-  background: rgba(30, 18, 4, 0.7);
-  border: 1px solid rgba(255, 184, 77, 0.55);
+  color: #f2d99a;
+  /* Fond bleu foncé cohérent avec le HUD (au lieu d'un brun qui tranchait) + liseré or renforcé */
+  background: rgba(6, 16, 28, 0.78);
+  border: 1px solid rgba(216, 184, 117, 0.5);
   font-family: "Orbitron", sans-serif;
   font-size: 9px;
   letter-spacing: 0.12em;
@@ -4172,7 +4175,7 @@ body.hud-minimal .medallion-halo { display: none; }
   touch-action: none;
   transition: color 0.15s, background-color 0.15s, box-shadow 0.15s;
 }
-.ptt-btn:hover { box-shadow: 0 0 12px rgba(255, 184, 77, 0.4); }
+.ptt-btn:hover { box-shadow: 0 0 12px rgba(216, 184, 117, 0.4); }
 .ptt-btn.on {
   color: #1a0505;
   background: #c26b60;
