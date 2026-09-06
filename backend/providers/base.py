@@ -21,6 +21,7 @@ class MediaDescriptor:
     kind: str
     embeddable: bool
     external_url: str
+    controllable: bool = False
     embed_url: str | None = None
     message: str = ""
 

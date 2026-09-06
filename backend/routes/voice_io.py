@@ -4,6 +4,7 @@ Groq Whisper) et téléchargement des archives source."""
 
 import logging
 import os
+from collections import OrderedDict
 from pathlib import Path
 
 import httpx
@@ -12,6 +13,26 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
+
+# Cache LRU en mémoire pour les synthèses TTS répétées (ex. "SIRIUS est prêt.")
+_TTS_CACHE: OrderedDict[tuple, dict] = OrderedDict()
+_TTS_CACHE_MAX = 64
+
+
+def _cache_get(key: tuple) -> dict | None:
+    if key in _TTS_CACHE:
+        _TTS_CACHE.move_to_end(key)
+        return _TTS_CACHE[key]
+    return None
+
+
+def _cache_set(key: tuple, value: dict) -> None:
+    if key in _TTS_CACHE:
+        _TTS_CACHE.move_to_end(key)
+    else:
+        _TTS_CACHE[key] = value
+        if len(_TTS_CACHE) > _TTS_CACHE_MAX:
+            _TTS_CACHE.popitem(last=False)
 
 
 class GoogleTTSRequest(BaseModel):
@@ -31,6 +52,16 @@ ALLOWED_TTS_VOICES = {
 def make_voice_io_router():
     router = APIRouter(tags=["voice-io"])
 
+    @router.get("/tts/google")
+    async def google_tts_info():
+        """Sonde de disponibilité (les anciens clients/moniteurs interrogent cette route en GET)."""
+        return {
+            "ok": True,
+            "provider": "google",
+            "configured": bool(os.environ.get("GOOGLE_TTS_API_KEY")),
+            "message": "Utiliser POST /api/tts/google pour synthétiser.",
+        }
+
     @router.post("/tts/google")
     async def google_tts(req: GoogleTTSRequest):
         key = os.environ.get("GOOGLE_TTS_API_KEY")
@@ -39,13 +70,22 @@ def make_voice_io_router():
         text = req.text.strip()[:4500]
         if not text:
             raise HTTPException(status_code=400, detail="Texte vide")
+        voice = req.voice if req.voice in ALLOWED_TTS_VOICES else "fr-FR-Neural2-G"
+        rate = max(0.5, min(2.0, req.rate))
+        pitch = max(-10.0, min(10.0, req.pitch))
+
+        cache_key = (text, voice, round(rate, 2), round(pitch, 2))
+        cached = _cache_get(cache_key)
+        if cached:
+            return cached
+
         payload = {
             "input": {"text": text},
-            "voice": {"languageCode": "fr-FR", "name": req.voice if req.voice in ALLOWED_TTS_VOICES else "fr-FR-Neural2-G"},
+            "voice": {"languageCode": "fr-FR", "name": voice},
             "audioConfig": {
                 "audioEncoding": "MP3",
-                "speakingRate": max(0.5, min(2.0, req.rate)),
-                "pitch": max(-10.0, min(10.0, req.pitch)),
+                "speakingRate": rate,
+                "pitch": pitch,
             },
         }
         try:
@@ -62,7 +102,9 @@ def make_voice_io_router():
         audio = r.json().get("audioContent")
         if not audio:
             raise HTTPException(status_code=502, detail="Réponse TTS sans audio")
-        return {"audio": audio, "format": "mp3"}
+        result = {"audio": audio, "format": "mp3"}
+        _cache_set(cache_key, result)
+        return result
 
     # Generic TTS endpoint wrapper (compatibility)
     @router.post("/tts")

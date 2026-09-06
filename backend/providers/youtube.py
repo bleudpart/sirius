@@ -30,8 +30,9 @@ def resolve(query: str = "", url: str = "", parent_host: str = "localhost") -> M
             title="Video YouTube",
             kind="video",
             embeddable=True,
+            controllable=True,
             external_url=f"https://www.youtube.com/watch?v={identifier}",
-            embed_url=f"https://www.youtube-nocookie.com/embed/{identifier}",
+            embed_url=f"https://www.youtube-nocookie.com/embed/{identifier}?enablejsapi=1",
         )
 
     cleaned_query = clean_query(query)
@@ -43,4 +44,3 @@ def resolve(query: str = "", url: str = "", parent_host: str = "localhost") -> M
         external_url=f"https://www.youtube.com/results?search_query={quote_query(cleaned_query)}",
         message="La recherche YouTube est ouverte dans un onglet pour respecter les regles d'integration de la plateforme.",
     )
-

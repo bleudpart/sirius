@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const BACKEND_BASE = process.env.REACT_APP_BACKEND_URL || "http://127.0.0.1:8001";
 const MEDIA_API = `${BACKEND_BASE}/api/media`;
+const HEARTBEAT_INTERVAL_MS = 20000;
+const HEARTBEAT_TIMEOUT_MS = 7000;
 
 export const MEDIA_PROVIDERS = [
   { id: "youtube", label: "YouTube" },
@@ -93,11 +95,17 @@ export function useMediaControl() {
             reject(new Error("Le controle multimedia n'a pas recu de reponse."));
           }, 5000);
           pendingRef.current.set(id, { resolve, reject, timeout });
-          socket.send(JSON.stringify({
-            type: "media_control",
-            request_id: id,
-            control: normalizedControl,
-          }));
+          try {
+            socket.send(JSON.stringify({
+              type: "media_control",
+              request_id: id,
+              control: normalizedControl,
+            }));
+          } catch (sendError) {
+            window.clearTimeout(timeout);
+            pendingRef.current.delete(id);
+            reject(sendError);
+          }
         });
       } else {
         const payload = await request("/control", {
@@ -119,6 +127,8 @@ export function useMediaControl() {
   useEffect(() => {
     let socket;
     let retryTimer;
+    let heartbeatTimer;
+    let heartbeatTimeout;
     let stopped = false;
     let attempt = 0;
 
@@ -140,6 +150,32 @@ export function useMediaControl() {
       }, delay);
     };
 
+    const clearHeartbeat = () => {
+      if (heartbeatTimer) window.clearInterval(heartbeatTimer);
+      if (heartbeatTimeout) window.clearTimeout(heartbeatTimeout);
+      heartbeatTimer = undefined;
+      heartbeatTimeout = undefined;
+    };
+
+    const startHeartbeat = () => {
+      clearHeartbeat();
+      heartbeatTimer = window.setInterval(() => {
+        if (!socket || socket.readyState !== WebSocket.OPEN) return;
+        const id = requestId();
+        try {
+          socket.send(JSON.stringify({ type: "ping", request_id: id }));
+        } catch {
+          socket.close();
+          return;
+        }
+        if (heartbeatTimeout) window.clearTimeout(heartbeatTimeout);
+        heartbeatTimeout = window.setTimeout(() => {
+          heartbeatTimeout = undefined;
+          if (socket && socket.readyState === WebSocket.OPEN) socket.close();
+        }, HEARTBEAT_TIMEOUT_MS);
+      }, HEARTBEAT_INTERVAL_MS);
+    };
+
     const connect = () => {
       if (stopped) return;
       try {
@@ -154,6 +190,7 @@ export function useMediaControl() {
       socket.onopen = () => {
         attempt = 0;
         setConnected(true);
+        startHeartbeat();
       };
       socket.onmessage = (event) => {
         let payload;
@@ -161,6 +198,11 @@ export function useMediaControl() {
           payload = JSON.parse(event.data);
         } catch (messageError) {
           setError(messageError.message || "Le serveur multimedia a envoye un message invalide.");
+          return;
+        }
+        if (payload.type === "media_pong") {
+          if (heartbeatTimeout) window.clearTimeout(heartbeatTimeout);
+          heartbeatTimeout = undefined;
           return;
         }
         if (payload.type === "media_state") {
@@ -187,6 +229,7 @@ export function useMediaControl() {
         }
       };
       socket.onclose = () => {
+        clearHeartbeat();
         setConnected(false);
         if (socketRef.current === socket) socketRef.current = null;
         rejectPending("La connexion multimedia a ete fermee.");
@@ -203,6 +246,7 @@ export function useMediaControl() {
     return () => {
       stopped = true;
       if (retryTimer) window.clearTimeout(retryTimer);
+      clearHeartbeat();
       rejectPending("Le controle multimedia a ete ferme.");
       if (socket) {
         socket.onopen = socket.onmessage = socket.onclose = socket.onerror = null;

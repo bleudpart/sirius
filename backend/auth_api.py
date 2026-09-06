@@ -150,7 +150,13 @@ def _set_cookies(response: Response, access_token: str, refresh_token: Optional[
 
 async def require_user(request: Request, db=None) -> dict:
     del db
+    # Cookie d'abord ; fallback Authorization: Bearer quand le cookie SameSite
+    # n'est pas rejoué (page localhost:3000 → API 127.0.0.1:8001 = cross-site).
     token = request.cookies.get("access_token") or ""
+    if not token:
+        auth_header = request.headers.get("authorization") or ""
+        if auth_header.lower().startswith("bearer "):
+            token = auth_header[7:].strip()
     return _user(_decode_token(token))
 
 
@@ -165,7 +171,7 @@ async def local_session(request: Request, response: Response):
     access = create_access_token(LEGACY_UID, LEGACY_UID, "admin")
     refresh = create_refresh_token(LEGACY_UID, LEGACY_UID, "admin")
     _set_cookies(response, access, refresh)
-    return _user({"sub": LEGACY_UID, "email": LEGACY_UID, "role": "admin"})
+    return {**_user({"sub": LEGACY_UID, "email": LEGACY_UID, "role": "admin"}), "access_token": access}
 
 
 @router.post("/login")
@@ -179,7 +185,7 @@ async def login(data: LoginRequest, request: Request, response: Response):
     access = create_access_token(LEGACY_UID, LEGACY_UID, "admin")
     refresh = create_refresh_token(LEGACY_UID, LEGACY_UID, "admin")
     _set_cookies(response, access, refresh)
-    return _user({"sub": LEGACY_UID, "email": LEGACY_UID, "role": "admin"})
+    return {**_user({"sub": LEGACY_UID, "email": LEGACY_UID, "role": "admin"}), "access_token": access}
 
 
 @router.get("/me")

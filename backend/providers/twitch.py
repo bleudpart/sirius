@@ -37,6 +37,7 @@ def resolve(query: str = "", url: str = "", parent_host: str = "localhost") -> M
             title=f"Twitch - {channel}",
             kind="stream",
             embeddable=True,
+            controllable=True,
             external_url=f"https://www.twitch.tv/{channel}",
             embed_url=f"https://player.twitch.tv/?channel={channel}&parent={parent}",
         )
@@ -50,4 +51,3 @@ def resolve(query: str = "", url: str = "", parent_host: str = "localhost") -> M
         external_url=f"https://www.twitch.tv/search?term={quote_query(cleaned_query)}",
         message="Selectionnez une chaine Twitch dans la recherche officielle.",
     )
-

@@ -40,6 +40,7 @@ def resolve(query: str = "", url: str = "", parent_host: str = "localhost") -> M
             title=f"Spotify {kind}",
             kind=kind,
             embeddable=True,
+            controllable=True,
             external_url=external_url,
             embed_url=f"https://open.spotify.com/embed/{kind}/{identifier}",
         )
@@ -53,4 +54,3 @@ def resolve(query: str = "", url: str = "", parent_host: str = "localhost") -> M
         external_url=f"https://open.spotify.com/search/{quote_query(cleaned_query)}",
         message="Ouvrez le resultat Spotify pour choisir un titre, un album ou une playlist.",
     )
-

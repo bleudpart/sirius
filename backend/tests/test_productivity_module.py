@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 import pytest
 
 import local_memory
+from auth_api import create_access_token
 from productivite.intent_productivite import parse_productivity_intent
 from productivite.routes_productivite import make_productivity_router
 from productivite.store import ProductivityStore
@@ -13,7 +14,9 @@ def productivity_client(tmp_path):
     app = FastAPI()
     store = ProductivityStore(tmp_path / "productivity-test.db")
     app.include_router(make_productivity_router(db=None, store=store))
-    return TestClient(app)
+    client = TestClient(app)
+    client.cookies.set("access_token", create_access_token("productivity-test", "productivity@test.local"))
+    return client
 
 
 def test_document_and_code_analysis_routes(productivity_client):

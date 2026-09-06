@@ -20,6 +20,8 @@ BASE_URL = base_url.rstrip("/")
 def api():
     session = requests.Session()
     session.headers.update({"Content-Type": "application/json"})
+    authenticated = session.post(f"{BASE_URL}/api/auth/local-session", timeout=20)
+    assert authenticated.status_code == 200, authenticated.text
     yield session
     session.close()
 

@@ -10,12 +10,12 @@ from providers.base import MediaDescriptor, MediaProviderError
 
 
 PROVIDER_CAPABILITIES = (
-    {"id": "youtube", "label": "YouTube", "embeddable": True},
-    {"id": "spotify", "label": "Spotify", "embeddable": True},
-    {"id": "twitch", "label": "Twitch", "embeddable": True},
-    {"id": "tiktok", "label": "TikTok", "embeddable": True},
-    {"id": "deezer", "label": "Deezer", "embeddable": True},
-    {"id": "netflix", "label": "Netflix", "embeddable": False},
+    {"id": "youtube", "label": "YouTube", "embeddable": True, "controllable": True},
+    {"id": "spotify", "label": "Spotify", "embeddable": True, "controllable": True},
+    {"id": "twitch", "label": "Twitch", "embeddable": True, "controllable": True},
+    {"id": "tiktok", "label": "TikTok", "embeddable": True, "controllable": False},
+    {"id": "deezer", "label": "Deezer", "embeddable": True, "controllable": False},
+    {"id": "netflix", "label": "Netflix", "embeddable": False, "controllable": False},
 )
 
 
@@ -37,4 +37,3 @@ class MediaProxy:
         if not resolver:
             raise MediaProviderError("Fournisseur multimedia non pris en charge.")
         return resolver(query=query, url=url, parent_host=parent_host)
-

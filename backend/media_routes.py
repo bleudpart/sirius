@@ -50,6 +50,7 @@ class MediaSessionManager:
             "query": "",
             "status": "idle",
             "embeddable": False,
+            "controllable": False,
             "embed_url": None,
             "external_url": "",
             "message": "",
@@ -89,6 +90,8 @@ class MediaSessionManager:
         state = self.state_for(user_id)
         if not state["provider"] and action != "close":
             raise MediaStateError("Aucun media n'est selectionne.")
+        if action in {"play", "pause", "stop", "seek", "toggle"} and not state.get("controllable"):
+            raise MediaStateError("Ce media utilise les controles officiels de sa plateforme.")
 
         status_for_action = {
             "play": "playing",
