@@ -340,6 +340,28 @@ function App() {
     if (tok) localStorage.setItem("sirius_spotify", JSON.stringify(tok));
     else localStorage.removeItem("sirius_spotify");
   }, []);
+  // Jeton de session applicatif obtenu après la connexion Outlook (cf. postMessage
+  // "microsoft-auth"). Le cookie posé par le callback Microsoft ne sert à rien : il est posé
+  // sur l'origine de MICROSOFT_REDIRECT_URI, différente de celle utilisée par le SPA pour
+  // appeler l'API (localhost vs 127.0.0.1) — sans ce jeton rejoué en Authorization: Bearer,
+  // tous les appels /api/microsoft/* échouent en 401 malgré une connexion "réussie".
+  const [msAuth, setMsAuth] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("sirius_ms_auth")) || null; } catch { return null; }
+  });
+  const msAuthRef = useRef(msAuth);
+  msAuthRef.current = msAuth;
+  const saveMsAuth = useCallback((tok) => {
+    setMsAuth(tok);
+    if (tok) localStorage.setItem("sirius_ms_auth", JSON.stringify(tok));
+    else localStorage.removeItem("sirius_ms_auth");
+  }, []);
+  // Ajoute automatiquement l'en-tête Authorization pour tous les appels Outlook/e-mails.
+  const msFetch = useCallback((path, options = {}) => {
+    const token = msAuthRef.current?.access_token;
+    const headers = { ...(options.headers || {}) };
+    if (token) headers.Authorization = "Bearer " + token;
+    return fetch(`${API}${path}`, { ...options, headers });
+  }, []);
   const userName = (profile?.name || "").trim();
   const [status, setStatus] = useState("idle");
   const [booting, setBooting] = useState(true);
@@ -1932,7 +1954,7 @@ function App() {
     pushStep(id, "Connexion à Microsoft Graph");
     let mails = null, nonLus = 0;
     try {
-      const r = await fetch(`${API}/microsoft/mail?top=5`);
+      const r = await msFetch(`/microsoft/mail?top=5`);
       const d = await r.json().catch(() => ({}));
       if (r.ok) {
         mails = (d.mails || []).map((m) => ({ de: m.de, sujet: m.sujet, apercu: m.apercu, lu: m.lu, date: m.recu }));
@@ -1971,7 +1993,7 @@ function App() {
     const lignes = mails.map((m) => `${m.lu ? "  " : "● "}${m.date || ""} — ${m.de}\n   ${m.sujet}\n   ${m.apercu || ""}`).join("\n\n");
     finishTask(id, { kind: "text", texte: lignes, legende: `Outlook · lecture de ${top.length} mail(s)` });
     setText(spoken); speakOut(spoken);
-  }, [openTask, pushStep, finishTask, failTask, speakOut]);
+  }, [openTask, pushStep, finishTask, failTask, speakOut, msFetch]);
 
   // Lecture des mails Gmail (compte Google connecté via l'Agenda) : voix + fenêtre HUD
   const readGmailAloud = useCallback(async (openOnly = false) => {
@@ -2025,7 +2047,7 @@ function App() {
   const launchOutlookMail = useCallback(async () => {    const id = openTask("OUTLOOK — BOÎTE DE RÉCEPTION", "outlook");
     pushStep(id, "Connexion à Microsoft Graph");
     try {
-    const r = await fetch(`${API}/microsoft/mail?top=12`);
+    const r = await msFetch(`/microsoft/mail?top=12`);
       const d = await r.json().catch(() => ({}));
       if (!r.ok) {
         failTask(id, d.detail || "Lecture impossible");
@@ -2046,7 +2068,7 @@ function App() {
       const m = nonLus > 0 ? `Vous avez ${nonLus} email${nonLus > 1 ? "s" : ""} non lu${nonLus > 1 ? "s" : ""}. Détails dans la fenêtre.` : "Aucun email non lu. Boîte affichée dans la fenêtre.";
       setText(m); speakOut(m);
     } catch (e) { failTask(id, "Microsoft Graph injoignable"); }
-  }, [openTask, pushStep, finishTask, failTask, speakOut]);
+  }, [openTask, pushStep, finishTask, failTask, speakOut, msFetch]);
 
   const launchOutlookAgenda = useCallback(async () => {
     const id = openTask("OUTLOOK — AGENDA (14 JOURS)", "outlook");
@@ -2057,7 +2079,7 @@ function App() {
         failTask(id, "Fuseau horaire local indisponible");
         return;
       }
-      const r = await fetch(`${API}/outlook/events?tz=${encodeURIComponent(tz)}`);
+      const r = await msFetch(`/outlook/events?tz=${encodeURIComponent(tz)}`);
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { failTask(id, d.detail || "Lecture impossible"); return; }
       pushStep(id, "Lecture du calendrier");
@@ -2068,7 +2090,7 @@ function App() {
       const m = evts.length ? `${evts.length} rendez-vous à venir. Prochain : ${evts[0].titre}, le ${evts[0].debut}. Agenda affiché.` : "Aucun rendez-vous à venir sur 14 jours.";
       setText(m); speakOut(m);
     } catch (e) { failTask(id, "Microsoft Graph injoignable"); }
-  }, [openTask, pushStep, finishTask, failTask, speakOut]);
+  }, [openTask, pushStep, finishTask, failTask, speakOut, msFetch]);
 
   // ── Assistant e-mails Outlook : classement par importance, résumé quotidien, actions confirmées ──
   const askEmailSetupQuestion = useCallback(() => {
@@ -2099,7 +2121,7 @@ function App() {
     const summaryLevel = /d[ée]taill[ée]/.test(low) ? "detaille" : "court";
     const vipMatches = [...low.matchAll(/vip\s*:?\s*([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})/gi)].map((m) => m[1]);
     try {
-      await fetch(`${API}/email/preferences`, {
+      await msFetch(`/email/preferences`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2108,7 +2130,7 @@ function App() {
         }),
       });
       for (const email of vipMatches) {
-        await fetch(`${API}/email/preferences/sender-rule`, {
+        await msFetch(`/email/preferences/sender-rule`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sender: email, rule: "vip" }),
@@ -2120,14 +2142,14 @@ function App() {
       + `tri par ${defaultSort}, résumé ${summaryLevel}${vipMatches.length ? `, ${vipMatches.length} VIP ajouté(s)` : ""}. `
       + "Voici tes e-mails.";
     setStatus("speaking"); setText(m); speakOut(m);
-  }, [speakOut]);
+  }, [speakOut, msFetch]);
 
   const fetchEmailBriefing = useCallback(async () => {
     const id = openTask("OUTLOOK — MES E-MAILS", "outlook");
     pushStep(id, "Vérification des préférences");
     let prefs;
     try {
-      const rp = await fetch(`${API}/email/preferences`);
+      const rp = await msFetch(`/email/preferences`);
       prefs = await rp.json().catch(() => ({}));
     } catch (e) {
       failTask(id, "Microsoft Graph injoignable"); setStatus("speaking");
@@ -2142,7 +2164,7 @@ function App() {
     pushStep(id, "Connexion à Microsoft Graph");
     let data;
     try {
-      const r = await fetch(`${API}/microsoft/mail/briefing?top=25`);
+      const r = await msFetch(`/microsoft/mail/briefing?top=25`);
       data = await r.json().catch(() => ({}));
       if (!r.ok) {
         if (r.status === 401 || r.status === 409) {
@@ -2224,7 +2246,7 @@ function App() {
       spoken += "Le reste est détaillé dans la fenêtre.";
     }
     setText(spoken); speakOut(spoken);
-  }, [openTask, pushStep, finishTask, failTask, speakOut, askEmailSetupQuestion]);
+  }, [openTask, pushStep, finishTask, failTask, speakOut, askEmailSetupQuestion, msFetch]);
 
   // Résout « le message 2 », « le premier », « le dernier » vers l'ID réel du dernier "Mes e-mails"
   const resolveEmailOrdinal = useCallback((text) => {
@@ -2254,14 +2276,14 @@ function App() {
     setStatus("thinking");
     try {
       if (action === "read") {
-        await fetch(`${API}/microsoft/mail/${mail.id}/read`, { method: "POST" }).catch(() => {});
+        await msFetch(`/microsoft/mail/${mail.id}/read`, { method: "POST" }).catch(() => {});
         setStatus("speaking");
         const m = `${mail.de} — ${mail.sujet}. ${mail.apercu || "Aucun aperçu disponible."}`;
         setText(m); speakOut(m);
         return;
       }
       if (action === "summarize") {
-        const r = await fetch(`${API}/microsoft/mail/${mail.id}/summary`);
+        const r = await msFetch(`/microsoft/mail/${mail.id}/summary`);
         const d = await r.json().catch(() => ({}));
         setStatus("speaking");
         const m = d.resume || "Je n'ai pas pu résumer ce message.";
@@ -2269,7 +2291,7 @@ function App() {
         return;
       }
       if (action === "mark_done") {
-        await fetch(`${API}/microsoft/mail/${mail.id}/read`, { method: "POST" });
+        await msFetch(`/microsoft/mail/${mail.id}/read`, { method: "POST" });
         setStatus("speaking");
         const m = `Message de ${mail.de} marqué comme traité.`;
         setText(m); speakOut(m);
@@ -2291,7 +2313,7 @@ function App() {
         const label = action === "archive" ? "archiver" : action === "delete" ? "supprimer" : "envoyer la réponse à";
         const path = action === "reply" ? `reply` : action;
         const body = action === "reply" ? { text: extraText || "", confirm: false } : { confirm: false };
-        const r = await fetch(`${API}/microsoft/mail/${mail.id}/${path}`, {
+        const r = await msFetch(`/microsoft/mail/${mail.id}/${path}`, {
           method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
         });
         const d = await r.json().catch(() => ({}));
@@ -2306,7 +2328,7 @@ function App() {
       const m = "Microsoft Graph injoignable pour cette action.";
       setText(m); speakOut(m);
     }
-  }, [speakOut]);
+  }, [speakOut, msFetch]);
 
   const confirmPendingEmailAction = useCallback(async (confirmed) => {
     const pending = pendingEmailAction;
@@ -2322,7 +2344,7 @@ function App() {
     try {
       const path = pending.action === "reply" ? "reply" : pending.action;
       const body = pending.action === "reply" ? { text: pending.text, confirm: true } : { confirm: true };
-      const r = await fetch(`${API}/microsoft/mail/${pending.id}/${path}`, {
+      const r = await msFetch(`/microsoft/mail/${pending.id}/${path}`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
       });
       const ok = r.ok;
@@ -2337,12 +2359,12 @@ function App() {
       const m = "Microsoft Graph injoignable, action non effectuée.";
       setText(m); speakOut(m);
     }
-  }, [pendingEmailAction, speakOut]);
+  }, [pendingEmailAction, speakOut, msFetch]);
 
   const setEmailSenderRule = useCallback(async (sender, rule) => {
     setStatus("thinking");
     try {
-      await fetch(`${API}/email/preferences/sender-rule`, {
+      await msFetch(`/email/preferences/sender-rule`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sender, rule }),
       });
@@ -2355,7 +2377,7 @@ function App() {
       const m = "Je n'ai pas pu enregistrer cette préférence.";
       setText(m); speakOut(m);
     }
-  }, [speakOut]);
+  }, [speakOut, msFetch]);
 
   const launchOutlookCreateEvent = useCallback(async (rest) => {
     const d = new Date();
@@ -2552,7 +2574,20 @@ function App() {
     let backendOrigin = "";
     try { backendOrigin = new URL(BACKEND_BASE).origin; } catch { /* ignore */ }
     const onMsg = (e) => {
-      if (e.origin !== window.location.origin && e.origin !== backendOrigin) return; // sécurité : n'accepte que notre SPA ou notre API
+      let allowed = e.origin === window.location.origin || e.origin === backendOrigin;
+      if (!allowed) {
+        // Cas Outlook : MICROSOFT_REDIRECT_URI (ex: http://localhost:8001/...) peut utiliser un
+        // hôte différent de BACKEND_BASE (ex: http://127.0.0.1:8001) tout en étant le MÊME serveur
+        // local — sinon ce postMessage est perdu et la connexion Outlook "réussie" côté Microsoft
+        // paraît quand même avoir échoué (Sirius ne reçoit jamais la confirmation ni les jetons).
+        try {
+          const o = new URL(e.origin);
+          const b = new URL(BACKEND_BASE);
+          const loopbackHosts = new Set(["localhost", "127.0.0.1", "[::1]"]);
+          allowed = loopbackHosts.has(o.hostname) && loopbackHosts.has(b.hostname) && o.port === b.port;
+        } catch { allowed = false; }
+      }
+      if (!allowed) return; // sécurité : n'accepte que notre SPA ou notre API locale
       const data = e.data;
       if (!data) return;
       if (data.type === "spotify-auth") {
@@ -2568,13 +2603,16 @@ function App() {
       }
       if (data.type === "microsoft-auth") {
         setStatus("speaking");
+        if (data.ok && data.access_token) {
+          saveMsAuth({ access_token: data.access_token, refresh_token: data.refresh_token });
+        }
         const m = data.ok ? "Outlook connecté. Demandez-moi « mes e-mails »." : "La connexion Outlook a échoué. Réessayez « connecte Outlook ».";
         setText(m); speakOut(m);
       }
     };
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);
-  }, [saveSpotify, speakOut]);
+  }, [saveSpotify, saveMsAuth, speakOut]);
 
   // Récupère le morceau en cours sur Spotify et l'annonce
   const fetchNowPlaying = useCallback(async () => {

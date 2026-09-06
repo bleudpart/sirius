@@ -32,16 +32,27 @@ logger = logging.getLogger("sirius.microsoft")
 FRONTEND_URL = (os.environ.get("FRONTEND_URL") or "http://localhost:3000").rstrip("/")
 
 
-def _ms_popup_response(ok: bool, code: str, message: str) -> HTMLResponse:
+def _ms_popup_response(ok: bool, code: str, message: str, tokens: dict | None = None) -> HTMLResponse:
     """La connexion Microsoft est ouverte par connectOutlook() dans un NOUVEL ONGLET
     (window.open) : une redirection classique vers FRONTEND_URL, une fois l'auth terminée,
     ferait donc démarrer une DEUXIÈME instance complète du SPA dans cet onglet (rechargement
     du HUD, nouvelle séquence de démarrage) — vu par l'utilisateur comme "un nouveau SIRIUS
     qui démarre" au lieu d'un simple retour à l'onglet original déjà ouvert. On renvoie donc
     une page minimale qui prévient l'onglet d'origine via postMessage puis se referme seule,
-    exactement comme pour la connexion Spotify (routes/spotify_routes.py)."""
+    exactement comme pour la connexion Spotify (routes/spotify_routes.py).
+
+    Le cookie de session posé par _set_cookies() ne sert à rien ici : cette page tourne sur
+    l'origine de MICROSOFT_REDIRECT_URI (ex: localhost:8001) alors que le SPA (localhost:3000)
+    appelle l'API sur une AUTRE origine (ex: 127.0.0.1:8001) — un cookie ne traverse jamais un
+    changement d'hôte. Sans jeton transmis explicitement ici, toutes les requêtes /api/microsoft/*
+    suivantes échouaient silencieusement en 401 malgré une connexion "réussie" en apparence.
+    On transmet donc access_token/refresh_token dans le postMessage, comme pour Spotify, afin que
+    le SPA les rejoue en en-tête Authorization: Bearer sur chaque appel Outlook."""
     import json as _json
-    payload = _json.dumps({"type": "microsoft-auth", "ok": ok, "code": code})
+    payload = {"type": "microsoft-auth", "ok": ok, "code": code}
+    if tokens:
+        payload.update(tokens)
+    payload = _json.dumps(payload)
     origin = _json.dumps(FRONTEND_URL)
     title = "Outlook connecté ✓" if ok else "Connexion Outlook échouée"
     return HTMLResponse(
@@ -50,6 +61,7 @@ def _ms_popup_response(ok: bool, code: str, message: str) -> HTMLResponse:
         f"<script>window.opener&&window.opener.postMessage({payload},{origin});"
         f"setTimeout(()=>window.close(),{'800' if ok else '2500'});</script></body></html>"
     )
+
 
 
 AUTHORITY = "https://login.microsoftonline.com/common"
@@ -464,9 +476,13 @@ def make_microsoft_router(db):
             await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"microsoft_id": ms_id}})
 
         await _save_tokens(db, user["user_id"], token, email)
-        resp = _ms_popup_response(True, "connected", f"Connecté en tant que {email or ms_id}.")
-        _set_cookies(resp, create_access_token(user["user_id"], user.get("email", email)),
-                     create_refresh_token(user["user_id"]))
+        app_access = create_access_token(user["user_id"], user.get("email", email))
+        app_refresh = create_refresh_token(user["user_id"])
+        resp = _ms_popup_response(
+            True, "connected", f"Connecté en tant que {email or ms_id}.",
+            tokens={"access_token": app_access, "refresh_token": app_refresh},
+        )
+        _set_cookies(resp, app_access, app_refresh)
         logger.info("[MICROSOFT] %s connecté", email or ms_id)
         return resp
 
