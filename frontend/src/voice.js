@@ -2,6 +2,7 @@
 // Voix de Sirius — synthèse locale ou Google Cloud TTS avec basculement
 // automatique sur la synthèse du navigateur si la clé est absente ou l'API indisponible.
 const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
+const TTS_REQUEST_TIMEOUT_MS = 8000;
 const MALE = /(paul|henri|thomas|nicolas|claude|mathieu|guillaume|daniel|jerome|male|homme|man|wavenet-d|wavenet-b|standard-b|standard-d)/i;
 const FEMALE = /(female|femme|amelie|audrey|marie|julie|celine|hortense|denise|eloise|charline|virginie|chantal|neural2-f|neural2-a|neural2-c|neural2-e|wavenet-a|wavenet-c|wavenet-e)/i;
 
@@ -96,17 +97,21 @@ export async function playAudio(base64, { volume = 1, onstart, onend } = {}) {
 
 async function speakGoogle(message, { voice, rate, pitch, volume = 1, onstart, onend }, seq) {
   if (Date.now() < googleDownUntil) return false;
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), TTS_REQUEST_TIMEOUT_MS);
   try {
     const r = await fetch(`${API}/tts/google`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: phonetic(message), voice, rate, pitch }),
+      signal: controller.signal,
     });
     if (!r.ok) {
       if (r.status === 503) googleDownUntil = Date.now() + 600000; // clé absente
       return false;
     }
     const d = await r.json();
+    window.clearTimeout(timeout);
     const audioBase64 = d.audio_base64 || d.audio;
     if (!audioBase64) return false;
     // Une voix plus récente a pris la parole pendant le chargement → on se tait (pas d'écho)
@@ -135,6 +140,8 @@ async function speakGoogle(message, { voice, rate, pitch, volume = 1, onstart, o
     });
   } catch (e) {
     return false;
+  } finally {
+    window.clearTimeout(timeout);
   }
 }
 

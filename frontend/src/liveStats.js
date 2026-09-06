@@ -60,6 +60,11 @@ function getClockValues() {
     timeLocal: formatLocalTime(nowLocal),
     timeUTC: formatUtcTime(nowUTC),
     dayLocal: formatLocalDate(nowLocal),
+    dayLocalCompact: nowLocal.toLocaleDateString("fr-FR", {
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
+    }),
   };
 }
 
@@ -75,7 +80,7 @@ export function LiveDate() {
 
 export function LiveClock({ variant = "hud" }) {
   useClockNow();
-  const { timeLocal, timeUTC, dayLocal } = getClockValues();
+  const { timeLocal, timeUTC, dayLocal, dayLocalCompact } = getClockValues();
 
   if (variant === "card") {
     return (
@@ -91,7 +96,7 @@ export function LiveClock({ variant = "hud" }) {
     <div className="hud-clock-values">
       <div className="hud-time" data-testid="sirius-time">{timeLocal}</div>
       <div className="hud-utc" data-testid="sirius-time-utc">UTC · {timeUTC}</div>
-      <div className="hud-date" data-testid="sirius-date">{dayLocal}</div>
+      <div className="hud-date" data-testid="sirius-date">{dayLocalCompact}</div>
     </div>
   );
 }
