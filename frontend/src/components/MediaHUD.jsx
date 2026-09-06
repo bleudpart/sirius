@@ -19,8 +19,12 @@ function readSpotifyTokens() {
   try { return JSON.parse(localStorage.getItem(SPOTIFY_TOKENS_KEY)) || null; } catch { return null; }
 }
 
-function isSpotifyLink(text) {
-  return /^spotify:|open\.spotify\.com/i.test(text || "");
+function looksLikeUrl(text) {
+  // Couvre les liens http(s):// (ex: open.spotify.com/track/..., youtube.com/watch?...)
+  // ainsi que les URI de type "spotify:track:...". Le champ RECHERCHE annonce
+  // explicitement accepter "un lien officiel" : il faut le transmettre tel quel
+  // en tant qu'URL a resoudre, jamais comme texte de recherche libre.
+  return /^[a-z][a-z0-9+.-]*:/i.test((text || "").trim());
 }
 
 function intentKey(intent) {
@@ -50,7 +54,20 @@ export default function MediaHUD({ onClose, onShowOnDisplay, initialIntent, stan
   const [query, setQuery] = useState(initialIntent?.query || "");
   const windowRef = useRef(null);
   const appliedIntent = useRef("");
+  const syncedProviderFromState = useRef(false);
   const initialKey = useMemo(() => intentKey(initialIntent), [initialIntent]);
+
+  // A l'ouverture du panneau, l'etat multimedia (dernier media resolu, persiste
+  // cote serveur) est recupere via refresh() independamment du selecteur FOURNISSEUR
+  // qui, lui, redemarre toujours sur "youtube" par defaut : sans cette synchronisation,
+  // le menu affichait "YouTube" alors que le lecteur montrait un titre Spotify deja charge.
+  useEffect(() => {
+    if (syncedProviderFromState.current) return;
+    if (initialKey && initialKey !== "{}") return; // une intention explicite est deja prioritaire
+    if (!state || !state.provider) return;
+    syncedProviderFromState.current = true;
+    setProvider(state.provider);
+  }, [state, initialKey]);
 
   const bringToFront = useCallback(() => {
     if (!standalone && windowRef.current) {
@@ -99,20 +116,30 @@ export default function MediaHUD({ onClose, onShowOnDisplay, initialIntent, stan
   }, [standalone]);
 
   const resolveSmart = useCallback(async ({ provider: targetProvider, query: rawQuery }) => {
+    const trimmed = (rawQuery || "").trim();
+
+    // Le champ RECHERCHE accepte aussi un lien officiel deja colle (placeholder
+    // "... ou lien officiel"). Il faut alors le transmettre en tant qu'URL a
+    // resoudre, jamais comme texte de recherche libre (sinon Spotify/YouTube le
+    // traitent comme une recherche generique non embarquable).
+    if (looksLikeUrl(trimmed)) {
+      return resolveMedia({ provider: targetProvider, url: trimmed });
+    }
+
     // Spotify n'a pas de page de recherche embarquable (Spotify ne fournit pas
     // d'iframe pour /search/...) : une recherche texte brute reste bloquée sur
     // "Ouvrez le résultat Spotify..." avec un bouton manuel. Si un compte Spotify
     // est déjà connecté, on utilise la recherche authentifiée (même route que le
     // lecteur Spotify dédié) pour récupérer un titre précis et le charger
     // directement dans le lecteur intégré, sans étape manuelle.
-    if (targetProvider === "spotify" && rawQuery && !isSpotifyLink(rawQuery)) {
+    if (targetProvider === "spotify" && trimmed) {
       const tokens = readSpotifyTokens();
       if (tokens && (tokens.access_token || tokens.refresh_token)) {
         try {
           const r = await fetch(`${API}/spotify/search`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...tokens, query: rawQuery }),
+            body: JSON.stringify({ ...tokens, query: trimmed }),
           });
           const d = await r.json().catch(() => ({}));
           if (r.ok && d.access_token) {
@@ -127,7 +154,7 @@ export default function MediaHUD({ onClose, onShowOnDisplay, initialIntent, stan
         }
       }
     }
-    return resolveMedia({ provider: targetProvider, query: rawQuery });
+    return resolveMedia({ provider: targetProvider, query: trimmed });
   }, [resolveMedia]);
 
   const resolve = useCallback(async (event) => {
