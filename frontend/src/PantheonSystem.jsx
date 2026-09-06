@@ -190,7 +190,7 @@ export default function PantheonSystem({ onClose, keys }) {
             return (
               <div className="zc-bar-row" key={s.name}>
                 <span className="prime-intent-name">{s.name}</span>
-                <div className="zc-bar-track"><div className="zc-bar-fill" style={{ width: `${health}%`, background: health > 60 ? "#34d399" : health > 0 ? "#ff9500" : "#f43f5e", boxShadow: "0 0 8px rgba(52,211,153,0.5)" }} /></div>
+                <div className="zc-bar-track"><div className="zc-bar-fill" style={{ width: `${health}%`, background: health > 60 ? "#91e6f2" : health > 0 ? "#ff9500" : "#f43f5e", boxShadow: "0 0 8px rgba(52,211,153,0.5)" }} /></div>
                 <b className="prime-intent-count">{s.latency != null ? `${s.latency}ms` : "—"}</b>
               </div>
             );
@@ -233,7 +233,7 @@ export default function PantheonSystem({ onClose, keys }) {
             {history.map((h) => (
               <div className="prime-journal-row" key={h.id}>
                 <span className="prime-time">{(h.created_at || "").slice(11, 16)}</span>
-                <span className="prime-journal-text">{h.service} — {h.action} <b style={{ color: h.status === "OK" ? "#34d399" : "#f43f5e" }}>[{h.status}]</b></span>
+                <span className="prime-journal-text">{h.service} — {h.action} <b style={{ color: h.status === "OK" ? "#91e6f2" : "#f43f5e" }}>[{h.status}]</b></span>
               </div>
             ))}
             {history.length === 0 && <div className="memory-empty">Aucune interaction enregistrée.</div>}

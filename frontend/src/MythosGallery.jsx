@@ -52,7 +52,7 @@ export default function MythosGallery({ onClose, onOpenModule, initialModule = n
   }, []);
 
   const sel = active;
-  const selColor = sel ? (COLOR_HEX[sel.style.color] || "#22d3ee") : "#22d3ee";
+  const selColor = sel ? (COLOR_HEX[sel.style.color] || "#91e6f2") : "#91e6f2";
 
   // Chaque personnage se présente avec son propre timbre à l'ouverture de sa fiche
   useEffect(() => {
@@ -77,7 +77,7 @@ export default function MythosGallery({ onClose, onOpenModule, initialModule = n
         {/* Rangée de vignettes */}
         <div className="mg-thumbs" data-testid="mythos-gallery-thumbs">
           {chars.map((c) => {
-            const col = COLOR_HEX[c.style.color] || "#22d3ee";
+            const col = COLOR_HEX[c.style.color] || "#91e6f2";
             const on = sel && sel.module === c.module;
             return (
               <button

@@ -17,8 +17,8 @@ async function postFix(err, confirmed) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      fixId: err.fixId, errorType: err.errorType,
-      confirmed, actionToken: err.actionToken || null,
+      fixId: err.fixId,
+      confirmed,
     }),
   });
   return r.json();
@@ -173,7 +173,7 @@ export default function ArgusPanel({ onClose, onClientAction, onRepaired }) {
           className="mythos-avatar"
         />
       )}
-      <div className="prime-sub">DÉTECTION CONTINUE · AUTO / SÉVÈRE / CRITIQUE · RÉPARATIONS SÉCURISÉES PAR JETON</div>
+      <div className="prime-sub">DÉTECTION CONTINUE · AUTO / SÉVÈRE / CRITIQUE · RÉPARATIONS SUR LISTE BLANCHE</div>
 
       <div className="argus-body">
         <div className="haccp-tabs">

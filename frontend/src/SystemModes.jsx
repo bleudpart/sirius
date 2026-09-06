@@ -171,7 +171,7 @@ export function VisionModule({ onClose, onSpeak, keys, autoAnalyze }) {
       </div>
       {desc && (
         <div className="vision-result" data-testid="vision-result" style={{ display: "flex", gap: 10, alignItems: "flex-start", marginTop: 8 }}>
-          {snap && <img src={snap} alt="Capture" data-testid="vision-snapshot" style={{ width: 96, borderRadius: 6, border: "1px solid rgba(34,211,238,0.35)", flexShrink: 0 }} />}
+          {snap && <img src={snap} alt="Capture" data-testid="vision-snapshot" style={{ width: 96, borderRadius: 6, border: "1px solid rgba(145,230,242,0.35)", flexShrink: 0 }} />}
           <div style={{ minWidth: 0 }}>
             <p className="vision-desc" data-testid="vision-description" style={{ margin: 0 }}>{desc}</p>
             {ocr && (

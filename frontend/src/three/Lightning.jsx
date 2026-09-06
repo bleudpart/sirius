@@ -3,7 +3,7 @@ import { useRef, useMemo } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 
-const PALETTE = ["#ff7a1a", "#ff2d55", "#ff3ba7", "#2dff6a", "#22d3ee", "#a06bff"];
+const PALETTE = ["#ff7a1a", "#ff2d55", "#ff3ba7", "#2dff6a", "#91e6f2", "#a06bff"];
 const SEGS = 9;
 
 // Un éclair jagged entre un point de départ (main) et le centre (triangle)

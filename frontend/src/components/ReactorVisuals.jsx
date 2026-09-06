@@ -394,13 +394,15 @@ export function Waveform({ status, color }) {
         return mid + Math.sin(nx * 18 + t * (2.2 + li)) * mid * amp * env
                    + Math.sin(nx * 41 - t * 3) * mid * amp * 0.35 * env;
       };
-      // Dégradé cyan ↔ or animé le long de l'onde
+      // Dégradé cyan ↔ or animé le long de l'onde — palette resynchronisée avec les anneaux
+      // du globe (cyan #4ff0ff/#7fd8ff/#b6f0ff, or #ffd166/#ffc978) : la ligne se fond
+      // désormais dans le HUD actuel au lieu de garder l'ancien cyan/or plus vif et isolé.
       const grad = ctx.createLinearGradient(0, 0, w, 0);
       const ph = (Math.sin(t * 0.7) + 1) / 2;
-      grad.addColorStop(0, "#22d3ee");
-      grad.addColorStop(Math.max(0.12, Math.min(0.88, 0.5 - ph * 0.25)), "#f5c542");
-      grad.addColorStop(Math.max(0.14, Math.min(0.9, 0.5 + ph * 0.25)), "#ffd75e");
-      grad.addColorStop(1, "#22d3ee");
+      grad.addColorStop(0, "#7fd8ff");
+      grad.addColorStop(Math.max(0.12, Math.min(0.88, 0.5 - ph * 0.25)), "#ffd166");
+      grad.addColorStop(Math.max(0.14, Math.min(0.9, 0.5 + ph * 0.25)), "#ffc978");
+      grad.addColorStop(1, "#7fd8ff");
       // Spectre pointu (pics verticaux symétriques) — style hologramme cyan
       ctx.beginPath();
       for (let x = 0; x <= w; x += 3 * DPR) {
@@ -411,11 +413,11 @@ export function Waveform({ status, color }) {
         ctx.moveTo(x, mid - sh);
         ctx.lineTo(x, mid + sh);
       }
-      ctx.strokeStyle = "#5ee9fb";
+      ctx.strokeStyle = "#4ff0ff";
       ctx.globalAlpha = 0.85;
       ctx.lineWidth = 1.3 * DPR;
       ctx.shadowBlur = 10;
-      ctx.shadowColor = "#22d3ee";
+      ctx.shadowColor = "#7fd8ff";
       ctx.stroke();
       // Onde fluide dorée en surimpression
       ctx.beginPath();
@@ -430,7 +432,7 @@ export function Waveform({ status, color }) {
       ctx.globalAlpha = 0.9;
       ctx.lineWidth = 1.6 * DPR;
       ctx.shadowBlur = 12;
-      ctx.shadowColor = "#f5c542";
+      ctx.shadowColor = "#ffd166";
       ctx.stroke();
       // Ligne d'horizon lumineuse
       ctx.beginPath();
@@ -440,7 +442,7 @@ export function Waveform({ status, color }) {
       ctx.globalAlpha = 0.55;
       ctx.lineWidth = 1 * DPR;
       ctx.shadowBlur = 8;
-      ctx.shadowColor = "#7ff3ff";
+      ctx.shadowColor = "#b6f0ff";
       ctx.stroke();
       // Particules dorées émises par l'onde quand Sirius parle (ou fort niveau micro)
       const emitting = st === "speaking" || (st === "listening" && levelRef.current > 0.25);
@@ -462,8 +464,8 @@ export function Waveform({ status, color }) {
         p.x += p.vx; p.y += p.vy; p.vy *= 0.985; p.life -= p.decay;
         if (p.life <= 0) return false;
         ctx.globalAlpha = p.life * 0.9;
-        ctx.fillStyle = p.gold ? "#ffd75e" : "#7ff3ff";
-        ctx.shadowColor = p.gold ? "#f5c542" : "#22d3ee";
+        ctx.fillStyle = p.gold ? "#ffd166" : "#b6f0ff";
+        ctx.shadowColor = p.gold ? "#ffc978" : "#7fd8ff";
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.r * (0.6 + p.life * 0.6), 0, Math.PI * 2);
         ctx.fill();

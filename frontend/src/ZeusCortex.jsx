@@ -32,10 +32,10 @@ function RingGauge({ label, value, color, testid }) {
 }
 
 const SUBSYSTEMS = [
-  { name: "LOGIQUE", key: "logique", color: "#22d3ee" },
+  { name: "LOGIQUE", key: "logique", color: "#91e6f2" },
   { name: "LANGAGE", key: "langage", color: "#ff9500" },
   { name: "VISION", key: "vision", color: "#a855f7" },
-  { name: "INTUITION", key: "intuition", color: "#34d399" },
+  { name: "INTUITION", key: "intuition", color: "#91e6f2" },
 ];
 const MODULES = [
   { name: "Oracle Divin", on: true },
@@ -118,7 +118,7 @@ export default function ZeusCortex({ onClose, onAsk, answer, speaking }) {
         line(w1, cw, ch, (i) => ch / 2
           + Math.sin(i * 0.06 + t * 2.4) * ch * 0.16
           + Math.sin(i * 0.19 + t * 4.1) * ch * 0.10
-          + Math.sin(i * 0.42 + t * 7.3) * ch * 0.05, "#22d3ee");
+          + Math.sin(i * 0.42 + t * 7.3) * ch * 0.05, "#91e6f2");
       }
       if (o1) {
         const cw = oscRef.current.clientWidth, ch = oscRef.current.clientHeight;
@@ -137,8 +137,8 @@ export default function ZeusCortex({ onClose, onAsk, answer, speaking }) {
         const bw = cw / bars.length;
         bars.forEach((b, i) => {
           bars[i] = Math.max(0.08, Math.min(1, b + (Math.random() - 0.5) * 0.08));
-          a1.fillStyle = "rgba(34,211,238,0.75)";
-          a1.shadowColor = "#22d3ee";
+          a1.fillStyle = "rgba(145,230,242,0.75)";
+          a1.shadowColor = "#91e6f2";
           a1.shadowBlur = 5;
           a1.fillRect(i * bw + 1, ch * (1 - bars[i]), bw - 2, ch * bars[i]);
         });
@@ -177,7 +177,7 @@ export default function ZeusCortex({ onClose, onAsk, answer, speaking }) {
         <div className="zc-section-title">CANAL DE DONNÉES</div>
         <canvas ref={waveRef} className="zc-canvas" />
         <div className="zc-rings">
-          <RingGauge label="ACTIVITÉ COGNITIVE" value={stats.cog} color="#22d3ee" testid="zeus-gauge-cog" />
+          <RingGauge label="ACTIVITÉ COGNITIVE" value={stats.cog} color="#91e6f2" testid="zeus-gauge-cog" />
           <RingGauge label="CHARGE MÉMOIRE" value={stats.mem} color="#ff9500" testid="zeus-gauge-mem" />
         </div>
         {totals && (
@@ -200,7 +200,7 @@ export default function ZeusCortex({ onClose, onAsk, answer, speaking }) {
         <canvas ref={oscRef} className="zc-canvas" />
         <div className="zc-section-title">VÉRIFICATION SYSTÈME</div>
         <div className="zc-bar-track big">
-          <div className="zc-bar-fill" style={{ width: `${stats.verifL}%`, background: "#22d3ee", boxShadow: "0 0 10px #22d3ee" }} />
+          <div className="zc-bar-fill" style={{ width: `${stats.verifL}%`, background: "#91e6f2", boxShadow: "0 0 10px #91e6f2" }} />
         </div>
         <div className="zc-kv-row">
           <div className="zc-kv"><span>TRAITEMENT</span><b data-testid="zeus-speed">{stats.ms} ms</b></div>

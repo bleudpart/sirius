@@ -96,7 +96,7 @@ export default function ScriptInstaller({ onClose, onSpeak }) {
             />
             <textarea
               className="mm-edit-area"
-              style={{ width: "100%", minHeight: 180, background: "rgba(0,18,30,0.9)", border: "1px solid rgba(0,240,255,0.4)", color: "#d5f6ff", fontFamily: "monospace", fontSize: 12, padding: 10, outline: "none", resize: "vertical" }}
+              style={{ width: "100%", minHeight: 180, background: "rgba(0,18,30,0.9)", border: "1px solid rgba(145,230,242,0.4)", color: "#d5f6ff", fontFamily: "monospace", fontSize: 12, padding: 10, outline: "none", resize: "vertical" }}
               value={script}
               onChange={(e) => { setScript(e.target.value); setAnalysis(null); }}
               placeholder="Collez ici le script à installer (Python, JS, TS, Bash, config, module SIRIUS)..."

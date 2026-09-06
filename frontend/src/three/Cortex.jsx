@@ -22,7 +22,7 @@ export default function Cortex({ pulseRef, cortexRef, active = false }) {
     blending: THREE.AdditiveBlending, depthWrite: false,
   }), []);
   const midMat = useMemo(() => new THREE.LineBasicMaterial({
-    color: "#22d3ee", transparent: true, opacity: 0.75,
+    color: "#91e6f2", transparent: true, opacity: 0.75,
     blending: THREE.AdditiveBlending, depthWrite: false,
   }), []);
   const fillMat = useMemo(() => new THREE.MeshBasicMaterial({

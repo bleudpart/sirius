@@ -6,9 +6,9 @@ import { Sun, Cloud, CloudRain, CloudSnow, CloudFog, CloudLightning } from "luci
 import { formatLocalDate, formatLocalTime } from "@/dateTime";
 
 export const STATES = {
-  idle: { label: "EN VEILLE", color: "#22d3ee", glow: "#0ea5b7" },
+  idle: { label: "EN VEILLE", color: "#91e6f2", glow: "#0ea5b7" },
   listening: { label: "À L'ÉCOUTE", color: "#38bdf8", glow: "#0284c7" },
-  thinking: { label: "RÉFLEXION", color: "#fbbf24", glow: "#d97706" },
+  thinking: { label: "RÉFLEXION", color: "#d8b875", glow: "#d97706" },
   speaking: { label: "EN RÉPONSE", color: "#5eead4", glow: "#14b8a6" },
 };
 

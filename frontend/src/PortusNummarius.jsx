@@ -18,7 +18,7 @@ function Spark({ data, up }) {
   const pts = data.map((v, i) => `${(i / (data.length - 1)) * 70},${22 - ((v - min) / span) * 20}`).join(" ");
   return (
     <svg width="70" height="24" className="numm-spark">
-      <polyline points={pts} fill="none" stroke={up ? "#34d399" : "#f87171"} strokeWidth="1.5" />
+      <polyline points={pts} fill="none" stroke={up ? "#91e6f2" : "#c98175"} strokeWidth="1.5" />
     </svg>
   );
 }
@@ -114,17 +114,17 @@ export default function PortusNummarius({ onClose }) {
                     <AreaChart data={chartData} margin={{ top: 12, right: 16, left: 0, bottom: 4 }}>
                       <defs>
                         <linearGradient id="nummFill" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor={up ? "#34d399" : "#f87171"} stopOpacity={0.45} />
-                          <stop offset="100%" stopColor={up ? "#34d399" : "#f87171"} stopOpacity={0.02} />
+                          <stop offset="0%" stopColor={up ? "#91e6f2" : "#c98175"} stopOpacity={0.45} />
+                          <stop offset="100%" stopColor={up ? "#91e6f2" : "#c98175"} stopOpacity={0.02} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid stroke="rgba(245,197,66,0.08)" vertical={false} />
-                      <XAxis dataKey="d" tick={{ fill: "#8aa2b5", fontSize: 10 }} tickLine={false} axisLine={{ stroke: "rgba(245,197,66,0.25)" }} minTickGap={40} />
+                      <CartesianGrid stroke="rgba(216,184,117,0.08)" vertical={false} />
+                      <XAxis dataKey="d" tick={{ fill: "#8aa2b5", fontSize: 10 }} tickLine={false} axisLine={{ stroke: "rgba(216,184,117,0.25)" }} minTickGap={40} />
                       <YAxis domain={["auto", "auto"]} tick={{ fill: "#8aa2b5", fontSize: 10 }} tickLine={false} axisLine={false} width={62}
                         tickFormatter={(v) => fmtPrice(v)} />
-                      <Tooltip contentStyle={{ background: "rgba(5,14,22,0.95)", border: "1px solid rgba(245,197,66,0.5)", borderRadius: 8, fontSize: 12, color: "#ffe9a8" }}
+                      <Tooltip contentStyle={{ background: "rgba(5,14,22,0.95)", border: "1px solid rgba(216,184,117,0.5)", borderRadius: 8, fontSize: 12, color: "#f2d99a" }}
                         formatter={(v) => [`${fmtPrice(v)} $`, sel.label]} labelStyle={{ color: "#7fd4e8" }} />
-                      <Area type="monotone" dataKey="v" stroke={up ? "#34d399" : "#f87171"} strokeWidth={2} fill="url(#nummFill)" dot={false} animationDuration={600} />
+                      <Area type="monotone" dataKey="v" stroke={up ? "#91e6f2" : "#c98175"} strokeWidth={2} fill="url(#nummFill)" dot={false} animationDuration={600} />
                     </AreaChart>
                   </ResponsiveContainer>
                 )}

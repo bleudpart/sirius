@@ -6,11 +6,11 @@ import StarField from "@/StarField";
 const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
 
 const NODES = [
-  { id: "cortex", name: "ZEUS CORTEX", color: "#ffd77a" },
-  { id: "prime", name: "SIRIUS PRIME", color: "#22d3ee" },
+  { id: "cortex", name: "ZEUS CORTEX", color: "#e3c98e" },
+  { id: "prime", name: "SIRIUS PRIME", color: "#91e6f2" },
   { id: "oracle", name: "ORACLE DIVIN", color: "#a855f7" },
   { id: "pantheon", name: "PANTHEON", color: "#ff9500" },
-  { id: "dev", name: "COMPAGNON DEV", color: "#34d399" },
+  { id: "dev", name: "COMPAGNON DEV", color: "#91e6f2" },
   { id: "files", name: "FICHIERS", color: "#38bdf8" },
 ];
 
@@ -66,7 +66,7 @@ export default function NexusCeleste({ onClose }) {
       // Liens + impulsions
       pos.forEach((n, i) => {
         const grad = x.createLinearGradient(cx, cy, n.x, n.y);
-        grad.addColorStop(0, "rgba(34,211,238,0.55)");
+        grad.addColorStop(0, "rgba(145,230,242,0.55)");
         grad.addColorStop(1, n.color);
         x.strokeStyle = grad;
         x.lineWidth = 1.2;
@@ -100,8 +100,8 @@ export default function NexusCeleste({ onClose }) {
       const pr = 16 + Math.sin(t * 2.4) * 3;
       const g = x.createRadialGradient(cx, cy, 0, cx, cy, pr * 2.4);
       g.addColorStop(0, "rgba(255,255,255,0.95)");
-      g.addColorStop(0.4, "rgba(34,211,238,0.8)");
-      g.addColorStop(1, "rgba(34,211,238,0)");
+      g.addColorStop(0.4, "rgba(145,230,242,0.8)");
+      g.addColorStop(1, "rgba(145,230,242,0)");
       x.fillStyle = g;
       x.beginPath();
       x.arc(cx, cy, pr * 2.4, 0, Math.PI * 2);
@@ -152,7 +152,7 @@ export default function NexusCeleste({ onClose }) {
             </div>
             <div className="zc-kv-row" style={{ marginTop: 10 }}>
               <div className="zc-kv"><span>SYNCHRONISATION</span><b>{sync}%</b></div>
-              <div className="zc-kv"><span>ÉTAT DU NEXUS</span><b style={{ color: "#34d399" }}>STABLE</b></div>
+              <div className="zc-kv"><span>ÉTAT DU NEXUS</span><b style={{ color: "#91e6f2" }}>STABLE</b></div>
             </div>
           </section>
         </div>

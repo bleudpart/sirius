@@ -47,12 +47,12 @@ function MonthlyChart({ data }) {
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
         {[0.25, 0.5, 0.75, 1].map((f) => (
-          <line key={f} x1={P} x2={W - P} y1={y(max * f)} y2={y(max * f)} stroke="rgba(245,197,66,0.12)" strokeWidth="1" />
+          <line key={f} x1={P} x2={W - P} y1={y(max * f)} y2={y(max * f)} stroke="rgba(216,184,117,0.12)" strokeWidth="1" />
         ))}
-        <path d={area("in")} fill="rgba(245,197,66,0.13)" />
-        <path d={area("out")} fill="rgba(34,211,238,0.10)" />
-        <path d={path("in")} fill="none" stroke="#f5c542" strokeWidth="2" />
-        <path d={path("out")} fill="none" stroke="#22d3ee" strokeWidth="2" />
+        <path d={area("in")} fill="rgba(216,184,117,0.13)" />
+        <path d={area("out")} fill="rgba(145,230,242,0.10)" />
+        <path d={path("in")} fill="none" stroke="#d8b875" strokeWidth="2" />
+        <path d={path("out")} fill="none" stroke="#91e6f2" strokeWidth="2" />
         {data.map((d, i) => (
           <g key={d.m}>
             <circle cx={x(i)} cy={y(d.in)} r="2.6" fill="#ffd75e" />

@@ -7,7 +7,7 @@
   width: min(440px, 92vw);
   z-index: 96;
   background: rgba(3, 14, 24, 0.96);
-  border: 1px solid rgba(34, 211, 238, 0.35);
+  border: 1px solid rgba(145, 230, 242, 0.35);
   border-radius: 8px;
   padding: 26px 28px 24px;
   backdrop-filter: blur(12px);
@@ -19,7 +19,7 @@
   color: #9fd3e8; background: transparent; border: 1px solid transparent;
   transition: color 0.2s, border-color 0.2s;
 }
-.about-close:hover { color: #eafaff; border-color: rgba(34, 211, 238, 0.5); }
+.about-close:hover { color: #eafaff; border-color: rgba(145, 230, 242, 0.5); }
 .about-title {
   margin: 0 0 12px;
   font-family: "Orbitron", sans-serif;

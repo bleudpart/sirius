@@ -43,8 +43,8 @@ export default function MythosBackdrop({ module, state = "idle" }) {
   }, [module]);
 
   if (!char) return null;
-  const glow = COLOR_GLOW[char.style.color] || "rgba(0,240,255,0.5)";
-  const hex = COLOR_HEX[char.style.color] || "#22d3ee";
+  const glow = COLOR_GLOW[char.style.color] || "rgba(145,230,242,0.5)";
+  const hex = COLOR_HEX[char.style.color] || "#91e6f2";
   const column = char.column;
   const jug = char.jug;
 

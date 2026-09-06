@@ -631,7 +631,7 @@ export function BootScreen({ onDone, userName, onOpenModule }) {
               ))}
             </div>
           </div>
-          <ReactorCore status="thinking" volume={0.35} color="#22d3ee" eco={false} />
+          <ReactorCore status="thinking" volume={0.35} color="#91e6f2" eco={false} />
         </div>
         <h1 className="boot-title" data-testid="boot-title"><img src="/holo/sirius-title.png" alt="Σ.I.R.I.U.S" className="boot-title-img" draggable={false} /></h1>
         <div className="boot-acronym" data-testid="boot-acronym">

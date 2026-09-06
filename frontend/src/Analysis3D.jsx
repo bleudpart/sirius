@@ -6,8 +6,8 @@ import * as THREE from "three";
 import { X, Boxes, MousePointer2 } from "lucide-react";
 import "./Analysis3D.css";
 
-const GOLD = "#f5c542";
-const CYAN = "#22d3ee";
+const GOLD = "#d8b875";
+const CYAN = "#91e6f2";
 
 function makeTextTexture(title, text) {
   const W = 1024;
@@ -29,10 +29,10 @@ function makeTextTexture(title, text) {
   const x = c.getContext("2d");
   x.fillStyle = "rgba(2, 14, 24, 0.92)";
   x.fillRect(0, 0, W, H);
-  x.strokeStyle = "rgba(245,197,66,0.85)";
+  x.strokeStyle = "rgba(216,184,117,0.85)";
   x.lineWidth = 4;
   x.strokeRect(6, 6, W - 12, H - 12);
-  x.strokeStyle = "rgba(34,211,238,0.4)";
+  x.strokeStyle = "rgba(145,230,242,0.4)";
   x.lineWidth = 2;
   x.strokeRect(16, 16, W - 32, H - 32);
   x.fillStyle = GOLD;

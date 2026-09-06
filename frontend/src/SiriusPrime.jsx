@@ -4,7 +4,7 @@ import { X, Sparkles, BookOpenText, Map, Database, Lightbulb, Trash2, Pencil, Ch
 
 const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
 const DAYS = ["LUN", "MAR", "MER", "JEU", "VEN", "SAM", "DIM"];
-const BAR_COLORS = ["#22d3ee", "#ff9500", "#a855f7", "#34d399", "#f43f5e", "#ffe600"];
+const BAR_COLORS = ["#91e6f2", "#ff9500", "#a855f7", "#91e6f2", "#f43f5e", "#ffe600"];
 
 function ConfidenceRing({ value }) {
   const C = 2 * Math.PI * 52;
@@ -12,9 +12,9 @@ function ConfidenceRing({ value }) {
     <svg viewBox="0 0 120 120" width="120" height="120" data-testid="prime-confidence">
       <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="8" />
       <circle
-        cx="60" cy="60" r="52" fill="none" stroke="#22d3ee" strokeWidth="8" strokeLinecap="round"
+        cx="60" cy="60" r="52" fill="none" stroke="#91e6f2" strokeWidth="8" strokeLinecap="round"
         strokeDasharray={C} strokeDashoffset={C * (1 - value / 100)} transform="rotate(-90 60 60)"
-        style={{ filter: "drop-shadow(0 0 8px #22d3ee)", transition: "stroke-dashoffset 1s ease" }}
+        style={{ filter: "drop-shadow(0 0 8px #91e6f2)", transition: "stroke-dashoffset 1s ease" }}
       />
       <text x="60" y="66" textAnchor="middle" fill="#eafaff" fontSize="26" fontFamily="Orbitron">{value}%</text>
     </svg>
@@ -83,8 +83,8 @@ export default function SiriusPrime({ onClose }) {
     const bw = cw / 24;
     hours.forEach((v, i) => {
       const h = (v / max) * (ch - 16);
-      x.fillStyle = v > 0 ? "rgba(34,211,238,0.85)" : "rgba(255,255,255,0.07)";
-      x.shadowColor = "#22d3ee";
+      x.fillStyle = v > 0 ? "rgba(145,230,242,0.85)" : "rgba(255,255,255,0.07)";
+      x.shadowColor = "#91e6f2";
       x.shadowBlur = v > 0 ? 6 : 0;
       x.fillRect(i * bw + 2, ch - 14 - Math.max(2, h), bw - 4, Math.max(2, h));
       if (i % 6 === 0) {
@@ -146,7 +146,7 @@ export default function SiriusPrime({ onClose }) {
           <div className="prime-weekdays">
             {data && data.habits.weekdays.map((v, i) => (
               <div className="prime-wd" key={i}>
-                <div className="prime-wd-cell" style={{ opacity: 0.15 + 0.85 * (v / wdMax), boxShadow: v > 0 ? "0 0 8px #22d3ee" : "none" }} />
+                <div className="prime-wd-cell" style={{ opacity: 0.15 + 0.85 * (v / wdMax), boxShadow: v > 0 ? "0 0 8px #91e6f2" : "none" }} />
                 <span>{DAYS[i]}</span>
               </div>
             ))}

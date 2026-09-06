@@ -58,8 +58,8 @@ export default function SanctuaryAmbience({ statusPulseRef, eco = false }) {
       const c = s.getContext("2d");
       const g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
       g.addColorStop(0, "rgba(255,225,150,0.9)");
-      g.addColorStop(0.45, "rgba(245,197,66,0.5)");
-      g.addColorStop(1, "rgba(245,197,66,0)");
+      g.addColorStop(0.45, "rgba(216,184,117,0.5)");
+      g.addColorStop(1, "rgba(216,184,117,0)");
       c.fillStyle = g;
       c.fillRect(0, 0, 64, 64);
       return s;

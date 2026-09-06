@@ -1,0 +1,568 @@
+/* © 2026 Daniel Partel – SIRIUS Assistant. Fenêtres HUD vitrées (référence bleu nuit / cyan / or champagne). */
+
+:root {
+  --sir-night: #061321;
+  --sir-navy: #091a2b;
+  --sir-panel: #10283d;
+  --sir-steel: #31536c;
+  --sir-cyan: #91e6f2;
+  --sir-cyan-soft: #d3faff;
+  --sir-text: #edf7f8;
+  --sir-text-2: #a8bac5;
+  --sir-gold: #d8b875;
+  --sir-gold-soft: #f2d99a;
+  --sir-border-gold: rgba(231, 202, 143, 0.72);
+  --sir-glass: rgba(12, 33, 52, 0.62);
+  --sir-shadow: rgba(0, 5, 14, 0.72);
+}
+
+/* ---------- couche panneaux ---------- */
+.shud-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+.shud-col {
+  position: absolute;
+  top: 9vh;
+  bottom: 18vh;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: clamp(200px, 17vw, 260px);
+  overflow: hidden auto;
+  scrollbar-width: none;
+  pointer-events: none;
+}
+.shud-col::-webkit-scrollbar { display: none; }
+.shud-col.left { left: 1.4vw; }
+.shud-col.right { right: 1.4vw; top: 24vh; }
+.shud-drawer-btn { display: none; }
+
+/* ---------- panneau vitré : verre transparent holographique cyan ----------
+   Remplace l'ancien bordurage majoritairement doré par un verre nettement cyan (teinte
+   dominante de holo-scan), tout en gardant quelques accents or sur les icônes/textes pour
+   ne pas perdre l'identité SIRIUS. Une fine ligne de balayage cyan traverse le panneau
+   pour un vrai effet « hologramme projeté » plutôt qu'un simple flou de fond. */
+.shud-panel {
+  pointer-events: auto;
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  padding: 12px 14px 13px;
+  background: linear-gradient(155deg, rgba(16, 48, 68, 0.42), rgba(4, 16, 28, 0.58));
+  border: 1px solid rgba(126, 231, 255, 0.42);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  box-shadow:
+    0 22px 44px var(--sir-shadow),
+    0 0 26px rgba(126, 231, 255, 0.22),
+    inset 0 0 20px rgba(126, 231, 255, 0.08),
+    inset 0 1px 0 rgba(220, 250, 255, 0.14);
+  transform: perspective(700px) rotateX(var(--shud-tilt-x, 0deg)) rotateY(var(--shud-tilt-y, 0deg));
+  transition: box-shadow 0.3s ease, filter 0.3s ease, transform 0.25s ease;
+  animation:
+    shudIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) both,
+    shudFloat 8s ease-in-out calc(var(--shud-delay, 0ms) + 1s) infinite;
+  animation-delay: var(--shud-delay, 0ms);
+  font-family: "Rajdhani", "Segoe UI", sans-serif;
+  color: var(--sir-text);
+}
+/* Balayage holographique cyan, discret et continu */
+.shud-panel::before {
+  content: "";
+  position: absolute;
+  inset: -40% -10%;
+  background: linear-gradient(100deg, transparent 40%, rgba(145, 230, 242, 0.09) 48%, rgba(145, 230, 242, 0.16) 50%, rgba(145, 230, 242, 0.09) 52%, transparent 60%);
+  animation: shudScan 6s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+.shud-head, .shud-body { position: relative; z-index: 1; }
+@keyframes shudScan {
+  0% { transform: translateX(-60%); }
+  100% { transform: translateX(60%); }
+}
+.shud-panel:hover {
+  filter: brightness(1.09);
+  box-shadow:
+    0 24px 48px var(--sir-shadow),
+    0 0 36px rgba(126, 231, 255, 0.32),
+    inset 0 0 20px rgba(126, 231, 255, 0.12),
+    inset 0 1px 0 rgba(220, 250, 255, 0.2);
+}
+/* Fenêtre en cours de glisser-déposer : détachée de la colonne, bien mise en avant */
+.shud-panel.shud-dragging {
+  animation-play-state: paused, paused;
+  transition: none;
+  box-shadow:
+    0 30px 60px rgba(0, 0, 0, 0.6),
+    0 0 46px rgba(126, 231, 255, 0.45),
+    inset 0 0 22px rgba(126, 231, 255, 0.16);
+  cursor: grabbing;
+}
+@keyframes shudIn {
+  from { opacity: 0; transform: perspective(700px) translateY(16px); }
+  to { opacity: 1; transform: perspective(700px) translateY(0); }
+}
+@keyframes shudFloat {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -6px; }
+}
+
+/* lignes fines reliant les panneaux au globe */
+.shud-link-left::after,
+.shud-link-right::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: clamp(20px, 4vw, 70px);
+  height: 1px;
+  background: linear-gradient(90deg, rgba(145, 230, 242, 0.45), transparent);
+  pointer-events: none;
+}
+.shud-link-left::after { left: 100%; }
+.shud-link-right::after {
+  right: 100%;
+  background: linear-gradient(270deg, rgba(145, 230, 242, 0.45), transparent);
+}
+
+/* ---------- en-tête ---------- */
+.shud-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-bottom: 8px;
+  margin-bottom: 9px;
+  border-bottom: 1px solid rgba(49, 83, 108, 0.65);
+  cursor: grab;
+  touch-action: none;
+}
+.shud-panel.shud-dragging .shud-head { cursor: grabbing; }
+.shud-ico { color: var(--sir-gold); display: inline-flex; }
+.shud-title {
+  margin: 0;
+  flex: 1;
+  font-family: "Orbitron", "Rajdhani", sans-serif;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sir-text);
+  line-height: 1.35;
+}
+.shud-meta { font-size: 10px; color: var(--sir-text-2); font-weight: 600; }
+.shud-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--sir-cyan);
+  box-shadow: 0 0 8px var(--sir-cyan);
+  animation: shudPulse 3s ease-in-out infinite;
+}
+@keyframes shudPulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+
+/* Boutons d'action de la fenêtre : réancrer (quand détachée) et fermer */
+.shud-icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px;
+  border-radius: 5px;
+  border: 1px solid rgba(126, 231, 255, 0.35);
+  background: rgba(126, 231, 255, 0.08);
+  color: var(--sir-cyan-soft);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.shud-icon-btn:hover { background: rgba(126, 231, 255, 0.22); border-color: rgba(126, 231, 255, 0.6); }
+.shud-icon-btn.shud-close:hover { background: rgba(255, 122, 122, 0.18); border-color: rgba(255, 140, 140, 0.55); color: #ffb3b3; }
+
+/* Barre de fenêtres masquées : chips cliquables pour rouvrir */
+.shud-restore-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 2px 2px 6px;
+}
+.shud-restore-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 10.5px;
+  letter-spacing: 0.03em;
+  color: var(--sir-cyan-soft);
+  background: rgba(126, 231, 255, 0.08);
+  border: 1px dashed rgba(126, 231, 255, 0.4);
+  border-radius: 999px;
+  padding: 4px 10px 4px 8px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.shud-restore-chip:hover { background: rgba(126, 231, 255, 0.2); border-color: rgba(126, 231, 255, 0.7); }
+
+/* ---------- contenu ---------- */
+.shud-body { font-size: 12px; color: var(--sir-text-2); }
+.shud-line {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--sir-text-2); margin-bottom: 4px;
+}
+.shud-line span { display: inline-flex; align-items: center; gap: 5px; }
+.shud-line b { color: var(--sir-gold-soft); font-weight: 600; }
+.shud-line b.up { color: var(--sir-cyan); }
+.shud-line b.down { color: var(--sir-gold); }
+.shud-sep { border-top: 1px solid rgba(49, 83, 108, 0.55); padding-top: 7px; margin-top: 7px; }
+.shud-muted { color: var(--sir-text-2); font-size: 10.5px; opacity: 0.8; }
+
+.shud-track {
+  height: 4px; border-radius: 3px; overflow: hidden;
+  background: rgba(49, 83, 108, 0.55);
+  margin: 2px 0 9px;
+}
+.shud-track i {
+  display: block; height: 100%; border-radius: inherit;
+  background: linear-gradient(90deg, var(--sir-gold), var(--sir-gold-soft));
+  box-shadow: 0 0 8px rgba(216, 184, 117, 0.55);
+  animation: shudFill 1.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition: width 0.5s ease;
+}
+.shud-track i.cyan {
+  background: linear-gradient(90deg, var(--sir-cyan), var(--sir-cyan-soft));
+  box-shadow: 0 0 8px rgba(145, 230, 242, 0.55);
+}
+@keyframes shudFill { from { translate: -100% 0; } to { translate: 0 0; } }
+.shud-prio:last-child .shud-track { margin-bottom: 2px; }
+
+/* ---------- calendrier ---------- */
+.shud-cal-nav { position: absolute; top: 10px; right: 30px; display: flex; gap: 4px; }
+.shud-cal-nav button {
+  width: 18px; height: 18px; line-height: 1; padding: 0;
+  border: 1px solid rgba(49, 83, 108, 0.8); border-radius: 5px;
+  background: transparent; color: var(--sir-cyan); cursor: pointer; font-size: 12px;
+}
+.shud-cal-nav button:hover { border-color: var(--sir-border-gold); color: var(--sir-gold-soft); }
+.shud-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.shud-cal b {
+  font-size: 8.5px; text-align: center; font-weight: 700;
+  color: var(--sir-gold); letter-spacing: 0.04em;
+}
+.shud-day {
+  position: relative;
+  padding: 2.5px 0; border: 0; border-radius: 5px;
+  background: transparent; color: var(--sir-text-2);
+  font: 600 10px "Rajdhani", sans-serif; cursor: pointer;
+  transition: background 0.25s, color 0.25s;
+}
+.shud-day:hover { background: rgba(145, 230, 242, 0.14); color: var(--sir-text); }
+.shud-day.today {
+  color: #04121f; background: var(--sir-cyan);
+  box-shadow: 0 0 10px rgba(145, 230, 242, 0.65);
+}
+.shud-day.sel:not(.today) { outline: 1px solid var(--sir-border-gold); color: var(--sir-gold-soft); }
+.shud-evt-dot {
+  position: absolute; left: 50%; bottom: 0; translate: -50% 0;
+  width: 3px; height: 3px; border-radius: 50%;
+  background: var(--sir-gold-soft); box-shadow: 0 0 4px var(--sir-gold);
+}
+.shud-evt-list { margin: 8px 0 0; padding: 0; list-style: none; }
+.shud-evt-list li {
+  font-size: 11px; color: var(--sir-text); padding: 3px 0;
+  border-top: 1px solid rgba(49, 83, 108, 0.4);
+}
+
+/* ---------- donut ---------- */
+.shud-wide { width: 100%; }
+.shud-donut-row { display: flex; align-items: center; gap: 12px; }
+.shud-donut {
+  position: relative; flex: none;
+  width: 66px; height: 66px; border-radius: 50%;
+  box-shadow: 0 0 16px rgba(216, 184, 117, 0.3);
+  animation: shudSpinIn 1.4s ease-out both;
+}
+.shud-donut::after { content: ""; position: absolute; inset: 15px; border-radius: 50%; background: var(--sir-panel); }
+@keyframes shudSpinIn { from { rotate: -120deg; opacity: 0; } to { rotate: 0deg; opacity: 1; } }
+.shud-legend { display: flex; flex-direction: column; gap: 4px; font-size: 11px; }
+.shud-legend em { font-style: normal; font-weight: 700; color: var(--sir-text); }
+.shud-legend em.g { color: var(--sir-gold-soft); }
+.shud-legend em.c { color: var(--sir-cyan); }
+
+/* ---------- ressources ---------- */
+.shud-res { display: flex; align-items: flex-start; gap: 9px; margin-bottom: 7px; transition: translate 0.25s ease; }
+.shud-res:hover { translate: 3px 0; }
+.shud-res:last-child { margin-bottom: 0; }
+.shud-res-ico {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 50%;
+  color: var(--sir-cyan);
+  background: rgba(145, 230, 242, 0.1);
+  border: 1px solid rgba(49, 83, 108, 0.8);
+}
+.shud-res-main { flex: 1; min-width: 0; }
+
+/* ---------- notifications ---------- */
+.shud-notifs { margin: 0; padding: 0; list-style: none; max-height: 168px; overflow-y: auto; scrollbar-width: thin; }
+.shud-notifs button {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 5px 4px; border: 0; border-radius: 8px;
+  background: transparent; color: inherit; text-align: left; cursor: pointer;
+  transition: background 0.25s;
+}
+.shud-notifs button:disabled { cursor: default; }
+.shud-notifs button:hover:not(:disabled) { background: rgba(145, 230, 242, 0.1); }
+.shud-notifs li + li { border-top: 1px solid rgba(49, 83, 108, 0.4); }
+.shud-notif-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.shud-notif-txt b { font-size: 11.5px; color: var(--sir-text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shud-notif-txt small { font-size: 10px; color: var(--sir-text-2); }
+.shud-badge {
+  flex: none; font-size: 9px; font-weight: 700; letter-spacing: 0.06em;
+  padding: 2px 7px; border-radius: 99px;
+  color: var(--sir-cyan); border: 1px solid rgba(49, 83, 108, 0.9);
+}
+.shud-badge.unread { color: var(--sir-gold-soft); border-color: var(--sir-border-gold); box-shadow: 0 0 8px rgba(216, 184, 117, 0.35); }
+
+/* ---------- paramètres rapides ---------- */
+.shud-select { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 0; font-size: 11.5px; }
+.shud-select + .shud-select { border-top: 1px solid rgba(49, 83, 108, 0.45); }
+.shud-select select {
+  min-width: 104px; min-height: 26px;
+  padding: 3px 8px; border-radius: 7px;
+  background: rgba(6, 19, 33, 0.85); color: var(--sir-text);
+  border: 1px solid rgba(49, 83, 108, 0.9);
+  font: 600 11px "Rajdhani", sans-serif;
+  cursor: pointer;
+}
+.shud-select select:hover, .shud-select select:focus-visible { border-color: var(--sir-cyan); outline: none; }
+
+/* ---------- actions rapides ---------- */
+.shud-actions { display: flex; flex-direction: column; gap: 7px; pointer-events: auto; }
+.shud-actions button {
+  display: flex; align-items: center; gap: 8px;
+  min-height: 34px; padding: 6px 12px; border-radius: 10px;
+  background: rgba(12, 33, 52, 0.66);
+  border: 1px solid rgba(49, 83, 108, 0.9);
+  color: var(--sir-text); font: 600 11px "Orbitron", "Rajdhani", sans-serif;
+  letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
+  transition: border-color 0.3s, box-shadow 0.3s, transform 0.12s;
+}
+.shud-actions button span { flex: 1; text-align: left; }
+.shud-actions button svg:first-child { color: var(--sir-gold); }
+.shud-actions button:hover { border-color: var(--sir-border-gold); box-shadow: 0 0 16px rgba(145, 230, 242, 0.22); }
+.shud-actions button:active { transform: translateY(1px) scale(0.99); }
+
+/* ---------- bouton Prochaines Actions (maintenant dans sirius-identity — flux normal) ---------- */
+.shud-next-wrap {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  translate: none;
+  pointer-events: auto;
+  text-align: center;
+  cursor: grab;
+  display: inline-block;
+}
+.shud-next-wrap.shud-dragging {
+  cursor: grabbing;
+}
+.shud-next-wrap.shud-dragging .shud-next {
+  animation-play-state: paused;
+  transition: none;
+}
+.shud-next {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 34px; padding: 7px 22px; border-radius: 99px;
+  background: linear-gradient(180deg, rgba(24, 55, 78, 0.82), rgba(5, 19, 34, 0.92));
+  border: 1px solid var(--sir-border-gold);
+  /* Lettrage en or (au lieu du blanc-cyan générique) pour matcher l'icône déjà dorée */
+  color: var(--sir-gold-soft); font: 600 11px "Orbitron", sans-serif;
+  letter-spacing: 0.16em; text-transform: uppercase; cursor: pointer;
+  text-shadow: 0 0 8px rgba(216, 184, 117, 0.45);
+  box-shadow: 0 0 20px rgba(145, 230, 242, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  animation: shudFloat 6s ease-in-out infinite;
+  transition: box-shadow 0.3s, filter 0.3s;
+}
+.shud-next:hover { filter: brightness(1.12); box-shadow: 0 0 30px rgba(145, 230, 242, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2); }
+.shud-next svg { color: var(--sir-gold-soft); }
+/* Boutons fermer/réancrer superposés au coin de la pilule, visibles seulement au survol pour
+   ne pas alourdir le visuel épuré de la pilule au repos. */
+.shud-next-close, .shud-next-redock {
+  position: absolute;
+  top: -6px;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.shud-next-wrap:hover .shud-next-close,
+.shud-next-wrap:hover .shud-next-redock { opacity: 1; }
+.shud-next-close { right: -6px; }
+.shud-next-redock { right: 20px; }
+.shud-next-restore {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 99px;
+  background: rgba(24, 55, 78, 0.55);
+  border: 1px dashed rgba(126, 231, 255, 0.4);
+  color: var(--sir-text-2); font: 600 10px "Orbitron", sans-serif;
+  letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.shud-next-restore:hover { background: rgba(126, 231, 255, 0.18); border-color: rgba(126, 231, 255, 0.7); color: var(--sir-text); }
+.shud-next-pop {
+  position: absolute; left: 50%; bottom: calc(100% + 10px); translate: -50% 0;
+  width: 240px; padding: 12px 14px; border-radius: 12px; text-align: left;
+  background: linear-gradient(145deg, rgba(24, 55, 78, 0.9), rgba(5, 19, 34, 0.94));
+  border: 1px solid var(--sir-border-gold);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 22px 44px var(--sir-shadow);
+  animation: shudIn 0.3s ease both;
+  cursor: default;
+}
+.shud-next-pop-close {
+  position: absolute; top: 8px; right: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 5px;
+  border: 1px solid rgba(126, 231, 255, 0.35);
+  background: rgba(126, 231, 255, 0.08);
+  color: var(--sir-cyan-soft);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.shud-next-pop-close:hover { background: rgba(255, 122, 122, 0.18); border-color: rgba(255, 140, 140, 0.55); color: #ffb3b3; }
+.shud-next-pop b {
+  display: block; font: 600 9.5px "Orbitron", sans-serif; letter-spacing: 0.12em;
+  color: var(--sir-gold-soft); text-transform: uppercase; margin: 6px 24px 4px 0;
+}
+.shud-next-pop b:first-child { margin-top: 0; }
+.shud-next-pop p { margin: 0 0 3px; font-size: 11.5px; color: var(--sir-text-2); }
+
+/* ---------- fond ville nocturne ---------- */
+.city-backdrop { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; background: linear-gradient(180deg, #04101d 0%, var(--sir-night) 42%, #040d18 78%, #030a13 100%); }
+.city-glow {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 12%, rgba(145, 230, 242, 0.09), transparent 46%),
+    radial-gradient(ellipse at 18% 80%, rgba(216, 184, 117, 0.05), transparent 40%),
+    radial-gradient(ellipse at 84% 78%, rgba(145, 230, 242, 0.05), transparent 40%);
+}
+/* Silhouettes de gratte-ciels supprimées (traits verticaux parasites sur le fond, demandés
+   à retirer) — fond épuré : dégradé + grille uniquement. */
+.city-skyline { display: none; }
+.city-bokeh i {
+  position: absolute; width: 4px; height: 4px; border-radius: 50%;
+  background: var(--sir-gold-soft);
+  box-shadow: 0 0 10px 3px rgba(242, 217, 154, 0.4);
+  opacity: 0.55; filter: blur(0.6px);
+  animation: shudPulse 5s ease-in-out infinite;
+}
+.city-bokeh i:nth-child(1) { left: 7%; top: 30%; }
+.city-bokeh i:nth-child(2) { left: 13%; top: 44%; background: var(--sir-cyan-soft); box-shadow: 0 0 10px 3px rgba(211, 250, 255, 0.35); animation-delay: 1s; }
+.city-bokeh i:nth-child(3) { left: 22%; top: 36%; animation-delay: 2.2s; }
+.city-bokeh i:nth-child(4) { left: 78%; top: 32%; animation-delay: 0.6s; }
+.city-bokeh i:nth-child(5) { left: 86%; top: 46%; background: var(--sir-cyan-soft); box-shadow: 0 0 10px 3px rgba(211, 250, 255, 0.35); animation-delay: 3s; }
+.city-bokeh i:nth-child(6) { left: 93%; top: 34%; animation-delay: 1.6s; }
+.city-bokeh i:nth-child(7) { left: 40%; top: 26%; opacity: 0.3; animation-delay: 2.6s; }
+.city-bokeh i:nth-child(8) { left: 62%; top: 24%; opacity: 0.3; background: var(--sir-cyan-soft); animation-delay: 0.2s; }
+.city-floor {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 27vh;
+  background: linear-gradient(180deg, transparent 0%, rgba(4, 13, 24, 0.75) 40%, #030a13 100%);
+}
+.city-floor::before {
+  content: ""; position: absolute; left: 8%; right: 8%; top: 30%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(145, 230, 242, 0.4), rgba(216, 184, 117, 0.4), transparent);
+}
+
+/* ---------- wordmark ---------- */
+.sirius-wordmark {
+  display: block;
+  font-family: "Cinzel", "Orbitron", serif;
+  font-weight: 700;
+  font-size: clamp(30px, 6vh, 56px);
+  /* Élargi horizontalement (espacement des lettres) sans toucher au font-size (hauteur) —
+     demande explicite : plus large, mais pas plus haut. */
+  letter-spacing: 0.36em;
+  margin-right: -0.36em;
+  line-height: 1.05;
+  text-transform: uppercase;
+  background: linear-gradient(180deg, #fff6da 0%, #f2d99a 20%, #b98d4b 42%, #8a6423 52%, #d8b875 66%, #f7e7bd 88%, #d8b875 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 3px 1px rgba(3, 10, 19, 0.85)) drop-shadow(0 0 22px rgba(216, 184, 117, 0.35));
+}
+.sirius-tagline {
+  display: block;
+  margin-top: 8px;
+  font-family: "Orbitron", "Rajdhani", sans-serif;
+  font-weight: 500;
+  font-size: clamp(10px, 1.7vh, 15px);
+  letter-spacing: 0.42em;
+  margin-right: -0.42em;
+  text-transform: uppercase;
+  color: var(--sir-text);
+  text-shadow: 0 0 12px rgba(145, 230, 242, 0.5);
+}
+
+/* ---------- horloge intégrée (reprend l'ancienne pilule Heure & UTC) ---------- */
+.shud-clock .shud-body { color: var(--sir-text); }
+.shud-clock .shud-body b, .shud-clock .shud-body strong { color: var(--sir-gold-soft); }
+.shud-clock .shud-body small { color: var(--sir-text-2); }
+/* Le composant <LiveClock/> réutilise les anciennes classes .hud-time/.hud-utc/.hud-date
+   (règle globale : font-size 34px, pensée pour l'ancien gros cadran plein écran). Dans cette
+   fenêtre HUD compacte, ce texte débordait largement le format des autres panneaux (~12px de
+   base) — on le ramène ici à une échelle cohérente avec le reste du HUD. */
+.shud-clock .hud-time {
+  font-size: 19px;
+  letter-spacing: 1.5px;
+}
+.shud-clock .hud-utc,
+.shud-clock .hud-date {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+/* ---------- repositionnement du titre (réf. : SIRIUS sous le socle) ---------- */
+.reactor-text { justify-content: flex-end !important; padding-bottom: 0.5vh; }
+h1.sirius-title {
+  background: none !important;
+  animation: none !important;
+  filter: none !important;
+  letter-spacing: 0 !important;
+  margin-right: 0 !important;
+  font-size: 16px !important;
+  -webkit-text-fill-color: initial !important;
+  color: var(--sir-text) !important;
+}
+
+/* ---------- responsive ---------- */
+@media (max-width: 1240px) {
+  .shud-col { width: clamp(190px, 20vw, 230px); }
+  .shud-link-left::after, .shud-link-right::after { display: none; }
+}
+@media (max-width: 1100px) {
+  .shud-drawer-btn {
+    display: block; position: fixed; left: 10px; top: 45%; z-index: 6;
+    padding: 8px 10px; border-radius: 10px;
+    background: var(--sir-glass); color: var(--sir-gold-soft);
+    border: 1px solid var(--sir-border-gold);
+    font: 700 10px "Orbitron", sans-serif; letter-spacing: 0.1em; cursor: pointer;
+  }
+  .shud-layer { display: none; }
+  .shud-layer.open {
+    display: block; pointer-events: auto; overflow-y: auto;
+    background: rgba(3, 10, 19, 0.82); backdrop-filter: blur(8px);
+  }
+  .shud-layer.open .shud-col {
+    position: static; width: min(420px, 92vw); margin: 12px auto; overflow: visible;
+  }
+  .shud-layer.open .shud-next-wrap { position: static; translate: none; margin: 10px auto 30px; display: block; }
+  .shud-panel { animation: shudIn 0.4s ease both; }
+}
+@media (max-width: 640px) {
+  .shud-layer.open .shud-col { width: 94vw; }
+  .shud-actions button { min-height: 44px; }
+  .shud-day { min-height: 24px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shud-panel, .shud-next, .shud-donut, .shud-track i, .shud-dot, .city-bokeh i {
+    animation: none !important;
+    transition: none !important;
+  }
+  .shud-panel { transform: none; }
+}

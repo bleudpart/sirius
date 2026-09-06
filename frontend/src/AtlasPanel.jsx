@@ -22,17 +22,17 @@ function wmoInfo(code) {
 
 const HOLO_STYLE = [
   { elementType: "geometry", stylers: [{ color: "#04121c" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#67e8f9" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#91e6f2" }] },
   { elementType: "labels.text.stroke", stylers: [{ color: "#02090f" }] },
   { featureType: "administrative", elementType: "geometry.stroke", stylers: [{ color: "#155e75" }] },
-  { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#f5c542" }] },
-  { featureType: "administrative.country", elementType: "labels.text.fill", stylers: [{ color: "#f5c542" }] },
+  { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#d8b875" }] },
+  { featureType: "administrative.country", elementType: "labels.text.fill", stylers: [{ color: "#d8b875" }] },
   { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] },
   { featureType: "road", elementType: "geometry", stylers: [{ color: "#0b2a3a" }] },
   { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#083344" }] },
   { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#7dd3fc" }] },
   { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#164e63" }] },
-  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#f5c542" }, { weight: 0.4 }] },
+  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#d8b875" }, { weight: 0.4 }] },
   { featureType: "transit", stylers: [{ visibility: "off" }] },
   { featureType: "water", elementType: "geometry", stylers: [{ color: "#021019" }] },
   { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#0e7490" }] },
@@ -64,8 +64,8 @@ function RoutePath({ path }) {
   const map = useMap();
   useEffect(() => {
     if (!map || !path || !path.length || !window.google) return;
-    const glow = new window.google.maps.Polyline({ path, strokeColor: "#f5c542", strokeOpacity: 0.3, strokeWeight: 10, map });
-    const line = new window.google.maps.Polyline({ path, strokeColor: "#22d3ee", strokeOpacity: 0.95, strokeWeight: 4, map });
+    const glow = new window.google.maps.Polyline({ path, strokeColor: "#d8b875", strokeOpacity: 0.3, strokeWeight: 10, map });
+    const line = new window.google.maps.Polyline({ path, strokeColor: "#91e6f2", strokeOpacity: 0.95, strokeWeight: 4, map });
     const b = new window.google.maps.LatLngBounds();
     path.forEach((p) => b.extend(p));
     map.fitBounds(b, 70);
@@ -340,7 +340,7 @@ export default function AtlasPanel({ onClose, onSpeak, keys, onSaveKeys, initial
                 <TrafficOverlay enabled={traffic} />
                 {marker && <Marker position={{ lat: marker.lat, lng: marker.lng }} />}
                 {userPos && (
-                  <Marker position={userPos} icon={{ path: 0, scale: 8, fillColor: "#22d3ee", fillOpacity: 1, strokeColor: "#f5c542", strokeWeight: 2 }} />
+                  <Marker position={userPos} icon={{ path: 0, scale: 8, fillColor: "#91e6f2", fillOpacity: 1, strokeColor: "#d8b875", strokeWeight: 2 }} />
                 )}
                 {route && (
                   <>

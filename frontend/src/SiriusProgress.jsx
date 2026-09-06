@@ -28,9 +28,9 @@ const POS_KEY = "sirius_progress_pos";
 
 // Témoin de mode : une couleur par état de Sirius
 const MODES = {
-  idle: { label: "Veille", color: "#22d3ee" },
+  idle: { label: "Veille", color: "#91e6f2" },
   listening: { label: "Écoute", color: "#38bdf8" },
-  thinking: { label: "Réflexion", color: "#fbbf24" },
+  thinking: { label: "Réflexion", color: "#d8b875" },
   speaking: { label: "Réponse", color: "#5eead4" },
 };
 

@@ -70,12 +70,12 @@
 }
 
 .oracle-productivity-state.state-focus {
-  color: #f5c542;
+  color: #d8b875;
 }
 
 .oracle-productivity-state.state-focus i {
-  background: #f5c542;
-  box-shadow: 0 0 9px #f5c542;
+  background: #d8b875;
+  box-shadow: 0 0 9px #d8b875;
 }
 
 .oracle-productivity-state.state-clear {
@@ -107,6 +107,6 @@
 }
 
 .oracle-productivity-counts b {
-  color: #f5c542;
+  color: #d8b875;
   margin-left: 3px;
 }

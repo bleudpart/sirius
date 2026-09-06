@@ -16,16 +16,24 @@
 }
 @keyframes bannerIn { from { opacity: 0; transform: translate(-50%, -12px); } to { opacity: 1; transform: translate(-50%, 0); } }
 .mode-banner.safe {
-  background: rgba(30, 4, 4, 0.95);
-  border: 1px solid rgba(255, 77, 77, 0.8);
-  color: #ff9d9d;
-  box-shadow: 0 0 18px rgba(255, 60, 60, 0.35);
+  max-width: min(760px, 92vw);
+  background: linear-gradient(145deg, rgba(38, 24, 33, 0.92), rgba(9, 20, 33, 0.94));
+  border: 1px solid rgba(201, 129, 117, 0.65);
+  color: #dfa89e;
+  border-radius: 10px;
+  clip-path: none;
+  box-shadow: 0 14px 34px rgba(0, 5, 14, 0.6), 0 0 14px rgba(201, 129, 117, 0.2);
+  backdrop-filter: blur(14px);
 }
 .mode-banner.frugal {
-  background: rgba(28, 20, 2, 0.94);
-  border: 1px solid rgba(255, 190, 60, 0.7);
-  color: #ffd88a;
-  box-shadow: 0 0 14px rgba(255, 180, 40, 0.25);
+  max-width: min(680px, 90vw);
+  background: linear-gradient(145deg, rgba(30, 40, 46, 0.92), rgba(9, 20, 33, 0.94));
+  border: 1px solid rgba(216, 184, 117, 0.6);
+  color: #e8cfa0;
+  border-radius: 10px;
+  clip-path: none;
+  box-shadow: 0 14px 34px rgba(0, 5, 14, 0.6), 0 0 12px rgba(216, 184, 117, 0.18);
+  backdrop-filter: blur(14px);
 }
 .mode-banner-title { font-size: 9.5px; letter-spacing: 3px; }
 .mode-banner-cause { font-family: "Rajdhani", sans-serif; font-size: 11px; opacity: 0.85; }
@@ -73,9 +81,9 @@
   top: 120px;
   width: 300px;
   z-index: 60;
-  background: rgba(0, 6, 14, 0.95);
-  border: 1px solid rgba(0, 240, 255, 0.55);
-  box-shadow: 0 0 20px rgba(0, 200, 255, 0.25), 0 16px 40px rgba(0, 0, 0, 0.55);
+  background: rgba(9, 26, 43, 0.92);
+  border: 1px solid rgba(145, 230, 242, 0.55);
+  box-shadow: 0 0 20px rgba(145, 230, 242, 0.25), 0 16px 40px rgba(0, 0, 0, 0.55);
   clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
   padding: 12px 14px;
   animation: bannerIn 0.35s ease both;
@@ -88,17 +96,17 @@
   font-family: "Orbitron", sans-serif;
   font-size: 9px;
   letter-spacing: 2.5px;
-  color: #aef3ff;
+  color: #d3faff;
 }
-.vision-icon-btn { background: none; border: 1px solid rgba(0,240,255,0.35); color: #8be9ff; padding: 3px 5px; cursor: pointer; }
-.vision-video { width: 100%; border: 1px solid rgba(0, 240, 255, 0.3); display: block; }
-.vision-error { color: #ffb347; font-size: 11px; line-height: 1.4; }
+.vision-icon-btn { background: none; border: 1px solid rgba(145,230,242,0.35); color: #91e6f2; padding: 3px 5px; cursor: pointer; }
+.vision-video { width: 100%; border: 1px solid rgba(145, 230, 242, 0.3); display: block; }
+.vision-error { color: #d8b875; font-size: 11px; line-height: 1.4; }
 .vision-question {
   width: 100%;
   margin-top: 8px;
-  background: rgba(0, 18, 30, 0.85);
-  border: 1px solid rgba(0, 240, 255, 0.35);
-  color: #d5f6ff;
+  background: rgba(6, 19, 33, 0.85);
+  border: 1px solid rgba(145, 230, 242, 0.35);
+  color: #edf7f8;
   font-family: "Rajdhani", sans-serif;
   font-size: 12px;
   padding: 6px 8px;
@@ -109,9 +117,9 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  background: rgba(0, 24, 40, 0.85);
-  border: 1px solid rgba(0, 240, 255, 0.5);
-  color: #8be9ff;
+  background: rgba(13, 35, 54, 0.85);
+  border: 1px solid rgba(145, 230, 242, 0.5);
+  color: #91e6f2;
   font-family: "Orbitron", sans-serif;
   font-size: 8px;
   letter-spacing: 1.5px;
@@ -119,15 +127,15 @@
   cursor: pointer;
   transition: background-color 0.2s, box-shadow 0.2s;
 }
-.vision-btn:hover { background: rgba(0, 240, 255, 0.15); box-shadow: 0 0 10px rgba(0, 240, 255, 0.35); }
+.vision-btn:hover { background: rgba(145, 230, 242, 0.15); box-shadow: 0 0 10px rgba(145, 230, 242, 0.35); }
 .vision-btn:disabled { opacity: 0.5; cursor: wait; }
-.vision-privacy { color: #5fa8bd; font-size: 9px; }
+.vision-privacy { color: #748b99; font-size: 9px; }
 .vision-desc {
   margin-top: 9px;
-  color: #d5f6ff;
+  color: #edf7f8;
   font-size: 12px;
   line-height: 1.45;
-  border-left: 2px solid rgba(0, 240, 255, 0.5);
+  border-left: 2px solid rgba(145, 230, 242, 0.5);
   padding-left: 8px;
   max-height: 160px;
   overflow-y: auto;

@@ -11,7 +11,7 @@
 .mg-thumb {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   padding: 10px 6px; cursor: pointer; background: rgba(0, 18, 30, 0.55);
-  border: 1px solid rgba(0, 240, 255, 0.15); border-radius: 8px;
+  border: 1px solid rgba(145, 230, 242, 0.15); border-radius: 8px;
   font-family: inherit; transition: border-color 0.25s, background-color 0.25s, transform 0.25s;
 }
 .mg-thumb:hover { transform: translateY(-3px); background: rgba(0, 30, 45, 0.7); }

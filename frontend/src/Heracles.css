@@ -10,12 +10,12 @@
 .her-input { flex: 1; margin: 0 !important; }
 .her-go {
   display: inline-flex; align-items: center; gap: 6px; padding: 0 16px;
-  border-radius: 4px; cursor: pointer; background: rgba(0, 240, 255, 0.12);
-  color: #7df3ff; border: 1px solid rgba(0, 240, 255, 0.5);
+  border-radius: 4px; cursor: pointer; background: rgba(145, 230, 242, 0.12);
+  color: #7df3ff; border: 1px solid rgba(145, 230, 242, 0.5);
   font-family: inherit; font-size: 11px; letter-spacing: 1.5px;
   transition: background-color 0.2s, box-shadow 0.2s;
 }
-.her-go:hover { background: rgba(0, 240, 255, 0.25); box-shadow: 0 0 14px rgba(0, 240, 255, 0.35); }
+.her-go:hover { background: rgba(145, 230, 242, 0.25); box-shadow: 0 0 14px rgba(145, 230, 242, 0.35); }
 .her-go:disabled { opacity: 0.5; cursor: wait; }
 .her-go .spin { animation: her-spin 0.9s linear infinite; }
 @keyframes her-spin { to { transform: rotate(360deg); } }
@@ -28,17 +28,17 @@
 .her-result { margin-top: 14px; }
 .her-typebadge {
   display: inline-flex; align-items: center; gap: 7px; font-size: 10px; letter-spacing: 1.6px;
-  color: #7df3ff; padding: 4px 10px; border: 1px solid rgba(0, 240, 255, 0.4);
+  color: #7df3ff; padding: 4px 10px; border: 1px solid rgba(145, 230, 242, 0.4);
   border-radius: 3px; background: rgba(0, 40, 60, 0.35);
 }
-.her-typebadge b { color: #00f0ff; letter-spacing: 0.5px; }
+.her-typebadge b { color: #91e6f2; letter-spacing: 0.5px; }
 .her-pdf {
   display: inline-flex; align-items: center; gap: 5px; margin-left: 10px; cursor: pointer;
-  background: rgba(0, 240, 255, 0.12); border: 1px solid rgba(0, 240, 255, 0.5);
+  background: rgba(145, 230, 242, 0.12); border: 1px solid rgba(145, 230, 242, 0.5);
   color: #7df3ff; border-radius: 3px; padding: 3px 10px; font-size: 9px; letter-spacing: 1.3px;
   font-family: inherit; transition: background-color 0.2s, box-shadow 0.2s;
 }
-.her-pdf:hover { background: rgba(0, 240, 255, 0.25); box-shadow: 0 0 12px rgba(0, 240, 255, 0.3); }
+.her-pdf:hover { background: rgba(145, 230, 242, 0.25); box-shadow: 0 0 12px rgba(145, 230, 242, 0.3); }
 .her-pdf:disabled { opacity: 0.5; cursor: wait; }
 .her-pdf .spin { animation: her-spin 0.9s linear infinite; }
 .her-summary { margin-top: 10px; font-size: 13px; color: #d5f6ff; letter-spacing: 0.4px; }
@@ -46,10 +46,10 @@
 .her-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; margin-top: 12px; }
 .her-plat {
   display: flex; align-items: center; gap: 8px; padding: 9px 12px; text-decoration: none;
-  border: 1px solid rgba(0, 240, 255, 0.28); border-radius: 5px; background: rgba(0, 18, 30, 0.7);
+  border: 1px solid rgba(145, 230, 242, 0.28); border-radius: 5px; background: rgba(0, 18, 30, 0.7);
   color: #b9ecff; font-size: 12px; transition: background-color 0.2s, border-color 0.2s;
 }
-.her-plat:hover { background: rgba(0, 240, 255, 0.1); border-color: rgba(0, 240, 255, 0.55); }
+.her-plat:hover { background: rgba(145, 230, 242, 0.1); border-color: rgba(145, 230, 242, 0.55); }
 .her-plat.trouvé { border-color: rgba(120, 255, 160, 0.5); }
 .her-plat.absent { opacity: 0.6; }
 .her-plat-name { flex: 1; letter-spacing: 0.5px; }
@@ -59,9 +59,9 @@
 .her-plat-status.incertain { color: #ffd98f; border: 1px solid rgba(255, 200, 100, 0.4); }
 
 .her-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 12px; }
-.her-fields > div { display: flex; flex-direction: column; gap: 3px; padding: 8px 12px; border: 1px solid rgba(0, 240, 255, 0.25); border-radius: 5px; background: rgba(0, 18, 30, 0.7); }
+.her-fields > div { display: flex; flex-direction: column; gap: 3px; padding: 8px 12px; border: 1px solid rgba(145, 230, 242, 0.25); border-radius: 5px; background: rgba(0, 18, 30, 0.7); }
 .her-fields span { font-size: 9px; letter-spacing: 1.4px; color: #6fb4c6; }
-.her-fields b { font-size: 13px; color: #00f0ff; }
+.her-fields b { font-size: 13px; color: #91e6f2; }
 .her-fields b.ok { color: #a4ffbe; }
 .her-fields b.bad { color: #ff9d9d; }
 .her-mx { grid-column: 1 / -1; }
@@ -71,7 +71,7 @@
 .her-intent summary { cursor: pointer; letter-spacing: 1.5px; font-size: 10px; color: #5fb9cc; }
 .her-intent pre {
   margin-top: 8px; padding: 10px; font-size: 11px; overflow-x: auto;
-  background: rgba(0, 18, 30, 0.9); border: 1px solid rgba(0, 240, 255, 0.3); border-radius: 4px; color: #b9ecff;
+  background: rgba(0, 18, 30, 0.9); border: 1px solid rgba(145, 230, 242, 0.3); border-radius: 4px; color: #b9ecff;
 }
 
 .her-disclaimer {

@@ -4,7 +4,7 @@ import { Workflow, X, Cast, Loader2, Maximize } from "lucide-react";
 
 const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
 
-const TYPE_COLORS = { user: "#fbbf24", ui: "#22d3ee", service: "#5eead4", database: "#a78bfa", external: "#fb7185" };
+const TYPE_COLORS = { user: "#d8b875", ui: "#91e6f2", service: "#5eead4", database: "#a78bfa", external: "#fb7185" };
 const TYPE_LABELS = { user: "ACTEUR", ui: "INTERFACE", service: "SERVICE", database: "BASE DE DONNÉES", external: "EXTERNE" };
 
 // Placement automatique en colonnes (niveaux BFS depuis les nœuds sans lien entrant)
@@ -53,7 +53,7 @@ export function DiagramSVG({ diagram, animKey }) {
     <svg key={animKey} viewBox={`0 0 ${width} ${height}`} className="dg-svg" data-testid="architect-diagram">
       <defs>
         <marker id="dg-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-          <path d="M 0 0 L 10 5 L 0 10 z" fill="#22d3ee" />
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#91e6f2" />
         </marker>
       </defs>
       {links.map((l, j) => {
@@ -64,7 +64,7 @@ export function DiagramSVG({ diagram, animKey }) {
           <g key={`e${j}`}>
             <line
               className="dg-edge" x1={x1} y1={y1} x2={x2} y2={y2}
-              stroke="rgba(34,211,238,0.6)" strokeWidth="1.6" markerEnd="url(#dg-arrow)"
+              stroke="rgba(145,230,242,0.6)" strokeWidth="1.6" markerEnd="url(#dg-arrow)"
               style={{ animationDelay: `${edgeStart + j * 0.22}s` }}
             />
             {l.label && (
@@ -78,7 +78,7 @@ export function DiagramSVG({ diagram, animKey }) {
       })}
       {nodes.map((n, i) => {
         const p = pos[n.id];
-        const c = TYPE_COLORS[n.type] || "#22d3ee";
+        const c = TYPE_COLORS[n.type] || "#91e6f2";
         return (
           <g key={n.id} className="dg-node" style={{ animationDelay: `${i * nodeDelay}s` }} data-testid={`architect-node-${n.id}`}>
             <rect x={p.x} y={p.y} width={W} height={H} rx="4"

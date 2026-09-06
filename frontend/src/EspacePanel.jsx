@@ -44,8 +44,8 @@ function Sun() {
     const ctx = c.getContext("2d");
     const g = ctx.createRadialGradient(64, 64, 4, 64, 64, 64);
     g.addColorStop(0, "rgba(255,225,140,0.9)");
-    g.addColorStop(0.4, "rgba(245,197,66,0.35)");
-    g.addColorStop(1, "rgba(245,197,66,0)");
+    g.addColorStop(0.4, "rgba(216,184,117,0.35)");
+    g.addColorStop(1, "rgba(216,184,117,0)");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, 128, 128);
     return new THREE.CanvasTexture(c);
@@ -58,7 +58,7 @@ function Sun() {
       </mesh>
       <mesh>
         <sphereGeometry args={[3.35, 32, 32]} />
-        <meshBasicMaterial color="#f5c542" wireframe transparent opacity={0.35} />
+        <meshBasicMaterial color="#d8b875" wireframe transparent opacity={0.35} />
       </mesh>
       <sprite ref={glow}>
         <spriteMaterial map={glowTex} transparent depthWrite={false} blending={THREE.AdditiveBlending} />
@@ -88,11 +88,11 @@ function EarthMoon({ paused }) {
           </mesh>
           <mesh>
             <sphereGeometry args={[2.16, 24, 24]} />
-            <meshBasicMaterial color="#22d3ee" wireframe transparent opacity={0.3} />
+            <meshBasicMaterial color="#91e6f2" wireframe transparent opacity={0.3} />
           </mesh>
           <mesh>
             <sphereGeometry args={[2.45, 32, 32]} />
-            <meshBasicMaterial color="#22d3ee" transparent opacity={0.06} side={THREE.BackSide} />
+            <meshBasicMaterial color="#91e6f2" transparent opacity={0.06} side={THREE.BackSide} />
           </mesh>
         </group>
         <group ref={moonOrbit}>
@@ -108,7 +108,7 @@ function EarthMoon({ paused }) {
       </group>
       <mesh rotation={[Math.PI / 2, 0, 0]}>
         <ringGeometry args={[17.94, 18.06, 128]} />
-        <meshBasicMaterial color="#f5c542" transparent opacity={0.16} side={THREE.DoubleSide} />
+        <meshBasicMaterial color="#d8b875" transparent opacity={0.16} side={THREE.DoubleSide} />
       </mesh>
     </group>
   );
