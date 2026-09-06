@@ -8,9 +8,20 @@ import { MEDIA_PROVIDERS, useMediaControl } from "@/ws/media_control";
 import "./media.css";
 
 const MEDIA_WINDOW_GEOMETRY = "sirius_media_window_geometry_v1";
+const SPOTIFY_TOKENS_KEY = "sirius_spotify";
 const MIN_WINDOW_WIDTH = 420;
 const MIN_WINDOW_HEIGHT = 360;
 let mediaWindowZ = 96;
+
+const API = `${process.env.REACT_APP_BACKEND_URL || "http://127.0.0.1:8001"}/api`;
+
+function readSpotifyTokens() {
+  try { return JSON.parse(localStorage.getItem(SPOTIFY_TOKENS_KEY)) || null; } catch { return null; }
+}
+
+function isSpotifyLink(text) {
+  return /^spotify:|open\.spotify\.com/i.test(text || "");
+}
 
 function intentKey(intent) {
   return JSON.stringify(intent || {});
@@ -87,12 +98,44 @@ export default function MediaHUD({ onClose, onShowOnDisplay, initialIntent, stan
     return () => window.removeEventListener("resize", applyGeometry);
   }, [standalone]);
 
+  const resolveSmart = useCallback(async ({ provider: targetProvider, query: rawQuery }) => {
+    // Spotify n'a pas de page de recherche embarquable (Spotify ne fournit pas
+    // d'iframe pour /search/...) : une recherche texte brute reste bloquée sur
+    // "Ouvrez le résultat Spotify..." avec un bouton manuel. Si un compte Spotify
+    // est déjà connecté, on utilise la recherche authentifiée (même route que le
+    // lecteur Spotify dédié) pour récupérer un titre précis et le charger
+    // directement dans le lecteur intégré, sans étape manuelle.
+    if (targetProvider === "spotify" && rawQuery && !isSpotifyLink(rawQuery)) {
+      const tokens = readSpotifyTokens();
+      if (tokens && (tokens.access_token || tokens.refresh_token)) {
+        try {
+          const r = await fetch(`${API}/spotify/search`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...tokens, query: rawQuery }),
+          });
+          const d = await r.json().catch(() => ({}));
+          if (r.ok && d.access_token) {
+            try { localStorage.setItem(SPOTIFY_TOKENS_KEY, JSON.stringify({ ...tokens, access_token: d.access_token })); } catch { /* stockage indisponible, sans impact */ }
+          }
+          const top = r.ok && Array.isArray(d.tracks) ? d.tracks[0] : null;
+          if (top?.id) {
+            return await resolveMedia({ provider: targetProvider, url: `spotify:track:${top.id}` });
+          }
+        } catch {
+          // Repli silencieux : recherche brute ci-dessous (affiche "Ouvrir Spotify").
+        }
+      }
+    }
+    return resolveMedia({ provider: targetProvider, query: rawQuery });
+  }, [resolveMedia]);
+
   const resolve = useCallback(async (event) => {
     if (event) event.preventDefault();
     const cleanedQuery = query.trim();
     if (!cleanedQuery) return;
-    await resolveMedia({ provider, query: cleanedQuery });
-  }, [provider, query, resolveMedia]);
+    await resolveSmart({ provider, query: cleanedQuery });
+  }, [provider, query, resolveSmart]);
 
   useEffect(() => {
     if (!initialKey || initialKey === "{}" || appliedIntent.current === initialKey) return;
@@ -111,13 +154,14 @@ export default function MediaHUD({ onClose, onShowOnDisplay, initialIntent, stan
         return;
       }
       if (!selectedQuery) return;
-      const resolved = await resolveMedia({ provider: selectedProvider, query: selectedQuery });
+      const resolved = await resolveSmart({ provider: selectedProvider, query: selectedQuery });
       if (resolved && command === "play") {
         await controlMedia({ action: "play" });
       }
     };
     void applyIntent();
-  }, [controlMedia, initialIntent, initialKey, refresh, resolveMedia]);
+  }, [controlMedia, initialIntent, initialKey, refresh, resolveSmart]);
+
 
   const showOnDisplay = () => {
     if (!state || !onShowOnDisplay) return;
