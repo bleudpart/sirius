@@ -1,11 +1,12 @@
 // © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
-const { app, BrowserWindow, session, shell, Menu, globalShortcut, ipcMain } = require("electron");
+const { app, BrowserWindow, session, shell, Menu, globalShortcut, ipcMain, dialog } = require("electron");
 const path = require("path");
 const {
   closeMediaHudWindow,
   sendMediaCommand,
   toggleMediaHudWindow,
 } = require("./electron/hud_windows");
+const { startBackend, stopBackend } = require("./electron/backend_process");
 
 // SIRIUS — Application de bureau Windows (Electron)
 // Charge le HUD React compilé (dossier build) et accorde l'accès au micro.
@@ -16,6 +17,16 @@ let overlayWindow = null;
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
 if (!hasSingleInstanceLock) {
+  // Avant, l'application se fermait ici sans aucun message : si une instance restait
+  // bloquée en arrière-plan après un redémarrage (processus zombie, fenêtre masquée…),
+  // cliquer sur l'icône ne provoquait strictement rien à l'écran — symptôme rapporté
+  // comme « ça ne démarre pas ». On affiche désormais un message explicite (utilisable
+  // avant même que l'app soit "ready") pour que l'utilisateur sache quoi faire.
+  dialog.showErrorBox(
+    "SIRIUS — déjà en cours d'exécution",
+    "Une autre instance de SIRIUS semble déjà active (peut-être masquée ou bloquée en arrière-plan après un redémarrage).\n\n" +
+      "Ouvrez le Gestionnaire des tâches (Ctrl+Maj+Échap), cherchez un processus « SIRIUS » ou « electron.exe », terminez-le, puis relancez l'application."
+  );
   app.quit();
 }
 
@@ -28,7 +39,7 @@ app.on("second-instance", () => {
 const mediaPreload = path.join(__dirname, "electron", "preload_media.js");
 
 function baseUrl() {
-  return isDev ? "http://localhost:3000" : "file://" + path.join(__dirname, "..", "build", "index.html");
+  return isDev ? "http://localhost:3000" : "http://127.0.0.1:8001";
 }
 
 function mediaWindowOptions() {
@@ -57,7 +68,7 @@ function createWindow() {
     height: 900,
     minWidth: 1024,
     minHeight: 680,
-    backgroundColor: "#000000",
+    backgroundColor: "#061321",
     title: "SIRIUS",
     autoHideMenuBar: true,
     icon: path.join(__dirname, "icon.ico"),
@@ -71,27 +82,42 @@ function createWindow() {
   });
 
   // Accorde automatiquement l'accès au microphone (reconnaissance vocale)
-  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-    if (permission === "media" || permission === "microphone" || permission === "audioCapture") {
-      callback(true);
-    } else {
-      callback(true);
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
+    const allowedPermissions = new Set([
+      "audioCapture",
+      "geolocation",
+      "media",
+      "microphone",
+      "notifications",
+    ]);
+    const requestingUrl = details?.requestingUrl || webContents.getURL();
+    let trustedOrigin = false;
+    try {
+      trustedOrigin = new URL(requestingUrl).origin === new URL(baseUrl()).origin;
+    } catch {
+      trustedOrigin = false;
     }
+    callback(trustedOrigin && allowedPermissions.has(permission));
   });
 
   // Démarre en plein écran immersif pour l'effet HUD
   mainWindow.maximize();
 
-  if (isDev) {
-    mainWindow.loadURL("http://localhost:3000");
-  } else {
-    mainWindow.loadFile(path.join(__dirname, "..", "build", "index.html"));
-  }
+  mainWindow.loadURL(baseUrl());
 
   // Ouvre les liens externes dans le navigateur par défaut
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: "deny" };
+  });
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    try {
+      if (new URL(url).origin === new URL(baseUrl()).origin) return;
+    } catch {
+      // Invalid navigation targets are blocked below.
+    }
+    event.preventDefault();
+    if (/^https?:\/\//i.test(url)) shell.openExternal(url);
   });
 
   mainWindow.on("closed", () => {
@@ -131,8 +157,24 @@ function toggleOverlay() {
   overlayWindow.on("closed", () => { overlayWindow = null; });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   if (!hasSingleInstanceLock) return;
+
+  if (!isDev) {
+    try {
+      await startBackend({
+        resourcesPath: process.resourcesPath,
+        userDataPath: app.getPath("userData"),
+      });
+    } catch (error) {
+      dialog.showErrorBox(
+        "SIRIUS — démarrage impossible",
+        `${error.message}\n\nConsultez backend.log dans ${app.getPath("userData")}.`
+      );
+      app.quit();
+      return;
+    }
+  }
 
   // Active les raccourcis Couper/Copier/Coller/Tout sélectionner (Ctrl+X/C/V/A)
   Menu.setApplicationMenu(
@@ -201,4 +243,5 @@ app.on("window-all-closed", () => {
 
 app.on("will-quit", () => {
   globalShortcut.unregisterAll();
+  stopBackend();
 });

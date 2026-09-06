@@ -29,8 +29,21 @@ MEDIA_EMBED_PARENT=localhost # optionnel · domaine autorise pour les lecteurs T
 ```
 Lancer le backend :
 ```
-uvicorn server:app --host 0.0.0.0 --port 8001
+uvicorn server:app --host 127.0.0.1 --port 8001 --no-proxy-headers
 ```
+
+Le backend doit rester lié à l'interface loopback : le bootstrap automatique et
+les contrôles Omega sont réservés aux connexions locales directes.
+
+## Application Windows autonome
+
+Depuis `frontend`, exécuter `BUILD.bat`. Le script compile le HUD, transforme le
+backend Python en exécutable local, puis génère l'installateur NSIS et la version
+portable dans `frontend\dist`.
+
+L'application installée démarre elle-même son backend sur `127.0.0.1:8001`.
+Les données modifiables, journaux et secrets restent dans le dossier utilisateur
+Windows de SIRIUS ; aucun serveur Python manuel n'est nécessaire.
 
 ## 3. Frontend (React)
 ```

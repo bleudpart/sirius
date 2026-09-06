@@ -9,7 +9,7 @@ echo            S . I . R . I . U . S   -   BUILD WINDOWS
 echo  ============================================================
 echo.
 echo   Ce script compile SIRIUS en application Windows (.exe).
-echo   Prerequis : Node.js installe (https://nodejs.org)
+echo   Prerequis : Node.js et Python 3.12 installes.
 echo.
 echo  ------------------------------------------------------------
 echo.
@@ -31,6 +31,15 @@ where node >nul 2>nul
 if %errorlevel% neq 0 (
     echo  [ERREUR] Node.js n'est pas installe.
     echo  Telechargez la version LTS : https://nodejs.org
+    echo.
+    pause
+    exit /b
+)
+
+where python >nul 2>nul
+if %errorlevel% neq 0 (
+    echo  [ERREUR] Python n'est pas installe.
+    echo  Telechargez Python 3.12 : https://www.python.org/downloads/
     echo.
     pause
     exit /b
@@ -59,7 +68,7 @@ if not defined PM (
 
 echo  Gestionnaire utilise : %PM%
 echo.
-echo  [1/3] Installation des dependances (quelques minutes)...
+echo  [1/4] Installation des dependances (quelques minutes)...
 echo.
 if "%PM%"=="yarn" (
     call yarn install
@@ -73,8 +82,16 @@ if %errorlevel% neq 0 (
     exit /b
 )
 
+call python -m pip install -r "..\backend\requirements.txt" -r "..\backend\requirements-build.txt"
+if %errorlevel% neq 0 (
+    echo.
+    echo  [ERREUR] Installation des dependances Python echouee.
+    pause
+    exit /b
+)
+
 echo.
-echo  [2/3] Compilation du HUD React...
+echo  [2/4] Compilation du HUD React...
 echo.
 if "%PM%"=="yarn" (
     call yarn build
@@ -89,12 +106,27 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo  [3/3] Generation de l'installeur Windows (.exe)...
+echo  [3/4] Compilation du backend autonome...
 echo.
 if "%PM%"=="yarn" (
-    call yarn electron:build
+    call yarn backend:build
 ) else (
-    call npm run electron:build
+    call npm run backend:build
+)
+if %errorlevel% neq 0 (
+    echo.
+    echo  [ERREUR] Compilation du backend echouee.
+    pause
+    exit /b
+)
+
+echo.
+echo  [4/4] Generation de l'installeur Windows (.exe)...
+echo.
+if "%PM%"=="yarn" (
+    call yarn electron-builder --win nsis portable
+) else (
+    call npx electron-builder --win nsis portable
 )
 if %errorlevel% neq 0 (
     echo.
