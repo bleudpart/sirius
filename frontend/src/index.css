@@ -3,6 +3,47 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+    --sirius-bg-950: #030b14;
+    --sirius-bg-900: #061321;
+    --sirius-bg-850: #091827;
+    --sirius-panel: rgba(13, 35, 54, 0.72);
+    --sirius-panel-strong: rgba(9, 28, 45, 0.88);
+    --sirius-panel-soft: rgba(27, 55, 75, 0.52);
+    --sirius-blue-steel: #31536c;
+    --sirius-blue-muted: #7995a7;
+    --sirius-cyan: #91e6f2;
+    --sirius-cyan-bright: #d3faff;
+    --sirius-cyan-light: #d3faff;
+    --sirius-cyan-glow: rgba(145, 230, 242, 0.38);
+    --sirius-gold: #d8b875;
+    --sirius-gold-bright: #f2d99a;
+    --sirius-gold-light: #f2d99a;
+    --sirius-gold-dark: #9d7a3e;
+    --sirius-gold-glow: rgba(216, 184, 117, 0.32);
+    --sirius-text: #edf7f8;
+    --sirius-text-secondary: #a8bac5;
+    --sirius-text-muted: #748b99;
+    --sirius-border: rgba(216, 184, 117, 0.66);
+    --sirius-border-soft: rgba(145, 230, 242, 0.22);
+    --sirius-shadow: rgba(0, 5, 14, 0.72);
+    --sirius-success: #91e6f2;
+    --sirius-warning: #d8b875;
+    --sirius-danger: #c98175;
+    --sirius-background: #061321;
+    --sirius-space-xs: 4px;
+    --sirius-space-sm: 8px;
+    --sirius-space-md: 12px;
+    --sirius-space-lg: 18px;
+    --sirius-space-xl: 24px;
+    --sirius-radius-control: 8px;
+    --sirius-radius-panel: 18px;
+    --sirius-radius-pill: 999px;
+    --sirius-motion-fast: 120ms;
+    --sirius-motion-normal: 200ms;
+    --sirius-motion-slow: 320ms;
+}
+
 body {
     margin: 0;
     font-family:
@@ -11,6 +52,95 @@ body {
         sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+}
+
+.fde-crash-boundary {
+    min-height: 100vh;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: var(--sirius-space-md);
+    padding: var(--sirius-space-xl);
+    color: #e8fbff;
+    text-align: center;
+    background:
+        radial-gradient(circle at center, rgba(145, 230, 242, 0.12), transparent 42%),
+        var(--sirius-background);
+}
+
+.fde-crash-boundary h1,
+.fde-crash-boundary p {
+    margin: 0;
+}
+
+.fde-crash-boundary h1 {
+    color: var(--sirius-gold);
+    font: 700 16px "Orbitron", "Segoe UI", sans-serif;
+    letter-spacing: 0.12em;
+}
+
+.fde-crash-boundary p {
+    max-width: 520px;
+    color: #9ab6c1;
+}
+
+.fde-crash-boundary button,
+.fde-module-loading,
+.fde-module-error {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sirius-space-sm);
+    min-height: 36px;
+    padding: 0 var(--sirius-space-md);
+    color: #f4e6c3;
+    background: rgba(9, 26, 43, 0.94);
+    border: 1px solid rgba(216, 184, 117, 0.55);
+    border-radius: var(--sirius-radius-control);
+    font: 700 10px "Orbitron", "Segoe UI", sans-serif;
+    letter-spacing: 0.08em;
+}
+
+.fde-crash-boundary button {
+    cursor: pointer;
+}
+
+.fde-module-error {
+    position: fixed;
+    left: 50%;
+    bottom: var(--sirius-space-xl);
+    z-index: 96;
+    transform: translateX(-50%);
+}
+
+.fde-module-error button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sirius-space-xs);
+    color: inherit;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+}
+
+.fde-module-loading {
+    position: fixed;
+    left: 50%;
+    bottom: var(--sirius-space-xl);
+    z-index: 95;
+    transform: translateX(-50%);
+    pointer-events: none;
+    box-shadow: 0 0 18px rgba(216, 184, 117, 0.18);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }
 
 code {

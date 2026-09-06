@@ -1,15 +1,23 @@
 // © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
 // Chargement différé des modules (code-splitting) : le HUD démarre léger,
 // chaque module n'est téléchargé et interprété qu'à sa première ouverture.
-import { lazy, Suspense } from "react";
+import { lazy, memo, Suspense } from "react";
+import FdeErrorBoundary from "@/FdeErrorBoundary";
+
+function ModuleFallback() {
+  return <div className="fde-module-loading" role="status">CHARGEMENT DU MODULE…</div>;
+}
 
 const wrap = (loader) => {
   const C = lazy(loader);
-  const W = (props) => (
-    <Suspense fallback={null}>
-      <C {...props} />
-    </Suspense>
-  );
+  const W = memo((props) => (
+    <FdeErrorBoundary module>
+      <Suspense fallback={<ModuleFallback />}>
+        <C {...props} />
+      </Suspense>
+    </FdeErrorBoundary>
+  ));
+  W.displayName = "LazySiriusModule";
   return W;
 };
 

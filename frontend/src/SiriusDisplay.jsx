@@ -2,7 +2,7 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { gsap } from "gsap";
 import { animateWindowOpen, animateWindowClose, animateResizeSettle } from "./gsapAnimations";
-import { Monitor, RotateCw, ExternalLink, Globe, MessageSquare, Film, ImageIcon, Minus, ChevronUp, ShieldCheck, X, Maximize2, Minimize2, ClipboardPaste, Save, FileText, UploadCloud, Sparkles, Loader2, Facebook, Instagram, MessageCircle } from "lucide-react";
+import { Monitor, RotateCw, ExternalLink, Globe, MessageSquare, Film, ImageIcon, Minus, ChevronUp, ShieldCheck, X, Maximize2, Minimize2, ClipboardPaste, Save, FileText, UploadCloud, Sparkles, Loader2, Facebook, Instagram, MessageCircle, ThumbsUp, ThumbsDown } from "lucide-react";
 import { progress } from "./SiriusProgress";
 import Analysis3D from "./Analysis3D";
 import ModulesMedia from "./ModulesMedia";
@@ -50,7 +50,23 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
   const [dragOver, setDragOver] = useState(false);
   const [analysis, setAnalysis] = useState(null);
   const [show3D, setShow3D] = useState(false);
+  const [feedbackVote, setFeedbackVote] = useState(null);
   const analysisSeq = useRef(0);
+
+  // Reset vote when a new item arrives
+  const itemId = item && item.id;
+  useEffect(() => { setFeedbackVote(null); }, [itemId]);
+
+  const sendFeedback = useCallback((rating) => {
+    if (!item || !item.id) return;
+    setFeedbackVote(rating);
+    fetch(`${API}/feedback`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ item_id: String(item.id), rating, context: (item.contenu || "").slice(0, 300) }),
+    }).catch(() => {});
+  }, [item]);
 
   // Analyse IA en arrière-plan du fichier déposé + commentaire vocal de Sirius
   const analyzeFile = useCallback(async (file, kind) => {
@@ -391,6 +407,31 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
               <div className="sd-message" data-testid="sirius-display-message">
                 {item.titre && <div className="sd-msg-title">{item.titre}</div>}
                 <p>{item.contenu}</p>
+                <div className="sd-feedback" data-testid="sirius-display-feedback">
+                  <button
+                    className={`sd-vote up ${feedbackVote === "up" ? "active" : ""}`}
+                    onClick={() => sendFeedback("up")}
+                    title="Bonne réponse"
+                    data-testid="sirius-display-vote-up"
+                    disabled={feedbackVote !== null}
+                  >
+                    <ThumbsUp size={12} />
+                  </button>
+                  <button
+                    className={`sd-vote down ${feedbackVote === "down" ? "active" : ""}`}
+                    onClick={() => sendFeedback("down")}
+                    title="Mauvaise réponse"
+                    data-testid="sirius-display-vote-down"
+                    disabled={feedbackVote !== null}
+                  >
+                    <ThumbsDown size={12} />
+                  </button>
+                  {feedbackVote && (
+                    <span className="sd-vote-thanks" data-testid="sirius-display-vote-thanks">
+                      {feedbackVote === "up" ? "Merci ✓" : "Noté"}
+                    </span>
+                  )}
+                </div>
               </div>
             )}
             {!pasted && isWeb && (

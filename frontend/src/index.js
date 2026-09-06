@@ -6,6 +6,8 @@ import "./index.css";
 import App from "@/App";
 import AuthGate from "@/AuthGate";
 import MediaHudWindow from "@/MediaHudWindow";
+import FdeErrorBoundary from "@/FdeErrorBoundary";
+import { initFdeOmega } from "@/fdeOmega";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,12 +20,16 @@ const queryClient = new QueryClient({
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 const isMediaHud = new URLSearchParams(window.location.search).has("mediaHud");
+const stopFdeOmega = initFdeOmega();
+window.addEventListener("beforeunload", stopFdeOmega, { once: true });
 // StrictMode retiré : il double l'exécution des effets en développement,
 // ce qui faisait parler chaque module deux fois (écho des voix de présentation).
 root.render(
   <QueryClientProvider client={queryClient}>
-    <AuthGate>
-      {isMediaHud ? <MediaHudWindow /> : <App />}
-    </AuthGate>
+    <FdeErrorBoundary>
+      <AuthGate>
+        {isMediaHud ? <MediaHudWindow /> : <App />}
+      </AuthGate>
+    </FdeErrorBoundary>
   </QueryClientProvider>,
 );
