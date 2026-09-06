@@ -22,7 +22,9 @@ from typing import Any, Sequence
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-DEFAULT_DATABASE_PATH = SCRIPT_DIR / "sirius_local.db"
+DEFAULT_DATABASE_PATH = Path(
+    os.getenv("SIRIUS_DATA_DIR", SCRIPT_DIR)
+) / "sirius_local.db"
 DEFAULT_BACKUP_DIRECTORY = SCRIPT_DIR / "backups" / "sirius_doctor"
 MANIFEST_SUFFIX = ".manifest.json"
 MANIFEST_VERSION = 1

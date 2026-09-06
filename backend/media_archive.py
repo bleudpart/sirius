@@ -5,6 +5,7 @@ import sqlite3
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from runtime_paths import data_file
 
 
 class MediaArchive:
@@ -17,7 +18,7 @@ class MediaArchive:
         elif configured_path:
             self.path = Path(configured_path)
         else:
-            self.path = Path(__file__).parent / "sirius_local.db"
+            self.path = data_file("sirius_local.db")
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._initialize()
 

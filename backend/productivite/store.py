@@ -7,6 +7,7 @@ import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from runtime_paths import data_file
 
 
 class ProductivityStore:
@@ -19,7 +20,7 @@ class ProductivityStore:
         elif configured_path:
             self.path = Path(configured_path)
         else:
-            self.path = Path(__file__).resolve().parents[1] / "sirius_local.db"
+            self.path = data_file("sirius_local.db")
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._initialize()
 
