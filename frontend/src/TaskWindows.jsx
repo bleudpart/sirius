@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useRef, useState } from "react";
 import { X, Image as ImageIcon, Film, Cog, CheckCircle2, AlertTriangle, Loader2, FolderCheck, Mail } from "lucide-react";
 
@@ -6,7 +6,7 @@ let zCounter = 90;
 
 const TYPE_ICON = { image: ImageIcon, video: Film, outlook: Mail };
 
-// Fenêtre de tâche contrôlée par SIRIUS : ouverture auto, étapes en direct, résultat intégré
+// Fenêtre de tâche contrôlée par ΣIRIUS : ouverture auto, étapes en direct, résultat intégré
 function TaskWindow({ task, onClose }) {
   const ref = useRef(null);
   const [z, setZ] = useState(() => ++zCounter);
@@ -71,7 +71,7 @@ function TaskWindow({ task, onClose }) {
         <Icon size={13} />
         <div className="ww-titles">
           <span className="ww-title">{task.titre}</span>
-          <span className="ww-url">TÂCHE SIRIUS · {task.type.toUpperCase()}</span>
+          <span className="ww-url">TÂCHE ΣIRIUS · {task.type.toUpperCase()}</span>
         </div>
         <span className={`tw-badge tw-${task.status}`} data-testid={`task-window-status-${task.id}`}>
           {task.status === "running" && <Loader2 size={10} className="tw-spin" />}

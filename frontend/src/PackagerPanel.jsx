@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useEffect, useState } from "react";
 import { X, Package, Loader2, Download, FileCheck, Monitor, Smartphone, Apple, FileText, AlertTriangle } from "lucide-react";
 import "./Packager.css";
@@ -24,7 +24,7 @@ export default function PackagerPanel({ onClose, onSpeak, autoInstaller = false 
     document.body.appendChild(a);
     a.click();
     a.remove();
-    onSpeak && onSpeak("Installateur universel SIRIUS téléchargé. Un seul script pour Windows, macOS, Linux, Android et iPhone.");
+    onSpeak && onSpeak("Installateur universel ΣIRIUS téléchargé. Un seul script pour Windows, macOS, Linux, Android et iPhone.");
   }, [autoInstaller, autoDone, onSpeak]);
 
   const build = async () => {
@@ -57,7 +57,7 @@ export default function PackagerPanel({ onClose, onSpeak, autoInstaller = false 
         <section className="prime-card argus-wide">
           {!out && (
             <div className="pkg-intro">
-              <p>Génère la structure complète du package d'installation SIRIUS# (3 plateformes, scripts d'auto-extraction, docs et icône officielle).</p>
+              <p>Génère la structure complète du package d'installation ΣIRIUS# (3 plateformes, scripts d'auto-extraction, docs et icône officielle).</p>
               <button className="pkg-build" onClick={build} disabled={busy} data-testid="packager-build-btn">
                 {busy ? <Loader2 size={15} className="spin" /> : <Package size={15} />} GÉNÉRER LE PACKAGE
               </button>

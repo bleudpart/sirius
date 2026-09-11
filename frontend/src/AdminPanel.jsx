@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Panneau d'administration : comptes inscrits, activité, désactivation et suppression.
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Panneau d'administration : comptes inscrits, activité, désactivation et suppression.
 import { useEffect, useState } from "react";
 import { ShieldCheck, RefreshCw, User, Ban, CheckCircle2, Trash2 } from "lucide-react";
 import { ConfirmButton } from "@/ConfirmButton";

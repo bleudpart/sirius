@@ -1,12 +1,12 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Storyboard publicitaire PROMO# (15 plans).
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Storyboard publicitaire PROMO# (15 plans).
 PROMO_SHOTS = [
     {
         "id": 1, "title": "LA PLATEFORME", "timecode": "0:00 – 0:07",
-        "scene": "Noir total. Le réacteur doré de SIRIUS s'éveille : anneaux concentriques or, pulsations cyan, symboles grecs en orbite. Montée en puissance immédiate.",
+        "scene": "Noir total. Le réacteur doré de ΣIRIUS s'éveille : anneaux concentriques or, pulsations cyan, symboles grecs en orbite. Montée en puissance immédiate.",
         "ambiance": "Impact sonore sourd, nappe qui monte. Affirmation, rupture.",
         "visuels": "Zoom avant sur le noyau, particules d'or, éclats cyan, clair-obscur publicitaire.",
-        "message": "Rupture de positionnement : SIRIUS n'est pas un gadget, c'est une plateforme.",
-        "voix": "SIRIUS n'est pas un assistant. C'est une plateforme d'intelligence opérationnelle.",
+        "message": "Rupture de positionnement : ΣIRIUS n'est pas un gadget, c'est une plateforme.",
+        "voix": "ΣIRIUS n'est pas un assistant. C'est une plateforme d'intelligence opérationnelle.",
         "image": "/api/promo/img/shot1.jpg",
     },
     {
@@ -14,7 +14,7 @@ PROMO_SHOTS = [
         "scene": "Le temple holographique doré se construit en fils de lumière : colonnes, amphore, flux cyan. L'utilisateur entre dans un autre monde.",
         "ambiance": "Majestueux, promesse d'élévation.",
         "visuels": "Wireframe or en construction, reflets cyan, travelling ascendant.",
-        "message": "SIRIUS élève chaque utilisateur au rang de sur-performant.",
+        "message": "ΣIRIUS élève chaque utilisateur au rang de sur-performant.",
         "voix": "Elle transforme n'importe quel utilisateur — particulier ou entreprise — en acteur sur-performant.",
         "image": "/api/promo/img/shot2.jpg",
     },
@@ -23,8 +23,8 @@ PROMO_SHOTS = [
         "scene": "Un cerveau de lumière dorée tourne entre les colonnes, ceint d'anneaux cyan de données. Graphiques et rouages traités à grande vitesse.",
         "ambiance": "Quatre impacts rythmés, un par verbe.",
         "visuels": "Cerveau doré, anneaux data cyan, traînées de lumière ultra-rapides.",
-        "message": "Les 4 verbes de SIRIUS : analyser, automatiser, anticiper, exécuter.",
-        "voix": "SIRIUS analyse. Automatise. Anticipe. Et exécute.",
+        "message": "Les 4 verbes de ΣIRIUS : analyser, automatiser, anticiper, exécuter.",
+        "voix": "ΣIRIUS analyse. Automatise. Anticipe. Et exécute.",
         "image": "/api/promo/img/shot11.jpg",
     },
     {
@@ -40,7 +40,7 @@ PROMO_SHOTS = [
         "id": 5, "title": "LE CHAOS ACTUEL", "timecode": "0:26 – 0:39",
         "scene": "Rupture visuelle : des dizaines de fenêtres d'applications éparpillées, câbles emmêlés, une silhouette débordée qui jongle entre les écrans. Lumière froide, grise.",
         "ambiance": "Stress, friction, gâchis. Le seul plan volontairement terne du film.",
-        "visuels": "Fenêtres dispersées, gris/bleu froid, silhouette débordée — contraste maximal avec l'or de SIRIUS.",
+        "visuels": "Fenêtres dispersées, gris/bleu froid, silhouette débordée — contraste maximal avec l'or de ΣIRIUS.",
         "message": "Le problème : outils dispersés, process inefficaces, tâches répétitives.",
         "voix": "Aujourd'hui, les entreprises dépensent des fortunes en outils dispersés, en process inefficaces, en tâches répétitives. Et les particuliers jonglent entre dix applications pour ce qu'un seul système devrait gérer.",
         "image": "/api/promo/img/shot12.jpg",
@@ -51,7 +51,7 @@ PROMO_SHOTS = [
         "ambiance": "Résolution triomphante, retour de l'or.",
         "visuels": "Faisceaux d'or convergents, panneau unique doré, emblème Σ central rayonnant.",
         "message": "La solution : une interface, un cerveau, un flux.",
-        "voix": "SIRIUS remplace tout ça. Une seule interface. Un seul cerveau. Un seul flux d'action.",
+        "voix": "ΣIRIUS remplace tout ça. Une seule interface. Un seul cerveau. Un seul flux d'action.",
         "image": "/api/promo/img/shot13.jpg",
     },
     {
@@ -87,7 +87,7 @@ PROMO_SHOTS = [
         "ambiance": "Solennel, suspension… puis frappe.",
         "visuels": "Gardien translucide, halo pulsant, colonnes floues.",
         "message": "La signature : un assistant qui agit, pas qui répond.",
-        "voix": "SIRIUS se positionne au centre de ces secteurs, avec une approche unique : un assistant qui ne répond pas… un assistant qui agit.",
+        "voix": "ΣIRIUS se positionne au centre de ces secteurs, avec une approche unique : un assistant qui ne répond pas… un assistant qui agit.",
         "image": "/api/promo/img/shot3.jpg",
     },
     {
@@ -105,7 +105,7 @@ PROMO_SHOTS = [
         "ambiance": "Proximité, chacun se reconnaît.",
         "visuels": "Faisceau vertical cyan, particules d'or, œil d'analyse, viewer 3D.",
         "message": "Cibles : entreprises (coûts) et particuliers (temps).",
-        "voix": "SIRIUS est conçu pour devenir indispensable. Pour les entreprises qui veulent réduire leurs coûts. Pour les particuliers qui veulent gagner du temps.",
+        "voix": "ΣIRIUS est conçu pour devenir indispensable. Pour les entreprises qui veulent réduire leurs coûts. Pour les particuliers qui veulent gagner du temps.",
         "image": "/api/promo/img/shot9.jpg",
     },
     {
@@ -123,16 +123,16 @@ PROMO_SHOTS = [
         "ambiance": "Confiance, envolée orchestrale.",
         "visuels": "Courbe dorée en escalier céleste, lauriers, ciel cyan étoilé.",
         "message": "Appel aux investisseurs : la prochaine génération d'assistants.",
-        "voix": "Investir dans SIRIUS, c'est investir dans la prochaine génération d'assistants intelligents : un système qui ne se contente pas d'aider, mais qui exécute, optimise, et transforme.",
+        "voix": "Investir dans ΣIRIUS, c'est investir dans la prochaine génération d'assistants intelligents : un système qui ne se contente pas d'aider, mais qui exécute, optimise, et transforme.",
         "image": "/api/promo/img/shot15.jpg",
     },
     {
-        "id": 15, "title": "SIRIUS", "timecode": "1:56 – 2:03",
+        "id": 15, "title": "ΣIRIUS", "timecode": "1:56 – 2:03",
         "scene": "Le titre ΣIRIUS en or massif explose en particules d'or et de cyan sous l'étoile la plus brillante. Fondu vers le carton final.",
         "ambiance": "Apothéose, puis note finale cristalline.",
         "visuels": "Typographie grecque monumentale, explosion de particules, lens flare, étoile Sirius.",
         "message": "Signature finale : la puissance opérationnelle, accessible à tous.",
-        "voix": "SIRIUS. La puissance opérationnelle, accessible à tous.",
+        "voix": "ΣIRIUS. La puissance opérationnelle, accessible à tous.",
         "image": "/api/promo/img/shot10.jpg",
     },
 ]

@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // Fenêtres holographiques 3D : transforme les écrans plats en panneaux cyan flottants,
 // déplaçables (drag sur l'en-tête), redimensionnables (poignée bas-droite) et fermables.
 const SEL = ".prime-screen, .zeus-screen, .eu-screen, .setup-screen, .iw-panel";

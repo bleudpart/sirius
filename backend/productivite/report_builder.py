@@ -19,7 +19,7 @@ class ReportBuilder:
         lines = [
             f"# {clean_title}",
             "",
-            f"Genere par SIRIUS le {generated_at}.",
+            f"Genere par ΣIRIUS le {generated_at}.",
             "",
             "## Synthese",
             f"- Notes actives : {summary['notes']}",

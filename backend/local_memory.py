@@ -1,5 +1,5 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
-"""Mémoire locale persistante de SIRIUS (SQLite) : préférences, projets, souvenirs."""
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+"""Mémoire locale persistante de ΣIRIUS (SQLite) : préférences, projets, souvenirs."""
 import re
 import sqlite3
 import unicodedata
@@ -18,7 +18,7 @@ def _conn():
 
 
 def _local_datetime(timestamp: str):
-    """Convert stored timestamps to the PC's local date and time for SIRIUS PRIME."""
+    """Convert stored timestamps to the PC's local date and time for ΣIRIUS PRIME."""
     if not timestamp:
         return None
     try:
@@ -64,6 +64,10 @@ def init_local_db():
 def delete_user_data(user_id: str):
     """Efface toutes les données SQLite d'un utilisateur (suppression de compte)."""
     with _conn() as con:
+        con.execute(
+            "DELETE FROM fact_vectors WHERE fact_id IN (SELECT id FROM facts WHERE user_id = ?)",
+            (user_id,),
+        )
         con.execute("DELETE FROM facts WHERE user_id = ?", (user_id,))
         con.execute("DELETE FROM events WHERE user_id = ?", (user_id,))
         media_events_exists = con.execute(
@@ -110,6 +114,9 @@ def update_fact(fact_id: str, text: str, user_id: str = None) -> bool:
             cur = con.execute("UPDATE facts SET text = ? WHERE id = ? AND user_id = ?", (text, fact_id, user_id))
         else:
             cur = con.execute("UPDATE facts SET text = ? WHERE id = ?", (text, fact_id))
+        if cur.rowcount > 0:
+            # Le texte a changé : le vecteur en cache est périmé, il sera recalculé.
+            con.execute("DELETE FROM fact_vectors WHERE fact_id = ?", (fact_id,))
     return cur.rowcount > 0
 
 
@@ -230,6 +237,8 @@ def delete_fact(fact_id: str, user_id: str = None) -> bool:
             cur = con.execute("DELETE FROM facts WHERE id = ? AND user_id = ?", (fact_id, user_id))
         else:
             cur = con.execute("DELETE FROM facts WHERE id = ?", (fact_id,))
+        if cur.rowcount > 0:
+            con.execute("DELETE FROM fact_vectors WHERE fact_id = ?", (fact_id,))
     return cur.rowcount > 0
 
 
@@ -420,6 +429,39 @@ def store_vector(fact_id: str, model: str, vector):
             "INSERT OR REPLACE INTO fact_vectors (fact_id, model, vector) VALUES (?, ?, ?)",
             (fact_id, model, _json.dumps([round(float(v), 6) for v in vector])),
         )
+
+
+def facts_missing_vectors(model: str, limit: int = 64):
+    """Faits sans vecteur d'embedding en cache — candidats à la pré-vectorisation."""
+    with _conn() as con:
+        rows = con.execute(
+            "SELECT f.id, f.text FROM facts f "
+            "LEFT JOIN fact_vectors v ON v.fact_id = f.id AND v.model = ? "
+            "WHERE v.fact_id IS NULL ORDER BY f.created_at DESC LIMIT ?",
+            (model, limit),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def vectorized_facts(user_id: str, model: str, limit: int = 2000):
+    """Tous les faits d'un utilisateur déjà vectorisés, avec leur vecteur décodé."""
+    import json as _json
+    with _conn() as con:
+        rows = con.execute(
+            "SELECT f.id, f.category, f.text, f.created_at, f.use_count, v.vector "
+            "FROM facts f JOIN fact_vectors v ON v.fact_id = f.id AND v.model = ? "
+            "WHERE f.user_id = ? ORDER BY f.created_at DESC LIMIT ?",
+            (model, user_id, limit),
+        ).fetchall()
+    facts = []
+    for row in rows:
+        fact = dict(row)
+        try:
+            fact["vector"] = _json.loads(fact["vector"])
+        except Exception:
+            continue
+        facts.append(fact)
+    return facts
 
 
 init_local_db()

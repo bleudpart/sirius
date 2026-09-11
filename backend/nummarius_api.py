@@ -1,4 +1,4 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. PORTUS NUMMARIUS# — bourse & marchés.
+# © 2026 Daniel Partel – ΣIRIUS Assistant. PORTUS NUMMARIUS# — bourse & marchés.
 import os
 import time
 

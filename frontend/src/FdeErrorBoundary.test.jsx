@@ -51,7 +51,7 @@ describe("FdeErrorBoundary", () => {
     });
     const fallback = container.querySelector('[data-testid="fde-crash-boundary"]');
     expect(fallback).not.toBeNull();
-    expect(fallback.textContent).toContain("SIRIUS — INTERFACE PROTÉGÉE");
+    expect(fallback.textContent).toContain("ΣIRIUS — INTERFACE PROTÉGÉE");
     expect(reportFdeCrash).toHaveBeenCalledTimes(1);
     expect(reportFdeCrash.mock.calls[0][0]).toBeInstanceOf(Error);
   });

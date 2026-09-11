@@ -1,6 +1,9 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
-"""Intégration Google Calendar : OAuth2 + lecture/création d'événements (httpx, sans SDK)."""
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
+"""Intégration Google Calendar + Gmail : OAuth2 + lecture/création d'événements et lecture
+des e-mails Gmail (httpx, sans SDK). Le même jeton Google (scope gmail.readonly demandé lors
+de la connexion à l'Agenda) sert aussi à lire la boîte de réception Gmail."""
 import os
+import secrets
 from datetime import datetime, timedelta, timezone
 
 import httpx
@@ -8,9 +11,14 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
+import email_intel
+from auth_api import resolve_user_id, LEGACY_UID, is_direct_local_request
+from email_signature import append_signature_text
+
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 AUTH_URL = "https://accounts.google.com/o/oauth2/auth"
 CAL_API = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
+GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me"
 SCOPE = "https://www.googleapis.com/auth/calendar"
 DOC_ID = "default"
 
@@ -42,11 +50,20 @@ class EventIn(BaseModel):
     description: str = ""
 
 
+class GmailSendReq(BaseModel):
+    to: str
+    subject: str = "Message envoyé par ΣIRIUS"
+    body: str = ""
+
+
+class GmailReplyReq(BaseModel):
+    body: str = ""
+
+
 def make_gcal_router(db):
     router = APIRouter()
 
     async def _uid(request: Request) -> str:
-        from auth_api import resolve_user_id
         return await resolve_user_id(request, db)
 
     async def _get_token(uid: str) -> str:
@@ -82,17 +99,31 @@ def make_gcal_router(db):
     @router.get("/oauth/calendar/login")
     async def gcal_login(request: Request):
         cid, _ = _client_conf()
-        uid = await _uid(request)
+        # Comme pour Microsoft (microsoft_graph.py) : le "state" doit être un jeton opaque
+        # généré côté serveur et lié à l'utilisateur résolu ICI, jamais l'uid brut envoyé
+        # tel quel — sinon un attaquant peut forger son propre code OAuth et l'associer au
+        # compte d'une victime via un lien piégé (CSRF de liaison de compte).
+        try:
+            uid = await resolve_user_id(request, db)
+        except HTTPException:
+            if not is_direct_local_request(request):
+                raise
+            uid = LEGACY_UID
+        state = secrets.token_urlsafe(32)
+        await db.oauth_states.insert_one({
+            "_id": f"gcal:{state}", "uid": uid,
+            "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
+        })
         from urllib.parse import urlencode
 
         params = urlencode({
             "client_id": cid,
             "redirect_uri": _redirect_uri(request),
             "response_type": "code",
-            "scope": SCOPE + " https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/gmail.readonly",
+            "scope": SCOPE + " https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send",
             "access_type": "offline",
             "prompt": "consent",
-            "state": uid,
+            "state": state,
         })
         return {"authorization_url": f"{AUTH_URL}?{params}"}
 
@@ -100,6 +131,10 @@ def make_gcal_router(db):
     async def gcal_callback(request: Request, code: str = "", error: str = "", state: str = ""):
         if error or not code:
             return RedirectResponse(f"{FRONTEND_URL}/?gcal=error")
+        st = await db.oauth_states.find_one_and_delete({"_id": f"gcal:{state}"})
+        if not st or datetime.fromisoformat(st["expires_at"]) < datetime.now(timezone.utc):
+            return RedirectResponse(f"{FRONTEND_URL}/?gcal=error")
+        uid = st["uid"]
         cid, csec = _client_conf()
         async with httpx.AsyncClient(timeout=20) as cx:
             r = await cx.post(
@@ -122,7 +157,7 @@ def make_gcal_router(db):
             email = u.json().get("email", "") if u.status_code == 200 else ""
         expires_at = (datetime.now(timezone.utc) + timedelta(seconds=tokens.get("expires_in", 3500))).isoformat()
         await db.google_calendar.update_one(
-            {"_id": state or DOC_ID},
+            {"_id": uid},
             {"$set": {"tokens": tokens, "email": email, "expires_at": expires_at, "connected_at": datetime.now(timezone.utc).isoformat()}},
             upsert=True,
         )
@@ -196,6 +231,135 @@ def make_gcal_router(db):
             r = await cx.delete(f"{CAL_API}/{event_id}", headers={"Authorization": "Bearer " + token})
         if r.status_code not in (200, 204):
             raise HTTPException(status_code=502, detail=f"Suppression refusée par Google ({r.status_code}).")
+        return {"ok": True}
+
+    def _header(headers: list, name: str) -> str:
+        for h in headers or []:
+            if (h.get("name") or "").lower() == name.lower():
+                return h.get("value") or ""
+        return ""
+
+    @router.get("/gmail/messages")
+    async def gmail_messages(request: Request, top: int = 10):
+        """Derniers mails Gmail (boîte de réception), classés par importance comme pour
+        Outlook (email_intel) afin d'alimenter les cases stylisées du display et signaler
+        les messages urgents pour l'alerte vocale."""
+        uid = await _uid(request)
+        token = await _get_token(uid)
+        top = max(1, min(top, 25))
+        async with httpx.AsyncClient(timeout=15) as cx:
+            r = await cx.get(
+                f"{GMAIL_API}/messages",
+                params={"maxResults": top, "labelIds": "INBOX", "q": "in:inbox"},
+                headers={"Authorization": "Bearer " + token},
+            )
+            if r.status_code == 401:
+                raise HTTPException(status_code=401, detail="Session Gmail expirée, reconnectez-vous.")
+            if r.status_code != 200:
+                raise HTTPException(status_code=502, detail=f"Gmail a répondu {r.status_code}.")
+            ids = [m["id"] for m in r.json().get("messages", [])]
+            mails = []
+            non_lus = 0
+            for mid in ids:
+                mr = await cx.get(
+                    f"{GMAIL_API}/messages/{mid}",
+                    params={"format": "metadata", "metadataHeaders": ["From", "Subject"]},
+                    headers={"Authorization": "Bearer " + token},
+                )
+                if mr.status_code != 200:
+                    continue
+                m = mr.json()
+                headers = (m.get("payload") or {}).get("headers") or []
+                from_raw = _header(headers, "From")
+                de_email = from_raw.split("<")[-1].replace(">", "").strip().lower() if "<" in from_raw else from_raw.strip().lower()
+                de_nom = from_raw.split("<")[0].strip().strip('"') if "<" in from_raw else from_raw
+                lu = "UNREAD" not in (m.get("labelIds") or [])
+                if not lu:
+                    non_lus += 1
+                recu_ms = int(m.get("internalDate") or 0)
+                recu = datetime.fromtimestamp(recu_ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M") if recu_ms else ""
+                mail = {
+                    "id": mid,
+                    "sujet": _header(headers, "Subject") or "(sans objet)",
+                    "de": de_nom or de_email,
+                    "de_email": de_email,
+                    "recu": recu,
+                    "lu": lu,
+                    "apercu": (m.get("snippet") or "")[:140],
+                    "importance": "normal",
+                }
+                verdict = email_intel.classify_email(mail)
+                mails.append({**mail, **verdict})
+            return {"non_lus": non_lus, "mails": mails, "total": len(mails)}
+
+    def _build_raw_message(to: str, subject: str, body: str, in_reply_to: str = "", references: str = "") -> str:
+        """Construit un message RFC 2822 encodé en base64url, comme exigé par
+        l'API Gmail (users.messages.send attend un champ "raw")."""
+        import base64
+        from email.mime.text import MIMEText
+
+        msg = MIMEText(body, "plain", "utf-8")
+        msg["to"] = to
+        msg["subject"] = subject
+        if in_reply_to:
+            msg["In-Reply-To"] = in_reply_to
+            msg["References"] = references or in_reply_to
+        return base64.urlsafe_b64encode(msg.as_bytes()).decode()
+
+    @router.post("/gmail/send")
+    async def gmail_send(request: Request, req: GmailSendReq):
+        """Envoie un nouvel e-mail Gmail, avec la signature ΣIRIUS HUD ajoutée automatiquement."""
+        uid = await _uid(request)
+        token = await _get_token(uid)
+        to = (req.to or "").strip()
+        if not to:
+            raise HTTPException(status_code=400, detail="Destinataire manquant")
+        raw = _build_raw_message(to, req.subject, append_signature_text(req.body))
+        async with httpx.AsyncClient(timeout=20) as cx:
+            r = await cx.post(
+                f"{GMAIL_API}/messages/send",
+                json={"raw": raw},
+                headers={"Authorization": "Bearer " + token},
+            )
+        if r.status_code not in (200, 202):
+            raise HTTPException(status_code=502, detail="Envoi Gmail impossible")
+        return {"ok": True}
+
+    @router.post("/gmail/messages/{message_id}/reply")
+    async def gmail_reply(request: Request, message_id: str, req: GmailReplyReq):
+        """Répond à un e-mail Gmail existant (même fil de discussion), signature ΣIRIUS HUD incluse."""
+        uid = await _uid(request)
+        token = await _get_token(uid)
+        async with httpx.AsyncClient(timeout=20) as cx:
+            mr = await cx.get(
+                f"{GMAIL_API}/messages/{message_id}",
+                params={"format": "metadata", "metadataHeaders": ["From", "Subject", "Message-ID", "References"]},
+                headers={"Authorization": "Bearer " + token},
+            )
+            if mr.status_code == 401:
+                raise HTTPException(status_code=401, detail="Session Gmail expirée, reconnectez-vous.")
+            if mr.status_code != 200:
+                raise HTTPException(status_code=404, detail="E-mail introuvable")
+            m = mr.json()
+            headers = (m.get("payload") or {}).get("headers") or []
+            to = _header(headers, "From")
+            subject = _header(headers, "Subject") or ""
+            if not subject.lower().startswith("re:"):
+                subject = f"Re: {subject}"
+            message_id_hdr = _header(headers, "Message-ID")
+            references = _header(headers, "References")
+            thread_id = m.get("threadId")
+            raw = _build_raw_message(to, subject, append_signature_text(req.body), message_id_hdr, references)
+            payload = {"raw": raw}
+            if thread_id:
+                payload["threadId"] = thread_id
+            r = await cx.post(
+                f"{GMAIL_API}/messages/send",
+                json=payload,
+                headers={"Authorization": "Bearer " + token},
+            )
+        if r.status_code not in (200, 202):
+            raise HTTPException(status_code=502, detail="Réponse Gmail impossible")
         return {"ok": True}
 
     return router

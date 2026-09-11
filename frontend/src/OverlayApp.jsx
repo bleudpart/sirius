@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { speakFr } from "@/voice";
@@ -70,7 +70,7 @@ export default function OverlayApp() {
   return (
     <div className="overlay-root" data-testid="sirius-overlay">
       <form className="overlay-bar" onSubmit={ask}>
-        <span className="overlay-prompt">SIRIUS&gt;</span>
+        <span className="overlay-prompt">ΣIRIUS&gt;</span>
         <input
           ref={inputRef}
           className="overlay-input"

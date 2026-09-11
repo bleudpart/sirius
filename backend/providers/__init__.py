@@ -1,4 +1,4 @@
-"""Fournisseurs de liens multimedia integres au HUD SIRIUS."""
+"""Fournisseurs de liens multimedia integres au HUD ΣIRIUS."""
 
 from .deezer import resolve as resolve_deezer
 from .netflix import resolve as resolve_netflix

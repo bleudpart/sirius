@@ -5,7 +5,9 @@ Assistant vocal HUD style Iron Man. Frontend React + Backend FastAPI (+ Electron
 ## 1. Prérequis
 - Node.js 18+ et Yarn  (`npm install -g yarn`)
 - Python 3.10+
-- MongoDB local (ou une URL MongoDB)
+- MongoDB local **optionnel** : s'il est absent, SIRIUS utilise automatiquement
+  une base SQLite locale (`sirius_docstore.db`). Variable `SIRIUS_DB=local` ou
+  `SIRIUS_DB=mongo` pour forcer un mode.
 
 ## 2. Backend (FastAPI)
 ```
@@ -62,6 +64,15 @@ yarn start
 ## 4. Construire l'application Windows (.exe)
 Dans `frontend/`, double-clique sur **BUILD.bat** (garde-le en CRLF / ASCII).
 L'exécutable est généré dans le dossier de sortie Electron.
+
+Pour publier une mise à jour automatique via GitHub Releases :
+1. Ouvre un terminal à la racine du projet.
+2. Configure le jeton de publication : `set GH_TOKEN=ton_token_github`.
+3. Lance `RELEASE-SIRIUS-AUTO.bat`.
+
+Le script augmente automatiquement le numéro de version, compile le HUD et le
+backend, publie la release GitHub, puis les applications installées proposent le
+redémarrage lorsque la mise à jour est téléchargée.
 
 ## 5. Sauvegarder la mémoire locale
 Depuis `backend/`, **Sirius Doctor** crée une copie SQLite cohérente de

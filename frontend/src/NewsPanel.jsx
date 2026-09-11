@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 import { useEffect, useState, useCallback, useRef } from "react";
 import { X, Newspaper, RefreshCw, Search, Volume2, ExternalLink } from "lucide-react";
 import { speakFr, cancelSpeech } from "@/voice";

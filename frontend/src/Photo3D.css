@@ -1,0 +1,98 @@
+/* © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France). */
+/* PHOTO3D# — reconstruction 3D locale à partir de photos — style holographique or & cyan */
+.p3d-overlay {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(980px, 96vw);
+  height: min(720px, 90vh);
+  display: flex; flex-direction: column;
+  z-index: 120;
+  background: rgba(2, 10, 18, 0.97);
+  border: 1px solid rgba(216, 184, 117, 0.55);
+  border-radius: 10px;
+  box-shadow: 0 0 34px rgba(216, 184, 117, 0.25), 0 0 26px rgba(145, 230, 242, 0.18);
+  backdrop-filter: blur(14px);
+  overflow: hidden;
+  animation: p3dIn 0.25s ease-out;
+}
+@keyframes p3dIn { from { opacity: 0; transform: translate(-50%, -47%); } to { opacity: 1; transform: translate(-50%, -50%); } }
+
+.p3d-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px;
+  color: #d8b875;
+  border-bottom: 1px solid rgba(216, 184, 117, 0.3);
+}
+.p3d-title { font-family: "Orbitron", sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-shadow: 0 0 8px rgba(216, 184, 117, 0.4); }
+.p3d-close {
+  margin-left: auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 6px; cursor: pointer;
+  color: #9fd3e8; background: transparent; border: 1px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+}
+.p3d-close:hover { color: #f2d99a; border-color: rgba(216, 184, 117, 0.55); }
+
+.p3d-body { flex: 1; display: flex; flex-direction: column; gap: 10px; padding: 14px; overflow-y: auto; }
+
+.p3d-dropzone {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  border: 2px dashed rgba(145, 230, 242, 0.35);
+  border-radius: 10px;
+  color: #9fd3e8;
+  cursor: pointer;
+  padding: 30px;
+  text-align: center;
+  transition: border-color 0.2s, background 0.2s;
+  min-height: 220px;
+}
+.p3d-dropzone:hover, .p3d-dropzone.drag { border-color: rgba(216, 184, 117, 0.75); background: rgba(216, 184, 117, 0.06); }
+.p3d-dropzone p { margin: 0; font-family: "Rajdhani", sans-serif; font-size: 14px; }
+.p3d-hint { font-size: 11.5px !important; color: #6f95a8; font-style: italic; }
+
+.p3d-thumbs { display: flex; flex-wrap: wrap; gap: 8px; }
+.p3d-thumb { position: relative; width: 64px; height: 64px; border-radius: 6px; overflow: hidden; border: 1px solid rgba(145, 230, 242, 0.3); }
+.p3d-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.p3d-thumb button {
+  position: absolute; top: 2px; right: 2px;
+  width: 16px; height: 16px; border-radius: 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(2, 10, 18, 0.75); color: #f2d99a; border: none; cursor: pointer;
+}
+.p3d-thumb-count {
+  display: inline-flex; align-items: center; gap: 5px;
+  color: #d8b875; font-size: 12px; font-family: "Rajdhani", sans-serif;
+  padding: 0 6px;
+}
+
+.p3d-progress-wrap { display: flex; flex-direction: column; gap: 6px; }
+.p3d-progress-bar { height: 8px; border-radius: 4px; background: rgba(145, 230, 242, 0.12); overflow: hidden; }
+.p3d-progress-fill { height: 100%; background: linear-gradient(90deg, #91e6f2, #d8b875); transition: width 0.35s ease; }
+.p3d-progress-label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #9fd3e8; font-family: "Rajdhani", sans-serif; }
+.p3d-spin { animation: p3dSpin 0.9s linear infinite; }
+@keyframes p3dSpin { to { transform: rotate(360deg); } }
+
+.p3d-error { color: #f28b8b; font-size: 12.5px; font-family: "Rajdhani", sans-serif; }
+
+.p3d-viewer { flex: 1; min-height: 260px; border-radius: 8px; overflow: hidden; border: 1px solid rgba(145, 230, 242, 0.2); background: radial-gradient(circle at 50% 40%, rgba(145,230,242,0.05), transparent 70%); }
+.p3d-viewer canvas { width: 100% !important; height: 100% !important; cursor: grab; }
+.p3d-viewer canvas:active { cursor: grabbing; }
+
+.p3d-footer { display: flex; gap: 10px; padding: 12px 14px; border-top: 1px solid rgba(216, 184, 117, 0.25); }
+.p3d-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border-radius: 6px; cursor: pointer;
+  font-family: "Rajdhani", sans-serif; font-size: 13px; font-weight: 600; letter-spacing: 0.03em;
+  background: rgba(145, 230, 242, 0.08); color: #9fd3e8; border: 1px solid rgba(145, 230, 242, 0.3);
+  transition: background 0.2s, color 0.2s;
+}
+.p3d-btn:hover { background: rgba(145, 230, 242, 0.16); }
+.p3d-btn.primary { background: rgba(216, 184, 117, 0.14); color: #f2d99a; border-color: rgba(216, 184, 117, 0.55); }
+.p3d-btn.primary:hover { background: rgba(216, 184, 117, 0.24); }
+.p3d-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+@media (max-width: 640px) {
+  .p3d-overlay { width: calc(100vw - 12px); height: 92vh; }
+}

@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // Horloge et stats système isolées : évite de re-rendre tout le HUD chaque seconde.
 import { useEffect, useState } from "react";
 import { Cpu, Activity } from "lucide-react";

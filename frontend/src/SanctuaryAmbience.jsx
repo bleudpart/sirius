@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // Ambiance « Sanctuaire Profond » : bokeh doré multi-profondeur, poussière d'or ascendante,
 // nappes de brume et onde vocale cyan réactive qui se dissout en poussière d'or.
 import { useRef, useEffect } from "react";

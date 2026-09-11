@@ -1,4 +1,4 @@
-"""Local-first authenticated session boundary for SIRIUS."""
+"""Local-first authenticated session boundary for ΣIRIUS."""
 
 import base64
 import hashlib

@@ -67,6 +67,7 @@ if not defined PM (
 )
 
 echo  Gestionnaire utilise : %PM%
+for /f "delims=" %%v in ('node -p "require('./package.json').version"') do set "SIRIUS_VERSION=%%v"
 echo.
 echo  [1/4] Installation des dependances (quelques minutes)...
 echo.
@@ -141,8 +142,8 @@ echo                       TERMINE !
 echo  ============================================================
 echo.
 echo   Votre application est dans le dossier : dist\
-echo     - "SIRIUS Setup 1.0.0.exe"     = installeur classique
-echo     - "SIRIUS-portable-1.0.0.exe"  = version portable
+echo     - "SIRIUS Setup %SIRIUS_VERSION%.exe"     = installeur classique
+echo     - "SIRIUS-portable-%SIRIUS_VERSION%.exe"  = version portable
 echo.
 start "" "dist"
 pause

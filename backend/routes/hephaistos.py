@@ -1,4 +1,4 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 """HÉPHAÏSTOS : diagnostic système réel (endpoints internes, services, intégrations)
 et statut de configuration des clés API (booléens uniquement, jamais les valeurs)."""
 
@@ -9,8 +9,9 @@ from datetime import datetime, timezone
 
 import httpx
 import psutil
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
+from auth_api import require_user
 from local_memory import log_service
 
 logger = logging.getLogger(__name__)
@@ -98,7 +99,7 @@ def make_hephaistos_router(db):
             ("CALLMEBOT", "https://api.callmebot.com/whatsapp.php", True),
             ("OPEN-METEO", "https://api.open-meteo.com/v1/forecast?latitude=48.85&longitude=2.35&current=temperature_2m", True),
         ]
-        default_headers = {"User-Agent": "SIRIUS-HUD/1.0 (contact@sirius.local)"}
+        default_headers = {"User-Agent": "ΣIRIUS-HUD/1.0 (contact@sirius.local)"}
 
         async with httpx.AsyncClient(timeout=12, follow_redirects=True, headers=default_headers) as cx:
             for name, url, configured in integ:
@@ -159,13 +160,15 @@ def make_hephaistos_router(db):
         return report
 
     @router.get("/hephaistos/history")
-    async def hephaistos_history(limit: int = 40):
+    async def hephaistos_history(request: Request, limit: int = 40):
+        await require_user(request, db)
         docs = await db.diagnostics.find({}, {"_id": 0}).sort("at", -1).to_list(max(1, min(limit, 200)))
         return {"history": list(reversed(docs))}
 
     @router.delete("/hephaistos/history")
-    async def hephaistos_history_purge(keep: int = 0):
+    async def hephaistos_history_purge(request: Request, keep: int = 0):
         """Purge l'historique des diagnostics. keep>0 conserve les N plus récents."""
+        await require_user(request, db)
         if keep > 0:
             recent = await db.diagnostics.find({}, {"at": 1}).sort("at", -1).to_list(keep)
             cutoff = recent[-1]["at"] if len(recent) >= keep else None
@@ -176,7 +179,8 @@ def make_hephaistos_router(db):
         return {"ok": True, "deleted": res.deleted_count}
 
     @router.get("/system/keys_status")
-    async def keys_status():
+    async def keys_status(request: Request):
+        await require_user(request, db)
         def ok(name):
             return bool((os.environ.get(name) or "").strip())
         return {"keys": [

@@ -1,4 +1,4 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 """ZEUS CORTEX (statistiques d'usage), ORACLE DIVIN (briefing & prédictions),
 PANTHEON SYSTEM (processus, connectivité, OCR, WhatsApp)."""
 
@@ -154,7 +154,7 @@ def make_pantheon_oracle_router(db, rate_ok):
 
     @router.get("/pantheon/connectivity")
     async def pantheon_connectivity():
-        services = [{"name": "NOYAU SIRIUS", "status": "CONNECTÉ", "latency": 1, "real": True}]
+        services = [{"name": "NOYAU ΣIRIUS", "status": "CONNECTÉ", "latency": 1, "real": True}]
         checks = [
             ("MÉTÉO", "https://api.open-meteo.com/v1/forecast?latitude=48.85&longitude=2.35&current=temperature_2m"),
             ("MARCHÉS", "https://api.kraken.com/0/public/Time"),
@@ -328,7 +328,7 @@ def make_pantheon_oracle_router(db, rate_ok):
                         movers = [s for s in stocks if abs(s["change"]) >= 2.0]
                         if movers and wa_phone.strip() and wa_key.strip():
                             lines = [f"{s['name']} {'+' if s['change'] >= 0 else ''}{s['change']}% ({s['price']} $)" for s in movers]
-                            msg = "⚠️ SIRIUS — Alerte Alpha Vantage :\n" + "\n".join(lines)
+                            msg = "⚠️ ΣIRIUS — Alerte Alpha Vantage :\n" + "\n".join(lines)
                             try:
                                 await _send_callmebot(wa_phone.strip(), wa_key.strip(), msg)
                                 log_service("WHATSAPP", f"Alerte Alpha Vantage envoyée ({len(movers)} titre(s))", "OK")

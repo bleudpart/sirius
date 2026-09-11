@@ -1,4 +1,4 @@
-"""MediaProxy SIRIUS.
+"""MediaProxy ΣIRIUS.
 
 Le proxy ne telecharge et ne relaye jamais de medias tiers. Il normalise les
 liens officiels et choisit seulement les lecteurs iframe autorises par chaque

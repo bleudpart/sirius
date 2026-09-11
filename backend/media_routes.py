@@ -1,4 +1,4 @@
-"""Routes FastAPI et WebSocket du module multimedia SIRIUS."""
+"""Routes FastAPI et WebSocket du module multimedia ΣIRIUS."""
 
 import os
 import re

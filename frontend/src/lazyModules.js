@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // Chargement différé des modules (code-splitting) : le HUD démarre léger,
 // chaque module n'est téléchargé et interprété qu'à sa première ouverture.
 import { lazy, memo, Suspense } from "react";
@@ -31,6 +31,8 @@ export const OracleDivin = wrap(() => import("@/OracleDivin"));
 export const PantheonSystem = wrap(() => import("@/PantheonSystem"));
 export const NexusCeleste = wrap(() => import("@/NexusCeleste"));
 export const SiriusDisplay = wrap(() => import("@/SiriusDisplay"));
+export const FloorPlanPanel = wrap(() => import("@/FloorPlan"));
+export const Photo3DPanel = wrap(() => import("@/Photo3D"));
 export const EuropeanaViewer = wrap(() => import("@/EuropeanaViewer"));
 export const HaccpModule = wrap(() => import("@/HaccpModule"));
 export const KeysStatus = wrap(() => import("@/KeysStatus"));

@@ -1,4 +1,4 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 """Backend tests for iteration_3:
 - /api/chat now accepts {keys, profile} and personalizes answer (profile.name, profession)
 - /api/tts accepts {openai_key:""} and must fall back to a configured TTS backend (audio) or return clear error (no crash)

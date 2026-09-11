@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useEffect, useRef, useState } from "react";
 import { Download, BellRing, X, Share } from "lucide-react";
 import "./PwaPrompt.css";
@@ -74,7 +74,7 @@ export default function PwaPrompt() {
       await fetch(`${API}/push/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: "SIRIUS", body: "Notifications activées. Je peux désormais vous contacter à tout moment." }),
+        body: JSON.stringify({ title: "ΣIRIUS", body: "Notifications activées. Je peux désormais vous contacter à tout moment." }),
       });
     } catch (e) { /* refus ou navigateur incompatible */ }
     setBusy(false);
@@ -102,9 +102,9 @@ export default function PwaPrompt() {
       <div className="pwa-banner-glow" />
       <img src="/icon-192.png" alt="" className="pwa-banner-icon" />
       <div className="pwa-banner-text">
-        <b>Installer SIRIUS</b>
+        <b>Installer ΣIRIUS</b>
         {installable ? (
-          <span>Ajoutez SIRIUS à votre écran d'accueil pour une expérience plein écran.</span>
+          <span>Ajoutez ΣIRIUS à votre écran d'accueil pour une expérience plein écran.</span>
         ) : (
           <span className="pwa-ios-hint"><Share size={11} /> Touchez « Partager » puis « Sur l'écran d'accueil »</span>
         )}

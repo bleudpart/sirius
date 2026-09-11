@@ -65,11 +65,14 @@ chainlit.md
 
 # Data and databases
 agenthub/agents/youtube/db
+*.db-shm
+*.db-wal
 
 # SIRIUS local data & secrets (ne jamais versionner)
 *.db
 *.sqlite
 *.sqlite3
+backend/embeddings/
 backend/push_subs.json
 backend/push_watch.json
 backend/proc_id.txt

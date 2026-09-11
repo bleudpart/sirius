@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useMemo, useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
@@ -37,7 +37,7 @@ function makeTextTexture(title, text) {
   x.strokeRect(16, 16, W - 32, H - 32);
   x.fillStyle = GOLD;
   x.font = "700 34px Orbitron, sans-serif";
-  x.fillText("ANALYSE SIRIUS", 46, 74);
+  x.fillText("ANALYSE ΣIRIUS", 46, 74);
   x.fillStyle = "rgba(159,211,232,0.85)";
   x.font = "500 24px Rajdhani, sans-serif";
   x.fillText((title || "").slice(0, 60).toUpperCase(), 46, 112);
@@ -200,7 +200,7 @@ export default function Analysis3D({ title, text, imageUrl, onClose }) {
     <div className="an3d-overlay" data-testid="analysis-3d-panel" onPointerDown={(e) => e.stopPropagation()} onDrop={(e) => { e.preventDefault(); e.stopPropagation(); }} onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}>
       <div className="an3d-bar">
         <Boxes size={14} />
-        <span className="an3d-title">PROJECTION 3D — ANALYSE SIRIUS</span>
+        <span className="an3d-title">PROJECTION 3D — ANALYSE ΣIRIUS</span>
         <span className="an3d-hint"><MousePointer2 size={11} /> glissez pour pivoter à 360° · molette pour zoomer</span>
         <button className="an3d-close" onClick={onClose} data-testid="analysis-3d-close-btn"><X size={15} /></button>
       </div>

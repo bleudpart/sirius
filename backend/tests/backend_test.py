@@ -1,5 +1,5 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
-"""Restored SIRIUS module API regression tests: galleries, tools, settings, packages, and memory."""
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+"""Restored ΣIRIUS module API regression tests: galleries, tools, settings, packages, and memory."""
 import os
 import time
 import uuid
@@ -515,8 +515,8 @@ class TestSiriusCompleteAudit:
         by_module = {item.get("module"): item for item in characters}
         assert by_module["ATLAS#"]["character"] == "Atlas"
         assert by_module["ATLAS#"]["image"] == "/api/mythos/img/atlas.jpg"
-        assert by_module["SIRIUS DISPLAY#"]["character"] == "Iris"
-        assert by_module["SIRIUS DISPLAY#"]["image"] == "/api/mythos/img/iris.jpg"
+        assert by_module["ΣIRIUS DISPLAY#"]["character"] == "Iris"
+        assert by_module["ΣIRIUS DISPLAY#"]["image"] == "/api/mythos/img/iris.jpg"
         assert all(isinstance(item.get("style"), dict) and item["style"] for item in characters)
         for filename in ("atlas.jpg", "iris.jpg"):
             image = api.get(f"{BASE_URL}/api/mythos/img/{filename}", timeout=30)

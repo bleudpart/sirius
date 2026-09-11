@@ -35,7 +35,7 @@ def test_synonymes_voiture(memory_db):
 # ---------- Épisodes : stockage et rappel ----------
 
 def test_episode_roundtrip(memory_db):
-    memory_db.add_episode("u1", "L'utilisateur a préparé son audit HACCP avec SIRIUS.", session_id="u1:demo")
+    memory_db.add_episode("u1", "L'utilisateur a préparé son audit HACCP avec ΣIRIUS.", session_id="u1:demo")
     episodes = memory_db.recent_episodes("u1")
     assert len(episodes) == 1
     assert "HACCP" in episodes[0]["summary"]
@@ -177,3 +177,90 @@ def test_rerank_survit_a_une_panne_embeddings(memory_db, monkeypatch):
     facts = [{"id": "1", "text": "a"}, {"id": "2", "text": "b"}]
     result = asyncio.run(semantic_vectors.semantic_rerank("question", facts, top_k=1))
     assert result == facts[:1]  # repli mots-clés, jamais bloquant
+
+
+# ---------- Cerveau vectoriel : rappel complet + pré-vectorisation ----------
+
+def test_recall_vectoriel_trouve_sans_mot_commun(memory_db, monkeypatch):
+    """Un souvenir sans AUCUN mot commun avec la question est retrouvé par le sens."""
+    monkeypatch.setattr(semantic_vectors, "_EMBED_API_KEY", "fake-key")
+    monkeypatch.setattr(semantic_vectors, "_query_cache", {})
+    semantic_vectors._user_index.clear()
+
+    vectors = {
+        "quel est mon plat prefere ?": [1.0, 0.0],
+        "j'adore les lasagnes": [0.95, 0.05],
+        "le velo est au garage": [0.0, 1.0],
+    }
+
+    async def fake_embed(texts):
+        return [vectors[t] for t in texts]
+
+    monkeypatch.setattr(semantic_vectors, "_embed_batch", fake_embed)
+
+    memory_db.add_fact("souvenir", "j'adore les lasagnes", user_id="u1")
+    memory_db.add_fact("souvenir", "le velo est au garage", user_id="u1")
+
+    # Pré-vectorisation en tâche de fond : les deux souvenirs reçoivent leur vecteur.
+    assert asyncio.run(semantic_vectors.vectorize_missing()) == 2
+
+    # Rappel mots-clés vide (aucun mot commun) : seul le vectoriel peut retrouver le fait.
+    result = asyncio.run(
+        semantic_vectors.semantic_recall("quel est mon plat prefere ?", [], user_id="u1", top_k=1)
+    )
+    assert result and result[0]["text"] == "j'adore les lasagnes"
+
+
+def test_recall_vectoriel_sans_cle_est_transparent(memory_db, monkeypatch):
+    monkeypatch.setattr(semantic_vectors, "_EMBED_API_KEY", "")
+    seeds = [{"id": "1", "text": "a"}, {"id": "2", "text": "b"}]
+    result = asyncio.run(semantic_vectors.semantic_recall("question", seeds, user_id="u1", top_k=1))
+    assert result == seeds[:1]
+
+
+def test_recall_vectoriel_survit_a_une_panne(memory_db, monkeypatch):
+    monkeypatch.setattr(semantic_vectors, "_EMBED_API_KEY", "fake-key")
+    monkeypatch.setattr(semantic_vectors, "_query_cache", {})
+
+    async def broken_embed(texts):
+        raise ConnectionError("api morte")
+
+    monkeypatch.setattr(semantic_vectors, "_embed_batch", broken_embed)
+    seeds = [{"id": "1", "text": "a"}, {"id": "2", "text": "b"}]
+    result = asyncio.run(semantic_vectors.semantic_recall("question", seeds, user_id="u1", top_k=2))
+    assert result == seeds[:2]  # repli mots-clés, jamais bloquant
+
+
+# ---------- Embeddings 100 % locaux (fastembed) ----------
+
+class _FakeLocalModel:
+    def embed(self, texts):
+        return [[float(len(t)), 1.0] for t in texts]
+
+
+def test_bascule_embeddings_locaux(monkeypatch):
+    monkeypatch.setattr(semantic_vectors, "_local_model_instance", None)
+    monkeypatch.setattr(semantic_vectors, "EMBED_MODEL", semantic_vectors.EMBED_MODEL)
+    monkeypatch.setattr(semantic_vectors, "_query_cache", {"vieux": [1.0]})
+
+    assert not semantic_vectors.local_embeddings_ready()
+    semantic_vectors._activate_local_model(_FakeLocalModel())
+
+    assert semantic_vectors.local_embeddings_ready()
+    assert semantic_vectors.embeddings_available()  # même sans clé API
+    assert semantic_vectors.EMBED_MODEL == semantic_vectors.LOCAL_EMBED_NAME
+    assert semantic_vectors._query_cache == {}  # nouvel espace vectoriel : caches purgés
+
+    vectors = asyncio.run(semantic_vectors._embed_batch(["abc", "abcdef"]))
+    assert vectors == [[3.0, 1.0], [6.0, 1.0]]  # encodé localement, zéro réseau
+
+
+def test_init_local_embeddings_echoue_en_silence(monkeypatch):
+    monkeypatch.setattr(semantic_vectors, "_local_model_instance", None)
+
+    def broken_loader():
+        raise OSError("hors-ligne")
+
+    monkeypatch.setattr(semantic_vectors, "_load_local_model_sync", broken_loader)
+    assert asyncio.run(semantic_vectors.init_local_embeddings()) is False
+    assert not semantic_vectors.local_embeddings_ready()

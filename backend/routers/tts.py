@@ -1,4 +1,4 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 # Stub TTS conservé pour compatibilité d'import ; les routes réelles
 # sont enregistrées par routes/voice_io.py (api_router prefix="/api").
 from fastapi import APIRouter

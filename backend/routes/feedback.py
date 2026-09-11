@@ -1,5 +1,5 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
-"""Feedback léger : thumbs up/down sur les réponses SIRIUS."""
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
+"""Feedback léger : thumbs up/down sur les réponses ΣIRIUS."""
 
 import logging
 import sqlite3

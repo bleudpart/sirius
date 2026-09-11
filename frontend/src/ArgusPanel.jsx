@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   X, ShieldAlert, RefreshCw, Wrench, History, Loader2, CheckCircle2,
@@ -68,6 +68,7 @@ function ErrorRow({ err, onClientAction, onDone, onRepaired }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
+  const repairable = err.repairable !== false && err.fixId && err.fixId !== "none" && err.fixId !== "manual_restore";
 
   const repair = async () => {
     if (err.requiresConfirmation && !confirming) { setConfirming(true); return; }
@@ -108,7 +109,7 @@ function ErrorRow({ err, onClientAction, onDone, onRepaired }) {
       <p className="argus-msg">{err.message}</p>
       <p className="argus-fix"><Wrench size={10} /> {err.proposedFix}</p>
       {result && <p className="argus-result" data-testid="argus-fix-result">{result}</p>}
-      {!err.repaired && !result && (
+      {!err.repaired && !result && repairable && (
         <div className="argus-actions">
           <button className={`argus-btn ${confirming ? "confirm" : ""}`} onClick={repair} disabled={busy} data-testid="argus-repair-btn">
             {busy ? <Loader2 size={10} className="argus-spin" /> : <Wrench size={10} />}
@@ -118,6 +119,11 @@ function ErrorRow({ err, onClientAction, onDone, onRepaired }) {
             <button className="argus-btn ghost" onClick={() => setConfirming(false)} data-testid="argus-cancel-btn">ANNULER</button>
           )}
         </div>
+      )}
+      {!err.repaired && !result && !repairable && (
+        <p className="argus-result" data-testid="argus-manual-result">
+          {err.severity === "auto" ? "Information de développement : aucune réparation automatique nécessaire." : "Intervention manuelle requise."}
+        </p>
       )}
     </div>
   );
@@ -142,7 +148,7 @@ export default function ArgusPanel({ onClose, onClientAction, onRepaired }) {
   const runScan = useCallback(async () => {
     setScanning(true);
     const pid = progress.start("ARGUS — SCAN DES SYSTÈMES");
-    progress.log(pid, "Analyse des sous-systèmes SIRIUS en cours", 40);
+    progress.log(pid, "Analyse des sous-systèmes ΣIRIUS en cours", 40);
     try {
       const r = await fetch(`${API}/argus/scan`, { method: "POST" });
       const d = await r.json();
@@ -151,8 +157,8 @@ export default function ArgusPanel({ onClose, onClientAction, onRepaired }) {
       const nb = (d.errors || []).filter((e) => e.errorType !== "none").length;
       progress.done(pid, nb ? `Scan terminé — ${nb} anomalie${nb > 1 ? "s" : ""} détectée${nb > 1 ? "s" : ""}` : "Scan terminé — aucun problème détecté");
     } catch (_) {
-      progress.error(pid, "Backend SIRIUS injoignable");
-      setErrors([{ errorType: "reseau", message: "Backend SIRIUS injoignable.", severity: "critical", proposedFix: "Vérifiez que le serveur est démarré (port 8001).", requiresConfirmation: true, actionToken: null, fixId: "retest_backend", id: "x" }]);
+      progress.error(pid, "Backend ΣIRIUS injoignable");
+      setErrors([{ errorType: "reseau", message: "Backend ΣIRIUS injoignable.", severity: "critical", proposedFix: "Vérifiez que le serveur est démarré (port 8001).", requiresConfirmation: true, actionToken: null, fixId: "retest_backend", id: "x" }]);
     }
     setScanning(false);
   }, []);

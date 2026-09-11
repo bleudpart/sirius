@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useEffect, useState } from "react";
 import { X, Volume2, ArrowRight } from "lucide-react";import { speakAsCharacter, cancelSpeech, CHAR_PROFILES } from "@/voice";
 import "./MythosGallery.css";
@@ -68,10 +68,10 @@ export default function MythosGallery({ onClose, onOpenModule, initialModule = n
   return (
     <div className="prime-screen mythos-gallery" data-testid="mythos-gallery">
       <header className="zeus-head">
-        <div className="oracle-title font-divine"><img src="/holo/logo-mythos.png" alt="" className="th-logo" data-testid="mythos-logo" /> PANTHÉON SIRIUS — GALERIE MYTHOS</div>
+        <div className="oracle-title font-divine"><img src="/holo/logo-mythos.png" alt="" className="th-logo" data-testid="mythos-logo" /> PANTHÉON ΣIRIUS — GALERIE MYTHOS</div>
         <button className="setup-close zeus-close" onClick={onClose} data-testid="mythos-gallery-close-btn"><X size={18} /></button>
       </header>
-      <div className="prime-sub">LES IDENTITÉS MYTHOLOGIQUES DES MODULES SIRIUS#</div>
+      <div className="prime-sub">LES IDENTITÉS MYTHOLOGIQUES DES MODULES ΣIRIUS#</div>
 
       <div className="mg-body">
         {/* Rangée de vignettes */}

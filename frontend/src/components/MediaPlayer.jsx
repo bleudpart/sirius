@@ -276,7 +276,7 @@ export default function MediaPlayer({ state, onControl, compact = false }) {
     <section className={`media-player media-player-${state.provider} ${playable ? "is-playing" : ""} ${compact ? "is-compact" : ""}`} data-testid="media-player">
       <div className="media-player-meta">
         <span className="media-player-provider">{state.provider}</span>
-        <strong>{state.title || "Media SIRIUS"}</strong>
+        <strong>{state.title || "Media ΣIRIUS"}</strong>
         <span className={`media-player-status status-${state.status || "idle"}`}>{state.status || "idle"}</span>
       </div>
 

@@ -1,4 +1,4 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 """Stubs de compatibilité ATLAS (itinéraires) et HERACLES (OSINT)."""
 
 from fastapi import APIRouter

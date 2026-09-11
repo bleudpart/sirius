@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useState, useRef } from "react";
 import { User, KeyRound, Sparkles, ExternalLink, X, Download, Upload, Music, Volume2, Brain, Monitor, RotateCcw, CheckCircle2, XCircle, Loader2, Zap, Layers, Rocket } from "lucide-react";
 import { speakFr, speakAsCharacter, CHAR_PROFILES, MYTHOS_VOICES, loadCharOverrides, DEFAULT_VOICE, loadVoiceConfig } from "@/voice";
@@ -145,7 +145,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
   const [saved, setSaved] = useState(false);
 
   const exportProfile = () => {
-    const data = JSON.stringify({ profile, keys, _app: "SIRIUS", _version: 1 }, null, 2);
+    const data = JSON.stringify({ profile, keys, _app: "ΣIRIUS", _version: 1 }, null, 2);
     const blob = new Blob([data], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -199,7 +199,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
         <div className="setup-head">
           <Sparkles size={26} />
           <div>
-            <h1 className="setup-title">CONFIGURATION DE SIRIUS</h1>
+            <h1 className="setup-title">CONFIGURATION DE ΣIRIUS</h1>
             <p className="setup-sub">Personnalisez votre assistant. Tout reste sur votre ordinateur.</p>
           </div>
         </div>
@@ -464,7 +464,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
         )}
 
         <button type="submit" className="setup-submit" data-testid="setup-submit">
-          {isEdit ? "ENREGISTRER" : "DÉMARRER SIRIUS"}
+          {isEdit ? "ENREGISTRER" : "DÉMARRER ΣIRIUS"}
         </button>
 
         {saved && (

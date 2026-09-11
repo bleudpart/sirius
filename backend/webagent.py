@@ -1,6 +1,6 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
-# SIRIUS Web Agent : recherche Google (SerpAPI) + navigateur invisible (Playwright).
-# Capture d'écran du meilleur résultat réel — page de résultats holographique SIRIUS en secours.
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
+# ΣIRIUS Web Agent : recherche Google (SerpAPI) + navigateur invisible (Playwright).
+# Capture d'écran du meilleur résultat réel — page de résultats holographique ΣIRIUS en secours.
 import html as _html
 import logging
 import os
@@ -57,7 +57,7 @@ async def serp_results(query, serp_key=None):
 
 
 def _results_html(query, results):
-    """Page de résultats holographique SIRIUS (rendue localement puis capturée)."""
+    """Page de résultats holographique ΣIRIUS (rendue localement puis capturée)."""
     rows = "".join(
         f"<div class='r'><div class='t'>{_html.escape(r['title'])}</div>"
         f"<div class='l'>{_html.escape(r['source'] or r['link'])}</div>"

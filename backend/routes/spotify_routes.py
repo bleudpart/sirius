@@ -1,4 +1,4 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 """Spotius : intégration Spotify (OAuth popup, morceau en cours, lecture, recherche)."""
 
 import logging

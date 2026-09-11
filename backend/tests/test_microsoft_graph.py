@@ -90,6 +90,10 @@ def test_token_request_only_includes_real_secret():
     assert confidential_data["client_secret"] == "secret"
 
 
+def test_microsoft_scopes_allow_sending_mail():
+    assert "Mail.Send" in microsoft_graph.SCOPES.split()
+
+
 def test_login_from_local_machine_redirects_without_a_session(monkeypatch):
     """La fenêtre de connexion Microsoft est ouverte via window.open() dans un nouvel onglet,
     qui navigue directement vers l'API sans cookie de session ni en-tête Authorization (page
@@ -127,6 +131,30 @@ def test_login_from_local_machine_redirects_without_a_session(monkeypatch):
     )
 
 
+def test_callback_retries_transient_microsoft_server_error():
+    import asyncio
+    from fastapi import Response as FastAPIResponse
+
+    async def _run():
+        router = microsoft_graph.make_microsoft_router(_FakeDB())
+        callback = {route.path: route.endpoint for route in router.routes}["/auth/callback/microsoft-entra-id"]
+        return await callback(
+            FastAPIResponse(),
+            code="",
+            state="state-that-microsoft-returned",
+            error="server_error",
+            error_description="Temporary server error",
+        )
+
+    response = asyncio.run(_run())
+    body = response.body.decode()
+
+    assert response.status_code == 200
+    assert "relance automatiquement la connexion Outlook" in body
+    assert "sessionStorage.getItem('sirius-ms-retry')" in body
+    assert "location.replace('/api/auth/microsoft/login')" in body
+
+
 def test_callback_links_local_login_to_legacy_user_and_notifies_opener(monkeypatch):
     """Le /login de secours (machine locale, sans session) enregistre l'état OAuth sous
     LEGACY_UID. Le callback doit rattacher le compte Microsoft à ce MÊME identifiant — sinon
@@ -137,7 +165,7 @@ def test_callback_links_local_login_to_legacy_user_and_notifies_opener(monkeypat
     FRONTEND_URL) puis se ferme, PAS une redirection classique : connectOutlook() ouvre la
     connexion dans une popup (window.open), et une redirection vers FRONTEND_URL ferait
     démarrer une deuxième instance complète du SPA dans cette popup au lieu de simplement
-    revenir à l'onglet original déjà ouvert ("un nouveau SIRIUS qui démarre")."""
+    revenir à l'onglet original déjà ouvert ("un nouveau ΣIRIUS qui démarre")."""
     import asyncio
     from urllib.parse import urlparse, parse_qs
     from fastapi import Response as FastAPIResponse
@@ -217,5 +245,58 @@ def test_callback_links_local_login_to_legacy_user_and_notifies_opener(monkeypat
         user = await db.users.find_one({"user_id": LEGACY_UID})
         assert user is not None
         assert user["microsoft_id"] == "ms-object-id-123"
+
+    asyncio.run(_run())
+
+
+def test_send_mail_requires_preview_then_confirmation(monkeypatch):
+    import asyncio
+    from starlette.requests import Request
+
+    calls = []
+
+    async def fake_require_user(_request, _db):
+        return {"user_id": "user-1"}
+
+    async def fake_graph_write(_db, user_id, method, path, json_body=None):
+        calls.append((user_id, method, path, json_body))
+        return {}
+
+    monkeypatch.setattr(microsoft_graph, "require_user", fake_require_user)
+    monkeypatch.setattr(microsoft_graph, "_graph_write", fake_graph_write)
+
+    async def _run():
+        router = microsoft_graph.make_microsoft_router(_FakeDB())
+        send_mail = {route.path: route.endpoint for route in router.routes}["/microsoft/mail/send"]
+        scope = {
+            "type": "http", "method": "POST", "path": "/api/microsoft/mail/send",
+            "headers": [], "client": ("127.0.0.1", 51234), "server": ("testserver", 80),
+            "scheme": "http", "query_string": b"",
+        }
+        request = Request(scope)
+        preview = await send_mail(
+            microsoft_graph.SendMailIn(
+                to="test@example.com",
+                subject="Test SIRIUS",
+                body="Message de test.",
+            ),
+            request,
+        )
+        assert preview["requiresConfirmation"] is True
+        assert calls == []
+
+        sent = await send_mail(
+            microsoft_graph.SendMailIn(
+                to="test@example.com",
+                subject="Test SIRIUS",
+                body="Message de test.",
+                confirm=True,
+            ),
+            request,
+        )
+        assert sent["ok"] is True
+        assert calls[0][0:3] == ("user-1", "POST", "/me/sendMail")
+        assert calls[0][3]["message"]["toRecipients"][0]["emailAddress"]["address"] == "test@example.com"
+        assert calls[0][3]["saveToSentItems"] is True
 
     asyncio.run(_run())

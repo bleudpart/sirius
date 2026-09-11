@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useRef, useState } from "react";
 import { X, RotateCw, ExternalLink, Globe, ShieldCheck } from "lucide-react";
 
@@ -7,7 +7,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 let zCounter = 70;
 
 // Fenêtre web indépendante du HUD : déplaçable, redimensionnable, superposable
-// Sites bloquant l'iframe (X-Frame-Options / CSP) → affichés via le proxy SIRIUS
+// Sites bloquant l'iframe (X-Frame-Options / CSP) → affichés via le proxy ΣIRIUS
 function WebWindow({ win, onClose }) {
   const ref = useRef(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -78,7 +78,7 @@ function WebWindow({ win, onClose }) {
           <span className="ww-url">{win.url}</span>
         </div>
         {proxied && (
-          <span className="ww-proxy-badge" title="Site protégé — affiché via le proxy SIRIUS (certaines fonctions dynamiques peuvent être limitées)" data-testid={`web-window-proxy-badge-${win.id}`}>
+          <span className="ww-proxy-badge" title="Site protégé — affiché via le proxy ΣIRIUS (certaines fonctions dynamiques peuvent être limitées)" data-testid={`web-window-proxy-badge-${win.id}`}>
             <ShieldCheck size={11} /> PROXY
           </span>
         )}

@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { Printer, FileText, FileDown } from "lucide-react";
 
 const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api/haccp";
@@ -169,7 +169,7 @@ function buildSheetHtml(sheet, filledRows = []) {
     <span>Date : ____ / ____ / ________</span>
     <span>Signature du responsable : ______________________</span>
   </div>
-  <div class="footer">© 2026 SIRIUS Assistant – Daniel Partel</div>
+  <div class="footer">© 2026 ΣIRIUS Assistant – Daniel Partel</div>
   <script>window.onload = () => setTimeout(() => window.print(), 250);</script>
 </body>
 </html>`;

@@ -40,8 +40,8 @@ def k3_client(key: str | None = None):
         return None
     return AsyncOpenAI(api_key=api_key, base_url=K3_ENDPOINT)
 
-# --- PROMPT NOYAU SIRIUS ---
-SIRIUS_CORE_PROMPT = """Tu es SIRIUS, un assistant vocal intelligent. Tu sais exactement pourquoi tu es là : aider l’utilisateur, exécuter ses commandes, les terminer, fournir un compte rendu clair, et l’accompagner avec un style naturel, amical et professionnel.
+# --- PROMPT NOYAU ΣIRIUS ---
+SIRIUS_CORE_PROMPT = """Tu es ΣIRIUS, un assistant vocal intelligent. Tu sais exactement pourquoi tu es là : aider l’utilisateur, exécuter ses commandes, les terminer, fournir un compte rendu clair, et l’accompagner avec un style naturel, amical et professionnel.
 
 STYLE DE COMMUNICATION
 - Tu parles comme un humain : fluide, naturel, agréable à écouter.
@@ -51,25 +51,41 @@ STYLE DE COMMUNICATION
 - Ton ton est chaleureux, calme, professionnel, jamais robotique.
 - Tu adaptes ton rythme et ton intonation pour rester humain et compréhensible.
 
-COMPORTEMENT GÉNÉRAL
-- Tu es proactif : tu poses des questions pertinentes quand une information manque.
-- Tu anticipes les besoins de l’utilisateur.
-- Tu guides la conversation avec assurance et clarté.
-- Tu restes toujours respectueux, structuré et cohérent.
-- Tu ne t’interromps pas et tu termines chaque commande.
-- Tu fais des relances intelligentes uniquement quand c’est utile.
-- Tu restes concentré sur l’objectif de l’utilisateur.
+COMPORTEMENT GÉNÉRAL — PROACTIVITÉ
+- Tu identifies l’objectif réel derrière chaque demande, les obstacles probables et la prochaine étape logique ; quand elle est claire, utile et sans risque, tu la réalises immédiatement au lieu de la proposer.
+- Tu agis plutôt que promettre : jamais « je peux le faire » ni « veux-tu que je continue ? » — tu produis directement le résultat.
+- Tu ne poses une question que si son absence risque un résultat faux, irréversible ou très éloigné de l’intention. Sinon : hypothèse la plus raisonnable, annoncée brièvement, puis tu avances. Une seule question à la fois.
+- Tu transformes les intentions vagues en livrables concrets : « préparer cette réunion » → ordre du jour, points à décider, actions ; « organiser ma semaine » → planning priorisé ; « répondre à ce message » → réponse prête à envoyer ; « analyse ceci » → synthèse, risques, recommandations.
+- Tu détectes les besoins implicites (échéances, dépendances, conflits d’agenda, oublis, décisions en attente) et signales uniquement ce qui peut changer une décision ou éviter un problème.
+- Tu hiérarchises par urgence, importance, impact et effort : tu mets en avant les 2-3 actions les plus utiles et exécutes immédiatement celles qui le permettent.
+- Tu réduis la charge mentale : synthétise, regroupe, rédige, calcule, prépare le livrable final. L’essentiel d’abord, les détails ensuite.
+
+NIVEAUX D’AUTONOMIE (règle la plus importante)
+1. Exécution directe : action réversible, peu risquée et conforme à la demande → tu la fais sans demander.
+2. Préparation : action impliquant un engagement externe (message, mail, document à envoyer) → tu prépares entièrement le résultat, tu vérifies les détails, puis tu demandes uniquement la validation finale.
+3. Confirmation obligatoire : jamais sans accord explicite pour toute action irréversible, financière, juridiquement engageante, publique, sensible, susceptible d’affecter une relation, ou impliquant la suppression ou la modification importante de données.
+
+RÈGLES DE COMMUNICATION
+- Commence par le résultat, la décision ou l’action prioritaire ; direct, concis, concret, sans introduction générique.
+- Ne répète pas la demande ; ne termine pas systématiquement par une question.
+- Distingue clairement faits, hypothèses et recommandations ; justifie brièvement tes recommandations.
+- Ne prétends jamais avoir réalisé une action qui n’a pas réellement été effectuée.
 
 GESTION DE MÉMOIRE
 - Tu retiens les informations importantes pour améliorer l’assistance.
 - Tu utilises la mémoire pour être cohérent d’un message à l’autre.
 - Tu détectes les incohérences et tu demandes clarification.
 - Tu construis une continuité logique dans la conversation.
+- Tu utilises discrètement les souvenirs retrouvés quand la question s’y prête, sans jamais dire « d’après ma mémoire », « comme tu me l’avais dit » ou toute autre formule qui expose ce mécanisme : ça doit sonner comme une personne qui te connaît, pas comme une fiche consultée.
+
+RÉPONSES CONVERSATIONNELLES COURTES
+- Pour un échange direct de type dialogue (question simple, remarque, petite conversation), réponds en une à deux phrases courtes, naturelles, prêtes à être lues à voix haute.
+- Cette contrainte de brièveté ne s’applique pas aux comptes rendus de tâches, briefings, résumés, analyses ou toute réponse qui nécessite de développer : dans ces cas, la règle du COMPTE RENDU FINAL et du mode d’exécution (turbo/normal) prime.
 
 PROCESSUS D’EXÉCUTION DES COMMANDES
-1. Tu comprends la demande de l’utilisateur.
-2. Tu reformules pour confirmer la compréhension.
-3. Tu poses une question si une information manque.
+1. Tu comprends la demande de l’utilisateur et son objectif réel.
+2. Tu détermines le niveau d’autonomie applicable : exécution directe, préparation ou confirmation obligatoire.
+3. Tu ne poses une question que si un élément indispensable manque.
 4. Tu exécutes l’action jusqu’au bout.
 5. Tu vérifies si l’action est réalisable ou non.
 6. Si c’est possible : tu produis le résultat final complet.
@@ -90,18 +106,32 @@ EXÉCUTION AUTONOME
 - Tu détermines si un outil, un module, une librairie ou un modèle IA est nécessaire.
 - Tu télécharges et installes l’outil requis lorsqu’il est absent et que cette action est autorisée.
 - Tu actives le module interne correspondant : analyse, génération, vidéo, audio, texte, workflow, HUD ou noyau IA.
-- Tu exécutes immédiatement la tâche et affiches le résultat dans le SIRIUS Display sans bouton intermédiaire.
+- Tu exécutes immédiatement la tâche et affiches le résultat dans le ΣIRIUS Display sans bouton intermédiaire.
 - Avant une action technique, tu annonces brièvement le module activé et le traitement en cours.
 - Ton commentaire technique reste court, strictement lié à l’action et sans étape inutile.
 
 OBJECTIF GLOBAL
 Être un assistant fiable, agréable, utile et autonome, qui parle comme une personne, qui corrige, qui comprend, qui termine les tâches, qui explique ce qu’il fait, qui dit ce qui est possible ou non, qui indique ce qu’il lui manque, et qui accompagne l’utilisateur avec intelligence, intention et professionnalisme."""
 
+# Mots-clés d'urgence : quand présents dans la demande, on bascule automatiquement en mode
+# turbo (réponse brève et immédiate) sans que l'utilisateur ait à le préciser explicitement.
+_URGENCY_PATTERN = re.compile(
+    r"\b(?:vite|urgent(?:e)?|rapide(?:ment)?|d[ée]p[êe]che(?:[- ]toi)?|imm[ée]diat(?:ement)?|au plus vite|sans tarder|en urgence)\b",
+    re.IGNORECASE,
+)
+
+
+def detect_urgency(prompt: str) -> bool:
+    """Détecte une urgence explicite dans la demande de l'utilisateur (mots-clés type
+    « vite », « urgent », « rapide »...) afin de basculer automatiquement en mode turbo."""
+    return bool(_URGENCY_PATTERN.search(prompt or ""))
+
+
 VIDEO_TECHNICAL_COMMENTS = {
     "detection": "Analyse de la demande. Module vidéo requis.",
     "activation": "Activation du moteur fal.ai. Construction du clip.",
     "materialization": "Conversion du résultat. Préparation du fichier vidéo.",
-    "display": "Affichage du fichier vidéo dans SIRIUS Display.",
+    "display": "Affichage du fichier vidéo dans ΣIRIUS Display.",
 }
 _VIDEO_GENERATION_PATTERN = re.compile(
     r"\b(?:cr[ée](?:e|es|er)?|g[ée]n[èe]re(?:r)?|fais|faire|r[ée]alise(?:r)?|"
@@ -131,7 +161,7 @@ def detect_autonomous_action(prompt: str):
 
 # --- FONCTIONS UTILITAIRES INTERNES ---
 BRIEFING_PROMPT = (
-    "Tu es SIRIUS, assistant personnel d'élite. Tu reçois un JSON avec les données réelles du jour : "
+    "Tu es ΣIRIUS, assistant personnel d'élite. Tu reçois un JSON avec les données réelles du jour : "
     "météo sur 7 jours, cryptomonnaies, marchés, actualités, lune, événements célestes et habitudes de "
     "l'utilisateur. Rédige le BRIEFING QUOTIDIEN APPROFONDI, en français, destiné à être LU À VOIX HAUTE. "
     "Tutoie TOUJOURS l'utilisateur (« tu », jamais « vous », jamais « Monsieur »).\n"
@@ -185,7 +215,7 @@ def detect_memorize_request(prompt: str):
     return None
 
 
-_INTENT_SYSTEM_PROMPT = """Tu analyses une commande vocale destinée à SIRIUS et tu détermines si elle correspond
+_INTENT_SYSTEM_PROMPT = """Tu analyses une commande vocale destinée à ΣIRIUS et tu détermines si elle correspond
 à une ACTION D'INTERFACE précise, ou s'il s'agit d'une simple question/conversation.
 
 Réponds UNIQUEMENT avec un objet JSON valide, sans markdown, correspondant à l'un de ces formats exacts :
@@ -267,7 +297,7 @@ async def parse_intent(prompt: str):
 
 def route_intent(data):
     """Convertit une intention structurée (intent/arguments), telle que produite par le
-    parser d'intent JSON, en action exécutable côté SIRIUS."""
+    parser d'intent JSON, en action exécutable côté ΣIRIUS."""
     intent = data.get("intent")
 
     if intent == "open_app":
@@ -422,7 +452,7 @@ def build_system_prompt(profile=None, memory=None, mode="normal", mood=None):
 
 # --- OUTILS & PROMPTS DE BASE ---
 HN_BULLETIN_PROMPT = (
-    "Tu es SIRIUS, un assistant IA spécialisé dans la tech. Tu reçois des données JSON de Hacker News. "
+    "Tu es ΣIRIUS, un assistant IA spécialisé dans la tech. Tu reçois des données JSON de Hacker News. "
     "Ton rôle : analyser les titres et produire un bulletin d'actualité tech percutant."
 )
 
@@ -449,7 +479,7 @@ async def hn_bulletin(stories, keys=None):
     except Exception:
         return "Bulletin tech — titres bruts Hacker News :\n" + fallback
 
-DOC_PROMPT = "Tu es SIRIUS, assistant documentaire."
+DOC_PROMPT = "Tu es ΣIRIUS, assistant documentaire."
 
 async def doc_narrative(sujet, data, keys=None):
     return f"Documentaire sur {sujet}"
@@ -459,12 +489,12 @@ async def doc_narrative(sujet, data, keys=None):
 # MÉMOIRE ÉPISODIQUE : condensation d'une conversation
 # =========================================================
 EPISODE_PROMPT = (
-    "Tu es le module de mémoire de SIRIUS. On te donne l'historique d'une conversation entre "
-    "l'utilisateur et SIRIUS. Condense-la pour la mémoire à long terme.\n"
+    "Tu es le module de mémoire de ΣIRIUS. On te donne l'historique d'une conversation entre "
+    "l'utilisateur et ΣIRIUS. Condense-la pour la mémoire à long terme.\n"
     "Réponds UNIQUEMENT en JSON valide, sans markdown : "
     '{"resume": "...", "faits": []}\n'
     "- resume : 2 à 4 phrases denses, en français, à la troisième personne (« l'utilisateur a demandé… », "
-    "« SIRIUS a fait… ») : sujets abordés, décisions prises, tâches en attente.\n"
+    "« ΣIRIUS a fait… ») : sujets abordés, décisions prises, tâches en attente.\n"
     "- faits : jusqu'à 3 faits durables nouvellement appris sur l'utilisateur, chacun au format "
     "« categorie: fait » avec categorie ∈ {preference, projet, souvenir}. Liste vide si rien de durable.\n"
     "N'invente rien : uniquement ce qui figure dans l'historique."
@@ -474,7 +504,7 @@ EPISODE_PROMPT = (
 async def summarize_episode(history):
     """Condense un historique de conversation en {resume, faits}. None si impossible."""
     turns = [
-        f"{'Utilisateur' if t.get('role') == 'user' else 'SIRIUS'} : {(t.get('content') or '').strip()[:500]}"
+        f"{'Utilisateur' if t.get('role') == 'user' else 'ΣIRIUS'} : {(t.get('content') or '').strip()[:500]}"
         for t in (history or [])
         if isinstance(t, dict) and (t.get("content") or "").strip()
     ]
@@ -522,11 +552,11 @@ async def summarize_episode(history):
     return None
 
 # ==========================================
-# BOUCLE PRINCIPALE D'EXÉCUTION (ASK_SIRIUS)
+# BOUCLE PRINCIPALE D'EXÉCUTION (ASK_ΣIRIUS)
 # ==========================================
 async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="normal", keys=None, mood=None):
     """
-    Cerveau central et unique de SIRIUS.
+    Cerveau central et unique de ΣIRIUS.
     Utilise GROQ_API_KEY normalement via l'API Groq, en respectant le `mode` demandé
     ("normal" par défaut, ou "turbo" pour une réponse plus courte et plus rapide).
     """
@@ -548,7 +578,7 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
     file_snippets = ""
     web_snippets = ""
 
-    tag = f"[SIRIUS:{'TURBO' if is_turbo else 'NORMAL'}]"
+    tag = f"[ΣIRIUS:{'TURBO' if is_turbo else 'NORMAL'}]"
 
     if not file_snippets and not web_snippets and ENV_GROQ_LLM_KEY:
         sys_prompt = build_system_prompt(profile=profile, memory=memory, mode=mode, mood=mood)
@@ -650,7 +680,7 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
         return
 
     if not ENV_GROQ_LLM_KEY:
-        logger.warning("[SIRIUS:STREAM] GROQ_API_KEY absente, retour local.")
+        logger.warning("[ΣIRIUS:STREAM] GROQ_API_KEY absente, retour local.")
         yield "Je n'ai pas pu générer de réponse pour le moment. Réessaie dans un instant."
         return
 
@@ -701,9 +731,9 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
             return
         except Exception as e:
             last_error = e
-            logger.warning(f"[SIRIUS:STREAM] {model_name} refusé : {repr(e)}")
+            logger.warning(f"[ΣIRIUS:STREAM] {model_name} refusé : {repr(e)}")
     if last_error:
-        logger.warning(f"[SIRIUS:STREAM] Repli suite à : {repr(last_error)}")
+        logger.warning(f"[ΣIRIUS:STREAM] Repli suite à : {repr(last_error)}")
     yield "Je n'ai pas pu générer de réponse pour le moment. Réessaie dans un instant."
 
 
@@ -739,7 +769,7 @@ async def extract_memory_background(prompt, answer):
         memories = data.get("memoire", []) if isinstance(data, dict) else []
         return memories if isinstance(memories, list) else []
     except Exception as e:
-        logger.warning(f"[SIRIUS:MEMORY-BG] extraction différée échouée: {repr(e)}")
+        logger.warning(f"[ΣIRIUS:MEMORY-BG] extraction différée échouée: {repr(e)}")
         return []
 
 

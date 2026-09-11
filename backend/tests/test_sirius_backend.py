@@ -1,5 +1,5 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
-"""Backend regression tests for SIRIUS refactor.
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+"""Backend regression tests for ΣIRIUS refactor.
 
 Covers:
 - POST /api/chat (with invalid Groq key => French fallback, 4 fields)

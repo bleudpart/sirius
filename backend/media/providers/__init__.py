@@ -1,4 +1,4 @@
-"""Providers multimedia disponibles dans le HUD SIRIUS."""
+"""Providers multimedia disponibles dans le HUD ΣIRIUS."""
 
 from .deezer import MEDIA_PROVIDER as DEEZER
 from .netflix import MEDIA_PROVIDER as NETFLIX

@@ -47,7 +47,10 @@ def test_omega_scan_detects_runtime_integrity_drift(tmp_path):
 
     result = engine.scan()
 
-    assert any(error["errorType"] == "integrity_drift" for error in result["errors"])
+    drift_error = next(error for error in result["errors"] if error["errorType"] == "integrity_drift")
+    assert drift_error["severity"] == "auto"
+    assert drift_error["repairable"] is False
+    assert drift_error["requiresConfirmation"] is False
     assert result["engine"]["frozen"] is True
     assert "backend/sirius_brain.py" in result["engine"]["frozen_paths"]
 

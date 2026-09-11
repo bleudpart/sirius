@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // Panneaux HUD autonomes extraits d'App.js : mémoire, pop-ups holographiques,
 // analytique, choix musical, jauges, météo flottante, carte centrale et écran de boot.
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -8,7 +8,7 @@ import { weatherInfo } from "@/appLogic";
 import { ReactorCore } from "@/components/ReactorVisuals";
 import { LiveClock, LiveDate, useLiveStats } from "@/liveStats";
 import { getLocalDateKey } from "@/dateTime";
-import { speakCinematic } from "@/voice";
+import { speakCinematic, cleanTextForDisplay } from "@/voice";
 
 const BACKEND_BASE = process.env.REACT_APP_BACKEND_URL || "http://127.0.0.1:8001";
 const API = BACKEND_BASE + "/api";
@@ -198,7 +198,7 @@ export function MemoryPanel({ memory, userName, onSave, onClose }) {
 // Pop-up holographique avec effet machine à écrire, fermé manuellement par l'utilisateur
 export function HoloPopup({ popup, onClose, onImage }) {
   const [shown, setShown] = useState("");
-  const full = popup.contenu || "";
+  const full = cleanTextForDisplay(popup.contenu || "");
   useEffect(() => {
     let i = 0;
     const id = setInterval(() => {

@@ -84,7 +84,7 @@ export default function ModulesMedia({ onOpenModule }) {
     <section className="media-modules" aria-labelledby="media-modules-title" data-testid="media-modules">
       <header className="media-modules-head">
         <div>
-          <span className="media-modules-kicker">SIRIUS MEDIA</span>
+          <span className="media-modules-kicker">ΣIRIUS MEDIA</span>
           <h2 id="media-modules-title">Modules multimédia</h2>
           <p>Accédez à vos plateformes dans une fenêtre externe compatible avec leurs politiques de sécurité.</p>
         </div>

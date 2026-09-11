@@ -1,4 +1,4 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. THÉMIS# : génération PDF + extraction IA de pièces comptables.
+# © 2026 Daniel Partel – ΣIRIUS Assistant. THÉMIS# : génération PDF + extraction IA de pièces comptables.
 import base64
 import io
 import json
@@ -52,7 +52,7 @@ def build_doc_pdf(doc, emetteur=""):
     c.rect(0, h - 100, w, 4, stroke=0, fill=1)
     c.setFillColor(white)
     c.setFont("Helvetica-Bold", 22)
-    c.drawString(40, h - 52, emetteur or "SIRIUS ENTERPRISE")
+    c.drawString(40, h - 52, emetteur or "ΣIRIUS ENTERPRISE")
     c.setFillColor(accent)
     c.setFont("Helvetica-Bold", 16)
     c.drawRightString(w - 40, h - 44, f"{kind} {doc.get('number', '')}")
@@ -62,7 +62,7 @@ def build_doc_pdf(doc, emetteur=""):
     if doc.get("due_date"):
         c.drawRightString(w - 40, h - 76, f"Échéance : {doc['due_date']}")
     c.setFont("Helvetica-Oblique", 8)
-    c.drawString(40, h - 76, f"Modèle {style['label']} — généré par SIRIUS · THÉMIS")
+    c.drawString(40, h - 76, f"Modèle {style['label']} — généré par ΣIRIUS · THÉMIS")
 
     y = h - 140
     c.setFillColor(accent)
@@ -136,7 +136,7 @@ def build_doc_pdf(doc, emetteur=""):
     c.rect(0, 40, w, 3, stroke=0, fill=1)
     c.setFillColor(grey)
     c.setFont("Helvetica", 8)
-    c.drawCentredString(w / 2, 26, f"{kind} {doc.get('number', '')} — statut : {doc.get('status', '')} — document généré par SIRIUS · module THÉMIS")
+    c.drawCentredString(w / 2, 26, f"{kind} {doc.get('number', '')} — statut : {doc.get('status', '')} — document généré par ΣIRIUS · module THÉMIS")
     c.showPage()
     c.save()
     return buf.getvalue()
@@ -219,7 +219,7 @@ def build_consult_pdf(module, question, reponse, date_str=""):
         "SOLON#": ("SOLON", "AVIS JURIDIQUE", "Législateur d'Athènes — droit français"),
         "PROMÉTHÉE#": ("PROMÉTHÉE", "PLAN DE PROJET", "Titan de la prévoyance — gestion de projet"),
     }
-    name, kind, sub = conf.get(module, ("PANTHÉON", "CONSULTATION", "SIRIUS"))
+    name, kind, sub = conf.get(module, ("PANTHÉON", "CONSULTATION", "ΣIRIUS"))
     gold, band, dark, grey = HexColor("#b8860b"), HexColor("#1a1206"), HexColor("#222222"), HexColor("#666666")
     buf = io.BytesIO()
     c = pdfcanvas.Canvas(buf, pagesize=A4)
@@ -240,7 +240,7 @@ def build_consult_pdf(module, question, reponse, date_str=""):
         c.setFont("Helvetica", 9)
         if date_str:
             c.drawRightString(w - 40, h - 46, f"Consultation du {date_str}")
-        c.drawRightString(w - 40, h - 62, "SIRIUS · PANTHÉON")
+        c.drawRightString(w - 40, h - 62, "ΣIRIUS · PANTHÉON")
         c.setFont("Helvetica-Oblique", 8)
         c.setFillColor(grey)
         c.drawRightString(w - 40, 28, f"Page {page}")
@@ -310,7 +310,7 @@ def build_receipt_pdf(tx):
     c.drawString(40, h - 52, "REÇU DE PAIEMENT")
     c.setFillColor(gold)
     c.setFont("Helvetica-Oblique", 9)
-    c.drawString(40, h - 72, "HERMÈS AGORA — SIRIUS · PANTHÉON")
+    c.drawString(40, h - 72, "HERMÈS AGORA — ΣIRIUS · PANTHÉON")
     c.setFillColor(white)
     c.setFont("Helvetica", 9)
     date_pay = (tx.get("updated_at") or "")[:10]
@@ -363,7 +363,7 @@ def build_receipt_pdf(tx):
     c.line(40, 40, w - 40, 40)
     c.setFillColor(grey)
     c.setFont("Helvetica-Oblique", 8)
-    c.drawRightString(w - 40, 28, "SIRIUS · HERMÈS AGORA")
+    c.drawRightString(w - 40, 28, "ΣIRIUS · HERMÈS AGORA")
     c.save()
     buf.seek(0)
     return buf

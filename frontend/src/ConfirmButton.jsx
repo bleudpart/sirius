@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // Bouton destructif à double confirmation : 1er clic = armer (3 s), 2e clic = exécuter.
 import { useEffect, useState } from "react";
 

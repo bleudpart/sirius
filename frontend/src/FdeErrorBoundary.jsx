@@ -30,7 +30,7 @@ export default class FdeErrorBoundary extends Component {
     return (
       <main className="fde-crash-boundary" role="alert" data-testid="fde-crash-boundary">
         <AlertTriangle size={28} />
-        <h1>SIRIUS — INTERFACE PROTÉGÉE</h1>
+        <h1>ΣIRIUS — INTERFACE PROTÉGÉE</h1>
         <p>FDE_OMEGA a isolé un composant instable avant qu’il ne bloque toute l’application.</p>
         <button type="button" onClick={() => window.location.reload()}>
           <RotateCcw size={15} /> RECHARGER L’INTERFACE

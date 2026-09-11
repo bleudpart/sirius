@@ -86,7 +86,7 @@ def _jpeg_data_url():
         font = ImageFont.load_default()
         small = font
     draw.rectangle((35, 35, 1165, 665), outline="black", width=8)
-    draw.text((90, 150), "SIRIUS VISION TEST", fill="black", font=font)
+    draw.text((90, 150), "ΣIRIUS VISION TEST", fill="black", font=font)
     draw.text((90, 310), "CODE OCR : NEMA 17", fill="navy", font=font)
     draw.text((90, 475), "JUILLET 2026", fill="darkred", font=small)
     buf = io.BytesIO()
@@ -108,7 +108,7 @@ class TestSiriusVoyant:
         assert isinstance(data.get("description"), str) and data["description"].strip()
         assert isinstance(data.get("texte_extrait"), str)
         normalized_ocr = data["texte_extrait"].upper()
-        assert "SIRIUS" in normalized_ocr
+        assert "ΣIRIUS" in normalized_ocr
         assert "NEMA 17" in normalized_ocr
         assert isinstance(data.get("synthese"), str) and data["synthese"].strip()
         assert data.get("responseText") == data.get("synthese")

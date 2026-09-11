@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // Fermeture holographique générique : intercepte les boutons de fermeture,
 // joue l'animation GSAP 3D puis relaie le clic réel au composant.
 import { animateHoloClose, animateHoloCloseCard } from "./gsapAnimations";

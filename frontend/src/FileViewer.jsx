@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useCallback, useEffect, useRef, useState } from "react";
 import Editor from "@monaco-editor/react";
 import { X, Save, Loader2, Eye, FileWarning, RotateCcw } from "lucide-react";
@@ -91,7 +91,7 @@ export default function FileViewer({ file, onClose, onSaved }) {
           {dirty && <span className="fv-dirty" data-testid="file-viewer-dirty">● modifié</span>}
           {kind === "text" && (
             <button className="fv-btn gold" onClick={save} disabled={saving || !dirty} data-testid="file-viewer-save-btn">
-              {saving ? <Loader2 size={12} className="dg-spin" /> : <Save size={12} />} ENREGISTRER DANS SIRIUS
+              {saving ? <Loader2 size={12} className="dg-spin" /> : <Save size={12} />} ENREGISTRER DANS ΣIRIUS
             </button>
           )}
           <button className="fv-btn" onClick={onClose} data-testid="file-viewer-close-btn"><X size={14} /></button>

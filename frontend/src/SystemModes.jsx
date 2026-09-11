@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ShieldOff, BatteryLow, Camera, X, Loader2, ScanEye, Stethoscope, Power } from "lucide-react";
 import "./SystemModes.css";
@@ -148,7 +148,7 @@ export function VisionModule({ onClose, onSpeak, keys, autoAnalyze }) {
   return (
     <div className="vision-card" data-testid="vision-module">
       <div className="vision-head">
-        <span className="vision-title"><ScanEye size={13} /> VISION SIRIUS</span>
+        <span className="vision-title"><ScanEye size={13} /> VISION ΣIRIUS</span>
         <button className="vision-icon-btn" onClick={onClose} data-testid="vision-close-btn"><X size={14} /></button>
       </div>
       {error ? (

@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // Animations GSAP centralisées : ouverture, fermeture, resize élastique, holographique.
 import { gsap } from "gsap";
 

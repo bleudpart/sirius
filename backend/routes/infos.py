@@ -1,4 +1,4 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 """Infos externes : actualités (NewsAPI), météo (OpenWeatherMap), fiches pays,
 bulletin tech Hacker News, mini-documentaire multi-sources et recherche Europeana."""
 
@@ -101,7 +101,7 @@ async def _gather_documentary_data(sujet: str):
     import asyncio as _aio
     from urllib.parse import quote
     data = {}
-    ua = {"User-Agent": "SIRIUS-HUD/1.0 (contact: daniel.partel@sirius-hud.fr) python-httpx"}
+    ua = {"User-Agent": "ΣIRIUS-HUD/1.0 (contact: daniel.partel@sirius-hud.fr) python-httpx"}
     async with httpx.AsyncClient(timeout=12, follow_redirects=True, headers=ua) as cx:
         async def wiki():
             # Résolution du titre exact (insensible à la casse) puis résumé

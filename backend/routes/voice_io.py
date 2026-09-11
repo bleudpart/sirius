@@ -1,4 +1,4 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 """Entrées/sorties vocales : Google Cloud TTS, transcription STT (backend dédié ou
 Groq Whisper) et téléchargement des archives source."""
 
@@ -12,9 +12,11 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from voice_corrections import normalize_voice_transcript
+
 logger = logging.getLogger(__name__)
 
-# Cache LRU en mémoire pour les synthèses TTS répétées (ex. "SIRIUS est prêt.")
+# Cache LRU en mémoire pour les synthèses TTS répétées (ex. "ΣIRIUS est prêt.")
 _TTS_CACHE: OrderedDict[tuple, dict] = OrderedDict()
 _TTS_CACHE_MAX = 64
 
@@ -150,7 +152,11 @@ def make_voice_io_router():
                 logger.error("[STT] backend inaccessible: %s", error)
                 raise HTTPException(status_code=502, detail="Service de reconnaissance vocale injoignable.") from error
             if r.status_code == 200:
-                return r.json()
+                payload = r.json()
+                text = payload.get("text") or payload.get("transcript") or ""
+                if text:
+                    payload["text"] = normalize_voice_transcript(text).strip()
+                return payload
             logger.error("[STT] backend returned %s: %s", r.status_code, r.text[:200])
             raise HTTPException(status_code=502, detail="Le service de reconnaissance vocale a refusé l'audio.")
 
@@ -166,16 +172,26 @@ def make_voice_io_router():
                             "language": "fr",
                             "response_format": "json",
                             "temperature": "0",
+                            "prompt": (
+                                "Lexique SIRIUS en français : SIRIUS, Daniel Partel, ARGUS, OMEGA, ATLAS, "
+                                "Outlook, Hotmail, Thémis, Panthéon, Héphaïstos, Héraclès, Pythagore, "
+                                "Calliope, Prométhée, Hermès, Agora. Transcrire ces noms exactement."
+                            ),
                         },
                     )
             except httpx.HTTPError as error:
                 logger.error("[STT] Groq Whisper inaccessible: %s", error)
-                raise HTTPException(status_code=502, detail="Transcription SIRIUS temporairement injoignable.") from error
+                raise HTTPException(status_code=502, detail="Transcription ΣIRIUS temporairement injoignable.") from error
             if r.status_code == 200:
                 payload = r.json()
-                return {"text": (payload.get("text") or "").strip(), "provider": "groq-whisper"}
+                raw_text = (payload.get("text") or "").strip()
+                return {
+                    "text": normalize_voice_transcript(raw_text).strip(),
+                    "raw_text": raw_text,
+                    "provider": "groq-whisper",
+                }
             logger.error("[STT] Groq Whisper returned %s: %s", r.status_code, r.text[:200])
-            raise HTTPException(status_code=502, detail="La transcription SIRIUS a refusé l'audio.")
+            raise HTTPException(status_code=502, detail="La transcription ΣIRIUS a refusé l'audio.")
 
         raise HTTPException(status_code=503, detail="Aucun moteur de reconnaissance vocale serveur n'est configuré.")
 

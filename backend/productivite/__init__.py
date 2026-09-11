@@ -1,2 +1,2 @@
-"""Module Productivite & Travail de SIRIUS."""
+"""Module Productivite & Travail de ΣIRIUS."""
 

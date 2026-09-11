@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 // Voix de Sirius — synthèse locale ou Google Cloud TTS avec basculement
 // automatique sur la synthèse du navigateur si la clé est absente ou l'API indisponible.
 const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
@@ -26,14 +26,49 @@ const phonetic = (text) =>
     .replace(/\bS\.I\.R\.I\.U\.S\b/gi, "Siriusse")
     .replace(/\bcortex\b/gi, "cortèxe");
 
-// Nettoyage du texte avant synthèse vocale : supprime la ponctuation, les parenthèses/crochets/accolades
-// et les barres obliques pour empêcher leur lecture littérale par le moteur TTS et sonner plus naturel.
+// Nettoyage du texte avant synthèse vocale : retire l'habillage Markdown (astérisques,
+// tirets de liste, titres #, `code`, liens…) et les symboles pour que le moteur TTS lise
+// uniquement le texte. La ponctuation de phrase (. , ; : ! ?) est CONSERVÉE : le moteur
+// ne la prononce pas, il respire dessus — la retirer accélère artificiellement la voix.
+// Nettoyage du texte pour l'affichage ΣIRIUS DISPLAY : retire l'habillage Markdown
+// (titres #, gras/italique, puces) que le LLM ajoute parfois, tout en gardant les
+// retours à la ligne et la ponctuation — contrairement à cleanTextForSpeech, on ne
+// touche pas aux parenthèses/barres qui ont un sens visuel à l'écrit.
+export function cleanTextForDisplay(t) {
+  return String(t || "")
+    .replace(/```[\s\S]*?```/g, (m) => m.replace(/```/g, ""))  // garde le contenu des blocs de code
+    .replace(/`([^`]*)`/g, "$1")
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/^[ \t]*#{1,6}[ \t]+/gm, "")        // titres # ## ###
+    .replace(/^[ \t]*>[ \t]?/gm, "")             // citations >
+    .replace(/^[ \t]*[*+•▪◦][ \t]+/gm, "— ")     // puces * + • → tiret simple
+    .replace(/^[ \t]*-[ \t]+/gm, "— ")           // puces - → tiret simple
+    .replace(/(\*\*|__)(.*?)\1/g, "$2")          // **gras** __gras__
+    .replace(/(?<!\w)(\*|_)([^*_\n]+)\1(?!\w)/g, "$2") // *italique* _italique_
+    .replace(/[*_`~]/g, "")                      // symboles Markdown restants
+    .replace(/\n{3,}/g, "\n\n")                  // pas plus de 2 retours à la ligne d'affilée
+    .trim();
+}
+
 function cleanTextForSpeech(t) {
   return String(t || "")
-    .replace(/[.,;:!?]/g, "")        // supprime ponctuation
-    .replace(/[()\[\]{}]/g, "")      // supprime parenthèses / crochets / accolades
+    .replace(/```[\s\S]*?```/g, " ")            // blocs de code entiers
+    .replace(/`([^`]*)`/g, "$1")                 // `code` en ligne → contenu
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")  // liens/images Markdown → texte du lien
+    .replace(/^[ \t]*#{1,6}[ \t]+/gm, "")        // titres # ## ###
+    .replace(/^[ \t]*>[ \t]?/gm, "")             // citations >
+    .replace(/^[ \t]*[-*+•▪◦][ \t]+/gm, "")      // puces de liste - * + •
+    .replace(/^[ \t]*\d+[.)][ \t]+/gm, "")       // listes numérotées 1. 2)
+    .replace(/(\*\*|__)(.*?)\1/g, "$2")          // **gras** __gras__
+    .replace(/(\*|_)(.*?)\1/g, "$2")             // *italique* _italique_
+    .replace(/[*_#`~|]/g, " ")                   // symboles Markdown restants
+    .replace(/[—–]/g, ", ")                      // tirets longs → pause naturelle
+    .replace(/\s-{2,}\s/g, ", ")                 // -- ou --- entre mots
+    .replace(/(\d)\s*-\s*(\d)/g, "$1 à $2")       // plage numérique 10-15 → « 10 à 15 » (pas « moins »)
+    .replace(/-/g, " ")                          // tout tiret restant (mots composés, listes) → espace, jamais lu comme « moins »
+    .replace(/[()\[\]{}<>]/g, "")    // supprime parenthèses / crochets / accolades / chevrons
     .replace(/\/+/g, " ")            // supprime barres
-    .replace(/\s+/g, " ")            // normalise espaces
+    .replace(/[ \t]+/g, " ")         // normalise espaces (garde les fins de phrase)
     .trim();
 }
 
@@ -180,13 +215,15 @@ function speakBrowser(message, { rate = 1.0, pitch = 1.08, volume = 1, gender = 
   (synth.getVoices() || []).length === 0 ? setTimeout(doSpeak, 200) : doSpeak();
 }
 
-// Voix feutrée nocturne : entre 22 h et 5 h, SIRIUS parle plus lentement, plus grave et plus doucement
+// Voix feutrée nocturne : entre 22 h et 5 h, ΣIRIUS parle plus lentement, plus grave et plus doucement
 const isNight = () => { const h = new Date().getHours(); return h >= 22 || h < 5; };
 
 export function speakFr(message, { onstart, onend } = {}) {
   if (!message) { (onend || (() => {}))(); return; }
+  const urgent = isUrgent(message); // détecté avant nettoyage (les « ! » comptent)
+  message = cleanTextForSpeech(message);
+  if (!message) { (onend || (() => {}))(); return; }
   const cfg = loadVoiceConfig();
-  const urgent = isUrgent(message);
   const night = isNight();
   let rate = Math.max(0.5, Math.min(2, urgent ? cfg.rate + 0.13 : cfg.rate));
   if (night) rate = Math.max(0.5, rate * 0.87);
@@ -235,6 +272,8 @@ export function speakSeries(sentence, opts = {}) {
 // Présentation au démarrage : voix grave et posée, style bande-annonce de film
 export function speakCinematic(message, { onstart, onend } = {}) {
   if (!message) { (onend || (() => {}))(); return; }
+  message = cleanTextForSpeech(message);
+  if (!message) { (onend || (() => {}))(); return; }
   const cfg = loadVoiceConfig();
   const seq = ++speakSeq;
   if (isBrowserVoice(cfg.name)) {
@@ -258,7 +297,7 @@ export const MYTHOS_VOICES = {
 // Profils par défaut des personnages du Panthéon (modifiables par personnage dans la configuration VOIX)
 export const CHAR_PROFILES = {
   "ARGUS#": "M1", "LOCUS#": "M2", "ORACLE#": "F2", "PANTHÉON#": "M1", "HERACLES#": "M1",
-  "SIRIUS CORTEX#": "F1", "HÉPHAÏSTOS#": "M1", "ATLAS#": "M1", "SIRIUS DISPLAY#": "F1",
+  "ΣIRIUS CORTEX#": "F1", "HÉPHAÏSTOS#": "M1", "ATLAS#": "M1", "ΣIRIUS DISPLAY#": "F1",
   "THÉMIS#": "F1", "SOLON#": "M2", "PROMÉTHÉE#": "M2", "HERMÈS AGORA#": "M2", "CALLIOPE#": "F2",
   "PYTHAGORE#": "M1",
 };

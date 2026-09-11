@@ -1,4 +1,4 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 """Classement des e-mails Outlook par importance (voir cahier des charges "assistant e-mails").
 
 Module volontairement pur (aucun accès réseau/DB) : classify_email() prend un mail déjà

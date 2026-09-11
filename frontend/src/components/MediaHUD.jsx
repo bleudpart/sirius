@@ -324,7 +324,7 @@ export default function MediaHUD({ onClose, onShowOnDisplay, initialIntent, stan
         {!standalone && state?.provider && (
           <div className="media-hud-footer">
             <button type="button" className="media-display-btn" onClick={showOnDisplay} data-testid="media-show-display">
-              AFFICHER DANS SIRIUS DISPLAY
+              AFFICHER DANS ΣIRIUS DISPLAY
             </button>
           </div>
         )}

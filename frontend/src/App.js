@@ -1,8 +1,8 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Mic, MicOff, Clock, Cpu, Wifi, MapPin, Calendar, X, Leaf, UserCog, Brain, Music, Repeat, RotateCcw, BarChart3, Workflow, FolderOpen, Code2, Database, Sparkles, Eye, Landmark, Library, Orbit, Monitor, ShieldCheck, AudioLines, Radar, ShieldAlert, Camera, Fingerprint, Zap, Package, Clapperboard, Grip, Radio, Wrench, FileCode, History, Maximize, Minimize, KeyRound, Home as HomeIcon, BadgeInfo, Globe2, Hammer, TrendingUp, Newspaper, Scale, Flame, BookOpen, Sigma, AlarmClock, Power } from "lucide-react";
+import { Mic, MicOff, Clock, Cpu, Wifi, MapPin, Calendar, X, Leaf, UserCog, Brain, Music, Repeat, RotateCcw, BarChart3, Workflow, Ruler, FolderOpen, Code2, Database, Sparkles, Eye, Landmark, Library, Orbit, Monitor, ShieldCheck, AudioLines, Radar, ShieldAlert, Camera, Fingerprint, Zap, Package, Clapperboard, Grip, Radio, Wrench, FileCode, History, Maximize, Minimize, KeyRound, Home as HomeIcon, BadgeInfo, Globe2, Hammer, TrendingUp, Newspaper, Scale, Flame, BookOpen, Sigma, AlarmClock, Power, Boxes } from "lucide-react";
 import {
   ArchitectPanel, SpectatorView, FilesPanel, DevCompanion, ZeusCortex, SiriusPrime, OracleDivin,
   PantheonSystem, NexusCeleste, SiriusDisplay, EuropeanaViewer, HaccpModule, KeysStatus, KeraunosPanel,
@@ -10,6 +10,7 @@ import {
   AtlasPanel, HeraclesPanel, HephaistosPanel, MythosGallery, ConsultPanel, PrometheePanel, CalliopePanel, CalendarPanel,
   FaceIdPanel, PythagorePanel, PackagerPanel, TrailerGallery, SiriusSetup, PromoPanel, ThemisPanel,
   AdminPanel, PortusNummarius, AgoraPipeline, NewsPanel, ReveilPanel, SpotifyPanel, MediaHUD, ProductivityPanel,
+  FloorPlanPanel, Photo3DPanel,
 } from "@/lazyModules";
 import { pushStats, pushSimStats } from "@/liveStats";
 import { formatLocalDate, formatLocalTime, getLocalDateKey } from "@/dateTime";
@@ -38,6 +39,8 @@ import { initUiSounds } from "@/uiSounds";
 import { initHoloFx } from "@/holoFx";
 import { getDisplayAutoCloseDelay } from "@/displayTiming";
 import { initReadAloud } from "@/readAloud";
+import { detectMailProvider, extractEmailRecipientQuery, isVoiceNo, isVoiceYes, voiceNumberChoice } from "@/emailComposeVoice";
+import { chooseBestVoiceTranscript, normalizeVoiceTranscript } from "@/voiceCorrections";
 import { initHoloWindows, minimizeAll } from "@/holoWindows";
 import { ConfirmButton } from "@/ConfirmButton";
 import { getHUDStyleVariables, renderHUD } from "@/theme";
@@ -47,15 +50,16 @@ import { AmbientEngine } from "@/ambientAudio";
 
 /* executeIntent moved into the real App component (see later in the file) */
 
-// HUD SIRIUS — interface holographique
+// HUD ΣIRIUS — interface holographique
 // Ne pas tenter de créer un WebSocket local si aucun backend n'est réellement attendu.
 const WS_URL = process.env.REACT_APP_WS_URL || (
   typeof window !== "undefined" && window.location && window.location.hostname !== "localhost"
     ? "ws://127.0.0.1:8001/api/ws"
     : ""
 );
+const ARGUS_ALERT_DISMISS_MS = 30 * 60 * 1000;
 
-// Correspondance tâche SIRIUS -> fenêtre de progression globale
+// Correspondance tâche ΣIRIUS -> fenêtre de progression globale
 const progressMap = {};
 
 // ⚡ FIX : Fallback explicite vers http://127.0.0.1:8001 si la variable d'env est vide
@@ -345,23 +349,42 @@ function App() {
   // sur l'origine de MICROSOFT_REDIRECT_URI, différente de celle utilisée par le SPA pour
   // appeler l'API (localhost vs 127.0.0.1) — sans ce jeton rejoué en Authorization: Bearer,
   // tous les appels /api/microsoft/* échouent en 401 malgré une connexion "réussie".
+  // Sécurité : ce jeton reste en localStorage (accessible au JS de la page) pour garder la
+  // connexion active d'une session à l'autre, mais on limite la fenêtre d'exposition en cas
+  // de faille XSS en l'expirant côté client après 12h (durée alignée sur le jeton d'accès
+  // applicatif, cf. _ACCESS_TTL_SECONDS dans auth_api.py) — au-delà, il faut se reconnecter.
+  const MS_AUTH_TTL_MS = 12 * 60 * 60 * 1000;
   const [msAuth, setMsAuth] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("sirius_ms_auth")) || null; } catch { return null; }
+    try {
+      const raw = JSON.parse(localStorage.getItem("sirius_ms_auth")) || null;
+      if (raw && raw.saved_at && Date.now() - raw.saved_at > MS_AUTH_TTL_MS) {
+        localStorage.removeItem("sirius_ms_auth");
+        return null;
+      }
+      return raw;
+    } catch { return null; }
   });
   const msAuthRef = useRef(msAuth);
   msAuthRef.current = msAuth;
   const saveMsAuth = useCallback((tok) => {
-    setMsAuth(tok);
-    if (tok) localStorage.setItem("sirius_ms_auth", JSON.stringify(tok));
+    const stamped = tok ? { ...tok, saved_at: Date.now() } : null;
+    setMsAuth(stamped);
+    if (stamped) localStorage.setItem("sirius_ms_auth", JSON.stringify(stamped));
     else localStorage.removeItem("sirius_ms_auth");
   }, []);
-  // Ajoute automatiquement l'en-tête Authorization pour tous les appels Outlook/e-mails.
+  // Ajoute automatiquement l'en-tête Authorization pour tous les appels Outlook/e-mails ;
+  // purge aussi le jeton expiré (>12h) pour ne pas le laisser traîner inutilement.
   const msFetch = useCallback((path, options = {}) => {
-    const token = msAuthRef.current?.access_token;
+    const cur = msAuthRef.current;
+    if (cur && cur.saved_at && Date.now() - cur.saved_at > MS_AUTH_TTL_MS) {
+      saveMsAuth(null);
+      return fetch(`${API}${path}`, options);
+    }
+    const token = cur?.access_token;
     const headers = { ...(options.headers || {}) };
     if (token) headers.Authorization = "Bearer " + token;
     return fetch(`${API}${path}`, { ...options, headers });
-  }, []);
+  }, [saveMsAuth]);
   const userName = (profile?.name || "").trim();
   const [status, setStatus] = useState("idle");
   const [booting, setBooting] = useState(true);
@@ -436,7 +459,7 @@ function App() {
       }
     }).catch(() => {});
   }, []);
-  // SIRIUS DISPLAY : panneau piloté par Sirius — s'ouvre automatiquement, se ferme après
+  // ΣIRIUS DISPLAY : panneau piloté par Sirius — s'ouvre automatiquement, se ferme après
   const [display, setDisplay] = useState({ type: "idle" });
   const [displayHistory, setDisplayHistory] = useState([]);
   const [displayOpen, setDisplayOpen] = useState(false);
@@ -457,11 +480,55 @@ function App() {
   const openWebWindow = useCallback((url, titre, iframeOk, noscript) => {
     showOnDisplay({ type: "web", url, titre, iframeOk, noscript: !!noscript });
   }, [showOnDisplay]);
+  // Réponse en direct : la fenêtre ΣIRIUS DISPLAY révèle le texte comme une frappe en
+  // temps réel. Le cerveau (Groq) génère souvent toute la réponse en une fraction de
+  // seconde : sans cadence d'affichage, le texte apparaîtrait d'un bloc. Un minuteur
+  // révèle donc le texte à vitesse de lecture, en accélérant si le retard s'accumule.
+  const streamDisplayIdRef = useRef(null);
+  const streamTypingRef = useRef({ timer: null, target: "", shown: 0, done: false });
+  const streamOnDisplay = useCallback((contenu, done = false, titre = "ΣIRIUS — RÉPONSE") => {
+    const st = streamTypingRef.current;
+    st.target = contenu || "";
+    if (done) st.done = true;
+    if (!streamDisplayIdRef.current) {
+      const entry = { type: "message", titre, contenu: "", id: Date.now() + Math.random() };
+      streamDisplayIdRef.current = entry.id;
+      st.shown = 0;
+      st.done = done;
+      setDisplay(entry);
+      setDisplayHistory((h) => [entry, ...h].slice(0, 8));
+      setDisplayOpen(true);
+      clearTimeout(displayCloseTimer.current);
+    }
+    if (st.timer) return;
+    st.timer = setInterval(() => {
+      const cur = streamTypingRef.current;
+      const id = streamDisplayIdRef.current;
+      if (!id) { clearInterval(cur.timer); cur.timer = null; return; } // flux interrompu
+      // Cadence de lecture confortable (~25 car./s), accélérant seulement si un très
+      // gros texte s'accumule (ex: briefing) pour ne jamais dépasser ~50 car./s.
+      const backlog = cur.target.length - cur.shown;
+      cur.shown = Math.min(cur.target.length, cur.shown + Math.min(2, Math.max(1, Math.ceil(backlog / 250))));
+      const visible = cur.target.slice(0, cur.shown);
+      setDisplay((d) => (d && d.id === id ? { ...d, contenu: visible } : d));
+      if (cur.shown >= cur.target.length && cur.done) {
+        clearInterval(cur.timer);
+        cur.timer = null;
+        streamDisplayIdRef.current = null;
+        setDisplayHistory((h) => h.map((e) => (e.id === id ? { ...e, contenu: cur.target } : e)));
+        const closeDelay = getDisplayAutoCloseDelay({ type: "message", contenu: cur.target });
+        if (closeDelay) {
+          clearTimeout(displayCloseTimer.current);
+          displayCloseTimer.current = setTimeout(() => setDisplayOpen(false), closeDelay);
+        }
+      }
+    }, 40);
+  }, []);
   const closeWebWindow = useCallback((id) => {
     setWebWindows((ws) => ws.filter((w) => w.id !== id));
   }, []);
 
-  // Fenêtres de tâches SIRIUS : ouvertes et pilotées par Sirius (créations, rendus, analyses)
+  // Fenêtres de tâches ΣIRIUS : ouvertes et pilotées par Sirius (créations, rendus, analyses)
   // Moteur émotionnel : humeur & énergie de Sirius (module le ton du LLM et des interventions)
   const moodBoostRef = useRef({ humeur: null, until: 0, delta: 0 });
   const computeMood = useCallback(() => {
@@ -583,6 +650,9 @@ function App() {
   // Architecte visuel (générateur de diagrammes IA)
   const [showArchitect, setShowArchitect] = useState(false);
   const [architectPrompt, setArchitectPrompt] = useState("");
+  const [showPlans, setShowPlans] = useState(false);
+  const [plansPrompt, setPlansPrompt] = useState("");
+  const [showPhoto3D, setShowPhoto3D] = useState(false);
   const [showFiles, setShowFiles] = useState(false);
   // Mains holographiques 3D (couche R3F superposée) + pouls synchronisé avec le réacteur
   const [hands3D, setHands3D] = useState(() => localStorage.getItem("sirius_hands3d") !== "0");
@@ -592,13 +662,19 @@ function App() {
   const [showOracle, setShowOracle] = useState(false);
   const [showMemoryMgr, setShowMemoryMgr] = useState(false);
   const [outlookChoice, setOutlookChoice] = useState(null);
+  // Anticipation cognitive : file d'attente des plans d'action (brouillons de réponse) à
+  // confirmer un par un à la voix avant tout envoi réel — rien n'est jamais envoyé sans accord.
+  const [pendingActionPlan, setPendingActionPlan] = useState(null); // { id, de, sujet, brouillon_reponse, queue }
   // Assistant e-mails Outlook (classement, actions confirmées, configuration unique)
   const [pendingEmailAction, setPendingEmailAction] = useState(null); // { action, id, label, text? }
+  const [pendingEmailCompose, setPendingEmailCompose] = useState(null); // { step, query, contacts, contact, provider, subject, body }
   const [pendingEmailSetup, setPendingEmailSetup] = useState(false); // question de préférences en attente de réponse
   const lastEmailBriefingRef = useRef([]); // liste plate ordonnée du dernier "Mes e-mails" (pour "le message 2")
   const [showInstall, setShowInstall] = useState(false);
   const [showArgus, setShowArgus] = useState(false);
   const [argusAlert, setArgusAlert] = useState(null);
+  const dismissedArgusAlertsRef = useRef(new Map());
+  const activeArgusAlertKeyRef = useRef("");
   const [sysMode, setSysMode] = useState("normal");
   const [sysCause, setSysCause] = useState("");
   const [frugalManual, setFrugalManual] = useState(null);
@@ -702,6 +778,44 @@ function App() {
     }
     if (fixId === "reconnect_groq") { setShowSetup(true); }
   }, []);
+
+  const getArgusAlertKey = useCallback((alert) => {
+    if (!alert) return "";
+    return [
+      alert.errorType || "system",
+      alert.severity || "unknown",
+      String(alert.message || "").slice(0, 180),
+    ].join("|");
+  }, []);
+
+  const dismissArgusAlert = useCallback((alert = argusAlert) => {
+    const key = getArgusAlertKey(alert);
+    if (key) dismissedArgusAlertsRef.current.set(key, Date.now());
+    activeArgusAlertKeyRef.current = "";
+    setArgusAlert(null);
+  }, [argusAlert, getArgusAlertKey]);
+
+  const handleArgusCriticalAlert = useCallback((e) => {
+    if (!e || (e.severity !== "critical" && e.severity !== "severe")) return;
+    const key = getArgusAlertKey(e);
+    const dismissedAt = dismissedArgusAlertsRef.current.get(key);
+    if (dismissedAt && Date.now() - dismissedAt < ARGUS_ALERT_DISMISS_MS) return;
+    dismissedArgusAlertsRef.current.delete(key);
+    if (activeArgusAlertKeyRef.current === key) return;
+
+    activeArgusAlertKeyRef.current = key;
+    setArgusAlert(e);
+    const MODS = { ia: "le module IA", vocal: "le module vocal", hud: "l'interface HUD", backend: "le noyau backend", reseau: "la liaison réseau", outlook: "le module Outlook", haccp: "le module HACCP", oracle: "l'Oracle Divin", pantheon: "le Panthéon", permissions: "les permissions" };
+    if (e.severity === "critical") {
+      speakRef.current(`Anomalie critique détectée sur ${MODS[e.errorType] || "un module système"}. ${e.proposedFix ? "Réparation proposée : " + e.proposedFix + "." : ""} Ouvre ARGUS pour intervenir.`);
+      if (sysMode === "normal") {
+        setSysMode("safe");
+        setSysCause(e.message || "erreur critique détectée");
+      }
+    } else {
+      speakRef.current(`Anomalie détectée sur ${MODS[e.errorType] || "un module"}. Rien de critique, mais une intervention est recommandée.`);
+    }
+  }, [getArgusAlertKey, sysMode]);
 
   // Assistant d'installation : lancé automatiquement au premier démarrage (profil créé, jamais installé)
   useEffect(() => {
@@ -1047,7 +1161,7 @@ function App() {
       const answer = localAnswer(command);
       setText(answer);
       speakOut(answer);
-      showOnDisplay({ type: "message", titre: "SIRIUS — HEURE LOCALE", contenu: answer });
+      showOnDisplay({ type: "message", titre: "ΣIRIUS — HEURE LOCALE", contenu: answer });
       return;
     }
 
@@ -1122,6 +1236,7 @@ function App() {
                 streamProducedOutput = true;
                 full += ev.text; pending += ev.text;
                 setText(full);
+                streamOnDisplay(full);
                 let m;
                 while ((m = /^([\s\S]*?[.!?…])(?:\s+|$)/.exec(pending)) && m[1].trim().length > 1) {
                   speakChunk(m[1]);
@@ -1138,13 +1253,14 @@ function App() {
 
         if (data) {
           if (dispatchAutonomousVideoAction(data.action)) {
+            streamDisplayIdRef.current = null;
             if (pid && progress?.done) progress.done(pid, "Action vidéo transmise");
             return;
           }
           if (pending.trim()) speakChunk(pending);
           const answer = (data.answer || full || "").trim();
           if (!spoken) { setText(answer); speakOut(answer); } else { setText(answer); }
-          showOnDisplay({ type: "message", titre: "SIRIUS — RÉPONSE", contenu: answer });
+          streamOnDisplay(answer, true);
           if (pid && progress?.done) progress.done(pid, "Réponse délivrée en direct");
           return; // ✅ SUCCÈS STREAM : On sort ici
         }
@@ -1154,6 +1270,7 @@ function App() {
         console.warn("⚠️ Stream interrompu ou timeout (60s) -> Passage en voie classique...", e);
       }
       if (streamProducedOutput || externalSignal?.aborted) {
+        streamDisplayIdRef.current = null; // prochaine réponse : nouvelle fenêtre propre
         if (pid && progress?.error) progress.error(pid, "Réponse interrompue après restitution partielle");
         return;
       }
@@ -1188,7 +1305,7 @@ function App() {
         const answer = data.answer || "Réponse reçue du serveur.";
         setText(answer);
         speakOut(answer);
-        showOnDisplay({ type: "message", titre: "SIRIUS — RÉPONSE", contenu: answer });
+        streamOnDisplay(answer, true);
         if (pid && progress?.done) progress.done(pid, "Réponse délivrée (voie classique)");
         return; // ✅ SUCCÈS CLASSIQUE : On sort ici
       }
@@ -1209,9 +1326,9 @@ function App() {
       
     setText(fallback);
     speakOut(fallback);
-    showOnDisplay({ type: "message", titre: "SIRIUS — RÉPONSE LOCALE", contenu: fallback });
+    showOnDisplay({ type: "message", titre: "ΣIRIUS — RÉPONSE LOCALE", contenu: fallback });
 
-  }, [speakOut, keys, profile, computeMood, showOnDisplay, sysMode]);
+  }, [speakOut, keys, profile, computeMood, showOnDisplay, streamOnDisplay, sysMode]);
 
   // ---- Interruption naturelle : le micro écoute PENDANT que Sirius parle ----
   const stopInterruptListener = useCallback(() => {
@@ -1530,7 +1647,7 @@ function App() {
     }
   }, [speakOut, addPopup, keys]);
 
-  // SIRIUS WebBrowser : ouvre toute URL ou le 1er résultat d'une recherche, sans confirmation
+  // ΣIRIUS WebBrowser : ouvre toute URL ou le 1er résultat d'une recherche, sans confirmation
   const launchWebBrowser = useCallback(async (target) => {
     setStatus("thinking");
     setText(`Ouverture de ${target}...`);
@@ -1563,7 +1680,7 @@ function App() {
 
   const lastArchiveRef = useRef(null);
 
-  // Archivage automatique de chaque création dans la médiathèque SIRIUS
+  // Archivage automatique de chaque création dans la médiathèque ΣIRIUS
   const archiveCreation = useCallback(async (taskId, kind, nom, payload) => {
     try {
       const r = await fetch(`${API}/archive`, {
@@ -1586,7 +1703,7 @@ function App() {
     }
   }, [patchTask, speakOut]);
 
-  // Tâche SIRIUS : génération d'image (Nano Banana) — tout s'affiche dans la fenêtre dédiée, jamais dans le chat
+  // Tâche ΣIRIUS : génération d'image (Nano Banana) — tout s'affiche dans la fenêtre dédiée, jamais dans le chat
   const launchImageTask = useCallback(async (prompt, requireReference = false) => {
     const id = openTask(`IMAGE — ${prompt.slice(0, 42).toUpperCase()}`, "image");
     pushStep(id, "Initialisation du moteur de rendu");
@@ -1690,7 +1807,7 @@ function App() {
     setText(m); speakOut(m);
   }, [openTask, pushStep, finishTask, openWebWindow, speakOut, showOnDisplay]);
 
-  // Tâche SIRIUS : agent web invisible (Playwright) — recherche Google/DuckDuckGo + capture pour le Display
+  // Tâche ΣIRIUS : agent web invisible (Playwright) — recherche Google/DuckDuckGo + capture pour le Display
   const launchWebAgent = useCallback(async (query) => {
     const id = openTask(`WEB — ${query.slice(0, 44).toUpperCase()}`, "image");
     setStatus("thinking");
@@ -1724,7 +1841,7 @@ function App() {
     }
   }, [openTask, pushStep, finishTask, failTask, speakOut]);
 
-  // Tâche SIRIUS : génération de clip vidéo (fal.ai) — suivi en direct dans la fenêtre dédiée
+  // Tâche ΣIRIUS : génération de clip vidéo (fal.ai) — suivi en direct dans la fenêtre dédiée
   const launchVideoTask = useCallback(async (prompt) => {
     const id = openTask(`CLIP — ${prompt.slice(0, 44).toUpperCase()}`, "video");
     const technicalComment = "Analyse de la demande. Module vidéo requis.";
@@ -1768,7 +1885,7 @@ function App() {
         const videoUrl = d.display_url || d.video_url;
         if (d.etat === "termine" && videoUrl && !videoUrl.startsWith("data:")) {
           pushStep(id, d.technical_comment || "Conversion du résultat. Préparation du fichier vidéo.");
-          pushStep(id, d.display_comment || "Affichage du fichier vidéo dans SIRIUS Display.");
+          pushStep(id, d.display_comment || "Affichage du fichier vidéo dans ΣIRIUS Display.");
           finishTask(id, { kind: "video", src: videoUrl, legende: prompt });
           showOnDisplay({ type: "video", src: videoUrl, legende: prompt });
           archiveCreation(id, "video", prompt, { url: videoUrl });
@@ -1901,7 +2018,7 @@ function App() {
     }
   }, [speakOut]);
 
-  // Plateformes externes en fenêtre HUD dédiée (via proxy SIRIUS) + archivage des contenus consultés
+  // Plateformes externes en fenêtre HUD dédiée (via proxy ΣIRIUS) + archivage des contenus consultés
   const launchPlatform = useCallback(async (key, query) => {
     const PLATFORMS = {
       youtube: { nom: "YouTube", home: "https://www.youtube.com/results?search_query=tendances+du+jour", search: (q) => `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}` },
@@ -1941,7 +2058,7 @@ function App() {
     // Popup (pas noopener/noreferrer : la popup doit garder window.opener pour prévenir
     // cet onglet via postMessage une fois connectée, cf. _ms_popup_response côté backend).
     // Sans ça, la redirection finale rechargeait le SPA en plein dans CET onglet-popup,
-    // ce qui démarrait une deuxième instance complète de SIRIUS ("un nouveau SIRIUS démarre").
+    // ce qui démarrait une deuxième instance complète de ΣIRIUS ("un nouveau ΣIRIUS démarre").
     window.open(`${API}/auth/microsoft/login`, "outlook-auth", "width=520,height=720");
     setStatus("speaking");
     const m = "Connecte-toi à Outlook dans la fenêtre qui s'ouvre...";
@@ -2015,18 +2132,23 @@ function App() {
         setText(msg); speakOut(msg);
         return;
       }
-      const mails = d.mails || [];
+      const mails = (d.mails || []).map((m) => ({ ...m, source: "gmail" }));
       if (!mails.length) {
         finishTask(id, { kind: "text", texte: "Boîte de réception vide.", legende: "Gmail · aucun mail" });
+        showOnDisplay({ type: "emails", titre: "GMAIL — BOÎTE DE RÉCEPTION", mails: [] });
         const m = "Ta boîte Gmail est vide.";
         setText(m); speakOut(m);
         return;
       }
-      const lignes = mails.map((m) => `${m.lu ? "  " : "● "}${m.date || ""} — ${m.de}\n   ${m.sujet}\n   ${m.apercu || ""}`).join("\n\n");
+      const urgents = mails.filter((m) => m.categorie === "Critique");
+      const lignes = mails.map((m) => `${m.lu ? "  " : "● "}${m.recu || m.date || ""} — ${m.de}\n   ${m.sujet}\n   ${m.apercu || ""}`).join("\n\n");
       finishTask(id, { kind: "text", texte: `NON LUS : ${d.non_lus}\n\n${lignes}`, legende: `Gmail · ${d.non_lus} non lu(s)` });
+      showOnDisplay({ type: "emails", titre: "GMAIL — BOÎTE DE RÉCEPTION", mails });
       let spoken;
-      if (openOnly) {
-        spoken = d.non_lus > 0 ? `Tu as ${d.non_lus} mail${d.non_lus > 1 ? "s" : ""} Gmail non lu${d.non_lus > 1 ? "s" : ""}. Détails dans la fenêtre.` : "Aucun mail Gmail non lu. Boîte affichée dans la fenêtre.";
+      if (urgents.length > 0) {
+        spoken = `Attention, ${urgents.length} email${urgents.length > 1 ? "s" : ""} urgent${urgents.length > 1 ? "s" : ""} dans Gmail. Le plus récent : ${urgents[0].sujet}, de ${urgents[0].de}.`;
+      } else if (openOnly) {
+        spoken = d.non_lus > 0 ? `Tu as ${d.non_lus} mail${d.non_lus > 1 ? "s" : ""} Gmail non lu${d.non_lus > 1 ? "s" : ""}. Cases affichées sur le display.` : "Aucun mail Gmail non lu. Boîte affichée sur le display.";
       } else {
         const top = mails.slice(0, 3);
         spoken = d.non_lus > 0 ? `Tu as ${d.non_lus} mail${d.non_lus > 1 ? "s" : ""} Gmail non lu${d.non_lus > 1 ? "s" : ""}. ` : "Aucun mail Gmail non lu. ";
@@ -2042,7 +2164,161 @@ function App() {
       const m = "Je n'arrive pas à joindre Gmail pour le moment.";
       setText(m); speakOut(m);
     }
+  }, [openTask, pushStep, finishTask, failTask, speakOut, showOnDisplay]);
+
+  // Envoi d'un e-mail Gmail (compte Google connecté via l'Agenda) : signature ΣIRIUS HUD ajoutée côté backend
+  const sendGmail = useCallback(async (to, subject, body) => {
+    const id = openTask("GMAIL — ENVOI", "outlook");
+    pushStep(id, "Envoi via Gmail");
+    setStatus("thinking");
+    try {
+      const r = await fetch(`${API}/gmail/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to, subject: subject || "Message envoyé par ΣIRIUS", body: body || "" }),
+      });
+      const d = await r.json().catch(() => ({}));
+      setStatus("speaking");
+      if (r.status === 401) {
+        failTask(id, "Compte Google non connecté");
+        const m = "Connecte d'abord ton compte Google avant d'envoyer un mail Gmail.";
+        setText(m); speakOut(m);
+        return;
+      }
+      if (!r.ok) {
+        const msg = d.detail || "Envoi Gmail impossible.";
+        failTask(id, msg);
+        setText(msg); speakOut(msg);
+        return;
+      }
+      finishTask(id, { kind: "text", texte: `E-mail envoyé à ${to}.`, legende: "Gmail · envoi réussi" });
+      const m = `E-mail Gmail envoyé à ${to}.`;
+      setText(m); speakOut(m);
+    } catch (e) {
+      failTask(id, "Gmail injoignable");
+      setStatus("speaking");
+      const m = "Je n'arrive pas à joindre Gmail pour le moment.";
+      setText(m); speakOut(m);
+    }
   }, [openTask, pushStep, finishTask, failTask, speakOut]);
+
+  const sendOutlookEmail = useCallback(async (to, subject, body) => {
+    const id = openTask("OUTLOOK — ENVOI", "outlook");
+    pushStep(id, "Préparation de l'envoi Outlook");
+    setStatus("thinking");
+    try {
+      const previewResponse = await msFetch(`/microsoft/mail/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to, subject: subject || "Message envoyé par ΣIRIUS", body: body || "", confirm: false }),
+      });
+      if (!previewResponse.ok) {
+        const detail = await previewResponse.json().catch(() => ({}));
+        throw new Error(detail.detail || "Préparation Outlook impossible.");
+      }
+      pushStep(id, "Envoi confirmé via Microsoft Graph");
+      const r = await msFetch(`/microsoft/mail/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to, subject: subject || "Message envoyé par ΣIRIUS", body: body || "", confirm: true }),
+      });
+      const d = await r.json().catch(() => ({}));
+      setStatus("speaking");
+      if (r.status === 401 || r.status === 409) {
+        failTask(id, "Compte Outlook non connecté");
+        const m = "Ton compte Outlook doit être reconnecté pour envoyer un e-mail.";
+        setText(m); speakOut(m);
+        return false;
+      }
+      if (!r.ok) {
+        failTask(id, d.detail || "Envoi Outlook impossible");
+        const m = d.detail || "Outlook a refusé l'envoi du message.";
+        setText(m); speakOut(m);
+        return false;
+      }
+      finishTask(id, { kind: "text", texte: `E-mail envoyé à ${to}.`, legende: "Outlook · envoi réussi" });
+      const m = `C'est envoyé à ${to} avec ma signature SIRIUS.`;
+      setText(m); speakOut(m);
+      return true;
+    } catch (e) {
+      failTask(id, e.message || "Outlook injoignable");
+      setStatus("speaking");
+      const m = e.message || "Je n'arrive pas à joindre Outlook pour le moment.";
+      setText(m); speakOut(m);
+      return false;
+    }
+  }, [openTask, pushStep, finishTask, failTask, speakOut, msFetch]);
+
+  const startGuidedEmailCompose = useCallback(async (query, forcedProvider = "") => {
+    const cleanQuery = (query || "").trim();
+    if (!cleanQuery) {
+      setStatus("speaking");
+      const m = "À quel contact dois-je envoyer l'e-mail ?";
+      setText(m); speakOut(m);
+      return;
+    }
+    const directEmail = (cleanQuery.match(/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i) || [])[0];
+    if (directEmail) {
+      setPendingEmailCompose({
+        step: forcedProvider ? "body" : "choose_provider",
+        query: directEmail,
+        contact: { nom: directEmail, email: directEmail },
+        provider: forcedProvider || "",
+        subject: "Message envoyé par ΣIRIUS",
+      });
+      const m = forcedProvider
+        ? `Adresse ${directEmail} notée. Quelle est la teneur du message à envoyer ?`
+        : `Adresse ${directEmail} notée. Tu veux envoyer avec Outlook ou Gmail ?`;
+      setStatus("speaking"); setText(m); speakOut(m);
+      return;
+    }
+    const id = openTask(`E-MAIL — CONTACT : ${cleanQuery}`, "outlook");
+    pushStep(id, "Recherche du destinataire dans les contacts Outlook");
+    setStatus("thinking");
+    try {
+      const r = await msFetch(`/microsoft/contacts?top=10&query=${encodeURIComponent(cleanQuery)}`);
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const message = r.status === 401 || r.status === 409
+          ? "Ton compte Outlook doit être connecté pour chercher dans tes contacts. Dis « connecte Outlook »."
+          : (d.detail || "Recherche de contact impossible.");
+        failTask(id, message);
+        setStatus("speaking"); setText(message); speakOut(message);
+        return;
+      }
+      const contacts = (d.contacts || []).filter((c) => c.email);
+      showOnDisplay({ type: "contacts", titre: `CONTACTS — ${cleanQuery}`, contacts });
+      if (!contacts.length) {
+        failTask(id, "Contact introuvable");
+        setStatus("speaking");
+        const m = `Je n'ai pas trouvé ${cleanQuery} dans tes contacts Outlook. Donne-moi directement son adresse e-mail.`;
+        setPendingEmailCompose({ step: "manual_to", query: cleanQuery, provider: forcedProvider || "" });
+        setText(m); speakOut(m);
+        return;
+      }
+      if (contacts.length > 1) {
+        finishTask(id, { kind: "text", texte: contacts.map((c, i) => `${i + 1}. ${c.nom} — ${c.email}`).join("\n"), legende: "Contacts · choix requis" });
+        setPendingEmailCompose({ step: "choose_contact", query: cleanQuery, contacts, provider: forcedProvider || "" });
+        setStatus("speaking");
+        const m = `J'ai trouvé ${contacts.length} contacts pour ${cleanQuery}. Dis le numéro du bon contact.`;
+        setText(m); speakOut(m);
+        return;
+      }
+      const contact = contacts[0];
+      finishTask(id, { kind: "text", texte: `${contact.nom}\n${contact.email}`, legende: "Contact trouvé" });
+      setPendingEmailCompose({ step: forcedProvider ? "body" : "choose_provider", query: cleanQuery, contact, provider: forcedProvider || "", subject: "Message envoyé par ΣIRIUS" });
+      setStatus("speaking");
+      const m = forcedProvider
+        ? `J'ai trouvé ${contact.nom} dans tes contacts. Quelle est la teneur du message à envoyer ?`
+        : `J'ai trouvé ${contact.nom} dans tes contacts. Tu veux envoyer avec Outlook ou Gmail ?`;
+      setText(m); speakOut(m);
+    } catch (e) {
+      failTask(id, "Contacts injoignables");
+      setStatus("speaking");
+      const m = "Je n'arrive pas à lire tes contacts pour le moment.";
+      setText(m); speakOut(m);
+    }
+  }, [openTask, pushStep, finishTask, failTask, speakOut, msFetch, showOnDisplay]);
 
   const launchOutlookMail = useCallback(async () => {    const id = openTask("OUTLOOK — BOÎTE DE RÉCEPTION", "outlook");
     pushStep(id, "Connexion à Microsoft Graph");
@@ -2059,16 +2335,117 @@ function App() {
         return;
       }
       pushStep(id, "Analyse de la boîte de réception");
-      const mails = d.mails || [];
+      const mails = (d.mails || []).map((m) => ({ ...m, source: "outlook" }));
       const nonLus = mails.filter((mail) => !mail.lu).length;
+      const urgents = mails.filter((mail) => mail.categorie === "Critique");
       const lignes = mails.map((m) =>
         `${m.lu ? "  " : "● "}${m.recu || ""} — ${m.de}\n   ${m.sujet}\n   ${m.apercu || ""}`).join("\n\n") || "Boîte de réception vide.";
       finishTask(id, { kind: "text", texte: `NON LUS : ${nonLus}\n\n${lignes}`, legende: `Outlook · ${nonLus} non lu(s)` });
+      showOnDisplay({ type: "emails", titre: "OUTLOOK — BOÎTE DE RÉCEPTION", mails });
       setStatus("speaking");
-      const m = nonLus > 0 ? `Vous avez ${nonLus} email${nonLus > 1 ? "s" : ""} non lu${nonLus > 1 ? "s" : ""}. Détails dans la fenêtre.` : "Aucun email non lu. Boîte affichée dans la fenêtre.";
+      let m;
+      if (urgents.length > 0) {
+        m = `Attention, ${urgents.length} email${urgents.length > 1 ? "s" : ""} urgent${urgents.length > 1 ? "s" : ""} dans Outlook. Le plus récent : ${urgents[0].sujet}, de ${urgents[0].de}.`;
+      } else {
+        m = nonLus > 0 ? `Vous avez ${nonLus} email${nonLus > 1 ? "s" : ""} non lu${nonLus > 1 ? "s" : ""}. Cases affichées sur le display.` : "Aucun email non lu. Boîte affichée sur le display.";
+      }
       setText(m); speakOut(m);
     } catch (e) { failTask(id, "Microsoft Graph injoignable"); }
-  }, [openTask, pushStep, finishTask, failTask, speakOut, msFetch]);
+  }, [openTask, pushStep, finishTask, failTask, speakOut, msFetch, showOnDisplay]);
+
+  const launchOutlookContacts = useCallback(async (query = "") => {
+    const cleanQuery = query.trim();
+    const id = openTask(
+      cleanQuery ? `OUTLOOK — CONTACTS : ${cleanQuery}` : "OUTLOOK — CONTACTS",
+      "outlook"
+    );
+    pushStep(id, "Recherche dans les contacts Outlook");
+    try {
+      const r = await msFetch(`/microsoft/contacts?top=100&query=${encodeURIComponent(cleanQuery)}`);
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const message = r.status === 401 || r.status === 409
+          ? "Ton compte Outlook doit être reconnecté pour autoriser l'accès aux contacts."
+          : (d.detail || "Je n'arrive pas à lire tes contacts Outlook.");
+        failTask(id, message);
+        setStatus("speaking");
+        setText(message);
+        speakOut(message);
+        return;
+      }
+      const contacts = d.contacts || [];
+      finishTask(id, {
+        kind: "text",
+        texte: contacts.map((c) => [
+          c.nom,
+          c.email,
+          c.telephone,
+          [c.poste, c.entreprise].filter(Boolean).join(" · "),
+        ].filter(Boolean).join("\n")).join("\n\n") || "Aucun contact trouvé.",
+        legende: `Outlook · ${contacts.length} contact(s)`,
+      });
+      showOnDisplay({
+        type: "contacts",
+        titre: cleanQuery ? `OUTLOOK — CONTACTS : ${cleanQuery}` : "OUTLOOK — CONTACTS",
+        contacts,
+      });
+      setStatus("speaking");
+      const spoken = contacts.length
+        ? `${contacts.length} contact${contacts.length > 1 ? "s" : ""} trouvé${contacts.length > 1 ? "s" : ""}${cleanQuery ? ` pour ${cleanQuery}` : ""}. Les cartes sont affichées sur le display.`
+        : `Aucun contact${cleanQuery ? ` trouvé pour ${cleanQuery}` : ""}.`;
+      setText(spoken);
+      speakOut(spoken);
+    } catch (e) {
+      failTask(id, "Contacts Outlook injoignables");
+      const message = "Je n'arrive pas à joindre les contacts Outlook pour le moment.";
+      setStatus("speaking");
+      setText(message);
+      speakOut(message);
+    }
+  }, [openTask, pushStep, finishTask, failTask, speakOut, msFetch, showOnDisplay]);
+
+  // Recherche unifiée : contacts + emails + rendez-vous correspondant au mot-clé en un seul appel
+  const launchUnifiedSearch = useCallback(async (query) => {
+    const cleanQuery = (query || "").trim();
+    if (!cleanQuery) {
+      setStatus("speaking");
+      const m = "Que veux-tu que je cherche ?";
+      setText(m); speakOut(m);
+      return;
+    }
+    const id = openTask(`RECHERCHE — ${cleanQuery}`, "outlook");
+    pushStep(id, "Recherche dans contacts, e-mails et agenda");
+    try {
+      const r = await msFetch(`/microsoft/search?query=${encodeURIComponent(cleanQuery)}&top=8`);
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const message = r.status === 401 || r.status === 409
+          ? "Ton compte Outlook doit être connecté pour cette recherche."
+          : (d.detail || "Recherche impossible.");
+        failTask(id, message);
+        setStatus("speaking"); setText(message); speakOut(message);
+        return;
+      }
+      const { contacts = [], emails = [], evenements = [] } = d;
+      const blocs = [];
+      if (contacts.length) blocs.push(`CONTACTS (${contacts.length})\n` + contacts.map((c) => [c.nom, c.email, c.telephone].filter(Boolean).join(" · ")).join("\n"));
+      if (emails.length) blocs.push(`E-MAILS (${emails.length})\n` + emails.map((m) => `${m.de} — ${m.sujet}`).join("\n"));
+      if (evenements.length) blocs.push(`RENDEZ-VOUS (${evenements.length})\n` + evenements.map((e) => `${e.titre} — ${e.debut}`).join("\n"));
+      const texte = blocs.join("\n\n") || "Aucun résultat.";
+      finishTask(id, { kind: "text", texte, legende: `Recherche · ${d.total || 0} résultat(s)` });
+      showOnDisplay({ type: "contacts", titre: `RECHERCHE — ${cleanQuery}`, contacts });
+      setStatus("speaking");
+      const spoken = d.total > 0
+        ? `${contacts.length} contact${contacts.length > 1 ? "s" : ""}, ${emails.length} e-mail${emails.length > 1 ? "s" : ""} et ${evenements.length} rendez-vous trouvés pour ${cleanQuery}.`
+        : `Aucun résultat pour ${cleanQuery}.`;
+      setText(spoken); speakOut(spoken);
+    } catch (e) {
+      failTask(id, "Recherche injoignable");
+      setStatus("speaking");
+      const m = "Je n'arrive pas à effectuer la recherche pour le moment.";
+      setText(m); speakOut(m);
+    }
+  }, [openTask, pushStep, finishTask, failTask, speakOut, msFetch, showOnDisplay]);
 
   const launchOutlookAgenda = useCallback(async () => {
     const id = openTask("OUTLOOK — AGENDA (14 JOURS)", "outlook");
@@ -2222,6 +2599,7 @@ function App() {
       kind: "text", texte,
       legende: `Outlook · ${data.total_nouveaux} nouveau(x) sur ${data.total}`,
     });
+    showOnDisplay({ type: "emails", titre: "OUTLOOK — MES E-MAILS", mails: ordered.map((m) => ({ ...m, source: "outlook" })) });
 
     setStatus("speaking");
     let spoken;
@@ -2246,7 +2624,7 @@ function App() {
       spoken += "Le reste est détaillé dans la fenêtre.";
     }
     setText(spoken); speakOut(spoken);
-  }, [openTask, pushStep, finishTask, failTask, speakOut, askEmailSetupQuestion, msFetch]);
+  }, [openTask, pushStep, finishTask, failTask, speakOut, askEmailSetupQuestion, msFetch, showOnDisplay]);
 
   // Résout « le message 2 », « le premier », « le dernier » vers l'ID réel du dernier "Mes e-mails"
   const resolveEmailOrdinal = useCallback((text) => {
@@ -2361,6 +2739,146 @@ function App() {
     }
   }, [pendingEmailAction, speakOut, msFetch]);
 
+  const handlePendingEmailCompose = useCallback((command) => {
+    const pending = pendingEmailCompose;
+    if (!pending) return false;
+    const low = command.toLowerCase();
+
+    if (isVoiceNo(low) && pending.step !== "body") {
+      setPendingEmailCompose(null);
+      setStatus("speaking");
+      const m = "D'accord, e-mail annulé.";
+      setText(m); speakOut(m);
+      return true;
+    }
+
+    if (pending.step === "manual_to") {
+      const email = (command.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i) || [])[0];
+      if (!email) {
+        const m = "Je n'ai pas reconnu l'adresse e-mail. Peux-tu la répéter clairement ?";
+        setStatus("speaking"); setText(m); speakOut(m);
+        return true;
+      }
+      setPendingEmailCompose({ ...pending, step: pending.provider ? "body" : "choose_provider", contact: { nom: email, email }, subject: "Message envoyé par ΣIRIUS" });
+      const m = pending.provider
+        ? "Adresse notée. Quelle est la teneur du message à envoyer ?"
+        : "Adresse notée. Tu veux envoyer avec Outlook ou Gmail ?";
+      setStatus("speaking"); setText(m); speakOut(m);
+      return true;
+    }
+
+    if (pending.step === "choose_contact") {
+      const idx = voiceNumberChoice(command, pending.contacts.length);
+      const contact = idx >= 0 ? pending.contacts[idx] : pending.contacts.find((c) => low.includes((c.nom || "").toLowerCase()));
+      if (!contact) {
+        const m = "Je n'ai pas reconnu le contact choisi. Dis par exemple « le premier » ou « le deuxième ».";
+        setStatus("speaking"); setText(m); speakOut(m);
+        return true;
+      }
+      setPendingEmailCompose({ ...pending, step: pending.provider ? "body" : "choose_provider", contact, subject: "Message envoyé par ΣIRIUS" });
+      const m = pending.provider
+        ? `J'ai sélectionné ${contact.nom}. Quelle est la teneur du message à envoyer ?`
+        : `J'ai sélectionné ${contact.nom}. Tu veux envoyer avec Outlook ou Gmail ?`;
+      setStatus("speaking"); setText(m); speakOut(m);
+      return true;
+    }
+
+    if (pending.step === "choose_provider") {
+      const provider = detectMailProvider(command);
+      if (!provider) {
+        const m = "Tu veux que je l'envoie avec Outlook ou Gmail ?";
+        setStatus("speaking"); setText(m); speakOut(m);
+        return true;
+      }
+      setPendingEmailCompose({ ...pending, step: "body", provider });
+      const m = `Très bien, avec ${provider === "gmail" ? "Gmail" : "Outlook"}. Quelle est la teneur du message à envoyer ?`;
+      setStatus("speaking"); setText(m); speakOut(m);
+      return true;
+    }
+
+    if (pending.step === "body") {
+      const body = command.replace(/^(?:message|texte|corps)\s*[:\-]?\s*/i, "").trim();
+      if (!body) {
+        const m = "Je n'ai pas entendu le contenu du message. Dicte-moi le message à envoyer.";
+        setStatus("speaking"); setText(m); speakOut(m);
+        return true;
+      }
+      const next = { ...pending, step: "confirm", body, subject: pending.subject || "Message envoyé par ΣIRIUS" };
+      setPendingEmailCompose(next);
+      showOnDisplay({
+        type: "message",
+        titre: `E-MAIL — ${next.provider === "gmail" ? "GMAIL" : "OUTLOOK"}`,
+        contenu: `À : ${next.contact.nom} <${next.contact.email}>\nObjet : ${next.subject}\n\n${body}\n\nSignature SIRIUS ajoutée automatiquement.`,
+      });
+      const m = `Je vais envoyer à ${next.contact.nom} avec ${next.provider === "gmail" ? "Gmail" : "Outlook"} : ${body}. Confirmes-tu l'envoi ?`;
+      setStatus("speaking"); setText(m); speakOut(m);
+      return true;
+    }
+
+    if (pending.step === "confirm") {
+      if (isVoiceNo(low)) {
+        setPendingEmailCompose(null);
+        const m = "D'accord, e-mail annulé.";
+        setStatus("speaking"); setText(m); speakOut(m);
+        return true;
+      }
+      if (!isVoiceYes(low)) {
+        const m = "Dis « oui, envoie » pour confirmer, ou « non » pour annuler.";
+        setStatus("speaking"); setText(m); speakOut(m);
+        return true;
+      }
+      setPendingEmailCompose(null);
+      if (pending.provider === "gmail") {
+        sendGmail(pending.contact.email, pending.subject, pending.body);
+      } else {
+        sendOutlookEmail(pending.contact.email, pending.subject, pending.body);
+      }
+      return true;
+    }
+
+    return false;
+  }, [pendingEmailCompose, speakOut, showOnDisplay, sendGmail, sendOutlookEmail]);
+
+  // Anticipation cognitive : propose le brouillon de réponse suivant de la file d'attente,
+  // un par un, et attend « vas-y, envoie » / « non » avant tout envoi réel.
+  const presentNextActionPlan = useCallback((queue) => {
+    if (!queue || !queue.length) return;
+    const [next, ...rest] = queue;
+    setPendingActionPlan({ ...next, queue: rest });
+    setStatus("speaking");
+    const m = `Pour le message de ${next.de || "expéditeur inconnu"}, sujet « ${next.sujet || "sans objet"} », je propose : ${next.brouillon_reponse}. Dis « vas-y, envoie » ou « non ».`;
+    setText(m); speakOut(m);
+  }, [speakOut]);
+
+  const confirmPendingActionPlan = useCallback(async (confirmed) => {
+    const pending = pendingActionPlan;
+    if (!pending) return;
+    const queue = pending.queue || [];
+    setPendingActionPlan(null);
+    if (!confirmed) {
+      setStatus("speaking");
+      const m = "D'accord, réponse non envoyée.";
+      setText(m); speakOut(m);
+      if (queue.length) presentNextActionPlan(queue);
+      return;
+    }
+    setStatus("thinking");
+    try {
+      const r = await msFetch(`/microsoft/mail/${pending.id}/reply`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: pending.brouillon_reponse, confirm: true }),
+      });
+      setStatus("speaking");
+      const m = r.ok ? "C'est fait, la réponse a été envoyée." : "Microsoft Graph a refusé l'envoi, monsieur.";
+      setText(m); speakOut(m);
+    } catch (e) {
+      setStatus("speaking");
+      const m = "Microsoft Graph injoignable, réponse non envoyée.";
+      setText(m); speakOut(m);
+    }
+    if (queue.length) presentNextActionPlan(queue);
+  }, [pendingActionPlan, presentNextActionPlan, speakOut, msFetch]);
+
   const setEmailSenderRule = useCallback(async (sender, rule) => {
     setStatus("thinking");
     try {
@@ -2398,7 +2916,7 @@ function App() {
     }
     setStatus("thinking");
     try {
-      const r = await fetch(`${API}/outlook/events`, {
+      const r = await msFetch(`/outlook/events`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ titre, start: fmt(d), end: fmt(fin), tz }),
@@ -2411,14 +2929,14 @@ function App() {
       setStatus("speaking");
       setText("Microsoft Graph injoignable"); speakOut("Microsoft Graph injoignable");
     }
-  }, [speakOut]);
+  }, [speakOut, msFetch]);
 
   // ---- Intents Outlook (JSON strict) : lecture directe, actions sensibles confirmées ----
   const runOutlookExecute = useCallback(async (intent, parameters, actionToken) => {
     const id = openTask(`OUTLOOK — ${intent.replace("outlook.", "").toUpperCase()}`, "outlook");
     pushStep(id, "Exécution via Microsoft Graph");
     try {
-      const r = await fetch(`${API}/outlook/intent/execute`, {
+      const r = await msFetch(`/outlook/intent/execute`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ intent, parameters, actionToken: actionToken || null }),
@@ -2440,12 +2958,12 @@ function App() {
       finishTask(id, { kind: "text", texte, legende: (d.responseText || "").slice(0, 90) });
       setStatus("speaking"); setText(d.responseText); speakOut(d.responseText);
     } catch (e) { failTask(id, "Microsoft Graph injoignable"); }
-  }, [openTask, pushStep, finishTask, failTask, speakOut]);
+  }, [openTask, pushStep, finishTask, failTask, speakOut, msFetch]);
 
   const launchOutlookIntent = useCallback(async (command) => {
     setStatus("thinking");
     try {
-      const r = await fetch(`${API}/outlook/intent`, {
+      const r = await msFetch(`/outlook/intent`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: command, keys }),
@@ -2467,7 +2985,7 @@ function App() {
       setStatus("speaking");
       setText("Microsoft Graph injoignable"); speakOut("Microsoft Graph injoignable");
     }
-  }, [keys, runOutlookExecute, speakOut]);
+  }, [keys, runOutlookExecute, speakOut, msFetch]);
 
   // Lance directement la requête sur le service choisi
   // Spotify connecté → VRAIE lecture via l'API (appareil actif requis, Premium pour la lecture à distance)
@@ -2684,7 +3202,7 @@ function App() {
     return () => clearInterval(id);
   }, [spotify, refreshNowPlayingBanner]);
 
-  // Lecteur Spotify intégré : le HUD devient un appareil Spotify Connect « SIRIUS HUD »
+  // Lecteur Spotify intégré : le HUD devient un appareil Spotify Connect « ΣIRIUS HUD »
   // (Web Playback SDK — nécessite Spotify Premium ; sans Premium, repli sur les appareils externes)
   useEffect(() => {
     const refreshTok = spotify && spotify.refresh_token;
@@ -2695,7 +3213,7 @@ function App() {
       if (cancelled || playerDeviceRef.current) return;
       try {
         player = new window.Spotify.Player({
-          name: "SIRIUS HUD",
+          name: "ΣIRIUS HUD",
           volume: 0.8,
           getOAuthToken: async (cb) => {
             try {
@@ -2827,7 +3345,7 @@ function App() {
         setStatus("idle");
         return;
       }
-      console.error("[SIRIUS NLU] Erreur intent :", e);
+      console.error("[ΣIRIUS NLU] Erreur intent :", e);
       // En cas de pépin sur l'intent, on s'appuie sur la réponse déjà en cours en parallèle.
       await cloudAnswerPromise;
     } finally {
@@ -2859,6 +3377,11 @@ function App() {
       return;
     }
 
+    if (pendingEmailCompose && handlePendingEmailCompose(command)) {
+      mark("email · composition guidée");
+      return;
+    }
+
     // Assistant e-mails : réponse à la question de préférences posée une seule fois
     if (pendingEmailSetup) {
       mark("email · préférences");
@@ -2868,7 +3391,7 @@ function App() {
 
     // Assistant e-mails : confirmation d'une action sensible (archiver/supprimer/répondre)
     if (pendingEmailAction) {
-      if (/\b(oui|ouais|vas[- ]y|ok|d'accord|confirme|je confirme|bien s[ûu]r)\b/.test(low)) {
+      if (/\b(oui|ouais|vas[- ]y|envoie|envoi|ok|d'accord|confirme|je confirme|bien s[ûu]r)\b/.test(low)) {
         mark("email · confirmation");
         confirmPendingEmailAction(true);
         return;
@@ -2876,6 +3399,20 @@ function App() {
       if (/\b(non|annule|laisse|pas maintenant|surtout pas)\b/.test(low)) {
         mark("email · annulation");
         confirmPendingEmailAction(false);
+        return;
+      }
+    }
+
+    // Anticipation cognitive : confirmation d'un brouillon de réponse proposé proactivement
+    if (pendingActionPlan) {
+      if (/\b(oui|ouais|vas[- ]y|envoie|envoi|ok|d'accord|confirme|je confirme|bien s[ûu]r)\b/.test(low)) {
+        mark("plan d'action · confirmation");
+        confirmPendingActionPlan(true);
+        return;
+      }
+      if (/\b(non|annule|laisse|pas maintenant|surtout pas)\b/.test(low)) {
+        mark("plan d'action · refus");
+        confirmPendingActionPlan(false);
         return;
       }
     }
@@ -2961,6 +3498,19 @@ function App() {
       return;
     }
 
+    const unifiedSearchM = low.match(/(?:cherche|recherche|trouve)\w*(?:[- ]moi)?\s+(?:tout\s+sur|partout)\s+(.+)/);
+    if (unifiedSearchM) {
+      mark("recherche · unifiée");
+      launchUnifiedSearch(unifiedSearchM[1].replace(/[?!.]+$/, "").trim());
+      return;
+    }
+
+    const gmailSendM = low.match(/envoie (?:un )?(?:e-?mail|mail|courriel|message)\s+gmail\s+[àa]\s+(\S+@\S+)(?:\s*(?:,|:)?\s*(?:objet|sujet)\s*[:\-]?\s*(.+?))?(?:\s*(?:,|:)?\s*(?:message|corps|texte)\s*[:\-]?\s*(.+))?$/);
+    if (gmailSendM) {
+      mark("gmail · envoi");
+      sendGmail(gmailSendM[1].trim(), (gmailSendM[2] || "").trim(), (gmailSendM[3] || "").trim());
+      return;
+    }
     // Outlook : connexion, lecture des mails, agenda, envoi, création de rendez-vous.
     // Gmail : ouverture, lecture. Traité ICI (avant l'intent Groq) pour les mêmes raisons que
     // la musique d'ambiance : ces phrases contiennent des mots (« mail », « outlook »...) que la
@@ -2984,15 +3534,24 @@ function App() {
         return;
       }
     }
+    const contactCommand = low.match(/(?:cherche|recherche|trouve|affiche|montre|liste|ouvre)\w*(?:[- ]moi)?\s+(?:(?:le|un|une)\s+)?(?:dans\s+)?(?:mes\s+)?contacts?(?:\s+outlook)?(?:\s+(?:(?:de|pour|nomm[ée]?)\s+)?(.+))?$/);
+    if (contactCommand || /\b(?:mes|les)\s+contacts?\b/.test(low)) {
+      const query = (contactCommand?.[1] || "").replace(/[?!.]+$/, "").trim();
+      mark("outlook · contacts");
+      launchOutlookContacts(query);
+      return;
+    }
     if (/connect(?:e|er|ion)?(?:[- ]moi)?\s*(?:à\s+)?outlook/.test(low)) {
       mark("outlook · connexion"); connectOutlook(); return;
     }
     if (/^(?:microsoft\s+)?outlook[\s?!.]*$/.test(low)) {
       mark("outlook · ouverture"); launchOutlookMail(); return;
     }
-    const sendM = low.match(/envoie (?:un )?(?:e-?mail|mail|courriel|message) [àa]\s+(.+)/);
+    const sendM = extractEmailRecipientQuery(command);
     if (sendM) {
-      mark("outlook · envoi"); launchOutlookIntent(command); return;
+      mark("email · composition guidée");
+      startGuidedEmailCompose(sendM, detectMailProvider(command));
+      return;
     }
     if (/(?:supprime|efface|d[ée]truis)\w*\s+(?:le\s|ce\s|la\s)?(?:dernier\s)?(?:e-?mail|mail|courriel)/.test(low)) {
       mark("outlook · suppression"); launchOutlookIntent(command); return;
@@ -3033,10 +3592,11 @@ function App() {
   // Lancement de la résolution d'intention
     resolveIntent(command);
   }, [
-    resolveIntent, speakOut, readGmailAloud, connectOutlook, launchOutlookMail,
+    resolveIntent, speakOut, readGmailAloud, sendGmail, launchUnifiedSearch, connectOutlook, launchOutlookMail, launchOutlookContacts,
     launchOutlookIntent, launchOutlookCreateEvent, launchOutlookAgenda, readMailAloud,
-    pendingEmailSetup, pendingEmailAction, applyEmailSetupAnswer, fetchEmailBriefing,
+    pendingEmailSetup, pendingEmailAction, pendingEmailCompose, handlePendingEmailCompose, applyEmailSetupAnswer, fetchEmailBriefing,
     confirmPendingEmailAction, resolveEmailOrdinal, runEmailAction, setEmailSenderRule,
+    pendingActionPlan, confirmPendingActionPlan, startGuidedEmailCompose,
   ]);
 
 // ⚡ PIPELINE DE COMMANDE SÉCURISÉ (Inclus : Archives, Proactivité & Sécurité)
@@ -3058,6 +3618,11 @@ function App() {
     // 01) Proactivité & Maintien de l'activité utilisateur
     lastActivityRef.current = Date.now();
     idleNotifiedRef.current = false;
+
+    if (pendingEmailCompose && handlePendingEmailCompose(command)) {
+      mark("email · composition guidée");
+      return;
+    }
 
     // 02) Modes système : secours / frugal / diagnostic / vision
     if (/\bmode (de )?secours\b|safe ?mode/.test(low)) {
@@ -3095,7 +3660,7 @@ function App() {
       }
     }
 
-    // 04) Apprentissage SIRIUS PRIME (Enregistrement en arrière-plan)
+    // 04) Apprentissage ΣIRIUS PRIME (Enregistrement en arrière-plan)
     fetch(`${API}/prime/log`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -3106,7 +3671,7 @@ function App() {
     if (outlookChoice) {
       const pending = outlookChoice;
       setOutlookChoice(null);
-      if (/\b(oui|ouais|vas[- ]y|ok|d'accord|confirme|je confirme|bien s[ûu]r)\b/.test(low)) {
+      if (/\b(oui|ouais|vas[- ]y|envoie|envoi|ok|d'accord|confirme|je confirme|bien s[ûu]r)\b/.test(low)) {
         mark("outlook · confirmation");
         runOutlookExecute(pending.intent, pending.parameters, pending.token);
         return;
@@ -3394,7 +3959,19 @@ function App() {
       }
     }
     // 0septdecies) Outlook : connexion, emails, agenda, création de rendez-vous, envoi
-    // 0gmail) Gmail : « ouvre gmail » (nouvel onglet), « lis mes mails gmail » (voix + fenêtre), « montre ma boîte gmail » (fenêtre)
+    // 0gmail) Gmail : « ouvre gmail » (nouvel onglet), « lis mes mails gmail » (voix + fenêtre), « montre ma boîte gmail » (fenêtre), « envoie un mail gmail à... » (envoi réel)
+    const unifiedSearchM2 = low.match(/(?:cherche|recherche|trouve)\w*(?:[- ]moi)?\s+(?:tout\s+sur|partout)\s+(.+)/);
+    if (unifiedSearchM2) {
+      mark("recherche · unifiée");
+      launchUnifiedSearch(unifiedSearchM2[1].replace(/[?!.]+$/, "").trim());
+      return;
+    }
+    const gmailSendM2 = low.match(/envoie (?:un )?(?:e-?mail|mail|courriel|message)\s+gmail\s+[àa]\s+(\S+@\S+)(?:\s*(?:,|:)?\s*(?:objet|sujet)\s*[:\-]?\s*(.+?))?(?:\s*(?:,|:)?\s*(?:message|corps|texte)\s*[:\-]?\s*(.+))?$/);
+    if (gmailSendM2) {
+      mark("gmail · envoi");
+      sendGmail(gmailSendM2[1].trim(), (gmailSendM2[2] || "").trim(), (gmailSendM2[3] || "").trim());
+      return;
+    }
     if (/gmail|bo[îi]te google|mails? google/.test(low)) {
       if (/\b(?:lis|lis-moi|lire|lecture)\b/.test(low)) {
         mark("gmail · lecture");
@@ -3414,15 +3991,24 @@ function App() {
         return;
       }
     }
+    const contactCommand = low.match(/(?:cherche|recherche|trouve|affiche|montre|liste|ouvre)\w*(?:[- ]moi)?\s+(?:(?:le|un|une)\s+)?(?:dans\s+)?(?:mes\s+)?contacts?(?:\s+outlook)?(?:\s+(?:(?:de|pour|nomm[ée]?)\s+)?(.+))?$/);
+    if (contactCommand || /\b(?:mes|les)\s+contacts?\b/.test(low)) {
+      const query = (contactCommand?.[1] || "").replace(/[?!.]+$/, "").trim();
+      mark("outlook · contacts");
+      launchOutlookContacts(query);
+      return;
+    }
     if (/connect(?:e|er|ion)?(?:[- ]moi)?\s*(?:à\s+)?outlook/.test(low)) {
       mark("outlook · connexion"); connectOutlook(); return;
     }
     if (/^(?:microsoft\s+)?outlook[\s?!.]*$/.test(low)) {
       mark("outlook · ouverture"); launchOutlookMail(); return;
     }
-    const sendM = low.match(/envoie (?:un )?(?:e-?mail|mail|courriel|message) [àa]\s+(.+)/);
+    const sendM = extractEmailRecipientQuery(command);
     if (sendM) {
-      mark("outlook · envoi"); launchOutlookIntent(command); return;
+      mark("email · composition guidée");
+      startGuidedEmailCompose(sendM, detectMailProvider(command));
+      return;
     }
     if (/(?:supprime|efface|d[ée]truis)\w*\s+(?:le\s|ce\s|la\s)?(?:dernier\s)?(?:e-?mail|mail|courriel)/.test(low)) {
       mark("outlook · suppression"); launchOutlookIntent(command); return;
@@ -3490,7 +4076,7 @@ function App() {
       launchArchiveSearch((archM[2] || "").replace(/[?!.]+$/, "").trim(), archM[1]);
       return;
     }
-    // 0terdecies) Fenêtres de tâches SIRIUS : créations d'images et de clips vidéo
+    // 0terdecies) Fenêtres de tâches ΣIRIUS : créations d'images et de clips vidéo
     const imgEditM = low.match(/(?:transforme|modifie|retouche|adapte|recr[ée]e|refais)(?:[- ]moi)?\s+(?:cette\s+|l['’])?(?:image|photo|illustration)\s*(?:pour|en|avec|afin de|comme)?\s*(.*)/);
     const vidTaskM = low.match(/(?:cr[ée]{1,2}|g[ée]n[èe]re|fais|r[ée]alise|produis|monte)(?:[- ]moi)?\s+(?:une?\s+|le\s+|la\s+)?(?:clip|vid[ée]o|animation|court[- ]m[ée]trage)\s*(?:de|d'|du|des|sur|avec|repr[ée]sentant|montrant)?\s*(.*)/);
     const imgTaskM = low.match(/(?:cr[ée]{1,2}|g[ée]n[èe]re|fais|dessine|imagine|produis)(?:[- ]moi)?\s+(?:une?\s+|l')?(?:image|photo|illustration|logo|affiche|dessin)\s*(?:de|d'|du|des|sur|avec|repr[ée]sentant|montrant)?\s*(.*)/);
@@ -3517,7 +4103,7 @@ function App() {
       launchWeather(rawCity || undefined);
       return;
     }
-    // DISPLAY ASK : questions vocales (avec suivi de conversation) sur le fichier affiché dans le SIRIUS DISPLAY
+    // DISPLAY ASK : questions vocales (avec suivi de conversation) sur le fichier affiché dans le ΣIRIUS DISPLAY
     const dispCtx = window.__siriusDisplayFile;
     const dispChat = window.__siriusDisplayChat || [];
     const dispFollowUp = dispChat.length > 0 &&
@@ -3579,7 +4165,7 @@ function App() {
       setShowTrailer(true);
       return;
     }
-    // 0octodecies-bis) PACKAGER# universel : « installe SIRIUS partout », « installateur universel »
+    // 0octodecies-bis) PACKAGER# universel : « installe ΣIRIUS partout », « installateur universel »
     if (/(installe[- ]?(moi\s+)?sirius\s+partout|installateur universel|t[ée]l[ée]charge (l'|un )?installateur)/.test(low)) {
       mark("packager · installateur universel");
       setPackagerAutoInstall(true);
@@ -3727,7 +4313,7 @@ function App() {
       if (runBriefingRef.current) runBriefingRef.current(true);
       return;
     }
-    // 0webagent) SIRIUS Web Agent : « cherche X sur le web/google », « recherche web X et montre-moi »
+    // 0webagent) ΣIRIUS Web Agent : « cherche X sur le web/google », « recherche web X et montre-moi »
     const webAgentM = low.match(/(?:cherche|recherche|trouve)(?:[- ]moi)?\s+(.+?)\s+sur\s+(?:le\s+)?(?:web|internet|google|duckduckgo)\b/) ||
       low.match(/(?:recherche|cherche)\s+web\s+(.+)/) ||
       low.match(/(?:fais|lance)\s+une\s+recherche\s+(?:web\s+|internet\s+)?(?:sur|de|pour)\s+(.+)/);
@@ -3736,7 +4322,7 @@ function App() {
       const q = (webAgentM[1] || "").replace(/\s*(?:et\s+)?montre[- ]?(?:le\s+)?moi.*$/, "").replace(/[?!.]+$/, "").trim();
       if (q) { launchWebAgent(q); return; }
     }
-    // 0duodecies) SIRIUS WebBrowser : URL directe ou « ouvre le site / la page / navigue vers X »
+    // 0duodecies) ΣIRIUS WebBrowser : URL directe ou « ouvre le site / la page / navigue vers X »
     const urlM = command.match(/https?:\/\/\S+|www\.\S+|\b[a-z0-9-]{2,}\.(?:com|org|net|fr|io|dev|eu|info|gouv\.fr)(?:\/\S*)?/i);
     const navM = low.match(/(?:navigue vers|ouvre (?:le site|la page)|cherche et ouvre)\s+(.+)/);
     if (urlM || navM) {
@@ -3770,6 +4356,18 @@ function App() {
       setShowFiles(true);
       setStatus("speaking");
       const m = "Voici votre médiathèque.";
+      setText(m); speakOut(m);
+      return;
+    }
+    // 0quinquies-bis) PLANS# : « dessine-moi le plan d'un garage de 6 sur 4… »
+    const planMatch = low.match(/(?:dessine|trace|g[éè]n[èe]re|cr[ée]e|fais|montre)[- ]?(?:moi|nous)?\s*(?:le|un|les|des)?\s*plans?\s+(?:de|d'|du|d'une?|pour)\s*(.+)/);
+    if (planMatch || /(ouvre|lance).{0,12}(module\s+)?plans?\b/.test(low)) {
+      mark("plans");
+      const sujet = planMatch && planMatch[1] ? planMatch[1].trim() : "";
+      setPlansPrompt(sujet ? command : "");
+      setShowPlans(true);
+      setStatus("speaking");
+      const m = sujet ? "Très bien, je trace ce plan coté sous vos yeux." : "J'ouvre le module plans. Décrivez-moi les pièces et leurs dimensions.";
       setText(m); speakOut(m);
       return;
     }
@@ -3888,11 +4486,12 @@ function App() {
   // ---- Reconnaissance vocale navigateur (Web Speech API) ----
   const handleTranscript = useCallback((transcript, isFinal) => {
     if (speakingRef.current) return; // Sirius parle → on ignore (évite l'écho)
-    setVoiceTranscript(transcript.trim());
-    const t = transcript.toLowerCase().trim();
+    const normalizedTranscript = normalizeVoiceTranscript(transcript).trim();
+    setVoiceTranscript(normalizedTranscript);
+    const t = normalizedTranscript.toLowerCase().trim();
     if (!isFinal) {
       setStatus("listening");
-      setText(transcript);
+      setText(normalizedTranscript);
       return;
     }
     // Réponse vocale « oui / non » à une proposition de lecture à voix haute
@@ -3960,7 +4559,7 @@ function App() {
           return;
         }
         setStatus("thinking");
-        setText("Transcription vocale SIRIUS en cours...");
+        setText("Transcription vocale ΣIRIUS en cours...");
         try {
           const form = new FormData();
           const extension = blob.type.includes("mp4") ? "m4a" : "webm";
@@ -3976,8 +4575,8 @@ function App() {
           }
           handleTranscriptRef.current(transcript, true);
         } catch (error) {
-          console.error("Erreur transcription SIRIUS :", error);
-          setText(error.message || "La transcription vocale SIRIUS est indisponible.");
+          console.error("Erreur transcription ΣIRIUS :", error);
+          setText(error.message || "La transcription vocale ΣIRIUS est indisponible.");
           setStatus("idle");
         }
       };
@@ -3992,14 +4591,14 @@ function App() {
       window.__siriusMicOn = true;
       setMicOn(true);
       setStatus("listening");
-      setText("Je t'écoute — transcription SIRIUS...");
+      setText("Je t'écoute — transcription ΣIRIUS...");
       serverRecorderTimerRef.current = setTimeout(() => {
         if (serverRecorderRef.current?.state === "recording") serverRecorderRef.current.stop();
       }, 15000);
     } catch (error) {
       console.error("Impossible d'ouvrir le microphone :", error);
       setText(error?.name === "NotAllowedError"
-        ? "Accès au micro refusé. Autorisez le microphone dans les paramètres de SIRIUS."
+        ? "Accès au micro refusé. Autorisez le microphone dans les paramètres de ΣIRIUS."
         : "Impossible d'ouvrir le microphone sur cet appareil.");
       setStatus("idle");
     }
@@ -4039,7 +4638,7 @@ function App() {
     stopListening();
     if (ambientRef.current) ambientRef.current.pause();
     setStatus("idle");
-    setText("Extinction sécurisée de SIRIUS en cours...");
+    setText("Extinction sécurisée de ΣIRIUS en cours...");
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -4052,11 +4651,11 @@ function App() {
       if (!response.ok) {
         throw new Error(`Le contrôleur d'arrêt a répondu ${response.status}.`);
       }
-      setText("SIRIUS s'éteint. Vous pourrez le relancer depuis l'icône du Bureau.");
+      setText("ΣIRIUS s'éteint. Vous pourrez le relancer depuis l'icône du Bureau.");
     } catch (error) {
-      console.error("Impossible d'éteindre SIRIUS.", error);
+      console.error("Impossible d'éteindre ΣIRIUS.", error);
       setIsShuttingDown(false);
-      setText("L'extinction automatique a échoué. Fermez les consoles SIRIUS Backend et SIRIUS Frontend.");
+      setText("L'extinction automatique a échoué. Fermez les consoles ΣIRIUS Backend et ΣIRIUS Frontend.");
     } finally {
       clearTimeout(timeoutId);
     }
@@ -4080,7 +4679,7 @@ function App() {
       rec.lang = "fr-FR";
       rec.interimResults = true;
       rec.continuous = false;
-      rec.maxAlternatives = 1;
+      rec.maxAlternatives = 5;
       let gotFinal = false;
       let hadError = false;
       let useServerFallback = false;
@@ -4088,7 +4687,11 @@ function App() {
         let interim = "";
         let final = "";
         for (let i = e.resultIndex; i < e.results.length; i++) {
-          const t = e.results[i][0].transcript;
+          const alternatives = Array.from(e.results[i]).map((alt) => ({
+            transcript: alt.transcript,
+            confidence: alt.confidence,
+          }));
+          const t = chooseBestVoiceTranscript(alternatives) || e.results[i][0].transcript;
           if (e.results[i].isFinal) final += t;
           else interim += t;
         }
@@ -4113,7 +4716,7 @@ function App() {
         } else if (e.error === "network" || e.error === "service-not-allowed") {
           preferServerSttRef.current = true;
           useServerFallback = true;
-          setText("Le service vocal du navigateur est indisponible. Le mode transcription SIRIUS prend le relais.");
+          setText("Le service vocal du navigateur est indisponible. Le mode transcription ΣIRIUS prend le relais.");
           setStatus("idle");
         } else if (e.error === "audio-capture") {
           setText("Aucun microphone utilisable n'a été détecté.");
@@ -4283,7 +4886,7 @@ function App() {
     };
   }, [booting, showSetup]);
 
-  // Ambiance réactive : filtre + LFO s'adaptent au statut de SIRIUS
+  // Ambiance réactive : filtre + LFO s'adaptent au statut de ΣIRIUS
   useEffect(() => {
     if (ambientRef.current && ambientRef.current.setMood) {
       ambientRef.current.setMood(status);
@@ -4468,7 +5071,7 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [booting, showSetup]);
 
-  // Briefing matinal parlé et affiché dans SIRIUS Display.
+  // Briefing matinal parlé et affiché dans ΣIRIUS Display.
   const briefingDoneRef = useRef(false);
   const runBriefingDisplay = useCallback(async (force = false) => {
     const pid = progress.start("Briefing du jour", { silent: true });
@@ -4502,7 +5105,8 @@ function App() {
             }
           } catch (e) { /* objectif indisponible — briefing sans Agora */ }
           // Résumé Quotidien : agenda du jour, rappels d'échéances et tendances des marchés
-          let agendaTxt = "", rappelsTxt = "", bourseTxt = "";
+          let agendaTxt = "", rappelsTxt = "", bourseTxt = "", haccpTxt = "", mailTxt = "", planTxt = "", planCards = "";
+          let actionPlanQueue = [];
           await Promise.all([
             (async () => {
               try {
@@ -4553,22 +5157,65 @@ function App() {
                 bourseTxt = `${s}.`;
               } catch (e) { /* marchés indisponibles — briefing sans bourse */ }
             })(),
+            (async () => {
+              try {
+                const rh = await fetch(`${API}/haccp/overview`, { credentials: "include" });
+                if (!rh.ok) return;
+                const h = await rh.json();
+                const bits = [];
+                if (h.dlc_alertes > 0) bits.push(`${h.dlc_alertes} DLC à surveiller`);
+                if (h.nc_ouvertes > 0) bits.push(`${h.nc_ouvertes} non-conformité${h.nc_ouvertes > 1 ? "s" : ""} ouverte${h.nc_ouvertes > 1 ? "s" : ""}`);
+                if (h.docs_alertes > 0) bits.push(`${h.docs_alertes} document${h.docs_alertes > 1 ? "s" : ""} à renouveler`);
+                if (h.temp_non_conformes_jour > 0) bits.push(`${h.temp_non_conformes_jour} relevé${h.temp_non_conformes_jour > 1 ? "s" : ""} de température non conforme${h.temp_non_conformes_jour > 1 ? "s" : ""} aujourd'hui`);
+                if (bits.length) haccpTxt = ` Alertes HACCP : ${bits.join(", ")}.`;
+              } catch (e) { /* HACCP indisponible — briefing sans alertes HACCP */ }
+            })(),
+            (async () => {
+              try {
+                const rm = await msFetch(`/microsoft/mail/briefing?top=25&mark_seen=false`);
+                if (!rm.ok) return;
+                const mm = await rm.json();
+                const urgences = mm.urgences || [];
+                if (urgences.length) {
+                  mailTxt = ` Emails urgents : ${urgences.length} message${urgences.length > 1 ? "s" : ""}, le plus récent de ${urgences[0].de || "expéditeur inconnu"}, sujet ${urgences[0].sujet || "sans objet"}.`;
+                }
+              } catch (e) { /* Outlook non connecté — briefing sans emails urgents */ }
+            })(),
+            (async () => {
+              try {
+                const rp = await msFetch(`/microsoft/mail/action-plans?top=25&max_plans=3`);
+                if (!rp.ok) return;
+                const pp = await rp.json();
+                const plans = pp.plans || [];
+                if (plans.length) {
+                  planTxt = ` Anticipation : ${plans.length} plan${plans.length > 1 ? "s" : ""} d'action préparé${plans.length > 1 ? "s" : ""} pour vos e-mails les plus importants.`;
+                  planCards = plans.map((p) => (
+                    `• ${p.sujet} (de ${p.de || "expéditeur inconnu"})\n  Plan : ${p.plan}` +
+                    (p.brouillon_reponse ? `\n  Brouillon de réponse : ${p.brouillon_reponse}` : "")
+                  )).join("\n\n");
+                  actionPlanQueue = plans.filter((p) => p.brouillon_reponse);
+                }
+              } catch (e) { /* anticipation cognitive indisponible — briefing sans plans d'action */ }
+            })(),
           ]);
-          const msg = `${salut}${meteoAtlas}${agendaTxt}${rappelsTxt} ${d.briefing}${objAgora}${bourseTxt}`;
-          showOnDisplay({
-            type: "message",
-            titre: "BRIEFING QUOTIDIEN",
-            contenu: msg,
-          });
+          const msg = `${salut}${meteoAtlas}${agendaTxt}${rappelsTxt}${haccpTxt}${mailTxt}${planTxt} ${d.briefing}${objAgora}${bourseTxt}`;
+          const displayMsg = planCards ? `${msg}\n\n— Plans d'action proposés —\n${planCards}` : msg;
+          streamDisplayIdRef.current = null; // nouvelle fenêtre dédiée au briefing, révélée progressivement
+          streamOnDisplay(displayMsg, true, "BRIEFING QUOTIDIEN");
           setStatus("speaking");
           setText(msg);
           speakOut(msg);
           progress.done(pid, "Briefing délivré");
+          // Anticipation cognitive : propose ensuite, un par un et à voix haute, les brouillons
+          // de réponse — rien n'est jamais envoyé sans un « vas-y, envoie » explicite.
+          if (actionPlanQueue.length) {
+            setTimeout(() => presentNextActionPlan(actionPlanQueue), 4000);
+          }
         } else {
           progress.done(pid, "Aucun briefing disponible");
         }
       } catch (e) { progress.error(pid, "Briefing indisponible"); }
-  }, [showOnDisplay, speakOut, userName, profile]);
+  }, [streamOnDisplay, speakOut, userName, profile, msFetch, presentNextActionPlan]);
   useEffect(() => { runBriefingRef.current = runBriefingDisplay; }, [runBriefingDisplay]);
   useEffect(() => {
     if (booting || showSetup || briefingDoneRef.current) return;
@@ -4617,7 +5264,7 @@ function App() {
     { label: "PANTHEON SYSTEM", get: () => showPantheon, set: setShowPantheon },
     { label: "NEXUS CÉLESTE", get: () => showNexus, set: setShowNexus },
     { label: "ORACLE DIVIN", get: () => showOracle, set: setShowOracle },
-    { label: "SIRIUS PRIME", get: () => showPrime, set: setShowPrime },
+    { label: "ΣIRIUS PRIME", get: () => showPrime, set: setShowPrime },
     { label: "ZEUS CORTEX", get: () => showCortex, set: setShowCortex },
     { label: "ARGUS", get: () => showArgus, set: setShowArgus },
     { label: "LOCUS#", get: () => showLocus, set: setShowLocus },
@@ -4665,11 +5312,13 @@ function App() {
   });
 
   const moduleItems = [
-    { id: "reload", group: "SYSTÈME", label: "Recharger SIRIUS", Icon: RotateCcw, run: () => { window.__siriusBootPlayed = false; window.location.reload(); } },
-    { id: "display", group: "MÉDIAS", label: "SIRIUS DISPLAY", Icon: Monitor, active: displayOpen, run: () => { pinDisplay(); setDisplayOpen((o) => !o); } },
+    { id: "reload", group: "SYSTÈME", label: "Recharger ΣIRIUS", Icon: RotateCcw, run: () => { window.__siriusBootPlayed = false; window.location.reload(); } },
+    { id: "display", group: "MÉDIAS", label: "ΣIRIUS DISPLAY", Icon: Monitor, active: displayOpen, run: () => { pinDisplay(); setDisplayOpen((o) => !o); } },
     { id: "media-modules", group: "MÉDIAS", label: "Modules multimédia", Icon: Clapperboard, active: displayOpen && display.type === "media", run: () => showOnDisplay({ type: "media", titre: "MODULES MULTIMÉDIA" }) },
     { id: "files", group: "MÉDIAS", label: "Médiathèque", Icon: FolderOpen, run: () => setShowFiles(true) },
     { id: "architect", group: "OUTILS", label: "Architecte visuel", Icon: Workflow, run: () => { setArchitectPrompt(""); setShowArchitect(true); } },
+    { id: "plans", group: "OUTILS", label: "Plans 2D (PLANS#)", Icon: Ruler, run: () => { setPlansPrompt(""); setShowPlans(true); } },
+    { id: "photo3d", group: "OUTILS", label: "Photos → Objet 3D (PHOTO3D#)", Icon: Boxes, run: () => setShowPhoto3D(true) },
     { id: "pantheon", group: "PANTHÉON", label: "PANTHEON SYSTEM", Icon: PantheonLogo, run: () => setShowPantheon(true) },
     { id: "cortex", group: "PANTHÉON", label: "ZEUS CORTEX# — intelligence centrale", Icon: Zap, run: () => setShowCortex(true) },
     { id: "nexus", group: "PANTHÉON", label: "NEXUS CÉLESTE", Icon: Orbit, run: () => setShowNexus(true) },
@@ -4688,7 +5337,7 @@ function App() {
         if (!micOnRef.current) startListening();
       },
     },
-    { id: "prime", group: "OUTILS", label: "SIRIUS PRIME — mémoire", Icon: Sparkles, run: () => setShowPrime(true) },
+    { id: "prime", group: "OUTILS", label: "ΣIRIUS PRIME — mémoire", Icon: Sparkles, run: () => setShowPrime(true) },
     { id: "dev", group: "OUTILS", label: "Compagnon Dev", Icon: Code2, run: () => setShowDev(true) },
     { id: "analytics", group: "OUTILS", label: "Tableau analytique", Icon: BarChart3, run: () => setShowAnalytics(true) },
     { id: "memory", group: "OUTILS", label: "Ce que Sirius sait sur moi", Icon: Brain, run: () => setShowMemory(true) },
@@ -4811,6 +5460,22 @@ function App() {
 
       {showFiles && <FilesPanel onClose={() => setShowFiles(false)} />}
 
+      {showPlans && (
+        <FloorPlanPanel
+          keys={keys}
+          initialPrompt={plansPrompt}
+          onClose={() => setShowPlans(false)}
+          onSpeak={speakOut}
+        />
+      )}
+
+      {showPhoto3D && (
+        <Photo3DPanel
+          onClose={() => setShowPhoto3D(false)}
+          onSpeak={speakOut}
+        />
+      )}
+
       {showDev && <DevCompanion keys={keys} onClose={() => setShowDev(false)} />}
 
       {showCortex && (
@@ -4826,19 +5491,8 @@ function App() {
 
       {showOracle && <OracleDivin onClose={() => setShowOracle(false)} />}
       {showMemoryMgr && <MemoryManager onClose={() => setShowMemoryMgr(false)} />}
-      {showArgus && <ArgusPanel onClose={() => setShowArgus(false)} onClientAction={handleArgusClientAction} onRepaired={() => { setSysMode("normal"); setSysCause(""); }} />}
-      <ArgusWatcher onCriticalAlert={(e) => {
-        setArgusAlert(e);
-        const MODS = { ia: "le module IA", vocal: "le module vocal", hud: "l'interface HUD", backend: "le noyau backend", reseau: "la liaison réseau", outlook: "le module Outlook", haccp: "le module HACCP", oracle: "l'Oracle Divin", pantheon: "le Panthéon", permissions: "les permissions" };
-        if (e && e.severity === "critical") {
-          speakRef.current(`Anomalie critique détectée sur ${MODS[e.errorType] || "un module système"}. ${e.proposedFix ? "Réparation proposée : " + e.proposedFix + "." : ""} Ouvre ARGUS pour intervenir.`);
-          if (sysMode === "normal") {
-            setSysMode("safe"); setSysCause(e.message || "erreur critique détectée");
-          }
-        } else if (e && e.severity === "severe") {
-          speakRef.current(`Anomalie détectée sur ${MODS[e.errorType] || "un module"}. Rien de critique, mais une intervention est recommandée.`);
-        }
-      }} />
+      {showArgus && <ArgusPanel onClose={() => setShowArgus(false)} onClientAction={handleArgusClientAction} onRepaired={() => { setSysMode("normal"); setSysCause(""); dismissArgusAlert(); }} />}
+      <ArgusWatcher onCriticalAlert={handleArgusCriticalAlert} />
 
       <ModeBanner
         mode={sysMode}
@@ -4877,8 +5531,8 @@ function App() {
         const map = {
           "ARGUS#": setShowArgus, "LOCUS#": setShowLocus, "ORACLE#": setShowOracle,
           "PANTHÉON#": setShowPantheon, "HERACLES#": setShowHeracles,
-          "SIRIUS CORTEX#": setShowCortex, "HÉPHAÏSTOS#": setShowHephaistos,
-          "ATLAS#": setShowAtlas, "SIRIUS DISPLAY#": setDisplayOpen, "THÉMIS#": setShowThemis,
+          "ΣIRIUS CORTEX#": setShowCortex, "HÉPHAÏSTOS#": setShowHephaistos,
+          "ATLAS#": setShowAtlas, "ΣIRIUS DISPLAY#": setDisplayOpen, "THÉMIS#": setShowThemis,
           "HERMÈS AGORA#": setShowAgora, "SOLON#": setShowSolon, "PROMÉTHÉE#": setShowPromethee,
           "CALLIOPE#": setShowCalliope, "PYTHAGORE#": setShowPythagore,
         };
@@ -4941,16 +5595,16 @@ function App() {
       {showNummarius && <PortusNummarius onClose={() => setShowNummarius(false)} />}
       {showNews && <NewsPanel onClose={() => setShowNews(false)} />}
       {argusAlert && (
-        <div className="argus-alert" data-testid="argus-alert">
+        <div className="argus-alert" role="alertdialog" aria-live="assertive" aria-label="Alerte ARGUS" data-testid="argus-alert">
           <div className="argus-alert-title">
             <ShieldAlert size={12} /> ARGUS — {argusAlert.severity === "critical" ? "ERREUR CRITIQUE" : "ERREUR SÉVÈRE"}
           </div>
           <p>{argusAlert.message}</p>
           <div className="argus-alert-actions">
-            <button className="argus-btn" onClick={() => { setShowArgus(true); setArgusAlert(null); }} data-testid="argus-alert-open">
+            <button className="argus-btn" onClick={() => { setShowArgus(true); dismissArgusAlert(argusAlert); }} data-testid="argus-alert-open">
               OUVRIR ARGUS
             </button>
-            <button className="argus-btn ghost" onClick={() => setArgusAlert(null)} data-testid="argus-alert-dismiss">
+            <button className="argus-btn ghost" onClick={() => dismissArgusAlert(argusAlert)} data-testid="argus-alert-dismiss">
               IGNORER
             </button>
           </div>
@@ -5041,7 +5695,7 @@ function App() {
               className={`profile-btn sirius-shutdown-btn ${isShuttingDown ? "is-shutting-down" : ""}`}
               onConfirm={shutdownSirius}
               testId="sirius-shutdown-btn"
-              title={isShuttingDown ? "Extinction de SIRIUS en cours" : "Éteindre SIRIUS"}
+              title={isShuttingDown ? "Extinction de ΣIRIUS en cours" : "Éteindre ΣIRIUS"}
               label="ÉTEINDRE ?"
             >
               <Power size={15} />
@@ -5091,10 +5745,10 @@ function App() {
         onSpeak={(m) => speakRef.current(m)}
       />
 
-      {/* SIRIUS WebBrowser : fenêtres web indépendantes, déplaçables, redimensionnables */}
+      {/* ΣIRIUS WebBrowser : fenêtres web indépendantes, déplaçables, redimensionnables */}
       <WebWindows windows={webWindows} onClose={closeWebWindow} />
 
-      {/* SIRIUS DISPLAY : écran principal permanent piloté par Sirius */}
+      {/* ΣIRIUS DISPLAY : écran principal permanent piloté par Sirius */}
       {displayOpen && (
         <SiriusDisplay
           item={display}
@@ -5107,10 +5761,10 @@ function App() {
       )}
 
       {showVoicePanel && (
-        <section className="voice-capture-panel" role="dialog" aria-label="Reconnaissance vocale SIRIUS" data-testid="sirius-voice-panel" data-hud-panel>
+        <section className="voice-capture-panel" role="dialog" aria-label="Reconnaissance vocale ΣIRIUS" data-testid="sirius-voice-panel" data-hud-panel>
           <header className="voice-capture-header">
             <div>
-              <span className="voice-capture-kicker">SIRIUS · AUDIO LINK</span>
+              <span className="voice-capture-kicker">ΣIRIUS · AUDIO LINK</span>
               <strong>RECONNAISSANCE VOCALE</strong>
             </div>
             <button
@@ -5162,7 +5816,7 @@ function App() {
         </section>
       )}
 
-      {/* Fenêtres de tâches pilotées par SIRIUS (créations, rendus, étapes en direct) */}
+      {/* Fenêtres de tâches pilotées par ΣIRIUS (créations, rendus, étapes en direct) */}
       <TaskWindows tasks={tasks} onClose={closeTask} />
       <SiriusProgress mode={status} />
       <PwaPrompt />
@@ -5172,7 +5826,7 @@ function App() {
       {showEspace && <EspacePanel onClose={() => setShowEspace(false)} />}
       {touchToast && <div className="touch-toast" data-testid="sirius-touch-toast">{touchToast}</div>}
 
-      {/* Galerie de la médiathèque SIRIUS (« liste tes archives ») */}
+      {/* Galerie de la médiathèque ΣIRIUS (« liste tes archives ») */}
       {showGallery && (
         <ArchiveGallery
           nav={galleryNav}
@@ -5208,7 +5862,7 @@ function App() {
         </div>
       )}
 
-      {/* Tableau de bord principal SIRIUS — grille 3 colonnes */}
+      {/* Tableau de bord principal ΣIRIUS — grille 3 colonnes */}
       <main className="sirius-dashboard">
         <aside className="sirius-column sirius-column--left">
           <SiriusLeftColumn
@@ -5256,10 +5910,10 @@ function App() {
                 className="sirius-title-button"
                 onClick={speakQuote}
                 aria-label="Écouter une citation philosophique"
-                title="Cliquez sur SIRIUS pour écouter une citation philosophique"
+                title="Cliquez sur ΣIRIUS pour écouter une citation philosophique"
               >
                 <span className="sirius-wordmark">ΣIRIUS</span>
-                <span className="sirius-tagline">SIRIUS : VOTRE ASSISTANT PRIVILÉGIÉ</span>
+                <span className="sirius-tagline">ΣIRIUS : VOTRE ASSISTANT PRIVILÉGIÉ</span>
               </button>
             </h1>
           </div>
@@ -5278,7 +5932,7 @@ function App() {
 
       <div className="sirius-command-area">
 
-        {/* Zone de réponse supprimée : Sirius répond uniquement dans SIRIUS DISPLAY */}
+        {/* Zone de réponse supprimée : Sirius répond uniquement dans ΣIRIUS DISPLAY */}
 
         {imageReference && (
           <div className="image-reference-chip" data-testid="sirius-image-reference">
@@ -5291,7 +5945,7 @@ function App() {
         )}
 
         <form className="cmd-bar" onSubmit={sendCommand} data-testid="sirius-cmd-form">
-          <span className="cmd-prompt">SIRIUS&gt;</span>
+          <span className="cmd-prompt">ΣIRIUS&gt;</span>
           <input
             ref={imageReferenceInputRef}
             type="file"
@@ -5345,7 +5999,7 @@ function App() {
         )}
       </div>
 
-      <footer className="sirius-footer" data-testid="sirius-footer">© 2026 SIRIUS Assistant – Daniel Partel</footer>
+      <footer className="sirius-footer" data-testid="sirius-footer">© 2026 ΣIRIUS Assistant – Daniel Partel</footer>
       <GlobalDrop />
     </div>
   );

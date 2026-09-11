@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. PORTUS NUMMARIUS# — bourse & marchés (courbes d'évolution).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. PORTUS NUMMARIUS# — bourse & marchés (courbes d'évolution).
 import { useEffect, useState } from "react";
 import { TrendingUp, TrendingDown, RefreshCw, Landmark } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";

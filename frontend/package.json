@@ -1,6 +1,6 @@
 {
   "name": "sirius",
-  "version": "1.0.0",
+  "version": "1.0.7",
   "private": true,
   "license": "SEE LICENSE IN LICENSE",
   "author": "partel",
@@ -49,6 +49,7 @@
     "cra-template": "1.2.0",
     "date-fns": "4.1.0",
     "dayjs": "1.11.13",
+    "electron-updater": "6.3.9",
     "embla-carousel-react": "8.6.0",
     "framer-motion": "11.18.0",
     "gsap": "^3.15.0",
@@ -77,12 +78,23 @@
     "build": "craco build",
     "test": "craco test",
     "electron": "electron .",
+    "version:bump": "node scripts/bump-patch-version.js",
+    "version:bump:dry-run": "node scripts/bump-patch-version.js --dry-run",
     "backend:build": "python -m PyInstaller --noconfirm --clean --distpath ../backend/dist --workpath ../backend/build/desktop-sidecar ../backend/sirius-backend.spec",
-    "electron:build": "npm run backend:build && electron-builder --win nsis portable"
+    "electron:build": "npm run backend:build && electron-builder --win nsis portable",
+    "release:auto": "npm run version:bump && npm run build && npm run backend:build && electron-builder --win nsis portable --publish always",
+    "release": "electron-builder --win nsis portable --publish always"
   },
   "build": {
     "appId": "sh.techenclair.sirius",
     "productName": "SIRIUS",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "bleudpart",
+        "repo": "sirius"
+      }
+    ],
     "directories": {
       "output": "dist",
       "buildResources": "public"
@@ -92,7 +104,8 @@
       "public/electron/**/*.js",
       "public/icon.ico",
       "!build/**/*",
-      "!node_modules/**/*"
+      "!node_modules/**/*",
+      "node_modules/{argparse,builder-util-runtime,debug,electron-updater,fs-extra,graceful-fs,js-yaml,jsonfile,lazy-val,lodash.escaperegexp,lodash.isequal,ms,sax,semver,tiny-typed-emitter,universalify}/**/*"
     ],
     "extraResources": [
       {

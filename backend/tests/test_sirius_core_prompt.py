@@ -1,5 +1,5 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
-"""Regression tests for the active SIRIUS production prompt."""
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+"""Regression tests for the active ΣIRIUS production prompt."""
 
 from sirius_brain import SIRIUS_CORE_PROMPT, build_system_prompt
 
@@ -18,9 +18,17 @@ def test_system_prompt_matches_the_current_sirius_production_contract():
     assert "GESTION DE MÉMOIRE" in SIRIUS_CORE_PROMPT
     assert "COMPTE RENDU FINAL" in SIRIUS_CORE_PROMPT
     assert "EXÉCUTION AUTONOME" in SIRIUS_CORE_PROMPT
-    assert "SIRIUS Display sans bouton intermédiaire" in SIRIUS_CORE_PROMPT
+    assert "ΣIRIUS Display sans bouton intermédiaire" in SIRIUS_CORE_PROMPT
     assert "commentaire technique reste court" in SIRIUS_CORE_PROMPT
+    # Charte de proactivité : initiative encadrée par les niveaux d'autonomie.
+    assert "PROACTIVITÉ" in SIRIUS_CORE_PROMPT
+    assert "NIVEAUX D’AUTONOMIE" in SIRIUS_CORE_PROMPT
+    assert "Exécution directe" in SIRIUS_CORE_PROMPT
+    assert "validation finale" in SIRIUS_CORE_PROMPT
+    assert "Confirmation obligatoire" in SIRIUS_CORE_PROMPT
+    assert "RÈGLES DE COMMUNICATION" in SIRIUS_CORE_PROMPT
     assert "Contexte utilisateur : ton interlocuteur s'appelle Daniel." in prompt
     assert "Mode d'exécution : turbo." in prompt
     assert "Contexte d'humeur actuel : concentré." in prompt
-    assert "Éléments de contexte récents : Déployer le module HUD." in prompt
+    assert "MÉMOIRE PERSISTANTE" in prompt
+    assert "- Déployer le module HUD" in prompt

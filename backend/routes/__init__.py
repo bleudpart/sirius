@@ -1,1 +1,1 @@
-"""Routes independantes de l'application SIRIUS."""
+"""Routes independantes de l'application ΣIRIUS."""

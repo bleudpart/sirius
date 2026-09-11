@@ -1,4 +1,4 @@
-"""Safe diagnostics and recovery primitives for the SIRIUS Omega engine."""
+"""Safe diagnostics and recovery primitives for the ΣIRIUS Omega engine."""
 
 from __future__ import annotations
 
@@ -140,7 +140,7 @@ class OmegaEngine:
                         "integrity_drift",
                         "critical" if self._packaged else "auto",
                         f"Modification détectée pendant l'exécution : {relative_path}.",
-                        "Vérifier la modification puis redémarrer SIRIUS pour accepter une version validée."
+                        "Vérifier la modification puis redémarrer ΣIRIUS pour accepter une version validée."
                         if self._packaged
                         else "Modification de développement (hot-reload) — sans risque, aucune action requise.",
                         "manual_restore",
@@ -194,7 +194,7 @@ class OmegaEngine:
                     "permissions",
                     "critical",
                     "Le dossier backend n'est pas accessible en lecture/écriture.",
-                    "Rétablir les permissions du compte exécutant SIRIUS.",
+                    "Rétablir les permissions du compte exécutant ΣIRIUS.",
                     "manual_restore",
                 )
             )
@@ -372,7 +372,8 @@ class OmegaEngine:
             "message": message,
             "proposedFix": proposed_fix,
             "fixId": fix_id,
-            "requiresConfirmation": fix_id not in {"none"},
+            "repairable": fix_id in {"retest_backend", "clear_runtime_reports"},
+            "requiresConfirmation": fix_id in {"retest_backend", "clear_runtime_reports"},
             "repaired": False,
             "at": _timestamp(),
         }

@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   X, Hammer, Play, Loader2, CheckCircle2, XCircle, FileDown, Activity,
@@ -36,7 +36,7 @@ export default function HephaistosPanel({ onClose, onSpeak }) {
 
   const loadHistory = useCallback(async () => {
     try {
-      const r = await fetch(`${API}/hephaistos/history?limit=40`);
+      const r = await fetch(`${API}/hephaistos/history?limit=40`, { credentials: "include" });
       const d = await r.json();
       if (r.ok && d.history) setHistory(d.history);
     } catch {}
@@ -45,7 +45,7 @@ export default function HephaistosPanel({ onClose, onSpeak }) {
 
   const purgeHistory = useCallback(async (keep) => {
     try {
-      const r = await fetch(`${API}/hephaistos/history?keep=${keep}`, { method: "DELETE" });
+      const r = await fetch(`${API}/hephaistos/history?keep=${keep}`, { method: "DELETE", credentials: "include" });
       const d = await r.json().catch(() => ({}));
       if (r.ok) {
         loadHistory();

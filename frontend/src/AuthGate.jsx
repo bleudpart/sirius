@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // Porte d'authentification : connexion email/mot de passe + Microsoft, profil et déconnexion.
 import { useEffect, useState, createContext, useContext } from "react";
 import { LogIn, LogOut, User, Save } from "lucide-react";
@@ -118,7 +118,7 @@ function AuthScreen({ onAuth }) {
   return (
     <div className="auth-screen" data-testid="auth-screen">
       <div className="auth-card">
-        <img src="/holo/sirius-title.png" alt="SIRIUS" className="auth-logo" onError={(e) => { e.target.style.display = "none"; e.target.nextSibling.style.display = "block"; }} />
+        <img src="/holo/sirius-title.png" alt="ΣIRIUS" className="auth-logo" onError={(e) => { e.target.style.display = "none"; e.target.nextSibling.style.display = "block"; }} />
         <h1 className="auth-title font-divine" style={{ display: "none" }}>ΣIRIUS</h1>
         <p className="auth-sub">Identifie-toi pour accéder au sanctuaire</p>
         <form onSubmit={submit} className="auth-form" data-testid="auth-form">
@@ -187,7 +187,7 @@ export default function AuthGate({ children }) {
         let authenticatedUser = bootstrap.user;
         if (!bootstrap.response.ok) {
           const response = await fetch(`${API}/api/auth/me`);
-          if (!response.ok) throw new Error("Session SIRIUS indisponible.");
+          if (!response.ok) throw new Error("Session ΣIRIUS indisponible.");
           authenticatedUser = await response.json();
         }
         if (!cancelled) {
@@ -195,7 +195,7 @@ export default function AuthGate({ children }) {
           setUser(authenticatedUser);
         }
       } catch (error) {
-        console.warn("Authentification SIRIUS interrompue.", error);
+        console.warn("Authentification ΣIRIUS interrompue.", error);
         if (!cancelled) setUser(null);
       } finally {
         if (!cancelled) setChecking(false);

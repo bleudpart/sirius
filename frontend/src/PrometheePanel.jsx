@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // PROMÉTHÉE# — Gestion de projet : objectif, jalons, risques, actions. Historique cloud (MongoDB),
 // export PDF et envoi par email (SMTP Thémis). Dédié à Prométhée (voir ConsultPanel pour Solon).
 import { useCallback, useEffect, useState } from "react";
@@ -18,7 +18,7 @@ const smtpConf = () => {
   return {
     host: k.smtp_host.trim(), port: Number(k.smtp_port || 587),
     user: k.smtp_user || "", password: k.smtp_pass || "",
-    from_email: k.smtp_from || "", from_name: k.smtp_name || "SIRIUS — PANTHÉON",
+    from_email: k.smtp_from || "", from_name: k.smtp_name || "ΣIRIUS — PANTHÉON",
   };
 };
 

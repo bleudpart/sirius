@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // CALLIOPE# — Bibliothèque audio : recherche, écoute directe, téléchargement et classement de livres audio libres.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { X, BookOpen, Search, Loader2, Play, Download, FolderOpen, Trash2, RefreshCw, SkipBack, SkipForward } from "lucide-react";

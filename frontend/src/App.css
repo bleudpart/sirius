@@ -1,4 +1,4 @@
-/* © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France). */
+/* © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France). */
 @import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;500;600;700&family=Cinzel:wght@400;600;700&display=swap");
 
 * { box-sizing: border-box; }
@@ -21,7 +21,7 @@
     "command";
 }
 
-/* Fenêtre de prise de voix SIRIUS */
+/* Fenêtre de prise de voix ΣIRIUS */
 .voice-capture-panel {
   position: fixed;
   z-index: 2750;
@@ -589,7 +589,7 @@ body.hud-minimal .antique-jar { display: none; }
   50% { opacity: 0.45; }
 }
 
-/* Bouton SIRIUS DISPLAY : mis en évidence dans la barre d'outils */
+/* Bouton ΣIRIUS DISPLAY : mis en évidence dans la barre d'outils */
 .profile-btn.display-btn {
   width: auto;
   padding: 0 11px;
@@ -1038,7 +1038,7 @@ body.hud-minimal .antique-jar { display: none; }
 .reactor-text {
   position: absolute;
   inset: 0;
-  z-index: 3; /* texte SIRIUS lisible DEVANT le triangle */
+  z-index: 3; /* texte ΣIRIUS lisible DEVANT le triangle */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -3021,7 +3021,7 @@ body.hud-minimal .medallion-halo { display: none; }
   text-transform: uppercase;
   letter-spacing: 3px;
 }
-/* Modules divins (ZEUS CORE, ORACLE DIVIN, SIRIUS PRIME, PANTHEON SYSTEM, NEXUS CELESTE) */
+/* Modules divins (ZEUS CORE, ORACLE DIVIN, ΣIRIUS PRIME, PANTHEON SYSTEM, NEXUS CELESTE) */
 .font-divine {
   font-family: "Cinzel", serif !important;
   text-transform: uppercase;
@@ -3210,7 +3210,7 @@ body.hud-minimal .medallion-halo { display: none; }
   .zeus-bottom { width: 80vw; }
 }
 
-/* ===================== SIRIUS PRIME ===================== */
+/* ===================== ΣIRIUS PRIME ===================== */
 .prime-screen {
   position: fixed;
   inset: 0;
@@ -3436,7 +3436,7 @@ body.hud-minimal .medallion-halo { display: none; }
   to { transform: scale(7); opacity: 0; }
 }
 
-/* ---------- SIRIUS WebBrowser : fenêtres web indépendantes ---------- */
+/* ---------- ΣIRIUS WebBrowser : fenêtres web indépendantes ---------- */
 .web-window {
   position: fixed;
   width: 512px;
@@ -3581,7 +3581,7 @@ body.hud-minimal .medallion-halo { display: none; }
   border-radius: 999px;
 }
 
-/* ---------- Fenêtres de tâches SIRIUS ---------- */
+/* ---------- Fenêtres de tâches ΣIRIUS ---------- */
 .task-window {
   width: 448px;
   height: 344px;
@@ -3720,7 +3720,7 @@ body.hud-minimal .medallion-halo { display: none; }
   text-overflow: ellipsis;
 }
 
-/* ---------- Galerie des archives SIRIUS ---------- */
+/* ---------- Galerie des archives ΣIRIUS ---------- */
 .archive-gallery {
   width: 496px;
   height: 352px;
@@ -3834,7 +3834,7 @@ body.hud-minimal .medallion-halo { display: none; }
   text-overflow: ellipsis;
 }
 
-/* ===== SIRIUS DISPLAY : écran principal permanent piloté par Sirius ===== */
+/* ===== ΣIRIUS DISPLAY : écran principal permanent piloté par Sirius ===== */
 /* Matériau aligné sur le verre holographique cyan du HUD (.shud-panel) pour cohérence
    visuelle totale avec le HUD et les autres modules. */
 .sirius-display {
@@ -3991,6 +3991,126 @@ body.hud-minimal .medallion-halo { display: none; }
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.sd-emails { flex: 1; padding: 12px 14px; overflow-y: auto; }
+.sd-emails-empty { font-size: 12.5px; color: rgba(226, 248, 255, 0.65); }
+.sd-email-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 9px;
+}
+.sd-email-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  text-align: left;
+  padding: 10px 11px;
+  border-radius: 9px;
+  border: 1px solid rgba(145, 230, 242, 0.25);
+  background: linear-gradient(160deg, rgba(10, 24, 32, 0.85), rgba(6, 14, 20, 0.9));
+  color: rgba(226, 248, 255, 0.92);
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+  font-family: inherit;
+}
+.sd-email-card:focus-visible {
+  outline: 2px solid #d4af37;
+  outline-offset: 2px;
+}
+.sd-email-card:hover {
+  border-color: rgba(212, 175, 55, 0.6);
+  box-shadow: 0 0 14px rgba(212, 175, 55, 0.25);
+  transform: translateY(-1px);
+}
+.sd-email-card.unread { border-color: rgba(145, 230, 242, 0.5); }
+.sd-email-card.urgent {
+  border-color: rgba(255, 90, 90, 0.7);
+  box-shadow: 0 0 16px rgba(255, 90, 90, 0.25);
+}
+.sd-email-urgent {
+  position: absolute;
+  top: -8px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: "Orbitron", sans-serif;
+  font-size: 8.5px;
+  letter-spacing: 0.08em;
+  color: #ffb4b4;
+  background: rgba(40, 8, 8, 0.9);
+  border: 1px solid rgba(255, 90, 90, 0.6);
+  border-radius: 20px;
+  padding: 2px 8px;
+}
+.sd-email-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.sd-email-from { font-size: 11.5px; font-weight: 600; color: #91e6f2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sd-email-date { font-size: 9.5px; color: rgba(226, 248, 255, 0.5); flex: 0 0 auto; }
+.sd-email-subject { font-size: 12.5px; font-weight: 600; color: rgba(226, 248, 255, 0.95); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sd-email-preview { font-size: 11px; color: rgba(226, 248, 255, 0.6); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sd-email-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 2px; }
+.sd-email-badge {
+  font-family: "Orbitron", sans-serif;
+  font-size: 8.5px;
+  letter-spacing: 0.06em;
+  color: rgba(145, 230, 242, 0.75);
+  border: 1px solid rgba(145, 230, 242, 0.3);
+  border-radius: 20px;
+  padding: 1px 7px;
+}
+.sd-email-badge.imp { color: #d4af37; border-color: rgba(212, 175, 55, 0.5); }
+.sd-email-badge.crit { color: #ff8080; border-color: rgba(255, 90, 90, 0.6); }
+.sd-email-source { font-size: 9px; letter-spacing: 0.06em; color: rgba(226, 248, 255, 0.4); }
+.sd-contact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 9px;
+}
+.sd-contact-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+  text-align: left;
+  border: 1px solid rgba(145, 230, 242, 0.3);
+  border-radius: 9px;
+  background: linear-gradient(160deg, rgba(10, 24, 32, 0.85), rgba(6, 14, 20, 0.9));
+  color: rgba(226, 248, 255, 0.92);
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+}
+.sd-contact-card:hover {
+  border-color: rgba(212, 175, 55, 0.6);
+  box-shadow: 0 0 14px rgba(212, 175, 55, 0.25);
+  transform: translateY(-1px);
+}
+.sd-contact-card:focus-visible {
+  outline: 2px solid #d4af37;
+  outline-offset: 2px;
+}
+.sd-contact-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #91e6f2;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.sd-contact-role, .sd-contact-line, .sd-contact-empty {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+.sd-contact-role { color: rgba(212, 175, 55, 0.85); }
+.sd-contact-line { color: rgba(226, 248, 255, 0.72); }
+.sd-contact-empty { color: rgba(226, 248, 255, 0.45); }
+@media (max-width: 620px) {
+  .sd-emails { padding: 10px; }
+  .sd-email-grid, .sd-contact-grid { grid-template-columns: 1fr; }
 }
 .sd-history {
   flex: 0 0 auto;
@@ -4464,7 +4584,7 @@ body.hud-minimal .medallion-halo { display: none; }
 .card-drag-grip:hover { color: #a5f3fc; background: rgba(145, 230, 242, 0.14); }
 .draggable-card.dragging .card-drag-grip { cursor: grabbing; }
 
-/* ===================== RESPONSIVE — HUD SIRIUS ===================== */
+/* ===================== RESPONSIVE — HUD ΣIRIUS ===================== */
 /* Grand écran standard → petit portable */
 @media (max-width: 1100px) {
   .top-bar { padding: 0 16px; }
@@ -4622,7 +4742,7 @@ body.hud-minimal .medallion-halo { display: none; }
   opacity: 0.75;
 }
 
-/* Marque SIRIUS : lettrage or lumineux */
+/* Marque ΣIRIUS : lettrage or lumineux */
 .brand-tag {
   color: var(--gold-light);
   text-shadow: 0 0 12px var(--gold-glow), 0 0 30px rgba(216, 184, 117, 0.25);
@@ -4785,7 +4905,7 @@ body.hud-minimal .medallion-halo { display: none; }
   .hc-sheets-grid { grid-template-columns: 1fr; }
 }
 
-/* Analyse IA du fichier déposé dans le SIRIUS DISPLAY */
+/* Analyse IA du fichier déposé dans le ΣIRIUS DISPLAY */
 .sd-analysis {
   margin: 8px 10px 10px; padding: 8px 10px;
   border: 1px solid rgba(145, 230, 242, 0.3);
@@ -4804,7 +4924,7 @@ body.hud-minimal .medallion-halo { display: none; }
 .sd-analysis .sd-spin { animation: sdspin 1s linear infinite; }
 @keyframes sdspin { to { transform: rotate(360deg); } }
 
-/* Barre réseaux sociaux du SIRIUS DISPLAY (fenêtres dédiées : FB/IG/WA interdisent l'iframe) */
+/* Barre réseaux sociaux du ΣIRIUS DISPLAY (fenêtres dédiées : FB/IG/WA interdisent l'iframe) */
 .sd-social {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
   padding: 6px 10px;
@@ -5365,7 +5485,7 @@ body.hud-minimal .guardian-halo { display: none; }
 }
 .hud-date, .hud-utc { color: #cfa952; }
 
-/* Marque SIRIUS : lettrage or liquide + point scintillant */
+/* Marque ΣIRIUS : lettrage or liquide + point scintillant */
 .brand-tag {
   background-image: linear-gradient(105deg, #a37420 8%, #f2c65a 30%, #f6ecd6 50%, #f2c65a 70%, #a37420 92%);
   background-size: 230% 100%;
@@ -5954,7 +6074,7 @@ body[data-phase] .center-stage::before { content: none !important; }
 }
 .reactor-wrap .sirius-title-img { height: clamp(48px, 9vh, 96px); }
 
-/* ===== Panneaux HEURE / NOYAU (mode) / MÉTÉO en barre pilule (même style que SIRIUS–ACTIVITÉ), noir & or ===== */
+/* ===== Panneaux HEURE / NOYAU (mode) / MÉTÉO en barre pilule (même style que ΣIRIUS–ACTIVITÉ), noir & or ===== */
 .hud-panel.bottom-left,
 .hud-panel.bottom-right,
 .hud-panel.stats-mini,
@@ -6132,7 +6252,7 @@ body[data-phase] .center-stage::before { content: none !important; }
 .float-card.fc-tr .fc-big { font-size: 17px; }
 .float-card.fc-tr .fc-sub { font-size: 9px; white-space: nowrap; }
 
-/* ===== HUD SIRIUS de référence : composition cyan-or ===== */
+/* ===== HUD ΣIRIUS de référence : composition cyan-or ===== */
 .sirius-root {
   background:
     radial-gradient(ellipse at 50% 42%, rgba(0, 117, 150, 0.22) 0%, rgba(0, 42, 61, 0.16) 34%, transparent 65%),
@@ -6452,7 +6572,7 @@ body[data-phase] .center-stage::before { content: none !important; }
   50% { opacity: 0.9; transform: translateX(-50%) scaleX(1.12); }
 }
 
-/* La plateforme s'éveille avec le travail et la voix de SIRIUS. */
+/* La plateforme s'éveille avec le travail et la voix de ΣIRIUS. */
 .reactor-wrap.core-thinking .holo-platform,
 .reactor-wrap.core-speaking .holo-platform {
   animation: olympusActivePlatform 1.15s ease-in-out infinite;
@@ -6864,7 +6984,7 @@ body[data-phase] .center-stage::before { content: none !important; }
 .conn-led.on { background: var(--sirius-cyan) !important; box-shadow: 0 0 10px var(--sirius-cyan-glow) !important; }
 .conn-led.off { background: var(--sirius-gold) !important; box-shadow: 0 0 10px var(--sirius-gold-glow) !important; }
 
-/* Pilule d'activité SIRIUS + mode réponse (SiriusProgress) */
+/* Pilule d'activité ΣIRIUS + mode réponse (SiriusProgress) */
 .sp-wrap, .sirius-progress {
   background: linear-gradient(180deg, rgba(34, 66, 85, 0.78), rgba(10, 29, 44, 0.9)) !important;
   border: 1px solid rgba(216, 184, 117, 0.5) !important;
@@ -6907,3 +7027,67 @@ body[data-phase] .center-stage::before { content: none !important; }
    d'elle. Verrouillé ici en toute fin de feuille de style (priorité de cascade maximale) pour
    neutraliser cet effet quelle que soit la règle d'origine. */
 .cmd-bar { top: auto !important; bottom: auto !important; }
+
+/* ===== PLANS# — plans 2D cotés & géométrie ===== */
+.fp-overlay { position: fixed; inset: 0; background: rgba(2, 10, 20, 0.82); backdrop-filter: blur(4px); z-index: 320; display: flex; align-items: center; justify-content: center; }
+.fp-panel { width: min(1180px, 94vw); height: min(760px, 92vh); display: flex; flex-direction: column; background: linear-gradient(160deg, #071626 0%, #04101c 100%); border: 1px solid rgba(64, 200, 255, 0.35); border-radius: 12px; box-shadow: 0 0 42px rgba(30, 160, 255, 0.25); overflow: hidden; }
+.fp-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid rgba(64, 200, 255, 0.25); }
+.fp-title { display: flex; gap: 8px; align-items: center; color: #6fe3ff; font-weight: 700; letter-spacing: 2px; font-size: 13px; }
+.fp-close { background: none; border: 1px solid rgba(120, 210, 255, 0.4); color: #9fd9ff; border-radius: 6px; padding: 4px 6px; cursor: pointer; }
+.fp-close:hover { background: rgba(80, 190, 255, 0.15); }
+.fp-input-row { display: flex; gap: 10px; padding: 12px 14px 4px; }
+.fp-input { flex: 1; resize: none; background: rgba(8, 30, 50, 0.7); border: 1px solid rgba(64, 200, 255, 0.3); border-radius: 8px; color: #d9f3ff; padding: 9px 12px; font-size: 13px; line-height: 1.45; }
+.fp-input:focus { outline: none; border-color: #4fd0ff; }
+.fp-generate { min-width: 110px; background: linear-gradient(120deg, #0e5f8f, #0a86c8); color: #eaf9ff; border: none; border-radius: 8px; font-weight: 700; letter-spacing: 1.5px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.fp-generate:disabled { opacity: 0.6; cursor: wait; }
+.fp-spin { animation: fp-rot 0.9s linear infinite; }
+@keyframes fp-rot { to { transform: rotate(360deg); } }
+.fp-error { margin: 6px 14px 0; color: #ff9d9d; font-size: 12.5px; }
+.fp-body { flex: 1; display: flex; gap: 12px; padding: 12px 14px 14px; min-height: 0; }
+.fp-canvas { flex: 1; background: #061422; border: 1px solid rgba(64, 200, 255, 0.22); border-radius: 10px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.fp-empty { color: #6fa8c8; font-size: 13px; max-width: 400px; text-align: center; line-height: 1.6; padding: 20px; }
+.fp-svg { width: 100%; height: 100%; }
+.fp-grid line { stroke: rgba(80, 170, 230, 0.10); stroke-width: 1; }
+.fp-room { fill: rgba(20, 70, 110, 0.25); stroke: none; }
+.fp-wall { fill: none; stroke: #bfe9ff; }
+.fp-room-name { fill: #8fe0ff; font-size: 30px; font-weight: 700; letter-spacing: 1px; }
+.fp-room-area { fill: #62b7dd; font-size: 24px; }
+.fp-gap { stroke: #061422; }
+.fp-window line { stroke: #6fe3ff; stroke-width: 4; }
+.fp-door path { fill: none; stroke: #ffd27f; stroke-width: 3; stroke-dasharray: 8 6; }
+.fp-door-leaf { stroke: #ffd27f; stroke-width: 5; }
+.fp-garage { stroke: #ffd27f; stroke-width: 6; stroke-dasharray: 16 10; }
+.fp-furniture rect { fill: rgba(140, 190, 220, 0.12); stroke: #7fb6d6; stroke-width: 2.5; }
+.fp-furniture text { fill: #a6cfe6; font-size: 20px; }
+.fp-dim { color: #ff8d7a; }
+.fp-dim line { stroke: #ff8d7a; stroke-width: 2; }
+.fp-dim text { fill: #ffb5a6; font-size: 26px; font-weight: 600; }
+.fp-side { width: 280px; display: flex; flex-direction: column; gap: 10px; }
+.fp-side-title { color: #bfe9ff; font-weight: 700; font-size: 13.5px; letter-spacing: 0.6px; }
+.fp-metrics { width: 100%; border-collapse: collapse; font-size: 12.5px; color: #cfeaff; }
+.fp-metrics td { padding: 5px 6px; border-bottom: 1px solid rgba(80, 170, 230, 0.18); }
+.fp-metrics td + td { text-align: right; white-space: nowrap; }
+.fp-total td { color: #6fe3ff; font-weight: 700; border-top: 1.5px solid rgba(110, 200, 255, 0.5); }
+.fp-actions { display: flex; gap: 8px; margin-top: auto; }
+.fp-actions button { flex: 1; display: flex; gap: 6px; align-items: center; justify-content: center; background: rgba(10, 60, 95, 0.55); color: #bfe9ff; border: 1px solid rgba(90, 195, 255, 0.4); border-radius: 8px; padding: 8px 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.fp-actions button:hover { background: rgba(20, 95, 140, 0.6); }
+
+/* ===== PLANS# — vue 3D isométrique ===== */
+.fp-view-toggle { display: flex; gap: 4px; margin-left: auto; margin-right: 12px; }
+.fp-view-toggle button { background: rgba(8, 35, 58, 0.7); color: #7fc4e8; border: 1px solid rgba(90, 195, 255, 0.35); border-radius: 6px; padding: 4px 14px; font-size: 12px; font-weight: 700; letter-spacing: 1px; cursor: pointer; }
+.fp-view-toggle button.active { background: linear-gradient(120deg, #0e5f8f, #0a86c8); color: #eaf9ff; border-color: #4fd0ff; }
+.fp3-floor { fill: rgba(25, 85, 130, 0.4); stroke: rgba(140, 220, 255, 0.5); stroke-width: 2; }
+.fp3-label { fill: #9fe4ff; font-size: 26px; font-weight: 700; }
+.fp3-wall-back { fill: rgba(90, 170, 215, 0.35); stroke: #bfe9ff; stroke-width: 2.5; }
+.fp3-wall-front { fill: rgba(60, 130, 175, 0.14); stroke: rgba(160, 220, 250, 0.55); stroke-width: 2; }
+.fp3-door { fill: rgba(255, 210, 127, 0.75); stroke: #ffd27f; stroke-width: 2; }
+.fp3-window { fill: rgba(111, 227, 255, 0.65); stroke: #6fe3ff; stroke-width: 2; }
+.fp3-f-top { fill: rgba(170, 210, 235, 0.55); stroke: #9cc8e4; stroke-width: 1.5; }
+.fp3-f-side { fill: rgba(110, 150, 180, 0.5); stroke: #7fa8c6; stroke-width: 1.5; }
+.fp3-f-side2 { fill: rgba(85, 120, 150, 0.5); stroke: #7fa8c6; stroke-width: 1.5; }
+.fp3-f-label { fill: #cfe8f8; font-size: 19px; }
+.fp-op-label { fill: #ffe9b0; font-size: 17px; font-weight: 600; }
+.fp-pro-host { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #fbfaf4; border-radius: 10px; }
+.fp-pro-host svg { width: 100%; height: 100%; }
+.fp-plan-host { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; border-radius: 10px; overflow: hidden; }
+.fp-plan-host svg { width: 100%; height: 100%; }

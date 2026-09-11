@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useEffect, useRef, useState } from "react";
 import { Workflow, X, Cast, Loader2, Maximize } from "lucide-react";
 
@@ -170,7 +170,7 @@ export function ArchitectPanel({ keys, initialPrompt, onClose, onSpeak }) {
           />
           <button className="cmd-send" onClick={() => generate()} disabled={loading} data-testid="architect-generate-btn">
             {loading ? <Loader2 size={16} className="dg-spin" /> : <Workflow size={16} />}
-            {loading ? "SIRIUS DESSINE..." : "GÉNÉRER AVEC L'IA"}
+            {loading ? "ΣIRIUS DESSINE..." : "GÉNÉRER AVEC L'IA"}
           </button>
           <button className="setup-io-btn" onClick={openTV} title="Ouvre une fenêtre spectateur à diffuser sur la TV (Cast / HDMI)" data-testid="architect-tv-btn">
             <Cast size={15} /> MODE TV
@@ -218,7 +218,7 @@ export function SpectatorView() {
     <div className="spectator-view" data-testid="spectator-view">
       <div className="setup-grid-bg" />
       <header className="spectator-head">
-        <span className="spectator-brand"><Workflow size={18} /> SIRIUS · DESIGN REVIEW</span>
+        <span className="spectator-brand"><Workflow size={18} /> ΣIRIUS · DESIGN REVIEW</span>
         <span className="spectator-title" data-testid="spectator-title">{diagram ? diagram.titre : "EN ATTENTE DU DIAGRAMME..."}</span>
         <button className="setup-io-btn" onClick={goFullscreen} data-testid="spectator-fullscreen-btn"><Maximize size={15} /> PLEIN ÉCRAN</button>
       </header>

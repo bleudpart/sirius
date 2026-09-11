@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useEffect, useRef, useState } from "react";
 import { X, Send, BrainCircuit } from "lucide-react";
 import StarField from "@/StarField";
@@ -241,7 +241,7 @@ export default function ZeusCortex({ onClose, onAsk, answer, speaking }) {
       <div className="zeus-bottom">
         {answer && <div className="zeus-answer" data-testid="zeus-answer">{answer}</div>}
         <form className="cmd-bar zeus-cmd" onSubmit={ask} data-testid="zeus-ask-form">
-          <span className="cmd-prompt font-divine">SIRIUS&gt;</span>
+          <span className="cmd-prompt font-divine">ΣIRIUS&gt;</span>
           <input
             className="cmd-input"
             type="text"

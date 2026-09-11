@@ -1,4 +1,4 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 """Routes des suggestions proactives (moteur proactive.py)."""
 
 from fastapi import APIRouter, Request

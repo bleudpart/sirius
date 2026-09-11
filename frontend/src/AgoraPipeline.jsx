@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 import { useEffect, useState, useCallback, useRef } from "react";
 import { X, Plus, Trash2, ChevronLeft, ChevronRight, BellRing, TrendingUp, FileText, Receipt, Swords, Send, Award, History, Target, Mail, Download, Euro, Copy, ExternalLink, Loader2, CheckCircle2 } from "lucide-react";
 import { speakAsCharacter, cancelSpeech } from "@/voice";
@@ -15,7 +15,7 @@ const getSmtp = () => {
   try {
     const b = JSON.parse(localStorage.getItem("themis_keys")) || {};
     return (b.smtp_host || "").trim()
-      ? { host: b.smtp_host.trim(), port: Number(b.smtp_port || 587), user: b.smtp_user || "", password: b.smtp_pass || "", from_email: b.smtp_from || "", from_name: b.smtp_name || "HERMÈS AGORA — SIRIUS" }
+      ? { host: b.smtp_host.trim(), port: Number(b.smtp_port || 587), user: b.smtp_user || "", password: b.smtp_pass || "", from_email: b.smtp_from || "", from_name: b.smtp_name || "HERMÈS AGORA — ΣIRIUS" }
       : {};
   } catch (e) { return {}; }
 };
@@ -247,7 +247,7 @@ export default function AgoraPipeline({ onClose, onOpenThemis }) {
     let k = {};
     try { k = JSON.parse(localStorage.getItem("sirius_keys")) || {}; } catch (e) { k = {}; }
     if (!(k.smtp_host || "").trim()) return null;
-    return { host: k.smtp_host.trim(), port: Number(k.smtp_port || 587), user: k.smtp_user || "", password: k.smtp_pass || "", from_email: k.smtp_from || "", from_name: k.smtp_name || "HERMÈS AGORA — SIRIUS" };
+    return { host: k.smtp_host.trim(), port: Number(k.smtp_port || 587), user: k.smtp_user || "", password: k.smtp_pass || "", from_email: k.smtp_from || "", from_name: k.smtp_name || "HERMÈS AGORA — ΣIRIUS" };
   };
   const [txs, setTxs] = useState([]);
   const [txMsg, setTxMsg] = useState("");

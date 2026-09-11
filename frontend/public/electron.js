@@ -7,6 +7,7 @@ const {
   toggleMediaHudWindow,
 } = require("./electron/hud_windows");
 const { startBackend, stopBackend } = require("./electron/backend_process");
+const { setupAutoUpdater } = require("./electron/auto_update");
 
 // SIRIUS — Application de bureau Windows (Electron)
 // Charge le HUD React compilé (dossier build) et accorde l'accès au micro.
@@ -174,6 +175,8 @@ app.whenReady().then(async () => {
       app.quit();
       return;
     }
+    // Mises à jour automatiques via GitHub Releases (jamais bloquant).
+    setupAutoUpdater({ app, dialog });
   }
 
   // Active les raccourcis Couper/Copier/Coller/Tout sélectionner (Ctrl+X/C/V/A)

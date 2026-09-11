@@ -1,4 +1,4 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 """KERAUNOS# — module domotique Home Assistant (proxy REST)."""
 import re
 import unicodedata

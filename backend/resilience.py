@@ -1,4 +1,4 @@
-"""Couche de résilience SIRIUS : timeout, retries exponentiels et disjoncteur.
+"""Couche de résilience ΣIRIUS : timeout, retries exponentiels et disjoncteur.
 
 Chaque service externe (SerpAPI, stockage cloud, etc.) possède son propre
 disjoncteur nommé : après `failure_threshold` échecs consécutifs, les appels

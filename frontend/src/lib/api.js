@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Logiciel protégé.
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Logiciel protégé.
 // Centralisation du pipeline réseau HTTP & Timeout de sécurité
 
 export const BACKEND_BASE_URL = (process.env.REACT_APP_BACKEND_URL || "http://127.0.0.1:8001")
@@ -47,9 +47,9 @@ export const cloudAnswer = async (command) => {
   } catch (error) {
     clearTimeout(timeoutId);
     if (error.name === "AbortError") {
-      console.warn("[SIRIUS API] La requête vers le Cloud a dépassé le délai de 30s.");
+      console.warn("[ΣIRIUS API] La requête vers le Cloud a dépassé le délai de 30s.");
     } else {
-      console.error("[SIRIUS API] Erreur de communication :", error);
+      console.error("[ΣIRIUS API] Erreur de communication :", error);
     }
     throw error;
   }

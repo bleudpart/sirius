@@ -1,5 +1,5 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
-"""Stockage de fichiers SIRIUS — disque local uniquement (aucune dépendance cloud tierce).
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+"""Stockage de fichiers ΣIRIUS — disque local uniquement (aucune dépendance cloud tierce).
 
 Fichiers écrits dans backend/uploads/ (ou son équivalent d'export/desktop via data_dir())."""
 import logging

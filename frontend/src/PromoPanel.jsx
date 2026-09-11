@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Megaphone, Download, Maximize2, Copy, Check, Clapperboard, Volume2, Play, Film, Loader2 } from "lucide-react";
@@ -8,10 +8,10 @@ import "./Promo.css";
 const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
 const BACKEND = process.env.REACT_APP_BACKEND_URL || "";
 
-const CAPTION = `✨ SIRIUS — La plateforme d'intelligence opérationnelle.
+const CAPTION = `✨ ΣIRIUS — La plateforme d'intelligence opérationnelle.
 Un assistant qui ne répond pas… un assistant qui AGIT. 🏛️ Une seule interface. Un seul cerveau. Un seul flux d'action.
 ⚡ Analyse. Automatise. Anticipe. Exécute. Moins de coûts, plus de vitesse, zéro friction — pour les entreprises comme pour les particuliers.
-#SIRIUS #IA #Productivité #Automatisation #AssistantIntelligent #Innovation #Startup #FuturIsNow`;
+#ΣIRIUS #IA #Productivité #Automatisation #AssistantIntelligent #Innovation #Startup #FuturIsNow`;
 
 function shotText(s) {
   return `PLAN ${s.id} — ${s.title} (${s.timecode})
@@ -23,7 +23,7 @@ Voix off : « ${s.voix} »`;
 }
 
 function fullScript(shots) {
-  return `🎬 SIRIUS — STORYBOARD PUBLICITAIRE (${shots.length} plans · ~2 min)
+  return `🎬 ΣIRIUS — STORYBOARD PUBLICITAIRE (${shots.length} plans · ~2 min)
 Style : hologramme antique, or et cyan, rythme publicitaire premium.
 
 ${shots.map(shotText).join("\n\n")}
@@ -150,7 +150,7 @@ export default function PromoPanel({ onClose }) {
                 {copied === "caption" ? <Check size={14} /> : <Copy size={14} />} {copied === "caption" ? "LÉGENDE COPIÉE !" : "COPIER LA LÉGENDE RÉSEAUX"}
               </button>
               <button className="promo-btn gold" onClick={() => setPlayIdx(0)} data-testid="promo-play-btn">
-                <Play size={14} /> LECTURE DU FILM — VOIX SIRIUS
+                <Play size={14} /> LECTURE DU FILM — VOIX ΣIRIUS
               </button>
               {exportState === "done" ? (
                 <>

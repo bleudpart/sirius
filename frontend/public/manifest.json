@@ -1,6 +1,6 @@
 {
-  "short_name": "SIRIUS",
-  "name": "SIRIUS - Assistant holographique",
+  "short_name": "ΣIRIUS",
+  "name": "ΣIRIUS - Assistant holographique",
   "description": "Assistant personnel holographique intelligent par partel",
   "icons": [
     { "src": "icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any maskable" },

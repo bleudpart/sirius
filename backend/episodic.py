@@ -1,4 +1,4 @@
-"""Mémoire épisodique SIRIUS : condensation des conversations pendant les temps morts.
+"""Mémoire épisodique ΣIRIUS : condensation des conversations pendant les temps morts.
 
 Une boucle de fond scanne les sessions de chat inactives depuis plus de
 IDLE_MINUTES. Pour chaque session ayant de nouveaux échanges non condensés,

@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. THÉMIS# — gestion d'entreprise (devis, factures, commandes, clients, compta, stocks, pièces PDF/OCR, modèles, BYOK).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. THÉMIS# — gestion d'entreprise (devis, factures, commandes, clients, compta, stocks, pièces PDF/OCR, modèles, BYOK).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, LayoutDashboard, FileText, Package, Users, Coins, Boxes, LayoutTemplate, KeyRound, Plus, Trash2, ArrowRightLeft, Minus, FileDown, Archive, Upload, Eye, Bell, AlertTriangle, Mail, Download } from "lucide-react";
@@ -172,7 +172,7 @@ export default function ThemisPanel({ onClose }) {
 
   const clientName = (id) => (clients.find((c) => c.id === id) || {}).name || "";
   const smtpConf = () => (byok.smtp_host || "").trim()
-    ? { host: byok.smtp_host.trim(), port: Number(byok.smtp_port || 587), user: byok.smtp_user || "", password: byok.smtp_pass || "", from_email: byok.smtp_from || "", from_name: byok.smtp_name || "THÉMIS — SIRIUS" }
+    ? { host: byok.smtp_host.trim(), port: Number(byok.smtp_port || 587), user: byok.smtp_user || "", password: byok.smtp_pass || "", from_email: byok.smtp_from || "", from_name: byok.smtp_name || "THÉMIS — ΣIRIUS" }
     : null;
   const openEmail = (d, relance = false) => {
     const cl = clients.find((c) => c.id === d.client_id) || {};
@@ -181,7 +181,7 @@ export default function ThemisPanel({ onClose }) {
       setEmailForm({
         to: cl.email || "",
         subject: `Relance — Facture ${d.number}`,
-        message: `Bonjour${cl.name ? " " + cl.name : ""},\n\nSauf erreur de notre part, la facture ${d.number} d’un montant restant de ${restant.toFixed(2)} € TTC${d.due_date ? `, arrivée à échéance le ${isoToFr(d.due_date)}` : ""}, demeure impayée à ce jour.\n\nNous vous serions reconnaissants de bien vouloir procéder à son règlement dans les meilleurs délais. Si votre paiement nous est déjà parvenu, veuillez ne pas tenir compte de ce message.\n\nCordialement,\n${emetteur || "SIRIUS"}`,
+        message: `Bonjour${cl.name ? " " + cl.name : ""},\n\nSauf erreur de notre part, la facture ${d.number} d’un montant restant de ${restant.toFixed(2)} € TTC${d.due_date ? `, arrivée à échéance le ${isoToFr(d.due_date)}` : ""}, demeure impayée à ce jour.\n\nNous vous serions reconnaissants de bien vouloir procéder à son règlement dans les meilleurs délais. Si votre paiement nous est déjà parvenu, veuillez ne pas tenir compte de ce message.\n\nCordialement,\n${emetteur || "ΣIRIUS"}`,
         mail_type: "relance",
       });
     } else {
@@ -189,7 +189,7 @@ export default function ThemisPanel({ onClose }) {
       setEmailForm({
         to: cl.email || "",
         subject: `${d.kind === "facture" ? "Facture" : "Devis"} ${d.number}`,
-        message: `Bonjour${cl.name ? " " + cl.name : ""},\n\nVeuillez trouver ci-joint ${kind} ${d.number} d’un montant de ${Number(d.total_ttc || 0).toFixed(2)} € TTC${d.due_date ? `, à régler avant le ${isoToFr(d.due_date)}` : ""}.\n\nCordialement,\n${emetteur || "SIRIUS"}`,
+        message: `Bonjour${cl.name ? " " + cl.name : ""},\n\nVeuillez trouver ci-joint ${kind} ${d.number} d’un montant de ${Number(d.total_ttc || 0).toFixed(2)} € TTC${d.due_date ? `, à régler avant le ${isoToFr(d.due_date)}` : ""}.\n\nCordialement,\n${emetteur || "ΣIRIUS"}`,
         mail_type: "envoi",
       });
     }

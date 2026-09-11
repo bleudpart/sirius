@@ -1,4 +1,4 @@
-"""Runtime paths shared by source and packaged SIRIUS backends."""
+"""Runtime paths shared by source and packaged ΣIRIUS backends."""
 
 import json
 import os

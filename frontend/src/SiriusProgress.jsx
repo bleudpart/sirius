@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useEffect, useRef, useState } from "react";
 import { Activity, CheckCircle2, AlertTriangle, Loader2, X, History, Trash2 } from "lucide-react";
 import "./SiriusProgress.css";
@@ -12,7 +12,7 @@ export const fmtDuree = (ms) =>
   : ms < 60000 ? `${(ms / 1000).toFixed(1).replace(".", ",")} s`
   : `${Math.floor(ms / 60000)} min ${String(Math.round((ms % 60000) / 1000)).padStart(2, "0")} s`;
 
-// Fenêtre de progression globale SIRIUS : toute tâche longue s'y affiche en direct.
+// Fenêtre de progression globale ΣIRIUS : toute tâche longue s'y affiche en direct.
 // API globale : progress.start(nom) -> id, progress.log(id, msg, pct?), progress.done(id, msg?), progress.error(id, msg?)
 let seq = 0;
 const emit = (detail) => window.dispatchEvent(new CustomEvent("sirius-progress", { detail }));
@@ -55,7 +55,7 @@ export default function SiriusProgress({ mode = "idle" }) {
     const onEvt = (e) => {
       const { action, id, task, message, pct } = e.detail || {};
       if (!id) return;
-      if (action === "start") startedRef.current[id] = { task: task || "Tâche SIRIUS", t0: Date.now() };
+      if (action === "start") startedRef.current[id] = { task: task || "Tâche ΣIRIUS", t0: Date.now() };
       if (action === "done" || action === "error") {
         const st = startedRef.current[id];
         if (st) {
@@ -74,7 +74,7 @@ export default function SiriusProgress({ mode = "idle" }) {
       setTasks((ts) => {
         if (action === "start") {
           if (ts.some((t) => t.id === id)) return ts;
-          return [...ts, { id, task: task || "Tâche SIRIUS", pct: 4, status: "running", logs: [{ t: now(), msg: "Tâche démarrée" }] }];
+          return [...ts, { id, task: task || "Tâche ΣIRIUS", pct: 4, status: "running", logs: [{ t: now(), msg: "Tâche démarrée" }] }];
         }
         return ts.map((t) => {
           if (t.id !== id) return t;
@@ -156,7 +156,7 @@ export default function SiriusProgress({ mode = "idle" }) {
       <div ref={panelRef} className={`sirius-progress ${tasks.length ? "" : "sp-compact"}`} data-testid="sirius-progress-panel">
       <div className="sp-bar" onPointerDown={onBarDown} title="Glisser pour déplacer" data-testid="sirius-progress-bar-header">
         <Activity size={13} className={running ? "sp-pulse" : ""} />
-        <span className="sp-title">SIRIUS — ACTIVITÉ EN COURS</span>
+        <span className="sp-title">ΣIRIUS — ACTIVITÉ EN COURS</span>
         <span className="sp-mode" data-testid="sirius-mode-indicator" style={{ "--mode-c": m.color }}>
           <i className="sp-mode-bar" />
           Mode : {m.label}
@@ -195,7 +195,7 @@ export default function SiriusProgress({ mode = "idle" }) {
         <div className="sp-journal" data-testid="sirius-journal-panel">
           <div className="sp-bar">
             <History size={13} />
-            <span className="sp-title">JOURNAL DES TÂCHES SIRIUS</span>
+            <span className="sp-title">JOURNAL DES TÂCHES ΣIRIUS</span>
             <span className="sp-count">{journal.length} ENTRÉE{journal.length > 1 ? "S" : ""}</span>
             <button className="sp-close" title="Vider le journal" onClick={() => { writeJournal([]); setJournal([]); }} data-testid="sirius-journal-clear-btn"><Trash2 size={13} /></button>
             <button className="sp-close" onClick={() => setShowJournal(false)} data-testid="sirius-journal-close-btn"><X size={13} /></button>

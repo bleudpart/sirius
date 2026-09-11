@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   X, CheckCircle2, XCircle, Loader2, RotateCcw, Monitor, Mic, Server,
@@ -11,7 +11,7 @@ const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
 const STEPS = [
   { id: "environment", label: "ENVIRONNEMENT", icon: Monitor },
   { id: "micro", label: "MICRO & VOIX", icon: Mic },
-  { id: "backend", label: "BACKEND SIRIUS", icon: Server },
+  { id: "backend", label: "BACKEND ΣIRIUS", icon: Server },
   { id: "ia", label: "MOTEUR IA", icon: BrainCircuit },
   { id: "hud", label: "HUD", icon: LayoutDashboard },
   { id: "modules", label: "MODULES", icon: Boxes },
@@ -86,7 +86,7 @@ export default function InstallWizard({ onClose, onSpeak, keys }) {
     } catch (e) {
       setResults((res) => ({
         ...res,
-        [step]: { step, message: "Backend SIRIUS injoignable. Solution : vérifiez que le serveur est démarré (port 8001).", status: "error", next: step },
+        [step]: { step, message: "Backend ΣIRIUS injoignable. Solution : vérifiez que le serveur est démarré (port 8001).", status: "error", next: step },
       }));
       setRunning(false);
     }
@@ -120,7 +120,7 @@ export default function InstallWizard({ onClose, onSpeak, keys }) {
     <div className="iw-overlay" data-testid="install-wizard">
       <div className="iw-panel">
         <header className="iw-head">
-          <span className="iw-title">Σ INSTALLATION DE SIRIUS</span>
+          <span className="iw-title">Σ INSTALLATION DE ΣIRIUS</span>
           <button className="iw-icon-btn" onClick={onClose} data-testid="iw-close-btn"><X size={16} /></button>
         </header>
 
@@ -181,7 +181,7 @@ export default function InstallWizard({ onClose, onSpeak, keys }) {
           </button>
           {completedOk && (
             <button className="iw-btn activate" onClick={activate} data-testid="iw-activate-btn">
-              <Rocket size={12} /> ACTIVER SIRIUS
+              <Rocket size={12} /> ACTIVER ΣIRIUS
             </button>
           )}
         </footer>

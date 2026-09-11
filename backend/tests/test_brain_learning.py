@@ -1,4 +1,4 @@
-"""Tests de l'apprentissage rapide du cerveau SIRIUS.
+"""Tests de l'apprentissage rapide du cerveau ΣIRIUS.
 
 Couvre : mémorisation instantanée sans LLM, rappel par pertinence,
 renforcement par usage, classification automatique et prompt mémoire.

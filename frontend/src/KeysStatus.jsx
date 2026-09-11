@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useEffect, useState } from "react";
 import { KeyRound, X, BellRing, Send, CheckCircle2 } from "lucide-react";
 import "./KeysStatus.css";
@@ -13,7 +13,7 @@ export default function KeysStatus({ onClose }) {
   const loadAll = async () => {
     try {
       const [k, w] = await Promise.all([
-        fetch(`${API}/system/keys_status`).then((r) => r.json()),
+        fetch(`${API}/system/keys_status`, { credentials: "include" }).then((r) => r.json()),
         fetch(`${API}/push/watch`).then((r) => r.json()),
       ]);
       setKeys(k.keys || []);
@@ -39,7 +39,7 @@ export default function KeysStatus({ onClose }) {
     const r = await fetch(`${API}/push/send`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: "SIRIUS — Test", body: "La veille active fonctionne. Je vous préviendrai des actualités importantes." }),
+      body: JSON.stringify({ title: "ΣIRIUS — Test", body: "La veille active fonctionne. Je vous préviendrai des actualités importantes." }),
     });
     const d = await r.json();
     setTestMsg(d.sent > 0 ? `Notification envoyée à ${d.sent} appareil${d.sent > 1 ? "s" : ""}.` : "Aucun appareil abonné — activez d'abord les notifications.");

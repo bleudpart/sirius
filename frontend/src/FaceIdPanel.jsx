@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // Reconnaissance faciale 100 % locale (face-api.js) : rien ne quitte l'appareil.
 import { useEffect, useRef, useState, useCallback } from "react";
 import { X, ScanFace, UserCheck, Trash2, Camera } from "lucide-react";

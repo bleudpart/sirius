@@ -1,4 +1,4 @@
-"""Registre public des modules multimedia exposes par SIRIUS."""
+"""Registre public des modules multimedia exposes par ΣIRIUS."""
 
 from .providers import MEDIA_PROVIDERS
 

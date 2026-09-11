@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // Préférences HUD : transparence des panneaux, taille du texte, mode minimal.
 export const HUD_DEFAULTS = { alpha: 1, zoom: 1, minimal: false };
 

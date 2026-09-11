@@ -1,4 +1,4 @@
-"""Moteur de proactivité SIRIUS : suggestions issues de la mémoire réelle.
+"""Moteur de proactivité ΣIRIUS : suggestions issues de la mémoire réelle.
 
 Sources (toutes locales, aucun appel réseau) :
 - les PROJETS appris (facts categorie « projet », récents ou renforcés) ;
@@ -172,7 +172,7 @@ def _candidates(user_id: str, now) -> list:
             "description": f"À cette heure, tu demandes souvent « {intent} » ({habit_best['n']} fois). Je lance ?",
             "urgency": "faible",
             "reason": f"L'intention « {intent} » revient {habit_best['n']} fois autour de {habit_best['hour']} h.",
-            "benefit": "SIRIUS anticipe ton rituel au lieu d'attendre la commande.",
+            "benefit": "ΣIRIUS anticipe ton rituel au lieu d'attendre la commande.",
             "confidence": min(0.9, 0.4 + habit_best["n"] * 0.1),
             "action": {"type": "command", "text": intent},
         })

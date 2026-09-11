@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // Lecteur Spotify intégré au HUD : recherche + lecteur embarqué + morceau en cours.
 import { useState } from "react";
 import { X, Music, Search, Radio, MonitorSpeaker, Loader2 } from "lucide-react";

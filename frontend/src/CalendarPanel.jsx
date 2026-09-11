@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 import { useEffect, useState, useCallback } from "react";
 import { X, Calendar, Plus, RefreshCw, LogOut, ExternalLink, Trash2 } from "lucide-react";
 
@@ -23,10 +23,10 @@ export default function CalendarPanel({ onClose }) {
   const refresh = useCallback(async () => {
     setBusy(true); setErr("");
     try {
-      const s = await fetch(`${API}/api/calendar/status`).then((r) => r.json());
+      const s = await fetch(`${API}/api/calendar/status`, { credentials: "include" }).then((r) => r.json());
       setStatus(s);
       if (s.connected) {
-        const r = await fetch(`${API}/api/calendar/events?max_results=12`);
+        const r = await fetch(`${API}/api/calendar/events?max_results=12`, { credentials: "include" });
         if (!r.ok) throw new Error((await r.json()).detail || "Erreur agenda");
         setEvents((await r.json()).events);
       }
@@ -38,13 +38,13 @@ export default function CalendarPanel({ onClose }) {
 
   const connect = async () => {
     try {
-      const r = await fetch(`${API}/api/oauth/calendar/login`).then((r) => r.json());
+      const r = await fetch(`${API}/api/oauth/calendar/login`, { credentials: "include" }).then((r) => r.json());
       window.location.href = r.authorization_url;
     } catch (e) { setErr("Connexion Google impossible : " + e.message); }
   };
 
   const disconnect = async () => {
-    await fetch(`${API}/api/calendar/disconnect`, { method: "DELETE" });
+    await fetch(`${API}/api/calendar/disconnect`, { method: "DELETE", credentials: "include" });
     setStatus({ connected: false }); setEvents([]);
   };
 
@@ -55,6 +55,7 @@ export default function CalendarPanel({ onClose }) {
     try {
       const r = await fetch(`${API}/api/calendar/events`, {
         method: "POST", headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(form),
       });
       if (!r.ok) throw new Error((await r.json()).detail || "Création refusée");
@@ -65,7 +66,7 @@ export default function CalendarPanel({ onClose }) {
   };
 
   const removeEvent = async (id) => {
-    await fetch(`${API}/api/calendar/events/${id}`, { method: "DELETE" });
+    await fetch(`${API}/api/calendar/events/${id}`, { method: "DELETE", credentials: "include" });
     setEvents((evs) => evs.filter((x) => x.id !== id));
   };
 
@@ -79,7 +80,7 @@ export default function CalendarPanel({ onClose }) {
       <div className="gcal-body">
         {status && !status.connected && (
           <div className="gcal-connect" data-testid="calendar-connect-block">
-            <p>Connectez votre compte Google pour consulter et créer vos événements depuis SIRIUS.</p>
+            <p>Connectez votre compte Google pour consulter et créer vos événements depuis ΣIRIUS.</p>
             <button className="cmd-send" onClick={connect} data-testid="calendar-connect-btn">
               CONNECTER GOOGLE CALENDAR
             </button>

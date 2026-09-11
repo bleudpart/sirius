@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // Éclat au survol : fines étincelles d'or quand la souris effleure le noyau ou le gardien.
 import { useEffect, useRef } from "react";
 

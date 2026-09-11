@@ -1,4 +1,4 @@
-"""Interpretation locale des commandes multimedia SIRIUS."""
+"""Interpretation locale des commandes multimedia ΣIRIUS."""
 
 import re
 import unicodedata

@@ -1,5 +1,5 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
-"""Notifications push SIRIUS (Web Push / VAPID) — abonnements persistés en JSON local."""
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+"""Notifications push ΣIRIUS (Web Push / VAPID) — abonnements persistés en JSON local."""
 import os
 import json
 import base64
@@ -91,7 +91,7 @@ class UnsubscribeBody(BaseModel):
 
 
 class SendBody(BaseModel):
-    title: str = "SIRIUS"
+    title: str = "ΣIRIUS"
     body: str = ""
     url: str = "/"
 

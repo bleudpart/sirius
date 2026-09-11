@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // Lecture à voix haute universelle : dès qu'un contenu textuel significatif apparaît
 // dans un panneau (tous modules), Sirius propose « Veux-tu que je te lise ça à voix haute ? ».
 import { speakFr, cancelSpeech } from "@/voice";

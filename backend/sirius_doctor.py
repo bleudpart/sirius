@@ -1,5 +1,5 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
-"""Sauvegarde et contrôle d'intégrité de la mémoire locale SQLite de SIRIUS.
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+"""Sauvegarde et contrôle d'intégrité de la mémoire locale SQLite de ΣIRIUS.
 
 Le module est volontairement autonome : il peut être exécuté même lorsque le
 serveur FastAPI n'est pas démarré et n'ajoute aucune dépendance au projet.
@@ -492,7 +492,7 @@ def _add_database_arguments(parser: argparse.ArgumentParser) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Sauvegarde et contrôle d'intégrité de la mémoire SQLite locale de SIRIUS."
+        description="Sauvegarde et contrôle d'intégrité de la mémoire SQLite locale de ΣIRIUS."
     )
     subparsers = parser.add_subparsers(dest="command", metavar="{backup,check,verify}")
 

@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // Sons d'interface synthétisés (Web Audio) : clics cristallins, chimes d'ouverture/fermeture.
 let ctx = null;
 const ac = () => {

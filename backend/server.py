@@ -1,4 +1,4 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 
 import os
 import sys
@@ -48,6 +48,7 @@ from sirius_brain import (
     doc_narrative,
     k3_source,
     detect_autonomous_action,
+    detect_urgency,
     technical_video_comment,
 )
 
@@ -85,8 +86,10 @@ async def _gather_memory_context(texte: str, uid: str, extra_memory: list) -> li
     async def _facts():
         try:
             facts = recall_facts(texte, user_id=uid, limit=16)
-            from semantic_vectors import semantic_rerank
-            facts = await semantic_rerank(texte, facts, top_k=8)
+            # Cerveau vectoriel : cherche dans TOUS les souvenirs vectorisés (par le sens),
+            # fusionnés avec les candidats mots-clés — vecteurs pré-calculés, rappel instantané.
+            from semantic_vectors import semantic_recall
+            facts = await semantic_recall(texte, facts, user_id=uid, top_k=8)
         except Exception:
             facts = recall_facts(texte, user_id=uid, limit=8)
         fact_cutoff = (datetime.now(timezone.utc) - timedelta(days=_FACT_MAX_AGE_DAYS)).date().isoformat()
@@ -119,18 +122,24 @@ async def _gather_memory_context(texte: str, uid: str, extra_memory: list) -> li
 _watch_task = None
 _omega_task = None
 _episodic_task = None
+_vector_task = None
 
 
 @asynccontextmanager
 async def _lifespan(_app):
     # --- Démarrage ---
-    global _watch_task, _omega_task, _episodic_task
+    global _watch_task, _omega_task, _episodic_task, _vector_task
+    # Base documentaire : MongoDB si joignable, sinon docstore SQLite local.
+    await _select_database_backend()
     _watch_task = asyncio.create_task(_push_watch_loop())
     _omega_task = asyncio.create_task(_omega_watch_loop())
     # Mémoire épisodique : condensation des conversations pendant les temps morts.
     from episodic import episodic_loop
     from sirius_brain import summarize_episode
     _episodic_task = asyncio.create_task(episodic_loop(db, summarize_episode))
+    # Cerveau vectoriel : pré-vectorisation des souvenirs en tâche de fond.
+    from semantic_vectors import vector_warmup_loop
+    _vector_task = asyncio.create_task(vector_warmup_loop())
     from auth_api import seed_admin_and_indexes
     try:
         await seed_admin_and_indexes(db)
@@ -143,7 +152,7 @@ async def _lifespan(_app):
     finally:
         # --- Arrêt ---
         tasks = []
-        for task in (_watch_task, _omega_task, _episodic_task):
+        for task in (_watch_task, _omega_task, _episodic_task, _vector_task):
             if task:
                 task.cancel()
                 tasks.append(task)
@@ -160,11 +169,34 @@ from local_memory import list_facts, add_fact, delete_fact, update_fact, log_eve
 from auth_api import is_direct_local_request, resolve_user_id, require_user  # noqa: E402
 from omega_engine import OmegaEngine  # noqa: E402
 
-# 5. Connexion MongoDB
+# 5. Connexion base documentaire : MongoDB si disponible, sinon SQLite local.
+# SIRIUS_DB=mongo force MongoDB ; SIRIUS_DB=local force le docstore SQLite ;
+# sinon un ping au démarrage choisit automatiquement (voir _lifespan).
+from local_docstore import DatabaseRouter, LocalDocStore  # noqa: E402
 mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
 db_name = os.environ.get('DB_NAME', 'sirius_db')
-client = AsyncIOMotorClient(mongo_url)
-db = client[db_name]
+_DB_MODE = (os.getenv("SIRIUS_DB") or "").strip().lower()
+client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=1500)
+if _DB_MODE == "local":
+    db = DatabaseRouter(LocalDocStore())
+else:
+    db = DatabaseRouter(client[db_name])
+
+
+async def _select_database_backend():
+    """Bascule sur le docstore SQLite local si MongoDB est injoignable."""
+    if _DB_MODE == "local":
+        logger.info("[DB] Docstore SQLite local (forcé par SIRIUS_DB=local)")
+        return
+    try:
+        await asyncio.wait_for(client.admin.command("ping"), timeout=2.0)
+        logger.info("[DB] MongoDB détecté : %s", mongo_url)
+    except Exception:
+        if _DB_MODE == "mongo":
+            logger.error("[DB] SIRIUS_DB=mongo mais MongoDB est injoignable : %s", mongo_url)
+            return
+        db.use(LocalDocStore())
+        logger.info("[DB] MongoDB absent → docstore SQLite local (aucun serveur requis)")
 
 # 6. Initialisation du routeur principal pour /api
 api_router = APIRouter(prefix="/api")
@@ -191,11 +223,15 @@ async def health_check():
     """
     checks = {}
 
-    try:
-        await asyncio.wait_for(client.admin.command("ping"), timeout=2.0)
-        checks["mongo"] = "ok"
-    except Exception:
-        checks["mongo"] = "down"
+    checks["database"] = db.backend_name
+    if db.backend_name == "mongodb":
+        try:
+            await asyncio.wait_for(client.admin.command("ping"), timeout=2.0)
+            checks["mongo"] = "ok"
+        except Exception:
+            checks["mongo"] = "down"
+    else:
+        checks["mongo"] = "unused"
 
     checks["push_watch"] = "running" if (_watch_task and not _watch_task.done()) else "stopped"
     checks["omega_watch"] = "running" if (_omega_task and not _omega_task.done()) else "stopped"
@@ -238,7 +274,7 @@ class StatusCheck(BaseModel):
 class StatusCheckCreate(BaseModel):
     client_name: str
 
-# ---- Cerveau intelligent SIRIUS (Kimi K3 + recherche web) ----
+# ---- Cerveau intelligent ΣIRIUS (Kimi K3 + recherche web) ----
 class ChatRequest(BaseModel):
     text: str
     session_id: str = "default"
@@ -303,6 +339,10 @@ async def chat(req: ChatRequest, request: Request):
     merged_memory = await _gather_memory_context(texte, uid, req.memory)
     logger.info(f"[CHAT] Début génération - Mode reçu: '{req.ia_mode}' | Mode appliqué: '{mode_ia_effectif}'")
 
+    # Urgence détectée dans le texte (« vite », « urgent »...) → bascule automatique en mode
+    # turbo, sans que l'utilisateur ait à activer explicitement ce mode.
+    effective_mode = "turbo" if detect_urgency(texte) else (req.mode or "normal")
+
     try:
         t0 = time.perf_counter()
         if autonomous_action:
@@ -316,7 +356,7 @@ async def chat(req: ChatRequest, request: Request):
                 history=history,
                 profile=req.profile or {},
                 memory=merged_memory,
-                mode=req.mode or "normal",
+                mode=effective_mode,
                 keys=req.keys or {},
                 mood=req.mood or {}
             )
@@ -377,6 +417,7 @@ async def chat_stream(req: ChatRequest, request: Request):
     history = (doc or {}).get("history", [])
     merged_memory = await _gather_memory_context(texte, uid, req.memory)
     autonomous_action = detect_autonomous_action(texte)
+    effective_mode = "turbo" if detect_urgency(texte) else (req.mode or "normal")
 
     async def gen():
         t0 = time.perf_counter()
@@ -392,7 +433,7 @@ async def chat_stream(req: ChatRequest, request: Request):
                     history=history,
                     profile=req.profile or {},
                     memory=merged_memory,
-                    mode=req.mode or "normal",
+                    mode=effective_mode,
                     keys=req.keys or {},
                     mood=req.mood or {}
                 ):
@@ -529,7 +570,7 @@ class KeysCheckRequest(BaseModel):
 
 _KEY_CHECK_SPECS = {
     "groq": {
-        "label": "Cerveau SIRIUS",
+        "label": "Cerveau ΣIRIUS",
         "env": ("GROQ_API_KEY", "GROQ_KEY", "K3_API_KEY", "DANIEL_DEV_K3"),
     },
     "serp": {
@@ -610,7 +651,7 @@ async def keys_check_post(request: KeysCheckRequest):
 
 
 # =========================================================
-# ROUTE DE LECTURE AUTONOME POUR SIRIUS
+# ROUTE DE LECTURE AUTONOME POUR ΣIRIUS
 # =========================================================
 
 
@@ -812,7 +853,7 @@ from fastapi import Form
 
 @api_router.post("/display/analyze")
 async def display_analyze(file: UploadFile = File(...), keys: str = Form("{}")):
-    """Analyse IA d'un fichier déposé dans le SIRIUS DISPLAY (non stocké) + phrase à prononcer."""
+    """Analyse IA d'un fichier déposé dans le ΣIRIUS DISPLAY (non stocké) + phrase à prononcer."""
     try:
         keys_d = json.loads(keys or "{}")
     except Exception:
@@ -858,7 +899,7 @@ class DisplayAskIn(BaseModel):
 
 @api_router.post("/display/ask")
 async def display_ask_endpoint(req: DisplayAskIn):
-    """Question vocale contextuelle sur le fichier actuellement affiché dans le SIRIUS DISPLAY."""
+    """Question vocale contextuelle sur le fichier actuellement affiché dans le ΣIRIUS DISPLAY."""
     q = (req.question or "").strip()
     if not q:
         raise HTTPException(status_code=400, detail="Question vide.")
@@ -882,7 +923,7 @@ class VisionAnalyzeIn(BaseModel):
 
 @api_router.post("/vision/analyze")
 async def vision_analyze(req: VisionAnalyzeIn, request: Request):
-    """SIRIUS Voyant : capture caméra → description IA + OCR + synthèse vocale courte."""
+    """ΣIRIUS Voyant : capture caméra → description IA + OCR + synthèse vocale courte."""
     await require_user(request, db)
     b64 = req.image.split(",", 1)[1] if req.image.startswith("data:") else req.image
     if not b64:
@@ -927,7 +968,7 @@ def _url_publique(u: str) -> bool:
 
 @api_router.post("/webagent/run")
 async def webagent_run(req: WebAgentIn, request: Request):
-    """SIRIUS Web Agent : navigateur invisible → recherche/action web + capture sauvegardée en Médiathèque."""
+    """ΣIRIUS Web Agent : navigateur invisible → recherche/action web + capture sauvegardée en Médiathèque."""
     uid = (await require_user(request, db))["user_id"]
     q = (req.query or "").strip()
     target = (req.url or "").strip()
@@ -1085,7 +1126,7 @@ async def delete_file(file_id: str, request: Request):
         raise HTTPException(status_code=404, detail="Fichier introuvable")
     return {"ok": True}
 
-# ---- Archives SIRIUS : médiathèque automatique des créations ----
+# ---- Archives ΣIRIUS : médiathèque automatique des créations ----
 import base64 as _b64
 import unicodedata as _ud
 
@@ -1260,13 +1301,13 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 # Spotify (OAuth, lecture, recherche) : extrait vers routes/spotify_routes.py
 
-# ---- Mémoire locale SQLite & SIRIUS PRIME : extraits vers routes/memory_routes.py ----
+# ---- Mémoire locale SQLite & ΣIRIUS PRIME : extraits vers routes/memory_routes.py ----
 
 # ZEUS CORTEX / ORACLE DIVIN / PANTHEON : extraits vers routes/pantheon_oracle.py
 # Infos externes (news, météo, pays, technews, documentaire, europeana) : extraits vers routes/infos.py
 from routes.infos import NEWS_API_KEY, _fetch_headlines  # noqa: E402 (utilisés par oracle et veille push)
 
-# ---- SIRIUS WebBrowser : ouverture + analyse technique de pages web ----
+# ---- ΣIRIUS WebBrowser : ouverture + analyse technique de pages web ----
 from sirius_brain import web_report
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse, parse_qs, unquote
@@ -1425,7 +1466,7 @@ from urllib.parse import quote
 _PROXY_ATTRS = [("img", "src"), ("script", "src"), ("link", "href"), ("source", "src"),
                 ("video", "src"), ("audio", "src"), ("iframe", "src"), ("form", "action")]
 
-# ---- Rendu SIRIUS pour YouTube : grille de vidéos + lecteur embed officiel (fiable en iframe) ----
+# ---- Rendu ΣIRIUS pour YouTube : grille de vidéos + lecteur embed officiel (fiable en iframe) ----
 def _yt_walk(obj, out):
     if isinstance(obj, dict):
         if "videoRenderer" in obj:
@@ -1491,7 +1532,7 @@ body{{margin:0;background:#04101a;color:#cdeefb;font-family:'Segoe UI',sans-seri
 .t{{font-size:13px;font-weight:600;padding:0 9px;line-height:1.3}}
 .c{{font-size:11px;color:#67a8c4;padding:0 9px 9px}}
 </style></head><body>
-<div class="bar"><b>YOUTUBE · SIRIUS</b>
+<div class="bar"><b>YOUTUBE · ΣIRIUS</b>
 <form onsubmit="location='/api/webbrowser/proxy?url='+encodeURIComponent('https://www.youtube.com/results?search_query='+encodeURIComponent(this.q.value));return false">
 <input name="q" placeholder="Rechercher sur YouTube... ({query_label})" autocomplete="off"/><button>OK</button></form></div>
 <div class="grid">{cards}</div></body></html>"""
@@ -1547,7 +1588,7 @@ async def webbrowser_proxy(url: str, noscript: int = 0):
             a["target"] = "_self"
     return HTMLResponse(content=str(soup), headers={"Cache-Control": "no-store"})
 
-# ---- Fenêtres de tâches SIRIUS : génération d'images (Nano Banana) et clips (fal.ai) ----
+# ---- Fenêtres de tâches ΣIRIUS : génération d'images (Nano Banana) et clips (fal.ai) ----
 FAL_VIDEO_MODEL = "fal-ai/ltx-2/text-to-video/fast"
 _FAL_CLIENT_PACKAGE = "fal_client==1.0.0"
 _FAL_INSTALL_LOCK = asyncio.Lock()
@@ -1888,6 +1929,14 @@ api_router.include_router(make_outlook_router(db))
 from haccp import make_haccp_router
 api_router.include_router(make_haccp_router(db))
 
+# PLANS# : plans 2D cotés (style architecte) + export DXF AutoCAD
+from floorplan import make_floorplan_router
+api_router.include_router(make_floorplan_router(_rate_ok))
+
+# PHOTO3D# : reconstruction 3D locale à partir d'une série de photos
+from photo3d import make_photo3d_router
+api_router.include_router(make_photo3d_router(_rate_ok))
+
 from modules_api import make_modules_router
 api_router.include_router(make_modules_router(db))
 from payments_api import make_payments_router
@@ -1955,7 +2004,7 @@ async def _push_watch_loop():
                 sent_titles = w.get("sent_titles", [])
                 fresh = [a["titre"] for a in data.get("articles", []) if a.get("titre") and a["titre"] not in sent_titles]
                 for titre in fresh[:2]:
-                    send_push_to_all("SIRIUS — Veille active", titre)
+                    send_push_to_all("ΣIRIUS — Veille active", titre)
                     sent_titles.append(titre)
                 w["sent_titles"] = sent_titles[-60:]
                 w["last_run"] = time.time()
@@ -1985,7 +2034,7 @@ async def _omega_watch_loop():
 
 
 # =========================================================
-# MODULE AUTO-ÉVOLUTIF SIRIUS : MODIFICATION LOCALE CONTRÔLÉE
+# MODULE AUTO-ÉVOLUTIF ΣIRIUS : MODIFICATION LOCALE CONTRÔLÉE
 # =========================================================
 class PatchRequest(BaseModel):
     file_path: str = Field(min_length=1, max_length=80)
@@ -2128,7 +2177,7 @@ async def self_rollback(
         "frozen_paths": post_rollback_scan["engine"]["frozen_paths"],
     }
 # =========================================================
-# ROUTES ET INCLUSION DU ROUTEUR API SIRIUS
+# ROUTES ET INCLUSION DU ROUTEUR API ΣIRIUS
 # =========================================================
 
 @api_router.post("/self/reload")
@@ -2144,7 +2193,7 @@ async def self_reload(
         raise HTTPException(status_code=409, detail="Redémarrage refusé tant que les chemins critiques sont gelés.")
     raise HTTPException(
         status_code=409,
-        detail="Redémarrage automatique désactivé : redémarrer SIRIUS manuellement après vérification.",
+        detail="Redémarrage automatique désactivé : redémarrer ΣIRIUS manuellement après vérification.",
     )
 
 
@@ -2193,7 +2242,7 @@ class InstallStepRequest(BaseModel):
 
 _INSTALL_STEPS = {
     "environment": {
-        "message": "Environnement SIRIUS opérationnel.",
+        "message": "Environnement ΣIRIUS opérationnel.",
         "next": "micro",
         "items": ("Interface locale", "Configuration backend", "Accès au stockage"),
     },
@@ -2203,9 +2252,9 @@ _INSTALL_STEPS = {
         "items": ("Reconnaissance vocale", "Synthèse vocale"),
     },
     "backend": {
-        "message": "Backend SIRIUS connecté.",
+        "message": "Backend ΣIRIUS connecté.",
         "next": "ia",
-        "items": ("API FastAPI", "WebSocket SIRIUS"),
+        "items": ("API FastAPI", "WebSocket ΣIRIUS"),
     },
     "ia": {
         "message": "Moteur IA initialisé.",
@@ -2213,19 +2262,19 @@ _INSTALL_STEPS = {
         "items": ("Parseur d'intentions", "Modèles de secours"),
     },
     "hud": {
-        "message": "HUD SIRIUS disponible.",
+        "message": "HUD ΣIRIUS disponible.",
         "next": "modules",
         "items": ("Interface React", "Commandes vocales"),
     },
     "modules": {
-        "message": "Modules SIRIUS chargés.",
+        "message": "Modules ΣIRIUS chargés.",
         "next": "completed",
         "items": ("ORACLE", "ATLAS", "PANTHÉON"),
     },
     "completed": {
-        "message": "Installation terminée. SIRIUS est prêt.",
+        "message": "Installation terminée. ΣIRIUS est prêt.",
         "next": None,
-        "items": ("Système SIRIUS",),
+        "items": ("Système ΣIRIUS",),
     },
     "restart": {
         "message": "Assistant d'installation réinitialisé.",

@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // Réveil matinal : à l'heure choisie, Sirius lance le briefing (météo incluse) puis lit les mails.
 import { useState } from "react";
 import { X, AlarmClock, BellRing, BellOff } from "lucide-react";
@@ -39,7 +39,7 @@ export default function ReveilPanel({ onClose, onSpeak }) {
       <div className="reveil-body">
         <p className="reveil-desc">
           À l'heure choisie, Sirius te salue, lance ton <b>briefing du jour</b> (météo, agenda, rappels, marchés)
-          puis lit tes <b>derniers mails Outlook</b> à voix haute. L'onglet SIRIUS doit rester ouvert.
+          puis lit tes <b>derniers mails Outlook</b> à voix haute. L'onglet ΣIRIUS doit rester ouvert.
         </p>
         <div className="reveil-row">
           <label htmlFor="reveil-time">HEURE DU RÉVEIL</label>

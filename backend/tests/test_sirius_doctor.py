@@ -32,7 +32,7 @@ class SiriusDoctorTests(unittest.TestCase):
                 "CREATE TABLE child (id INTEGER PRIMARY KEY, parent_id INTEGER NOT NULL "
                 "REFERENCES parent(id))"
             )
-            connection.execute("INSERT INTO parent (name) VALUES ('SIRIUS')")
+            connection.execute("INSERT INTO parent (name) VALUES ('ΣIRIUS')")
             connection.execute("INSERT INTO child (parent_id) VALUES (1)")
             connection.commit()
 
@@ -56,7 +56,7 @@ class SiriusDoctorTests(unittest.TestCase):
             with closing(sqlite3.connect(result.backup)) as connection:
                 self.assertEqual(
                     connection.execute("SELECT name FROM parent WHERE id = 1").fetchone()[0],
-                    "SIRIUS",
+                    "ΣIRIUS",
                 )
 
     def test_detects_a_tampered_backup_from_its_manifest(self) -> None:

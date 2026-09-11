@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useCallback, useEffect, useState } from "react";
 import { X, FileCode2, ScanSearch, Download, Trash2, Loader2, ShieldAlert, History } from "lucide-react";
 import { progress } from "@/SiriusProgress";
@@ -51,7 +51,7 @@ export default function ScriptInstaller({ onClose, onSpeak }) {
     const pid = progress.start(`INSTALLATION MODULE — ${(name || "script").toUpperCase().slice(0, 30)}`);
     progress.log(pid, "Préparation de l'installation", 20);
     try {
-      progress.log(pid, "Déploiement du script dans SIRIUS", 55);
+      progress.log(pid, "Déploiement du script dans ΣIRIUS", 55);
       const r = await fetch(`${API}/scripts/install`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -99,7 +99,7 @@ export default function ScriptInstaller({ onClose, onSpeak }) {
               style={{ width: "100%", minHeight: 180, background: "rgba(0,18,30,0.9)", border: "1px solid rgba(145,230,242,0.4)", color: "#d5f6ff", fontFamily: "monospace", fontSize: 12, padding: 10, outline: "none", resize: "vertical" }}
               value={script}
               onChange={(e) => { setScript(e.target.value); setAnalysis(null); }}
-              placeholder="Collez ici le script à installer (Python, JS, TS, Bash, config, module SIRIUS)..."
+              placeholder="Collez ici le script à installer (Python, JS, TS, Bash, config, module ΣIRIUS)..."
               data-testid="scripts-textarea"
             />
             <div className="argus-actions" style={{ marginTop: 10 }}>

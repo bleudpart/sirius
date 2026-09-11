@@ -1,6 +1,6 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 /**
- * Moteur d'ambiance SIRIUS — lecture des vrais fichiers musicaux installés
+ * Moteur d'ambiance ΣIRIUS — lecture des vrais fichiers musicaux installés
  * (public/audio/ambiance.mp3, public/audio/gregorien.mp3), en boucle.
  * Expose la même interface que HTMLAudioElement (.play(), .pause(), .volume, .src)
  * pour rester compatible avec tout le code existant dans App.js.
@@ -19,9 +19,9 @@ const TRACKS = {
   gregorien: "/audio/gregorien.mp3",
 };
 
-// Douceur du volume selon l'humeur de SIRIUS (pas de filtrage possible sur un fichier audio
+// Douceur du volume selon l'humeur de ΣIRIUS (pas de filtrage possible sur un fichier audio
 // réel comme sur un synthétiseur — on se contente d'un léger « ducking » du volume pour ne
-// pas couvrir la voix pendant que SIRIUS parle).
+// pas couvrir la voix pendant que ΣIRIUS parle).
 const MOOD_GAIN = {
   idle: 1.0,
   thinking: 0.85,
@@ -62,7 +62,7 @@ export class AmbientEngine {
     if (this._audio) this._audio.pause();
   }
 
-  // ── Mood API (optionnelle — appelée quand le statut de SIRIUS change) ────
+  // ── Mood API (optionnelle — appelée quand le statut de ΣIRIUS change) ────
 
   setMood(status) {
     if (!this._audio) return;

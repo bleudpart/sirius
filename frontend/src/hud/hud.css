@@ -1,4 +1,4 @@
-/* © 2026 Daniel Partel – SIRIUS Assistant. Fenêtres HUD vitrées (référence bleu nuit / cyan / or champagne). */
+/* © 2026 Daniel Partel – ΣIRIUS Assistant. Fenêtres HUD vitrées (référence bleu nuit / cyan / or champagne). */
 
 :root {
   --sir-night: #061321;
@@ -43,7 +43,7 @@
 /* ---------- panneau vitré : verre transparent holographique cyan ----------
    Remplace l'ancien bordurage majoritairement doré par un verre nettement cyan (teinte
    dominante de holo-scan), tout en gardant quelques accents or sur les icônes/textes pour
-   ne pas perdre l'identité SIRIUS. Une fine ligne de balayage cyan traverse le panneau
+   ne pas perdre l'identité ΣIRIUS. Une fine ligne de balayage cyan traverse le panneau
    pour un vrai effet « hologramme projeté » plutôt qu'un simple flou de fond. */
 .shud-panel {
   pointer-events: auto;
@@ -516,7 +516,7 @@
   letter-spacing: 0.06em;
 }
 
-/* ---------- repositionnement du titre (réf. : SIRIUS sous le socle) ---------- */
+/* ---------- repositionnement du titre (réf. : ΣIRIUS sous le socle) ---------- */
 .reactor-text { justify-content: flex-end !important; padding-bottom: 0.5vh; }
 h1.sirius-title {
   background: none !important;

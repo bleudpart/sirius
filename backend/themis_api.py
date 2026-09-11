@@ -1,4 +1,4 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Module THÉMIS# : gestion d'entreprise.
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Module THÉMIS# : gestion d'entreprise.
 import asyncio
 import csv
 import io
@@ -133,7 +133,7 @@ class SmtpConf(BaseModel):
     user: str = ""
     password: str = ""
     from_email: str = ""
-    from_name: str = "THÉMIS — SIRIUS"
+    from_name: str = "THÉMIS — ΣIRIUS"
 
     @field_validator("host")
     @classmethod

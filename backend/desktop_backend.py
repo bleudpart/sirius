@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 def _prepare_runtime() -> None:
-    default_data_dir = Path(os.getenv("LOCALAPPDATA", Path.home())) / "SIRIUS"
+    default_data_dir = Path(os.getenv("LOCALAPPDATA", Path.home())) / "ΣIRIUS"
     data_dir = Path(os.getenv("SIRIUS_DATA_DIR", default_data_dir)).expanduser().resolve()
     data_dir.mkdir(parents=True, exist_ok=True)
     os.environ["SIRIUS_DATA_DIR"] = str(data_dir)
@@ -25,7 +25,7 @@ def _prepare_runtime() -> None:
             with os.fdopen(descriptor, "w", encoding="ascii") as stream:
                 stream.write(secret)
     if not secret:
-        raise RuntimeError("Le secret de session SIRIUS est vide.")
+        raise RuntimeError("Le secret de session ΣIRIUS est vide.")
     os.environ.setdefault("SIRIUS_AUTH_SECRET", secret)
 
 

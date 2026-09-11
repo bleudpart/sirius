@@ -1,5 +1,5 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
-"""Routes de la mémoire locale (facts SQLite) et de SIRIUS PRIME (journal d'apprentissage)."""
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
+"""Routes de la mémoire locale (facts SQLite) et de ΣIRIUS PRIME (journal d'apprentissage)."""
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel

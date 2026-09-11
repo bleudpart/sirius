@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // PYTHAGORE# — Mathématiques & géométrie : calcul exact (vocal), géométrie visuelle, tracé, explications, historique.
 import { useEffect, useRef, useState } from "react";
 import { X, Sigma, Loader2, ArrowRight, LineChart, GraduationCap, Calculator, Shapes, Mic, History, Trash2 } from "lucide-react";

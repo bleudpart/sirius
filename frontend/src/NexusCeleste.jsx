@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useEffect, useRef, useState } from "react";
 import { X, Orbit, Radio, GaugeCircle, Waves } from "lucide-react";
 import StarField from "@/StarField";
@@ -7,7 +7,7 @@ const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
 
 const NODES = [
   { id: "cortex", name: "ZEUS CORTEX", color: "#e3c98e" },
-  { id: "prime", name: "SIRIUS PRIME", color: "#91e6f2" },
+  { id: "prime", name: "ΣIRIUS PRIME", color: "#91e6f2" },
   { id: "oracle", name: "ORACLE DIVIN", color: "#a855f7" },
   { id: "pantheon", name: "PANTHEON", color: "#ff9500" },
   { id: "dev", name: "COMPAGNON DEV", color: "#91e6f2" },
@@ -96,7 +96,7 @@ export default function NexusCeleste({ onClose }) {
         x.fillText(n.name, n.x, n.y + 20);
       });
 
-      // Cœur SIRIUS
+      // Cœur ΣIRIUS
       const pr = 16 + Math.sin(t * 2.4) * 3;
       const g = x.createRadialGradient(cx, cy, 0, cx, cy, pr * 2.4);
       g.addColorStop(0, "rgba(255,255,255,0.95)");

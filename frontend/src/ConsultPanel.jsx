@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // Modules SOLON# (conseil juridique) et PROMÉTHÉE# (gestion de projet) — consultation plein écran.
 // Historique cloud (MongoDB), export PDF et envoi par email (SMTP Thémis).
 import { useCallback, useEffect, useState } from "react";
@@ -17,7 +17,7 @@ const smtpConf = () => {
   return {
     host: k.smtp_host.trim(), port: Number(k.smtp_port || 587),
     user: k.smtp_user || "", password: k.smtp_pass || "",
-    from_email: k.smtp_from || "", from_name: k.smtp_name || "SIRIUS — PANTHÉON",
+    from_email: k.smtp_from || "", from_name: k.smtp_name || "ΣIRIUS — PANTHÉON",
   };
 };
 

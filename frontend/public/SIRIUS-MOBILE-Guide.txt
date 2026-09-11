@@ -10,6 +10,29 @@ PRÉREQUIS : SIRIUS doit d'abord être DÉPLOYÉ en ligne
 (hébergement web de votre choix) → vous obtenez une URL de
 production, par exemple : https://sirius.....
 
+-------------------------------------------------
+🧪 TEST RAPIDE SANS HÉBERGEMENT
+-------------------------------------------------
+Pour faire tester SIRIUS depuis votre PC sans acheter de
+domaine ni louer de serveur :
+
+1. Installez Cloudflare Tunnel (cloudflared) :
+   https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/
+   Si Windows propose `winget`, vous pouvez aussi utiliser :
+   `winget install --id Cloudflare.cloudflared`
+2. Vérifiez que le backend local et les dépendances frontend
+   sont installés.
+3. Lancez `START-SIRIUS-MOBILE-TEST.bat` à la racine du projet.
+4. Copiez l'URL `https://...trycloudflare.com` affichée dans
+   la fenêtre Cloudflare et envoyez-la aux testeurs.
+5. Gardez votre PC, le backend et la fenêtre du tunnel allumés
+   pendant toute la session de test.
+
+Cette URL est temporaire et change à chaque lancement. Elle
+donne accès à l'environnement de test local : ne l'utilisez
+pas pour des données sensibles et arrêtez le tunnel après le
+test avec Ctrl+C.
+
 
 -------------------------------------------------
 📱 ANDROID (Chrome)

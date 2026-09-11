@@ -1,5 +1,5 @@
-/* © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France). */
-/* SIRIUS / ARGUS — surveillance & réparation */
+/* © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France). */
+/* ΣIRIUS / ARGUS — surveillance & réparation */
 .mythos-avatar {
   width: 280px;
   display: block;
@@ -111,7 +111,8 @@
   right: 26px;
   bottom: 120px;
   width: 330px;
-  z-index: 80;
+  /* L'alerte doit rester visible au-dessus des panneaux HUD (.prime-screen: 900). */
+  z-index: 1300;
   /* Matériau aligné sur le verre holographique cyan du HUD (.shud-panel), pour cohérence
      visuelle totale avec le HUD et les fenêtres de modules. */
   background: linear-gradient(155deg, rgba(16, 48, 68, 0.9), rgba(4, 16, 28, 0.95));
@@ -142,3 +143,12 @@
 }
 .argus-alert p { color: #cfeefb; font-size: 11.5px; line-height: 1.4; margin: 7px 0 9px; }
 .argus-alert-actions { display: flex; gap: 6px; }
+
+@media (max-width: 560px) {
+  .argus-alert {
+    right: 12px;
+    left: 12px;
+    bottom: 84px;
+    width: auto;
+  }
+}

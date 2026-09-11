@@ -1,4 +1,4 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 # Paiements Stripe pour les deals Hermès Agora : lien d'encaissement (acompte ou total), suivi, webhook.
 import os
 import asyncio

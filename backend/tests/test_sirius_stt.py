@@ -1,4 +1,4 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 """Tests for Whisper STT round-trip and white-label HTML."""
 import os
 import base64
@@ -71,7 +71,7 @@ def test_white_label_index_html():
     assert r.status_code == 200
     html = r.text
     # title
-    assert "<title>SIRIUS</title>" in html, "title is not SIRIUS"
+    assert "<title>ΣIRIUS</title>" in html, "title is not ΣIRIUS"
     # no emergent badge / posthog
     assert 'id="emergent-badge"' not in html, "emergent-badge present"
     assert "Made with Emergent" not in html, "'Made with Emergent' text present"

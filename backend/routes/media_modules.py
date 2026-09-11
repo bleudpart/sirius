@@ -10,6 +10,6 @@ router = APIRouter(tags=["modules"])
 
 @router.get("/modules/media")
 async def get_media_modules() -> dict[str, list[dict[str, str | bool]]]:
-    """Expose les modules multimedia utilisables par l'interface SIRIUS."""
+    """Expose les modules multimedia utilisables par l'interface ΣIRIUS."""
 
     return {"modules": list_media_modules()}

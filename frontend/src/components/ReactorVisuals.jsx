@@ -1,5 +1,5 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
-// Visuels canvas du réacteur SIRIUS : médaillon rotatif, cœur holographique
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
+// Visuels canvas du réacteur ΣIRIUS : médaillon rotatif, cœur holographique
 // et visualiseur vocal (onde + particules). Extraits d'App.js à l'identique.
 import { useEffect, useRef, useState } from "react";
 

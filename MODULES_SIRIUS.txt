@@ -45,6 +45,8 @@ NOTE : les dates proviennent de l'historique du projet. Les modules marqués
 - Fenêtre de progression & journal des tâches      : 01/08/2026
 - Bannière d'installation PWA + notifications push : 01/08/2026
 - KERAUNOS# — domotique Home Assistant (+ voix)    : 01/08/2026
+- Cerveau vectoriel local (rappel par le sens)     : 06/09/2026
+- PLANS# — plans 2D/3D cotés + géométrie + DXF     : 07/09/2026
 
 ── FONCTIONS INTÉGRÉES AU HUD (App.js) ─────────────────────────
 - Météo temps réel, horloge, statistiques CPU/RAM

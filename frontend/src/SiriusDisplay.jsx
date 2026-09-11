@@ -1,11 +1,12 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useRef, useState, useEffect, useCallback } from "react";
 import { gsap } from "gsap";
 import { animateWindowOpen, animateWindowClose, animateResizeSettle } from "./gsapAnimations";
-import { Monitor, RotateCw, ExternalLink, Globe, MessageSquare, Film, ImageIcon, Minus, ChevronUp, ShieldCheck, X, Maximize2, Minimize2, ClipboardPaste, Save, FileText, UploadCloud, Sparkles, Loader2, Facebook, Instagram, MessageCircle, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Monitor, RotateCw, ExternalLink, Globe, MessageSquare, Film, ImageIcon, Minus, ChevronUp, ShieldCheck, X, Maximize2, Minimize2, ClipboardPaste, Save, FileText, UploadCloud, Sparkles, Loader2, Facebook, Instagram, MessageCircle, ThumbsUp, ThumbsDown, Mail, AlertTriangle, ContactRound } from "lucide-react";
 import { progress } from "./SiriusProgress";
 import Analysis3D from "./Analysis3D";
 import ModulesMedia from "./ModulesMedia";
+import { cleanTextForDisplay } from "./voice";
 import MediaPlayer from "@/components/MediaPlayer";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -26,7 +27,66 @@ const TYPE_META = {
   video: { label: "VIDÉO", Icon: Film },
   image: { label: "IMAGE", Icon: ImageIcon },
   media: { label: "MÉDIAS", Icon: Film },
+  emails: { label: "E-MAILS", Icon: Mail },
+  contacts: { label: "CONTACTS", Icon: ContactRound },
 };
+
+// Case stylisée pour un e-mail (Outlook ou Gmail) : cliquable → ouvre la messagerie concernée
+function EmailCard({ mail, onOpen }) {
+  const urgent = mail.categorie === "Critique";
+  const openUrl = mail.source === "gmail"
+    ? (mail.id ? `https://mail.google.com/mail/u/0/#inbox/${mail.id}` : "https://mail.google.com/")
+    : "https://outlook.office.com/mail/";
+  return (
+    <button
+      type="button"
+      className={`sd-email-card ${urgent ? "urgent" : ""} ${mail.lu ? "read" : "unread"}`}
+      onClick={() => { try { window.open(openUrl, "_blank"); } catch (e) {} if (onOpen) onOpen(mail); }}
+      title="Ouvrir ce message"
+      data-testid="sirius-display-email-card"
+    >
+      {urgent && <span className="sd-email-urgent"><AlertTriangle size={12} /> URGENT</span>}
+      <div className="sd-email-top">
+        <span className="sd-email-from">{mail.de || mail.de_email || "Expéditeur inconnu"}</span>
+        <span className="sd-email-date">{(mail.recu || mail.date || "").slice(0, 16)}</span>
+      </div>
+      <div className="sd-email-subject">{mail.sujet || "(sans objet)"}</div>
+      {mail.apercu && <div className="sd-email-preview">{mail.apercu}</div>}
+      <div className="sd-email-footer">
+        <span className={`sd-email-badge ${mail.categorie === "Critique" ? "crit" : mail.categorie === "Important" ? "imp" : ""}`}>{mail.categorie || (mail.lu ? "Lu" : "Non lu")}</span>
+        <span className="sd-email-source">{mail.source === "gmail" ? "Gmail" : "Outlook"}</span>
+      </div>
+    </button>
+  );
+}
+
+function ContactCard({ contact }) {
+  const email = contact.email || contact.emails?.[0] || "";
+  const phone = contact.telephone || contact.telephones?.[0] || "";
+  return (
+    <button
+      type="button"
+      className="sd-contact-card"
+      onClick={() => {
+        if (email) {
+          window.location.href = `mailto:${email}`;
+        } else if (phone) {
+          window.location.href = `tel:${phone}`;
+        }
+      }}
+      title={email || phone ? "Contacter cette personne" : "Aucune coordonnée disponible"}
+      data-testid="sirius-display-contact-card"
+    >
+      <div className="sd-contact-name"><ContactRound size={15} /> {contact.nom || "Contact sans nom"}</div>
+      {(contact.poste || contact.entreprise) && (
+        <div className="sd-contact-role">{[contact.poste, contact.entreprise].filter(Boolean).join(" · ")}</div>
+      )}
+      {email && <div className="sd-contact-line">{email}</div>}
+      {phone && <div className="sd-contact-line">{phone}</div>}
+      {!email && !phone && <div className="sd-contact-empty">Aucune coordonnée</div>}
+    </button>
+  );
+}
 
 // Réseaux sociaux : FB/IG/WA refusent l'iframe (X-Frame-Options), donc fenêtre dédiée pilotée par le display
 const SOCIALS = [
@@ -39,7 +99,7 @@ const readGeo = () => {
   try { return JSON.parse(localStorage.getItem(GEO_KEY)) || {}; } catch (e) { return {}; }
 };
 
-// Panneau d'affichage SIRIUS : ouvert par Sirius quand il a du contenu à montrer (messages, web, vidéos, images)
+// Panneau d'affichage ΣIRIUS : ouvert par Sirius quand il a du contenu à montrer (messages, web, vidéos, images)
 export default function SiriusDisplay({ item, history, onSelect, onClose, onInteract, onSpeak }) {
   const ref = useRef(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -317,11 +377,11 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
       )}
       <div className="sd-bar" onPointerDown={onBarDown} onDoubleClick={() => { setMinimized(false); setFull((f) => !f); }} title={full ? "Double-clic : quitter le plein écran" : "Glisser pour déplacer — double-clic : plein écran"} data-testid="sirius-display-bar">
         <Monitor size={13} className="sd-logo" />
-        <span className="sd-name">SIRIUS DISPLAY</span>
+        <span className="sd-name">ΣIRIUS DISPLAY</span>
         <span className={`sd-badge sd-badge-${type}`} data-testid="sirius-display-badge">
           <Icon size={10} /> {label}
         </span>
-        {proxied && <span className="sd-proxy" title="Site protégé — affiché via le proxy SIRIUS"><ShieldCheck size={10} /></span>}
+        {proxied && <span className="sd-proxy" title="Site protégé — affiché via le proxy ΣIRIUS"><ShieldCheck size={10} /></span>}
         {isWeb && (
           <>
             <button onClick={() => setReloadKey((k) => k + 1)} title="Actualiser" data-testid="sirius-display-refresh"><RotateCw size={12} /></button>
@@ -374,7 +434,7 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
                 {analysis && (
                   <div className="sd-analysis" data-testid="sirius-display-analysis">
                     <div className="sd-analysis-head">
-                      <Sparkles size={11} /> ANALYSE SIRIUS {analysis.busy && <Loader2 size={11} className="sd-spin" />}
+                      <Sparkles size={11} /> ANALYSE ΣIRIUS {analysis.busy && <Loader2 size={11} className="sd-spin" />}
                       {analysis.text && (
                         <button className="sd-analysis-3d-btn" onClick={() => setShow3D(true)} data-testid="sirius-display-3d-btn">
                           VUE 3D
@@ -406,7 +466,7 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
             {!pasted && type === "message" && (
               <div className="sd-message" data-testid="sirius-display-message">
                 {item.titre && <div className="sd-msg-title">{item.titre}</div>}
-                <p>{item.contenu}</p>
+                <p>{cleanTextForDisplay(item.contenu)}</p>
                 <div className="sd-feedback" data-testid="sirius-display-feedback">
                   <button
                     className={`sd-vote up ${feedbackVote === "up" ? "active" : ""}`}
@@ -451,6 +511,32 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
             )}
             {!pasted && type === "media" && (
               <MediaPlayer state={item.media || item} onControl={item.onMediaControl} />
+            )}
+            {!pasted && type === "emails" && (
+              <div className="sd-emails" data-testid="sirius-display-emails">
+                {item.titre && <div className="sd-msg-title">{item.titre}</div>}
+                {(!item.mails || !item.mails.length) && (
+                  <p className="sd-emails-empty">Aucun e-mail à afficher.</p>
+                )}
+                <div className="sd-email-grid">
+                  {(item.mails || []).map((m, i) => (
+                    <EmailCard key={m.id || i} mail={m} />
+                  ))}
+                </div>
+              </div>
+            )}
+            {!pasted && type === "contacts" && (
+              <div className="sd-emails" data-testid="sirius-display-contacts">
+                {item.titre && <div className="sd-msg-title">{item.titre}</div>}
+                {(!item.contacts || !item.contacts.length) && (
+                  <p className="sd-emails-empty">Aucun contact trouvé.</p>
+                )}
+                <div className="sd-contact-grid">
+                  {(item.contacts || []).map((contact, i) => (
+                    <ContactCard key={contact.id || contact.email || i} contact={contact} />
+                  ))}
+                </div>
+              </div>
             )}
             {!pasted && type === "image" && (
               <div className="sd-media">

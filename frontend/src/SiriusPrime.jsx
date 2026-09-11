@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { X, Sparkles, BookOpenText, Map, Database, Lightbulb, Trash2, Pencil, Check } from "lucide-react";
 
@@ -117,7 +117,7 @@ export default function SiriusPrime({ onClose }) {
     <div className="prime-screen" data-testid="sirius-prime-panel">
       <canvas ref={starsRef} className="prime-stars" />
       <header className="zeus-head">
-        <div className="prime-title font-divine"><Sparkles size={20} /> SIRIUS PRIME</div>
+        <div className="prime-title font-divine"><Sparkles size={20} /> ΣIRIUS PRIME</div>
         <button className="setup-close zeus-close" onClick={onClose} data-testid="prime-close-btn"><X size={18} /></button>
       </header>
       <div className="prime-sub">MOTEUR DE MÉMOIRE &amp; D'APPRENTISSAGE — {data ? `${data.totals.events} COMMANDES · ${data.totals.facts} SOUVENIRS · ${data.totals.days} JOURS D'OBSERVATION` : "CHARGEMENT..."}</div>

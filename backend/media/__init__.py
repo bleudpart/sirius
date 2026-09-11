@@ -1,1 +1,1 @@
-"""Catalogue et providers des modules multimedia SIRIUS."""
+"""Catalogue et providers des modules multimedia ΣIRIUS."""

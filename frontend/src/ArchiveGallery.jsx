@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useEffect, useRef, useState } from "react";
 import { X, Folder, FolderOpen, ArrowLeft, Film, RotateCw, Library, Link2 } from "lucide-react";
 
@@ -7,7 +7,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 let zCounter = 85;
 const fold = (s) => (s || "").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
 
-// Galerie de la médiathèque SIRIUS : dossiers navigables (souris + voix), fenêtre HUD dédiée
+// Galerie de la médiathèque ΣIRIUS : dossiers navigables (souris + voix), fenêtre HUD dédiée
 export default function ArchiveGallery({ nav, onClose, onOpen, onSpeak }) {
   const ref = useRef(null);
   const [z, setZ] = useState(() => ++zCounter);
@@ -106,7 +106,7 @@ export default function ArchiveGallery({ nav, onClose, onOpen, onSpeak }) {
       <div className="ww-bar" onPointerDown={onBarDown} title="Glisser pour déplacer" data-testid="archive-gallery-bar">
         <Library size={13} />
         <div className="ww-titles">
-          <span className="ww-title">ARCHIVES SIRIUS{folder ? ` — ${folder.toUpperCase()}` : ""}</span>
+          <span className="ww-title">ARCHIVES ΣIRIUS{folder ? ` — ${folder.toUpperCase()}` : ""}</span>
           <span className="ww-url">{files.length} archive{files.length > 1 ? "s" : ""} · {names.length} dossier{names.length > 1 ? "s" : ""}</span>
         </div>
         {folder && (

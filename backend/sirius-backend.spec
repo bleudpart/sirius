@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 
 backend_dir = Path(SPECPATH)
@@ -9,10 +9,16 @@ hiddenimports = []
 for package in ("media", "productivite", "providers", "routers", "routes"):
     hiddenimports.extend(collect_submodules(package))
 hiddenimports.extend(collect_submodules("fal_client"))
+# Embeddings locaux : fastembed est importé paresseusement (fonction), on force sa collecte.
+hiddenimports.extend(collect_submodules("fastembed"))
+# PLANS# : export DXF (import paresseux dans floorplan.py).
+hiddenimports.extend(collect_submodules("ezdxf"))
 
 datas = [
     (str(project_dir / "frontend" / "build"), "frontend/build"),
 ]
+datas.extend(collect_data_files("fastembed"))
+datas.extend(collect_data_files("ezdxf"))
 static_dir = backend_dir / "static"
 if static_dir.exists():
     datas.append((str(static_dir), "static"))
@@ -31,16 +37,13 @@ analysis = Analysis(
         "black",
         "cv2",
         "flake8",
-        "huggingface_hub",
         "matplotlib",
         "mypy",
-        "onnxruntime",
         "pandas",
         "pygame",
         "pytest",
         "scipy",
         "sympy",
-        "tokenizers",
         "torch",
         "torchaudio",
         "torchvision",

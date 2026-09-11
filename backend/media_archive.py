@@ -1,4 +1,4 @@
-"""Archivage local et isole des actions multimedia SIRIUS."""
+"""Archivage local et isole des actions multimedia ΣIRIUS."""
 
 import os
 import sqlite3

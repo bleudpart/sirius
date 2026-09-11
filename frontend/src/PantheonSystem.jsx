@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   X, AppWindow, ScanText, Link2, BellRing, LayoutDashboard, History,
@@ -68,7 +68,7 @@ export default function PantheonSystem({ onClose, keys }) {
     try {
       const r = await fetch(`${API}/notify/whatsapp`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: notif.waNum.trim(), apikey: notif.waKey.trim(), text: "✅ SIRIUS — liaison WhatsApp opérationnelle. Les alertes Alpha Vantage vous seront transmises ici." }),
+        body: JSON.stringify({ phone: notif.waNum.trim(), apikey: notif.waKey.trim(), text: "✅ ΣIRIUS — liaison WhatsApp opérationnelle. Les alertes Alpha Vantage vous seront transmises ici." }),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setWaTest({ busy: false, ok: false, msg: d.detail || "Envoi refusé." }); return; }

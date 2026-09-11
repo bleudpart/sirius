@@ -495,7 +495,7 @@ class TestStripePdfAndReminderRegression:
                         "user": "",
                         "password": "",
                         "from_email": "qa-sirius@example.com",
-                        "from_name": "SIRIUS QA",
+                        "from_name": "ΣIRIUS QA",
                     },
                 },
                 timeout=60,

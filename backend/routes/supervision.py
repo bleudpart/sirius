@@ -1,4 +1,4 @@
-# © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+# © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 """Routes de supervision ARGUS / OMEGA (scan, statut, rapports, correctifs)."""
 
 from fastapi import APIRouter, Header, HTTPException, Request

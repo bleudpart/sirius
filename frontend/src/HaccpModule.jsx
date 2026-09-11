@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useCallback, useEffect, useState } from "react";
 import {
   X, ClipboardCheck, Tag, Thermometer, ShieldCheck, AlertTriangle, SprayCan,
@@ -88,7 +88,7 @@ function SectionTrace() {
       {label && (
         <div className="hc-label-back" onClick={() => setLabel(null)} data-testid="haccp-label-viewer">
           <div className="hc-label" onClick={(e) => e.stopPropagation()}>
-            <div className="hc-label-title">ÉTIQUETTE SIRIUS · HACCP</div>
+            <div className="hc-label-title">ÉTIQUETTE ΣIRIUS · HACCP</div>
             <div className="hc-label-prod">{label.produit}</div>
             <div className="hc-label-grid">
               <span>LOT</span><b>{label.lot || "—"}</b>

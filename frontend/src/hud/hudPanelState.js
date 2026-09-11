@@ -1,4 +1,4 @@
-// © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
+// © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // État partagé (localStorage + événement custom) pour les fenêtres HUD flottantes
 // (.shud-panel) : quelles sont masquées, et où sont-elles ancrées quand détachées de
 // leur colonne par glisser-déposer. Un simple module de fonctions (pas de contexte React)
