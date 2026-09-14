@@ -186,7 +186,7 @@ Write-Step '4/6 - Dependances et compilation du HUD React'
 $npmCli = Join-Path (Split-Path (Get-Command node).Source) 'npm.cmd'
 if (-not (Test-Path $npmCli)) { $npmCli = 'npm.cmd' }
 
-$installArgs = if (Test-Path (Join-Path $frontendDir 'package-lock.json')) { @('ci') } else { @('install') }
+$installArgs = @('install', '--legacy-peer-deps')
 Invoke-Step -FilePath $npmCli -Arguments $installArgs -WorkingDirectory $frontendDir `
     -FailureMessage 'Installation des dependances Node echouee.'
 Invoke-Step -FilePath $npmCli -Arguments @('run', 'build') -WorkingDirectory $frontendDir `
