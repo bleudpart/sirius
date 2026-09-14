@@ -9,6 +9,14 @@
   "homepage": "./",
   "proxy": "http://127.0.0.1:8001",
   "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/ios": "^8.5.2",
+    "@capacitor/local-notifications": "^8.3.1",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.3",
     "@hookform/resolvers": "5.0.1",
     "@monaco-editor/react": "^4.7.0",
     "@radix-ui/react-accordion": "1.2.8",
@@ -78,6 +86,9 @@
     "build": "craco build",
     "test": "craco test",
     "electron": "electron .",
+    "mobile:sync": "npm run build && npx cap sync",
+    "mobile:android": "npm run mobile:sync && npx cap open android",
+    "mobile:ios": "npm run mobile:sync && npx cap open ios",
     "version:bump": "node scripts/bump-patch-version.js",
     "version:bump:dry-run": "node scripts/bump-patch-version.js --dry-run",
     "backend:build": "python -m PyInstaller --noconfirm --clean --distpath ../backend/dist --workpath ../backend/build/desktop-sidecar ../backend/sirius-backend.spec",
@@ -132,7 +143,16 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "SIRIUS"
+      "shortcutName": "SIRIUS",
+      "artifactName": "SIRIUS-Setup-${version}.exe",
+      "uninstallDisplayName": "SIRIUS ${version}",
+      "license": "../CONTRAT_LICENCE.txt",
+      "installerLanguages": [
+        "fr_FR"
+      ],
+      "language": "1036",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false
     },
     "portable": {
       "artifactName": "SIRIUS-portable-${version}.exe"

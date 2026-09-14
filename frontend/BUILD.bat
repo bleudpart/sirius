@@ -9,7 +9,9 @@ echo            S . I . R . I . U . S   -   BUILD WINDOWS
 echo  ============================================================
 echo.
 echo   Ce script compile SIRIUS en application Windows (.exe).
-echo   Prerequis : Node.js et Python 3.12 installes.
+echo   Prerequis : Node.js et Python 3.12 deja installes.
+echo   Astuce : CREER-INSTALLATEUR-SIRIUS.bat (racine du projet) installe
+echo   automatiquement Node.js et Python s'ils manquent.
 echo.
 echo  ------------------------------------------------------------
 echo.
@@ -142,7 +144,7 @@ echo                       TERMINE !
 echo  ============================================================
 echo.
 echo   Votre application est dans le dossier : dist\
-echo     - "SIRIUS Setup %SIRIUS_VERSION%.exe"     = installeur classique
+echo     - "SIRIUS-Setup-%SIRIUS_VERSION%.exe"     = installeur a distribuer
 echo     - "SIRIUS-portable-%SIRIUS_VERSION%.exe"  = version portable
 echo.
 start "" "dist"

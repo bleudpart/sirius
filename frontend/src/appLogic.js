@@ -13,7 +13,7 @@ export const STATES = {
 };
 
 // Réponses locales instantanées (heure / date exactes uniquement)
-export const CLOUD_RETRY_MSG = "Mon cerveau cloud est momentanément injoignable. Réessaie dans un instant — je reste connecté à Groq.";
+export const CLOUD_RETRY_MSG = "Mon cerveau cloud est momentanément injoignable. Je n'ai exécuté aucune action distante. Réessaie dans un instant.";
 
 export const isLocalTimeQuestion = (command) => {
   const normalized = String(command || "")
@@ -27,21 +27,30 @@ export const isLocalTimeQuestion = (command) => {
 };
 
 export function localAnswer(c) {
+  const command = String(c || "").trim();
+  const normalized = command
+    .toLocaleLowerCase("fr-FR")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[’']/g, " ");
   const nowLocal = new Date();
   const timeLocal = formatLocalTime(nowLocal);
-  if (isLocalTimeQuestion(c)) return `Il est ${timeLocal}.`;
-  if (/(quel jour|quelle date|on est le|on est quel)/.test(c))
+  if (isLocalTimeQuestion(command)) return `Il est ${timeLocal}.`;
+  if (/(quel jour|quelle date|on est le|on est quel)/.test(normalized))
     return `Nous sommes le ${formatLocalDate(nowLocal)}.`;
-  if (/(bonjour|bonsoir|salut|coucou|hello)/.test(c)) return `Bonjour. Tous mes systèmes sont en ligne.`;
-  if (/(ça va|ca va|comment vas|comment tu vas|tu vas bien)/.test(c)) return `Je fonctionne parfaitement. Merci de demander.`;
-  if (/(merci)/.test(c)) return `Je vous en prie. C'est un plaisir.`;
-  if (/(ton nom|qui es-tu|comment tu t'appelles|c'est quoi ton nom)/.test(c)) return `Je suis Sirius, votre assistant personnel.`;
-  if (/(ton créateur|qui t'a créé|qui ta créé)/.test(c)) return `J'ai été créé par partel.`;
-  if (/(merci|au revoir|à bientôt|bonne nuit)/.test(c)) return `À ton service. À très bientôt.`;
-  if (/(éteins|allume|lumière|lumiere|salon|chambre|cuisine|prise|volet)/.test(c))
-    return `Commande domotique reçue. Une fois connecté à votre maison, j'exécuterai : ${c}.`;
-  if (/(météo|meteo|temps qu'il fait|il fait quel temps)/.test(c)) return `Connecté à votre backend, je consulterai la météo en temps réel.`;
-  return `J'ai bien reçu : ${c}. Je transmets à mon cerveau connecté.`;
+  if (/(bonjour|bonsoir|salut|coucou|hello)/.test(normalized)) return `Bonjour. Tous mes systèmes sont en ligne.`;
+  if (/(ca va|comment vas|comment tu vas|tu vas bien)/.test(normalized)) return `Je fonctionne parfaitement. Merci de demander.`;
+  if (/(merci)/.test(normalized)) return `Je vous en prie. C'est un plaisir.`;
+  if (/(ton nom|qui es tu|comment tu t appelles|c est quoi ton nom)/.test(normalized)) return `Je suis Sirius, votre assistant personnel.`;
+  if (/(ton createur|qui t a cree|qui ta cree)/.test(normalized)) return `J'ai été créé par Partel.`;
+  if (/(au revoir|a bientot|bonne nuit)/.test(normalized)) return `À ton service. À très bientôt.`;
+  if (/(arrete|stop|silence|tais toi|coupe la musique)/.test(normalized)) return `Je n'ai pas pu joindre le cerveau distant, mais aucune action n'a été envoyée.`;
+  if (/(envoie|envoyer|ecris|mail|email|courriel)/.test(normalized)) return `Je n'ai pas pu préparer cet e-mail : le cerveau distant est indisponible. Aucun message n'a été envoyé.`;
+  if (/(contact|numero de telephone|adresse email)/.test(normalized)) return `Je n'ai pas pu charger les contacts : le cerveau distant est indisponible.`;
+  if (/(calendrier|agenda|rendez vous|evenement)/.test(normalized)) return `Je n'ai pas pu consulter le calendrier : le cerveau distant est indisponible.`;
+  if (/(eteins|allume|lumiere|salon|chambre|cuisine|prise|volet)/.test(normalized)) return `Je n'ai pas pu joindre la domotique. Aucune commande n'a été exécutée.`;
+  if (/(meteo|temps qu il fait|il fait quel temps)/.test(normalized)) return `Je n'ai pas pu consulter la météo en temps réel.`;
+  return `${CLOUD_RETRY_MSG} Demande reçue : ${command || "commande vide"}.`;
 }
 
 // Détection d'intention pour afficher la bonne carte holographique

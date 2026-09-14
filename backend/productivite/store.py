@@ -57,6 +57,12 @@ class ProductivityStore:
                 "content TEXT NOT NULL, report_type TEXT NOT NULL, created_at TEXT NOT NULL)"
             )
             connection.execute(
+                "CREATE TABLE IF NOT EXISTS productivity_sync_changes ("
+                "id TEXT PRIMARY KEY, user_id TEXT NOT NULL, entity_type TEXT NOT NULL, "
+                "entity_id TEXT NOT NULL, operation TEXT NOT NULL, device_id TEXT NOT NULL, "
+                "payload TEXT NOT NULL, updated_at TEXT NOT NULL)"
+            )
+            connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_productivity_notes_user_updated "
                 "ON productivity_notes (user_id, updated_at DESC)"
             )
@@ -360,3 +366,41 @@ class ProductivityStore:
             connection.execute("DELETE FROM productivity_notes WHERE user_id = ?", (user,))
             connection.execute("DELETE FROM productivity_tasks WHERE user_id = ?", (user,))
             connection.execute("DELETE FROM productivity_reports WHERE user_id = ?", (user,))
+
+    def sync_pull(self, user_id: str, since: str = "") -> dict:
+        user = self._safe_user_id(user_id)
+        with self._connect() as connection:
+            note_rows = connection.execute("SELECT * FROM productivity_notes WHERE user_id = ? AND updated_at > ? ORDER BY updated_at", (user, since or "")).fetchall()
+            task_rows = connection.execute("SELECT * FROM productivity_tasks WHERE user_id = ? AND updated_at > ? ORDER BY updated_at", (user, since or "")).fetchall()
+        return {"notes": [self._note_from_row(row) for row in note_rows], "tasks": [dict(row) for row in task_rows], "server_time": self._now()}
+
+    def sync_push(self, user_id: str, device_id: str, changes: list[dict]) -> dict:
+        user = self._safe_user_id(user_id)
+        accepted, conflicts = [], []
+        with self._connect() as connection:
+            for change in changes[:500]:
+                entity_type = change.get("entity_type")
+                entity_id = str(change.get("entity_id") or "")
+                payload = change.get("payload") or {}
+                if entity_type not in ("note", "task") or not entity_id or not isinstance(payload, dict):
+                    conflicts.append({"entity_id": entity_id, "reason": "Changement invalide."})
+                    continue
+                table = "productivity_notes" if entity_type == "note" else "productivity_tasks"
+                remote = connection.execute(f"SELECT updated_at FROM {table} WHERE id = ? AND user_id = ?", (entity_id, user)).fetchone()
+                foreign = connection.execute(f"SELECT user_id FROM {table} WHERE id = ? AND user_id != ?", (entity_id, user)).fetchone()
+                if foreign:
+                    conflicts.append({"entity_id": entity_id, "entity_type": entity_type, "reason": "Enregistrement appartenant à un autre utilisateur."})
+                    continue
+                incoming_time = str(payload.get("updated_at") or "")
+                if remote and incoming_time and str(remote[0]) > incoming_time:
+                    conflicts.append({"entity_id": entity_id, "entity_type": entity_type, "reason": "Version distante plus récente."})
+                    continue
+                now = self._now()
+                if change.get("operation") == "delete":
+                    connection.execute(f"DELETE FROM {table} WHERE id = ? AND user_id = ?", (entity_id, user))
+                elif entity_type == "note":
+                    connection.execute("INSERT INTO productivity_notes (id,user_id,title,content,tags,pinned,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title,content=excluded.content,tags=excluded.tags,pinned=excluded.pinned,updated_at=excluded.updated_at", (entity_id, user, str(payload.get("title") or "")[:180], str(payload.get("content") or "")[:50000], json.dumps(self._tags(payload.get("tags")), ensure_ascii=False), int(bool(payload.get("pinned"))), payload.get("created_at") or now, incoming_time or now))
+                else:
+                    connection.execute("INSERT INTO productivity_tasks (id,user_id,title,description,status,priority,due_at,created_at,updated_at,completed_at) VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title,description=excluded.description,status=excluded.status,priority=excluded.priority,due_at=excluded.due_at,updated_at=excluded.updated_at,completed_at=excluded.completed_at", (entity_id, user, str(payload.get("title") or "")[:180], str(payload.get("description") or "")[:4000], str(payload.get("status") or "todo"), str(payload.get("priority") or "medium"), str(payload.get("due_at") or "")[:40], payload.get("created_at") or now, incoming_time or now, payload.get("completed_at")))
+                accepted.append(entity_id)
+        return {"accepted": accepted, "conflicts": conflicts, "server_time": self._now()}

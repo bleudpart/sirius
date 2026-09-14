@@ -72,9 +72,9 @@ def test_white_label_index_html():
     html = r.text
     # title
     assert "<title>ΣIRIUS</title>" in html, "title is not ΣIRIUS"
-    # no emergent badge / posthog
-    assert 'id="emergent-badge"' not in html, "emergent-badge present"
-    assert "Made with Emergent" not in html, "'Made with Emergent' text present"
+    # no platform branding / analytics injection
+    assert 'id="platform-badge"' not in html, "platform badge present"
+    assert "Made with a platform" not in html, "platform branding present"
     assert "posthog" not in html.lower(), "posthog script reference present"
 
 

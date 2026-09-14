@@ -52,7 +52,7 @@ def _load_or_create_secret() -> bytes:
 
 _AUTH_SECRET = _load_or_create_secret()
 _LOCAL_EMAIL = (os.getenv("SIRIUS_LOCAL_EMAIL") or LEGACY_UID).strip().lower()
-_LOCAL_PASSWORD = os.getenv("SIRIUS_LOCAL_PASSWORD") or ""
+_LOCAL_PASSWORD = (os.getenv("SIRIUS_LOCAL_PASSWORD") or "").strip()
 
 
 class LoginRequest(BaseModel):

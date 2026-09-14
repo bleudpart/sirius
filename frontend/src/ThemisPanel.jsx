@@ -1,7 +1,7 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. THÉMIS# — gestion d'entreprise (devis, factures, commandes, clients, compta, stocks, pièces PDF/OCR, modèles, BYOK).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, LayoutDashboard, FileText, Package, Users, Coins, Boxes, LayoutTemplate, KeyRound, Plus, Trash2, ArrowRightLeft, Minus, FileDown, Archive, Upload, Eye, Bell, AlertTriangle, Mail, Download } from "lucide-react";
+import { X, LayoutDashboard, FileText, Package, Users, Coins, Boxes, LayoutTemplate, KeyRound, Plus, Trash2, ArrowRightLeft, Minus, FileDown, Archive, Upload, Eye, Bell, AlertTriangle, Mail, Download, Calculator, Landmark } from "lucide-react";
 import { ConfirmButton } from "@/ConfirmButton";
 import { speakAsCharacter } from "@/voice";
 import "./Themis.css";
@@ -25,6 +25,7 @@ const TABS = [
   ["orders", "COMMANDES", Package],
   ["clients", "CLIENTS", Users],
   ["pay", "PAIEMENTS & COMPTA", Coins],
+  ["compta", "BILAN & COMPTABILITÉ", Calculator],
   ["pieces", "PIÈCES & PDF", Archive],
   ["stock", "STOCKS", Boxes],
   ["templates", "MODÈLES", LayoutTemplate],
@@ -116,6 +117,14 @@ export default function ThemisPanel({ onClose }) {
   const [emailForm, setEmailForm] = useState({ to: "", subject: "", message: "", mail_type: "envoi" });
   const [sending, setSending] = useState(false);
   const [byok, setByok] = useState(() => { try { return JSON.parse(localStorage.getItem("themis_keys")) || {}; } catch (e) { return {}; } });
+  const [accounting, setAccounting] = useState({ journal: [], tva: null, reconciliations: [], forecast: [] });
+  const [relanceCandidates, setRelanceCandidates] = useState(null);
+  const [sendingRelances, setSendingRelances] = useState(false);
+  const [bankStatementPreview, setBankStatementPreview] = useState(null);
+  const [importingStatement, setImportingStatement] = useState(false);
+  const bankFileRef = useRef(null);
+  const [journalForm, setJournalForm] = useState({ libelle: "", compte: "512000", debit: "", credit: "" });
+  const [bankForm, setBankForm] = useState({ date: new Date().toISOString().slice(0, 10), compte_bancaire: "", solde_releve: "" });
 
   const load = useCallback(async () => {
     try {
@@ -128,6 +137,18 @@ export default function ThemisPanel({ onClose }) {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  const loadAccounting = useCallback(async () => {
+    try {
+      const [journal, tva, reconciliations, forecast] = await Promise.all([
+        fetch(`${API}/journal`).then((r) => r.json()),
+        fetch(`${API}/tva`).then((r) => r.json()),
+        fetch(`${API}/reconciliations`).then((r) => r.json()),
+        fetch(`${API}/previsionnel`).then((r) => r.json()),
+      ]);
+      setAccounting({ journal: journal.entries || [], tva, reconciliations: reconciliations.items || [], forecast: forecast.projections || [] });
+    } catch (e) { setErr("Impossible de charger la comptabilité THÉMIS."); }
+  }, []);
+  useEffect(() => { if (tab === "compta") loadAccounting(); }, [tab, loadAccounting]);
   useEffect(() => {
     const t = setTimeout(() => speakAsCharacter("Thémis, gardienne de l'ordre. Votre entreprise est entre des mains rigoureuses.", { pitch: 0.95, rate: 0.88 }), 400);
     return () => clearTimeout(t);
@@ -149,6 +170,70 @@ export default function ThemisPanel({ onClose }) {
     setErr("");
     load();
     return true;
+  };
+
+  const postAccounting = async (path, body) => {
+    try {
+      const response = await fetch(`${API}/${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      if (!response.ok) throw new Error();
+      setErr("");
+      await loadAccounting();
+      return true;
+    } catch (e) { setErr("Enregistrement comptable impossible."); return false; }
+  };
+
+  const previewRelances = async () => {
+    try {
+      const response = await fetch(`${API}/relances`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ days_threshold: 0, confirm: false }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || "Aperçu indisponible.");
+      setRelanceCandidates(data.candidates || []);
+    } catch (error) { setErr(error.message || "Aperçu des relances impossible."); }
+  };
+
+  const sendAllRelances = async () => {
+    if (!relanceCandidates?.length || sendingRelances) return;
+    if (!smtpConf()) { setErr("Configurez le serveur SMTP dans l'onglet CLÉS API avant l'envoi."); return; }
+    if (!window.confirm(`Envoyer ${relanceCandidates.length} relance(s) maintenant ?`)) return;
+    setSendingRelances(true);
+    try {
+      const response = await fetch(`${API}/relances`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ days_threshold: 0, confirm: true, emetteur, smtp: smtpConf() }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || "Envoi des relances refusé.");
+      setRelanceCandidates([]);
+      setErr(`${data.sent_count || 0} relance(s) envoyée(s), ${data.failed_count || 0} échec(s).`);
+      await load();
+    } catch (error) { setErr(error.message || "Envoi des relances impossible."); }
+    setSendingRelances(false);
+  };
+
+  const previewBankStatement = async (file) => {
+    if (!file) return;
+    setImportingStatement(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch(`${API}/bank-statements/preview`, { method: "POST", body: formData });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || "Relevé bancaire invalide.");
+      setBankStatementPreview(data);
+    } catch (error) { setErr(error.message || "Lecture du relevé impossible."); }
+    setImportingStatement(false);
+  };
+
+  const importBankStatement = async () => {
+    if (!bankStatementPreview?.rows?.length) return;
+    setImportingStatement(true);
+    try {
+      const response = await fetch(`${API}/bank-statements/import`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rows: bankStatementPreview.rows }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || "Import bancaire refusé.");
+      setBankStatementPreview(null);
+      await load();
+      await loadAccounting();
+      setErr("");
+    } catch (error) { setErr(error.message || "Import bancaire impossible."); }
+    setImportingStatement(false);
   };
 
   const groqKey = () => { try { return (JSON.parse(localStorage.getItem("sirius_keys")) || {}).groq || ""; } catch (e) { return ""; } };
@@ -427,6 +512,12 @@ export default function ThemisPanel({ onClose }) {
                 if (ok) setPayForm({ doc_id: "", amount: "", method: "virement" });
               }}>ENCAISSER</button>
               <div className="th-section-title" style={{ marginTop: 18 }}>COMPTABILITÉ</div>
+              <button className="th-btn" onClick={previewRelances}><Bell size={13} /> VOIR LES RELANCES ÉCHUES</button>
+              {relanceCandidates && <div className="th-compta" data-testid="themis-relance-preview">
+                <b>{relanceCandidates.length} facture(s) à relancer</b>
+                {relanceCandidates.map((candidate) => { const doc = docs.find((item) => item.id === candidate.id); return <div key={candidate.id}>{candidate.number} · {EUR(candidate.remaining)} · {candidate.days_late} j <button className="th-icon-btn" disabled={!doc || !candidate.email} title={!candidate.email ? "Adresse e-mail absente" : "Préparer la relance"} onClick={() => doc && openEmail(doc, true)}><Mail size={11} /></button></div>; })}
+                {relanceCandidates.length > 0 && <button className="th-btn gold" onClick={sendAllRelances} disabled={sendingRelances}><Mail size={13} /> {sendingRelances ? "ENVOI…" : `ENVOYER LES ${relanceCandidates.length} RELANCES`}</button>}
+              </div>}
               <div className="th-compta">
                 <div>Encaissé : <b className="th-gold">{EUR(stats.encaisse)}</b></div>
                 <div>À encaisser : <b className="th-cyan">{EUR(stats.a_encaisser)}</b></div>
@@ -443,6 +534,47 @@ export default function ThemisPanel({ onClose }) {
                     <td><ConfirmButton className="th-icon-btn" onConfirm={() => post(`payments/${p.id}`, null, "DELETE")} testId={`themis-pay-del-${p.id}`}><Trash2 size={12} /></ConfirmButton></td></tr>
                 ))}
               </tbody></table>
+            </div>
+          </div>
+        )}
+
+        {tab === "compta" && accounting.tva && (
+          <div className="th-compta-page" data-testid="themis-compta">
+            <div className="th-section-title"><Calculator size={13} /> JOURNAL, TVA, BANQUE & PRÉVISIONNEL</div>
+            <p className="th-note">Outil de pilotage basé sur les données THÉMIS. Faites valider les déclarations par votre comptable.</p>
+            <div className="th-form-card" data-testid="themis-bank-import">
+              <div className="th-section-title"><Landmark size={13} /> IMPORTER UN RELEVÉ BANCAIRE</div>
+              <input ref={bankFileRef} type="file" accept=".csv,text/csv" hidden onChange={(e) => { previewBankStatement(e.target.files?.[0]); e.target.value = ""; }} />
+              <button className="th-btn" disabled={importingStatement} onClick={() => bankFileRef.current?.click()}><Upload size={13} /> {importingStatement ? "LECTURE…" : "CHOISIR UN CSV"}</button>
+              <span className="th-note">Colonnes attendues : date, libellé, montant, référence facultative. Dates ISO ou JJ/MM/AAAA.</span>
+              {bankStatementPreview && <div className="th-compta" data-testid="themis-bank-preview"><b>{bankStatementPreview.count} opération(s) · Total {EUR(bankStatementPreview.total)}</b>{bankStatementPreview.rows.slice(0, 8).map((row, index) => <div key={`${row.date}-${index}`}>{row.date} · {row.libelle || "Sans libellé"} · {EUR(row.montant)}</div>)}<button className="th-btn gold" onClick={importBankStatement} disabled={importingStatement}>CONFIRMER L’IMPORT</button><button className="th-btn" onClick={() => setBankStatementPreview(null)}>ANNULER</button></div>}
+            </div>
+            <div className="th-cards">
+              <div className="th-card"><span>CA HT (PÉRIODE)</span><b>{EUR(accounting.tva.ca_ht)}</b></div>
+              <div className="th-card gold"><span>TVA COLLECTÉE</span><b>{EUR(accounting.tva.tva_collectee)}</b></div>
+              <div className="th-card"><span>TVA DÉDUCTIBLE</span><b>{EUR(accounting.tva.tva_deductible)}</b></div>
+              <div className="th-card gold"><span>TVA NETTE À PAYER</span><b>{EUR(accounting.tva.a_payer)}</b></div>
+            </div>
+            <div className="th-split">
+              <div className="th-form-card">
+                <div className="th-section-title">NOUVELLE ÉCRITURE</div>
+                <input className="th-input" placeholder="Libellé" value={journalForm.libelle} onChange={(e) => setJournalForm({ ...journalForm, libelle: e.target.value })} />
+                <div className="th-row"><input className="th-input" placeholder="Compte" value={journalForm.compte} onChange={(e) => setJournalForm({ ...journalForm, compte: e.target.value })} /><input className="th-input" type="date" /></div>
+                <div className="th-row"><input className="th-input" type="number" placeholder="Débit" value={journalForm.debit} onChange={(e) => setJournalForm({ ...journalForm, debit: e.target.value })} /><input className="th-input" type="number" placeholder="Crédit" value={journalForm.credit} onChange={(e) => setJournalForm({ ...journalForm, credit: e.target.value })} /></div>
+                <button className="th-btn gold" disabled={!journalForm.libelle} onClick={async () => { const ok = await postAccounting("journal", { ...journalForm, debit: Number(journalForm.debit || 0), credit: Number(journalForm.credit || 0) }); if (ok) setJournalForm({ ...journalForm, libelle: "", debit: "", credit: "" }); }}>AJOUTER AU JOURNAL</button>
+                <div className="th-section-title" style={{ marginTop: 18 }}><Landmark size={12} /> RAPPROCHEMENT BANCAIRE</div>
+                <input className="th-input" type="date" value={bankForm.date} onChange={(e) => setBankForm({ ...bankForm, date: e.target.value })} />
+                <input className="th-input" placeholder="Compte bancaire" value={bankForm.compte_bancaire} onChange={(e) => setBankForm({ ...bankForm, compte_bancaire: e.target.value })} />
+                <input className="th-input" type="number" placeholder="Solde du relevé" value={bankForm.solde_releve} onChange={(e) => setBankForm({ ...bankForm, solde_releve: e.target.value })} />
+                <button className="th-btn" disabled={!bankForm.solde_releve} onClick={async () => { const ok = await postAccounting("reconciliations", { ...bankForm, solde_releve: Number(bankForm.solde_releve) }); if (ok) setBankForm({ ...bankForm, solde_releve: "" }); }}>RAPPROCHER</button>
+              </div>
+              <div className="th-list">
+                <div className="th-section-title">JOURNAL COMPTABLE</div>
+                <table className="th-table"><tbody>{accounting.journal.map((entry) => <tr key={entry.id}><td>{entry.date}</td><td>{entry.compte}</td><td>{entry.libelle}</td><td>{EUR(entry.debit)}</td><td>{EUR(entry.credit)}</td></tr>)}</tbody></table>
+                <div className="th-section-title" style={{ marginTop: 18 }}>PRÉVISIONNEL À 6 MOIS</div>
+                <table className="th-table"><tbody>{accounting.forecast.map((month) => <tr key={month.month}><td><b>{month.month}</b></td><td>Entrées {EUR(month.in)}</td><td>Sorties {EUR(month.out)}</td><td className={month.solde >= 0 ? "th-gold" : "th-late"}>Solde {EUR(month.solde)}</td></tr>)}</tbody></table>
+                {accounting.reconciliations.length > 0 && <><div className="th-section-title" style={{ marginTop: 18 }}>RAPPROCHEMENTS</div><table className="th-table"><tbody>{accounting.reconciliations.map((item) => <tr key={item.id}><td>{item.date}</td><td>Compta {EUR(item.solde_comptable)}</td><td>Relevé {EUR(item.solde_releve)}</td><td>Écart {EUR(item.difference)}</td><td>{item.status}</td></tr>)}</tbody></table></>}
+              </div>
             </div>
           </div>
         )}

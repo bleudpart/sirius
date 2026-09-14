@@ -99,7 +99,8 @@ def make_hephaistos_router(db):
             ("CALLMEBOT", "https://api.callmebot.com/whatsapp.php", True),
             ("OPEN-METEO", "https://api.open-meteo.com/v1/forecast?latitude=48.85&longitude=2.35&current=temperature_2m", True),
         ]
-        default_headers = {"User-Agent": "ΣIRIUS-HUD/1.0 (contact@sirius.local)"}
+        # En-tête ASCII obligatoire : httpx encode les headers en latin-1 (le Σ levait UnicodeEncodeError).
+        default_headers = {"User-Agent": "SIRIUS-HUD/1.0 (contact@sirius.local)"}
 
         async with httpx.AsyncClient(timeout=12, follow_redirects=True, headers=default_headers) as cx:
             for name, url, configured in integ:

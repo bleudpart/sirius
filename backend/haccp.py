@@ -1,6 +1,7 @@
 # © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 """Module HACCP : traçabilité, températures, PMS, non-conformités, nettoyage, allergènes, documents."""
 import uuid
+import io
 from datetime import datetime, timezone, date, timedelta
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, StringConstraints
@@ -96,6 +97,12 @@ class DocIn(BaseModel):
     date_emission: Optional[str] = None
     date_expiration: Optional[str] = None
     notes: Optional[str] = ""
+
+
+class AuditIn(BaseModel):
+    date_debut: Optional[str] = None
+    date_fin: Optional[str] = None
+    inclure_sections: List[str] = ["trace", "temp", "pms", "nc", "clean", "allerg", "docs"]
 
 
 def trace_status(item):
@@ -352,5 +359,46 @@ def make_haccp_router(db):
         temp_nc = await db.haccp_temp.count_documents({"conforme": False, "created_at": {"$gte": start}})
         return {"dlc_alertes": dlc_alertes, "nc_ouvertes": nc_ouvertes,
                 "docs_alertes": docs_alertes, "temp_non_conformes_jour": temp_nc}
+
+    @r.post("/audit")
+    async def audit_pdf(body: AuditIn):
+        fin = body.date_fin or today()
+        debut = body.date_debut or (date.today() - timedelta(days=30)).isoformat()
+        if debut > fin:
+            raise HTTPException(status_code=422, detail="La date de début doit précéder la date de fin.")
+        sections = set(body.inclure_sections or [])
+        window = {"created_at": {"$gte": debut, "$lte": f"{fin}T23:59:59+00:00"}}
+        report = ["RAPPORT D'AUDIT HACCP", f"Période auditée : {debut} au {fin}", ""]
+        if "trace" in sections:
+            traces = await db.haccp_trace.find(window, NO_ID).to_list(300)
+            report.append(f"Traçabilité : {len(traces)} réception(s) enregistrée(s).")
+        if "temp" in sections:
+            temperatures = await db.haccp_temp.find(window, NO_ID).to_list(500)
+            non_conformes = sum(1 for item in temperatures if not item.get("conforme", True))
+            report.append(f"Températures : {len(temperatures)} relevé(s), {non_conformes} non conforme(s).")
+        if "pms" in sections:
+            pms = await db.haccp_pms.find({}, NO_ID).to_list(300)
+            en_place = sum(1 for item in pms if item.get("statut") == "en_place")
+            report.append(f"PMS : {en_place}/{len(pms)} procédure(s) en place.")
+        if "nc" in sections:
+            ncs = await db.haccp_nc.find(window, NO_ID).to_list(300)
+            ouvertes = sum(1 for item in ncs if item.get("statut", "ouverte") == "ouverte")
+            report.append(f"Non-conformités : {len(ncs)} déclarée(s), {ouvertes} ouverte(s).")
+        if "clean" in sections:
+            tasks = await db.haccp_clean.find({}, NO_ID).to_list(300)
+            logs = await db.haccp_clean_log.find(window, NO_ID).to_list(500)
+            report.append(f"Nettoyage : {len(tasks)} tâche(s) définie(s), {len(logs)} réalisation(s) enregistrée(s).")
+        if "allerg" in sections:
+            allergens = await db.haccp_allerg.find({}, NO_ID).to_list(300)
+            report.append(f"Allergènes : {len(allergens)} fiche(s) plat enregistrée(s), référentiel de 14 allergènes UE.")
+        if "docs" in sections:
+            documents = await db.haccp_docs.find({}, NO_ID).to_list(300)
+            valid = sum(1 for item in documents if doc_status(item) == "valide")
+            report.append(f"Documentation : {valid}/{len(documents)} document(s) valide(s).")
+        report.extend(["", "Document de synthèse généré par SIRIUS.", "Cet outil prépare un audit interne et ne constitue pas une certification officielle."])
+        from themis_pdf import build_consult_pdf
+        pdf = build_consult_pdf("PANTHÉON", "Audit HACCP", "\n".join(report), date.today().strftime("%d/%m/%Y"))
+        return Response(content=pdf.getvalue(), media_type="application/pdf",
+                        headers={"Content-Disposition": f'attachment; filename="audit_haccp_{today()}.pdf"'})
 
     return r

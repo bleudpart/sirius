@@ -26,6 +26,12 @@ export default function NotesPanel() {
     void load("");
   }, [load]);
 
+  useEffect(() => {
+    const refresh = () => { void load(query); };
+    window.addEventListener("productivity-sync-complete", refresh);
+    return () => window.removeEventListener("productivity-sync-complete", refresh);
+  }, [load, query]);
+
   const reset = () => {
     setDraft(EMPTY_DRAFT);
     setEditingId("");

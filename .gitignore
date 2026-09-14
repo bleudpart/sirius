@@ -53,6 +53,7 @@ __pycache__/
 *pyc*
 venv/
 .venv/
+.venv-build/
 
 # Development tools
 chainlit.md
@@ -102,6 +103,7 @@ frontend/node_modules/electron/dist/electron
 .env
 .env.*
 *.env
+backend/contacts_cache.json
 credentials.json
 *.key
 .credentials

@@ -59,6 +59,16 @@ class ReportBuildRequest(BaseModel):
     report_type: str = Field(default="work", max_length=40)
 
 
+class SyncPullRequest(BaseModel):
+    device_id: str = Field(min_length=1, max_length=120)
+    since: str = Field(default="", max_length=40)
+
+
+class SyncPushRequest(BaseModel):
+    device_id: str = Field(min_length=1, max_length=120)
+    changes: list[dict] = Field(default_factory=list, max_length=500)
+
+
 def make_productivity_router(db, store: ProductivityStore | None = None) -> APIRouter:
     router = APIRouter(prefix="/productivity", tags=["productivity"])
     storage = store or ProductivityStore()
@@ -164,5 +174,19 @@ def make_productivity_router(db, store: ProductivityStore | None = None) -> APIR
     @router.get("/oracle")
     async def productivity_oracle(request: Request):
         return build_productivity_oracle(tasks.summary(await user_id_for(request)))
+
+    @router.post("/sync/pull")
+    async def sync_pull(payload: SyncPullRequest, request: Request):
+        return storage.sync_pull(await user_id_for(request), payload.since)
+
+    @router.post("/sync/push")
+    async def sync_push(payload: SyncPushRequest, request: Request):
+        return storage.sync_push(await user_id_for(request), payload.device_id, payload.changes)
+
+    @router.get("/sync/status")
+    async def sync_status(request: Request):
+        user_id = await user_id_for(request)
+        snapshot = storage.sync_pull(user_id)
+        return {"server_time": snapshot["server_time"], "notes": len(snapshot["notes"]), "tasks": len(snapshot["tasks"])}
 
     return router

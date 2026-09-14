@@ -28,6 +28,7 @@ const TYPE_META = {
   image: { label: "IMAGE", Icon: ImageIcon },
   media: { label: "MÉDIAS", Icon: Film },
   emails: { label: "E-MAILS", Icon: Mail },
+  email_draft: { label: "BROUILLON E-MAIL", Icon: Mail },
   contacts: { label: "CONTACTS", Icon: ContactRound },
 };
 
@@ -60,7 +61,7 @@ function EmailCard({ mail, onOpen }) {
   );
 }
 
-function ContactCard({ contact }) {
+function ContactCard({ contact, onPick }) {
   const email = contact.email || contact.emails?.[0] || "";
   const phone = contact.telephone || contact.telephones?.[0] || "";
   return (
@@ -68,16 +69,19 @@ function ContactCard({ contact }) {
       type="button"
       className="sd-contact-card"
       onClick={() => {
-        if (email) {
-          window.location.href = `mailto:${email}`;
-        } else if (phone) {
-          window.location.href = `tel:${phone}`;
-        }
+        // La composition reste pilotée par ΣIRIUS : jamais d'ouverture directe du client mail.
+        if (onPick) onPick(contact);
+        else if (phone) window.location.href = `tel:${phone}`;
       }}
-      title={email || phone ? "Contacter cette personne" : "Aucune coordonnée disponible"}
+      title={email ? "Écrire à ce contact avec ΣIRIUS" : phone ? "Appeler ce contact" : "Aucune coordonnée disponible"}
       data-testid="sirius-display-contact-card"
     >
-      <div className="sd-contact-name"><ContactRound size={15} /> {contact.nom || "Contact sans nom"}</div>
+      <div className="sd-contact-name">
+        <ContactRound size={15} /> {contact.nom || "Contact sans nom"}
+        {contact.source && (
+          <span className={`sd-contact-src ${contact.source}`}>{contact.source === "gmail" ? "GMAIL" : "OUTLOOK"}</span>
+        )}
+      </div>
       {(contact.poste || contact.entreprise) && (
         <div className="sd-contact-role">{[contact.poste, contact.entreprise].filter(Boolean).join(" · ")}</div>
       )}
@@ -85,6 +89,112 @@ function ContactCard({ contact }) {
       {phone && <div className="sd-contact-line">{phone}</div>}
       {!email && !phone && <div className="sd-contact-empty">Aucune coordonnée</div>}
     </button>
+  );
+}
+
+// Recherche locale : accents ignorés et mots dans n'importe quel ordre, comme côté backend.
+const foldContact = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+function ContactsView({ titre, contacts, onPick }) {
+  const [filter, setFilter] = useState("");
+  const all = contacts || [];
+  const tokens = foldContact(filter).split(/[^\w@.]+/).filter(Boolean);
+  const shown = tokens.length
+    ? all.filter((c) => {
+        const hay = foldContact([
+          c.nom, c.prenom, c.nom_famille, c.entreprise, c.poste,
+          ...(c.emails || [c.email]), ...(c.telephones || [c.telephone]),
+        ].filter(Boolean).join(" "));
+        return tokens.every((t) => hay.includes(t));
+      })
+    : all;
+
+  return (
+    <div className="sd-emails" data-testid="sirius-display-contacts">
+      {titre && <div className="sd-msg-title">{titre}</div>}
+      <div className="sd-contact-search">
+        <ContactRound size={13} />
+        <input
+          type="search"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Rechercher un contact (nom, e-mail, téléphone…)"
+          aria-label="Rechercher un contact"
+          data-testid="sirius-display-contact-search"
+        />
+        <span className="sd-contact-count">{shown.length}/{all.length}</span>
+      </div>
+      {!all.length && <p className="sd-emails-empty">Aucun contact trouvé.</p>}
+      {!!all.length && !shown.length && (
+        <p className="sd-emails-empty">Aucun contact ne correspond à « {filter} ».</p>
+      )}
+      <div className="sd-contact-grid">
+        {shown.map((contact, i) => (
+          <ContactCard key={contact.id || contact.email || i} contact={contact} onPick={onPick} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Brouillon d'e-mail éditable : dernier point de contrôle avant l'envoi réel.
+function EmailDraft({ item }) {
+  const [subject, setSubject] = useState(item.subject || "");
+  const [body, setBody] = useState(item.body || "");
+  const [sent, setSent] = useState(false);
+
+  const notify = (nextSubject, nextBody) => {
+    if (item.onEdit) item.onEdit({ subject: nextSubject, body: nextBody });
+  };
+
+  return (
+    <div className="sd-draft" data-testid="sirius-display-draft">
+      {item.titre && <div className="sd-msg-title">{item.titre}</div>}
+      <div className="sd-draft-to">
+        <Mail size={13} /> À : {item.nom || item.to}{item.nom && item.to ? ` <${item.to}>` : ""}
+      </div>
+      <label className="sd-draft-label">
+        Objet
+        <input
+          type="text"
+          value={subject}
+          disabled={sent}
+          onChange={(e) => { setSubject(e.target.value); notify(e.target.value, body); }}
+          data-testid="sirius-display-draft-subject"
+        />
+      </label>
+      <label className="sd-draft-label">
+        Message
+        <textarea
+          value={body}
+          rows={8}
+          disabled={sent}
+          onChange={(e) => { setBody(e.target.value); notify(subject, e.target.value); }}
+          data-testid="sirius-display-draft-body"
+        />
+      </label>
+      <p className="sd-draft-note">La signature ΣIRIUS est ajoutée automatiquement à l'envoi.</p>
+      <div className="sd-draft-actions">
+        <button
+          type="button"
+          className="sd-draft-send"
+          disabled={sent || !body.trim()}
+          onClick={() => { setSent(true); if (item.onSend) item.onSend({ subject, body }); }}
+          data-testid="sirius-display-draft-send"
+        >
+          {sent ? "ENVOI EN COURS…" : "ENVOYER"}
+        </button>
+        <button
+          type="button"
+          className="sd-draft-cancel"
+          disabled={sent}
+          onClick={() => { setSent(true); if (item.onCancel) item.onCancel(); }}
+          data-testid="sirius-display-draft-cancel"
+        >
+          ANNULER
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -526,18 +636,9 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
               </div>
             )}
             {!pasted && type === "contacts" && (
-              <div className="sd-emails" data-testid="sirius-display-contacts">
-                {item.titre && <div className="sd-msg-title">{item.titre}</div>}
-                {(!item.contacts || !item.contacts.length) && (
-                  <p className="sd-emails-empty">Aucun contact trouvé.</p>
-                )}
-                <div className="sd-contact-grid">
-                  {(item.contacts || []).map((contact, i) => (
-                    <ContactCard key={contact.id || contact.email || i} contact={contact} />
-                  ))}
-                </div>
-              </div>
+              <ContactsView titre={item.titre} contacts={item.contacts} onPick={item.onPickContact} />
             )}
+            {!pasted && type === "email_draft" && <EmailDraft item={item} />}
             {!pasted && type === "image" && (
               <div className="sd-media">
                 <img key={item.src} src={item.src} alt={item.legende || "affichage"} className="sd-image" data-testid="sirius-display-image" />

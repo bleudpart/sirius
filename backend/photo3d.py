@@ -19,12 +19,14 @@ le frontend interroge /api/photo3d/jobs/{id} pour la barre de progression.
 from __future__ import annotations
 
 import io
+import zipfile
 import logging
 import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -36,10 +38,11 @@ except Exception:  # pragma: no cover - opencv absent en environnement minimal
     cv2 = None
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 from runtime_paths import data_dir
+from auth_api import require_user
 
 logger = logging.getLogger("sirius.photo3d")
 
@@ -294,11 +297,12 @@ class Photo3DStatusResponse(BaseModel):
     message: str
 
 
-def make_photo3d_router(rate_ok) -> APIRouter:
+def make_photo3d_router(rate_ok, db=None) -> APIRouter:
     router = APIRouter(prefix="/photo3d", tags=["photo3d"])
 
     @router.post("/jobs")
     async def create_job(request: Request, files: list[UploadFile] = File(...)):
+        user = await require_user(request, db)
         if not rate_ok(request.client.host if request.client else "?", limit=5):
             raise HTTPException(status_code=429, detail="Trop de requêtes, patientez un instant.")
         if len(files) < MIN_PHOTOS:
@@ -321,18 +325,66 @@ def make_photo3d_router(rate_ok) -> APIRouter:
             image_paths.append(dest)
 
         JOBS.update(job.id, n_photos=len(image_paths))
+        if db is not None:
+            await db.photo3d_jobs.insert_one({"job_id": job.id, "user_id": user["user_id"], "status": job.status, "n_photos": job.n_photos, "created_at": datetime.now(timezone.utc).isoformat()})
         _EXECUTOR.submit(_run_job, job.id, image_paths)
         return job.to_public()
 
     @router.get("/jobs/{job_id}")
-    async def get_job(job_id: str):
+    async def get_job(job_id: str, request: Request):
+        user = await require_user(request, db)
+        if db is not None and not await db.photo3d_jobs.find_one({"job_id": job_id, "user_id": user["user_id"]}):
+            raise HTTPException(status_code=404, detail="Job introuvable.")
         job = JOBS.get(job_id)
         if not job:
             raise HTTPException(status_code=404, detail="Job introuvable.")
         return job.to_public()
 
+    @router.get("/history")
+    async def history(request: Request):
+        user = await require_user(request, db)
+        if db is None:
+            return {"jobs": []}
+        jobs = await db.photo3d_jobs.find({"user_id": user["user_id"]}, {"_id": 0}).sort("created_at", -1).to_list(100)
+        for item in jobs:
+            job = JOBS.get(item["job_id"])
+            if job:
+                item.update(job.to_public())
+            else:
+                folder = _OUTPUT_ROOT / item["job_id"]
+                obj_exists = (folder / "model.obj").is_file()
+                item.update({
+                    "status": "termine" if obj_exists else item.get("status", "en_attente"),
+                    "progress": 100 if obj_exists else 0,
+                    "message": "Modèle 3D prêt." if obj_exists else "Projet interrompu avant génération.",
+                    "obj_url": f"/api/photo3d/jobs/{item['job_id']}/model.obj" if obj_exists else None,
+                    "mtl_url": f"/api/photo3d/jobs/{item['job_id']}/model.mtl" if (folder / "model.mtl").is_file() else None,
+                })
+        return {"jobs": jobs}
+
+    @router.get("/history/{job_id}/export")
+    async def export_history(job_id: str, request: Request):
+        user = await require_user(request, db)
+        item = await db.photo3d_jobs.find_one({"job_id": job_id, "user_id": user["user_id"]}, {"_id": 0}) if db is not None else None
+        job = JOBS.get(job_id)
+        obj_filename = job.obj_filename if job else "model.obj"
+        mtl_filename = job.mtl_filename if job else "model.mtl"
+        if not item or not ( _OUTPUT_ROOT / job_id / obj_filename).is_file():
+            raise HTTPException(status_code=404, detail="Projet 3D introuvable.")
+        folder = _OUTPUT_ROOT / job_id
+        archive = io.BytesIO()
+        with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as bundle:
+            for filename in (obj_filename, mtl_filename):
+                path = folder / filename if filename else None
+                if path and path.is_file():
+                    bundle.write(path, filename)
+        return Response(content=archive.getvalue(), media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="photo3d-{job_id}.zip"'})
+
     @router.get("/jobs/{job_id}/model.obj")
-    async def get_model_obj(job_id: str):
+    async def get_model_obj(job_id: str, request: Request):
+        user = await require_user(request, db)
+        if db is not None and not await db.photo3d_jobs.find_one({"job_id": job_id, "user_id": user["user_id"]}):
+            raise HTTPException(status_code=404, detail="Modèle introuvable.")
         job = JOBS.get(job_id)
         if not job or not job.obj_filename:
             raise HTTPException(status_code=404, detail="Modèle non disponible.")
@@ -342,7 +394,10 @@ def make_photo3d_router(rate_ok) -> APIRouter:
         return FileResponse(path, media_type="text/plain", filename="sirius-model.obj")
 
     @router.get("/jobs/{job_id}/model.mtl")
-    async def get_model_mtl(job_id: str):
+    async def get_model_mtl(job_id: str, request: Request):
+        user = await require_user(request, db)
+        if db is not None and not await db.photo3d_jobs.find_one({"job_id": job_id, "user_id": user["user_id"]}):
+            raise HTTPException(status_code=404, detail="Matériau introuvable.")
         job = JOBS.get(job_id)
         if not job or not job.mtl_filename:
             raise HTTPException(status_code=404, detail="Matériau non disponible.")

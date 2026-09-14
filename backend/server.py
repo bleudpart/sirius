@@ -1935,7 +1935,7 @@ api_router.include_router(make_floorplan_router(_rate_ok))
 
 # PHOTO3D# : reconstruction 3D locale à partir d'une série de photos
 from photo3d import make_photo3d_router
-api_router.include_router(make_photo3d_router(_rate_ok))
+api_router.include_router(make_photo3d_router(_rate_ok, db))
 
 from modules_api import make_modules_router
 api_router.include_router(make_modules_router(db))

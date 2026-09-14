@@ -1,7 +1,8 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. PORTUS NUMMARIUS# — bourse & marchés (courbes d'évolution).
-import { useEffect, useState } from "react";
-import { TrendingUp, TrendingDown, RefreshCw, Landmark } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { TrendingUp, TrendingDown, RefreshCw, Landmark, Bell, Trash2, Plus } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { speakAsCharacter } from "@/voice";
 
 const API = process.env.REACT_APP_BACKEND_URL;
 const RANGES = [["1s", "1 SEM"], ["1m", "1 MOIS"], ["3m", "3 MOIS"], ["max", "MAX"]];
@@ -31,6 +32,10 @@ export default function PortusNummarius({ onClose }) {
   const [hist, setHist] = useState(null);
   const [loadingHist, setLoadingHist] = useState(false);
   const [err, setErr] = useState("");
+  const [alerts, setAlerts] = useState([]);
+  const [alertType, setAlertType] = useState("price_above");
+  const [alertThreshold, setAlertThreshold] = useState("");
+  const triggeredRef = useRef(new Set());
 
   const loadMarket = async () => {
     setErr("");
@@ -41,6 +46,40 @@ export default function PortusNummarius({ onClose }) {
       setAssets(data.assets);
       setErrs(data.errors || []);
       if (!sel && data.assets.length) setSel(data.assets[0]);
+      await loadAlerts();
+    } catch (e) { setErr(e.message); }
+  };
+
+  const loadAlerts = async () => {
+    try {
+      const response = await fetch(`${API}/api/nummarius/alerts`, { credentials: "include" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || "Alertes indisponibles");
+      setAlerts(data.alerts || []);
+      data.alerts.filter((alert) => alert.triggered && !triggeredRef.current.has(alert.id)).forEach((alert) => {
+        const asset = (assets || []).find((item) => item.id === alert.asset_id);
+        speakAsCharacter(`Alerte NUMMARIUS : ${asset?.label || alert.asset_id} a atteint le seuil défini.`, { pitch: 0.9, rate: 0.85 });
+        triggeredRef.current.add(alert.id);
+      });
+    } catch (e) { setErr(e.message); }
+  };
+
+  const addAlert = async () => {
+    if (!sel || !alertThreshold) return;
+    try {
+      const response = await fetch(`${API}/api/nummarius/alerts`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ asset_id: sel.id, alert_type: alertType, threshold: Number(alertThreshold) }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || "Création impossible");
+      setAlertThreshold("");
+      await loadAlerts();
+    } catch (e) { setErr(e.message); }
+  };
+
+  const deleteAlert = async (id) => {
+    try {
+      const response = await fetch(`${API}/api/nummarius/alerts/${id}`, { method: "DELETE", credentials: "include" });
+      if (!response.ok) throw new Error("Suppression impossible");
+      setAlerts((items) => items.filter((item) => item.id !== id));
     } catch (e) { setErr(e.message); }
   };
 
@@ -90,6 +129,17 @@ export default function PortusNummarius({ onClose }) {
                 </span>
               </button>
             ))}
+          </div>
+          <div className="numm-alerts" data-testid="nummarius-alerts">
+            <div className="numm-chart-title"><Bell size={13} /> ALERTES</div>
+            <div className="numm-alert-form">
+              <select value={alertType} onChange={(e) => setAlertType(e.target.value)} aria-label="Type d'alerte">
+                <option value="price_above">Prix au-dessus</option><option value="price_below">Prix en-dessous</option><option value="variation">Variation % au-dessus</option>
+              </select>
+              <input type="number" min="0.01" step="0.01" value={alertThreshold} onChange={(e) => setAlertThreshold(e.target.value)} placeholder={alertType === "variation" ? "%" : "$"} aria-label="Seuil" />
+              <button className="file-btn" onClick={addAlert} disabled={!sel || !alertThreshold} title="Ajouter l'alerte"><Plus size={13} /></button>
+            </div>
+            {alerts.map((alert) => <div className={`numm-alert ${alert.triggered ? "triggered" : ""}`} key={alert.id}><span>{alert.asset_id} · {alert.alert_type === "variation" ? `${alert.threshold}%` : `${alert.threshold}$`}{alert.triggered ? " · DÉCLENCHÉE" : ""}</span><button className="file-btn" onClick={() => deleteAlert(alert.id)} title="Supprimer l'alerte"><Trash2 size={11} /></button></div>)}
           </div>
         </aside>
         <section className="numm-main">

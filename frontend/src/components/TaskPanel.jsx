@@ -24,6 +24,11 @@ export default function TaskPanel() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    window.addEventListener("productivity-sync-complete", load);
+    return () => window.removeEventListener("productivity-sync-complete", load);
+  }, [load]);
+
   const create = async (event) => {
     event.preventDefault();
     if (!draft.title.trim() || busy) return;

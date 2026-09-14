@@ -1,4 +1,5 @@
-# SIRIUS Assistant
+
+# SIRIUS Assistant
 
 Assistant vocal personnel avec HUD futuriste style « Iron Man ».
 Frontend **React** + Backend **FastAPI** (Python), packagé en application Windows autonome via **Electron**.
@@ -97,6 +98,7 @@ Guide détaillé : [INSTALL-SIRIUS.md](./INSTALL-SIRIUS.md)
 
 ### Modules spécialisés
 - **HACCP** — hygiène & sécurité alimentaire (formulaires 2026)
+- **THÉMIS#** — devis, factures, paiements, pièces fournisseurs, journal comptable, synthèse TVA, rapprochement bancaire et bilan prévisionnel
 - **ARGUS#** — surveillance & réparation système
 - **LOCUS#** — géolocalisation & itinéraires
 - **HERACLES#** — investigation OSINT
@@ -116,6 +118,11 @@ Guide détaillé : [INSTALL-SIRIUS.md](./INSTALL-SIRIUS.md)
 - Menu `OUTILS` ou à la voix : *« Sirius, ouvre mes notes »*, *« analyse ce document »*, *« montre mes tâches »*
 - **DocAnalyzer**, **CodeAssist**, **SmartNotes**, **TaskMaster**, **ReportBuilder**
 - Analyses 100 % locales : le code n'est jamais exécuté, aucune clé API supplémentaire
+
+> **Limite comptable importante :** les fonctions de journal, TVA, rapprochement
+> bancaire et bilan prévisionnel de THÉMIS sont des outils de suivi et de
+> pilotage. Elles ne constituent pas une comptabilité légale certifiée, une
+> déclaration fiscale officielle ou un remplacement d'un expert-comptable.
 
 Liste complète des modules et dates : [MODULES_SIRIUS.txt](./MODULES_SIRIUS.txt)
 

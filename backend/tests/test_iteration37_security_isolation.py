@@ -517,10 +517,9 @@ class TestPaymentsIsolation:
             mongo_db.payment_transactions.delete_many({"session_id": {"$in": [sid_a, sid_b]}})
 
 
-# La CORS-liste de confiance ne référence plus le domaine d'hébergement Emergent : seules les
-# origines de dev locales (et celles explicitement ajoutées via CORS_ORIGINS) sont acceptées.
-def test_direct_backend_cors_rejects_emergent_preview_origin():
-    origin = "https://cybertech-panel.preview.emergentagent.com"
+# La CORS-liste de confiance rejette les origines de prévisualisation inconnues.
+def test_direct_backend_cors_rejects_untrusted_preview_origin():
+    origin = "https://untrusted-preview.example.invalid"
     response = requests.get(f"{DIRECT_URL}/api/auth/me", headers={"Origin": origin}, timeout=30)
     assert response.status_code == 401
     assert response.headers.get("access-control-allow-origin") != origin

@@ -24,7 +24,13 @@ const phonetic = (text) =>
   customPhonetic(String(text))
     .replace(/\bsirius\b/gi, "Siriusse")
     .replace(/\bS\.I\.R\.I\.U\.S\b/gi, "Siriusse")
-    .replace(/\bcortex\b/gi, "cortèxe");
+    .replace(/\bcortex\b/gi, "cortèxe")
+    // « e-mail » devient « e mail » au nettoyage, que le TTS français lit « eu mail ».
+    .replace(/\be[- ]?mails\b/gi, "imèls")
+    .replace(/\be[- ]?mail\b/gi, "imèl")
+    // Prénoms étrangers : le « ee » final se lit « é » en français, alors qu'il se dit « i »
+    // (Shivanee → Chivani). Limité aux mots capitalisés pour ne pas toucher au vocabulaire courant.
+    .replace(/(\p{Lu}\p{L}*?)ee\b/gu, "$1i");
 
 // Nettoyage du texte avant synthèse vocale : retire l'habillage Markdown (astérisques,
 // tirets de liste, titres #, `code`, liens…) et les symboles pour que le moteur TTS lise
@@ -62,10 +68,15 @@ function cleanTextForSpeech(t) {
     .replace(/(\*\*|__)(.*?)\1/g, "$2")          // **gras** __gras__
     .replace(/(\*|_)(.*?)\1/g, "$2")             // *italique* _italique_
     .replace(/[*_#`~|]/g, " ")                   // symboles Markdown restants
+    .replace(/[\u2010\u2011\u2012]/g, "-")       // tirets Unicode (insécables) → tiret simple
+    // Élision mal orthographiée par le LLM : « dites-m-en » → « dites-m'en » (sinon « m » se lit « meu »).
+    .replace(/-([mtl])-(en|y)\b/gi, "-$1'$2")
     .replace(/[—–]/g, ", ")                      // tirets longs → pause naturelle
     .replace(/\s-{2,}\s/g, ", ")                 // -- ou --- entre mots
     .replace(/(\d)\s*-\s*(\d)/g, "$1 à $2")       // plage numérique 10-15 → « 10 à 15 » (pas « moins »)
-    .replace(/-/g, " ")                          // tout tiret restant (mots composés, listes) → espace, jamais lu comme « moins »
+    // Seuls les tirets ISOLÉS deviennent des espaces. Un tiret entre deux lettres soude un mot
+    // (« dites-m'en », « peut-être », « e-mail ») : le couper fait lire « m » comme « meu ».
+    .replace(/(?<!\p{L})-|-(?!\p{L})/gu, " ")
     .replace(/[()\[\]{}<>]/g, "")    // supprime parenthèses / crochets / accolades / chevrons
     .replace(/\/+/g, " ")            // supprime barres
     .replace(/[ \t]+/g, " ")         // normalise espaces (garde les fins de phrase)

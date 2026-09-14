@@ -1324,6 +1324,11 @@ body.hud-minimal .medallion-halo { display: none; }
 .numm-chart { min-height: 356px; border: 1px solid rgba(216, 184, 117, 0.18); border-radius: 12px; background: rgba(5, 14, 22, 0.5); padding: 8px; }
 .numm-warn { color: #d8b875; font-size: 10.5px; margin-bottom: 8px; font-style: italic; }
 .numm-spark { flex-shrink: 0; }
+.numm-alerts { margin-top: 8px; padding: 10px; border: 1px solid rgba(127, 212, 232, 0.2); border-radius: 10px; background: rgba(5, 14, 22, 0.48); }
+.numm-alert-form { display: grid; grid-template-columns: 1fr 72px 30px; gap: 5px; margin: 8px 0; }
+.numm-alert-form select, .numm-alert-form input { min-width: 0; padding: 5px; border: 1px solid rgba(127, 212, 232, 0.3); border-radius: 5px; background: #07141e; color: #d8e6ef; font-size: 10px; }
+.numm-alert { display: flex; align-items: center; justify-content: space-between; gap: 5px; padding: 5px 0; border-top: 1px solid rgba(127, 212, 232, 0.1); color: #9db4c2; font-size: 10px; }
+.numm-alert.triggered { color: #f2d99a; }
 @media (max-width: 860px) { .numm-body { flex-direction: column; } .numm-side { width: 100%; } .numm-avatar { max-height: 140px; } }
 /* Lecture à voix haute universelle */
 .read-aloud-bar { position: absolute; bottom: 14px; left: 0; right: 0; margin: 0 auto; width: max-content; max-width: min(92%, 640px); z-index: 60; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: center; padding: 8px 16px; border-radius: 22px; background: rgba(5, 14, 22, 0.9); border: 1px solid rgba(216, 184, 117, 0.5); box-shadow: 0 0 16px rgba(216, 184, 117, 0.18); backdrop-filter: blur(8px); animation: readAloudIn 0.35s ease; }
@@ -1517,6 +1522,18 @@ body.hud-minimal .medallion-halo { display: none; }
   animation: goldSheen 5.5s ease-in-out infinite, goldPulse 3s ease-in-out infinite;
 }
 .cmd-send:hover { box-shadow: 0 0 18px rgba(216, 184, 117, 0.5); }
+.cmd-bar > .mic-btn {
+  flex: 0 0 72px;
+  width: 72px;
+  min-width: 72px;
+  height: 30px;
+  padding: 0;
+  margin: 0;
+  gap: 5px;
+  font-family: "Orbitron", sans-serif;
+  font-size: 9px;
+  letter-spacing: 0.6px;
+}
 .mic-btn {
   display: inline-flex;
   align-items: center;
@@ -4062,6 +4079,112 @@ body.hud-minimal .medallion-halo { display: none; }
 .sd-email-badge.imp { color: #d4af37; border-color: rgba(212, 175, 55, 0.5); }
 .sd-email-badge.crit { color: #ff8080; border-color: rgba(255, 90, 90, 0.6); }
 .sd-email-source { font-size: 9px; letter-spacing: 0.06em; color: rgba(226, 248, 255, 0.4); }
+.sd-draft {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 2px;
+}
+.sd-draft-to {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: #91e6f2;
+  letter-spacing: 0.03em;
+}
+.sd-draft-label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(226, 248, 255, 0.5);
+}
+.sd-draft-label input,
+.sd-draft-label textarea {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid rgba(145, 230, 242, 0.28);
+  border-radius: 8px;
+  background: rgba(6, 20, 30, 0.6);
+  color: #e2f8ff;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  resize: vertical;
+}
+.sd-draft-label input:focus,
+.sd-draft-label textarea:focus {
+  outline: none;
+  border-color: rgba(212, 175, 55, 0.6);
+  box-shadow: 0 0 12px rgba(212, 175, 55, 0.18);
+}
+.sd-draft-label input:disabled,
+.sd-draft-label textarea:disabled { opacity: 0.55; }
+.sd-draft-note { margin: 0; font-size: 10px; color: rgba(226, 248, 255, 0.42); }
+.sd-draft-actions { display: flex; gap: 9px; }
+.sd-draft-send,
+.sd-draft-cancel {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+.sd-draft-send {
+  border: 1px solid rgba(212, 175, 55, 0.65);
+  background: rgba(212, 175, 55, 0.16);
+  color: #f0dca4;
+}
+.sd-draft-cancel {
+  border: 1px solid rgba(145, 230, 242, 0.3);
+  background: rgba(6, 20, 30, 0.55);
+  color: rgba(226, 248, 255, 0.7);
+}
+.sd-draft-send:hover:not(:disabled),
+.sd-draft-cancel:hover:not(:disabled) { filter: brightness(1.25); }
+.sd-draft-send:disabled,
+.sd-draft-cancel:disabled { opacity: 0.45; cursor: not-allowed; }
+.sd-contact-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 10px;
+  padding: 7px 10px;
+  border: 1px solid rgba(145, 230, 242, 0.28);
+  border-radius: 8px;
+  background: rgba(6, 20, 30, 0.55);
+  color: rgba(145, 230, 242, 0.75);
+}
+.sd-contact-search:focus-within {
+  border-color: rgba(212, 175, 55, 0.6);
+  box-shadow: 0 0 12px rgba(212, 175, 55, 0.18);
+}
+.sd-contact-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: #e2f8ff;
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+}
+.sd-contact-search input::placeholder { color: rgba(226, 248, 255, 0.38); }
+.sd-contact-count {
+  flex: none;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: rgba(226, 248, 255, 0.45);
+}
 .sd-contact-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -4099,6 +4222,19 @@ body.hud-minimal .medallion-halo { display: none; }
   font-size: 12.5px;
   font-weight: 600;
 }
+.sd-contact-src {
+  margin-left: auto;
+  flex: none;
+  padding: 1px 6px;
+  border: 1px solid rgba(145, 230, 242, 0.35);
+  border-radius: 20px;
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  font-weight: 500;
+  color: rgba(226, 248, 255, 0.6);
+}
+.sd-contact-src.gmail { color: #f0a8a0; border-color: rgba(234, 67, 53, 0.55); }
+.sd-contact-src.outlook { color: #8fc4f5; border-color: rgba(0, 120, 212, 0.6); }
 .sd-contact-role, .sd-contact-line, .sd-contact-empty {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4650,6 +4786,7 @@ body.hud-minimal .medallion-halo { display: none; }
   .cmd-prompt { display: none; }
   .cmd-send { padding: 8px 10px; font-size: 10px; }
   .ptt-btn { padding: 7px 8px; font-size: 9px; }
+  .cmd-bar > .mic-btn { flex-basis: 64px; width: 64px; min-width: 64px; font-size: 8px; }
   .hud-panel.bottom-right { display: none; } /* NOYAU masqué sur téléphone */
   .hud-panel.bottom-left { min-width: 148px; bottom: 8px; left: 8px; }
   .hud-panel.stats-mini { min-width: 148px; max-width: 180px; bottom: 108px; left: 8px; right: auto; padding: 8px 12px; }

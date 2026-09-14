@@ -3,6 +3,8 @@
 des e-mails Gmail (httpx, sans SDK). Le même jeton Google (scope gmail.readonly demandé lors
 de la connexion à l'Agenda) sert aussi à lire la boîte de réception Gmail."""
 import os
+import logging
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -12,6 +14,7 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 import email_intel
+import contacts_cache
 from auth_api import resolve_user_id, LEGACY_UID, is_direct_local_request
 from email_signature import append_signature_text
 
@@ -19,8 +22,12 @@ TOKEN_URL = "https://oauth2.googleapis.com/token"
 AUTH_URL = "https://accounts.google.com/o/oauth2/auth"
 CAL_API = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
 GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me"
+PEOPLE_API = "https://people.googleapis.com/v1/people/me/connections"
 SCOPE = "https://www.googleapis.com/auth/calendar"
+MAX_GOOGLE_CONTACTS = 2000
 DOC_ID = "default"
+
+logger = logging.getLogger("sirius.google")
 
 # Le SPA (localhost:3000 en dev) et l'API sont deux serveurs distincts : une redirection
 # relative "/?gcal=..." émise par l'API se résout par rapport à l'API elle-même (un ancien
@@ -38,8 +45,15 @@ def _client_conf():
 
 
 def _redirect_uri(request: Request) -> str:
+    """URI de retour OAuth, identique à l'aller et au retour (exigence Google).
+    GOOGLE_REDIRECT_URI prime : Google n'accepte qu'une URI enregistrée au caractère près."""
+    explicit = (os.environ.get("GOOGLE_REDIRECT_URI") or "").strip()
+    if explicit:
+        return explicit
     host = request.headers.get("x-forwarded-host") or request.headers.get("host", "")
-    proto = request.headers.get("x-forwarded-proto", "https")
+    # Sans en-tête de proxy, le schéma réel de la requête fait foi : en local c'est http,
+    # et forcer https renverrait l'utilisateur vers une adresse que le backend ne sert pas.
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
     return f"{proto}://{host}/api/oauth/calendar/callback"
 
 
@@ -76,6 +90,10 @@ def make_gcal_router(db):
             return tokens["access_token"]
         refresh = tokens.get("refresh_token")
         if not refresh:
+            await db.google_calendar.update_one(
+                {"_id": uid},
+                {"$set": {"tokens": None, "expires_at": None}},
+            )
             raise HTTPException(status_code=401, detail="Session Google expirée, reconnectez-vous.")
         cid, csec = _client_conf()
         async with httpx.AsyncClient(timeout=15) as cx:
@@ -89,7 +107,22 @@ def make_gcal_router(db):
                 },
             )
         if r.status_code != 200:
-            raise HTTPException(status_code=401, detail="Rafraîchissement du jeton Google refusé, reconnectez-vous.")
+                try:
+                    error_data = r.json()
+                except ValueError:
+                    error_data = {}
+                if error_data.get("error") == "invalid_grant":
+                    await db.google_calendar.update_one(
+                        {"_id": uid},
+                        {"$set": {"tokens": None, "expires_at": None}},
+                    )
+                    logger.warning("[GOOGLE] refresh token expiré ou révoqué pour %s", uid)
+                    raise HTTPException(
+                        status_code=401,
+                        detail="Jeton Google expiré ou révoqué. Reconnecte ton compte Google.",
+                    )
+                logger.warning("[GOOGLE] échec du rafraîchissement (%s): %s", r.status_code, error_data.get("error", "réponse inconnue"))
+                raise HTTPException(status_code=401, detail="Rafraîchissement du jeton Google refusé, reconnectez-vous.")
         new = r.json()
         tokens["access_token"] = new["access_token"]
         expires_at = (datetime.now(timezone.utc) + timedelta(seconds=new.get("expires_in", 3500))).isoformat()
@@ -120,7 +153,7 @@ def make_gcal_router(db):
             "client_id": cid,
             "redirect_uri": _redirect_uri(request),
             "response_type": "code",
-            "scope": SCOPE + " https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send",
+            "scope": SCOPE + " https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/contacts.readonly",
             "access_type": "offline",
             "prompt": "consent",
             "state": state,
@@ -168,7 +201,17 @@ def make_gcal_router(db):
         doc = await db.google_calendar.find_one({"_id": await _uid(request)})
         if not doc or not doc.get("tokens"):
             return {"connected": False}
-        return {"connected": True, "email": doc.get("email", "")}
+        # Google retire silencieusement les champs non déclarés sur l'écran de consentement :
+        # un compte « connecté » peut donc n'avoir que l'agenda. Le HUD doit pouvoir le savoir.
+        granted = (doc.get("tokens") or {}).get("scope") or ""
+        return {
+            "connected": True,
+            "email": doc.get("email", ""),
+            "scopes": granted,
+            "gmail": "gmail.readonly" in granted,
+            "gmail_send": "gmail.send" in granted,
+            "contacts": "contacts.readonly" in granted,
+        }
 
     @router.get("/calendar/events")
     async def gcal_events(request: Request, max_results: int = 10):
@@ -238,6 +281,74 @@ def make_gcal_router(db):
             if (h.get("name") or "").lower() == name.lower():
                 return h.get("value") or ""
         return ""
+
+    @router.get("/google/contacts")
+    async def google_contacts(request: Request, top: int = 50, query: str = "", refresh: bool = False):
+        """Carnet d'adresses Google (People API), normalisé comme les contacts Outlook
+        et servi depuis le cache local tant qu'il est frais."""
+        from microsoft_graph import filter_contacts
+
+        uid = await _uid(request)
+        cached = None if refresh else contacts_cache.read(uid, "google")
+        if cached is not None:
+            found = filter_contacts(cached, query)
+            logger.info("[GOOGLE] contacts (cache) : %d lus, %d correspondent à %r", len(cached), len(found), query)
+            return {"contacts": found[:max(1, min(top, MAX_GOOGLE_CONTACTS))], "query": query.strip()}
+
+        token = await _get_token(uid)
+        people: list = []
+        page = ""
+        async with httpx.AsyncClient(timeout=20) as cx:
+            while len(people) < MAX_GOOGLE_CONTACTS:
+                params = {
+                    "personFields": "names,emailAddresses,phoneNumbers,organizations",
+                    "pageSize": 200,
+                    "sortOrder": "FIRST_NAME_ASCENDING",
+                }
+                if page:
+                    params["pageToken"] = page
+                r = await cx.get(PEOPLE_API, params=params, headers={"Authorization": "Bearer " + token})
+                if r.status_code == 401:
+                    raise HTTPException(status_code=401, detail="Session Google expirée, reconnectez-vous.")
+                if r.status_code == 403:
+                    # Deux causes distinctes : API non activée dans le projet, ou champ non accordé.
+                    reason = ((r.json().get("error") or {}).get("message") or "")[:300]
+                    logger.warning("[GOOGLE] contacts refusés: %s", reason)
+                    detail = ("API Google People non activée dans ton projet Google Cloud."
+                              if "has not been used" in reason or "disabled" in reason
+                              else "Accès aux contacts Google non autorisé — reconnecte ton compte Google.")
+                    raise HTTPException(status_code=403, detail=detail)
+                if r.status_code != 200:
+                    raise HTTPException(status_code=502, detail=f"Google Contacts a répondu {r.status_code}.")
+                data = r.json()
+                people.extend(data.get("connections", []))
+                page = data.get("nextPageToken") or ""
+                if not page:
+                    break
+
+        contacts = []
+        for p in people[:MAX_GOOGLE_CONTACTS]:
+            name = (p.get("names") or [{}])[0]
+            org = (p.get("organizations") or [{}])[0]
+            emails = [e.get("value", "").strip().lower() for e in (p.get("emailAddresses") or []) if e.get("value")]
+            phones = [t.get("value", "").strip() for t in (p.get("phoneNumbers") or []) if t.get("value")]
+            contacts.append({
+                "id": p.get("resourceName", ""),
+                "nom": name.get("displayName") or (emails[0] if emails else "Contact sans nom"),
+                "prenom": name.get("givenName") or "",
+                "nom_famille": name.get("familyName") or "",
+                "emails": emails,
+                "email": emails[0] if emails else "",
+                "telephones": phones,
+                "telephone": phones[0] if phones else "",
+                "entreprise": org.get("name") or "",
+                "poste": org.get("title") or "",
+                "source": "gmail",
+            })
+        contacts_cache.write(uid, "google", contacts)
+        found = filter_contacts(contacts, query)
+        logger.info("[GOOGLE] contacts (Google) : %d lus, %d correspondent à %r", len(contacts), len(found), query)
+        return {"contacts": found[:max(1, min(top, MAX_GOOGLE_CONTACTS))], "query": query.strip()}
 
     @router.get("/gmail/messages")
     async def gmail_messages(request: Request, top: int = 10):

@@ -22,6 +22,7 @@ from fastapi.responses import FileResponse, StreamingResponse, Response
 from pydantic import BaseModel
 from typing import Optional, List
 
+from auth_api import require_user
 from promo_shots import PROMO_SHOTS
 
 TRAILER_SHOTS = [
@@ -300,7 +301,7 @@ class MemoryPatchIn(BaseModel):
 
 
 async def _nominatim(address: str):
-    async with httpx.AsyncClient(timeout=12, headers={"User-Agent": "ΣIRIUS-HUD/1.0"}) as cx:
+    async with httpx.AsyncClient(timeout=12, headers={"User-Agent": "SIRIUS-HUD/1.0"}) as cx:
         r = await cx.get("https://nominatim.openstreetmap.org/search",
                          params={"q": address, "format": "json", "limit": 1, "accept-language": "fr"})
         data = r.json()
@@ -581,8 +582,152 @@ def make_modules_router(db):
                 
         raise HTTPException(status_code=404, detail="Image non trouvée")
 
+    async def _agora_user(request: Request):
+        return await require_user(request, db)
+
+    async def _claim_legacy_agora(user):
+        if user.get("role") == "admin":
+            for collection in (db.agora_deals, db.agora_settings, db.agora_coach_history):
+                await collection.update_many(
+                    {"user_id": {"$exists": False}},
+                    {"$set": {"user_id": user["user_id"]}},
+                )
+
     @r.get("/agora/deals")
-    def get_agora_deals():
-        return []
+    async def get_agora_deals(request: Request):
+        user = await _agora_user(request)
+        await _claim_legacy_agora(user)
+        deals = []
+        async for deal in db.agora_deals.find({"user_id": user["user_id"]}, {"_id": 0}):
+            deals.append(deal)
+        deals.sort(key=lambda deal: deal.get("updated_at") or "", reverse=True)
+        return {"deals": deals}
+
+    @r.post("/agora/deals")
+    async def create_agora_deal(data: DealIn, request: Request):
+        user = await _agora_user(request)
+        if data.etape not in AGORA_STAGES:
+            raise HTTPException(status_code=422, detail="Étape Agora invalide.")
+        timestamp = now_iso()
+        deal = {
+            "id": str(uuid.uuid4()), "user_id": user["user_id"],
+            **data.dict(), "created_at": timestamp, "updated_at": timestamp,
+        }
+        await db.agora_deals.insert_one(deal)
+        return {"ok": True, "deal": {key: value for key, value in deal.items() if key != "_id"}}
+
+    @r.put("/agora/deals/{deal_id}")
+    async def update_agora_deal(deal_id: str, data: DealUpdate, request: Request):
+        user = await _agora_user(request)
+        changes = data.dict(exclude_unset=True)
+        if "etape" in changes and changes["etape"] not in AGORA_STAGES:
+            raise HTTPException(status_code=422, detail="Étape Agora invalide.")
+        changes["updated_at"] = now_iso()
+        result = await db.agora_deals.update_one(
+            {"id": deal_id, "user_id": user["user_id"]}, {"$set": changes}
+        )
+        if not result.matched_count:
+            raise HTTPException(status_code=404, detail="Deal introuvable.")
+        deal = await db.agora_deals.find_one({"id": deal_id, "user_id": user["user_id"]}, {"_id": 0})
+        return {"ok": True, "deal": deal}
+
+    @r.delete("/agora/deals/{deal_id}")
+    async def delete_agora_deal(deal_id: str, request: Request):
+        user = await _agora_user(request)
+        result = await db.agora_deals.delete_one({"id": deal_id, "user_id": user["user_id"]})
+        if not result.deleted_count:
+            raise HTTPException(status_code=404, detail="Deal introuvable.")
+        return {"ok": True}
+
+    @r.get("/agora/deals/export.csv")
+    async def export_agora_deals(request: Request):
+        user = await _agora_user(request)
+        fields = ["id", "nom", "entreprise", "email", "valeur", "etape", "note", "relance", "created_at", "updated_at"]
+        output = io.StringIO(newline="")
+        writer = csv.DictWriter(output, fieldnames=fields)
+        writer.writeheader()
+        async for deal in db.agora_deals.find({"user_id": user["user_id"]}, {"_id": 0}):
+            writer.writerow({field: deal.get(field, "") for field in fields})
+        return Response(content=output.getvalue(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=pipeline-agora.csv"})
+
+    @r.post("/agora/deals/{deal_id}/relance")
+    async def relance_agora_deal(deal_id: str, data: RelanceIn, request: Request):
+        user = await _agora_user(request)
+        deal = await db.agora_deals.find_one({"id": deal_id, "user_id": user["user_id"]}, {"_id": 0})
+        if not deal:
+            raise HTTPException(status_code=404, detail="Deal introuvable.")
+        smtp = data.smtp or {}
+        if not deal.get("email"):
+            raise HTTPException(status_code=400, detail="Ce deal ne possède aucune adresse e-mail.")
+        if not smtp.get("host") or not smtp.get("from_email"):
+            raise HTTPException(status_code=400, detail="Configuration SMTP incomplète.")
+        raise HTTPException(status_code=501, detail="Envoi de relance non disponible dans ce mode.")
+
+    @r.get("/agora/coach/history")
+    async def get_agora_coach_history(request: Request):
+        user = await _agora_user(request)
+        sessions = []
+        async for session in db.agora_coach_history.find({"user_id": user["user_id"]}, {"_id": 0}):
+            sessions.append(session)
+        sessions.sort(key=lambda session: session.get("created_at") or "", reverse=True)
+        return {"sessions": sessions}
+
+    @r.post("/agora/coach")
+    async def agora_coach(data: CoachIn, request: Request):
+        user = await _agora_user(request)
+        history_text = "\n".join(
+            f"{item.get('role', 'user')}: {item.get('content', '')}"
+            for item in data.history if isinstance(item, dict)
+        )
+        prompt = f"Scénario commercial : {data.scenario}\nMode : {data.mode}\nHistorique :\n{history_text}"
+        try:
+            raw = await _llm(prompt, "Tu es le coach commercial Hermès Agora. Réponds en français, brièvement et concrètement.")
+            parsed = json.loads(raw)
+            response_text = str(parsed.get("reponse") or parsed.get("plan") or raw).strip()
+        except Exception as error:
+            logger.warning("[AGORA] coach LLM indisponible: %s", error)
+            response_text = "Le coach IA est momentanément indisponible. Reprends ton objection et formule un bénéfice concret."
+        if data.mode == "debrief":
+            session = {
+                "id": str(uuid.uuid4()), "user_id": user["user_id"],
+                "scenario": data.scenario, "history": data.history,
+                "reponse": response_text, "created_at": now_iso(),
+            }
+            await db.agora_coach_history.insert_one(session)
+        return {"ok": True, "reponse": response_text}
+
+    @r.get("/agora/objectif")
+    async def get_agora_objectif(request: Request):
+        user = await require_user(request, db)
+        user_id = user["user_id"]
+        now = datetime.now(timezone.utc)
+        month_prefix = now.strftime("%Y-%m")
+        setting = await db.agora_settings.find_one({"user_id": user_id, "key": "objectif"})
+        montant = float((setting or {}).get("montant", 10000))
+        cursor = db.agora_deals.find({"user_id": user_id, "etape": "GAGNÉ"})
+        gagne_mois = 0.0
+        async for deal in cursor:
+            created_at = str(deal.get("created_at") or "")
+            if created_at.startswith(month_prefix):
+                gagne_mois += float(deal.get("valeur") or 0)
+        progression_pct = round(gagne_mois / montant * 100, 2) if montant > 0 else 0
+        return {
+            "montant": montant,
+            "gagne_mois": gagne_mois,
+            "progression_pct": progression_pct,
+            "mois": month_prefix,
+        }
+
+    @r.put("/agora/objectif")
+    async def update_agora_objectif(data: ObjectifIn, request: Request):
+        user = await require_user(request, db)
+        if data.montant < 0:
+            raise HTTPException(status_code=422, detail="Le montant doit être positif.")
+        await db.agora_settings.update_one(
+            {"user_id": user["user_id"], "key": "objectif"},
+            {"$set": {"montant": float(data.montant), "user_id": user["user_id"], "key": "objectif"}},
+            upsert=True,
+        )
+        return await get_agora_objectif(request)
 
     return r

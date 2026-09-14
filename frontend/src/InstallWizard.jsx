@@ -56,6 +56,7 @@ export default function InstallWizard({ onClose, onSpeak, keys }) {
   const [running, setRunning] = useState(false);
   const [showJson, setShowJson] = useState(true);
   const doneRef = useRef(false);
+  const startedRef = useRef(false);
 
   const buildContext = useCallback(async (step) => {
     if (step === "environment") return { env: detectEnv() };
@@ -94,18 +95,16 @@ export default function InstallWizard({ onClose, onSpeak, keys }) {
 
   const restart = useCallback(async () => {
     doneRef.current = false;
+    startedRef.current = true;
     setResults({});
-    try {
-      await fetch(`${API}/install/step`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ step: "restart", context: {} }),
-      });
-    } catch (_) {}
     runStep("environment");
   }, [runStep]);
 
-  useEffect(() => { runStep("environment"); }, [runStep]);
+  useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    runStep("environment");
+  }, [runStep]);
 
   const activate = () => {
     localStorage.setItem("sirius_installed", "1");

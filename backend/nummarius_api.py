@@ -1,9 +1,11 @@
 # © 2026 Daniel Partel – ΣIRIUS Assistant. PORTUS NUMMARIUS# — bourse & marchés.
 import os
 import time
+import uuid
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel, Field
 
 STOCKS = [("AAPL", "APPLE"), ("MSFT", "MICROSOFT"), ("NVDA", "NVIDIA"), ("TSLA", "TESLA")]
 CRYPTOS = [("bitcoin", "BITCOIN"), ("ethereum", "ETHEREUM"), ("solana", "SOLANA")]
@@ -13,6 +15,12 @@ _crypto_hist = {}  # f"{cid}:{days}" -> {"ts": epoch, "points": [(iso, price)]}
 
 STOCK_TTL = 6 * 3600      # Alpha Vantage gratuit : 25 requêtes/jour → cache long
 CRYPTO_TTL = 15 * 60
+
+
+class MarketAlertIn(BaseModel):
+    asset_id: str
+    alert_type: str = "price_above"
+    threshold: float = Field(..., gt=0)
 
 
 async def _stock_yahoo(sym: str) -> list:
@@ -137,5 +145,39 @@ def make_nummarius_router(db):
             return {"label": crypto[1], "type": "crypto", "currency": "$",
                     "points": [{"t": t, "v": v} for t, v in pts]}
         raise HTTPException(status_code=404, detail="Actif inconnu.")
+
+    @r.post("/alerts")
+    async def create_alert(body: MarketAlertIn, request: Request):
+        uid = await _uid(request)
+        valid_assets = {asset_id for asset_id, _ in STOCKS + CRYPTOS}
+        if body.asset_id not in valid_assets:
+            raise HTTPException(status_code=422, detail="Actif NUMMARIUS inconnu.")
+        if body.alert_type not in ("price_above", "price_below", "variation"):
+            raise HTTPException(status_code=422, detail="Type d'alerte invalide.")
+        alert = {"id": str(uuid.uuid4()), "user_id": uid, **body.dict(), "active": True, "created_at": time.time()}
+        await db.nummarius_alerts.insert_one(alert)
+        alert.pop("_id", None)
+        return {"ok": True, "alert": alert}
+
+    @r.get("/alerts")
+    async def list_alerts(request: Request):
+        uid = await _uid(request)
+        market_data = await market(request)
+        current = {asset["id"]: asset for asset in market_data["assets"]}
+        alerts = await db.nummarius_alerts.find({"user_id": uid, "active": True}, {"_id": 0}).sort("created_at", -1).to_list(100)
+        for alert in alerts:
+            asset = current.get(alert["asset_id"])
+            value = asset.get("price") if asset and alert["alert_type"].startswith("price_") else asset.get("change") if asset else None
+            alert["current_value"] = value
+            alert["triggered"] = value is not None and (value >= alert["threshold"] if alert["alert_type"] in ("price_above", "variation") else value <= alert["threshold"])
+        return {"alerts": alerts}
+
+    @r.delete("/alerts/{alert_id}")
+    async def delete_alert(alert_id: str, request: Request):
+        uid = await _uid(request)
+        result = await db.nummarius_alerts.delete_one({"id": alert_id, "user_id": uid})
+        if not result.deleted_count:
+            raise HTTPException(status_code=404, detail="Alerte introuvable.")
+        return {"ok": True}
 
     return r

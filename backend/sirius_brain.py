@@ -27,6 +27,7 @@ GROQ_LLM_PRIMARY = MODELS[0]
 GROQ_LLM_FALLBACK = MODELS[1]
 GROQ_FALLBACK_MODELS = MODELS
 K3_MODEL = "moonshot-v1-8k"
+GROQ_JSON_OPTIONS = {"reasoning_effort": "low"}
 
 # Initialisation du client Groq / OpenAI (réutilisé entre requêtes : connexions HTTP conservées
 # en pool, évite l'aller-retour TLS/handshake d'une création par appel).
@@ -282,6 +283,7 @@ async def parse_intent(prompt: str):
                 max_tokens=200,
                 temperature=0.2,
                 response_format={"type": "json_object"},
+                extra_body=GROQ_JSON_OPTIONS,
                 timeout=8.0,
             )
             content = response.choices[0].message.content
@@ -630,6 +632,7 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
                     presence_penalty=0.9,
                     frequency_penalty=0.4,
                     response_format={"type": "json_object"},
+                    extra_body=GROQ_JSON_OPTIONS,
                     timeout=timeout,
                 )
                 raw_json = resp.choices[0].message.content.strip()
@@ -762,6 +765,7 @@ async def extract_memory_background(prompt, answer):
             max_tokens=200,
             temperature=0.2,
             response_format={"type": "json_object"},
+            extra_body=GROQ_JSON_OPTIONS,
             timeout=8.0,
         )
         raw = (resp.choices[0].message.content or "").strip()

@@ -6,7 +6,7 @@ import os
 import smtplib
 import uuid
 import zipfile
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from email.message import EmailMessage
 from typing import List, Optional
 
@@ -110,6 +110,73 @@ class PaymentIn(BaseModel):
         return v
 
 
+class JournalIn(BaseModel):
+    date: str = ""
+    libelle: str
+    compte: str = "512000"
+    type: str = "divers"
+    debit: float = 0
+    credit: float = 0
+
+
+class ReconciliationIn(BaseModel):
+    date: str
+    compte_bancaire: str = ""
+    solde_releve: float
+    notes: str = ""
+
+
+class BankStatementLine(BaseModel):
+    date: str
+    libelle: str = ""
+    montant: float
+    reference: str = ""
+
+
+class BankStatementImport(BaseModel):
+    rows: List[BankStatementLine]
+
+
+def parse_statement_date(value: str) -> str:
+    value = (value or "").strip()
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(value, fmt).date().isoformat()
+        except ValueError:
+            pass
+    raise ValueError(f"Date bancaire invalide : {value}")
+
+
+def parse_statement_csv(raw: bytes) -> List[dict]:
+    text = raw.decode("utf-8-sig")
+    sample = text[:2048]
+    dialect = csv.Sniffer().sniff(sample, delimiters=";,\t,")
+    reader = csv.DictReader(io.StringIO(text), dialect=dialect)
+    if not reader.fieldnames:
+        raise ValueError("Le relevé est vide ou ne possède pas d'en-tête.")
+    names = {name.strip().lower().replace("é", "e"): name for name in reader.fieldnames if name}
+    date_key = names.get("date")
+    label_key = names.get("libelle") or names.get("description") or names.get("label")
+    amount_key = names.get("montant") or names.get("amount") or names.get("debit")
+    ref_key = names.get("reference") or names.get("ref")
+    if not date_key or not amount_key:
+        raise ValueError("Colonnes obligatoires manquantes : date et montant.")
+    rows = []
+    for row in reader:
+        if not any((value or "").strip() for value in row.values()):
+            continue
+        amount_text = (row.get(amount_key) or "").strip().replace(" ", "").replace(",", ".")
+        try:
+            amount = float(amount_text)
+            parsed_date = parse_statement_date(row.get(date_key, ""))
+        except ValueError as error:
+            raise ValueError(str(error)) from error
+        rows.append({"date": parsed_date, "libelle": (row.get(label_key) or "").strip() if label_key else "", "montant": round(amount, 2), "reference": (row.get(ref_key) or "").strip() if ref_key else ""})
+    if not rows:
+        raise ValueError("Aucune opération exploitable dans le relevé.")
+    return rows
+
+
 class PieceEdit(BaseModel):
     fournisseur: Optional[str] = None
     numero: Optional[str] = None
@@ -159,6 +226,13 @@ class EmailIn(BaseModel):
         if "@" not in v or "." not in v.split("@")[-1]:
             raise ValueError("Adresse e-mail du destinataire invalide.")
         return v
+
+
+class BatchRelanceIn(BaseModel):
+    days_threshold: int = Field(default=0, ge=0, le=3650)
+    confirm: bool = False
+    emetteur: str = ""
+    smtp: Optional[SmtpConf] = None
 
 
 def _send_smtp(conf: SmtpConf, to: str, subject: str, body: str, pdf_bytes: bytes, pdf_name: str):
@@ -389,6 +463,47 @@ def make_themis_router(db):
             upd["$set"] = {"status": "envoyé"}
         await db.themis_docs.update_one({"id": did, "user_id": uid}, upd)
         return {"ok": True, "sent_to": body.to}
+
+    @r.post("/relances")
+    async def batch_relances(body: BatchRelanceIn, request: Request):
+        uid = await _uid(request)
+        today_date = datetime.now(timezone.utc).date()
+        docs = await db.themis_docs.find({"user_id": uid, "kind": "facture"}, NO_ID).to_list(2000)
+        clients = {c["id"]: c for c in await db.themis_clients.find({"user_id": uid}, NO_ID).to_list(2000)}
+        candidates = []
+        for doc in docs:
+            if doc.get("status") in ("payé", "refusé") or not doc.get("due_date"):
+                continue
+            try:
+                due = date.fromisoformat(str(doc["due_date"])[:10])
+            except ValueError:
+                continue
+            days_late = (today_date - due).days
+            client = clients.get(doc.get("client_id"), {})
+            email = client.get("email") or doc.get("email") or ""
+            if days_late < body.days_threshold:
+                continue
+            candidates.append({"id": doc["id"], "number": doc.get("number", ""), "client": doc.get("client_name") or client.get("name", ""), "email": email, "remaining": round(float(doc.get("total_ttc") or 0) - float(doc.get("paid") or 0), 2), "days_late": days_late})
+        if not body.confirm:
+            return {"ok": True, "preview": True, "candidates": candidates}
+        if not body.smtp:
+            raise HTTPException(status_code=400, detail="Configuration SMTP obligatoire pour envoyer les relances.")
+        sent, failed = [], []
+        for candidate in candidates:
+            if not candidate["email"]:
+                failed.append({"id": candidate["id"], "reason": "Adresse e-mail absente."})
+                continue
+            doc = next(item for item in docs if item["id"] == candidate["id"])
+            subject = f"Relance — Facture {candidate['number']}"
+            message = f"Bonjour,\n\nSauf erreur de notre part, la facture {candidate['number']} d'un montant restant de {candidate['remaining']:.2f} EUR demeure impayée. Merci de procéder à son règlement.\n\nCordialement,\n{body.emetteur or 'THÉMIS'}"
+            try:
+                pdf = build_doc_pdf(doc, emetteur=body.emetteur)
+                await asyncio.to_thread(_send_smtp, body.smtp, candidate["email"], subject, message, pdf, f"{candidate['number']}.pdf")
+                await db.themis_docs.update_one({"id": candidate["id"], "user_id": uid}, {"$push": {"emails": {"to": candidate["email"], "subject": subject, "type": "relance", "date": now_iso()}}})
+                sent.append(candidate["id"])
+            except Exception as error:
+                failed.append({"id": candidate["id"], "reason": str(error)[:160]})
+        return {"ok": True, "preview": False, "sent": sent, "failed": failed, "sent_count": len(sent), "failed_count": len(failed)}
 
     @r.delete("/docs/{did}")
     async def del_doc(did: str, request: Request):
@@ -645,6 +760,132 @@ def make_themis_router(db):
             "pieces_a_payer": len(a_payer), "total_pieces_a_payer": total_a_payer,
             "speech": " ".join(phrases),
         }
+
+    # ---------- COMPTABILITE & PREVISIONNEL ----------
+    @r.get("/journal")
+    async def journal(request: Request, from_date: str = "", to_date: str = ""):
+        uid = await _uid(request)
+        entries = await db.themis_journal.find({"user_id": uid}, NO_ID).sort("date", -1).to_list(2000)
+        if from_date:
+            entries = [e for e in entries if str(e.get("date", "")) >= from_date]
+        if to_date:
+            entries = [e for e in entries if str(e.get("date", "")) <= to_date]
+        return {"entries": entries}
+
+    @r.post("/journal")
+    async def add_journal_entry(body: JournalIn, request: Request):
+        uid = await _uid(request)
+        entry = body.dict()
+        entry.update({"id": str(uuid.uuid4()), "user_id": uid, "date": entry["date"] or now_iso()[:10], "created_at": now_iso()})
+        await db.themis_journal.insert_one(entry)
+        entry.pop("_id", None)
+        return {"ok": True, "entry": entry}
+
+    @r.get("/tva")
+    async def tva_summary(request: Request, from_date: str = "", to_date: str = ""):
+        uid = await _uid(request)
+        now = datetime.now(timezone.utc)
+        from_date = from_date or f"{now.year:04d}-{now.month:02d}-01"
+        to_date = to_date or now.strftime("%Y-%m-%d")
+        docs = await db.themis_docs.find({"user_id": uid, "kind": "facture"}, NO_ID).to_list(2000)
+        pieces = await db.themis_pieces.find({"user_id": uid}, NO_ID).to_list(2000)
+        in_period = lambda item, key="created_at": from_date <= str(item.get(key) or item.get("created_at") or "")[:10] <= to_date
+        sales = [d for d in docs if in_period(d)]
+        purchases = [p for p in pieces if in_period(p, "date")]
+        ca_ht = round(sum(float(d.get("total_ht") or 0) for d in sales), 2)
+        collected = round(sum(float(d.get("tva_amount") or 0) for d in sales), 2)
+        deductible = round(sum(float(p.get("tva") or 0) for p in purchases), 2)
+        return {"from": from_date, "to": to_date, "ca_ht": ca_ht, "tva_collectee": collected,
+                "achats_ht": round(sum(float(p.get("total_ht") or 0) for p in purchases), 2),
+                "tva_deductible": deductible, "tva_nette": round(collected - deductible, 2),
+                "a_payer": round(collected - deductible, 2)}
+
+    @r.get("/reconciliations")
+    async def list_reconciliations(request: Request):
+        uid = await _uid(request)
+        return {"items": await db.themis_reconciliations.find({"user_id": uid}, NO_ID).sort("date", -1).to_list(500)}
+
+    @r.post("/reconciliations")
+    async def add_reconciliation(body: ReconciliationIn, request: Request):
+        uid = await _uid(request)
+        payments = await db.themis_payments.find({"user_id": uid}, NO_ID).to_list(2000)
+        solde_comptable = round(sum(float(p.get("amount") or 0) for p in payments), 2)
+        difference = round(float(body.solde_releve) - solde_comptable, 2)
+        item = {**body.dict(), "id": str(uuid.uuid4()), "user_id": uid, "solde_comptable": solde_comptable,
+                "difference": difference, "status": "reconcilie" if abs(difference) < 0.01 else "en_cours", "created_at": now_iso()}
+        await db.themis_reconciliations.insert_one(item)
+        item.pop("_id", None)
+        return {"ok": True, "reconciliation": item}
+
+    @r.post("/bank-statements/preview")
+    async def preview_bank_statement(request: Request, file: UploadFile = File(...)):
+        uid = await _uid(request)
+        del uid
+        try:
+            rows = parse_statement_csv(await file.read())
+        except (UnicodeDecodeError, ValueError) as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        return {"ok": True, "count": len(rows), "total": round(sum(row["montant"] for row in rows), 2), "rows": rows[:2000]}
+
+    @r.post("/bank-statements/import")
+    async def import_bank_statement(body: BankStatementImport, request: Request):
+        uid = await _uid(request)
+        imported = 0
+        matched = 0
+        duplicates = 0
+        payments = await db.themis_payments.find({"user_id": uid}, NO_ID).to_list(2000)
+        for row in body.rows:
+            row_date = parse_statement_date(row.date)
+            duplicate_query = {"user_id": uid, "date": row_date, "montant": round(row.montant, 2), "reference": row.reference}
+            if await db.themis_bank_transactions.find_one(duplicate_query):
+                duplicates += 1
+                continue
+            match_id = None
+            if row.montant > 0:
+                for payment in payments:
+                    if abs(float(payment.get("amount") or 0) - row.montant) < 0.01 and str(payment.get("created_at", ""))[:10] == row_date:
+                        match_id = payment.get("id")
+                        matched += 1
+                        break
+            transaction = {"id": str(uuid.uuid4()), "user_id": uid, **row.dict(), "date": row_date, "matched_payment_id": match_id, "created_at": now_iso()}
+            await db.themis_bank_transactions.insert_one(transaction)
+            imported += 1
+        return {"ok": True, "imported": imported, "matched": matched, "duplicates": duplicates}
+
+    @r.get("/bank-statements")
+    async def list_bank_statements(request: Request):
+        uid = await _uid(request)
+        rows = await db.themis_bank_transactions.find({"user_id": uid}, NO_ID).sort("date", -1).to_list(2000)
+        return {"rows": rows}
+
+    @r.get("/previsionnel")
+    async def previsionnel(request: Request, months: int = 6):
+        uid = await _uid(request)
+        payments = await db.themis_payments.find({"user_id": uid}, NO_ID).to_list(2000)
+        pieces = await db.themis_pieces.find({"user_id": uid}, NO_ID).to_list(2000)
+        docs = await db.themis_docs.find({"user_id": uid, "kind": "facture"}, NO_ID).to_list(2000)
+        now = datetime.now(timezone.utc)
+        history = []
+        for offset in range(3, 0, -1):
+            month = now.month - offset
+            year = now.year + (month - 1) // 12
+            month = (month - 1) % 12 + 1
+            key = f"{year:04d}-{month:02d}"
+            incoming = sum(float(p.get("amount") or 0) for p in payments if str(p.get("created_at", ""))[:7] == key)
+            outgoing = sum(float(p.get("total_ttc") or 0) for p in pieces if (str(p.get("date") or p.get("created_at", ""))[:7] == key))
+            history.append((incoming, outgoing))
+        avg_in = sum(pair[0] for pair in history) / 3
+        avg_out = sum(pair[1] for pair in history) / 3
+        outstanding = sum(max(0, float(d.get("total_ttc") or 0) - float(d.get("paid") or 0)) for d in docs if d.get("status") not in ("payé", "refusé"))
+        result = []
+        for offset in range(1, max(1, min(months, 12)) + 1):
+            month = now.month + offset
+            year = now.year + (month - 1) // 12
+            month = (month - 1) % 12 + 1
+            incoming = avg_in + (outstanding if offset == 1 else 0)
+            result.append({"month": f"{year:04d}-{month:02d}", "in": round(incoming, 2), "out": round(avg_out, 2), "solde": round(incoming - avg_out, 2)})
+        return {"history": [{"in": round(i, 2), "out": round(o, 2)} for i, o in history], "projections": result,
+                "method": "moyenne des trois derniers mois + créances à encaisser le premier mois"}
 
     # ---------- TABLEAU DE BORD ----------
     @r.get("/stats")

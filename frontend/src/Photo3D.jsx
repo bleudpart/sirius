@@ -5,7 +5,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
 import { MTLLoader } from "three/examples/jsm/loaders/MTLLoader.js";
-import { X, Boxes, UploadCloud, Download, Loader2, RotateCw, ImagePlus } from "lucide-react";
+import { X, Boxes, UploadCloud, Download, Loader2, RotateCw, ImagePlus, History } from "lucide-react";
 import "./Photo3D.css";
 
 const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
@@ -61,23 +61,26 @@ function Model({ objUrl, mtlUrl }) {
       setObject(obj);
     };
 
-    if (mtlUrl) {
-      new MTLLoader().load(
-        mtlUrl,
-        (materials) => {
-          materials.preload();
-          const loader = new OBJLoader();
-          loader.setMaterials(materials);
-          loader.load(objUrl, applyObject, undefined, () => {
-            new OBJLoader().load(objUrl, applyObject);
-          });
-        },
-        undefined,
-        () => new OBJLoader().load(objUrl, applyObject)
-      );
-    } else {
-      new OBJLoader().load(objUrl, applyObject);
-    }
+    const loadModel = async () => {
+      try {
+        let materials;
+        if (mtlUrl) {
+          const mtlResponse = await fetch(mtlUrl, { credentials: "include" });
+          if (mtlResponse.ok) {
+            materials = new MTLLoader().parse(await mtlResponse.text(), "");
+            materials.preload();
+          }
+        }
+        const objResponse = await fetch(objUrl, { credentials: "include" });
+        if (!objResponse.ok) throw new Error("Modèle 3D inaccessible.");
+        const loader = new OBJLoader();
+        if (materials) loader.setMaterials(materials);
+        applyObject(loader.parse(await objResponse.text()));
+      } catch (error) {
+        if (!cancelled) setObject(null);
+      }
+    };
+    loadModel();
     return () => { cancelled = true; };
   }, [objUrl, mtlUrl]);
 
@@ -103,6 +106,8 @@ export default function Photo3D({ onClose, onSpeak }) {
   const [dragOver, setDragOver] = useState(false);
   const [job, setJob] = useState(null); // {job_id, status, progress, message, obj_url, mtl_url}
   const [error, setError] = useState("");
+  const [history, setHistory] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
   const inputRef = useRef(null);
   const pollRef = useRef(null);
 
@@ -140,7 +145,7 @@ export default function Photo3D({ onClose, onSpeak }) {
     }
     pollRef.current = setInterval(async () => {
       try {
-        const resp = await fetch(`${API}/photo3d/jobs/${job.job_id}`);
+        const resp = await fetch(`${API}/photo3d/jobs/${job.job_id}`, { credentials: "include" });
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.detail || "Suivi du job impossible");
         setJob(data);
@@ -165,7 +170,7 @@ export default function Photo3D({ onClose, onSpeak }) {
     files.forEach(({ file }) => form.append("files", file));
     try {
       setJob({ job_id: "", status: "en_cours", progress: 1, message: "Envoi des photos…" });
-      const resp = await fetch(`${API}/photo3d/jobs`, { method: "POST", body: form });
+      const resp = await fetch(`${API}/photo3d/jobs`, { method: "POST", body: form, credentials: "include" });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.detail || "Lancement impossible");
       setJob(data);
@@ -185,6 +190,24 @@ export default function Photo3D({ onClose, onSpeak }) {
     a.download = "sirius-model.obj";
     a.click();
   }, [objUrl]);
+
+  const loadHistory = useCallback(async () => {
+    try {
+      const response = await fetch(`${API}/photo3d/history`, { credentials: "include" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || "Historique indisponible.");
+      setHistory(data.jobs || []);
+      setShowHistory(true);
+    } catch (e) { setError(e.message || "Historique indisponible."); }
+  }, []);
+
+  const loadProject = useCallback((item) => {
+    if (item.obj_url) {
+      setJob(item);
+      setShowHistory(false);
+      setError("");
+    }
+  }, []);
 
   const busy = job && job.status !== "termine" && job.status !== "erreur";
   const progressPct = useMemo(() => Math.max(0, Math.min(100, job?.progress || 0)), [job]);
@@ -249,6 +272,8 @@ export default function Photo3D({ onClose, onSpeak }) {
 
           {error && <div className="p3d-error">{error}</div>}
 
+          {showHistory && <div className="p3d-history" data-testid="photo3d-history"><div className="p3d-progress-label"><History size={13} /> Projets précédents</div>{history.length === 0 && <p>Aucun projet enregistré.</p>}{history.map((item) => <button type="button" className="p3d-history-item" key={item.job_id} onClick={() => loadProject(item)} disabled={!item.obj_url}><span>{new Date(item.created_at).toLocaleString("fr-FR")}</span><span>{item.status} · {item.n_photos || 0} photos</span></button>)}</div>}
+
           {objUrl && (
             <div className="p3d-viewer" data-testid="photo3d-viewer">
               <Viewer objUrl={objUrl} mtlUrl={mtlUrl} />
@@ -257,6 +282,7 @@ export default function Photo3D({ onClose, onSpeak }) {
         </div>
 
         <footer className="p3d-footer">
+          <button className="p3d-btn" onClick={loadHistory} title="Voir les projets précédents"><History size={14} /> Historique</button>
           {!objUrl ? (
             <button className="p3d-btn primary" onClick={launch} disabled={busy || files.length < MIN_PHOTOS} data-testid="photo3d-launch-btn">
               {busy ? <Loader2 size={14} className="p3d-spin" /> : <Boxes size={14} />} Générer l'objet 3D

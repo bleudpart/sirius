@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import secrets
+import unicodedata
 import uuid
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
@@ -18,6 +19,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 
 import email_intel
+import contacts_cache
 from email_signature import append_signature_text
 from auth_api import (
     create_access_token, create_refresh_token, _set_cookies, require_user,
@@ -173,6 +175,28 @@ async def _graph_get(db, user_id: str, path: str, params=None, headers=None):
     return r.json()
 
 
+async def _graph_get_all(db, user_id: str, path: str, params=None, max_items: int = 1000):
+    """Comme _graph_get mais suit la pagination @odata.nextLink : Graph ne renvoie qu'une
+    page (10 contacts par défaut), ce qui tronquait silencieusement les grands carnets."""
+    token = await _access_token(db, user_id)
+    h = {"Authorization": "Bearer " + token}
+    items: list = []
+    url = f"{GRAPH}{path}"
+    async with httpx.AsyncClient(timeout=20) as cx:
+        while url and len(items) < max_items:
+            r = await cx.get(url, headers=h, params=params)
+            params = None  # le nextLink embarque déjà tous les paramètres de la requête
+            if r.status_code == 401:
+                raise HTTPException(status_code=401, detail="Autorisation Microsoft expirée — reconnecte ton compte.")
+            if r.status_code == 403:
+                raise HTTPException(status_code=403, detail="Permission Microsoft insuffisante — reconnecte Outlook pour autoriser les contacts.")
+            r.raise_for_status()
+            data = r.json()
+            items.extend(data.get("value", []))
+            url = data.get("@odata.nextLink")
+    return items[:max_items]
+
+
 async def _graph_write(db, user_id: str, method: str, path: str, json_body=None):
     """POST/PATCH/DELETE Microsoft Graph — utilisé uniquement pour les actions déjà
     confirmées explicitement par l'utilisateur (marquer lu, archiver, supprimer, répondre)."""
@@ -292,16 +316,58 @@ async def ms_recent_mail(db, user_id: str, top: int = 10):
     return mails
 
 
-async def ms_contacts(db, user_id: str, top: int = 50, query: str = ""):
-    """Contacts Outlook, normalisés pour l'affichage et la recherche vocale."""
-    data = await _graph_get(db, user_id, "/me/contacts", {
-        "$select": "id,displayName,givenName,surname,emailAddresses,businessPhones,mobilePhone,companyName,jobTitle",
-        "$orderby": "displayName",
-        "$top": str(top),
-    })
+CONTACTS_SELECT = "id,displayName,givenName,surname,emailAddresses,businessPhones,mobilePhone,companyName,jobTitle"
+MAX_CONTACTS = 2000
+
+
+def _fold(value: str) -> str:
+    """Minuscules sans accents : la dictée vocale n'accentue pas les noms de façon fiable."""
+    decomposed = unicodedata.normalize("NFD", value or "").casefold()
+    return "".join(ch for ch in decomposed if unicodedata.category(ch) != "Mn")
+
+
+def _contact_matches(haystack: str, tokens: list[str]) -> bool:
+    """Tous les mots cherchés doivent être présents, dans n'importe quel ordre : « daniel partel »
+    doit trouver « Partel, Daniel » comme « Daniel Partel ». Une terminaison ajoutée par la dictée
+    (« Partelé » pour « Partel ») est tolérée."""
+    words = [w for w in re.split(r"[^\w@.]+", haystack) if w]
+    return all(
+        token in haystack or any(len(w) >= 4 and token.startswith(w) for w in words)
+        for token in tokens
+    )
+
+
+async def _fetch_ms_contacts(db, user_id: str) -> list:
+    """Carnet Outlook complet, normalisé : pagination + dossiers de contacts secondaires."""
+    params = {"$select": CONTACTS_SELECT, "$orderby": "displayName", "$top": "100"}
+    raw = await _graph_get_all(db, user_id, "/me/contacts", dict(params), max_items=MAX_CONTACTS)
+
+    # /me/contacts ne couvre que le dossier par défaut : les dossiers créés par
+    # l'utilisateur (et leurs sous-dossiers) doivent être interrogés séparément.
+    try:
+        folders = await _graph_get_all(db, user_id, "/me/contactFolders", {"$select": "id", "$top": "50"}, max_items=50)
+    except (HTTPException, httpx.HTTPError) as e:
+        logger.warning("[MICROSOFT] dossiers de contacts illisibles: %s", e)
+        folders = []
+    for folder in folders:
+        folder_id = folder.get("id")
+        if not folder_id or len(raw) >= MAX_CONTACTS:
+            continue
+        try:
+            raw.extend(await _graph_get_all(
+                db, user_id, f"/me/contactFolders/{folder_id}/contacts",
+                dict(params), max_items=MAX_CONTACTS - len(raw),
+            ))
+        except (HTTPException, httpx.HTTPError) as e:
+            logger.warning("[MICROSOFT] dossier de contacts %s illisible: %s", folder_id, e)
+
     contacts = []
-    needle = (query or "").strip().casefold()
-    for c in data.get("value", []):
+    seen_ids = set()
+    for c in raw:
+        contact_id = c.get("id", "")
+        if contact_id and contact_id in seen_ids:
+            continue
+        seen_ids.add(contact_id)
         emails = [
             (entry.get("address") or "").strip().lower()
             for entry in (c.get("emailAddresses") or [])
@@ -312,8 +378,8 @@ async def ms_contacts(db, user_id: str, top: int = 50, query: str = ""):
             for phone in ((c.get("businessPhones") or []) + ([c.get("mobilePhone")] if c.get("mobilePhone") else []))
             if str(phone).strip()
         ]
-        contact = {
-            "id": c.get("id", ""),
+        contacts.append({
+            "id": contact_id,
             "nom": c.get("displayName") or "Contact sans nom",
             "prenom": c.get("givenName") or "",
             "nom_famille": c.get("surname") or "",
@@ -324,14 +390,50 @@ async def ms_contacts(db, user_id: str, top: int = 50, query: str = ""):
             "entreprise": c.get("companyName") or "",
             "poste": c.get("jobTitle") or "",
             "source": "outlook",
-        }
-        haystack = " ".join([
-            contact["nom"], contact["prenom"], contact["nom_famille"],
-            *contact["emails"], contact["entreprise"], contact["poste"],
-        ]).casefold()
-        if not needle or needle in haystack:
-            contacts.append(contact)
+        })
     return contacts
+
+
+async def ms_contacts(db, user_id: str, top: int = 50, query: str = "", refresh: bool = False):
+    """Contacts Outlook filtrés. Le carnet complet est servi depuis le cache local quand il
+    est frais : sans cela, chaque recherche relit des centaines de contacts chez Microsoft."""
+    contacts = None if refresh else contacts_cache.read(user_id, "outlook")
+    if contacts is None:
+        contacts = await _fetch_ms_contacts(db, user_id)
+        contacts_cache.write(user_id, "outlook", contacts)
+        source = "Microsoft"
+    else:
+        source = "cache"
+    found = filter_contacts(contacts, query)
+    logger.info("[MICROSOFT] contacts (%s) : %d lus, %d correspondent à %r",
+                source, len(contacts), len(found), query)
+    return found[:max(1, top)]
+
+
+def filter_contacts(contacts: list, query: str) -> list:
+    """Filtre partagé Outlook/Google : le NOM prime, l'e-mail et le téléphone complètent."""
+    tokens = contacts_cache.tokenize(query)
+    if not tokens:
+        return sorted(contacts, key=lambda c: c["nom"].casefold())
+    indexed = [(c, contacts_cache.searchable(c)) for c in contacts]
+    found = [(c, idx) for c, idx in indexed if contacts_cache.matches(idx, tokens)]
+    # La dictée ajoute souvent des mots parasites (« ... sur mail ») : plutôt que de ne rien
+    # renvoyer, on retombe sur les contacts correspondant au plus grand nombre de mots.
+    if not found and len(tokens) > 1:
+        scored = [(sum(1 for t in tokens if contacts_cache.matches(idx, [t])), c) for c, idx in indexed]
+        best = max((s for s, _ in scored), default=0)
+        if best:
+            return sorted([c for s, c in scored if s == best], key=lambda c: c["nom"].casefold())
+        return []
+
+    def rank(pair):
+        contact, _ = pair
+        nom = contacts_cache.fold(" ".join([
+            contact.get("nom", ""), contact.get("prenom", ""), contact.get("nom_famille", ""),
+        ]))
+        return (0 if all(t in nom for t in tokens) else 1, contact["nom"].casefold())
+
+    return [c for c, _ in sorted(found, key=rank)]
 
 
 DEFAULT_EMAIL_PREFS = {
@@ -489,6 +591,7 @@ async def build_action_plans(db, user_id: str, briefing: dict, max_plans: int = 
                 temperature=0.3,
                 timeout=10.0,
                 response_format={"type": "json_object"},
+                extra_body={"reasoning_effort": "low"},
             )
             content = json.loads(response.choices[0].message.content or "{}")
             plan_texte = (content.get("plan") or "").strip() or "Plan d'action indisponible pour ce message."
@@ -705,11 +808,11 @@ def make_microsoft_router(db):
         return {"mails": await ms_recent_mail(db, user["user_id"], top=min(top, 25))}
 
     @router.get("/microsoft/contacts")
-    async def microsoft_contacts(request: Request, top: int = 50, query: str = ""):
+    async def microsoft_contacts(request: Request, top: int = 50, query: str = "", refresh: bool = False):
         user = await require_user(request, db)
         return {
             "contacts": await ms_contacts(
-                db, user["user_id"], top=max(1, min(top, 100)), query=query
+                db, user["user_id"], top=max(1, min(top, MAX_CONTACTS)), query=query, refresh=refresh
             ),
             "query": query.strip(),
         }

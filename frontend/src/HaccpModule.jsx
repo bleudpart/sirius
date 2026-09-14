@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   X, ClipboardCheck, Tag, Thermometer, ShieldCheck, AlertTriangle, SprayCan,
-  Wheat, FileText, Plus, Trash2, Check, Printer,
+  Wheat, FileText, Plus, Trash2, Check, Printer, FileDown,
 } from "lucide-react";
 import SectionSheets from "./HaccpSheets";
 
@@ -38,6 +38,7 @@ const TABS = [
   { key: "allerg", label: "ALLERGÈNES", Icon: Wheat },
   { key: "docs", label: "DOCUMENTS", Icon: FileText },
   { key: "sheets", label: "FEUILLES", Icon: Printer },
+  { key: "audit", label: "AUDIT PDF", Icon: FileDown },
 ];
 
 const Dot = ({ tone }) => <span className={`hc-dot ${tone}`} />;
@@ -399,7 +400,54 @@ function SectionDocs() {
   );
 }
 
-const SECTIONS = { trace: SectionTrace, temp: SectionTemp, pms: SectionPms, nc: SectionNc, clean: SectionClean, allerg: SectionAllerg, docs: SectionDocs, sheets: SectionSheets };
+function SectionAudit() {
+  const [dateDebut, setDateDebut] = useState("");
+  const [dateFin, setDateFin] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [sections, setSections] = useState({ trace: true, temp: true, pms: true, nc: true, clean: true, allerg: true, docs: true });
+  const labels = { trace: "Traçabilité", temp: "Températures", pms: "PMS", nc: "Non-conformités", clean: "Nettoyage", allerg: "Allergènes", docs: "Documents" };
+
+  const generate = async () => {
+    setBusy(true);
+    try {
+      const response = await fetch(`${API}/audit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date_debut: dateDebut || null, date_fin: dateFin || null, inclure_sections: Object.keys(sections).filter((key) => sections[key]) }),
+      });
+      if (!response.ok) {
+        const detail = (await response.json().catch(() => ({}))).detail;
+        throw new Error(typeof detail === "string" ? detail : "Génération du rapport refusée.");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `audit_haccp_${new Date().toISOString().slice(0, 10)}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      window.dispatchEvent(new CustomEvent("haccp-error", { detail: error.message || "Génération du rapport impossible." }));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="hc-section" data-testid="haccp-section-audit">
+      <div className="zc-section-title">RAPPORT D’AUDIT HACCP</div>
+      <p className="pantheon-hint">Synthèse PDF des contrôles enregistrés pour préparer un audit interne.</p>
+      <div className="hc-form">
+        <div className="hc-row-main"><label>Du <input className="cmd-input" type="date" value={dateDebut} onChange={(e) => setDateDebut(e.target.value)} /></label><label>Au <input className="cmd-input" type="date" value={dateFin} onChange={(e) => setDateFin(e.target.value)} /></label></div>
+        <div className="hc-row-main">{Object.entries(sections).map(([key, checked]) => <label key={key}><input type="checkbox" checked={checked} onChange={(e) => setSections({ ...sections, [key]: e.target.checked })} /> {labels[key]}</label>)}</div>
+        <button className="cmd-send" onClick={generate} disabled={busy || !Object.values(sections).some(Boolean)}><FileDown size={14} /> {busy ? "GÉNÉRATION…" : "GÉNÉRER LE PDF"}</button>
+      </div>
+      <p className="hc-note">Ce rapport est un outil de suivi interne et ne constitue pas une certification officielle.</p>
+    </div>
+  );
+}
+
+const SECTIONS = { trace: SectionTrace, temp: SectionTemp, pms: SectionPms, nc: SectionNc, clean: SectionClean, allerg: SectionAllerg, docs: SectionDocs, sheets: SectionSheets, audit: SectionAudit };
 
 export default function HaccpModule({ onClose }) {
   const [tab, setTab] = useState("trace");

@@ -39,7 +39,7 @@ import { initUiSounds } from "@/uiSounds";
 import { initHoloFx } from "@/holoFx";
 import { getDisplayAutoCloseDelay } from "@/displayTiming";
 import { initReadAloud } from "@/readAloud";
-import { detectMailProvider, extractEmailRecipientQuery, isVoiceNo, isVoiceYes, voiceNumberChoice } from "@/emailComposeVoice";
+import { detectMailProvider, extractContactQuery, extractEmailRecipientQuery, isContactCommand, isSendEmailCommand, isVoiceNo, isVoiceYes, voiceNumberChoice } from "@/emailComposeVoice";
 import { chooseBestVoiceTranscript, normalizeVoiceTranscript } from "@/voiceCorrections";
 import { initHoloWindows, minimizeAll } from "@/holoWindows";
 import { ConfirmButton } from "@/ConfirmButton";
@@ -58,6 +58,9 @@ const WS_URL = process.env.REACT_APP_WS_URL || (
     : ""
 );
 const ARGUS_ALERT_DISMISS_MS = 30 * 60 * 1000;
+
+// Silence après lequel une phrase dictée est considérée terminée et envoyée au traitement.
+const PHRASE_SILENCE_MS = 1200;
 
 // Correspondance tâche ΣIRIUS -> fenêtre de progression globale
 const progressMap = {};
@@ -178,6 +181,10 @@ const todayStr = () => getLocalDateKey();
 
 const DAILY_BRIEFING_COMMAND = /^\s*(?:(?:mon|le)\s+)?(?:briefing(?:\s+(?:quotidien|du jour|matinal))?|r[ée]sum[ée]\s+du\s+jour)\s*[?.!]*\s*$/i;
 
+// Verbe exprimant une demande de liaison de compte, quelle que soit la tournure employée.
+const CONNECT_VERB = /\b(?:connect\w*|connexion|reconnect\w*|relie|relier|associe|associer|autorise|autoriser|lie|lier|branche|brancher)\b/i;
+const MS_AUTH_TTL_MS = 12 * 60 * 60 * 1000;
+
 // (horloge isolée dans liveStats.js : LiveClock / LiveDate — évite un re-render global chaque seconde)
 
 
@@ -200,7 +207,13 @@ const imageFileToBase64 = (file) => new Promise((resolve, reject) => {
 });
 
 function App() {
-  function speakOut(message) {
+  const currentSpokenRef = useRef("");
+  const onSpeechStartRef = useRef(() => {});
+  const onSpeechEndRef = useRef(() => {});
+  const startInterruptListenerRef = useRef(() => {});
+  const stopInterruptListenerRef = useRef(() => {});
+
+  const speakOut = useCallback((message) => {
     if (!message) {
       setStatus("idle");
       return;
@@ -218,27 +231,27 @@ function App() {
       onstart: () => {
         setStatus("speaking");
         setMetrics((m) => ({ ...m, tts: { ...m.tts, latMs: Math.round(performance.now() - t0), count: m.tts.count + 1 } }));
-        onSpeechStart();
-        if (autoMicRef.current && !micOnRef.current) startInterruptListener();
+        onSpeechStartRef.current();
+        if (autoMicRef.current && !micOnRef.current) startInterruptListenerRef.current();
       },
       onend: () => {
         if (window._siriusTTSTimer) clearTimeout(window._siriusTTSTimer);
         setMetrics((m) => ({ ...m, tts: { ...m.tts, durMs: Math.round(performance.now() - t0) } }));
-        stopInterruptListener();
-        onSpeechEnd();
+        stopInterruptListenerRef.current();
+        onSpeechEndRef.current();
         setStatus("idle");
       },
       onerror: () => {
         if (window._siriusTTSTimer) clearTimeout(window._siriusTTSTimer);
-        stopInterruptListener();
-        onSpeechEnd();
+        stopInterruptListenerRef.current();
+        onSpeechEndRef.current();
         setStatus("idle");
       }
     });
-  }
+  }, []);
 
   // ──👉 EXECUTEINTENT (collé automatiquement) — garder au tout début du composant App
-  const executeIntent = (d) => {
+  const executeIntentImpl = (d) => {
     const act = d.action;
     const target = (d.target || "").toLowerCase().trim();
     const confirm = (msg) => { setStatus("speaking"); setText(msg); speakOut(msg); };
@@ -320,6 +333,9 @@ function App() {
     }
     return false;
   };
+  const executeIntentRef = useRef(executeIntentImpl);
+  executeIntentRef.current = executeIntentImpl;
+  const executeIntent = useCallback((d) => executeIntentRef.current(d), []);
 
   const [profile, setProfile] = useState(loadProfile);
   const [keys, setKeys] = useState(loadKeys);
@@ -353,7 +369,6 @@ function App() {
   // connexion active d'une session à l'autre, mais on limite la fenêtre d'exposition en cas
   // de faille XSS en l'expirant côté client après 12h (durée alignée sur le jeton d'accès
   // applicatif, cf. _ACCESS_TTL_SECONDS dans auth_api.py) — au-delà, il faut se reconnecter.
-  const MS_AUTH_TTL_MS = 12 * 60 * 60 * 1000;
   const [msAuth, setMsAuth] = useState(() => {
     try {
       const raw = JSON.parse(localStorage.getItem("sirius_ms_auth")) || null;
@@ -405,6 +420,7 @@ function App() {
   const imageReferenceInputRef = useRef(null);
   const wsRef = useRef(null);
   const recognitionRef = useRef(null);
+  const phraseSilenceTimerRef = useRef(null);
   const serverRecorderRef = useRef(null);
   const serverRecorderStreamRef = useRef(null);
   const serverRecorderTimerRef = useRef(null);
@@ -421,10 +437,10 @@ function App() {
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [ecoMode, setEcoMode] = useState(() => localStorage.getItem("sirius_eco") === "1");
   useEffect(() => { localStorage.setItem("sirius_eco", ecoMode ? "1" : "0"); }, [ecoMode]);
-  const [autoMic, setAutoMic] = useState(false); // micro jamais déclenché automatiquement (fonction retirée)
+  const [autoMic, setAutoMic] = useState(() => localStorage.getItem("sirius_auto_mic") === "1");
   const autoMicRef = useRef(autoMic);
   autoMicRef.current = autoMic;
-  useEffect(() => { localStorage.setItem("sirius_auto_mic", "0"); }, [autoMic]);
+  useEffect(() => { localStorage.setItem("sirius_auto_mic", autoMic ? "1" : "0"); }, [autoMic]);
   const startListenRef = useRef(null);
   const autoListenTimerRef = useRef(null);
   const [weather, setWeather] = useState(null);
@@ -645,7 +661,6 @@ function App() {
     localStorage.setItem("sirius_mode", m);
   }, []);
   const interruptRecRef = useRef(null);
-  const currentSpokenRef = useRef("");
   const processCommandRef = useRef(null);
   // Architecte visuel (générateur de diagrammes IA)
   const [showArchitect, setShowArchitect] = useState(false);
@@ -1150,6 +1165,8 @@ function App() {
       }, 600);
     }
   }, []);
+  onSpeechStartRef.current = onSpeechStart;
+  onSpeechEndRef.current = onSpeechEnd;
 
   // Réponse intelligente via le cerveau cloud (Kimi K3 analyse → Groq formule, en flux avec fallbacks)
   // externalSignal : permet à resolveIntent d'annuler proprement ce flux si une action UI est
@@ -1336,6 +1353,7 @@ function App() {
     interruptRecRef.current = null;
     try { rec && rec.stop(); } catch (e) {}
   }, []);
+  stopInterruptListenerRef.current = stopInterruptListener;
 
   const startInterruptListener = useCallback(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1402,6 +1420,7 @@ function App() {
       rec.start();
     } catch (e) {}
   }, [stopInterruptListener, cloudAnswer]);
+  startInterruptListenerRef.current = startInterruptListener;
 
   // Citation philosophique : un clic sur le noyau fait parler la sagesse antique.
   // Si le panneau d'un dieu est ouvert (ou l'a été il y a moins de 3 min), c'est lui qui déclame.
@@ -2112,6 +2131,35 @@ function App() {
     setText(spoken); speakOut(spoken);
   }, [openTask, pushStep, finishTask, failTask, speakOut, msFetch]);
 
+  // Connexion du compte Google (Agenda + Gmail). Le callback Google redirige vers le SPA :
+  // on navigue dans cet onglet plutôt qu'en popup, qui démarrerait un second ΣIRIUS.
+  const connectGoogle = useCallback(async () => {
+    // Un compte « connecté » peut n'avoir que l'agenda : dans ce cas il FAUT réautoriser.
+    // On ne bloque la relance que si tous les droits utiles sont déjà accordés.
+    try {
+      const s = await fetch(`${API}/calendar/status`, { credentials: "include" });
+      const st = await s.json().catch(() => ({}));
+      if (s.ok && st.connected && st.gmail && st.gmail_send && st.contacts) {
+        setStatus("speaking");
+        const m = `Ton compte Google est déjà connecté${st.email ? ` avec ${st.email}` : ""}. Que veux-tu que je fasse ?`;
+        setText(m); speakOut(m);
+        return;
+      }
+    } catch (e) { /* statut indisponible : on tente la connexion */ }
+    setStatus("speaking");
+    const m = "J'ouvre la connexion à ton compte Google. Autorise l'accès, puis ΣIRIUS redémarre avec Gmail et l'Agenda.";
+    setText(m); speakOut(m);
+    try {
+      const r = await fetch(`${API}/oauth/calendar/login`, { credentials: "include" });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.authorization_url) throw new Error(d.detail || "URL d'autorisation indisponible.");
+      setTimeout(() => { window.location.href = d.authorization_url; }, 2600);
+    } catch (e) {
+      const msg = "Je n'arrive pas à lancer la connexion Google. Vérifie les identifiants Google dans les réglages.";
+      setStatus("speaking"); setText(msg); speakOut(msg);
+    }
+  }, [speakOut]);
+
   // Lecture des mails Gmail (compte Google connecté via l'Agenda) : voix + fenêtre HUD
   const readGmailAloud = useCallback(async (openOnly = false) => {
     const id = openTask(openOnly ? "GMAIL — BOÎTE DE RÉCEPTION" : "GMAIL — LECTURE DES MAILS", "outlook");
@@ -2122,7 +2170,7 @@ function App() {
       setStatus("speaking");
       if (r.status === 401) {
         failTask(id, "Compte Google non connecté");
-        const m = "Connecte d'abord ton compte Google : ouvre l'Agenda, clique sur « Connecter Google », puis redemande-moi tes mails Gmail.";
+        const m = "Ton compte Google n'est pas connecté. Dis « connecte Google » et j'ouvre l'autorisation.";
         setText(m); speakOut(m);
         return;
       }
@@ -2181,7 +2229,7 @@ function App() {
       setStatus("speaking");
       if (r.status === 401) {
         failTask(id, "Compte Google non connecté");
-        const m = "Connecte d'abord ton compte Google avant d'envoyer un mail Gmail.";
+        const m = "Ton compte Google n'est pas connecté. Dis « connecte Google », puis redemande-moi cet envoi.";
         setText(m); speakOut(m);
         return;
       }
@@ -2192,6 +2240,11 @@ function App() {
         return;
       }
       finishTask(id, { kind: "text", texte: `E-mail envoyé à ${to}.`, legende: "Gmail · envoi réussi" });
+      showOnDisplay({
+        type: "message",
+        titre: "E-MAIL ENVOYÉ — GMAIL",
+        contenu: `À : ${to}\nObjet : ${subject || "Message envoyé par ΣIRIUS"}\n\n${body || ""}\n\n—\nMessage envoyé par ΣIRIUS, assistant de Daniel Partel`,
+      });
       const m = `E-mail Gmail envoyé à ${to}.`;
       setText(m); speakOut(m);
     } catch (e) {
@@ -2200,22 +2253,15 @@ function App() {
       const m = "Je n'arrive pas à joindre Gmail pour le moment.";
       setText(m); speakOut(m);
     }
-  }, [openTask, pushStep, finishTask, failTask, speakOut]);
+  }, [openTask, pushStep, finishTask, failTask, speakOut, showOnDisplay]);
 
   const sendOutlookEmail = useCallback(async (to, subject, body) => {
     const id = openTask("OUTLOOK — ENVOI", "outlook");
-    pushStep(id, "Préparation de l'envoi Outlook");
     setStatus("thinking");
+    setText(`Envoi de l'e-mail à ${to}...`);
     try {
-      const previewResponse = await msFetch(`/microsoft/mail/send`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to, subject: subject || "Message envoyé par ΣIRIUS", body: body || "", confirm: false }),
-      });
-      if (!previewResponse.ok) {
-        const detail = await previewResponse.json().catch(() => ({}));
-        throw new Error(detail.detail || "Préparation Outlook impossible.");
-      }
+      // Confirmation vocale déjà obtenue dans le flux guidé : envoi direct (confirm:true),
+      // sans aller-retour « aperçu » supplémentaire qui doublait la latence.
       pushStep(id, "Envoi confirmé via Microsoft Graph");
       const r = await msFetch(`/microsoft/mail/send`, {
         method: "POST",
@@ -2237,6 +2283,11 @@ function App() {
         return false;
       }
       finishTask(id, { kind: "text", texte: `E-mail envoyé à ${to}.`, legende: "Outlook · envoi réussi" });
+      showOnDisplay({
+        type: "message",
+        titre: "E-MAIL ENVOYÉ — OUTLOOK",
+        contenu: `À : ${to}\nObjet : ${subject || "Message envoyé par ΣIRIUS"}\n\n${body || ""}\n\n—\nMessage envoyé par ΣIRIUS, assistant de Daniel Partel`,
+      });
       const m = `C'est envoyé à ${to} avec ma signature SIRIUS.`;
       setText(m); speakOut(m);
       return true;
@@ -2247,11 +2298,37 @@ function App() {
       setText(m); speakOut(m);
       return false;
     }
-  }, [openTask, pushStep, finishTask, failTask, speakOut, msFetch]);
+  }, [openTask, pushStep, finishTask, failTask, speakOut, msFetch, showOnDisplay]);
 
-  const startGuidedEmailCompose = useCallback(async (query, forcedProvider = "") => {
+  // Clic sur une pastille de contact : ΣIRIUS reprend la main sur la composition,
+  // au lieu de laisser le navigateur ouvrir le client mail du système.
+  const composeToContact = useCallback((contact, forcedProvider = "") => {
+    const email = contact?.email || contact?.emails?.[0] || "";
+    if (!email) {
+      setStatus("speaking");
+      const m = `${contact?.nom || "Ce contact"} n'a pas d'adresse e-mail enregistrée.`;
+      setText(m); speakOut(m);
+      return;
+    }
+    setPendingEmailCompose({
+      step: forcedProvider ? "body" : "choose_provider",
+      query: contact.nom || email,
+      contact: { ...contact, email },
+      provider: forcedProvider || "",
+      subject: "Message envoyé par ΣIRIUS",
+    });
+    setStatus("speaking");
+    const m = forcedProvider
+      ? `${contact.nom || email} sélectionné, envoi par ${forcedProvider === "gmail" ? "Gmail" : "Outlook"}. Quelle est la teneur du message ?`
+      : `${contact.nom || email} sélectionné. Tu veux envoyer avec Outlook ou Gmail ?`;
+    setText(m); speakOut(m);
+  }, [speakOut]);
+
+  // `attempt` borne les relances par nom : au deuxième échec, on exige l'adresse e-mail.
+  const startGuidedEmailCompose = useCallback(async (query, forcedProvider = "", attempt = 0) => {
     const cleanQuery = (query || "").trim();
     if (!cleanQuery) {
+      setPendingEmailCompose({ step: "manual_to", query: "", provider: forcedProvider || "", attempt: 0 });
       setStatus("speaking");
       const m = "À quel contact dois-je envoyer l'e-mail ?";
       setText(m); speakOut(m);
@@ -2272,27 +2349,41 @@ function App() {
       setStatus("speaking"); setText(m); speakOut(m);
       return;
     }
-    const id = openTask(`E-MAIL — CONTACT : ${cleanQuery}`, "outlook");
-    pushStep(id, "Recherche du destinataire dans les contacts Outlook");
+    const isGmail = forcedProvider === "gmail";
+    const label = isGmail ? "GMAIL" : "OUTLOOK";
+    const id = openTask(`${label} — CONTACT : ${cleanQuery}`, "outlook");
+    pushStep(id, `Recherche du destinataire dans les contacts ${isGmail ? "Google" : "Outlook"}`);
     setStatus("thinking");
     try {
-      const r = await msFetch(`/microsoft/contacts?top=10&query=${encodeURIComponent(cleanQuery)}`);
+      // Le carnet interrogé doit être celui du service qui enverra le message.
+      const r = isGmail
+        ? await fetch(`${API}/google/contacts?top=10&query=${encodeURIComponent(cleanQuery)}`, { credentials: "include" })
+        : await msFetch(`/microsoft/contacts?top=10&query=${encodeURIComponent(cleanQuery)}`);
       const d = await r.json().catch(() => ({}));
       if (!r.ok) {
-        const message = r.status === 401 || r.status === 409
-          ? "Ton compte Outlook doit être connecté pour chercher dans tes contacts. Dis « connecte Outlook »."
+        const message = r.status === 401 || r.status === 403 || r.status === 409
+          ? (isGmail
+            ? "Ton compte Google doit être connecté pour chercher dans tes contacts. Dis « connecte Google »."
+            : "Ton compte Outlook doit être connecté pour chercher dans tes contacts. Dis « connecte Outlook ».")
           : (d.detail || "Recherche de contact impossible.");
         failTask(id, message);
         setStatus("speaking"); setText(message); speakOut(message);
         return;
       }
       const contacts = (d.contacts || []).filter((c) => c.email);
-      showOnDisplay({ type: "contacts", titre: `CONTACTS — ${cleanQuery}`, contacts });
+      showOnDisplay({
+        type: "contacts",
+        titre: `${label} — CONTACTS : ${cleanQuery}`,
+        contacts,
+        onPickContact: (contact) => composeToContact(contact, forcedProvider),
+      });
       if (!contacts.length) {
         failTask(id, "Contact introuvable");
         setStatus("speaking");
-        const m = `Je n'ai pas trouvé ${cleanQuery} dans tes contacts Outlook. Donne-moi directement son adresse e-mail.`;
-        setPendingEmailCompose({ step: "manual_to", query: cleanQuery, provider: forcedProvider || "" });
+        const m = attempt > 0
+          ? `Toujours rien pour ${cleanQuery}. Dicte-moi son adresse e-mail, ou dis « annule ».`
+          : `Je n'ai pas trouvé ${cleanQuery} dans tes contacts ${isGmail ? "Google" : "Outlook"}. Redis-moi son nom autrement, ou donne-moi son adresse e-mail.`;
+        setPendingEmailCompose({ step: "manual_to", query: cleanQuery, provider: forcedProvider || "", attempt });
         setText(m); speakOut(m);
         return;
       }
@@ -2300,7 +2391,7 @@ function App() {
         finishTask(id, { kind: "text", texte: contacts.map((c, i) => `${i + 1}. ${c.nom} — ${c.email}`).join("\n"), legende: "Contacts · choix requis" });
         setPendingEmailCompose({ step: "choose_contact", query: cleanQuery, contacts, provider: forcedProvider || "" });
         setStatus("speaking");
-        const m = `J'ai trouvé ${contacts.length} contacts pour ${cleanQuery}. Dis le numéro du bon contact.`;
+        const m = `J'ai trouvé ${contacts.length} contacts pour ${cleanQuery}. Clique sur la bonne pastille, ou dis son numéro.`;
         setText(m); speakOut(m);
         return;
       }
@@ -2318,7 +2409,7 @@ function App() {
       const m = "Je n'arrive pas à lire tes contacts pour le moment.";
       setText(m); speakOut(m);
     }
-  }, [openTask, pushStep, finishTask, failTask, speakOut, msFetch, showOnDisplay]);
+  }, [openTask, pushStep, finishTask, failTask, speakOut, msFetch, showOnDisplay, composeToContact]);
 
   const launchOutlookMail = useCallback(async () => {    const id = openTask("OUTLOOK — BOÎTE DE RÉCEPTION", "outlook");
     pushStep(id, "Connexion à Microsoft Graph");
@@ -2361,7 +2452,7 @@ function App() {
     );
     pushStep(id, "Recherche dans les contacts Outlook");
     try {
-      const r = await msFetch(`/microsoft/contacts?top=100&query=${encodeURIComponent(cleanQuery)}`);
+      const r = await msFetch(`/microsoft/contacts?top=2000&query=${encodeURIComponent(cleanQuery)}`);
       const d = await r.json().catch(() => ({}));
       if (!r.ok) {
         const message = r.status === 401 || r.status === 409
@@ -2374,20 +2465,17 @@ function App() {
         return;
       }
       const contacts = d.contacts || [];
+      // Les pastilles du display sont la vue de référence : la tâche n'en garde qu'un résumé.
       finishTask(id, {
         kind: "text",
-        texte: contacts.map((c) => [
-          c.nom,
-          c.email,
-          c.telephone,
-          [c.poste, c.entreprise].filter(Boolean).join(" · "),
-        ].filter(Boolean).join("\n")).join("\n\n") || "Aucun contact trouvé.",
+        texte: `${contacts.length} contact(s) Outlook affiché(s) sur ΣIRIUS DISPLAY.`,
         legende: `Outlook · ${contacts.length} contact(s)`,
       });
       showOnDisplay({
         type: "contacts",
         titre: cleanQuery ? `OUTLOOK — CONTACTS : ${cleanQuery}` : "OUTLOOK — CONTACTS",
         contacts,
+        onPickContact: (contact) => composeToContact(contact, "outlook"),
       });
       setStatus("speaking");
       const spoken = contacts.length
@@ -2402,7 +2490,49 @@ function App() {
       setText(message);
       speakOut(message);
     }
-  }, [openTask, pushStep, finishTask, failTask, speakOut, msFetch, showOnDisplay]);
+  }, [openTask, pushStep, finishTask, failTask, speakOut, msFetch, showOnDisplay, composeToContact]);
+
+  // Carnet d'adresses Google (People API) — même présentation que les contacts Outlook.
+  const launchGoogleContacts = useCallback(async (query = "") => {
+    const cleanQuery = query.trim();
+    const id = openTask(cleanQuery ? `GMAIL — CONTACTS : ${cleanQuery}` : "GMAIL — CONTACTS", "outlook");
+    pushStep(id, "Recherche dans les contacts Google");
+    try {
+      const r = await fetch(`${API}/google/contacts?top=2000&query=${encodeURIComponent(cleanQuery)}`, { credentials: "include" });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const message = r.status === 403
+          ? "Google n'a pas accordé l'accès à tes contacts. Ajoute le champ contacts point readonly dans la console Google, puis redis « connecte Google »."
+          : r.status === 401
+            ? "Ton compte Google doit être connecté pour lire tes contacts. Dis « connecte Google »."
+            : (d.detail || "Je n'arrive pas à lire tes contacts Google.");
+        failTask(id, message);
+        setStatus("speaking"); setText(message); speakOut(message);
+        return;
+      }
+      const contacts = d.contacts || [];
+      finishTask(id, {
+        kind: "text",
+        texte: `${contacts.length} contact(s) Google affiché(s) sur ΣIRIUS DISPLAY.`,
+        legende: `Gmail · ${contacts.length} contact(s)`,
+      });
+      showOnDisplay({
+        type: "contacts",
+        titre: cleanQuery ? `GMAIL — CONTACTS : ${cleanQuery}` : "GMAIL — CONTACTS",
+        contacts,
+        onPickContact: (contact) => composeToContact(contact, "gmail"),
+      });
+      setStatus("speaking");
+      const spoken = contacts.length
+        ? `${contacts.length} contact${contacts.length > 1 ? "s" : ""} Google trouvé${contacts.length > 1 ? "s" : ""}${cleanQuery ? ` pour ${cleanQuery}` : ""}.`
+        : `Aucun contact Google${cleanQuery ? ` trouvé pour ${cleanQuery}` : ""}.`;
+      setText(spoken); speakOut(spoken);
+    } catch (e) {
+      failTask(id, "Contacts Google injoignables");
+      const message = "Je n'arrive pas à joindre les contacts Google pour le moment.";
+      setStatus("speaking"); setText(message); speakOut(message);
+    }
+  }, [openTask, pushStep, finishTask, failTask, speakOut, showOnDisplay, composeToContact]);
 
   // Recherche unifiée : contacts + emails + rendez-vous correspondant au mot-clé en un seul appel
   const launchUnifiedSearch = useCallback(async (query) => {
@@ -2433,7 +2563,12 @@ function App() {
       if (evenements.length) blocs.push(`RENDEZ-VOUS (${evenements.length})\n` + evenements.map((e) => `${e.titre} — ${e.debut}`).join("\n"));
       const texte = blocs.join("\n\n") || "Aucun résultat.";
       finishTask(id, { kind: "text", texte, legende: `Recherche · ${d.total || 0} résultat(s)` });
-      showOnDisplay({ type: "contacts", titre: `RECHERCHE — ${cleanQuery}`, contacts });
+      showOnDisplay({
+        type: "contacts",
+        titre: `RECHERCHE — ${cleanQuery}`,
+        contacts,
+        onPickContact: (contact) => composeToContact(contact),
+      });
       setStatus("speaking");
       const spoken = d.total > 0
         ? `${contacts.length} contact${contacts.length > 1 ? "s" : ""}, ${emails.length} e-mail${emails.length > 1 ? "s" : ""} et ${evenements.length} rendez-vous trouvés pour ${cleanQuery}.`
@@ -2445,7 +2580,7 @@ function App() {
       const m = "Je n'arrive pas à effectuer la recherche pour le moment.";
       setText(m); speakOut(m);
     }
-  }, [openTask, pushStep, finishTask, failTask, speakOut, msFetch, showOnDisplay]);
+  }, [openTask, pushStep, finishTask, failTask, speakOut, msFetch, showOnDisplay, composeToContact]);
 
   const launchOutlookAgenda = useCallback(async () => {
     const id = openTask("OUTLOOK — AGENDA (14 JOURS)", "outlook");
@@ -2755,7 +2890,18 @@ function App() {
     if (pending.step === "manual_to") {
       const email = (command.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i) || [])[0];
       if (!email) {
-        const m = "Je n'ai pas reconnu l'adresse e-mail. Peux-tu la répéter clairement ?";
+        // Sans adresse dictée, on retente une recherche par nom plutôt que de boucler sur la question.
+        const retry = command
+          .replace(/^(?:cherche|essaie|plut[ôo]t|c'est)\s+/i, "")
+          .replace(/^(?:[àa]|pour|au|aux)\s+/i, "")
+          .replace(/[?!.]+$/, "")
+          .trim();
+        if ((pending.attempt || 0) < 1 && retry.length >= 2) {
+          setPendingEmailCompose(null);
+          startGuidedEmailCompose(retry, pending.provider || "", (pending.attempt || 0) + 1);
+          return true;
+        }
+        const m = "Je n'ai pas reconnu l'adresse e-mail. Épelle-la ou dis « annule » pour arrêter.";
         setStatus("speaking"); setText(m); speakOut(m);
         return true;
       }
@@ -2805,12 +2951,30 @@ function App() {
       }
       const next = { ...pending, step: "confirm", body, subject: pending.subject || "Message envoyé par ΣIRIUS" };
       setPendingEmailCompose(next);
+      const dispatchSend = (draft) => {
+        setPendingEmailCompose(null);
+        const subject = (draft.subject || "").trim() || next.subject;
+        const corps = (draft.body || "").trim() || next.body;
+        if (next.provider === "gmail") sendGmail(next.contact.email, subject, corps);
+        else sendOutlookEmail(next.contact.email, subject, corps);
+      };
       showOnDisplay({
-        type: "message",
+        type: "email_draft",
         titre: `E-MAIL — ${next.provider === "gmail" ? "GMAIL" : "OUTLOOK"}`,
-        contenu: `À : ${next.contact.nom} <${next.contact.email}>\nObjet : ${next.subject}\n\n${body}\n\nSignature SIRIUS ajoutée automatiquement.`,
+        to: next.contact.email,
+        nom: next.contact.nom,
+        subject: next.subject,
+        body,
+        // Les retouches au clavier sont reportées dans l'état vocal : « oui, envoie » part du texte corrigé.
+        onEdit: (draft) => setPendingEmailCompose((cur) => (cur ? { ...cur, ...draft } : cur)),
+        onSend: dispatchSend,
+        onCancel: () => {
+          setPendingEmailCompose(null);
+          const m = "D'accord, e-mail annulé.";
+          setStatus("speaking"); setText(m); speakOut(m);
+        },
       });
-      const m = `Je vais envoyer à ${next.contact.nom} avec ${next.provider === "gmail" ? "Gmail" : "Outlook"} : ${body}. Confirmes-tu l'envoi ?`;
+      const m = `Je vais envoyer à ${next.contact.nom} avec ${next.provider === "gmail" ? "Gmail" : "Outlook"} : ${body}. Tu peux corriger le texte à l'écran, puis dire « oui, envoie » ou cliquer sur ENVOYER.`;
       setStatus("speaking"); setText(m); speakOut(m);
       return true;
     }
@@ -2837,7 +3001,7 @@ function App() {
     }
 
     return false;
-  }, [pendingEmailCompose, speakOut, showOnDisplay, sendGmail, sendOutlookEmail]);
+  }, [pendingEmailCompose, speakOut, showOnDisplay, sendGmail, sendOutlookEmail, startGuidedEmailCompose]);
 
   // Anticipation cognitive : propose le brouillon de réponse suivant de la file d'attente,
   // un par un, et attend « vas-y, envoie » / « non » avant tout envoi réel.
@@ -3511,6 +3675,24 @@ function App() {
       sendGmail(gmailSendM[1].trim(), (gmailSendM[2] || "").trim(), (gmailSendM[3] || "").trim());
       return;
     }
+    // Un verbe de liaison + le nom du service suffit : les tournures sont trop variées
+    // (« connecte Google », « connecte-toi à mon compte Gmail », « relie mon compte Google »…).
+    if (CONNECT_VERB.test(low) && /\b(?:google|gmail|g[- ]?mail)\b/.test(low)) {
+      mark("google · connexion"); connectGoogle(); return;
+    }
+    if (CONNECT_VERB.test(low) && /\b(?:outlook|microsoft|hotmail)\b/.test(low)) {
+      mark("outlook · connexion"); connectOutlook(); return;
+    }
+    // Les contacts passent AVANT le bloc Gmail : « affiche mes contacts Gmail » contient
+    // « gmail » et serait sinon traité comme une demande de boîte de réception.
+    if (isContactCommand(command)) {
+      const provider = detectMailProvider(command);
+      mark(provider === "gmail" ? "gmail · contacts" : "outlook · contacts");
+      const contactQuery = extractContactQuery(command);
+      if (provider === "gmail") launchGoogleContacts(contactQuery);
+      else launchOutlookContacts(contactQuery);
+      return;
+    }
     // Outlook : connexion, lecture des mails, agenda, envoi, création de rendez-vous.
     // Gmail : ouverture, lecture. Traité ICI (avant l'intent Groq) pour les mêmes raisons que
     // la musique d'ambiance : ces phrases contiennent des mots (« mail », « outlook »...) que la
@@ -3534,21 +3716,12 @@ function App() {
         return;
       }
     }
-    const contactCommand = low.match(/(?:cherche|recherche|trouve|affiche|montre|liste|ouvre)\w*(?:[- ]moi)?\s+(?:(?:le|un|une)\s+)?(?:dans\s+)?(?:mes\s+)?contacts?(?:\s+outlook)?(?:\s+(?:(?:de|pour|nomm[ée]?)\s+)?(.+))?$/);
-    if (contactCommand || /\b(?:mes|les)\s+contacts?\b/.test(low)) {
-      const query = (contactCommand?.[1] || "").replace(/[?!.]+$/, "").trim();
-      mark("outlook · contacts");
-      launchOutlookContacts(query);
-      return;
-    }
-    if (/connect(?:e|er|ion)?(?:[- ]moi)?\s*(?:à\s+)?outlook/.test(low)) {
-      mark("outlook · connexion"); connectOutlook(); return;
-    }
     if (/^(?:microsoft\s+)?outlook[\s?!.]*$/.test(low)) {
       mark("outlook · ouverture"); launchOutlookMail(); return;
     }
+    // Un envoi d'e-mail ne doit JAMAIS partir vers le LLM : sans destinataire, Sirius le demande.
     const sendM = extractEmailRecipientQuery(command);
-    if (sendM) {
+    if (sendM || isSendEmailCommand(command)) {
       mark("email · composition guidée");
       startGuidedEmailCompose(sendM, detectMailProvider(command));
       return;
@@ -3592,7 +3765,7 @@ function App() {
   // Lancement de la résolution d'intention
     resolveIntent(command);
   }, [
-    resolveIntent, speakOut, readGmailAloud, sendGmail, launchUnifiedSearch, connectOutlook, launchOutlookMail, launchOutlookContacts,
+    resolveIntent, speakOut, readGmailAloud, sendGmail, launchUnifiedSearch, connectOutlook, connectGoogle, launchOutlookMail, launchOutlookContacts, launchGoogleContacts,
     launchOutlookIntent, launchOutlookCreateEvent, launchOutlookAgenda, readMailAloud,
     pendingEmailSetup, pendingEmailAction, pendingEmailCompose, handlePendingEmailCompose, applyEmailSetupAnswer, fetchEmailBriefing,
     confirmPendingEmailAction, resolveEmailOrdinal, runEmailAction, setEmailSenderRule,
@@ -3972,6 +4145,20 @@ function App() {
       sendGmail(gmailSendM2[1].trim(), (gmailSendM2[2] || "").trim(), (gmailSendM2[3] || "").trim());
       return;
     }
+    if (CONNECT_VERB.test(low) && /\b(?:google|gmail|g[- ]?mail)\b/.test(low)) {
+      mark("google · connexion"); connectGoogle(); return;
+    }
+    if (CONNECT_VERB.test(low) && /\b(?:outlook|microsoft|hotmail)\b/.test(low)) {
+      mark("outlook · connexion"); connectOutlook(); return;
+    }
+    if (isContactCommand(command)) {
+      const provider = detectMailProvider(command);
+      mark(provider === "gmail" ? "gmail · contacts" : "outlook · contacts");
+      const contactQuery = extractContactQuery(command);
+      if (provider === "gmail") launchGoogleContacts(contactQuery);
+      else launchOutlookContacts(contactQuery);
+      return;
+    }
     if (/gmail|bo[îi]te google|mails? google/.test(low)) {
       if (/\b(?:lis|lis-moi|lire|lecture)\b/.test(low)) {
         mark("gmail · lecture");
@@ -3991,21 +4178,11 @@ function App() {
         return;
       }
     }
-    const contactCommand = low.match(/(?:cherche|recherche|trouve|affiche|montre|liste|ouvre)\w*(?:[- ]moi)?\s+(?:(?:le|un|une)\s+)?(?:dans\s+)?(?:mes\s+)?contacts?(?:\s+outlook)?(?:\s+(?:(?:de|pour|nomm[ée]?)\s+)?(.+))?$/);
-    if (contactCommand || /\b(?:mes|les)\s+contacts?\b/.test(low)) {
-      const query = (contactCommand?.[1] || "").replace(/[?!.]+$/, "").trim();
-      mark("outlook · contacts");
-      launchOutlookContacts(query);
-      return;
-    }
-    if (/connect(?:e|er|ion)?(?:[- ]moi)?\s*(?:à\s+)?outlook/.test(low)) {
-      mark("outlook · connexion"); connectOutlook(); return;
-    }
     if (/^(?:microsoft\s+)?outlook[\s?!.]*$/.test(low)) {
       mark("outlook · ouverture"); launchOutlookMail(); return;
     }
     const sendM = extractEmailRecipientQuery(command);
-    if (sendM) {
+    if (sendM || isSendEmailCommand(command)) {
       mark("email · composition guidée");
       startGuidedEmailCompose(sendM, detectMailProvider(command));
       return;
@@ -4564,7 +4741,7 @@ function App() {
           const form = new FormData();
           const extension = blob.type.includes("mp4") ? "m4a" : "webm";
           form.append("file", blob, `sirius-voice.${extension}`);
-          const response = await fetch(`${API}/stt`, { method: "POST", body: form });
+          const response = await fetch(`${API}/stt`, { method: "POST", body: form, credentials: "include" });
           const payload = await response.json().catch(() => ({}));
           if (!response.ok) throw new Error(payload.detail || "Transcription vocale impossible.");
           const transcript = (payload.text || payload.transcript || "").trim();
@@ -4584,6 +4761,14 @@ function App() {
         discardServerRecordingRef.current = true;
         setText("L'enregistrement du microphone a été interrompu.");
         setStatus("idle");
+        clearTimeout(serverRecorderTimerRef.current);
+        serverRecorderTimerRef.current = null;
+        micOnRef.current = false;
+        window.__siriusMicOn = false;
+        setMicOn(false);
+        serverRecorderRef.current = null;
+        serverRecorderStreamRef.current = null;
+        stream.getTracks().forEach((track) => track.stop());
       };
       recorder.start(250);
       setVoiceTranscript("");
@@ -4597,6 +4782,16 @@ function App() {
       }, 15000);
     } catch (error) {
       console.error("Impossible d'ouvrir le microphone :", error);
+      clearTimeout(serverRecorderTimerRef.current);
+      serverRecorderTimerRef.current = null;
+      micOnRef.current = false;
+      window.__siriusMicOn = false;
+      setMicOn(false);
+      serverRecorderRef.current = null;
+      if (serverRecorderStreamRef.current) {
+        serverRecorderStreamRef.current.getTracks().forEach((track) => track.stop());
+        serverRecorderStreamRef.current = null;
+      }
       setText(error?.name === "NotAllowedError"
         ? "Accès au micro refusé. Autorisez le microphone dans les paramètres de ΣIRIUS."
         : "Impossible d'ouvrir le microphone sur cet appareil.");
@@ -4608,6 +4803,10 @@ function App() {
   const stopListening = useCallback(() => {
     const rec = recognitionRef.current;
     recognitionRef.current = null;
+    if (phraseSilenceTimerRef.current) {
+      clearTimeout(phraseSilenceTimerRef.current);
+      phraseSilenceTimerRef.current = null;
+    }
     const serverRecorder = serverRecorderRef.current;
     if (serverRecorder) {
       discardServerRecordingRef.current = true;
@@ -4678,11 +4877,31 @@ function App() {
       const rec = new SR();
       rec.lang = "fr-FR";
       rec.interimResults = true;
-      rec.continuous = false;
+      // Mode continu : sans lui, Chrome clôt la session à la première pause et ne capte
+      // que le début de la phrase. Les segments sont recollés puis envoyés après un silence.
+      rec.continuous = true;
       rec.maxAlternatives = 5;
       let gotFinal = false;
       let hadError = false;
       let useServerFallback = false;
+      let phrase = "";
+      const clearSilenceTimer = () => {
+        if (phraseSilenceTimerRef.current) clearTimeout(phraseSilenceTimerRef.current);
+        phraseSilenceTimerRef.current = null;
+      };
+      const flushPhrase = () => {
+        clearSilenceTimer();
+        const spoken = phrase.trim();
+        phrase = "";
+        if (!spoken) return;
+        gotFinal = true;
+        handleTranscriptRef.current(spoken, true);
+        try { rec.stop(); } catch (e) { /* session déjà close */ }
+      };
+      const restartSilenceTimer = () => {
+        clearSilenceTimer();
+        phraseSilenceTimerRef.current = setTimeout(flushPhrase, PHRASE_SILENCE_MS);
+      };
       rec.onresult = (e) => {
         let interim = "";
         let final = "";
@@ -4697,15 +4916,19 @@ function App() {
         }
         if (!sttT0Ref.current) sttT0Ref.current = performance.now();
         if (final.trim()) {
-          gotFinal = true;
+          phrase = `${phrase} ${final.trim()}`.trim();
           const confRaw = e.results[e.results.length - 1][0].confidence;
           const ms = Math.round(performance.now() - sttT0Ref.current);
           setMetrics((m) => ({ ...m, stt: { ms, conf: confRaw ? Math.round(confRaw * 100) : m.stt.conf, count: m.stt.count + 1 } }));
-          handleTranscriptRef.current(final.trim(), true);
+          handleTranscriptRef.current(phrase, false);
+          restartSilenceTimer();
+        } else if (interim.trim()) {
+          handleTranscriptRef.current(`${phrase} ${interim}`.trim(), false);
+          restartSilenceTimer();
         }
-        else if (interim.trim()) handleTranscriptRef.current(interim, false);
       };
       rec.onerror = (e) => {
+        clearSilenceTimer();
         hadError = e.error !== "no-speech";
         micOnRef.current = false;
         window.__siriusMicOn = false;
@@ -4731,6 +4954,14 @@ function App() {
       rec.onend = () => {
         if (recognitionRef.current && recognitionRef.current !== rec) return;
         if (recognitionRef.current === rec) recognitionRef.current = null;
+        clearSilenceTimer();
+        // Arrêt manuel du micro : la phrase déjà captée ne doit pas être perdue.
+        if (phrase.trim() && !gotFinal) {
+          const spoken = phrase.trim();
+          phrase = "";
+          gotFinal = true;
+          handleTranscriptRef.current(spoken, true);
+        }
         micOnRef.current = false;
         window.__siriusMicOn = false;
         setMicOn(false);
@@ -4761,6 +4992,10 @@ function App() {
       setStatus("listening");
       setText("Je t'écoute...");
     } catch (e) {
+      recognitionRef.current = null;
+      micOnRef.current = false;
+      window.__siriusMicOn = false;
+      setMicOn(false);
       setText("Impossible de démarrer le micro sur cet appareil.");
       setStatus("idle");
     }
@@ -4838,8 +5073,10 @@ function App() {
   // Démarrage automatique du micro une fois le boot terminé (mode mains-libres)
   const autoStartedRef = useRef(false);
   useEffect(() => {
-    if (booting || showSetup) return;
-    if (!autoMic) return;
+    if (booting || showSetup || !autoMic) {
+      autoStartedRef.current = false;
+      return;
+    }
     if (autoStartedRef.current) return;
     autoStartedRef.current = true;
     const id = setTimeout(() => {
@@ -4847,7 +5084,10 @@ function App() {
         startListenRef.current();
       }
     }, 1200);
-    return () => clearTimeout(id);
+    return () => {
+      clearTimeout(id);
+      autoStartedRef.current = false;
+    };
   }, [booting, showSetup, autoMic]);
 
   // Si on coupe le mode auto, on arrête les relances programmées
@@ -4980,6 +5220,22 @@ function App() {
     applyPhase();
     const iv = setInterval(applyPhase, 60000);
     return () => clearInterval(iv);
+  }, []);
+
+  // Retour d'autorisation Google : sans confirmation au retour, l'utilisateur croit que la
+  // connexion a échoué et relance la demande en boucle.
+  useEffect(() => {
+    const gcal = new URLSearchParams(window.location.search).get("gcal");
+    if (!gcal) return;
+    window.history.replaceState({}, "", window.location.pathname);
+    const t = setTimeout(() => {
+      const m = gcal === "connected"
+        ? "Compte Google connecté. Tu peux me demander tes mails Gmail, tes contacts Google et ton agenda."
+        : "La connexion Google a échoué. Vérifie les autorisations puis redis « connecte Google ».";
+      setStatus("speaking"); setText(m); speakOut(m);
+    }, 2500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Retour de paiement Stripe : confirmation vocale après un encaissement Hermès Agora
@@ -5984,6 +6240,23 @@ function App() {
           >
             <Radio size={15} />
             <span>{pttActive ? "À VOUS" : "ESPACE"}</span>
+          </button>
+          <button
+            type="button"
+            className={`mic-btn ${autoMic ? "on" : ""}`}
+            onClick={() => {
+              const next = !autoMicRef.current;
+              setAutoMic(next);
+              if (next) startListening();
+              else stopListening();
+            }}
+            data-testid="sirius-global-mic-toggle"
+            title={autoMic ? "Désactiver le mode mains libres" : "Activer le mode mains libres"}
+            aria-label={autoMic ? "Désactiver le mode mains libres" : "Activer le mode mains libres"}
+            aria-pressed={autoMic}
+          >
+            {autoMic ? <MicOff size={15} /> : <Mic size={15} />}
+            <span>{autoMic ? "LIBRE" : "MICRO"}</span>
           </button>
           <button type="submit" className="cmd-send" data-testid="sirius-cmd-send">ENVOYER</button>
         </form>

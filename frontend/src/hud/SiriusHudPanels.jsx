@@ -13,26 +13,50 @@ import "@/hud/hud.css";
 
 const BACKEND_BASE = process.env.REACT_APP_BACKEND_URL || "http://127.0.0.1:8001";
 const API = BACKEND_BASE + "/api";
+const apiEntries = new Map();
 
 function useApi(path, refreshMs = 300000) {
-  const [data, setData] = useState(null);
-  const [error, setError] = useState(false);
-  const load = useCallback(async () => {
-    try {
-      const r = await fetch(`${API}${path}`, { credentials: "include" });
-      if (!r.ok) { setError(true); return; }
-      setData(await r.json());
-      setError(false);
-    } catch (e) {
-      setError(true);
-    }
-  }, [path]);
+  const [state, setState] = useState(() => {
+    const entry = apiEntries.get(path);
+    return entry ? { data: entry.data, error: entry.error } : { data: null, error: false };
+  });
   useEffect(() => {
-    load();
-    const id = setInterval(load, refreshMs);
-    return () => clearInterval(id);
-  }, [load, refreshMs]);
-  return [data, error];
+    let entry = apiEntries.get(path);
+    if (!entry) {
+      entry = { data: null, error: false, listeners: new Set(), timer: null, loading: false };
+      apiEntries.set(path, entry);
+    }
+    const notify = () => setState({ data: entry.data, error: entry.error });
+    entry.listeners.add(notify);
+    const load = async () => {
+      if (entry.loading) return;
+      entry.loading = true;
+      try {
+        const response = await fetch(`${API}${path}`, { credentials: "include" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        entry.data = await response.json();
+        entry.error = false;
+      } catch (error) {
+        entry.error = true;
+      } finally {
+        entry.loading = false;
+        entry.listeners.forEach((listener) => listener());
+      }
+    };
+    if (!entry.timer) {
+      load();
+      entry.timer = setInterval(load, refreshMs);
+    }
+    notify();
+    return () => {
+      entry.listeners.delete(notify);
+      if (!entry.listeners.size) {
+        clearInterval(entry.timer);
+        apiEntries.delete(path);
+      }
+    };
+  }, [path, refreshMs]);
+  return [state.data, state.error];
 }
 
 const MOIS = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
