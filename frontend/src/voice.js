@@ -1,6 +1,8 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 // Voix de Sirius — synthèse locale ou Google Cloud TTS avec basculement
 // automatique sur la synthèse du navigateur si la clé est absente ou l'API indisponible.
+import { Capacitor } from "@capacitor/core";
+
 const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
 const TTS_REQUEST_TIMEOUT_MS = 8000;
 const MALE = /(paul|henri|thomas|nicolas|claude|mathieu|guillaume|daniel|jerome|male|homme|man|wavenet-d|wavenet-b|standard-b|standard-d)/i;
@@ -242,6 +244,21 @@ export function speakFr(message, { onstart, onend } = {}) {
   const seq = ++speakSeq;
   const fem = FEMALE.test(cfg.name);
   const bPitch = (fem ? 1.12 : (urgent ? 0.92 : 0.85)) * (night ? 0.95 : 1);
+  if (Capacitor.getPlatform() === "android") {
+    speakGoogle(message, {
+      voice: "fr-FR-Neural2-G",
+      rate,
+      pitch: night ? -4.5 : -3,
+      volume,
+      onstart,
+      onend,
+    }, seq).then((ok) => {
+      if (!ok && seq === speakSeq) {
+        speakBrowser(message, { rate, pitch: 0.72, volume, gender: "male", onstart, onend });
+      }
+    });
+    return;
+  }
   if (isBrowserVoice(cfg.name)) {
     speakBrowser(message, { rate, pitch: bPitch, volume, gender: getBrowserGender(cfg.name), onstart, onend });
     return;
@@ -287,6 +304,20 @@ export function speakCinematic(message, { onstart, onend } = {}) {
   if (!message) { (onend || (() => {}))(); return; }
   const cfg = loadVoiceConfig();
   const seq = ++speakSeq;
+  if (Capacitor.getPlatform() === "android") {
+    speakGoogle(message, {
+      voice: "fr-FR-Neural2-G",
+      rate: 0.85,
+      pitch: -3,
+      onstart,
+      onend,
+    }, seq).then((ok) => {
+      if (!ok && seq === speakSeq) {
+        speakBrowser(message, { rate: 0.85, pitch: 0.72, gender: "male", onstart, onend });
+      }
+    });
+    return;
+  }
   if (isBrowserVoice(cfg.name)) {
     speakBrowser(message, { rate: 0.85, pitch: 0.95, gender: getBrowserGender(cfg.name), onstart, onend });
     return;

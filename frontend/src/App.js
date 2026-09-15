@@ -33,6 +33,7 @@ import GoldSparkles from "@/GoldSparkles";
 import CommandPalette from "@/CommandPalette";
 import ModulesMenu from "@/ModulesMenu";
 import { useAuth } from "@/AuthGate";
+import { App as CapacitorApp } from "@capacitor/app";
 import { speakFr, cancelSpeech, speakSeries, speakAsCharacter } from "@/voice";
 import { loadHud, applyHud } from "@/hudPrefs";
 import { initUiSounds } from "@/uiSounds";
@@ -422,6 +423,8 @@ function App() {
   const recognitionRef = useRef(null);
   const phraseSilenceTimerRef = useRef(null);
   const serverRecorderRef = useRef(null);
+  const microphoneStartPendingRef = useRef(false);
+  const microphoneRequestCooldownRef = useRef(0);
   const serverRecorderStreamRef = useRef(null);
   const serverRecorderTimerRef = useRef(null);
   const discardServerRecordingRef = useRef(false);
@@ -4694,12 +4697,14 @@ function App() {
   handleTranscriptRef.current = handleTranscript;
 
   const startServerListening = useCallback(async () => {
-    if (serverRecorderRef.current || micOnRef.current || speakingRef.current) return;
+    if (serverRecorderRef.current || micOnRef.current || microphoneStartPendingRef.current || speakingRef.current) return;
+    if (Date.now() < microphoneRequestCooldownRef.current) return;
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
       setText("L'enregistrement vocal n'est pas disponible sur cet appareil.");
       setStatus("idle");
       return;
     }
+    microphoneStartPendingRef.current = true;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       if (speakingRef.current) {
@@ -4796,6 +4801,12 @@ function App() {
         ? "Accès au micro refusé. Autorisez le microphone dans les paramètres de ΣIRIUS."
         : "Impossible d'ouvrir le microphone sur cet appareil.");
       setStatus("idle");
+      microphoneRequestCooldownRef.current = Date.now() + 5000;
+      if (autoMicRef.current) {
+        setAutoMic(false);
+      }
+    } finally {
+      microphoneStartPendingRef.current = false;
     }
   }, []);
 
@@ -4859,6 +4870,13 @@ function App() {
       clearTimeout(timeoutId);
     }
   }, [isLocalDevServer, isShuttingDown, stopListening]);
+
+  const exitMobileApp = useCallback(async () => {
+    cancelSpeech();
+    stopListening();
+    if (ambientRef.current) ambientRef.current.pause();
+    await CapacitorApp.exitApp();
+  }, [cancelSpeech, stopListening]);
 
   // Démarre l'écoute via la reconnaissance vocale du navigateur (instantanée, gratuite)
   const startListening = useCallback(() => {
@@ -5060,13 +5078,17 @@ function App() {
       pttUp();
     };
     const cancel = () => { if (pttRef.current) pttUp(); };
-    window.addEventListener("keydown", down);
-    window.addEventListener("keyup", up);
+    document.addEventListener("keydown", down, true);
+    document.addEventListener("keyup", up, true);
     window.addEventListener("blur", cancel);
+    window.addEventListener("pointerup", cancel, true);
+    document.addEventListener("visibilitychange", cancel);
     return () => {
-      window.removeEventListener("keydown", down);
-      window.removeEventListener("keyup", up);
+      document.removeEventListener("keydown", down, true);
+      document.removeEventListener("keyup", up, true);
       window.removeEventListener("blur", cancel);
+      window.removeEventListener("pointerup", cancel, true);
+      document.removeEventListener("visibilitychange", cancel);
     };
   }, [booting, showSetup, pttDown, pttUp]);
 
@@ -5537,6 +5559,12 @@ function App() {
     { label: "HACCP", get: () => !!haccp, set: (v) => setHaccp(v ? { sujet: "", auto: false } : null) },
   ];
   const [touchToast, setTouchToast] = useState(null);
+  const [hudScale, setHudScale] = useState(() => {
+    const saved = Number(localStorage.getItem("sirius_hud_scale"));
+    if (Number.isFinite(saved)) return Math.min(1.1, Math.max(0.8, saved));
+    return window.innerWidth <= 900 ? 0.82 : 1;
+  });
+  const hudScaleStartRef = useRef(hudScale);
   const touchToastTimer = useRef(null);
   const showTouchToast = (label) => {
     setTouchToast(label);
@@ -5554,16 +5582,15 @@ function App() {
   useTouchNav({
     onSwipeLeft: () => swipeNav(1),
     onSwipeRight: () => swipeNav(-1),
-    onPinchIn: () => {
-      const idx = TOUCH_RING.findIndex((m) => m.get());
-      if (idx !== -1) { TOUCH_RING[idx].set(false); showTouchToast("RETOUR AU HUD"); }
-      else if (showModulesMenu) setShowModulesMenu(false);
+    onPinchStart: () => {
+      hudScaleStartRef.current = hudScale;
     },
-    onPinchOut: () => {
-      if (!TOUCH_RING.some((m) => m.get()) && !showModulesMenu) {
-        setShowModulesMenu(true);
-        showTouchToast("MENU MODULES");
-      }
+    onPinch: (ratio) => {
+      setHudScale((current) => {
+        const next = Math.min(1.1, Math.max(0.8, hudScaleStartRef.current * ratio));
+        localStorage.setItem("sirius_hud_scale", String(next));
+        return next;
+      });
     },
   });
 
@@ -5635,7 +5662,7 @@ function App() {
   return (
     <div
       className={`sirius-root ${ecoMode ? "eco" : ""} mode-${sysMode}`}
-      style={{ ...getHUDStyleVariables(), "--accent": accentColor, "--glow": glowColor }}
+      style={{ ...getHUDStyleVariables(), "--accent": accentColor, "--glow": glowColor, "--hud-scale": hudScale }}
       data-core-active={hudTheme.core.active}
       data-guardian-active={hudTheme.guardian.visible}
       data-testid="sirius-hud"
@@ -5922,6 +5949,17 @@ function App() {
           <span className={`conn-led ${connected ? "on" : "off"}`} />
           {"IA CLOUD · GROQ / KIMI"}
           {mode === "brainstorm" && <span className="mode-badge" data-testid="brainstorm-badge">BRAINSTORM</span>}
+          {window.Capacitor?.getPlatform?.() === "android" && (
+            <button
+              className="profile-btn sirius-mobile-exit"
+              onClick={exitMobileApp}
+              data-testid="sirius-mobile-exit-btn"
+              title="Quitter SIRIUS"
+              aria-label="Quitter SIRIUS"
+            >
+              <X size={15} />
+            </button>
+          )}
           <button
             className={`profile-btn ${isFullscreen ? "on" : ""}`}
             onClick={toggleFullscreen}
@@ -6257,6 +6295,17 @@ function App() {
           >
             {autoMic ? <MicOff size={15} /> : <Mic size={15} />}
             <span>{autoMic ? "LIBRE" : "MICRO"}</span>
+          </button>
+          <button
+            type="button"
+            className="voice-panel-btn"
+            onClick={() => setShowVoicePanel(true)}
+            data-testid="sirius-voice-panel-btn"
+            title="Ouvrir la reconnaissance vocale"
+            aria-label="Ouvrir la reconnaissance vocale"
+          >
+            <AudioLines size={15} />
+            <span>VOIX</span>
           </button>
           <button type="submit" className="cmd-send" data-testid="sirius-cmd-send">ENVOYER</button>
         </form>

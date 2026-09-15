@@ -9,6 +9,7 @@ import { ReactorCore } from "@/components/ReactorVisuals";
 import { LiveClock, LiveDate, useLiveStats } from "@/liveStats";
 import { getLocalDateKey } from "@/dateTime";
 import { speakCinematic, cleanTextForDisplay } from "@/voice";
+import { Capacitor } from "@capacitor/core";
 
 const BACKEND_BASE = process.env.REACT_APP_BACKEND_URL || "http://127.0.0.1:8001";
 const API = BACKEND_BASE + "/api";
@@ -490,6 +491,24 @@ export function BootScreen({ onDone, userName, onOpenModule }) {
   const [speechDone, setSpeechDone] = useState(false);
   const speechStartedRef = useRef(false);
   const padRef = useRef(null);
+  const isAndroid = Capacitor.getPlatform() === "android";
+  const introSpeech = "Système. Intelligent. Réactif. Interface. Universel. Sécurisé. " +
+    "Je suis Sirius... façonné par mon créateur, Daniel Partel. " +
+    "Sirius scanne tous ses services... Tous mes services sont opérationnels... à votre disposition.";
+  const playIntroSpeech = () => {
+    try {
+      const pad = padRef.current;
+      if (pad) {
+        pad.ctx.resume().catch(() => {});
+        pad.master.gain.cancelScheduledValues(pad.ctx.currentTime);
+        pad.master.gain.linearRampToValueAtTime(0.045, pad.ctx.currentTime + 0.25);
+      }
+    } catch (e) {}
+    speakCinematic(introSpeech, {
+      onstart: () => { speechStartedRef.current = true; },
+      onend: () => setSpeechDone(true),
+    });
+  };
 
   // Fondu de sortie de la nappe sonore
   const stopPad = () => {
@@ -509,13 +528,6 @@ export function BootScreen({ onDone, userName, onOpenModule }) {
     // Garde anti-écho : une seule présentation vocale par chargement de page
     if (!window.__siriusBootSpoken) {
       window.__siriusBootSpoken = true;
-      speakCinematic(
-        "Système. Intelligent. Réactif. Interface. Universel. Sécurisé. " +
-        "Je suis Sirius... façonné par mon créateur, Daniel Partel. " +
-        "Sirius scanne tous ses services... " +
-        "Tous mes services sont opérationnels... à votre disposition.",
-        { onstart: () => { speechStartedRef.current = true; }, onend: () => setSpeechDone(true) }
-      );
     } else {
       setSpeechDone(true);
     }
@@ -526,7 +538,6 @@ export function BootScreen({ onDone, userName, onOpenModule }) {
       ctx.resume().catch(() => {});
       const master = ctx.createGain();
       master.gain.setValueAtTime(0, ctx.currentTime);
-      master.gain.linearRampToValueAtTime(0.045, ctx.currentTime + 3);
       master.connect(ctx.destination);
       [[55, "sine", 0.6], [110.4, "triangle", 0.35], [220.8, "sine", 0.12]].forEach(([f, type, lvl]) => {
         const o = ctx.createOscillator();
@@ -560,21 +571,26 @@ export function BootScreen({ onDone, userName, onOpenModule }) {
 
 // La présentation ne se ferme que lorsque le chargement ET le speech sont terminés
   useEffect(() => {
-    if (loaded && speechDone && !closing) {
+    if (loaded && speechDone && !closing && !isAndroid) {
       setClosing(true);
       stopPad();
       setTimeout(onDone, 700);
     }
-  }, [loaded, speechDone, closing]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loaded, speechDone, closing, isAndroid]); // eslint-disable-line react-hooks/exhaustive-deps
   // Chargé à 100 % mais voix jamais démarrée (autoplay bloqué / onend muet) → fermeture après 2,5 s
   useEffect(() => {
     if (!loaded || speechDone) return;
+    if (window.Capacitor?.getPlatform?.() === "android") return;
     const t = setTimeout(() => { if (!speechStartedRef.current) setSpeechDone(true); }, 2500);
     return () => clearTimeout(t);
   }, [loaded, speechDone]);
   return (
 
-    <div className={`boot-screen ${closing ? "closing" : ""}`} data-testid="boot-screen" onClick={() => { setClosing(true); stopPad(); setTimeout(onDone, 500); }}>
+    <div className={`boot-screen ${closing ? "closing" : ""}`} data-testid="boot-screen" onClick={() => {
+      if (isAndroid && !speechStartedRef.current) { playIntroSpeech(); return; }
+      if (!speechStartedRef.current && !speechDone) { playIntroSpeech(); return; }
+      setClosing(true); stopPad(); setTimeout(onDone, 500);
+    }}>
       <div className="boot-grid" />
       <div className="boot-scan" />
       <div className="boot-zeus" data-testid="boot-zeus">
@@ -650,7 +666,7 @@ export function BootScreen({ onDone, userName, onOpenModule }) {
         <div className="boot-bar">
           <div className="boot-bar-fill" style={{ width: `${progress}%` }} />
         </div>
-        <div className="boot-pct">{progress}%  —  cliquez pour passer</div>
+        <div className="boot-pct">{progress}%  —  touchez pour activer la voix</div>
       </div>
     </div>
   );

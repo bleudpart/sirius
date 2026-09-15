@@ -91,9 +91,10 @@ function syncLocalProfile(user) {
 }
 
 function AuthScreen({ onAuth }) {
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [form, setForm] = useState({ email: "danielpartel@hotmail.com", password: "" });
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [resetMode, setResetMode] = useState(false);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -115,22 +116,41 @@ function AuthScreen({ onAuth }) {
     window.location.href = `${API}/api/auth/microsoft/login`;
   };
 
+  const resetPassword = async (e) => {
+    e.preventDefault();
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch(`${API}/api/auth/reset-password`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: form.email, password: form.password }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(fmtErr(data.detail));
+      setResetMode(false);
+      setErr("Mot de passe modifié. Tu peux maintenant te connecter.");
+    } catch (e2) { setErr(e2.message); }
+    finally { setBusy(false); }
+  };
+
   return (
     <div className="auth-screen" data-testid="auth-screen">
       <div className="auth-card">
         <img src="/holo/sirius-title.png" alt="ΣIRIUS" className="auth-logo" onError={(e) => { e.target.style.display = "none"; e.target.nextSibling.style.display = "block"; }} />
         <h1 className="auth-title font-divine" style={{ display: "none" }}>ΣIRIUS</h1>
         <p className="auth-sub">Identifie-toi pour accéder au sanctuaire</p>
-        <form onSubmit={submit} className="auth-form" data-testid="auth-form">
+        <form onSubmit={resetMode ? resetPassword : submit} className="auth-form" data-testid="auth-form">
           <input type="email" placeholder="Email" value={form.email} required autoComplete="email"
             onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="auth-email-input" />
           <input type="password" placeholder="Mot de passe" value={form.password} required autoComplete="current-password"
             onChange={(e) => setForm({ ...form, password: e.target.value })} data-testid="auth-password-input" />
           {err && <div className="auth-error" data-testid="auth-error">{err}</div>}
           <button type="submit" className="auth-submit" disabled={busy} data-testid="auth-submit-btn">
-            <LogIn size={15} /> SE CONNECTER
+            <LogIn size={15} /> {resetMode ? "MODIFIER LE MOT DE PASSE" : "SE CONNECTER"}
           </button>
         </form>
+        <button className="auth-link" onClick={() => { setResetMode(!resetMode); setErr(""); }}>
+          {resetMode ? "Retour à la connexion" : "Mot de passe oublié ?"}
+        </button>
         <button className="auth-google" onClick={microsoftLogin} data-testid="auth-microsoft-btn">
           <svg width="15" height="15" viewBox="0 0 24 24"><path fill="#f35325" d="M1 1h10v10H1z"/><path fill="#81bc06" d="M13 1h10v10H13z"/><path fill="#05a6f0" d="M1 13h10v10H1z"/><path fill="#ffba08" d="M13 13h10v10H13z"/></svg>
           CONTINUER AVEC MICROSOFT

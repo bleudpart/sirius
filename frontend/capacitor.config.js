@@ -3,14 +3,14 @@ const { CapacitorConfig } = require("@capacitor/cli");
 /** @type {CapacitorConfig} */
 const config = {
   appId: "sh.techenclair.sirius",
-  appName: "SIRIUS",
+  appName: "ΣIRIUS",
   webDir: "build",
   bundledWebRuntime: false,
   android: {
-    allowMixedContent: false,
+    allowMixedContent: true,
   },
   server: {
-    androidScheme: "https",
+    androidScheme: "http",
   },
 };
 

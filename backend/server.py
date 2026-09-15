@@ -336,13 +336,12 @@ async def chat(req: ChatRequest, request: Request):
 
     # Mémoire locale (faits + épisodes condensés), rappel par pertinence sémantique/mots-clés —
     # les deux branches sont récupérées en parallèle (voir _gather_memory_context).
+    effective_mode = "turbo" if detect_urgency(texte) else (req.mode or "normal")
     merged_memory = await _gather_memory_context(texte, uid, req.memory)
-    logger.info(f"[CHAT] Début génération - Mode reçu: '{req.ia_mode}' | Mode appliqué: '{mode_ia_effectif}'")
+    logger.info(f"[CHAT] Début génération - Mode reçu: '{req.ia_mode}' | Mode appliqué: '{effective_mode}'")
 
     # Urgence détectée dans le texte (« vite », « urgent »...) → bascule automatique en mode
     # turbo, sans que l'utilisateur ait à activer explicitement ce mode.
-    effective_mode = "turbo" if detect_urgency(texte) else (req.mode or "normal")
-
     try:
         t0 = time.perf_counter()
         if autonomous_action:
@@ -2321,6 +2320,9 @@ _DEFAULT_DEV_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "capacitor://localhost",
+    "http://localhost",
+    "https://localhost",
     # Electron's packaged renderer is loaded from file:// and sends Origin: null.
     "null",
 ]

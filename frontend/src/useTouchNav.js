@@ -25,6 +25,7 @@ export default function useTouchNav(handlers) {
         multi = true;
         pinchFired = false;
         d0 = dist(e.touches);
+        if (ref.current.onPinchStart) ref.current.onPinchStart();
         return;
       }
       if (e.touches.length !== 1) return;
@@ -39,6 +40,11 @@ export default function useTouchNav(handlers) {
     const onMove = (e) => {
       if (multi && e.touches.length === 2 && !pinchFired && d0 > 0) {
         const r = dist(e.touches) / d0;
+        if (ref.current.onPinch) {
+          e.preventDefault();
+          ref.current.onPinch(r);
+          return;
+        }
         if (r < 0.72) { pinchFired = true; if (ref.current.onPinchIn) ref.current.onPinchIn(); }
         else if (r > 1.38) { pinchFired = true; if (ref.current.onPinchOut) ref.current.onPinchOut(); }
       }
@@ -57,7 +63,7 @@ export default function useTouchNav(handlers) {
     };
 
     window.addEventListener("touchstart", onStart, { passive: true });
-    window.addEventListener("touchmove", onMove, { passive: true });
+    window.addEventListener("touchmove", onMove, { passive: false });
     window.addEventListener("touchend", onEnd, { passive: true });
     return () => {
       window.removeEventListener("touchstart", onStart);

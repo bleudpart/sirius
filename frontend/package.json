@@ -87,6 +87,8 @@
     "test": "craco test",
     "electron": "electron .",
     "mobile:sync": "npm run build && npx cap sync",
+    "mobile:apk": "call BUILD-ANDROID.bat debug",
+    "mobile:apk:release": "call BUILD-ANDROID.bat release",
     "mobile:android": "npm run mobile:sync && npx cap open android",
     "mobile:ios": "npm run mobile:sync && npx cap open ios",
     "version:bump": "node scripts/bump-patch-version.js",

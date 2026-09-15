@@ -3,6 +3,7 @@
 import base64
 import hashlib
 import hmac
+import ipaddress
 import json
 import os
 import secrets
@@ -60,6 +61,46 @@ class LoginRequest(BaseModel):
     password: Optional[str] = None
 
 
+class PasswordResetRequest(BaseModel):
+    email: str
+    password: str
+
+
+def _password_override_path():
+    try:
+        from runtime_paths import data_dir
+
+        return data_dir() / ".local_password_hash"
+    except Exception:
+        return None
+
+
+def _password_matches(password: str) -> bool:
+    override_path = _password_override_path()
+    if override_path and override_path.exists():
+        try:
+            salt, expected = override_path.read_text(encoding="utf-8").strip().split(":", 1)
+            derived = hashlib.scrypt(password.encode("utf-8"), salt=bytes.fromhex(salt), n=16384, r=8, p=1)
+            return hmac.compare_digest(derived.hex(), expected)
+        except (OSError, ValueError):
+            return False
+    return not _LOCAL_PASSWORD or hmac.compare_digest(password, _LOCAL_PASSWORD)
+
+
+def _store_password(password: str):
+    path = _password_override_path()
+    if path is None:
+        raise HTTPException(status_code=500, detail="Stockage local indisponible.")
+    salt = secrets.token_bytes(16)
+    derived = hashlib.scrypt(password.encode("utf-8"), salt=salt, n=16384, r=8, p=1)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"{salt.hex()}:{derived.hex()}", encoding="utf-8")
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
+
+
 def is_direct_local_request(request: Request) -> bool:
     if any(header in request.headers for header in _FORWARDED_HEADERS):
         return False
@@ -67,7 +108,14 @@ def is_direct_local_request(request: Request) -> bool:
         return False
     if request.client.host in _LOCAL_HOSTS:
         return True
-    return request.client.host == "testclient" and "PYTEST_CURRENT_TEST" in os.environ
+    if request.client.host == "testclient":
+        return "PYTEST_CURRENT_TEST" in os.environ
+    if os.getenv("SIRIUS_ALLOW_LAN_AUTH", "").strip() == "1":
+        try:
+            return ipaddress.ip_address(request.client.host).is_private
+        except ValueError:
+            return False
+    return False
 
 
 def _b64encode(value: bytes) -> str:
@@ -168,10 +216,10 @@ async def resolve_user_id(request: Request, db=None) -> str:
 async def local_session(request: Request, response: Response):
     if not is_direct_local_request(request):
         raise HTTPException(status_code=403, detail="Session automatique réservée à la machine locale.")
-    access = create_access_token(LEGACY_UID, LEGACY_UID, "admin")
-    refresh = create_refresh_token(LEGACY_UID, LEGACY_UID, "admin")
+    access = create_access_token(_LOCAL_EMAIL, _LOCAL_EMAIL, "admin")
+    refresh = create_refresh_token(_LOCAL_EMAIL, _LOCAL_EMAIL, "admin")
     _set_cookies(response, access, refresh)
-    return {**_user({"sub": LEGACY_UID, "email": LEGACY_UID, "role": "admin"}), "access_token": access}
+    return {**_user({"sub": _LOCAL_EMAIL, "email": _LOCAL_EMAIL, "role": "admin"}), "access_token": access}
 
 
 @router.post("/login")
@@ -180,12 +228,26 @@ async def login(data: LoginRequest, request: Request, response: Response):
         raise HTTPException(status_code=403, detail="Connexion locale refusée depuis cette machine.")
     if data.email.strip().lower() != _LOCAL_EMAIL:
         raise HTTPException(status_code=401, detail="Identifiants invalides.")
-    if _LOCAL_PASSWORD and not hmac.compare_digest(data.password or "", _LOCAL_PASSWORD):
+    if not _password_matches(data.password or ""):
         raise HTTPException(status_code=401, detail="Identifiants invalides.")
-    access = create_access_token(LEGACY_UID, LEGACY_UID, "admin")
-    refresh = create_refresh_token(LEGACY_UID, LEGACY_UID, "admin")
+    access = create_access_token(_LOCAL_EMAIL, _LOCAL_EMAIL, "admin")
+    refresh = create_refresh_token(_LOCAL_EMAIL, _LOCAL_EMAIL, "admin")
     _set_cookies(response, access, refresh)
-    return {**_user({"sub": LEGACY_UID, "email": LEGACY_UID, "role": "admin"}), "access_token": access}
+    return {**_user({"sub": _LOCAL_EMAIL, "email": _LOCAL_EMAIL, "role": "admin"}), "access_token": access}
+
+
+@router.post("/reset-password")
+async def reset_password(data: PasswordResetRequest, request: Request):
+    if not is_direct_local_request(request):
+        raise HTTPException(status_code=403, detail="Réinitialisation réservée à la machine locale.")
+    email = data.email.strip().lower()
+    password = data.password.strip()
+    if email != _LOCAL_EMAIL:
+        raise HTTPException(status_code=400, detail="Adresse email incorrecte.")
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="Le mot de passe doit contenir au moins 8 caractères.")
+    _store_password(password)
+    return {"status": "password_updated"}
 
 
 @router.get("/me")

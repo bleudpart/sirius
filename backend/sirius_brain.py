@@ -26,7 +26,7 @@ MODELS = [
 GROQ_LLM_PRIMARY = MODELS[0]
 GROQ_LLM_FALLBACK = MODELS[1]
 GROQ_FALLBACK_MODELS = MODELS
-K3_MODEL = "moonshot-v1-8k"
+K3_MODEL = "kimi-k3"
 GROQ_JSON_OPTIONS = {"reasoning_effort": "low"}
 
 # Initialisation du client Groq / OpenAI (réutilisé entre requêtes : connexions HTTP conservées
@@ -566,6 +566,7 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
     k3_key = keys.get("k3") or ENV_K3_KEY
     serp_key = keys.get("serp") or ENV_SERP_KEY
     is_turbo = (mode or "normal").lower() == "turbo"
+    k3_key = (keys or {}).get("k3") or ENV_K3_KEY
 
     # ⚡ APPRENTISSAGE INSTANTANÉ : mémorisation/correction sans aller-retour LLM.
     memorize = detect_memorize_request(prompt)
@@ -649,6 +650,37 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
             logger.warning(f"{tag} Repli suite à : {repr(last_error)}")
     elif not ENV_GROQ_LLM_KEY:
         logger.warning(f"{tag} GROQ_API_KEY absente, retour local.")
+
+    if k3_key:
+        try:
+            sys_prompt = build_system_prompt(profile=profile, memory=memory, mode=mode, mood=mood)
+            history_messages = []
+            for turn in (history or [])[-10:]:
+                role = turn.get("role") if isinstance(turn, dict) else None
+                content = (turn.get("content") or "").strip() if isinstance(turn, dict) else ""
+                if role in ("user", "assistant") and content:
+                    history_messages.append({"role": role, "content": content[:800]})
+            json_instruction = (
+                '\n\nRéponds UNIQUEMENT avec un objet JSON valide, sans markdown, au format exact : '
+                '{"reponse": "...", "memoire": [], "popups": []}'
+            )
+            client_k3 = k3_client(k3_key)
+            resp = await client_k3.chat.completions.create(
+                model=K3_MODEL,
+                messages=[
+                    {"role": "system", "content": sys_prompt + json_instruction},
+                    *history_messages,
+                    {"role": "user", "content": prompt},
+                ],
+                max_tokens=1200,
+                temperature=0.8,
+                timeout=30.0,
+            )
+            raw_json = resp.choices[0].message.content.strip()
+            answer, memories, popups = _parse_structured(raw_json)
+            return {"reponse": answer, "memoire": memories, "popups": popups}
+        except Exception as e:
+            logger.warning(f"{tag} Repli Kimi refusé : {repr(e)}")
 
     # Repli standard si l'appel au LLM n'a pas abouti
     return {
@@ -737,6 +769,29 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
             logger.warning(f"[ΣIRIUS:STREAM] {model_name} refusé : {repr(e)}")
     if last_error:
         logger.warning(f"[ΣIRIUS:STREAM] Repli suite à : {repr(last_error)}")
+
+    if k3_key:
+        try:
+            client_k3 = k3_client(k3_key)
+            stream = await client_k3.chat.completions.create(
+                model=K3_MODEL,
+                messages=[
+                    {"role": "system", "content": sys_prompt + plain_instruction},
+                    *history_messages,
+                    {"role": "user", "content": prompt},
+                ],
+                max_tokens=max_tokens,
+                temperature=0.8,
+                timeout=timeout,
+                stream=True,
+            )
+            async for chunk in stream:
+                delta = chunk.choices[0].delta.content if chunk.choices else None
+                if delta:
+                    yield delta
+            return
+        except Exception as e:
+            logger.warning(f"[ΣIRIUS:STREAM] Repli Kimi refusé : {repr(e)}")
     yield "Je n'ai pas pu générer de réponse pour le moment. Réessaie dans un instant."
 
 

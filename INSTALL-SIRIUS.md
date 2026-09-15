@@ -37,6 +37,13 @@ SIRIUS sans installation classique.
 6. Lancez l'application depuis Android Studio sur le téléphone ou la tablette.
 7. Autorisez le microphone et les notifications lorsque Android les demande.
 
+Pour créer directement un APK de test sous Windows, ouvrez un terminal dans
+`frontend` et lancez `npm run mobile:apk`. Le fichier sera créé dans
+`frontend/android/app/build/outputs/apk/debug/app-debug.apk`. Pour un APK de
+publication signé, configurez d'abord la signature Android puis lancez
+`npm run mobile:apk:release` ; sans signature configurée, l'APK release ne
+sera pas installable tel quel sur un téléphone.
+
 ### Utiliser SIRIUS sur iPhone ou iPad
 
 1. Sur un Mac, installez Xcode et les outils nécessaires.

@@ -24,7 +24,11 @@ _TTS_CACHE_MAX = 64
 def _cache_get(key: tuple) -> dict | None:
     if key in _TTS_CACHE:
         _TTS_CACHE.move_to_end(key)
-        return _TTS_CACHE[key]
+        cached = _TTS_CACHE[key]
+        if "audio" in cached and "audio_base64" not in cached:
+            cached = {**cached, "audio_base64": cached["audio"]}
+            _TTS_CACHE[key] = cached
+        return cached
     return None
 
 
@@ -104,7 +108,7 @@ def make_voice_io_router():
         audio = r.json().get("audioContent")
         if not audio:
             raise HTTPException(status_code=502, detail="Réponse TTS sans audio")
-        result = {"audio": audio, "format": "mp3"}
+        result = {"audio": audio, "audio_base64": audio, "format": "mp3"}
         _cache_set(cache_key, result)
         return result
 
