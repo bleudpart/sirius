@@ -28,6 +28,12 @@
   letter-spacing: 0.1em;
   color: #eafaff;
 }
+.sirius-brand-mark,
+.sirius-footer-mark {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  color: #f2d99a;
+}
 .about-text {
   margin: 0;
   font-family: "Rajdhani", sans-serif;

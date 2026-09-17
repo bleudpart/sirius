@@ -550,8 +550,15 @@ export function BootScreen({ onDone, userName, onOpenModule }) {
       });
       padRef.current = { ctx, master };
     } catch (e) {}
-    // Sécurité : on ne bloque jamais plus de 16 s si la voix ne répond pas
+    // Sécurité : on ne bloque jamais plus de 16 s si la voix ne répond pas.
     const safety = setTimeout(() => setSpeechDone(true), 16000);
+    const hardStop = setTimeout(() => {
+      setLoaded(true);
+      setSpeechDone(true);
+      setClosing(true);
+      stopPad();
+      setTimeout(onDone, 500);
+    }, 18000);
     const step = 520;
     const dur = lines.length * step + 600;
     let i = 0;
@@ -566,17 +573,17 @@ export function BootScreen({ onDone, userName, onOpenModule }) {
       setProgress(p);
       if (p >= 100) { setLoaded(true); clearInterval(progTimer); }
     }, 40);
-    return () => { clearInterval(lineTimer); clearInterval(progTimer); clearTimeout(safety); stopPad(); };
+    return () => { clearInterval(lineTimer); clearInterval(progTimer); clearTimeout(safety); clearTimeout(hardStop); stopPad(); };
   }, [lines.length, onDone]); // eslint-disable-line react-hooks/exhaustive-deps
 
-// La présentation ne se ferme que lorsque le chargement ET le speech sont terminés
+// Sur Windows, le chargement visuel ne doit jamais rester bloqué par la synthèse vocale.
   useEffect(() => {
-    if (loaded && speechDone && !closing && !isAndroid) {
-      setClosing(true);
-      stopPad();
-      setTimeout(onDone, 700);
-    }
-  }, [loaded, speechDone, closing, isAndroid]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!loaded || closing || isAndroid) return;
+    setClosing(true);
+    stopPad();
+    const closeTimer = setTimeout(onDone, 700);
+    return () => clearTimeout(closeTimer);
+  }, [loaded, closing, isAndroid, onDone]);
   // Chargé à 100 % mais voix jamais démarrée (autoplay bloqué / onend muet) → fermeture après 2,5 s
   useEffect(() => {
     if (!loaded || speechDone) return;
@@ -593,10 +600,6 @@ export function BootScreen({ onDone, userName, onOpenModule }) {
     }}>
       <div className="boot-grid" />
       <div className="boot-scan" />
-      <div className="boot-zeus" data-testid="boot-zeus">
-        <img src="/holo/zeus-boot.jpg" alt="Zeus" draggable={false} />
-        <div className="boot-zeus-caption font-divine">ZEUS · PANTHÉON#</div>
-      </div>
       <div className="boot-modules" data-testid="boot-modules">
         <div className="boot-modules-title font-divine">Panthéon des Modules</div>
         {[
@@ -649,7 +652,6 @@ export function BootScreen({ onDone, userName, onOpenModule }) {
           </div>
           <ReactorCore status="thinking" volume={0.35} color="#91e6f2" eco={false} />
         </div>
-        <h1 className="boot-title" data-testid="boot-title"><img src="/holo/sirius-title.png" alt="Σ.I.R.I.U.S" className="boot-title-img" draggable={false} /></h1>
         <div className="boot-acronym" data-testid="boot-acronym">
           {[["S", "System"], ["I", "Intelligent"], ["R", "Responsive"], ["I", "Interface"], ["U", "Universal"], ["S", "Secure"]].map(([l, w], i) => (
             <span className="boot-acro-item" key={i} style={{ animationDelay: `${0.5 + i * 0.22}s` }}>
@@ -667,6 +669,7 @@ export function BootScreen({ onDone, userName, onOpenModule }) {
           <div className="boot-bar-fill" style={{ width: `${progress}%` }} />
         </div>
         <div className="boot-pct">{progress}%  —  touchez pour activer la voix</div>
+        <div className="boot-copyright">© 2026 ΣIRIUS par Daniel Partel – Tous droits réservés.</div>
       </div>
     </div>
   );

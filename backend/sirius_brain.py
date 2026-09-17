@@ -12,12 +12,16 @@ from productivite.intent_productivite import parse_productivity_intent
 logger = logging.getLogger(__name__)
 
 # --- VARIABLES D'ENVIRONNEMENT & CONFIGURATION ---
-GROQ_API_KEY = (os.getenv("GROQ_API_KEY") or os.getenv("GROQ_KEY") or "").strip()
+# GROQ_KEY is the configured application key. Prefer it over a stale legacy
+# machine-level GROQ_API_KEY so the Windows installer uses the intended secret.
+GROQ_API_KEY = (os.getenv("GROQ_KEY") or os.getenv("GROQ_API_KEY") or "").strip()
 K3_API_KEY = (os.getenv("K3_API_KEY") or os.getenv("DANIEL_DEV_K3") or "").strip()
 K3_ENDPOINT = os.getenv("K3_ENDPOINT", "https://api.moonshot.cn/v1").strip() or "https://api.moonshot.cn/v1"
 ENV_K3_KEY = K3_API_KEY
 ENV_SERP_KEY = (os.getenv("SERP_API_KEY") or "").strip()
-ENV_GROQ_LLM_KEY = GROQ_API_KEY
+# Kimi K3 is the primary provider. Groq remains an opt-in fallback only when
+# no Kimi key is available, so an invalid legacy Groq key cannot intercept requests.
+ENV_GROQ_LLM_KEY = "" if K3_API_KEY else GROQ_API_KEY
 GROQ_LLM_ENDPOINT = "https://api.groq.com/openai/v1"
 MODELS = [
     "openai/gpt-oss-20b",
@@ -26,7 +30,7 @@ MODELS = [
 GROQ_LLM_PRIMARY = MODELS[0]
 GROQ_LLM_FALLBACK = MODELS[1]
 GROQ_FALLBACK_MODELS = MODELS
-K3_MODEL = "kimi-k3"
+K3_MODEL = "kimi-k2.6"
 GROQ_JSON_OPTIONS = {"reasoning_effort": "low"}
 
 # Initialisation du client Groq / OpenAI (réutilisé entre requêtes : connexions HTTP conservées
@@ -389,7 +393,8 @@ async def enrich_briefing(data, keys=None):
                 {"role": "user", "content": payload[:12000]},
             ],
             max_tokens=1400,
-            temperature=0.2,
+            # Kimi K3 accepte uniquement temperature=1.0.
+            temperature=1.0 if base_url == K3_ENDPOINT else 0.2,
         )
         content = resp.choices[0].message.content or ""
         briefing = str(content).strip()
@@ -559,13 +564,13 @@ async def summarize_episode(history):
 async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="normal", keys=None, mood=None):
     """
     Cerveau central et unique de ΣIRIUS.
-    Utilise GROQ_API_KEY normalement via l'API Groq, en respectant le `mode` demandé
-    ("normal" par défaut, ou "turbo" pour une réponse plus courte et plus rapide).
+    Utilise Kimi K3 en priorité, avec Groq comme secours si aucune clé K3 n'est disponible.
     """
     keys = keys or {}
     k3_key = keys.get("k3") or ENV_K3_KEY
     serp_key = keys.get("serp") or ENV_SERP_KEY
     is_turbo = (mode or "normal").lower() == "turbo"
+    k3_key = (keys or {}).get("k3") or ENV_K3_KEY
     k3_key = (keys or {}).get("k3") or ENV_K3_KEY
 
     # ⚡ APPRENTISSAGE INSTANTANÉ : mémorisation/correction sans aller-retour LLM.
@@ -673,7 +678,7 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
                     {"role": "user", "content": prompt},
                 ],
                 max_tokens=1200,
-                temperature=0.8,
+                temperature=1.0,
                 timeout=30.0,
             )
             raw_json = resp.choices[0].message.content.strip()
@@ -703,6 +708,7 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
     pour ne jamais retarder la réponse parlée.
     """
     is_turbo = (mode or "normal").lower() == "turbo"
+    k3_key = (keys or {}).get("k3") or ENV_K3_KEY
 
     # ⚡ APPRENTISSAGE INSTANTANÉ : mémorisation/correction sans aller-retour LLM.
     memorize = detect_memorize_request(prompt)
@@ -714,8 +720,8 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
             yield f"C'est mémorisé instantanément : {fact}."
         return
 
-    if not ENV_GROQ_LLM_KEY:
-        logger.warning("[ΣIRIUS:STREAM] GROQ_API_KEY absente, retour local.")
+    if not ENV_GROQ_LLM_KEY and not k3_key:
+        logger.warning("[ΣIRIUS:STREAM] Aucune clé LLM disponible, retour local.")
         yield "Je n'ai pas pu générer de réponse pour le moment. Réessaie dans un instant."
         return
 
@@ -729,7 +735,7 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
     # Réponse conversationnelle parlée : pas besoin de 4096 tokens (~3000 mots) par défaut,
     # ça n'a jamais de sens à l'oral et ça ne fait qu'allonger le pire cas de génération.
     max_tokens = 512 if is_turbo else 1200
-    client_groq = client or AsyncOpenAI(api_key=ENV_GROQ_LLM_KEY, base_url=GROQ_LLM_ENDPOINT, max_retries=0)
+    client_groq = client or AsyncOpenAI(api_key=ENV_GROQ_LLM_KEY, base_url=GROQ_LLM_ENDPOINT, max_retries=0) if ENV_GROQ_LLM_KEY else None
 
     # Historique resserré : 10 tours (au lieu de 20) à 800 caractères (au lieu de 2000) — la
     # mémoire épisodique condensée prend déjà le relais pour le contexte plus ancien, inutile
@@ -742,7 +748,7 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
             history_messages.append({"role": role, "content": content[:800]})
 
     last_error = None
-    for model_name in models_to_try:
+    for model_name in models_to_try if client_groq else []:
         try:
             stream = await client_groq.chat.completions.create(
                 model=model_name,
@@ -772,24 +778,19 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
 
     if k3_key:
         try:
-            client_k3 = k3_client(k3_key)
-            stream = await client_k3.chat.completions.create(
-                model=K3_MODEL,
-                messages=[
-                    {"role": "system", "content": sys_prompt + plain_instruction},
-                    *history_messages,
-                    {"role": "user", "content": prompt},
-                ],
-                max_tokens=max_tokens,
-                temperature=0.8,
-                timeout=timeout,
-                stream=True,
+            result = await ask_sirius(
+                prompt=prompt,
+                history=history,
+                profile=profile,
+                memory=memory,
+                mode=mode,
+                keys=keys,
+                mood=mood,
             )
-            async for chunk in stream:
-                delta = chunk.choices[0].delta.content if chunk.choices else None
-                if delta:
-                    yield delta
-            return
+            answer = (result.get("reponse") or "").strip()
+            if answer:
+                yield answer
+                return
         except Exception as e:
             logger.warning(f"[ΣIRIUS:STREAM] Repli Kimi refusé : {repr(e)}")
     yield "Je n'ai pas pu générer de réponse pour le moment. Réessaie dans un instant."

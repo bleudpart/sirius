@@ -144,7 +144,7 @@ def make_voice_io_router():
         if not data:
             raise HTTPException(status_code=400, detail="Audio vide")
         stt_url = os.environ.get("WHISPER_API_URL") or os.environ.get("STT_BACKEND_URL")
-        groq_key = (os.environ.get("GROQ_API_KEY") or "").strip()
+        groq_key = (os.environ.get("GROQ_KEY") or os.environ.get("GROQ_API_KEY") or "").strip()
         fname = getattr(file, "filename", None) or "audio.webm"
         ctype = getattr(file, "content_type", None) or "audio/webm"
         if stt_url:

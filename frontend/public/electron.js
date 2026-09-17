@@ -176,7 +176,7 @@ app.whenReady().then(async () => {
       return;
     }
     // Mises à jour automatiques via GitHub Releases (jamais bloquant).
-    setupAutoUpdater({ app, dialog });
+    setupAutoUpdater({ app, dialog, ipcMain });
   }
 
   // Active les raccourcis Couper/Copier/Coller/Tout sélectionner (Ctrl+X/C/V/A)

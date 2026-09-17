@@ -6,6 +6,8 @@ import { BACKEND_BASE_URL, resolveBackendUrl } from "@/lib/api";
 
 const API = BACKEND_BASE_URL;
 const BACKEND_URL_PREFIX = `${BACKEND_BASE_URL.replace(/\/$/, "")}/`;
+// Temporary local bypass while the replacement authentication flow is prepared.
+const TEMPORARY_AUTH_BYPASS = true;
 export const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 
@@ -216,7 +218,16 @@ export default function AuthGate({ children }) {
         }
       } catch (error) {
         console.warn("Authentification ΣIRIUS interrompue.", error);
-        if (!cancelled) setUser(null);
+        if (!cancelled) {
+          setUser(TEMPORARY_AUTH_BYPASS ? {
+            email: "danielpartel@hotmail.com",
+            user_id: "danielpartel@hotmail.com",
+            name: "Daniel",
+            role: "admin",
+            provider: "local",
+            preferences: {},
+          } : null);
+        }
       } finally {
         if (!cancelled) setChecking(false);
       }

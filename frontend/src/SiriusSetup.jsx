@@ -143,6 +143,19 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
   };
 
   const [saved, setSaved] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState("");
+
+  const checkForUpdate = async () => {
+    if (!window.siriusUpdates?.check) {
+      setUpdateStatus("Mise à jour disponible uniquement dans l'application Windows.");
+      return;
+    }
+    setUpdateStatus("Vérification en cours...");
+    const result = await window.siriusUpdates.check();
+    if (!result?.ok) setUpdateStatus("Vérification impossible pour le moment.");
+    else if (result.available) setUpdateStatus("Nouvelle version détectée. Téléchargement en cours...");
+    else setUpdateStatus("SIRIUS est à jour.");
+  };
 
   const exportProfile = () => {
     const data = JSON.stringify({ profile, keys, _app: "ΣIRIUS", _version: 1 }, null, 2);
@@ -462,6 +475,13 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
             Sans clé personnelle, Sirius utilise la clé du serveur — il répond toujours via l'IA connectée.
           </div>
         )}
+
+        <div className="setup-actions" style={{ alignItems: "center", justifyContent: "center" }}>
+          <button type="button" className="setup-io-btn" onClick={checkForUpdate} data-testid="setup-check-update">
+            <Download size={15} /> MISE À JOUR
+          </button>
+          {updateStatus && <span className="setup-note" data-testid="setup-update-status">{updateStatus}</span>}
+        </div>
 
         <button type="submit" className="setup-submit" data-testid="setup-submit">
           {isEdit ? "ENREGISTRER" : "DÉMARRER ΣIRIUS"}

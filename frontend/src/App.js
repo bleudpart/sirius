@@ -5947,7 +5947,7 @@ function App() {
         </div>
         <div className="conn-status" data-testid="sirius-connection">
           <span className={`conn-led ${connected ? "on" : "off"}`} />
-          {"IA CLOUD · GROQ / KIMI"}
+          {"IA CLOUD · KIMI K3"}
           {mode === "brainstorm" && <span className="mode-badge" data-testid="brainstorm-badge">BRAINSTORM</span>}
           {window.Capacitor?.getPlatform?.() === "android" && (
             <button
@@ -6321,7 +6321,7 @@ function App() {
         )}
       </div>
 
-      <footer className="sirius-footer" data-testid="sirius-footer">© 2026 ΣIRIUS Assistant – Daniel Partel</footer>
+      <footer className="sirius-footer" data-testid="sirius-footer">© 2026 <span className="sirius-footer-mark">Σ</span>IRIUS par Daniel Partel</footer>
       <GlobalDrop />
     </div>
   );

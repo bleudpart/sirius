@@ -5,7 +5,7 @@
 
 const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
 
-function setupAutoUpdater({ app, dialog }) {
+function setupAutoUpdater({ app, dialog, ipcMain }) {
   let autoUpdater;
   try {
     ({ autoUpdater } = require("electron-updater"));
@@ -15,7 +15,7 @@ function setupAutoUpdater({ app, dialog }) {
   }
 
   autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true; // installée à la fermeture si l'utilisateur refuse le redémarrage
+  autoUpdater.autoInstallOnAppQuit = true; // installée automatiquement à la fermeture
 
   autoUpdater.on("error", (error) => {
     // Hors-ligne ou release absente : silencieux, on réessaiera au prochain cycle.
@@ -26,19 +26,9 @@ function setupAutoUpdater({ app, dialog }) {
     console.log(`[UPDATE] nouvelle version détectée : ${info.version} (téléchargement en cours)`);
   });
 
-  autoUpdater.on("update-downloaded", async (info) => {
-    const { response } = await dialog.showMessageBox({
-      type: "info",
-      title: "SIRIUS — mise à jour prête",
-      message: `La version ${info.version} de SIRIUS est téléchargée.`,
-      detail: "Redémarrer maintenant pour l'installer ? Sinon elle s'installera à la prochaine fermeture.",
-      buttons: ["Redémarrer maintenant", "Plus tard"],
-      defaultId: 0,
-      cancelId: 1,
-    });
-    if (response === 0) {
-      autoUpdater.quitAndInstall();
-    }
+  autoUpdater.on("update-downloaded", (info) => {
+    // Aucun clic demandé : l'installation se fera à la prochaine fermeture.
+    console.log(`[UPDATE] version ${info.version} prête, installation automatique à la fermeture`);
   });
 
   const check = () => {
@@ -46,6 +36,15 @@ function setupAutoUpdater({ app, dialog }) {
       /* déjà couvert par l'événement error */
     });
   };
+
+  ipcMain.handle("sirius-update-check", async () => {
+    try {
+      const result = await autoUpdater.checkForUpdates();
+      return { ok: true, available: Boolean(result?.updateInfo && result.updateInfo.version !== app.getVersion()) };
+    } catch (error) {
+      return { ok: false, message: error?.message || "Vérification impossible." };
+    }
+  });
 
   // Première vérification différée : ne jamais ralentir le démarrage du HUD.
   setTimeout(check, 15 * 1000);

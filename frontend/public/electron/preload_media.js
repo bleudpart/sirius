@@ -13,3 +13,7 @@ contextBridge.exposeInMainWorld("siriusMedia", {
   },
 });
 
+contextBridge.exposeInMainWorld("siriusUpdates", {
+  check: () => ipcRenderer.invoke("sirius-update-check"),
+});
+

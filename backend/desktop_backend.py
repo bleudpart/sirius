@@ -41,6 +41,9 @@ def main() -> None:
         reload=False,
         proxy_headers=False,
         access_log=True,
+        # The packaged sidecar has no console stream; Uvicorn's default
+        # formatter calls isatty() on that missing stream and aborts startup.
+        log_config=None,
     )
 
 
