@@ -1,14 +1,22 @@
 # © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 """Mémoire locale persistante de ΣIRIUS (SQLite) : préférences, projets, souvenirs."""
+import os
 import re
 import sqlite3
+import time
 import unicodedata
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from runtime_paths import data_file
 
 DB_PATH = data_file("sirius_local.db")
 CATEGORIES = ("preference", "projet", "souvenir")
+try:
+    TEMPORARY_MEMORY_TTL_DAYS = max(0, int(os.getenv("SIRIUS_TEMP_MEMORY_TTL_DAYS", "3")))
+except ValueError:
+    TEMPORARY_MEMORY_TTL_DAYS = 3
+_EXPIRY_INTERVAL_SECONDS = 3600.0
+_last_expiry_by_user = {}
 
 
 def _conn():
@@ -59,6 +67,43 @@ def init_local_db():
             "CREATE TABLE IF NOT EXISTS fact_vectors ("
             "fact_id TEXT PRIMARY KEY, model TEXT NOT NULL, vector TEXT NOT NULL)"
         )
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_facts_user_category_activity "
+            "ON facts(user_id, category, last_used, created_at)"
+        )
+
+
+def expire_stale_temporary_memory(user_id: str | None = "legacy", force: bool = False) -> int:
+    """Efface les souvenirs temporaires non consultés depuis 3 jours, sans bloquer le chat."""
+    if TEMPORARY_MEMORY_TTL_DAYS <= 0:
+        return 0
+    key = user_id or "__all__"
+    now_mono = time.monotonic()
+    if not force and now_mono - _last_expiry_by_user.get(key, 0.0) < _EXPIRY_INTERVAL_SECONDS:
+        return 0
+    _last_expiry_by_user[key] = now_mono
+
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=TEMPORARY_MEMORY_TTL_DAYS)).isoformat()
+    params = [cutoff]
+    user_clause = ""
+    if user_id:
+        user_clause = "AND user_id = ?"
+        params.append(user_id)
+    with _conn() as con:
+        rows = con.execute(
+            "SELECT id FROM facts "
+            "WHERE category = 'souvenir' "
+            "AND COALESCE(last_used, created_at) < ? "
+            f"{user_clause} ORDER BY COALESCE(last_used, created_at) ASC LIMIT 200",
+            tuple(params),
+        ).fetchall()
+        ids = [row["id"] for row in rows]
+        if not ids:
+            return 0
+        placeholders = ",".join("?" for _ in ids)
+        con.execute(f"DELETE FROM fact_vectors WHERE fact_id IN ({placeholders})", ids)
+        con.execute(f"DELETE FROM facts WHERE id IN ({placeholders})", ids)
+    return len(ids)
 
 
 def delete_user_data(user_id: str):
@@ -133,6 +178,7 @@ INTENT_SUGGESTIONS = {
 def prime_overview():
     """Synthèse apprentissage : journal du jour, habitudes, score de confiance, suggestions."""
     today = datetime.now().date()
+    expire_stale_temporary_memory(user_id=None)
     with _conn() as con:
         events = [dict(r) for r in con.execute(
             "SELECT * FROM events ORDER BY created_at DESC LIMIT 400").fetchall()]
@@ -193,6 +239,7 @@ def prime_overview():
 
 
 def list_facts(category=None, user_id: str = "legacy"):
+    expire_stale_temporary_memory(user_id=user_id)
     with _conn() as con:
         if category in CATEGORIES:
             rows = con.execute(
@@ -334,6 +381,7 @@ def recall_facts(query: str, user_id: str = "legacy", limit: int = 8):
     sert, plus il remonte vite — c'est le mécanisme d'apprentissage par renforcement.
     Sans recouvrement, renvoie les faits les plus récents (comportement antérieur).
     """
+    expire_stale_temporary_memory(user_id=user_id)
     query_tokens = _tokens(query)
     now = datetime.now(timezone.utc)
     with _conn() as con:
@@ -433,6 +481,7 @@ def store_vector(fact_id: str, model: str, vector):
 
 def facts_missing_vectors(model: str, limit: int = 64):
     """Faits sans vecteur d'embedding en cache — candidats à la pré-vectorisation."""
+    expire_stale_temporary_memory(user_id=None)
     with _conn() as con:
         rows = con.execute(
             "SELECT f.id, f.text FROM facts f "
@@ -446,6 +495,7 @@ def facts_missing_vectors(model: str, limit: int = 64):
 def vectorized_facts(user_id: str, model: str, limit: int = 2000):
     """Tous les faits d'un utilisateur déjà vectorisés, avec leur vecteur décodé."""
     import json as _json
+    expire_stale_temporary_memory(user_id=user_id)
     with _conn() as con:
         rows = con.execute(
             "SELECT f.id, f.category, f.text, f.created_at, f.use_count, v.vector "

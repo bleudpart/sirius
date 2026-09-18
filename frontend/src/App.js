@@ -69,6 +69,8 @@ const progressMap = {};
 // ⚡ FIX : Fallback explicite vers http://127.0.0.1:8001 si la variable d'env est vide
 const BACKEND_BASE = process.env.REACT_APP_BACKEND_URL || "http://127.0.0.1:8001";
 const API = BACKEND_BASE + "/api";
+const DAILY_BRIEFING_CACHE_MS = 30 * 60 * 1000;
+const BRIEFING_CONTEXT_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 
 const dispatchAutonomousVideoAction = (action) => {
   const prompt = typeof action?.prompt === "string" ? action.prompt.trim() : "";
@@ -180,7 +182,7 @@ const loadMemory = () => {
 };
 const todayStr = () => getLocalDateKey();
 
-const DAILY_BRIEFING_COMMAND = /^\s*(?:(?:mon|le)\s+)?(?:briefing(?:\s+(?:quotidien|du jour|matinal))?|r[ée]sum[ée]\s+du\s+jour)\s*[?.!]*\s*$/i;
+const DAILY_BRIEFING_COMMAND = /^\s*(?:(?:mon|le)\s+)?(?:briefing(?:\s+(?:quotidien|du jour|matinal))?|r[ée]sum[ée](?:[-\s]+moi)?(?:\s+(?:la|ma|du)\s+)?journ[ée]e?|fais[-\s]+moi\s+le\s+point(?:\s+sur\s+(?:ma\s+)?journ[ée]e?)?|qu'est[-\s]ce\s+qui\s+m'attend(?:\s+aujourd'hui)?|(?:mes\s+)?priorit[ée]s\s+du\s+jour|quoi\s+de\s+neuf\s+aujourd'hui)\s*[?.!]*\s*$/i;
 
 // Verbe exprimant une demande de liaison de compte, quelle que soit la tournure employée.
 const CONNECT_VERB = /\b(?:connect\w*|connexion|reconnect\w*|relie|relier|associe|associer|autorise|autoriser|lie|lier|branche|brancher)\b/i;
@@ -420,6 +422,9 @@ function App() {
   const imageReferenceRef = useRef(null);
   const imageReferenceInputRef = useRef(null);
   const wsRef = useRef(null);
+  const backendStatsActiveRef = useRef(false);
+  const spotifyRequestRef = useRef(false);
+  const briefingInFlightRef = useRef(false);
   const recognitionRef = useRef(null);
   const phraseSilenceTimerRef = useRef(null);
   const serverRecorderRef = useRef(null);
@@ -1009,7 +1014,9 @@ function App() {
 
   // Stats simulées (remplacées par le backend si connecté) — via bus liveStats, sans re-render du HUD
   useEffect(() => {
-    const id = setInterval(() => pushSimStats(), 1500);
+    const id = setInterval(() => {
+      if (!backendStatsActiveRef.current) pushSimStats();
+    }, 1500);
     return () => clearInterval(id);
   }, []);
 
@@ -1064,6 +1071,7 @@ function App() {
       wsRef.current = ws;
       ws.onopen = () => {
         attempt = 0;
+        backendStatsActiveRef.current = true;
         setConnected(true);
         // Keepalive : évite les fermetures silencieuses pour inactivité
         pingTimer = setInterval(() => {
@@ -1091,6 +1099,7 @@ function App() {
         } catch (e) {}
       };
       ws.onclose = () => {
+        backendStatsActiveRef.current = false;
         setConnected(false);
         if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
         wsRef.current = null;
@@ -1105,6 +1114,7 @@ function App() {
     connect();
     return () => {
       stopped = true;
+      backendStatsActiveRef.current = false;
       if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
       cleanupSocket();
     };
@@ -3158,6 +3168,8 @@ function App() {
   // Spotify connecté → VRAIE lecture via l'API (appareil actif requis, Premium pour la lecture à distance)
   const launchMusic = useCallback(async (query, source) => {
     if (source === "spotify" && spotifyRef.current && spotifyRef.current.access_token) {
+      if (spotifyRequestRef.current) return;
+      spotifyRequestRef.current = true;
       setStatus("thinking");
       setText(`Lancement de « ${query} » sur Spotify...`);
       try {
@@ -3196,7 +3208,9 @@ function App() {
           setText(m); speakOut(m);
           return;
         }
-      } catch (e) {}
+      } catch (e) {} finally {
+        spotifyRequestRef.current = false;
+      }
       // Erreur inattendue → repli sur la recherche web
     }
     const url = source === "youtube"
@@ -3466,55 +3480,66 @@ function App() {
     return false;
   }, [speakOut]);
 
-// Compréhension naturelle : la phrase part vers Groq, qui renvoie une intention UI ou « none »
+// Compréhension naturelle : commandes simples en local, Groq réservé aux intents ambigus.
   const resolveIntent = useCallback(async (command) => {
     if (!command || isBusy.current) return;
 
     setStatus("thinking");
     isBusy.current = true;
+    const normalized = command.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const localIntent = (() => {
+      if (DAILY_BRIEFING_COMMAND.test(command)) return { action: "daily_briefing", say: "Je prépare le briefing quotidien." };
+      if (/\b(?:silence|tais[- ]toi|arrete\s+(?:de\s+)?(?:parler|lire|lecture))\b/.test(normalized)) return { action: "stop_reading" };
+      if (/\b(?:range|reduis|minimise)\b.*\b(?:tout|fenetres?|modules?)\b/.test(normalized)) return { action: "minimize_all" };
+      if (/\b(?:coupe|arrete)\b.*\b(?:musique|ambiance)\b/.test(normalized)) return { action: "stop_music" };
+      if (/\b(?:relance|reprends|remets|lance)\b.*\b(?:musique|ambiance)\b/.test(normalized)) return { action: "play_music" };
+      if (/\b(?:ouvre|affiche|lance)\b.*\bspotify\b/.test(normalized)) return { action: "spotify", say: "J'ouvre le lecteur Spotify." };
+      return null;
+    })();
 
-    // Les deux appels partent désormais EN PARALLÈLE (au lieu de l'un après l'autre) : la
-    // classification d'intention (Groq) et la réponse conversationnelle (Groq, en flux) tournent
-    // en même temps. Cas le plus fréquent (pas d'action UI) : la réponse déjà en cours continue
-    // normalement, sans le temps d'attente supplémentaire de l'intent. Si une action UI réelle
-    // est détectée, on annule proprement le flux de réponse déjà lancé (fetch + synthèse vocale)
-    // pour éviter que Sirius parle ET exécute une action en même temps.
-    const chatController = new AbortController();
-    const cloudAnswerPromise = cloudAnswer(command, { signal: chatController.signal }).catch(() => {});
+    const maybeUiCommand = /\b(?:ouvre|ouvrir|affiche|afficher|lance|lancer|ferme|fermer|reduit|reduis|minimise|range|connecte|deconnecte|arrete|coupe|relance|active|desactive)\b/.test(normalized);
 
     try {
+      if (localIntent && executeIntent(localIntent)) {
+        setMetrics((m) => ({ ...m, nlu: { intent: `local · ${localIntent.action}`, count: m.nlu.count } }));
+        return;
+      }
+
+      if (!maybeUiCommand) {
+        await cloudAnswer(command);
+        return;
+      }
+
       const ctrl = new AbortController();
-      const to = setTimeout(() => ctrl.abort(), 90000);
+      let intentResponse = null;
+      const to = setTimeout(() => ctrl.abort(), 12000);
+      try {
+        intentResponse = await fetch(`${API}/intent`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: command }),
+          signal: ctrl.signal,
+        });
+      } finally {
+        clearTimeout(to);
+      }
 
-      const r = await fetch(`${API}/intent`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: command }),
-        signal: ctrl.signal,
-      });
+      const d = await intentResponse.json().catch(() => null);
 
-      clearTimeout(to);
-      const d = await r.json().catch(() => null);
-
-      // Si une intention UI est détectée et exécutée, on annule le flux de réponse parallèle.
-      if (r.ok && d && d.action && d.action !== "none" && executeIntent(d)) {
-        chatController.abort();
-        cancelSpeech();
+      if (intentResponse.ok && d && d.action && d.action !== "none" && executeIntent(d)) {
         setMetrics((m) => ({ ...m, nlu: { intent: `groq · ${d.action}`, count: m.nlu.count } }));
         return;
       }
 
-      // Sinon (pas d'action, ou action non reconnue) : la réponse déjà en cours va à son terme.
-      await cloudAnswerPromise;
+      await cloudAnswer(command);
 
     } catch (e) {
       if (isAbortError(e)) {
-        setStatus("idle");
+        await cloudAnswer(command);
         return;
       }
       console.error("[ΣIRIUS NLU] Erreur intent :", e);
-      // En cas de pépin sur l'intent, on s'appuie sur la réponse déjà en cours en parallèle.
-      await cloudAnswerPromise;
+      await cloudAnswer(command);
     } finally {
       // ⚡ SECURITE ABSOLUE : Débloque le réacteur et ferme le flou visuel dans 100% des cas
       isBusy.current = false;
@@ -3524,7 +3549,24 @@ function App() {
 
   const processCommand = useCallback((command) => {
     if (!command) return;
+    let enrichedCommand = command;
     const low = command.toLowerCase();
+
+    const asksBriefingDetail = /(?:plus de d[ée]tails|pr[ée]cisions?|d[ée]veloppe|explique|qu'est[- ]ce qui s'est pass[ée]|que sait[- ]on|parle[- ]moi davantage|approfondis)/.test(low)
+      && /(?:incident|[ée]v[ée]nement|actualit[ée]|info|cette|ce sujet|ce point|paris|ukraine|guerre|march[ée]|m[ée]t[ée]o)/.test(low);
+    if (asksBriefingDetail) {
+      try {
+        const rawBriefingContext = localStorage.getItem("sirius_last_briefing_context");
+        let briefingContext = localStorage.getItem("sirius_last_briefing") === todayStr() ? rawBriefingContext : "";
+        if (rawBriefingContext?.startsWith("{")) {
+          const parsed = JSON.parse(rawBriefingContext);
+          briefingContext = parsed?.saved_at && Date.now() - parsed.saved_at <= BRIEFING_CONTEXT_TTL_MS ? parsed.text : "";
+        }
+        if (briefingContext) {
+          enrichedCommand = `${command}\n\nCONTEXTE DU DERNIER BRIEFING :\n${briefingContext}\n\nIdentifie le sujet demandé dans ce contexte. Donne les précisions utiles et, si l'information est évolutive, vérifie-la avec une recherche web récente.`;
+        }
+      } catch (_) {}
+    }
 
     // Mode contextuel adaptatif : suivi du rythme d'activité
     cmdTimesRef.current = [...cmdTimesRef.current.filter((t) => Date.now() - t < 120000), Date.now()];
@@ -3766,7 +3808,7 @@ function App() {
     mark("analyse...");
 
   // Lancement de la résolution d'intention
-    resolveIntent(command);
+    resolveIntent(enrichedCommand);
   }, [
     resolveIntent, speakOut, readGmailAloud, sendGmail, launchUnifiedSearch, connectOutlook, connectGoogle, launchOutlookMail, launchOutlookContacts, launchGoogleContacts,
     launchOutlookIntent, launchOutlookCreateEvent, launchOutlookAgenda, readMailAloud,
@@ -4486,9 +4528,9 @@ function App() {
       }
     }
     // 0briefing) Briefing à la demande : « refais-moi le briefing », « résumé du jour »
-    if (/(refais|relance|redonne|repasse|refait)[- ]?(moi )?(le |mon )?(briefing|r[ée]sum[ée])|briefing du jour|(mon |le )?r[ée]sum[ée] du jour|donne[- ]moi (le |mon )?briefing/.test(low)) {
+    if (/(refais|relance|redonne|repasse|refait)[- ]?(moi )?(le |mon )?(briefing|r[ée]sum[ée])|briefing du jour|(mon |le )?r[ée]sum[ée] du jour|donne[- ]moi (le |mon )?briefing|fais[- ]moi le point|qu'est[- ]ce qui m'attend|priorit[ée]s du jour|quoi de neuf aujourd'hui/.test(low)) {
       mark("briefing · demande");
-      const m = "Très bien monsieur, je vous prépare votre résumé du jour.";
+      const m = "D’accord, je te prépare le point clair sur ta journée.";
       setStatus("thinking"); setText(m); speakOut(m);
       if (runBriefingRef.current) runBriefingRef.current(true);
       return;
@@ -5352,9 +5394,25 @@ function App() {
   // Briefing matinal parlé et affiché dans ΣIRIUS Display.
   const briefingDoneRef = useRef(false);
   const runBriefingDisplay = useCallback(async (force = false) => {
+    if (briefingInFlightRef.current) return;
+    briefingInFlightRef.current = true;
     const pid = progress.start("Briefing du jour", { silent: true });
     progress.log(pid, "Collecte des actualités et de la veille…", 25);
     try {
+      try {
+        const cached = JSON.parse(localStorage.getItem("sirius_daily_briefing_cache") || "null");
+        if (!force && cached?.date === todayStr() && Date.now() - (cached.saved_at || 0) < DAILY_BRIEFING_CACHE_MS && cached.msg) {
+          localStorage.setItem("sirius_last_briefing", todayStr());
+          localStorage.setItem("sirius_last_briefing_context", JSON.stringify({ saved_at: cached.saved_at, text: cached.msg.slice(-12000) }));
+          streamDisplayIdRef.current = null;
+          streamOnDisplay(cached.displayMsg || cached.msg, true, "BRIEFING QUOTIDIEN");
+          setStatus("speaking");
+          setText(cached.msg);
+          speakOut(cached.msg);
+          progress.done(pid, "Briefing délivré depuis le cache");
+          return;
+        }
+      } catch (e) { /* cache briefing illisible — recalcul normal */ }
       const r = await fetch(`${API}/oracle/overview`, { credentials: "include" });
       const d = await r.json();
       if (d.briefing) {
@@ -5478,6 +5536,9 @@ function App() {
           ]);
           const msg = `${salut}${meteoAtlas}${agendaTxt}${rappelsTxt}${haccpTxt}${mailTxt}${planTxt} ${d.briefing}${objAgora}${bourseTxt}`;
           const displayMsg = planCards ? `${msg}\n\n— Plans d'action proposés —\n${planCards}` : msg;
+          const savedAt = Date.now();
+          localStorage.setItem("sirius_last_briefing_context", JSON.stringify({ saved_at: savedAt, text: msg.slice(-12000) }));
+          localStorage.setItem("sirius_daily_briefing_cache", JSON.stringify({ date: todayStr(), saved_at: savedAt, msg, displayMsg }));
           streamDisplayIdRef.current = null; // nouvelle fenêtre dédiée au briefing, révélée progressivement
           streamOnDisplay(displayMsg, true, "BRIEFING QUOTIDIEN");
           setStatus("speaking");
@@ -5493,6 +5554,7 @@ function App() {
           progress.done(pid, "Aucun briefing disponible");
         }
       } catch (e) { progress.error(pid, "Briefing indisponible"); }
+      finally { briefingInFlightRef.current = false; }
   }, [streamOnDisplay, speakOut, userName, profile, msFetch, presentNextActionPlan]);
   useEffect(() => { runBriefingRef.current = runBriefingDisplay; }, [runBriefingDisplay]);
   useEffect(() => {

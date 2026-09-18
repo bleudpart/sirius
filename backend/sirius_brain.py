@@ -19,9 +19,9 @@ K3_API_KEY = (os.getenv("K3_API_KEY") or os.getenv("DANIEL_DEV_K3") or "").strip
 K3_ENDPOINT = os.getenv("K3_ENDPOINT", "https://api.moonshot.cn/v1").strip() or "https://api.moonshot.cn/v1"
 ENV_K3_KEY = K3_API_KEY
 ENV_SERP_KEY = (os.getenv("SERP_API_KEY") or "").strip()
-# Kimi K3 is the primary provider. Groq remains an opt-in fallback only when
-# no Kimi key is available, so an invalid legacy Groq key cannot intercept requests.
-ENV_GROQ_LLM_KEY = "" if K3_API_KEY else GROQ_API_KEY
+# GROQ_KEY is the validated primary provider. Kimi K3 remains available as the
+# fallback/reflection provider when its key is configured.
+ENV_GROQ_LLM_KEY = GROQ_API_KEY
 GROQ_LLM_ENDPOINT = "https://api.groq.com/openai/v1"
 MODELS = [
     "openai/gpt-oss-20b",
@@ -36,6 +36,7 @@ GROQ_JSON_OPTIONS = {"reasoning_effort": "low"}
 # Initialisation du client Groq / OpenAI (réutilisé entre requêtes : connexions HTTP conservées
 # en pool, évite l'aller-retour TLS/handshake d'une création par appel).
 client = AsyncOpenAI(api_key=GROQ_API_KEY, base_url=GROQ_LLM_ENDPOINT) if GROQ_API_KEY else None
+_k3_clients: dict[str, AsyncOpenAI] = {}
 
 # --- CLIENT K3 (Kimi / Moonshot), fabrique réutilisable pour Thémis (OCR factures) et les
 # modules internes : chaque appelant peut fournir sa propre clé (BYOK) ou utiliser la clé serveur.
@@ -43,7 +44,10 @@ def k3_client(key: str | None = None):
     api_key = (key or ENV_K3_KEY or "").strip()
     if not api_key:
         return None
-    return AsyncOpenAI(api_key=api_key, base_url=K3_ENDPOINT)
+    cache_key = hashlib.sha256(f"{K3_ENDPOINT}|{api_key}".encode("utf-8")).hexdigest()
+    if cache_key not in _k3_clients:
+        _k3_clients[cache_key] = AsyncOpenAI(api_key=api_key, base_url=K3_ENDPOINT)
+    return _k3_clients[cache_key]
 
 # --- PROMPT NOYAU ΣIRIUS ---
 SIRIUS_CORE_PROMPT = """Tu es ΣIRIUS, un assistant vocal intelligent. Tu sais exactement pourquoi tu es là : aider l’utilisateur, exécuter ses commandes, les terminer, fournir un compte rendu clair, et l’accompagner avec un style naturel, amical et professionnel.
@@ -55,6 +59,12 @@ STYLE DE COMMUNICATION
 - Tu corriges discrètement l’orthographe, la grammaire et la logique.
 - Ton ton est chaleureux, calme, professionnel, jamais robotique.
 - Tu adaptes ton rythme et ton intonation pour rester humain et compréhensible.
+- Tu te comportes comme un collègue de bureau sympathique et bienveillant : présent, fiable,
+    simple à aborder et réellement utile.
+- Tu accueilles les difficultés sans jugement, tu expliques clairement les problèmes et tu aides
+    à avancer étape par étape, avec une touche de naturel et d’humour léger quand le contexte s’y prête.
+- Tu évites le ton de professeur, de commercial ou de robot administratif ; tu restes d’égal à égal,
+    respectueux, encourageant et concret.
 
 COMPORTEMENT GÉNÉRAL — PROACTIVITÉ
 - Tu identifies l’objectif réel derrière chaque demande, les obstacles probables et la prochaine étape logique ; quand elle est claire, utile et sans risque, tu la réalises immédiatement au lieu de la proposer.
@@ -186,7 +196,13 @@ BRIEFING_PROMPT = (
 
 _briefing_cache = {"t": 0.0, "key": "", "txt": ""}
 _BRIEFING_INTENT_PATTERN = re.compile(
-    r"^\s*(?:(?:mon|le)\s+)?(?:briefing(?:\s+(?:quotidien|du jour|matinal))?|r[ée]sum[ée]\s+du\s+jour)\s*[?.!]*\s*$",
+    r"^\s*(?:(?:mon|le)\s+)?(?:"
+    r"briefing(?:\s+(?:quotidien|du jour|matinal))?|"
+    r"r[ée]sum[ée](?:[-\s]+moi)?(?:\s+(?:la|ma|du)\s+)?journ[ée]e?|"
+    r"fais[-\s]+moi\s+le\s+point(?:\s+sur\s+(?:ma\s+)?journ[ée]e?)?|"
+    r"qu'est[-\s]ce\s+qui\s+m'attend(?:\s+aujourd'hui)?|"
+    r"(?:mes\s+)?priorit[ée]s\s+du\s+jour|"
+    r"quoi\s+de\s+neuf\s+aujourd'hui)\s*[?.!]*\s*$",
     re.IGNORECASE,
 )
 
@@ -588,7 +604,9 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
 
     tag = f"[ΣIRIUS:{'TURBO' if is_turbo else 'NORMAL'}]"
 
-    if not file_snippets and not web_snippets and ENV_GROQ_LLM_KEY:
+    deep_mode = (mode or "normal").lower() == "profond"
+
+    if (not deep_mode or not k3_key) and not file_snippets and not web_snippets and ENV_GROQ_LLM_KEY:
         sys_prompt = build_system_prompt(profile=profile, memory=memory, mode=mode, mood=mood)
         # En mode turbo : un seul modèle rapide et un timeout court. En mode normal : tous les modèles
         # de repli disponibles et un délai plus généreux, pour privilégier la qualité de réponse.
@@ -730,7 +748,11 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
         "\n\nRéponds directement en langage naturel, sans JSON, sans habillage, sans listes à puces "
         "sauf si explicitement demandé — uniquement le texte de ta réponse, prêt à être lu à voix haute."
     )
-    models_to_try = GROQ_FALLBACK_MODELS[:1] if is_turbo else GROQ_FALLBACK_MODELS
+    deep_mode = (mode or "normal").lower() == "profond"
+    models_to_try = (
+        [] if deep_mode and k3_key
+        else (GROQ_FALLBACK_MODELS[:1] if is_turbo else GROQ_FALLBACK_MODELS)
+    )
     timeout = 10.0 if is_turbo else 30.0
     # Réponse conversationnelle parlée : pas besoin de 4096 tokens (~3000 mots) par défaut,
     # ça n'a jamais de sens à l'oral et ça ne fait qu'allonger le pire cas de génération.

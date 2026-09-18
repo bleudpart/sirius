@@ -115,6 +115,21 @@ async def _gather_memory_context(texte: str, uid: str, extra_memory: list) -> li
         for e in episodes
     ]
 
+
+_MEMORY_EXTRACTION_HINT_RE = re.compile(
+    r"\b(?:souviens[-\s]toi|retiens|m[ée]morise|note\s+que|"
+    r"je\s+(?:pr[ée]f[èe]re|d[ée]teste|travaille\s+sur|pr[ée]pare|dois|devrais|veux|aime)|"
+    r"mon\s+(?:projet|objectif|rappel|rdv|rendez[-\s]vous)|ma\s+(?:pr[ée]f[ée]rence|deadline|priorit[ée])|"
+    r"deadline|[ée]ch[ée]ance|avant\s+\d|pour\s+demain|c'est\s+faux|en\s+fait|"
+    r"je\s+t'ai\s+(?:d[ée]j[àa]\s+)?dit)\b",
+    re.IGNORECASE,
+)
+
+
+def should_extract_memory(texte: str, answer: str = "") -> bool:
+    """Évite le second appel LLM mémoire pour les échanges sans signal mémorisable."""
+    return bool(_MEMORY_EXTRACTION_HINT_RE.search(f"{texte or ''}\n{answer or ''}"))
+
 # =========================================================
 # INITIALISATION UNIQUE DE L'APPLICATION ET INTERCEPTATION OPTIONS
 # =========================================================
@@ -125,27 +140,39 @@ _episodic_task = None
 _vector_task = None
 
 
+async def _delayed_background_loop(delay_seconds: float, factory):
+    await asyncio.sleep(delay_seconds)
+    await factory()
+
+
+async def _run_episodic_loop_delayed():
+    from episodic import episodic_loop
+    from sirius_brain import summarize_episode
+    await episodic_loop(db, summarize_episode)
+
+
+async def _run_vector_warmup_loop_delayed():
+    from semantic_vectors import vector_warmup_loop
+    await vector_warmup_loop()
+
+
 @asynccontextmanager
 async def _lifespan(_app):
     # --- Démarrage ---
     global _watch_task, _omega_task, _episodic_task, _vector_task
     # Base documentaire : MongoDB si joignable, sinon docstore SQLite local.
     await _select_database_backend()
-    _watch_task = asyncio.create_task(_push_watch_loop())
-    _omega_task = asyncio.create_task(_omega_watch_loop())
-    # Mémoire épisodique : condensation des conversations pendant les temps morts.
-    from episodic import episodic_loop
-    from sirius_brain import summarize_episode
-    _episodic_task = asyncio.create_task(episodic_loop(db, summarize_episode))
-    # Cerveau vectoriel : pré-vectorisation des souvenirs en tâche de fond.
-    from semantic_vectors import vector_warmup_loop
-    _vector_task = asyncio.create_task(vector_warmup_loop())
     from auth_api import seed_admin_and_indexes
     try:
         await seed_admin_and_indexes(db)
         logger.info("[AUTH] Index et compte admin prêts")
     except Exception as e:
         logger.error(f"[AUTH] Init échouée: {e}")
+    _watch_task = asyncio.create_task(_delayed_background_loop(1.5, _push_watch_loop))
+    _omega_task = asyncio.create_task(_delayed_background_loop(2.0, _omega_watch_loop))
+    # Mémoire épisodique et vectorisation : imports et boucles décalés après le lancement.
+    _episodic_task = asyncio.create_task(_delayed_background_loop(4.0, _run_episodic_loop_delayed))
+    _vector_task = asyncio.create_task(_delayed_background_loop(6.0, _run_vector_warmup_loop_delayed))
     # (Stockage 100% local — plus d'initialisation cloud à faire ici.)
     try:
         yield
@@ -336,7 +363,10 @@ async def chat(req: ChatRequest, request: Request):
 
     # Mémoire locale (faits + épisodes condensés), rappel par pertinence sémantique/mots-clés —
     # les deux branches sont récupérées en parallèle (voir _gather_memory_context).
-    effective_mode = "turbo" if detect_urgency(texte) else (req.mode or "normal")
+    requested_ia_mode = (req.ia_mode or "jarvis").lower()
+    effective_mode = "turbo" if detect_urgency(texte) else (
+        "profond" if requested_ia_mode == "profond" else (req.mode or "normal")
+    )
     merged_memory = await _gather_memory_context(texte, uid, req.memory)
     logger.info(f"[CHAT] Début génération - Mode reçu: '{req.ia_mode}' | Mode appliqué: '{effective_mode}'")
 
@@ -416,7 +446,10 @@ async def chat_stream(req: ChatRequest, request: Request):
     history = (doc or {}).get("history", [])
     merged_memory = await _gather_memory_context(texte, uid, req.memory)
     autonomous_action = detect_autonomous_action(texte)
-    effective_mode = "turbo" if detect_urgency(texte) else (req.mode or "normal")
+    requested_ia_mode = (req.ia_mode or "jarvis").lower()
+    effective_mode = "turbo" if detect_urgency(texte) else (
+        "profond" if requested_ia_mode == "profond" else (req.mode or "normal")
+    )
 
     async def gen():
         t0 = time.perf_counter()
@@ -456,7 +489,7 @@ async def chat_stream(req: ChatRequest, request: Request):
 
             # Apprentissage automatique différé : n'ajoute AUCUNE latence à la réponse déjà
             # restituée (voix + affichage) — s'exécute en tâche de fond après coup.
-            if not autonomous_action:
+            if not autonomous_action and should_extract_memory(texte, answer):
                 async def _learn_later():
                     try:
                         from sirius_brain import extract_memory_background

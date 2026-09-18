@@ -21,7 +21,7 @@
   font-size: 8px;
   letter-spacing: 2px;
 }
-.pro-mode-label { margin-right: 4px; opacity: 0.85; }
+.pro-mode-label { display: inline-flex; align-items: center; gap: 4px; margin-right: 4px; opacity: 0.95; color: #f2d99a; text-shadow: 0 0 9px rgba(216, 184, 117, 0.55); }
 .pro-mode-btn {
   background: rgba(0, 20, 34, 0.7);
   border: 1px solid rgba(145, 230, 242, 0.35);
@@ -83,6 +83,10 @@
   line-height: 1.45;
   margin: 7px 0 9px;
 }
+.sugg-confidence { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 7px; margin: 0 0 9px; font-family: "Orbitron", sans-serif; font-size: 6.5px; letter-spacing: 1px; color: #d8b875; }
+.sugg-confidence i { display: block; height: 3px; background: rgba(145, 230, 242, 0.16); overflow: hidden; }
+.sugg-confidence i b { display: block; height: 100%; background: linear-gradient(90deg, #91e6f2, #f2d99a); box-shadow: 0 0 7px rgba(242, 217, 154, 0.65); }
+.sugg-confidence small { color: #7fa6b5; font-size: 6px; white-space: nowrap; }
 .sugg-confirm {
   color: #ffb347;
   font-size: 10.5px;

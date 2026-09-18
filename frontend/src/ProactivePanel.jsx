@@ -1,6 +1,6 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useCallback, useEffect, useState } from "react";
-import { Zap, Play, Wrench, Clock3, XCircle, HelpCircle, ShieldAlert } from "lucide-react";
+import { Zap, Play, Wrench, Clock3, XCircle, HelpCircle, ShieldAlert, BrainCircuit } from "lucide-react";
 import "./Proactive.css";
 
 const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
@@ -85,7 +85,7 @@ export default function ProactivePanel({ onAction, onSpeak }) {
     <div className="proactive-stack" data-testid="proactive-panel">
       <div className="pro-mode-row">
         <Zap size={11} />
-        <span className="pro-mode-label">SUGGESTIONS</span>
+        <span className="pro-mode-label"><BrainCircuit size={11} /> SIRIUS ANTICIPE</span>
         {MODES.map(([m, label]) => (
           <button
             key={m}
@@ -109,6 +109,11 @@ export default function ProactivePanel({ onAction, onSpeak }) {
             )}
           </div>
           <p className="sugg-desc">{s.description}</p>
+          <div className="sugg-confidence" title={s.reason || "Suggestion issue de la mémoire locale"}>
+            <span>CONFIANCE {Math.round((s.confidence || 0) * 100)} %</span>
+            <i><b style={{ width: `${Math.round((s.confidence || 0) * 100)}%` }} /></i>
+            <small>{s.source === "projet" ? "PROJET EN MÉMOIRE" : s.source === "habitude" ? "HABITUDE DÉTECTÉE" : "CONTEXTE RÉCENT"}</small>
+          </div>
           {confirming[s.id] && (
             <p className="sugg-confirm" data-testid="sugg-confirm-msg">
               Action sensible — cliquez à nouveau sur EXÉCUTER pour confirmer.

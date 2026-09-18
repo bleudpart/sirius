@@ -24,6 +24,7 @@ import math
 import os
 import threading
 import time
+from collections import OrderedDict
 
 from local_memory import (
     facts_missing_vectors,
@@ -43,7 +44,8 @@ logger = logging.getLogger("sirius.semantic")
 EMBED_MODEL = os.getenv("SIRIUS_EMBED_MODEL", "gemini-embedding-001")
 _EMBED_API_KEY = (os.getenv("GEMINI_API_KEY") or "").strip()
 _QUERY_CACHE_MAX = 128
-_query_cache = {}
+_QUERY_CACHE_TTL = 900.0
+_query_cache = OrderedDict()
 
 # Embeddings 100 % locaux (fastembed) : chargés en tâche de fond, jamais bloquants.
 LOCAL_EMBED_REPO = os.getenv(
@@ -56,11 +58,13 @@ _local_model_lock = threading.Lock()
 
 # Cache RAM des vecteurs de faits : évite lecture SQLite + décodage JSON par requête.
 _VECTOR_CACHE_MAX = 5000
-_vector_cache = {}
+_VECTOR_CACHE_TTL = 1800.0
+_vector_cache = OrderedDict()
 
 # Index vectoriel par utilisateur (faits + vecteurs), reconstruit au plus toutes les 60 s.
 _USER_INDEX_TTL = 60.0
-_user_index = {}
+_USER_INDEX_MAX = 32
+_user_index = OrderedDict()
 
 
 def local_embeddings_ready() -> bool:
@@ -117,14 +121,23 @@ def _local_encode(model, texts):
 
 
 def _remember_vector(fact_id: str, vector):
-    if len(_vector_cache) >= _VECTOR_CACHE_MAX:
-        _vector_cache.pop(next(iter(_vector_cache)))
-    _vector_cache[fact_id] = list(vector)
+    _vector_cache[fact_id] = (time.monotonic(), list(vector))
+    _vector_cache.move_to_end(fact_id)
+    while len(_vector_cache) > _VECTOR_CACHE_MAX:
+        _vector_cache.popitem(last=False)
 
 
 def _fact_vector(fact_id: str):
     """Vecteur d'un fait : RAM d'abord, sinon SQLite (puis mémorisé en RAM)."""
-    vector = _vector_cache.get(fact_id)
+    cached = _vector_cache.get(fact_id)
+    vector = None
+    if cached is not None:
+        stamp, cached_vector = cached
+        if time.monotonic() - stamp < _VECTOR_CACHE_TTL:
+            _vector_cache.move_to_end(fact_id)
+            vector = cached_vector
+        else:
+            _vector_cache.pop(fact_id, None)
     if vector is None:
         vector = get_cached_vector(fact_id, EMBED_MODEL)
         if vector is not None:
@@ -186,14 +199,20 @@ async def _query_vector(query: str):
     key = (query or "").strip().lower()[:300]
     if not key:
         return None
-    if key in _query_cache:
-        return _query_cache[key]
+    cached = _query_cache.get(key)
+    if cached is not None:
+        stamp, vector = cached
+        if time.monotonic() - stamp < _QUERY_CACHE_TTL:
+            _query_cache.move_to_end(key)
+            return vector
+        _query_cache.pop(key, None)
     vectors = await _embed_batch([key])
     vector = vectors[0] if vectors else None
     if vector:
-        if len(_query_cache) >= _QUERY_CACHE_MAX:
-            _query_cache.pop(next(iter(_query_cache)))
-        _query_cache[key] = vector
+        _query_cache[key] = (time.monotonic(), vector)
+        _query_cache.move_to_end(key)
+        while len(_query_cache) > _QUERY_CACHE_MAX:
+            _query_cache.popitem(last=False)
     return vector
 
 
@@ -252,9 +271,13 @@ def _user_vector_index(user_id: str):
     """Index vectoriel d'un utilisateur (faits + vecteurs), avec TTL en RAM."""
     entry = _user_index.get(user_id)
     if entry and time.monotonic() - entry["stamp"] < _USER_INDEX_TTL:
+        _user_index.move_to_end(user_id)
         return entry["facts"]
     facts = vectorized_facts(user_id, EMBED_MODEL)
     _user_index[user_id] = {"stamp": time.monotonic(), "facts": facts}
+    _user_index.move_to_end(user_id)
+    while len(_user_index) > _USER_INDEX_MAX:
+        _user_index.popitem(last=False)
     return facts
 
 

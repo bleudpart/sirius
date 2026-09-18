@@ -38,6 +38,13 @@ def _dumps(doc: dict) -> str:
     return json.dumps(doc, ensure_ascii=False, default=_json_default)
 
 
+_INDEXED_FIELDS = ("user_id", "session_id", "created_at", "updated_at")
+
+
+def _indexed_values(doc: dict) -> tuple:
+    return tuple(_normalize(_get(doc, field)[0]) for field in _INDEXED_FIELDS)
+
+
 def _get(doc, path):
     """Valeur d'une clé, avec support des clés pointées (« a.b.c »)."""
     current = doc
@@ -297,15 +304,48 @@ class LocalDocStore:
                 "pk INTEGER PRIMARY KEY AUTOINCREMENT, "
                 "collection TEXT NOT NULL, doc TEXT NOT NULL)"
             )
+            cols = [r[1] for r in con.execute("PRAGMA table_info(documents)").fetchall()]
+            for field in _INDEXED_FIELDS:
+                if field not in cols:
+                    con.execute(f"ALTER TABLE documents ADD COLUMN {field} TEXT")
             con.execute(
                 "CREATE INDEX IF NOT EXISTS idx_documents_collection ON documents(collection)"
             )
+            for field in _INDEXED_FIELDS:
+                con.execute(
+                    f"CREATE INDEX IF NOT EXISTS idx_documents_{field} ON documents(collection, {field})"
+                )
+            con.execute(
+                "CREATE INDEX IF NOT EXISTS idx_documents_session_updated "
+                "ON documents(collection, session_id, updated_at)"
+            )
             con.execute("PRAGMA journal_mode=WAL")
+        self._backfill_indexed_columns(limit=1000)
 
     def _conn(self):
         con = sqlite3.connect(self._path)
         con.row_factory = sqlite3.Row
         return con
+
+    def _backfill_indexed_columns(self, limit: int = 1000):
+        with _lock, self._conn() as con:
+            rows = con.execute(
+                "SELECT pk, collection, doc FROM documents "
+                "WHERE user_id IS NULL AND session_id IS NULL AND created_at IS NULL AND updated_at IS NULL "
+                "LIMIT ?",
+                (limit,),
+            ).fetchall()
+            for row in rows:
+                try:
+                    doc = json.loads(row["doc"])
+                except Exception:
+                    continue
+                values = _indexed_values(doc)
+                con.execute(
+                    "UPDATE documents SET user_id = ?, session_id = ?, created_at = ?, updated_at = ? "
+                    "WHERE pk = ? AND collection = ?",
+                    (*values, row["pk"], row["collection"]),
+                )
 
     def __getattr__(self, name: str) -> LocalCollection:
         if name.startswith("_"):
@@ -317,10 +357,35 @@ class LocalDocStore:
 
     # --- primitives internes (synchrones : SQLite locale, opérations courtes) ---
 
+    def _where_from_indexed_query(self, collection: str, query: dict):
+        where = ["collection = ?"]
+        params = [collection]
+        for key, condition in (query or {}).items():
+            if key.startswith("$"):
+                return "collection = ?", [collection]
+            if key not in _INDEXED_FIELDS:
+                continue
+            if isinstance(condition, dict):
+                for operator, expected in condition.items():
+                    if operator == "$options":
+                        continue
+                    sql_operator = {"$lt": "<", "$lte": "<=", "$gt": ">", "$gte": ">=", "$ne": "!="}.get(operator)
+                    if not sql_operator or expected is None:
+                        return "collection = ?", [collection]
+                    where.append(f"({key} {sql_operator} ? OR {key} IS NULL)")
+                    params.append(_normalize(expected))
+            else:
+                if condition is None:
+                    continue
+                where.append(f"({key} = ? OR {key} IS NULL)")
+                params.append(_normalize(condition))
+        return " AND ".join(where), params
+
     def _scan(self, collection: str, query=None, limit=None):
+        where_sql, params = self._where_from_indexed_query(collection, query or {})
         with self._conn() as con:
             rows = con.execute(
-                "SELECT pk, doc FROM documents WHERE collection = ? ORDER BY pk", (collection,)
+                f"SELECT pk, doc FROM documents WHERE {where_sql} ORDER BY pk", tuple(params)
             ).fetchall()
         found = 0
         for row in rows:
@@ -336,18 +401,22 @@ class LocalDocStore:
 
     def _insert(self, collection: str, document: dict) -> int:
         document.pop("_id", None)
+        values = _indexed_values(document)
         with _lock, self._conn() as con:
             cur = con.execute(
-                "INSERT INTO documents (collection, doc) VALUES (?, ?)",
-                (collection, _dumps(document)),
+                "INSERT INTO documents (collection, doc, user_id, session_id, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (collection, _dumps(document), *values),
             )
         return cur.lastrowid
 
     def _replace_pk(self, collection: str, pk: int, document: dict):
+        values = _indexed_values(document)
         with _lock, self._conn() as con:
             con.execute(
-                "UPDATE documents SET doc = ? WHERE pk = ? AND collection = ?",
-                (_dumps(document), pk, collection),
+                "UPDATE documents SET doc = ?, user_id = ?, session_id = ?, created_at = ?, updated_at = ? "
+                "WHERE pk = ? AND collection = ?",
+                (_dumps(document), *values, pk, collection),
             )
 
     def _delete_pk(self, collection: str, pk: int):

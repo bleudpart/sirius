@@ -211,6 +211,10 @@ def evaluate(user_id: str, now=None) -> dict:
                 "description": c["description"],
                 "urgency": c["urgency"],
                 "risk_level": "faible",
+                "reason": c["reason"],
+                "benefit": c["benefit"],
+                "confidence": c["confidence"],
+                "source": c["kind"].split(":", 1)[0],
             })
 
     return {"settings": {"mode": mode}, "suggestions": suggestions}

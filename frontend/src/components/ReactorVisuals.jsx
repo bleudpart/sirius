@@ -30,7 +30,7 @@ export function MedallionRing({ status }) {
     >
       <img src="/holo/ring-gold.png" alt="" className="live-medallion-img" draggable={false} />
       <img src="/holo/ring-gold.png" alt="" className="live-medallion-img inner-rev" draggable={false} />
-      <img src="/holo/sirius-title.png" alt="ΣIRIUS" className="live-medallion-title" data-testid="sirius-hud-title" draggable={false} />
+      <span className="live-medallion-title" data-testid="sirius-hud-title" aria-label="ΣIRIUS">ΣIRIUS</span>
     </div>
   );
 }

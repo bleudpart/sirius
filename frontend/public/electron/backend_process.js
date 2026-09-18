@@ -5,6 +5,8 @@ const { spawn } = require("child_process");
 
 const HEALTH_URL = "http://127.0.0.1:8001/health";
 const HEALTH_TIMEOUT_MS = 30000;
+const HEALTH_POLL_MIN_MS = 120;
+const HEALTH_POLL_MAX_MS = 1200;
 let backendProcess = null;
 
 function readHealth(timeoutMs = 1500) {
@@ -29,12 +31,14 @@ function readHealth(timeoutMs = 1500) {
 
 async function waitForHealth(child, timeoutMs = HEALTH_TIMEOUT_MS) {
   const deadline = Date.now() + timeoutMs;
+  let delayMs = HEALTH_POLL_MIN_MS;
   while (Date.now() < deadline) {
     if (child && child.exitCode !== null) {
       throw new Error(`Le backend SIRIUS s'est arrêté avec le code ${child.exitCode}.`);
     }
     if (await readHealth()) return;
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    delayMs = Math.min(HEALTH_POLL_MAX_MS, Math.round(delayMs * 1.6));
   }
   throw new Error("Le backend SIRIUS n'a pas répondu dans le délai prévu.");
 }
