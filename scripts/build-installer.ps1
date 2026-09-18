@@ -220,7 +220,7 @@ Write-Info "Dossier : $distDir"
 Get-ChildItem -Path $distDir -Filter '*.exe' -ErrorAction SilentlyContinue |
     ForEach-Object { Write-Host "      - $($_.Name)" -ForegroundColor White }
 Write-Host ''
-Write-Info "Distribuez SIRIUS-Setup-$version.exe : il contient le HUD et le backend."
+Write-Info "Distribuez ΣIRIUS-Windows-$version.exe : il contient le HUD et le backend."
 Write-Info "L'utilisateur final n'a besoin ni de Python, ni de Node.js, ni de MongoDB."
 
 if (Test-Path $distDir) {

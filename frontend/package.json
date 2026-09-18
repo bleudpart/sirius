@@ -100,7 +100,7 @@
   },
   "build": {
     "appId": "sh.techenclair.sirius",
-    "productName": "SIRIUS",
+    "productName": "ΣIRIUS",
     "publish": [
       {
         "provider": "github",
@@ -145,9 +145,9 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "SIRIUS",
-      "artifactName": "SIRIUS-Setup-${version}.exe",
-      "uninstallDisplayName": "SIRIUS ${version}",
+      "shortcutName": "ΣIRIUS",
+      "artifactName": "ΣIRIUS-Windows-${version}.exe",
+      "uninstallDisplayName": "ΣIRIUS ${version}",
       "license": "../CONTRAT_LICENCE.txt",
       "installerLanguages": [
         "fr_FR"
@@ -157,7 +157,7 @@
       "deleteAppDataOnUninstall": false
     },
     "portable": {
-      "artifactName": "SIRIUS-portable-${version}.exe"
+      "artifactName": "ΣIRIUS-Portable-${version}.exe"
     }
   },
   "browserslist": {

@@ -8,7 +8,7 @@ Assistant vocal HUD style Iron Man. Frontend React + Backend FastAPI (+ Electron
 
 ### Installer SIRIUS sur un PC Windows
 
-1. Téléchargez le fichier `SIRIUS-Setup-<version>.exe`.
+1. Téléchargez le fichier `ΣIRIUS-Windows-<version>.exe`.
 2. Ouvrez le fichier téléchargé. Si Windows affiche un avertissement, vérifiez
   que le fichier provient bien de votre source SIRIUS, puis autorisez son
   exécution.
@@ -24,7 +24,7 @@ Assistant vocal HUD style Iron Man. Frontend React + Backend FastAPI (+ Electron
 
 Pour les démarrages suivants, utilisez le raccourci **SIRIUS** du Bureau ou du
 menu Démarrer. Vous n'avez besoin d'installer ni Python, ni Node.js, ni
-MongoDB. Le fichier `SIRIUS-portable-<version>.exe` permet aussi d'utiliser
+MongoDB. Le fichier `ΣIRIUS-Portable-<version>.exe` permet aussi d'utiliser
 SIRIUS sans installation classique.
 
 ### Utiliser SIRIUS sur Android ou une tablette Android
@@ -65,7 +65,7 @@ Store nécessite en plus les comptes développeur correspondants.
 
 Rien à installer au préalable : **ni Python, ni Node.js, ni MongoDB**.
 
-1. Récupérez le fichier `SIRIUS-Setup-<version>.exe`.
+1. Récupérez le fichier `ΣIRIUS-Windows-<version>.exe`.
 2. Double-cliquez dessus, acceptez le contrat de licence, choisissez le dossier.
 3. SIRIUS démarre seul : il lance son propre backend sur `127.0.0.1:8001`.
 
@@ -73,7 +73,7 @@ L'installation ne demande pas de droits administrateur (installation par
 utilisateur). Les données, journaux et secrets restent dans votre dossier
 utilisateur Windows. Les mises à jour sont proposées automatiquement.
 
-Une version `SIRIUS-portable-<version>.exe` existe aussi : aucun installateur,
+Une version `ΣIRIUS-Portable-<version>.exe` existe aussi : aucun installateur,
 elle s'exécute directement.
 
 La base mobile Capacitor est préparée dans `frontend/capacitor.config.js` pour

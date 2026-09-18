@@ -27,6 +27,6 @@ if defined SIRIUS_EXE (
 )
 
 echo SIRIUS n'est pas installe sur cet ordinateur.
-echo Lancez SIRIUS-Setup-*.exe ou utilisez la version portable.
+echo Lancez ΣIRIUS-Windows-*.exe ou utilisez ΣIRIUS-Portable-*.exe.
 pause
 exit /b 1

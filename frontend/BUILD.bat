@@ -144,8 +144,8 @@ echo                       TERMINE !
 echo  ============================================================
 echo.
 echo   Votre application est dans le dossier : dist\
-echo     - "SIRIUS-Setup-%SIRIUS_VERSION%.exe"     = installeur a distribuer
-echo     - "SIRIUS-portable-%SIRIUS_VERSION%.exe"  = version portable
+echo     - "ΣIRIUS-Windows-%SIRIUS_VERSION%.exe"   = installeur Windows a distribuer
+echo     - "ΣIRIUS-Portable-%SIRIUS_VERSION%.exe"  = version portable
 echo.
 start "" "dist"
 pause
