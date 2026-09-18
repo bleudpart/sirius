@@ -195,6 +195,7 @@ from storage import put_object, get_object, APP_NAME
 from local_memory import list_facts, add_fact, delete_fact, update_fact, log_event, prime_overview, log_service, list_service_log, recall_facts, learn_fact, recent_episodes
 from auth_api import is_direct_local_request, resolve_user_id, require_user  # noqa: E402
 from omega_engine import OmegaEngine  # noqa: E402
+from version_info import APP_NAME, APP_RELEASE, APP_VERSION  # noqa: E402
 
 # 5. Connexion base documentaire : MongoDB si disponible, sinon SQLite local.
 # SIRIUS_DB=mongo force MongoDB ; SIRIUS_DB=local force le docstore SQLite ;
@@ -264,7 +265,9 @@ async def health_check():
     checks["omega_watch"] = "running" if (_omega_task and not _omega_task.done()) else "stopped"
 
     keys = {
-        "llm": bool(os.getenv("GROQ_API_KEY") or os.getenv("K3_API_KEY") or os.getenv("DANIEL_DEV_K3") or os.getenv("GEMINI_API_KEY")),
+        "llm": bool(os.getenv("GROQ_KEY") or os.getenv("GROQ_API_KEY") or os.getenv("K3_API_KEY") or os.getenv("DANIEL_DEV_K3") or os.getenv("GEMINI_API_KEY")),
+        "groq": bool(os.getenv("GROQ_KEY") or os.getenv("GROQ_API_KEY")),
+        "kimi": bool(os.getenv("K3_API_KEY") or os.getenv("DANIEL_DEV_K3")),
         "serpapi": bool(os.getenv("SERP_API_KEY")),
         "spotify": bool(os.getenv("SPOTIFY_CLIENT_ID")),
     }
@@ -281,6 +284,9 @@ async def health_check():
     return {
         "status": overall,
         "service": "sirius-backend",
+        "app": APP_NAME,
+        "version": APP_VERSION,
+        "release": APP_RELEASE,
         "checks": checks,
         "keys": keys,
         "breakers": breakers_snapshot(),
@@ -309,7 +315,7 @@ class ChatRequest(BaseModel):
     profile: dict = {}
     memory: list = []
     mode: str = "normal"
-    ia_mode: str = "profond"
+    ia_mode: str = "jarvis"
     mood: dict = {}
 
 # Limitation de débit simple (anti-abus des clés serveur)

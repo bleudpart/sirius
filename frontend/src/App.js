@@ -48,6 +48,7 @@ import { getHUDStyleVariables, renderHUD } from "@/theme";
 import { SiriusLeftColumn, SiriusRightColumn, SiriusNextAction } from "@/hud/SiriusHudPanels";
 import "@/App.css";
 import { AmbientEngine } from "@/ambientAudio";
+import { APP_RELEASE } from "@/version";
 
 /* executeIntent moved into the real App component (see later in the file) */
 
@@ -408,7 +409,7 @@ function App() {
   const [booting, setBooting] = useState(true);
   const volume = undefined; // → statusPulseRef.current.volume (sans re-render)
   const [text, setText] = useState(
-    `${greetByPhase(userName)} Tous mes systèmes sont en ligne.`
+    `${greetByPhase(userName)} Tous mes systèmes sont en ligne. ${APP_RELEASE}.`
   );
   const [connected, setConnected] = useState(false);
   const [isShuttingDown, setIsShuttingDown] = useState(false);
