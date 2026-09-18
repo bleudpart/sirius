@@ -94,6 +94,7 @@ backend/proc_id.txt
 
 # Build caches
 .cache/
+.scannerwork/
 
 memory/test_credentials.md
 

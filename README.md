@@ -74,6 +74,24 @@ Guide détaillé : [INSTALL-SIRIUS.md](./INSTALL-SIRIUS.md)
 
 ---
 
+## Sécurité qualité avec SonarQube
+
+Le dépôt contient une configuration SonarQube dans `sonar-project.properties`.
+Avant une release sensible, lance le scan depuis une session PowerShell où le
+token reste en variable d'environnement, jamais dans le dépôt :
+
+```powershell
+$env:SONAR_HOST_URL="http://localhost:9000"
+$env:SONAR_TOKEN="<token-sonarqube>"
+.\scripts\sonar-scan.ps1
+```
+
+Le script exécute `git diff --check`, une compilation Python ciblée, le build
+frontend, puis `sonar-scanner`. Les dossiers de build, artefacts, dépendances,
+données locales et secrets sont exclus du scan.
+
+---
+
 ## ✨ Fonctionnalités
 
 ### Cœur du système
