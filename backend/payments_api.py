@@ -3,6 +3,7 @@
 import os
 import asyncio
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 import stripe
 from fastapi import APIRouter, HTTPException, Request
@@ -10,6 +11,29 @@ from pydantic import BaseModel
 
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+_LOCAL_CHECKOUT_ORIGINS = {"http://localhost:3000", "http://127.0.0.1:3000"}
+
+
+def _checkout_origin(origin_url: str) -> str:
+    """Accept only exact configured HTTPS origins for Stripe return redirects."""
+    configured = {
+        value.strip().rstrip("/")
+        for value in os.environ.get("SIRIUS_PUBLIC_ORIGINS", "https://sirius-assistant.fr").split(",")
+        if value.strip()
+    }
+    allowed = configured | _LOCAL_CHECKOUT_ORIGINS
+    candidate = (origin_url or "").strip().rstrip("/")
+    parsed = urlparse(candidate)
+    if (
+        candidate not in allowed
+        or parsed.scheme not in {"http", "https"}
+        or parsed.path
+        or parsed.params
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise HTTPException(status_code=400, detail="Origine de retour Stripe non autorisée.")
+    return candidate
 
 
 def now_iso():
@@ -49,6 +73,7 @@ def make_payments_router(db):
     @r.post("/payments/deal-checkout")
     async def deal_checkout(body: DealCheckoutIn, request: Request):
         uid = await _uid(request)
+        origin = _checkout_origin(body.origin_url)
         deal = await db.agora_deals.find_one({"id": body.deal_id, "user_id": uid}, {"_id": 0})
         if not deal:
             raise HTTPException(status_code=404, detail="Deal introuvable.")
@@ -72,8 +97,8 @@ def make_payments_router(db):
                 "quantity": 1,
             }],
             mode="payment",
-            success_url=f"{body.origin_url}/?payment=success&session_id={{CHECKOUT_SESSION_ID}}",
-            cancel_url=f"{body.origin_url}/?payment=cancel",
+            success_url=f"{origin}/?payment=success&session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{origin}/?payment=cancel",
             metadata={"deal_id": deal["id"], "percent": str(pct)},
         )
         try:

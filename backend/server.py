@@ -2358,6 +2358,8 @@ async def process_install_step(request: InstallStepRequest):
 # CONFIGURATION CORS UNIFIÉE (dev local + production)
 # =========================================================
 _DEFAULT_DEV_ORIGINS = [
+    "https://sirius-assistant.fr",
+    "https://www.sirius-assistant.fr",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:5173",
