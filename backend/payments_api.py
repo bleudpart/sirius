@@ -2,7 +2,7 @@
 # Paiements Stripe pour les deals Hermès Agora : lien d'encaissement (acompte ou total), suivi, webhook.
 import os
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 
 import stripe
@@ -44,6 +44,28 @@ class DealCheckoutIn(BaseModel):
     deal_id: str
     percent: int = 30
     origin_url: str
+
+
+class LicenseCheckoutIn(BaseModel):
+    tier: str
+    origin_url: str
+
+
+_LICENSE_PRICE_ENV = {
+    "standard": "STRIPE_PRICE_STANDARD_79",
+    "pro": "STRIPE_PRICE_PRO_149",
+    "lifetime": "STRIPE_PRICE_LIFETIME_299",
+    "monthly": "STRIPE_PRICE_MONTHLY_35",
+}
+
+
+def _license_price(tier: str) -> tuple[str, str]:
+    normalized = (tier or "").strip().lower()
+    env_name = _LICENSE_PRICE_ENV.get(normalized)
+    price_id = (os.getenv(env_name or "") or "").strip()
+    if not env_name or not price_id.startswith("price_"):
+        raise HTTPException(status_code=503, detail="Cette licence Stripe n'est pas encore configurée.")
+    return normalized, price_id
 
 
 def make_payments_router(db):
@@ -114,6 +136,40 @@ def make_payments_router(db):
             "created_at": now_iso(), "updated_at": now_iso(),
         })
         return {"checkout_url": session.url, "session_id": session.id, "amount": amount_cents}
+
+    @r.post("/licenses/checkout")
+    async def license_checkout(body: LicenseCheckoutIn, request: Request):
+        uid = await _uid(request)
+        origin = _checkout_origin(body.origin_url)
+        tier, price_id = _license_price(body.tier)
+        subscription = tier == "monthly"
+        trial_days = max(0, min(int(os.getenv("STRIPE_TRIAL_DAYS", "7")), 30))
+        kwargs = {
+            "line_items": [{"price": price_id, "quantity": 1}],
+            "mode": "subscription" if subscription else "payment",
+            "success_url": f"{origin}/?payment=success&session_id={{CHECKOUT_SESSION_ID}}",
+            "cancel_url": f"{origin}/?payment=cancel",
+            "client_reference_id": uid,
+            "metadata": {"kind": "license", "tier": tier, "user_id": uid},
+        }
+        if subscription and trial_days:
+            kwargs["subscription_data"] = {"trial_period_days": trial_days, "metadata": {"tier": tier, "user_id": uid}}
+        try:
+            session = await asyncio.to_thread(stripe.checkout.Session.create, **kwargs)
+        except stripe.error.StripeError as error:
+            raise HTTPException(status_code=502, detail=f"Stripe indisponible : {str(error)[:120]}") from error
+        await db.payment_transactions.insert_one({
+            "session_id": session.id, "user_id": uid, "kind": "license", "tier": tier,
+            "price_id": price_id, "status": "initiated", "payment_status": "pending",
+            "created_at": now_iso(), "updated_at": now_iso(),
+        })
+        return {"checkout_url": session.url, "session_id": session.id, "tier": tier}
+
+    @r.get("/licenses/me")
+    async def license_status(request: Request):
+        uid = await _uid(request)
+        license_doc = await db.user_licenses.find_one({"user_id": uid}, {"_id": 0})
+        return {"license": license_doc or {"tier": "free", "status": "inactive"}}
 
     async def _sync_from_stripe(record):
         try:
@@ -228,11 +284,45 @@ def make_payments_router(db):
         except Exception:
             raise HTTPException(status_code=400, detail="Signature invalide.")
         obj, t = event["data"]["object"], event["type"]
+        if await db.stripe_events.find_one({"event_id": event["id"]}, {"_id": 0}):
+            return {"status": "already_processed"}
+        await db.stripe_events.insert_one({"event_id": event["id"], "type": t, "received_at": now_iso()})
         if t == "checkout.session.completed":
             await db.payment_transactions.update_one(
                 {"session_id": obj["id"], "payment_status": {"$ne": "paid"}},
                 {"$set": {"status": "completed", "payment_status": obj.get("payment_status", "paid"),
                           "stripe_payment_intent_id": obj.get("payment_intent"), "updated_at": now_iso()}})
+            transaction = await db.payment_transactions.find_one({"session_id": obj["id"], "kind": "license"}, {"_id": 0})
+            if transaction:
+                tier = transaction["tier"]
+                subscription_id = obj.get("subscription")
+                await db.user_licenses.update_one(
+                    {"user_id": transaction["user_id"]},
+                    {"$set": {
+                        "user_id": transaction["user_id"], "tier": tier,
+                        "status": "trialing" if tier == "monthly" and obj.get("payment_status") == "no_payment_required" else "active",
+                        "stripe_customer_id": obj.get("customer"), "stripe_subscription_id": subscription_id,
+                        "updated_at": now_iso(),
+                        "expires_at": None if tier == "lifetime" else (datetime.now(timezone.utc) + timedelta(days=max(0, int(os.getenv("STRIPE_TRIAL_DAYS", "7"))))).isoformat() if tier == "monthly" else None,
+                    }},
+                    upsert=True,
+                )
+        elif t in {"customer.subscription.created", "customer.subscription.updated"}:
+            metadata = obj.get("metadata") or {}
+            uid, tier = metadata.get("user_id"), metadata.get("tier")
+            if uid and tier:
+                await db.user_licenses.update_one(
+                    {"user_id": uid},
+                    {"$set": {"tier": tier, "status": obj.get("status", "active"), "stripe_subscription_id": obj.get("id"), "updated_at": now_iso()}},
+                    upsert=True,
+                )
+        elif t in {"invoice.payment_succeeded", "invoice.payment_failed"}:
+            subscription_id = obj.get("subscription")
+            if subscription_id:
+                await db.user_licenses.update_one(
+                    {"stripe_subscription_id": subscription_id},
+                    {"$set": {"status": "active" if t.endswith("succeeded") else "past_due", "updated_at": now_iso()}},
+                )
         elif t == "checkout.session.async_payment_succeeded":
             await db.payment_transactions.update_one({"session_id": obj["id"]},
                 {"$set": {"payment_status": "paid", "updated_at": now_iso()}})
