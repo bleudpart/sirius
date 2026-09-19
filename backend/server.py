@@ -280,7 +280,7 @@ async def health_check():
 
     from resilience import breakers_snapshot
 
-    overall = "ok" if checks["mongo"] == "ok" else "degraded"
+    overall = "ok" if checks["mongo"] in {"ok", "unused"} else "degraded"
     return {
         "status": overall,
         "service": "sirius-backend",
@@ -317,6 +317,7 @@ class ChatRequest(BaseModel):
     mode: str = "normal"
     ia_mode: str = "jarvis"
     mood: dict = {}
+    environment: dict = {}
 
 # Limitation de débit simple (anti-abus des clés serveur)
 _RATE: dict[str, deque[float]] = {}
@@ -393,7 +394,8 @@ async def chat(req: ChatRequest, request: Request):
                 memory=merged_memory,
                 mode=effective_mode,
                 keys=req.keys or {},
-                mood=req.mood or {}
+                mood=req.mood or {},
+                environment=req.environment or {},
             )
             answer = result.get("reponse", "")
             memories = result.get("memoire", [])
@@ -473,7 +475,8 @@ async def chat_stream(req: ChatRequest, request: Request):
                     memory=merged_memory,
                     mode=effective_mode,
                     keys=req.keys or {},
-                    mood=req.mood or {}
+                    mood=req.mood or {},
+                    environment=req.environment or {},
                 ):
                     parts.append(delta)
                     yield f"data: {json.dumps({'type': 'delta', 'text': delta}, ensure_ascii=False)}\n\n"
