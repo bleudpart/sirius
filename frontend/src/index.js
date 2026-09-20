@@ -8,6 +8,7 @@ import AuthGate from "@/AuthGate";
 import MediaHudWindow from "@/MediaHudWindow";
 import FdeErrorBoundary from "@/FdeErrorBoundary";
 import { initFdeOmega } from "@/fdeOmega";
+import PublicStore from "@/PublicStore";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,6 +21,8 @@ const queryClient = new QueryClient({
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 const isMediaHud = new URLSearchParams(window.location.search).has("mediaHud");
+const isPublicStore = ["sirius-assistant.fr", "www.sirius-assistant.fr"].includes(window.location.hostname)
+  || window.location.pathname === "/acheter";
 const stopFdeOmega = initFdeOmega();
 window.addEventListener("beforeunload", stopFdeOmega, { once: true });
 // StrictMode retiré : il double l'exécution des effets en développement,
@@ -28,7 +31,7 @@ root.render(
   <QueryClientProvider client={queryClient}>
     <FdeErrorBoundary>
       <AuthGate>
-        {isMediaHud ? <MediaHudWindow /> : <App />}
+        {isPublicStore ? <PublicStore /> : isMediaHud ? <MediaHudWindow /> : <App />}
       </AuthGate>
     </FdeErrorBoundary>
   </QueryClientProvider>,

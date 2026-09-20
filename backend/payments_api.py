@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 
 import stripe
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
@@ -49,6 +49,10 @@ class DealCheckoutIn(BaseModel):
 class LicenseCheckoutIn(BaseModel):
     tier: str
     origin_url: str
+
+
+class PublicLicenseCheckoutIn(LicenseCheckoutIn):
+    email: EmailStr
 
 
 _LICENSE_PRICE_ENV = {
@@ -161,6 +165,35 @@ def make_payments_router(db):
         await db.payment_transactions.insert_one({
             "session_id": session.id, "user_id": uid, "kind": "license", "tier": tier,
             "price_id": price_id, "status": "initiated", "payment_status": "pending",
+            "created_at": now_iso(), "updated_at": now_iso(),
+        })
+        return {"checkout_url": session.url, "session_id": session.id, "tier": tier}
+
+    @r.post("/public/license-checkout")
+    async def public_license_checkout(body: PublicLicenseCheckoutIn, request: Request):
+        origin = _checkout_origin(body.origin_url)
+        tier, price_id = _license_price(body.tier)
+        buyer_email = str(body.email).strip().lower()
+        subscription = tier == "monthly"
+        trial_days = max(0, min(int(os.getenv("STRIPE_TRIAL_DAYS", "7")), 30))
+        kwargs = {
+            "line_items": [{"price": price_id, "quantity": 1}],
+            "mode": "subscription" if subscription else "payment",
+            "success_url": f"{origin}/?payment=success&session_id={{CHECKOUT_SESSION_ID}}",
+            "cancel_url": f"{origin}/?payment=cancel",
+            "customer_email": buyer_email,
+            "metadata": {"kind": "license", "tier": tier, "user_id": buyer_email, "buyer_email": buyer_email},
+        }
+        if subscription and trial_days:
+            kwargs["subscription_data"] = {"trial_period_days": trial_days, "metadata": {"tier": tier, "user_id": buyer_email}}
+        try:
+            session = await asyncio.to_thread(stripe.checkout.Session.create, **kwargs)
+        except stripe.error.StripeError as error:
+            raise HTTPException(status_code=502, detail=f"Stripe indisponible : {str(error)[:120]}") from error
+        await db.payment_transactions.insert_one({
+            "session_id": session.id, "user_id": buyer_email, "buyer_email": buyer_email,
+            "kind": "license", "tier": tier, "price_id": price_id,
+            "status": "initiated", "payment_status": "pending",
             "created_at": now_iso(), "updated_at": now_iso(),
         })
         return {"checkout_url": session.url, "session_id": session.id, "tier": tier}
