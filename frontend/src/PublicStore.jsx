@@ -68,13 +68,22 @@ export default function PublicStore() {
         <span className="public-secure"><ShieldCheck size={15} /> Paiement sécurisé Stripe</span>
       </header>
       <section className="public-hero">
-        <p className="public-kicker"><Sparkles size={14} /> <span className="public-kicker-gold">ΣIRIUS</span> — ASSISTANT PROFESSIONNEL NUMÉRIQUE INTELLIGENT ET AUTONOME</p>
         <h1>Votre espace de travail<br /><em>prend vie.</em></h1>
+        <p className="public-kicker"><Sparkles size={14} /> <span className="public-kicker-gold">ΣIRIUS</span> — ASSISTANT PROFESSIONNEL NUMÉRIQUE INTELLIGENT ET AUTONOME</p>
         <p className="public-promise">Dites-lui quoi faire, il s'occupe de tout : l'assistant personnel intelligent et indispensable qui vous facilite la vie.</p>
         <p className="public-lead">ΣIRIUS fusionne vos données, vos outils métier et une IA contextuelle pour automatiser vos tâches et vous guider au quotidien. Vous donnez le cap, ΣIRIUS analyse, orchestre vos outils métier et exécute chaque action avec précision.</p>
         <p className="public-platforms">Disponible sur Windows, Android, iPhone, iPad et tablette.</p>
         <div className="public-core-preview">
-          <img src="/hud-preview.png" alt="Aperçu du noyau ΣIRIUS" />
+          <div className="public-core-window" aria-label="Noyau ΣIRIUS" role="img">
+            <span className="public-core-window-title">Noyau actif</span>
+            <span className="public-core-window-status">SYS.ONLINE</span>
+            <div className="public-core-art">
+              <img src="/holo/ring-gold.png" alt="" className="public-core-ring public-core-ring-outer" draggable={false} />
+              <img src="/holo/ring-gold.png" alt="" className="public-core-ring public-core-ring-inner" draggable={false} />
+              <div className="public-core-scan-band" aria-hidden="true" />
+              <div className="public-core-heart" />
+            </div>
+          </div>
           <span><strong>Le noyau ΣIRIUS</strong> Votre centre de commande intelligent, en un coup d'œil.</span>
         </div>
       </section>
