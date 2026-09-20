@@ -1,21 +1,26 @@
 import { useState } from "react";
 import { Check, ShieldCheck, Sparkles, ArrowRight } from "lucide-react";
+import PublicLegal from "./PublicLegal";
 import "./PublicStore.css";
 
 const API = `${process.env.REACT_APP_BACKEND_URL || "https://api.sirius-assistant.fr"}/api`;
 
 const PLANS = [
-  { id: "monthly", name: "Abonnement Entreprise", price: "35", suffix: "/ mois", note: "7 jours d'essai gratuit", featured: true, features: ["Fiches clients centralisées, zéro tableur", "Relances de facturation envoyées seules", "Stocks à jour à la seconde près", "Dictez la réponse, ΣIRIUS envoie le mail", "Un service cloud entièrement personnalisable", "Module complet de gestion comptable"] },
+  { id: "monthly", name: "Abonnement Entreprise", price: "35", suffix: "/ mois", note: "7 jours d'essai gratuit", featured: true, features: ["Fiches clients centralisées, zéro tableur", "Relances de facturation envoyées seules", "Stocks à jour à la seconde près", "Dictez la réponse, ΣIRIUS envoie le mail", "Un service cloud entièrement personnalisable", "Module complet de gestion comptable", "Résiliable à tout moment depuis le portail Stripe"] },
   { id: "standard", name: "Standard", price: "79", suffix: " unique", features: ["À vous, pour toujours — aucun renouvellement", "Un HUD digne d'un poste de commandement", "L'essentiel, sans superflu"] },
   { id: "pro", name: "Pro", price: "149", suffix: " unique", features: ["Les modules que vos concurrents n'ont pas", "HACCP et productivité pilotés d'une voix", "Une ligne directe vers le support"] },
   { id: "lifetime", name: "Lifetime", price: "299", suffix: " unique", features: ["Payez une fois, gardez ΣIRIUS à vie", "Chaque futur module, déjà inclus", "Le sommet de la gamme, sans compromis"] },
 ];
 
 export default function PublicStore() {
+  if (["/mentions-legales", "/conditions-generales", "/confidentialite"].includes(window.location.pathname)) return <PublicLegal />;
   const [email, setEmail] = useState("");
   const [selected, setSelected] = useState("monthly");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [portalBusy, setPortalBusy] = useState(false);
+  const checkoutSessionId = new URLSearchParams(window.location.search).get("session_id");
+  const paymentSucceeded = new URLSearchParams(window.location.search).get("payment") === "success";
 
   const checkout = async (event) => {
     event.preventDefault();
@@ -36,6 +41,25 @@ export default function PublicStore() {
     }
   };
 
+  const manageSubscription = async () => {
+    if (!checkoutSessionId) return;
+    setError("");
+    setPortalBusy(true);
+    try {
+      const response = await fetch(`${API}/public/license-portal`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: checkoutSessionId, origin_url: window.location.origin }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.portal_url) throw new Error(data.detail || "Impossible d'ouvrir la gestion d'abonnement.");
+      window.location.assign(data.portal_url);
+    } catch (cause) {
+      setError(cause.message || "La gestion d'abonnement est momentanément indisponible.");
+      setPortalBusy(false);
+    }
+  };
+
   return (
     <main className="public-store">
       <header className="public-nav">
@@ -45,8 +69,13 @@ export default function PublicStore() {
       <section className="public-hero">
         <p className="public-kicker"><Sparkles size={14} /> <span className="public-kicker-gold">ΣIRIUS</span> — ASSISTANT PROFESSIONNEL NUMÉRIQUE INTELLIGENT ET AUTONOME</p>
         <h1>Votre espace de travail<br /><em>prend vie.</em></h1>
+        <p className="public-promise">Dites-lui quoi faire, il s'occupe de tout : l'assistant personnel intelligent et indispensable qui vous facilite la vie.</p>
         <p className="public-lead">ΣIRIUS fusionne vos données, vos outils métier et une IA contextuelle pour automatiser vos tâches et vous guider au quotidien. Vous donnez le cap, ΣIRIUS analyse, orchestre vos outils métier et exécute chaque action avec précision.</p>
         <p className="public-platforms">Disponible sur Windows, Android, iPhone, iPad et tablette.</p>
+        <div className="public-core-preview">
+          <img src="/hud-preview.png" alt="Aperçu du noyau ΣIRIUS" />
+          <span><strong>Le noyau ΣIRIUS</strong> Votre centre de commande intelligent, en un coup d'œil.</span>
+        </div>
       </section>
       <section className="public-plans" aria-label="Offres ΣIRIUS">
         {PLANS.map((plan) => (
@@ -68,7 +97,12 @@ export default function PublicStore() {
         {error && <p className="public-error" role="alert">{error}</p>}
         <p className="public-legal">Vous serez redirigé vers Stripe. Aucun paiement réel en mode test.</p>
       </form>
-      <footer className="public-footer">© 2026 ΣIRIUS par Daniel Partel · Licence et confidentialité</footer>
+      {paymentSucceeded && checkoutSessionId && <section className="public-subscription-success">
+        <strong>Paiement confirmé.</strong>
+        <span>Gérez ou résiliez votre abonnement depuis le portail Stripe sécurisé.</span>
+        <button type="button" onClick={manageSubscription} disabled={portalBusy}>{portalBusy ? "Ouverture..." : "Gérer mon abonnement"}</button>
+      </section>}
+      <footer className="public-footer">© 2026 ΣIRIUS par Daniel Partel · <a href="/mentions-legales">Mentions légales</a> · <a href="/conditions-generales">Conditions générales</a> · <a href="/confidentialite">Confidentialité</a></footer>
     </main>
   );
 }
