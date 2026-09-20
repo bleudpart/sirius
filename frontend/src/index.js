@@ -30,9 +30,11 @@ window.addEventListener("beforeunload", stopFdeOmega, { once: true });
 root.render(
   <QueryClientProvider client={queryClient}>
     <FdeErrorBoundary>
-      <AuthGate>
-        {isPublicStore ? <PublicStore /> : isMediaHud ? <MediaHudWindow /> : <App />}
-      </AuthGate>
+      {isPublicStore ? <PublicStore /> : (
+        <AuthGate>
+          {isMediaHud ? <MediaHudWindow /> : <App />}
+        </AuthGate>
+      )}
     </FdeErrorBoundary>
   </QueryClientProvider>,
 );
