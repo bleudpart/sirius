@@ -5,10 +5,10 @@ import "./PublicStore.css";
 const API = `${process.env.REACT_APP_BACKEND_URL || "https://api.sirius-assistant.fr"}/api`;
 
 const PLANS = [
-  { id: "monthly", name: "Abonnement", price: "35", suffix: "/ mois", note: "7 jours d'essai gratuit", featured: true, features: ["HUD Σirius complet", "Mises à jour incluses", "Mémoire et proactivité"] },
-  { id: "standard", name: "Standard", price: "79", suffix: " unique", features: ["Licence permanente", "HUD professionnel", "Modules essentiels"] },
-  { id: "pro", name: "Pro", price: "149", suffix: " unique", features: ["Modules métiers avancés", "Productivité et HACCP", "Support prioritaire"] },
-  { id: "lifetime", name: "Lifetime", price: "299", suffix: " unique", features: ["Accès à vie", "Toutes les fonctions Pro", "Évolutions futures incluses"] },
+  { id: "monthly", name: "Abonnement Entreprise", price: "35", suffix: "/ mois", note: "7 jours d'essai gratuit", featured: true, features: ["Fiches clients centralisées, zéro tableur", "Relances de facturation envoyées seules", "Stocks à jour à la seconde près", "Dictez la réponse, ΣIRIUS envoie le mail", "Un service cloud entièrement personnalisable", "Module complet de gestion comptable"] },
+  { id: "standard", name: "Standard", price: "79", suffix: " unique", features: ["À vous, pour toujours — aucun renouvellement", "Un HUD digne d'un poste de commandement", "L'essentiel, sans superflu"] },
+  { id: "pro", name: "Pro", price: "149", suffix: " unique", features: ["Les modules que vos concurrents n'ont pas", "HACCP et productivité pilotés d'une voix", "Une ligne directe vers le support"] },
+  { id: "lifetime", name: "Lifetime", price: "299", suffix: " unique", features: ["Payez une fois, gardez ΣIRIUS à vie", "Chaque futur module, déjà inclus", "Le sommet de la gamme, sans compromis"] },
 ];
 
 export default function PublicStore() {
@@ -43,9 +43,9 @@ export default function PublicStore() {
         <span className="public-secure"><ShieldCheck size={15} /> Paiement sécurisé Stripe</span>
       </header>
       <section className="public-hero">
-        <p className="public-kicker"><Sparkles size={14} /> ASSISTANT NUMÉRIQUE PROFESSIONNEL</p>
+        <p className="public-kicker"><Sparkles size={14} /> ΣIRIUS — ASSISTANT PROFESSIONNEL NUMÉRIQUE INTELLIGENT ET AUTONOME</p>
         <h1>Votre espace de travail<br /><em>prend vie.</em></h1>
-        <p className="public-lead">ΣIRIUS réunit intelligence, mémoire et outils métiers dans un assistant qui vous accompagne réellement.</p>
+        <p className="public-lead">ΣIRIUS fusionne vos données, vos outils métier et une IA contextuelle pour automatiser vos tâches et vous guider au quotidien. Vous donnez le cap, ΣIRIUS analyse, orchestre vos outils métier et exécute chaque action avec précision.</p>
       </section>
       <section className="public-plans" aria-label="Offres ΣIRIUS">
         {PLANS.map((plan) => (
