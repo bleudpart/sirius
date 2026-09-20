@@ -13,7 +13,6 @@ const PLANS = [
 ];
 
 export default function PublicStore() {
-  if (["/mentions-legales", "/conditions-generales", "/confidentialite"].includes(window.location.pathname)) return <PublicLegal />;
   const [email, setEmail] = useState("");
   const [selected, setSelected] = useState("monthly");
   const [busy, setBusy] = useState(false);
@@ -21,6 +20,8 @@ export default function PublicStore() {
   const [portalBusy, setPortalBusy] = useState(false);
   const checkoutSessionId = new URLSearchParams(window.location.search).get("session_id");
   const paymentSucceeded = new URLSearchParams(window.location.search).get("payment") === "success";
+
+  if (["/mentions-legales", "/conditions-generales", "/confidentialite"].includes(window.location.pathname)) return <PublicLegal />;
 
   const checkout = async (event) => {
     event.preventDefault();
