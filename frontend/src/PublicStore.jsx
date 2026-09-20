@@ -39,13 +39,14 @@ export default function PublicStore() {
   return (
     <main className="public-store">
       <header className="public-nav">
-        <a className="public-brand" href="/">ΣIRIUS<span>.</span></a>
+        <a className="public-brand" href="/"><span className="public-brand-gold">ΣIRIUS</span><span>.</span></a>
         <span className="public-secure"><ShieldCheck size={15} /> Paiement sécurisé Stripe</span>
       </header>
       <section className="public-hero">
-        <p className="public-kicker"><Sparkles size={14} /> ΣIRIUS — ASSISTANT PROFESSIONNEL NUMÉRIQUE INTELLIGENT ET AUTONOME</p>
+        <p className="public-kicker"><Sparkles size={14} /> <span className="public-kicker-gold">ΣIRIUS</span> — ASSISTANT PROFESSIONNEL NUMÉRIQUE INTELLIGENT ET AUTONOME</p>
         <h1>Votre espace de travail<br /><em>prend vie.</em></h1>
         <p className="public-lead">ΣIRIUS fusionne vos données, vos outils métier et une IA contextuelle pour automatiser vos tâches et vous guider au quotidien. Vous donnez le cap, ΣIRIUS analyse, orchestre vos outils métier et exécute chaque action avec précision.</p>
+        <p className="public-platforms">Disponible sur Windows, Android, iPhone, iPad et tablette.</p>
       </section>
       <section className="public-plans" aria-label="Offres ΣIRIUS">
         {PLANS.map((plan) => (
