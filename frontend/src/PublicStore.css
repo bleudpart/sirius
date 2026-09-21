@@ -1,4 +1,4 @@
-:root { --store-ink:#d5f6ff; --store-green:#91e6f2; --store-lime:#f2d99a; --store-paper:#061321; --store-line:rgba(145,230,242,.25); --store-panel:#10283d; --store-gold:#d8b875; --store-gold-strong:#f3d58a; }
+:root { --store-ink:#d5f6ff; --store-green:#91e6f2; --store-lime:#ffd35c; --store-paper:#061321; --store-line:rgba(243,197,87,.42); --store-panel:#10283d; --store-gold:#e7b94f; --store-gold-strong:#ffe18a; }
 .public-store { min-height:100vh; color:var(--store-ink); background:radial-gradient(circle at 78% 4%,rgba(145,230,242,.18) 0,transparent 29%),radial-gradient(circle at 20% 22%,rgba(216,184,117,.08) 0,transparent 20%),linear-gradient(145deg,#030b14 0%,#061321 52%,#091a2b 100%); font-family:"Rajdhani",sans-serif; padding:0 6vw 38px; }
 .public-nav { display:flex; justify-content:space-between; align-items:center; max-width:1180px; margin:auto; padding:28px 0; border-bottom:1px solid var(--store-line); font-family:"Orbitron",sans-serif; }
 .public-brand { color:var(--store-ink); font-size:25px; font-weight:800; letter-spacing:.08em; text-decoration:none; }.public-brand span{color:var(--store-gold)}.public-brand-gold{color:var(--store-gold)}.public-secure{display:flex;align-items:center;gap:7px;font-size:12px;color:#9fd3e8}
@@ -11,3 +11,13 @@
 @keyframes publicScanSpin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
 @keyframes publicHeartPulse { 0%,100% { transform:rotate(-45deg) scale(0.92); box-shadow:0 0 12px rgba(107,231,255,.8),0 0 26px rgba(60,179,255,.5),inset 0 0 12px rgba(255,255,255,.5);} 50% { transform:rotate(-45deg) scale(1.18); box-shadow:0 0 24px rgba(107,231,255,.95),0 0 50px rgba(60,179,255,.8),inset 0 0 20px rgba(255,255,255,.8);} }
 @media(max-width:800px){.public-store{padding:0 18px 30px}.public-nav{padding:20px 0}.public-hero{margin:48px auto 34px}.public-hero h1{font-size:52px}.public-lead{font-size:17px}.public-plans{grid-template-columns:1fr 1fr}.public-plan{min-height:220px;padding:18px 15px}.public-plan-name{font-size:20px;margin-bottom:18px}.public-price strong{font-size:30px}.public-form-row{flex-direction:column}.public-form-row button{height:48px;justify-content:center}.public-core-preview{align-items:flex-start}.public-core-window{width:174px;height:118px}.public-core-art{width:150px;height:100px}.public-core-ring{width:112px;height:112px}.public-core-ring-inner{width:76px;height:76px}.public-core-heart{width:34px;height:34px}.public-core-heart::before,.public-core-heart::after{width:34px;height:34px}.public-core-heart::before{top:-18px}.public-core-heart::after{right:-18px}.public-core-window-title,.public-core-window-status{font-size:6px}.public-core-window-title{top:7px;left:28px}.public-core-window-status{right:8px;bottom:7px}}
+
+/* The startup HUD uses a breathing cyan central disk, not a literal heart icon. */
+.public-core-heart{width:44px;height:44px;transform:none;border-radius:50%;background:radial-gradient(circle at 35% 28%,#ffffff 0%,#d9fbff 22%,#8beaff 44%,#25c2f0 68%,#0874a7 100%);filter:drop-shadow(0 0 8px rgba(107,231,255,.95)) drop-shadow(0 0 18px rgba(60,179,255,.72));box-shadow:inset 0 0 12px rgba(255,255,255,.72);animation:publicHeartPulse 1.8s ease-in-out infinite}
+.public-core-heart::before,.public-core-heart::after{content:none}
+@keyframes publicHeartPulse { 0%,100% { transform:scale(.96); opacity:.88; } 50% { transform:scale(1.08); opacity:1; } }
+@media(max-width:800px){.public-core-heart{width:38px;height:38px}}
+
+/* Bright gold framing for the storefront windows and plan cards. */
+.public-core-window{border-color:rgba(243,197,87,.72);box-shadow:inset 0 0 22px rgba(97,214,255,.1),0 0 18px rgba(243,197,87,.18)}
+.public-plan,.public-checkout{border-color:var(--store-line)}

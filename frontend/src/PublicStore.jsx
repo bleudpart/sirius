@@ -84,7 +84,7 @@ export default function PublicStore() {
               <div className="public-core-heart" />
             </div>
           </div>
-          <span><strong>Le noyau ΣIRIUS</strong> Votre centre de commande intelligent, en un coup d'œil.</span>
+          <span><strong>La matrice de ΣIRIUS</strong> ΣIRIUS, le cœur réactif. Son interface matricielle holographique et son intelligence augmentée.</span>
         </div>
       </section>
       <section className="public-plans" aria-label="Offres ΣIRIUS">
