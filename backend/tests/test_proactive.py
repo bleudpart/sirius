@@ -28,7 +28,7 @@ def _at_hour(hour):
 def test_projet_recent_genere_une_suggestion(memory_db):
     memory_db.add_fact("projet", "préparer l'audit HACCP d'octobre", user_id="u1")
     result = proactive.evaluate("u1", now=_at_hour(14))
-    assert result["settings"]["mode"] == "equilibre"
+    assert result["settings"]["mode"] == "proactif"
     assert any("audit HACCP" in s["description"] for s in result["suggestions"])
 
 
@@ -51,6 +51,21 @@ def test_episode_recent_propose_une_reprise(memory_db):
     assert any("menu de la semaine" in s["description"] for s in result["suggestions"])
 
 
+def test_intervention_recente_genere_un_suivi(memory_db):
+    memory_db.log_work_intervention(
+        "Analyse du plan HACCP",
+        project="HACCP",
+        status="running",
+        user_id="u1",
+        entry_id="haccp-1",
+    )
+    result = proactive.evaluate("u1", now=_at_hour(14))
+    suggestion = next(s for s in result["suggestions"] if s["title"] == "Suivi d'intervention")
+    assert suggestion["source"] == "intervention"
+    assert "HACCP" in suggestion["description"]
+    assert suggestion["decision"] == "agir"
+
+
 def test_habitude_horaire_detectee(memory_db):
     now = _at_hour(9)
     for _ in range(3):
@@ -64,17 +79,17 @@ def test_habitude_horaire_detectee(memory_db):
 
 # ---------- Modes et plafonds ----------
 
-def test_mode_discret_limite_a_une_suggestion(memory_db):
+def test_mode_proactif_expose_les_suggestions(memory_db):
     proactive.set_mode("u1", "discret")
     memory_db.add_fact("projet", "projet A", user_id="u1")
     memory_db.add_episode("u1", "conversation récente", session_id="u1:x")
     result = proactive.evaluate("u1", now=_at_hour(8))
-    assert len(result["suggestions"]) == 1
-    assert result["settings"]["mode"] == "discret"
+    assert len(result["suggestions"]) >= 2
+    assert result["settings"]["mode"] == "proactif"
 
 
-def test_mode_invalide_retombe_sur_equilibre(memory_db):
-    assert proactive.set_mode("u1", "n'importe quoi") == "equilibre"
+def test_mode_est_toujours_proactif(memory_db):
+    assert proactive.set_mode("u1", "n'importe quoi") == "proactif"
 
 
 # ---------- Actions du panneau ----------
@@ -87,6 +102,16 @@ def test_executer_renvoie_une_commande(memory_db):
     assert action["executed"] is True
     assert action["proposed_action"]["type"] == "command"
     assert "HACCP" in action["proposed_action"]["text"]
+
+
+def test_projet_recoit_un_plan_d_intervention_autonome(memory_db):
+    memory_db.add_fact("projet", "certification HACCP", user_id="u1")
+
+    suggestion = proactive.evaluate("u1", now=_at_hour(14))["suggestions"][0]
+
+    assert suggestion["decision"] == "agir"
+    assert "Je peux" in suggestion["intervention"]
+    assert suggestion["alternative"]
 
 
 def test_ne_plus_proposer_supprime_definitivement(memory_db):

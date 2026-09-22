@@ -62,6 +62,13 @@ def init_local_db():
             "id TEXT PRIMARY KEY, user_id TEXT NOT NULL, session_id TEXT, "
             "summary TEXT NOT NULL, created_at TEXT NOT NULL)"
         )
+        con.execute(
+            "CREATE TABLE IF NOT EXISTS work_log ("
+            "id TEXT PRIMARY KEY, user_id TEXT NOT NULL, title TEXT NOT NULL, "
+            "project TEXT NOT NULL DEFAULT '', task_type TEXT NOT NULL DEFAULT '', "
+            "status TEXT NOT NULL, result TEXT NOT NULL DEFAULT '', date_key TEXT NOT NULL, "
+            "started_at TEXT NOT NULL, completed_at TEXT)"
+        )
         # Rappel sémantique : vecteurs d'embedding mis en cache localement.
         con.execute(
             "CREATE TABLE IF NOT EXISTS fact_vectors ("
@@ -70,6 +77,10 @@ def init_local_db():
         con.execute(
             "CREATE INDEX IF NOT EXISTS idx_facts_user_category_activity "
             "ON facts(user_id, category, last_used, created_at)"
+        )
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_work_log_user_date_project "
+            "ON work_log(user_id, date_key, project, started_at)"
         )
 
 
@@ -127,6 +138,7 @@ def delete_user_data(user_id: str):
             ).fetchone()
             if table_exists:
                 con.execute(f"DELETE FROM {table} WHERE user_id = ?", (user_id,))
+        con.execute("DELETE FROM work_log WHERE user_id = ?", (user_id,))
 
 
 def migrate_legacy_to_user(user_id: str):
@@ -148,6 +160,80 @@ def log_event(text: str, intent: str = "", user_id: str = "legacy"):
             (str(uuid.uuid4()), text, (intent or "")[:40], now_local.hour, now_local.weekday(), now.isoformat(), user_id),
         )
     return True
+
+
+def log_work_intervention(
+    title: str,
+    task_type: str = "",
+    project: str = "",
+    status: str = "running",
+    result: str = "",
+    user_id: str = "legacy",
+    entry_id: str | None = None,
+):
+    """Enregistre une intervention Sirius durablement, avec sa date locale."""
+    title = (title or "").strip()[:300]
+    if not title:
+        return None
+    now = datetime.now(timezone.utc)
+    entry = {
+        "id": (entry_id or str(uuid.uuid4())).strip()[:120],
+        "user_id": user_id,
+        "title": title,
+        "project": (project or "").strip()[:160],
+        "task_type": (task_type or "").strip()[:80],
+        "status": (status or "running").strip()[:40],
+        "result": (result or "").strip()[:1200],
+        "date_key": now.astimezone().date().isoformat(),
+        "started_at": now.isoformat(),
+        "completed_at": None,
+    }
+    with _conn() as con:
+        con.execute(
+            "INSERT OR IGNORE INTO work_log (id, user_id, title, project, task_type, status, result, date_key, started_at, completed_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            tuple(entry.values()),
+        )
+        persisted = con.execute(
+            "SELECT * FROM work_log WHERE id = ? AND user_id = ?", (entry["id"], user_id)
+        ).fetchone()
+    return dict(persisted) if persisted else None
+
+
+def update_work_intervention(entry_id: str, status: str, result: str = "", user_id: str = "legacy") -> bool:
+    """Clôture ou met à jour une intervention appartenant à son utilisateur."""
+    status = (status or "").strip()[:40]
+    if not entry_id or not status:
+        return False
+    completed_at = datetime.now(timezone.utc).isoformat() if status in {"done", "error", "cancelled"} else None
+    with _conn() as con:
+        cur = con.execute(
+            "UPDATE work_log SET status = ?, result = ?, completed_at = COALESCE(?, completed_at) "
+            "WHERE id = ? AND user_id = ?",
+            (status, (result or "").strip()[:1200], completed_at, entry_id, user_id),
+        )
+    return cur.rowcount > 0
+
+
+def list_work_interventions(
+    user_id: str = "legacy", date_key: str = "", project: str = "", limit: int = 100
+):
+    """Retourne l'historique, filtrable par date locale et par projet."""
+    limit = max(1, min(int(limit), 500))
+    clauses = ["user_id = ?"]
+    params = [user_id]
+    if date_key:
+        clauses.append("date_key = ?")
+        params.append(date_key)
+    if project:
+        clauses.append("lower(project) LIKE ?")
+        params.append(f"%{project.strip().lower()}%")
+    with _conn() as con:
+        rows = con.execute(
+            f"SELECT * FROM work_log WHERE {' AND '.join(clauses)} ORDER BY started_at DESC LIMIT ?",
+            (*params, limit),
+        ).fetchall()
+    return [dict(row) for row in rows]
 
 
 def update_fact(fact_id: str, text: str, user_id: str = None) -> bool:

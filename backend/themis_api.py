@@ -14,6 +14,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field, field_validator
 
+from email_signature import append_signature_text
 from themis_pdf import build_doc_pdf, extract_piece
 
 NO_ID = {"_id": 0}
@@ -241,7 +242,7 @@ def _send_smtp(conf: SmtpConf, to: str, subject: str, body: str, pdf_bytes: byte
     msg["From"] = f"{conf.from_name} <{sender}>" if conf.from_name else sender
     msg["To"] = to
     msg["Subject"] = subject
-    msg.set_content(body)
+    msg.set_content(append_signature_text(body))
     if pdf_bytes:
         msg.add_attachment(pdf_bytes, maintype="application", subtype="pdf", filename=pdf_name)
     if int(conf.port) == 465:

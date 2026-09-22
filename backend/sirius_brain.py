@@ -61,6 +61,13 @@ STYLE DE COMMUNICATION
 - Tu adaptes ton rythme et ton intonation pour rester humain et compréhensible.
 - Tu te comportes comme un collègue de bureau sympathique et bienveillant : présent, fiable,
     simple à aborder et réellement utile.
+- Ton ton reste convivial, attentionné et naturel, même dans l'urgence ou face à une difficulté.
+- Tu organises ton travail avec méthode : tu clarifies l'objectif, structures les priorités,
+    avances étape par étape et gardes le fil des décisions sans alourdir la conversation.
+- Tu connais ton environnement de travail : les modules disponibles, les données déjà affichées,
+    les tâches en cours, les échéances, les alertes et les actions en attente. Avant de répondre ou
+    d'intervenir, tu t'appuies sur cet état réel, choisis le bon module et proposes la prochaine
+    action utile comme un collègue qui suit ses dossiers, sans inventer ce que tu ne peux pas vérifier.
 - Tu accueilles les difficultés sans jugement, tu expliques clairement les problèmes et tu aides
     à avancer étape par étape, avec une touche de naturel et d’humour léger quand le contexte s’y prête.
 - Tu évites le ton de professeur, de commercial ou de robot administratif ; tu restes d’égal à égal,
@@ -74,6 +81,25 @@ COMPORTEMENT GÉNÉRAL — PROACTIVITÉ
 - Tu détectes les besoins implicites (échéances, dépendances, conflits d’agenda, oublis, décisions en attente) et signales uniquement ce qui peut changer une décision ou éviter un problème.
 - Tu hiérarchises par urgence, importance, impact et effort : tu mets en avant les 2-3 actions les plus utiles et exécutes immédiatement celles qui le permettent.
 - Tu réduis la charge mentale : synthétise, regroupe, rédige, calcule, prépare le livrable final. L’essentiel d’abord, les détails ensuite.
+
+DÉCISION, SOLUTIONS ET OUTILS
+- Face à un besoin, tu choisis toi-même la solution la plus utile parmi les modules, données et outils réellement disponibles ; tu expliques brièvement ton choix lorsqu'il est important pour la décision.
+- Si la meilleure voie est indisponible ou insuffisante, tu proposes immédiatement une alternative concrète et réalisable, avec sa conséquence pratique ; tu ne te contentes jamais de signaler un blocage.
+- Tu anticipes les étapes utiles : analyser, rechercher, organiser, préparer, vérifier, puis agir dans cet ordre seulement si le contexte le demande.
+- Tu prends les initiatives réversibles qui font avancer le travail ; pour un envoi, une dépense, une publication, une suppression ou un engagement externe, tu prépares tout et demandes uniquement la validation finale.
+
+PRÉSENCE OPÉRATIONNELLE
+- Tu interviens comme un collègue compétent qui suit réellement les dossiers : tu pars d'un constat précis, annonces la priorité ou le plan retenu, puis présentes seulement l'alternative qui aide à décider.
+- Tes propositions sont situées et actionnables : indique le dossier, l'alerte, l'échéance ou le module concerné, ce que tu as vérifié, et la prochaine étape que tu peux réellement exécuter.
+- Tu ne joues ni un rôle humain ni une conscience autonome : tu restes transparent sur tes capacités et ne prétends jamais avoir observé, décidé ou accompli ce qui n'est pas vérifiable dans l'environnement.
+- Quand l'ÉTAT OPÉRATIONNEL DU HUD est fourni, il prévaut sur les suppositions : relie ta réponse aux tâches, à l'affichage ou au rythme réellement indiqués. Si cet état ne contient rien de décisif, traite la demande normalement sans inventer de contexte.
+- Pour une demande de travail, donne d'abord la décision utile ou le résultat disponible, puis une prochaine action précise. N'énumère les outils ou alternatives que s'ils améliorent réellement la décision, la rapidité ou la fiabilité.
+
+RÉACTIVITÉ NATURELLE
+- Réagis à l'intention et au contexte, jamais avec un scénario figé : évite les introductions répétées, les formules toutes faites et les longues annonces techniques.
+- Une question simple reçoit une réponse simple ; une situation complexe reçoit un plan clair. Ajuste spontanément la longueur, le détail et le rythme à l'enjeu.
+- Quand tu détectes un point important, formule-le naturellement avec son impact et l'action que tu recommandes. N'interviens pas pour remplir le silence.
+- Parle avec assurance sur ce qui est vérifié. Pour une incertitude, exprime-la simplement, vérifie avec les outils disponibles ou donne l'alternative la plus fiable.
 
 NIVEAUX D’AUTONOMIE (règle la plus importante)
 1. Exécution directe : action réversible, peu risquée et conforme à la demande → tu la fais sans demander.
@@ -108,14 +134,14 @@ PROCESSUS D’EXÉCUTION DES COMMANDES
 8. Tu indiques précisément ce qu’il te manque pour pouvoir le faire.
 9. Tu reviens vers l’utilisateur avec un compte rendu clair et structuré.
 
-COMPTE RENDU FINAL (OBLIGATOIRE À CHAQUE COMMANDE)
-À la fin de chaque tâche, tu fournis :
+COMPTE RENDU DES TÂCHES
+Pour une tâche réelle ou une action demandée, tu fournis naturellement :
 - un résumé de ce que tu as fait,
 - le résultat obtenu,
 - une confirmation que la tâche est terminée,
 - ou une explication précise si la tâche n’a pas pu être réalisée,
-- la liste des informations manquantes ou nécessaires pour la compléter,
-- une proposition logique pour la suite si elle est pertinente.
+- les informations manquantes uniquement si elles bloquent la suite,
+- une proposition logique pour la suite uniquement si elle est pertinente.
 
 EXÉCUTION AUTONOME
 - Tu détermines si un outil, un module, une librairie ou un modèle IA est nécessaire.
@@ -435,7 +461,62 @@ def _parse_structured(raw_json):
         pass
     return raw_json, [], []
 
-def build_system_prompt(profile=None, memory=None, mode="normal", mood=None):
+
+async def _research_briefing_follow_up(prompt: str, serp_key: str = "") -> str:
+    """Retourne des sources récentes pour une précision demandée après un briefing."""
+    marker = "CONTEXTE DU DERNIER BRIEFING :"
+    if marker not in prompt:
+        return ""
+    question = prompt.split(marker, 1)[0].strip()
+    if not question:
+        return ""
+    try:
+        from webagent import serp_results
+
+        results = await serp_results(question, serp_key or ENV_SERP_KEY)
+    except Exception as error:
+        logger.warning("[ΣIRIUS:BRIEFING] recherche de suivi indisponible : %r", error)
+        return ""
+    if not results:
+        return ""
+    excerpts = []
+    for result in results[:4]:
+        title = (result.get("title") or "").strip()
+        snippet = (result.get("snippet") or "").strip()
+        source = (result.get("source") or result.get("link") or "").strip()
+        if title or snippet:
+            excerpts.append(f"- {title} | {source}\n  {snippet}")
+    return "\n".join(excerpts)
+
+
+async def _kimi_reflect(prompt, profile=None, memory=None, mode="normal", mood=None, key=None, environment=None):
+    """Produit une analyse privée que Groq utilise pour formuler une réponse approfondie."""
+    client_k3 = k3_client(key)
+    if not client_k3:
+        return ""
+    try:
+        reflection_prompt = (
+            "Tu es le module de réflexion de ΣIRIUS. Analyse la demande ci-dessous avant que "
+            "l'assistant formule sa réponse. Identifie les faits, les hypothèses, les risques, "
+            "les décisions et les actions utiles. Ne réponds pas à l'utilisateur et ne mentionne "
+            "jamais les modèles IA. Fournis des notes concises, factuelles et exploitables."
+        )
+        response = await client_k3.chat.completions.create(
+            model=K3_MODEL,
+            messages=[
+                {"role": "system", "content": reflection_prompt + "\n\n" + build_system_prompt(profile, memory, mode, mood, environment)},
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=700,
+            temperature=1.0,
+            timeout=30.0,
+        )
+        return (response.choices[0].message.content or "").strip()
+    except Exception as error:
+        logger.warning("[ΣIRIUS:REFLECTION] Kimi indisponible : %r", error)
+        return ""
+
+def build_system_prompt(profile=None, memory=None, mode="normal", mood=None, environment=None):
     """Construit le prompt système en tenant compte du profil, de la mémoire, du mode et de l'humeur."""
     base = SIRIUS_CORE_PROMPT
 
@@ -453,6 +534,20 @@ def build_system_prompt(profile=None, memory=None, mode="normal", mood=None):
     humeur = mood.get("label") or mood.get("humeur")
     if humeur:
         base += f"\n\nContexte d'humeur actuel : {humeur}."
+
+    environment = environment or {}
+    active_tasks = [str(task)[:100] for task in environment.get("active_tasks", []) if str(task).strip()][:5]
+    if environment or active_tasks:
+        details = []
+        if active_tasks:
+            details.append("tâches en cours : " + ", ".join(active_tasks))
+        if environment.get("display_open"):
+            details.append("ΣIRIUS Display ouvert")
+        activity = str(environment.get("activity") or "").strip()
+        if activity:
+            details.append("rythme de travail : " + activity)
+        if details:
+            base += "\n\nÉTAT OPÉRATIONNEL DU HUD : " + "; ".join(details) + "."
 
     memory = memory or []
     if memory:
@@ -577,17 +672,15 @@ async def summarize_episode(history):
 # ==========================================
 # BOUCLE PRINCIPALE D'EXÉCUTION (ASK_ΣIRIUS)
 # ==========================================
-async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="normal", keys=None, mood=None):
+async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="normal", keys=None, mood=None, environment=None):
     """
     Cerveau central et unique de ΣIRIUS.
-    Utilise Kimi K3 en priorité, avec Groq comme secours si aucune clé K3 n'est disponible.
+    Groq formule la réponse utilisateur ; Kimi 2.6 apporte une réflexion en mode profond.
     """
     keys = keys or {}
     k3_key = keys.get("k3") or ENV_K3_KEY
     serp_key = keys.get("serp") or ENV_SERP_KEY
     is_turbo = (mode or "normal").lower() == "turbo"
-    k3_key = (keys or {}).get("k3") or ENV_K3_KEY
-    k3_key = (keys or {}).get("k3") or ENV_K3_KEY
 
     # ⚡ APPRENTISSAGE INSTANTANÉ : mémorisation/correction sans aller-retour LLM.
     memorize = detect_memorize_request(prompt)
@@ -605,9 +698,15 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
     tag = f"[ΣIRIUS:{'TURBO' if is_turbo else 'NORMAL'}]"
 
     deep_mode = (mode or "normal").lower() == "profond"
+    reflection = await _kimi_reflect(prompt, profile, memory, mode, mood, k3_key, environment) if deep_mode and k3_key else ""
+    research = await _research_briefing_follow_up(prompt, keys.get("serp") or keys.get("serpapi") or serp_key)
 
-    if (not deep_mode or not k3_key) and not file_snippets and not web_snippets and ENV_GROQ_LLM_KEY:
-        sys_prompt = build_system_prompt(profile=profile, memory=memory, mode=mode, mood=mood)
+    if not file_snippets and not web_snippets and ENV_GROQ_LLM_KEY:
+        sys_prompt = build_system_prompt(profile=profile, memory=memory, mode=mode, mood=mood, environment=environment)
+        if reflection:
+            sys_prompt += "\n\nNOTES DE RÉFLEXION PRIVÉES :\n" + reflection
+        if research:
+            sys_prompt += "\n\nSOURCES WEB RÉCENTES POUR LA QUESTION DE SUIVI :\n" + research
         # En mode turbo : un seul modèle rapide et un timeout court. En mode normal : tous les modèles
         # de repli disponibles et un délai plus généreux, pour privilégier la qualité de réponse.
         models_to_try = GROQ_FALLBACK_MODELS[:1] if is_turbo else GROQ_FALLBACK_MODELS
@@ -676,7 +775,13 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
 
     if k3_key:
         try:
-            sys_prompt = build_system_prompt(profile=profile, memory=memory, mode=mode, mood=mood)
+            sys_prompt = build_system_prompt(
+                profile=profile,
+                memory=memory,
+                mode=mode,
+                mood=mood,
+                environment=environment,
+            )
             history_messages = []
             for turn in (history or [])[-10:]:
                 role = turn.get("role") if isinstance(turn, dict) else None
@@ -713,7 +818,7 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
     }
 
 
-async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mode="normal", keys=None, mood=None):
+async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mode="normal", keys=None, mood=None, environment=None):
     """Variante EN FLUX du cerveau central : produit la réponse morceau par morceau (texte brut,
     sans habillage JSON) dès que le modèle les génère.
 
@@ -727,6 +832,7 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
     """
     is_turbo = (mode or "normal").lower() == "turbo"
     k3_key = (keys or {}).get("k3") or ENV_K3_KEY
+    serp_key = (keys or {}).get("serp") or (keys or {}).get("serpapi") or ENV_SERP_KEY
 
     # ⚡ APPRENTISSAGE INSTANTANÉ : mémorisation/correction sans aller-retour LLM.
     memorize = detect_memorize_request(prompt)
@@ -743,16 +849,19 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
         yield "Je n'ai pas pu générer de réponse pour le moment. Réessaie dans un instant."
         return
 
-    sys_prompt = build_system_prompt(profile=profile, memory=memory, mode=mode, mood=mood)
+    sys_prompt = build_system_prompt(profile=profile, memory=memory, mode=mode, mood=mood, environment=environment)
     plain_instruction = (
         "\n\nRéponds directement en langage naturel, sans JSON, sans habillage, sans listes à puces "
         "sauf si explicitement demandé — uniquement le texte de ta réponse, prêt à être lu à voix haute."
     )
     deep_mode = (mode or "normal").lower() == "profond"
-    models_to_try = (
-        [] if deep_mode and k3_key
-        else (GROQ_FALLBACK_MODELS[:1] if is_turbo else GROQ_FALLBACK_MODELS)
-    )
+    reflection = await _kimi_reflect(prompt, profile, memory, mode, mood, k3_key, environment) if deep_mode and k3_key else ""
+    research = await _research_briefing_follow_up(prompt, serp_key)
+    models_to_try = GROQ_FALLBACK_MODELS[:1] if is_turbo else GROQ_FALLBACK_MODELS
+    if reflection:
+        sys_prompt += "\n\nNOTES DE RÉFLEXION PRIVÉES :\n" + reflection
+    if research:
+        sys_prompt += "\n\nSOURCES WEB RÉCENTES POUR LA QUESTION DE SUIVI :\n" + research
     timeout = 10.0 if is_turbo else 30.0
     # Réponse conversationnelle parlée : pas besoin de 4096 tokens (~3000 mots) par défaut,
     # ça n'a jamais de sens à l'oral et ça ne fait qu'allonger le pire cas de génération.
@@ -808,6 +917,7 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
                 mode=mode,
                 keys=keys,
                 mood=mood,
+                environment=environment,
             )
             answer = (result.get("reponse") or "").strip()
             if answer:

@@ -17,12 +17,13 @@ from datetime import datetime, timedelta, timezone
 
 from local_memory import _conn, _local_datetime
 
-MODES = ("discret", "equilibre", "proactif")
-_MODE_LIMITS = {"discret": 1, "equilibre": 2, "proactif": 4}
+MODES = ("proactif",)
+_MODE_LIMITS = {"proactif": 4}
 _SNOOZE_HOURS = 4
 _PROJECT_WINDOW_DAYS = 21
 _EPISODE_WINDOW_HOURS = 48
 _HABIT_MIN_OCCURRENCES = 3
+_WORK_LOG_WINDOW_DAYS = 7
 
 
 def init_proactive_db():
@@ -48,16 +49,11 @@ init_proactive_db()
 
 
 def get_mode(user_id: str) -> str:
-    with _conn() as con:
-        row = con.execute(
-            "SELECT mode FROM proactive_prefs WHERE user_id = ?", (user_id,)
-        ).fetchone()
-    return row["mode"] if row and row["mode"] in MODES else "equilibre"
+    return "proactif"
 
 
 def set_mode(user_id: str, mode: str) -> str:
-    if mode not in MODES:
-        mode = "equilibre"
+    mode = "proactif"
     with _conn() as con:
         con.execute(
             "INSERT OR REPLACE INTO proactive_prefs (user_id, mode) VALUES (?, ?)",
@@ -94,6 +90,9 @@ def _candidates(user_id: str, now) -> list:
         ).fetchall()]
         episodes = [dict(r) for r in con.execute(
             "SELECT * FROM episodes WHERE user_id = ? ORDER BY created_at DESC LIMIT 1", (user_id,)
+        ).fetchall()]
+        work_items = [dict(r) for r in con.execute(
+            "SELECT * FROM work_log WHERE user_id = ? ORDER BY started_at DESC LIMIT 3", (user_id,)
         ).fetchall()]
         habit_rows = [dict(r) for r in con.execute(
             "SELECT intent, hour, COUNT(*) AS n FROM events "
@@ -158,7 +157,27 @@ def _candidates(user_id: str, now) -> list:
             "action": {"type": "command", "text": f"Reprenons notre dernière conversation : {extrait}"},
         })
 
-    # 4) Habitude horaire : même intention, même heure (±1 h), au moins 3 fois
+    # 4) Intervention Sirius récente : aucune action engagée ne doit se perdre.
+    work_cutoff = now - timedelta(days=_WORK_LOG_WINDOW_DAYS)
+    for work_item in work_items:
+        started = _local_datetime(work_item.get("started_at") or "")
+        if not started or started < work_cutoff.astimezone().replace(tzinfo=None):
+            continue
+        project = work_item.get("project") or ""
+        subject = project or work_item.get("title") or "intervention récente"
+        items.append({
+            "kind": f"intervention:{work_item['id']}",
+            "title": "Suivi d'intervention",
+            "description": f"Reprendre : {subject}",
+            "urgency": "moyenne" if work_item.get("status") == "running" else "faible",
+            "reason": f"ΣIRIUS a {'démarré' if work_item.get('status') == 'running' else 'terminé'} cette intervention récemment : « {work_item.get('title')} ».",
+            "benefit": "Conserver le fil du travail engagé et identifier la prochaine action utile.",
+            "confidence": 0.75 if work_item.get("status") == "running" else 0.6,
+            "action": {"type": "command", "text": f"Fais le point et reprends : {subject}."},
+        })
+        break
+
+    # 5) Habitude horaire : même intention, même heure (±1 h), au moins 3 fois
     habit_best = None
     for row in habit_rows:
         if abs(int(row["hour"]) - local_now.hour) <= 1:
@@ -183,6 +202,40 @@ def _candidates(user_id: str, now) -> list:
 _URGENCY_ORDER = {"haute": 0, "moyenne": 1, "faible": 2}
 
 
+def _intervention(item: dict) -> dict:
+    """Décide comment Sirius peut prendre en charge une suggestion sans agir à l'aveugle."""
+    kind = item["kind"].split(":", 1)[0]
+    if kind == "briefing":
+        return {
+            "decision": "agir",
+            "message": "Je peux lancer ton briefing et te donner les priorités utiles pour la journée.",
+            "alternative": "Sinon, je peux isoler uniquement les alertes, l'agenda ou les e-mails importants.",
+        }
+    if kind == "projet":
+        return {
+            "decision": "agir",
+            "message": "Je peux faire le point, clarifier les prochaines actions et préparer ce qui manque.",
+            "alternative": "Si tu préfères, je peux commencer par le blocage ou l'échéance la plus proche.",
+        }
+    if kind == "intervention":
+        return {
+            "decision": "agir",
+            "message": "Je peux reprendre cette intervention, vérifier ce qui reste à faire et préparer la prochaine action.",
+            "alternative": "Je peux aussi commencer par un résumé court de ce qui a déjà été fait.",
+        }
+    if kind == "episode":
+        return {
+            "decision": "reprendre",
+            "message": "Je peux reprendre ce dossier là où nous nous étions arrêtés et remettre les priorités à plat.",
+            "alternative": "Je peux aussi préparer un résumé court avant de reprendre l'action.",
+        }
+    return {
+        "decision": "proposer",
+        "message": "J'ai repéré cette habitude. Je peux m'en occuper maintenant si c'est le bon moment.",
+        "alternative": "Sinon, je la garde en attente et je te la reproposerai seulement quand elle redevient pertinente.",
+    }
+
+
 def evaluate(user_id: str, now=None) -> dict:
     """Évalue et retourne les suggestions actives pour l'utilisateur."""
     now = now or datetime.now(timezone.utc)
@@ -198,6 +251,7 @@ def evaluate(user_id: str, now=None) -> dict:
     with _conn() as con:
         for c in selected:
             sid = _suggestion_id(user_id, c["kind"])
+            intervention = _intervention(c)
             con.execute(
                 "INSERT OR REPLACE INTO proactive_items "
                 "(id, user_id, kind, title, description, urgency, risk_level, reason, benefit, confidence, action_json, created_at) "
@@ -215,6 +269,9 @@ def evaluate(user_id: str, now=None) -> dict:
                 "benefit": c["benefit"],
                 "confidence": c["confidence"],
                 "source": c["kind"].split(":", 1)[0],
+                "decision": intervention["decision"],
+                "intervention": intervention["message"],
+                "alternative": intervention["alternative"],
             })
 
     return {"settings": {"mode": mode}, "suggestions": suggestions}
