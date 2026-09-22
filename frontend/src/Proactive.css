@@ -83,6 +83,12 @@
   line-height: 1.45;
   margin: 7px 0 9px;
 }
+.sugg-intervention {
+  margin: -3px 0 9px;
+  color: #f2d99a;
+  font-size: 10.5px;
+  line-height: 1.4;
+}
 .sugg-confidence { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 7px; margin: 0 0 9px; font-family: "Orbitron", sans-serif; font-size: 6.5px; letter-spacing: 1px; color: #d8b875; }
 .sugg-confidence i { display: block; height: 3px; background: rgba(145, 230, 242, 0.16); overflow: hidden; }
 .sugg-confidence i b { display: block; height: 100%; background: linear-gradient(90deg, #91e6f2, #f2d99a); box-shadow: 0 0 7px rgba(242, 217, 154, 0.65); }

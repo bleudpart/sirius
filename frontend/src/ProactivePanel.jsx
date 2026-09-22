@@ -1,20 +1,21 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Zap, Play, Wrench, Clock3, XCircle, HelpCircle, ShieldAlert, BrainCircuit } from "lucide-react";
 import "./Proactive.css";
 
 const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
-const MODES = [
-  ["discret", "DISCRET"],
-  ["equilibre", "ÉQUILIBRÉ"],
-  ["proactif", "PROACTIF"],
-];
 
 export default function ProactivePanel({ onAction, onSpeak }) {
   const [suggestions, setSuggestions] = useState([]);
-  const [settings, setSettings] = useState({ mode: "equilibre" });
   const [why, setWhy] = useState({});
   const [confirming, setConfirming] = useState({});
+  const announcedIdsRef = useRef(new Set());
+  const onSpeakRef = useRef(onSpeak);
+  const lastUserActivityRef = useRef(0);
+
+  useEffect(() => {
+    onSpeakRef.current = onSpeak;
+  }, [onSpeak]);
 
   const evaluate = useCallback(async (trigger) => {
     try {
@@ -24,15 +25,26 @@ export default function ProactivePanel({ onAction, onSpeak }) {
         body: JSON.stringify({ trigger }),
       });
       const d = await r.json();
-      setSuggestions(d.suggestions || []);
-      if (d.settings) setSettings(d.settings);
+      const nextSuggestions = d.suggestions || [];
+      setSuggestions(nextSuggestions);
+      if (Date.now() - lastUserActivityRef.current > 15000) {
+        const nextSuggestion = nextSuggestions.find((suggestion) => !announcedIdsRef.current.has(suggestion.id));
+        if (nextSuggestion) {
+          announcedIdsRef.current.add(nextSuggestion.id);
+          onSpeakRef.current?.(nextSuggestion.intervention || `J'ai repéré un point utile : ${nextSuggestion.description}`);
+        }
+      }
     } catch (_) {}
   }, []);
 
   useEffect(() => {
     evaluate("app_open");
-    const iv = setInterval(() => evaluate("periodic"), 10 * 60 * 1000);
-    return () => clearInterval(iv);
+    const onActivity = () => {
+      lastUserActivityRef.current = Date.now();
+      evaluate("activity");
+    };
+    window.addEventListener("sirius:activity", onActivity);
+    return () => window.removeEventListener("sirius:activity", onActivity);
   }, [evaluate]);
 
   const remove = (id) => setSuggestions((l) => l.filter((s) => s.id !== id));
@@ -68,17 +80,6 @@ export default function ProactivePanel({ onAction, onSpeak }) {
     } catch (_) {}
   };
 
-  const setMode = async (mode) => {
-    try {
-      const r = await fetch(`${API}/suggestions/settings`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ settings: { mode } }),
-      });
-      setSettings(await r.json());
-    } catch (_) {}
-  };
-
   if (!suggestions.length) return null;
 
   return (
@@ -86,16 +87,6 @@ export default function ProactivePanel({ onAction, onSpeak }) {
       <div className="pro-mode-row">
         <Zap size={11} />
         <span className="pro-mode-label"><BrainCircuit size={11} /> SIRIUS ANTICIPE</span>
-        {MODES.map(([m, label]) => (
-          <button
-            key={m}
-            className={`pro-mode-btn ${settings.mode === m ? "on" : ""}`}
-            onClick={() => setMode(m)}
-            data-testid={`sugg-mode-${m}`}
-          >
-            {label}
-          </button>
-        ))}
       </div>
       {suggestions.map((s) => (
         <div className={`sugg-card urg-${s.urgency}`} key={s.id} data-testid="suggestion-card">
@@ -109,6 +100,8 @@ export default function ProactivePanel({ onAction, onSpeak }) {
             )}
           </div>
           <p className="sugg-desc">{s.description}</p>
+          {s.intervention && <p className="sugg-intervention">{s.intervention}</p>}
+          {s.alternative && <p className="sugg-alternative">Alternative : {s.alternative}</p>}
           <div className="sugg-confidence" title={s.reason || "Suggestion issue de la mémoire locale"}>
             <span>CONFIANCE {Math.round((s.confidence || 0) * 100)} %</span>
             <i><b style={{ width: `${Math.round((s.confidence || 0) * 100)}%` }} /></i>
