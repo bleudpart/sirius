@@ -54,8 +54,6 @@
 .hud-preview img{display:block;width:100%;height:auto}
 .public-trust h2{font-family:"Cinzel",serif;font-size:26px;font-weight:500;margin:0 0 8px;color:var(--store-ink)}
 .public-trust-platforms{color:var(--store-gold);font:700 12px "Orbitron",sans-serif;letter-spacing:.08em;margin:0 0 26px}
-.public-trust-shot{max-width:640px;border:1px solid var(--store-line);background:#030d18;margin:0 0 30px}
-.public-trust-shot img{display:block;width:100%;height:auto}
 .public-testimonials{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:0 0 40px}
 .public-testimonial{margin:0;padding:18px;background:rgba(16,40,61,.6);border:1px solid var(--store-line);color:#bfe6f2;font-size:13px;line-height:1.5}
 .public-testimonial p{margin:0 0 10px}

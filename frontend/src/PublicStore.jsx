@@ -13,7 +13,7 @@ const PLANS = [
 ];
 
 const MATRIX_ACTIONS = [
-  { icon: Mic, text: "Dictez : « Envoie le devis à Martin » → ΣIRIUS prépare et envoie le mail." },
+  { icon: Mic, text: "Dites : « Envoie le devis à Martin » — ΣIRIUS prépare et envoie le mail." },
   { icon: Boxes, text: "Dictez : « Mets à jour le stock du plat du jour » → ΣIRIUS ajuste les stocks." },
   { icon: Radio, text: "Dictez : « Relance les factures en retard » → ΣIRIUS envoie les relances." },
   { icon: Home, text: "Dites : « Allume la lumière du salon » — ΣIRIUS contrôle votre domotique." },
@@ -24,6 +24,12 @@ const WHY_DIFFERENT = [
   "Intégration avec vos outils métier existants.",
   "Contrôle vocal et interface matricielle holographique.",
   "Intégration domotique complète (Home Assistant, lumières, volets, capteurs).",
+];
+
+const TESTIMONIALS = [
+  ["L’automatisation vocale change ma manière de travailler.", "Testeur pré-version"],
+  ["L’assistant exécute mes tâches sans intervention.", "Utilisateur bêta"],
+  ["La matrice holographique est intuitive et rapide.", "Early access"],
 ];
 
 export default function PublicStore() {
@@ -171,10 +177,10 @@ export default function PublicStore() {
         <h2>Ils utilisent ΣIRIUS</h2>
         <p className="public-trust-platforms">Windows · Android · iOS · Tablette</p>
         <div className="public-testimonials">
-          {[1, 2, 3].map((slot) => (
-            <blockquote key={slot} className="public-testimonial">
-              <p>« Témoignage client à venir. »</p>
-              <cite>Client ΣIRIUS</cite>
+          {TESTIMONIALS.map(([quote, author]) => (
+            <blockquote key={quote} className="public-testimonial">
+              <p>« {quote} »</p>
+              <cite>{author}</cite>
             </blockquote>
           ))}
         </div>
