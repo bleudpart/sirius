@@ -12,6 +12,44 @@
 @keyframes publicHeartPulse { 0%,100% { transform:rotate(-45deg) scale(0.92); box-shadow:0 0 12px rgba(107,231,255,.8),0 0 26px rgba(60,179,255,.5),inset 0 0 12px rgba(255,255,255,.5);} 50% { transform:rotate(-45deg) scale(1.18); box-shadow:0 0 24px rgba(107,231,255,.95),0 0 50px rgba(60,179,255,.8),inset 0 0 20px rgba(255,255,255,.8);} }
 @media(max-width:800px){.public-store{padding:0 18px 30px}.public-nav{padding:20px 0}.public-hero{margin:48px auto 34px}.public-hero h1{font-size:52px}.public-lead{font-size:17px}.public-plans{grid-template-columns:1fr 1fr}.public-plan{min-height:220px;padding:18px 15px}.public-plan-name{font-size:20px;margin-bottom:18px}.public-price strong{font-size:30px}.public-form-row{flex-direction:column}.public-form-row button{height:48px;justify-content:center}.public-core-preview{align-items:flex-start}.public-core-window{width:174px;height:118px}.public-core-art{width:150px;height:100px}.public-core-ring{width:112px;height:112px}.public-core-ring-inner{width:76px;height:76px}.public-core-heart{width:34px;height:34px}.public-core-heart::before,.public-core-heart::after{width:34px;height:34px}.public-core-heart::before{top:-18px}.public-core-heart::after{right:-18px}.public-core-window-title,.public-core-window-status{font-size:6px}.public-core-window-title{top:7px;left:28px}.public-core-window-status{right:8px;bottom:7px}}
 
+/* Hiérarchie hero renforcée + espacement des grandes sections */
+.public-hero h1{max-width:14ch}
+.public-value{max-width:640px;margin:0 0 22px;color:var(--store-gold-strong);font-size:24px;font-weight:700;line-height:1.35;text-shadow:0 0 16px rgba(231,185,79,.25)}
+.public-matrix{max-width:1180px;margin:64px auto 0;padding:0 0 8px}
+.public-matrix-actions{list-style:none;margin:26px 0 0;padding:0;display:grid;gap:12px;max-width:640px}
+.public-matrix-actions li{display:flex;align-items:flex-start;gap:10px;color:#bfe6f2;font-size:15px;line-height:1.4}
+.public-matrix-actions li svg{flex:0 0 auto;margin-top:2px;color:var(--store-gold)}
+.public-matrix-video{position:relative;max-width:420px;margin:26px 0 0;border:1px solid var(--store-line);background:#030d18;overflow:hidden}
+.public-matrix-video-el{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;background:#030d18}
+.public-matrix-video-badge{position:absolute;left:10px;bottom:10px;display:flex;align-items:center;gap:6px;background:rgba(6,19,33,.82);color:var(--store-gold-strong);font:700 11px "Orbitron",sans-serif;padding:6px 10px;letter-spacing:.04em}
+.public-plans{margin-top:56px}
+.public-plan-tagline{display:block;margin:-20px 0 20px;color:#9fd3e8;font-size:13px;line-height:1.35}
+.public-popular-alt{background:var(--store-gold-strong)}
+.public-reassurance{display:grid;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--store-line);font:12px "Rajdhani",sans-serif;color:#bfe6f2}
+.public-reassurance span{display:flex;align-items:center;gap:7px}
+.public-reassurance svg{color:var(--store-gold);flex:0 0 auto}
+.public-checkout{margin-top:56px}
+.public-checkout label{margin-top:14px}
+.public-checkout label:first-of-type{margin-top:0}
+.public-demo-link{display:flex;align-items:center;gap:8px;border:1px solid var(--store-gold);color:var(--store-gold-strong);padding:0 18px;font:700 13px "Orbitron",sans-serif;letter-spacing:.04em;text-decoration:none;white-space:nowrap}
+.public-demo-link:hover{background:rgba(231,185,79,.12)}
+.public-trust{max-width:1180px;margin:70px auto 0;padding-top:34px;border-top:1px solid var(--store-line)}
+.public-trust h2{font-family:"Cinzel",serif;font-size:26px;font-weight:500;margin:0 0 8px;color:var(--store-ink)}
+.public-trust-platforms{color:var(--store-gold);font:700 12px "Orbitron",sans-serif;letter-spacing:.08em;margin:0 0 26px}
+.public-trust-shot{max-width:640px;border:1px solid var(--store-line);background:#030d18;margin:0 0 30px}
+.public-trust-shot img{display:block;width:100%;height:auto}
+.public-testimonials{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:0 0 40px}
+.public-testimonial{margin:0;padding:18px;background:rgba(16,40,61,.6);border:1px solid var(--store-line);color:#bfe6f2;font-size:13px;line-height:1.5}
+.public-testimonial p{margin:0 0 10px}
+.public-testimonial cite{color:var(--store-gold-strong);font-style:normal;font-size:12px}
+.public-why h3{font-family:"Cinzel",serif;font-size:20px;font-weight:500;margin:0 0 14px;color:var(--store-ink)}
+.public-why ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.public-why li{display:flex;align-items:center;gap:9px;color:#bfe6f2;font-size:14px}
+.public-why li svg{color:var(--store-gold);flex:0 0 auto}
+.public-slogan{margin:0 0 12px;color:var(--store-gold-strong);font:700 13px "Orbitron",sans-serif;letter-spacing:.06em}
+@media(max-width:800px){.public-testimonials{grid-template-columns:1fr}.public-plan-tagline{margin-top:0}}
+
+
 /* The startup HUD uses a breathing cyan central disk, not a literal heart icon. */
 .public-core-heart{width:44px;height:44px;transform:none;border-radius:50%;background:radial-gradient(circle at 35% 28%,#ffffff 0%,#d9fbff 22%,#8beaff 44%,#25c2f0 68%,#0874a7 100%);filter:drop-shadow(0 0 8px rgba(107,231,255,.95)) drop-shadow(0 0 18px rgba(60,179,255,.72));box-shadow:inset 0 0 12px rgba(255,255,255,.72);animation:publicHeartPulse 1.8s ease-in-out infinite}
 .public-core-heart::before,.public-core-heart::after{content:none}

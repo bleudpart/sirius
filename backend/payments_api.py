@@ -53,6 +53,7 @@ class LicenseCheckoutIn(BaseModel):
 
 class PublicLicenseCheckoutIn(LicenseCheckoutIn):
     email: EmailStr
+    phone: str | None = None
 
 
 class PublicLicensePortalIn(BaseModel):
@@ -179,6 +180,7 @@ def make_payments_router(db):
         origin = _checkout_origin(body.origin_url)
         tier, price_id = _license_price(body.tier)
         buyer_email = str(body.email).strip().lower()
+        buyer_phone = (body.phone or "").strip()
         subscription = tier == "monthly"
         trial_days = max(0, min(int(os.getenv("STRIPE_TRIAL_DAYS", "7")), 30))
         kwargs = {
@@ -197,6 +199,7 @@ def make_payments_router(db):
             raise HTTPException(status_code=502, detail=f"Stripe indisponible : {str(error)[:120]}") from error
         await db.payment_transactions.insert_one({
             "session_id": session.id, "user_id": buyer_email, "buyer_email": buyer_email,
+            "buyer_phone": buyer_phone,
             "kind": "license", "tier": tier, "price_id": price_id,
             "status": "initiated", "payment_status": "pending",
             "created_at": now_iso(), "updated_at": now_iso(),
