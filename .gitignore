@@ -55,6 +55,13 @@ venv/
 .venv/
 .venv-build/
 
+# Local runtime data (secrets, DB, generated media) — never commit
+tmp-sirius-backend/
+.auth_secret
+auth-secret
+*.auth_secret
+sirius_local.db
+
 # Development tools
 chainlit.md
 .chainlit
