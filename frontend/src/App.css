@@ -823,36 +823,6 @@ body.hud-minimal .antique-jar { display: none; }
 .sirius-dashboard--hub .sirius-column--left { grid-column: 1; }
 .sirius-dashboard--hub .sirius-center { grid-column: 2; }
 
-/* Fenêtre HUD unique : profondeur visuelle obtenue avec des pseudo-éléments CSS,
-   sans canvas ni timer de rendu supplémentaire. */
-.sirius-dashboard::before,
-.sirius-dashboard::after {
-  content: "";
-  position: absolute;
-  inset: 6px clamp(8px, 1.4vw, 18px);
-  border: 1px solid rgba(145, 230, 242, 0.16);
-  border-radius: 18px;
-  pointer-events: none;
-  z-index: 0;
-}
-.sirius-dashboard::before {
-  background:
-    linear-gradient(90deg, transparent 0 12%, rgba(145, 230, 242, 0.05) 12.1% 12.2%, transparent 12.3% 87.7%, rgba(216, 184, 117, 0.06) 87.8% 87.9%, transparent 88%),
-    linear-gradient(180deg, rgba(145, 230, 242, 0.05), transparent 22%, transparent 78%, rgba(216, 184, 117, 0.04));
-  box-shadow: inset 0 0 28px rgba(20, 154, 190, 0.08), 0 0 22px rgba(20, 154, 190, 0.07);
-  animation: dashboardBreath 5s ease-in-out infinite;
-}
-.sirius-dashboard::after {
-  inset: 6px clamp(8px, 1.4vw, 18px);
-  border-color: transparent;
-  background: linear-gradient(90deg, transparent 0 46%, rgba(145, 230, 242, 0.18) 49%, rgba(242, 217, 154, 0.26) 50%, rgba(145, 230, 242, 0.18) 51%, transparent 54%) 0 0 / 220% 1px no-repeat;
-  animation: dashboardSweep 11s ease-in-out infinite;
-}
-.sirius-dashboard > * { position: relative; z-index: 1; }
-@keyframes dashboardBreath {
-  0%, 100% { opacity: 0.62; }
-  50% { opacity: 1; }
-}
 @keyframes dashboardSweep {
   0%, 62% { background-position: -120% 0; }
   82%, 100% { background-position: 120% 0; }
@@ -899,22 +869,6 @@ body.hud-minimal .antique-jar { display: none; }
 .workspace-mode .sirius-dashboard--hub {
   grid-template-columns: minmax(280px, 0.92fr) minmax(420px, 1.7fr);
 }
-.workspace-mode .sirius-dashboard::before {
-  inset: 0;
-  border: 0;
-  border-radius: inherit;
-  background:
-    linear-gradient(90deg, transparent 0%, rgba(0, 229, 255, 0.75) 18%, rgba(0, 229, 255, 0.08) 30%, transparent 42%, transparent 58%, rgba(255, 53, 184, 0.08) 70%, rgba(255, 190, 70, 0.72) 86%, transparent 100%) 0 0 / 220% 2px no-repeat,
-    linear-gradient(180deg, rgba(145, 230, 242, 0.045), transparent 28%, transparent 76%, rgba(216, 184, 117, 0.035));
-  animation: dashboardRgbLine 12s ease-in-out infinite;
-}
-.workspace-mode .sirius-dashboard::after {
-  inset: 0;
-  border: 1px solid rgba(145, 230, 242, 0.12);
-  border-radius: inherit;
-  background: none;
-  animation: none;
-}
 .workspace-mode .sirius-column {
   gap: 8px;
   padding: 2px;
@@ -926,10 +880,6 @@ body.hud-minimal .antique-jar { display: none; }
 .workspace-mode .sirius-column .shud-head {
   padding-bottom: 6px;
   margin-bottom: 7px;
-}
-@keyframes dashboardRgbLine {
-  0%, 58%, 100% { background-position: -120% 0, 0 0; opacity: 0.7; }
-  76% { background-position: 120% 0, 0 0; opacity: 1; }
 }
 .workspace-mode .sirius-stage {
   min-height: 0;
@@ -7076,15 +7026,11 @@ body[data-phase] .center-stage::before { content: none !important; }
   display: none;
 }
 
-.sirius-root.eco .sirius-dashboard::before,
-.sirius-root.eco .sirius-dashboard::after,
 .sirius-root.eco .sirius-stage::before {
   animation: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sirius-dashboard::before,
-  .sirius-dashboard::after,
   .sirius-stage::before {
     animation: none;
   }
