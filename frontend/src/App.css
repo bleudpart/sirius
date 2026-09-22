@@ -813,16 +813,15 @@ body.hud-minimal .antique-jar { display: none; }
   transform: scale(var(--hud-scale, 1));
   transform-origin: center top;
   transition: transform 0.12s ease-out;
+}
 
 /* Fenêtre d'info unique (Centre d'Information) : une seule colonne, plus large,
    remplace l'ancienne grille 3 colonnes à 8 fenêtres flottantes séparées. */
-}
 .sirius-dashboard--hub {
   grid-template-columns: minmax(280px, clamp(280px, 24vw, 360px)) minmax(0, 1fr);
 }
 .sirius-dashboard--hub .sirius-column--left { grid-column: 1; }
 .sirius-dashboard--hub .sirius-center { grid-column: 2; }
-}
 
 /* Fenêtre HUD unique : profondeur visuelle obtenue avec des pseudo-éléments CSS,
    sans canvas ni timer de rendu supplémentaire. */
