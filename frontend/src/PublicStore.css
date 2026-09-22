@@ -65,6 +65,9 @@
 .public-checkout label:first-of-type{margin-top:0}
 .public-demo-link{display:flex;align-items:center;gap:8px;border:1px solid var(--store-gold);color:var(--store-gold-strong);padding:0 18px;font:700 13px "Orbitron",sans-serif;letter-spacing:.04em;text-decoration:none;white-space:nowrap}
 .public-demo-link:hover{background:rgba(231,185,79,.12)}
+.public-paypal-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:12px;height:44px;border:1px solid #ffc439;background:#ffc439;color:#1a1a1a;font:700 13px "Orbitron",sans-serif;letter-spacing:.03em;cursor:pointer}
+.public-paypal-btn:hover:not(:disabled){background:#f0b429}
+.public-paypal-btn:disabled{opacity:.6;cursor:wait}
 .public-trust{max-width:1180px;margin:80px auto 80px;padding-top:34px;border-top:1px solid var(--store-line)}
 .public-hud-preview{max-width:1180px;margin:80px auto 80px;padding-top:34px;border-top:1px solid var(--store-line)}
 .public-hud-preview .public-section-title{margin-bottom:24px}

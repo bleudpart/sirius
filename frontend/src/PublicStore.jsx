@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, ShieldCheck, Sparkles, ArrowRight, PlayCircle, Mic, Boxes, Radio, Building2, UserRound, Zap, Crown, Home } from "lucide-react";
 import PublicLegal from "./PublicLegal";
 import "./PublicStore.css";
@@ -39,10 +39,33 @@ export default function PublicStore() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [portalBusy, setPortalBusy] = useState(false);
+  const [paypalBusy, setPaypalBusy] = useState(false);
+  const [paypalStatus, setPaypalStatus] = useState(null);
   const checkoutSessionId = new URLSearchParams(window.location.search).get("session_id");
   const paymentSucceeded = new URLSearchParams(window.location.search).get("payment") === "success";
 
   if (["/mentions-legales", "/conditions-generales", "/confidentialite"].includes(window.location.pathname)) return <PublicLegal />;
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("payment") !== "paypal-return") return;
+    const orderId = params.get("token");
+    if (!orderId) return;
+    (async () => {
+      try {
+        const response = await fetch(`${API}/public/paypal-capture`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ order_id: orderId }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.detail || "Le paiement PayPal n'a pas pu être confirmé.");
+        setPaypalStatus({ ok: true, tier: data.tier });
+      } catch (cause) {
+        setPaypalStatus({ ok: false, message: cause.message });
+      }
+    })();
+  }, []);
 
   const checkout = async (event) => {
     event.preventDefault();
@@ -79,6 +102,26 @@ export default function PublicStore() {
     } catch (cause) {
       setError(cause.message || "La gestion d'abonnement est momentanément indisponible.");
       setPortalBusy(false);
+    }
+  };
+
+  const checkoutPaypal = async () => {
+    if (selected === "monthly") { setError("L'abonnement mensuel n'est disponible que par carte (Stripe)."); return; }
+    if (!email.trim()) { setError("Renseignez votre e-mail avant de payer avec PayPal."); return; }
+    setError("");
+    setPaypalBusy(true);
+    try {
+      const response = await fetch(`${API}/public/paypal-checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), phone: phone.trim(), tier: selected, origin_url: window.location.origin }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.approve_url) throw new Error(data.detail || "PayPal est momentanément indisponible.");
+      window.location.assign(data.approve_url);
+    } catch (cause) {
+      setError(cause.message || "PayPal est momentanément indisponible.");
+      setPaypalBusy(false);
     }
   };
 
@@ -158,10 +201,20 @@ export default function PublicStore() {
           <input id="public-phone" type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="06 12 34 56 78" />
           <a className="public-demo-link" href="#matrice-demo"><PlayCircle size={17} /> Voir une démo</a>
         </div>
+        {selected !== "monthly" && (
+          <button type="button" className="public-paypal-btn" onClick={checkoutPaypal} disabled={paypalBusy}>
+            <ShieldCheck size={16} /> {paypalBusy ? "Ouverture..." : "Payer avec PayPal"}
+          </button>
+        )}
         {error && <p className="public-error" role="alert">{error}</p>}
         <p className="public-legal">Vous serez redirigé vers Stripe. Aucun paiement réel en mode test. Aucun engagement.</p>
       </form>
       <small className="public-checkout-note">Aucun engagement. Mode test Stripe, aucun débit réel.</small>
+      {paypalStatus && (
+        <p className={paypalStatus.ok ? "public-checkout-note" : "public-error"} role={paypalStatus.ok ? undefined : "alert"}>
+          {paypalStatus.ok ? `Paiement PayPal confirmé — licence ${paypalStatus.tier} activée.` : paypalStatus.message}
+        </p>
+      )}
       {paymentSucceeded && checkoutSessionId && <section className="public-subscription-success">
         <strong>Paiement confirmé.</strong>
         <span>Gérez ou résiliez votre abonnement depuis le portail Stripe sécurisé.</span>

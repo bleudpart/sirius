@@ -1982,6 +1982,8 @@ from modules_api import make_modules_router
 api_router.include_router(make_modules_router(db))
 from payments_api import make_payments_router
 api_router.include_router(make_payments_router(db))
+from paypal_api import make_paypal_router
+api_router.include_router(make_paypal_router(db))
 from google_calendar import make_gcal_router
 api_router.include_router(make_gcal_router(db))
 from auth_api import make_auth_router, make_admin_router
