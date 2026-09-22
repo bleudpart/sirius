@@ -16,6 +16,8 @@
 .public-hero h1{max-width:14ch}
 .public-value{max-width:640px;margin:0 0 22px;color:var(--store-gold-strong);font-size:24px;font-weight:700;line-height:1.35;text-shadow:0 0 16px rgba(231,185,79,.25)}
 .public-matrix{max-width:1180px;margin:64px auto 0;padding:0 0 8px}
+.public-section-title{grid-column:1/-1;margin:0 0 24px;color:var(--store-ink);font:500 28px/1.15 "Cinzel",serif}
+.public-matrix>.public-section-title{margin-bottom:26px}
 .public-matrix-actions{list-style:none;margin:26px 0 0;padding:0;display:grid;gap:12px;max-width:640px}
 .public-matrix-actions li{display:flex;align-items:flex-start;gap:10px;color:#bfe6f2;font-size:15px;line-height:1.4}
 .public-matrix-actions li svg{flex:0 0 auto;margin-top:2px;color:var(--store-gold)}
@@ -23,17 +25,29 @@
 .public-matrix-video-el{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;background:#030d18}
 .public-matrix-video-badge{position:absolute;left:10px;bottom:10px;display:flex;align-items:center;gap:6px;background:rgba(6,19,33,.82);color:var(--store-gold-strong);font:700 11px "Orbitron",sans-serif;padding:6px 10px;letter-spacing:.04em}
 .public-plans{margin-top:56px}
+.public-plans>.public-section-title{margin-bottom:0}
+.public-plan-icon{display:flex;align-items:center;justify-content:center;width:34px;height:34px;margin-bottom:16px;border:1px solid currentColor;color:var(--store-gold-strong)}
+.public-plan-standard{border-color:rgba(186,207,221,.58);background:linear-gradient(145deg,rgba(24,45,62,.9),rgba(11,27,43,.86))}
+.public-plan-pro{border-color:rgba(145,230,242,.6);background:linear-gradient(145deg,rgba(16,53,70,.88),rgba(10,31,47,.88))}
+.public-plan-lifetime{border-color:rgba(231,185,79,.7);background:linear-gradient(145deg,rgba(54,43,28,.8),rgba(19,35,48,.9))}
+.public-plan-monthly{border-color:rgba(243,197,87,.78)}
 .public-plan-tagline{display:block;margin:-20px 0 20px;color:#9fd3e8;font-size:13px;line-height:1.35}
 .public-popular-alt{background:var(--store-gold-strong)}
 .public-reassurance{display:grid;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--store-line);font:12px "Rajdhani",sans-serif;color:#bfe6f2}
 .public-reassurance span{display:flex;align-items:center;gap:7px}
 .public-reassurance svg{color:var(--store-gold);flex:0 0 auto}
 .public-checkout{margin-top:56px}
+.public-checkout-secure{display:flex;align-items:center;gap:7px;margin:0 0 16px;color:var(--store-gold-strong);font:700 12px "Orbitron",sans-serif;letter-spacing:.04em}
+.public-checkout .public-section-title{margin-bottom:22px}
 .public-checkout label{margin-top:14px}
 .public-checkout label:first-of-type{margin-top:0}
 .public-demo-link{display:flex;align-items:center;gap:8px;border:1px solid var(--store-gold);color:var(--store-gold-strong);padding:0 18px;font:700 13px "Orbitron",sans-serif;letter-spacing:.04em;text-decoration:none;white-space:nowrap}
 .public-demo-link:hover{background:rgba(231,185,79,.12)}
 .public-trust{max-width:1180px;margin:70px auto 0;padding-top:34px;border-top:1px solid var(--store-line)}
+.public-hud-preview{max-width:1180px;margin:78px auto 0;padding-top:34px;border-top:1px solid var(--store-line)}
+.public-hud-preview .public-section-title{margin-bottom:24px}
+.hud-preview{max-width:640px;border:1px solid var(--store-line);background:#030d18;box-shadow:0 18px 40px rgba(0,0,0,.24)}
+.hud-preview img{display:block;width:100%;height:auto}
 .public-trust h2{font-family:"Cinzel",serif;font-size:26px;font-weight:500;margin:0 0 8px;color:var(--store-ink)}
 .public-trust-platforms{color:var(--store-gold);font:700 12px "Orbitron",sans-serif;letter-spacing:.08em;margin:0 0 26px}
 .public-trust-shot{max-width:640px;border:1px solid var(--store-line);background:#030d18;margin:0 0 30px}

@@ -1,15 +1,15 @@
 import { useState } from "react";
-import { Check, ShieldCheck, Sparkles, ArrowRight, PlayCircle, Mic, Boxes, Radio } from "lucide-react";
+import { Check, ShieldCheck, Sparkles, ArrowRight, PlayCircle, Mic, Boxes, Radio, Building2, UserRound, Zap, Crown } from "lucide-react";
 import PublicLegal from "./PublicLegal";
 import "./PublicStore.css";
 
 const API = `${process.env.REACT_APP_BACKEND_URL || "https://api.sirius-assistant.fr"}/api`;
 
 const PLANS = [
-  { id: "monthly", name: "Abonnement Entreprise", tagline: "Automatisation complète pour votre structure.", price: "35", suffix: "/ mois", note: "7 jours d'essai gratuit", featured: true, badge: "LE PLUS CHOISI", features: ["Fiches clients centralisées, zéro tableur", "Relances de facturation envoyées seules", "Stocks à jour à la seconde près", "Dictez la réponse, ΣIRIUS envoie le mail", "Un service cloud entièrement personnalisable", "Module complet de gestion comptable", "Résiliable à tout moment depuis le portail Stripe"], reassurance: ["Compatible avec vos outils actuels (ERP, CRM, etc.)", "Sécurité des paiements assurée par Stripe", "Support prioritaire dédié", "Intégration possible en moins de 24 heures"] },
-  { id: "standard", name: "Standard", tagline: "Usage personnel, sans superflu.", price: "79", suffix: " unique", features: ["À vous, pour toujours — aucun renouvellement", "Un HUD digne d'un poste de commandement", "L'essentiel, sans superflu"] },
-  { id: "pro", name: "Pro", tagline: "Pour les métiers exigeants, modules avancés.", price: "149", suffix: " unique", features: ["Les modules que vos concurrents n'ont pas", "HACCP et productivité pilotés d'une voix", "Une ligne directe vers le support"] },
-  { id: "lifetime", name: "Lifetime", tagline: "Investissement long terme, tous les futurs modules inclus.", price: "299", suffix: " unique", badge: "LE PLUS COMPLET", features: ["Payez une fois, gardez ΣIRIUS à vie", "Chaque futur module, déjà inclus", "Le sommet de la gamme, sans compromis"] },
+  { id: "monthly", name: "Abonnement Entreprise", icon: Building2, tagline: "Automatisation complète pour votre structure.", price: "35", suffix: "/ mois", note: "7 jours d'essai gratuit", featured: true, badge: "LE PLUS CHOISI", features: ["Fiches clients centralisées, zéro tableur", "Relances de facturation envoyées seules", "Stocks à jour à la seconde près", "Dictez la réponse, ΣIRIUS envoie le mail", "Un service cloud entièrement personnalisable", "Module complet de gestion comptable", "Résiliable à tout moment depuis le portail Stripe"], reassurance: ["Compatible avec vos outils actuels (ERP, CRM, etc.)", "Sécurité des paiements assurée par Stripe", "Support prioritaire dédié", "Intégration possible en moins de 24 heures"] },
+  { id: "standard", name: "Standard", icon: UserRound, tagline: "Usage personnel, sans superflu.", price: "79", suffix: " unique", features: ["À vous, pour toujours — aucun renouvellement", "Un HUD digne d'un poste de commandement", "L'essentiel, sans superflu"] },
+  { id: "pro", name: "Pro", icon: Zap, tagline: "Pour les métiers exigeants, modules avancés.", price: "149", suffix: " unique", features: ["Les modules que vos concurrents n'ont pas", "HACCP et productivité pilotés d'une voix", "Une ligne directe vers le support"] },
+  { id: "lifetime", name: "Lifetime", icon: Crown, tagline: "Investissement long terme, tous les futurs modules inclus.", price: "299", suffix: " unique", badge: "LE PLUS COMPLET", features: ["Payez une fois, gardez ΣIRIUS à vie", "Chaque futur module, déjà inclus", "Le sommet de la gamme, sans compromis"] },
 ];
 
 const MATRIX_ACTIONS = [
@@ -78,7 +78,6 @@ export default function PublicStore() {
     <main className="public-store">
       <header className="public-nav">
         <a className="public-brand" href="/"><span className="public-brand-gold">ΣIRIUS</span><span>.</span></a>
-        <span className="public-secure"><ShieldCheck size={15} /> Paiement sécurisé Stripe</span>
       </header>
       <section className="public-hero">
         <h1>Votre espace de travail<br /><em>prend vie.</em></h1>
@@ -89,6 +88,7 @@ export default function PublicStore() {
         <p className="public-platforms">Disponible sur Windows, Android, iPhone, iPad et tablette.</p>
       </section>
       <section className="public-matrix" id="matrice-demo" aria-label="La matrice de ΣIRIUS">
+        <h2 className="public-section-title">La matrice de ΣIRIUS</h2>
         <div className="public-core-preview">
           <div className="public-core-window" aria-label="Noyau ΣIRIUS" role="img">
             <span className="public-core-window-title">Noyau actif</span>
@@ -107,31 +107,37 @@ export default function PublicStore() {
             <li key={text}><Icon size={16} /> <span>{text}</span></li>
           ))}
         </ul>
-        <div className="public-matrix-video" aria-label="Aperçu vidéo de l'interface réactive">
-          <video className="public-matrix-video-el" muted loop playsInline preload="none" poster="/hud-preview.png">
-            <source src="/holo/matrix-preview.mp4" type="video/mp4" />
+        <div className="sirius-video-preview public-matrix-video" aria-label="Aperçu vidéo de l'interface réactive">
+          <video className="public-matrix-video-el" controls muted loop playsInline preload="none" poster="/hud-preview.png">
           </video>
           <span className="public-matrix-video-badge"><PlayCircle size={14} /> Aperçu de l'interface réactive (5-7s)</span>
         </div>
       </section>
       <section className="public-plans" aria-label="Offres ΣIRIUS">
-        {PLANS.map((plan) => (
-          <button key={plan.id} type="button" className={`public-plan ${selected === plan.id ? "selected" : ""} ${plan.featured ? "featured" : ""}`} onClick={() => setSelected(plan.id)}>
-            {plan.badge && <span className={`public-popular ${plan.id === "lifetime" ? "public-popular-alt" : ""}`}>{plan.badge}</span>}
-            <span className="public-plan-name">{plan.name}</span>
-            <span className="public-plan-tagline">{plan.tagline}</span>
-            <span className="public-price"><strong>{plan.price} €</strong><small>{plan.suffix}</small></span>
-            {plan.note && <span className="public-note">{plan.note}</span>}
-            <span className="public-features">{plan.features.map((feature) => <span key={feature}><Check size={14} /> {feature}</span>)}</span>
-            {plan.reassurance && (
-              <span className="public-reassurance">
-                {plan.reassurance.map((line) => <span key={line}><ShieldCheck size={13} /> {line}</span>)}
-              </span>
-            )}
-          </button>
-        ))}
+        <h2 className="public-section-title">Choisissez votre formule</h2>
+        {PLANS.map((plan) => {
+          const PlanIcon = plan.icon;
+          return (
+            <button key={plan.id} type="button" className={`public-plan public-plan-${plan.id} ${selected === plan.id ? "selected" : ""} ${plan.featured ? "featured" : ""}`} onClick={() => setSelected(plan.id)}>
+              {plan.badge && <span className={`public-popular ${plan.id === "lifetime" ? "public-popular-alt" : ""}`}>{plan.badge}</span>}
+              <span className="public-plan-icon" aria-hidden="true"><PlanIcon size={19} /></span>
+              <span className="public-plan-name">{plan.name}</span>
+              <span className="public-plan-tagline">{plan.tagline}</span>
+              <span className="public-price"><strong>{plan.price} €</strong><small>{plan.suffix}</small></span>
+              {plan.note && <span className="public-note">{plan.note}</span>}
+              <span className="public-features">{plan.features.map((feature) => <span key={feature}><Check size={14} /> {feature}</span>)}</span>
+              {plan.reassurance && (
+                <span className="public-reassurance">
+                  {plan.reassurance.map((line) => <span key={line}><ShieldCheck size={13} /> {line}</span>)}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </section>
       <form className="public-checkout" onSubmit={checkout}>
+        <p className="public-checkout-secure"><ShieldCheck size={15} /> Paiement sécurisé Stripe</p>
+        <h2 className="public-section-title">Commencer avec ΣIRIUS</h2>
         <label htmlFor="public-email">Votre adresse e-mail</label>
         <div className="public-form-row">
           <input id="public-email" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="vous@exemple.fr" />
@@ -150,12 +156,15 @@ export default function PublicStore() {
         <span>Gérez ou résiliez votre abonnement depuis le portail Stripe sécurisé.</span>
         <button type="button" onClick={manageSubscription} disabled={portalBusy}>{portalBusy ? "Ouverture..." : "Gérer mon abonnement"}</button>
       </section>}
+      <section className="public-hud-preview" aria-label="Capture d'écran du HUD ΣIRIUS">
+        <h2 className="public-section-title">Le HUD ΣIRIUS en situation</h2>
+        <div className="hud-preview">
+          <img src="/hud-preview.png" alt="HUD ΣIRIUS" loading="lazy" />
+        </div>
+      </section>
       <section className="public-trust" aria-label="Confiance">
         <h2>Ils utilisent ΣIRIUS</h2>
         <p className="public-trust-platforms">Windows · Android · iOS · Tablette</p>
-        <div className="public-trust-shot">
-          <img src="/hud-preview.png" alt="Capture d'écran du HUD ΣIRIUS" loading="lazy" />
-        </div>
         <div className="public-testimonials">
           {[1, 2, 3].map((slot) => (
             <blockquote key={slot} className="public-testimonial">
