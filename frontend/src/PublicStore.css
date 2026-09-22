@@ -72,4 +72,7 @@
 
 /* Bright gold framing for the storefront windows and plan cards. */
 .public-core-window{border-color:rgba(243,197,87,.72);box-shadow:inset 0 0 22px rgba(97,214,255,.1),0 0 18px rgba(243,197,87,.18)}
+.public-core-window{border:0;background:transparent;box-shadow:none}
+.public-core-window::before,.public-core-window::after{content:none}
+.public-core-art::after{content:none}
 .public-plan,.public-checkout{border-color:var(--store-line)}
