@@ -44,8 +44,6 @@ export default function PublicStore() {
   const checkoutSessionId = new URLSearchParams(window.location.search).get("session_id");
   const paymentSucceeded = new URLSearchParams(window.location.search).get("payment") === "success";
 
-  if (["/mentions-legales", "/conditions-generales", "/confidentialite"].includes(window.location.pathname)) return <PublicLegal />;
-
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("payment") !== "paypal-return") return;
@@ -66,6 +64,8 @@ export default function PublicStore() {
       }
     })();
   }, []);
+
+  if (["/mentions-legales", "/conditions-generales", "/confidentialite"].includes(window.location.pathname)) return <PublicLegal />;
 
   const checkout = async (event) => {
     event.preventDefault();
