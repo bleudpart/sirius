@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { X, Anchor } from "lucide-react";
 import {
   useHudHiddenKeys, hideHudPanel,
@@ -122,7 +123,7 @@ export default function HudPanel({
 
   if (hidden) return null;
 
-  return (
+  const panel = (
     <section
       ref={ref}
       className={`shud-panel ${link ? `shud-link-${side}` : ""} ${className}`}
@@ -167,4 +168,10 @@ export default function HudPanel({
       {floatPos && <div className="shud-resize" onPointerDown={onResizePointerDown} title="Redimensionner" data-testid={`shud-panel-resize-${key}`} />}
     </section>
   );
+
+  // Une fois détachée (floatPos), la fenêtre sort du DOM de la colonne via un portail :
+  // sans ça, le `transform: scale(...)` du tableau de bord parent devient le conteneur du
+  // `position: fixed`, et la fenêtre reste piégée dans les limites du tableau de bord au lieu
+  // de pouvoir se déplacer librement sur tout l'écran.
+  return floatPos ? createPortal(panel, document.body) : panel;
 }

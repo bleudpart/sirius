@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Calendar, Target, PieChart, ListChecks, Users, Bell, Settings2,
   Scale, Sparkles, TrendingUp, ChevronRight, Cpu, Activity, Wifi, WifiOff, Clock, RotateCcw, X, Anchor, LayoutGrid,
@@ -458,7 +459,7 @@ function NextActionsButton({ events, bilan, connected }) {
     );
   }
 
-  return (
+  const pill = (
     <div
       ref={wrapRef}
       className="shud-next-wrap"
@@ -496,6 +497,10 @@ function NextActionsButton({ events, bilan, connected }) {
       )}
     </div>
   );
+
+  // Idem que HudPanel : détachée (floatPos), la pilule sort du DOM via un portail pour
+  // échapper au conteneur créé par le `transform` du tableau de bord parent.
+  return floatPos ? createPortal(pill, document.body) : pill;
 }
 
 const LEFT_PANEL_TITLES = { agenda: "Agenda Exécutif", priorites: "Priorités de la Journée", ressources: "Ressources Personnelles", notifications: "Notifications Actives" };
