@@ -5,11 +5,17 @@ set "ROOT=%~dp0"
 set "SIRIUS_EXE="
 
 for %%P in (
+  "%LOCALAPPDATA%\Programs\SIRIUS\ΣIRIUS.exe"
   "%LOCALAPPDATA%\Programs\SIRIUS\SIRIUS.exe"
+  "%LOCALAPPDATA%\SIRIUS\ΣIRIUS.exe"
   "%LOCALAPPDATA%\SIRIUS\SIRIUS.exe"
+  "%ProgramFiles%\SIRIUS\ΣIRIUS.exe"
   "%ProgramFiles%\SIRIUS\SIRIUS.exe"
+  "%ProgramFiles(x86)%\SIRIUS\ΣIRIUS.exe"
   "%ProgramFiles(x86)%\SIRIUS\SIRIUS.exe"
+  "%ROOT%frontend\dist\win-unpacked\ΣIRIUS.exe"
   "%ROOT%frontend\dist\win-unpacked\SIRIUS.exe"
+  "%ROOT%ΣIRIUS.exe"
   "%ROOT%SIRIUS.exe"
 ) do (
   if not defined SIRIUS_EXE if exist "%%~P" set "SIRIUS_EXE=%%~P"
@@ -17,7 +23,8 @@ for %%P in (
 
 if not defined SIRIUS_EXE (
   for /f "usebackq delims=" %%P in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$keys = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*','HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*','HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'; Get-ItemProperty $keys -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -eq 'SIRIUS' -and $_.InstallLocation } | Select-Object -First 1 -ExpandProperty InstallLocation"`) do (
-    if exist "%%~P\SIRIUS.exe" set "SIRIUS_EXE=%%~P\SIRIUS.exe"
+    if exist "%%~P\ΣIRIUS.exe" set "SIRIUS_EXE=%%~P\ΣIRIUS.exe"
+    if not defined SIRIUS_EXE if exist "%%~P\SIRIUS.exe" set "SIRIUS_EXE=%%~P\SIRIUS.exe"
   )
 )
 

@@ -14,9 +14,9 @@ $frontendDir = Join-Path $repoRoot 'frontend'
 $backendDir = Join-Path $repoRoot 'backend'
 $venvDir = Join-Path $backendDir '.venv-build'
 
-$requiredNodeMajor = 18
+$requiredNodeMajor = 20
 $pythonWingetId = 'Python.Python.3.12'
-$nodeWingetId = 'OpenJS.NodeJS.LTS'
+$nodeWingetId = 'OpenJS.NodeJS.20'
 
 function Write-Step {
     param([string]$Message)
@@ -197,6 +197,19 @@ Invoke-Step -FilePath $npmCli -Arguments @('run', 'backend:build') -WorkingDirec
     -FailureMessage 'Compilation du backend echouee.'
 
 Write-Step '6/6 - Generation de l installeur Windows'
+$sourceBundles = Get-ChildItem -Path (Join-Path $frontendDir 'build\static\js') -Filter 'main.*.js' -File |
+    Where-Object { $_.Name -notlike '*.map' }
+$embeddedBundles = Get-ChildItem -Path (Join-Path $backendDir 'dist\sirius-backend\_internal\frontend\build\static\js') -Filter 'main.*.js' -File |
+    Where-Object { $_.Name -notlike '*.map' }
+if ($sourceBundles.Count -ne 1 -or $embeddedBundles.Count -ne 1) {
+    throw 'Verification du bundle impossible : un unique main.*.js est requis dans le frontend et le backend embarque.'
+}
+$sourceHash = (Get-FileHash -LiteralPath $sourceBundles[0].FullName -Algorithm SHA256).Hash
+$embeddedHash = (Get-FileHash -LiteralPath $embeddedBundles[0].FullName -Algorithm SHA256).Hash
+if ($sourceBundles[0].Name -ne $embeddedBundles[0].Name -or $sourceHash -ne $embeddedHash) {
+    throw "Le HUD embarque ne correspond pas au build courant : $($sourceBundles[0].Name) / $($embeddedBundles[0].Name)."
+}
+Write-Info "HUD embarque verifie : $($sourceBundles[0].Name) ($sourceHash)"
 $builderArgs = @('exec', '--', 'electron-builder', '--win', 'nsis', 'portable')
 if ($Publish) {
     if (-not $env:GH_TOKEN) {

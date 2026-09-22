@@ -21,6 +21,7 @@ const config = {
 const LOCAL_SHUTDOWN_PATH = "/__sirius/shutdown";
 const LOCAL_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 const SHUTDOWN_SCRIPT = path.resolve(__dirname, "..", "scripts", "stop-sirius.ps1");
+const webpackDevServerMajor = Number(require("webpack-dev-server/package.json").version.split(".")[0]);
 
 function isTrustedLocalShutdownRequest(req) {
   if (req.headers["x-sirius-shutdown"] !== "1") return false;
@@ -230,6 +231,8 @@ webpackConfig.devServer = (devServerConfig) => {
 // Compatibilité dev server v5
 const configureDevServer = webpackConfig.devServer;
 webpackConfig.devServer = (devServerConfig) =>
-  makeDevServerV5Compatible(configureDevServer(devServerConfig));
+  webpackDevServerMajor >= 5
+    ? makeDevServerV5Compatible(configureDevServer(devServerConfig))
+    : configureDevServer(devServerConfig);
 
 module.exports = webpackConfig;

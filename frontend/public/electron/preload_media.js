@@ -17,3 +17,8 @@ contextBridge.exposeInMainWorld("siriusUpdates", {
   check: () => ipcRenderer.invoke("sirius-update-check"),
 });
 
+contextBridge.exposeInMainWorld("siriusFiles", {
+  selectFolder: () => ipcRenderer.invoke("sirius-files-select-folder"),
+  openFolder: (folderPath) => ipcRenderer.invoke("sirius-files-open-folder", folderPath),
+});
+

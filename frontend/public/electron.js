@@ -220,6 +220,19 @@ app.whenReady().then(async () => {
     return { visible: !!window };
   });
   ipcMain.handle("sirius-media-close-hud", () => ({ closed: closeMediaHudWindow() }));
+  ipcMain.handle("sirius-files-select-folder", async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: "Choisir un dossier Windows",
+      properties: ["openDirectory", "createDirectory"],
+    });
+    if (result.canceled || !result.filePaths[0]) return { canceled: true };
+    return { path: result.filePaths[0] };
+  });
+  ipcMain.handle("sirius-files-open-folder", async (_event, folderPath) => {
+    if (typeof folderPath !== "string" || !folderPath.trim()) return { ok: false, error: "Dossier invalide." };
+    const error = await shell.openPath(folderPath);
+    return error ? { ok: false, error } : { ok: true };
+  });
 
   // Menu contextuel (clic droit) avec Copier / Coller
   if (mainWindow) {

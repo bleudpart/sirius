@@ -50,3 +50,53 @@ def test_packaged_frontend_javascript_is_served_from_static_route():
     assert script.status_code == 200
     assert "javascript" in script.headers["content-type"]
     assert len(script.content) > 100_000
+
+
+def test_cleanup_stale_sirius_backends_kills_old_processes(monkeypatch):
+    killed = []
+
+    monkeypatch.setattr(
+        desktop_backend,
+        "_windows_sirius_processes",
+        lambda: [111, 222],
+    )
+    monkeypatch.setattr(desktop_backend.os, "getpid", lambda: 222)
+    monkeypatch.setattr(
+        desktop_backend,
+        "_send_terminate",
+        lambda pid: killed.append(pid),
+    )
+    monkeypatch.setattr(
+        desktop_backend,
+        "_windows_port_owner_pid",
+        lambda host, port: None,
+    )
+
+    desktop_backend._cleanup_stale_sirius_processes()
+
+    assert killed == [111]
+
+
+def test_cleanup_stale_sirius_backends_kills_port_owner_even_when_name_is_unknown(monkeypatch):
+    killed = []
+
+    monkeypatch.setattr(
+        desktop_backend,
+        "_windows_sirius_processes",
+        lambda: [],
+    )
+    monkeypatch.setattr(desktop_backend.os, "getpid", lambda: 999)
+    monkeypatch.setattr(
+        desktop_backend,
+        "_windows_port_owner_pid",
+        lambda host, port: 333,
+    )
+    monkeypatch.setattr(
+        desktop_backend,
+        "_send_terminate",
+        lambda pid: killed.append(pid),
+    )
+
+    desktop_backend._cleanup_stale_sirius_processes(host="127.0.0.1", port=8001)
+
+    assert killed == [333]
