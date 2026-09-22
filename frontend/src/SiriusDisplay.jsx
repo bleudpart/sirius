@@ -363,7 +363,7 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
     } else {
       const w = window.open(s.url, `sirius-social-${s.id}`, feats);
       socialWins.current[s.id] = w;
-      if (onSpeak) onSpeak(`${s.speak} ouvert dans la fenêtre dédiée du display, monsieur.`);
+      if (onSpeak) onSpeak(`${s.speak} ouvert dans la fenêtre dédiée du display.`);
     }
     setActiveSocial(s.id);
     if (onInteract) onInteract();

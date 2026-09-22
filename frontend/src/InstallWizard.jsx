@@ -82,7 +82,7 @@ export default function InstallWizard({ onClose, onSpeak, keys }) {
         setTimeout(() => runStep(d.next), 750);
       } else if (d.step === "completed" && d.status === "ok" && !doneRef.current) {
         doneRef.current = true;
-        onSpeak && onSpeak("Installation terminée. Tous les systèmes sont vérifiés. Sirius est activé, monsieur.");
+        onSpeak && onSpeak("Installation terminée. Tous les systèmes sont vérifiés. Sirius est activé.");
       }
     } catch (e) {
       setResults((res) => ({

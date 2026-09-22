@@ -798,6 +798,7 @@ body.hud-minimal .antique-jar { display: none; }
    NOUVEAU LAYOUT — sirius-dashboard (remplace center-stage)
    ═══════════════════════════════════════════════════════════ */
 .sirius-dashboard {
+  position: relative;
   grid-area: dashboard;
   min-height: 0;
   display: grid;
@@ -812,6 +813,41 @@ body.hud-minimal .antique-jar { display: none; }
   transform: scale(var(--hud-scale, 1));
   transform-origin: center top;
   transition: transform 0.12s ease-out;
+}
+
+/* Fenêtre HUD unique : profondeur visuelle obtenue avec des pseudo-éléments CSS,
+   sans canvas ni timer de rendu supplémentaire. */
+.sirius-dashboard::before,
+.sirius-dashboard::after {
+  content: "";
+  position: absolute;
+  inset: 6px clamp(8px, 1.4vw, 18px);
+  border: 1px solid rgba(145, 230, 242, 0.16);
+  border-radius: 18px;
+  pointer-events: none;
+  z-index: 0;
+}
+.sirius-dashboard::before {
+  background:
+    linear-gradient(90deg, transparent 0 12%, rgba(145, 230, 242, 0.05) 12.1% 12.2%, transparent 12.3% 87.7%, rgba(216, 184, 117, 0.06) 87.8% 87.9%, transparent 88%),
+    linear-gradient(180deg, rgba(145, 230, 242, 0.05), transparent 22%, transparent 78%, rgba(216, 184, 117, 0.04));
+  box-shadow: inset 0 0 28px rgba(20, 154, 190, 0.08), 0 0 22px rgba(20, 154, 190, 0.07);
+  animation: dashboardBreath 5s ease-in-out infinite;
+}
+.sirius-dashboard::after {
+  inset: 6px clamp(8px, 1.4vw, 18px);
+  border-color: transparent;
+  background: linear-gradient(90deg, transparent 0 46%, rgba(145, 230, 242, 0.18) 49%, rgba(242, 217, 154, 0.26) 50%, rgba(145, 230, 242, 0.18) 51%, transparent 54%) 0 0 / 220% 1px no-repeat;
+  animation: dashboardSweep 11s ease-in-out infinite;
+}
+.sirius-dashboard > * { position: relative; z-index: 1; }
+@keyframes dashboardBreath {
+  0%, 100% { opacity: 0.62; }
+  50% { opacity: 1; }
+}
+@keyframes dashboardSweep {
+  0%, 62% { background-position: -120% 0; }
+  82%, 100% { background-position: 120% 0; }
 }
 
 .sirius-column {
@@ -833,6 +869,98 @@ body.hud-minimal .antique-jar { display: none; }
   display: flex;
   flex-direction: column;
   overflow: visible;
+}
+
+/* Le centre est un espace de travail, pas une scène : la console d'activité est
+   l'unique fenêtre dominante et les modules restent dans les colonnes. */
+.workspace-mode .sirius-center {
+  position: relative;
+  min-width: 0;
+}
+.workspace-mode .sirius-dashboard {
+  width: min(1120px, calc(100vw - 28px));
+  margin-inline: auto;
+  grid-template-columns: minmax(180px, 0.82fr) minmax(360px, 1.45fr) minmax(180px, 0.82fr);
+  gap: 14px;
+  padding: 12px 14px 10px;
+  border: 1px solid rgba(145, 230, 242, 0.18);
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(8, 23, 37, 0.56), rgba(2, 8, 15, 0.42));
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.26), inset 0 0 34px rgba(145, 230, 242, 0.035);
+}
+.workspace-mode .sirius-dashboard::before {
+  inset: 0;
+  border: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(90deg, transparent 0%, rgba(0, 229, 255, 0.75) 18%, rgba(0, 229, 255, 0.08) 30%, transparent 42%, transparent 58%, rgba(255, 53, 184, 0.08) 70%, rgba(255, 190, 70, 0.72) 86%, transparent 100%) 0 0 / 220% 2px no-repeat,
+    linear-gradient(180deg, rgba(145, 230, 242, 0.045), transparent 28%, transparent 76%, rgba(216, 184, 117, 0.035));
+  animation: dashboardRgbLine 12s ease-in-out infinite;
+}
+.workspace-mode .sirius-dashboard::after {
+  inset: 0;
+  border: 1px solid rgba(145, 230, 242, 0.12);
+  border-radius: inherit;
+  background: none;
+  animation: none;
+}
+.workspace-mode .sirius-column {
+  gap: 8px;
+  padding: 2px;
+}
+.workspace-mode .sirius-column .hud-panel {
+  padding: 9px 10px 10px;
+  border-radius: 10px;
+}
+.workspace-mode .sirius-column .shud-head {
+  padding-bottom: 6px;
+  margin-bottom: 7px;
+}
+@keyframes dashboardRgbLine {
+  0%, 58%, 100% { background-position: -120% 0, 0 0; opacity: 0.7; }
+  76% { background-position: 120% 0, 0 0; opacity: 1; }
+}
+.workspace-mode .sirius-stage {
+  min-height: 0;
+  flex: 0 0 clamp(150px, 25vh, 230px);
+}
+.workspace-mode .sirius-stage .reactor-wrap {
+  width: min(20vh, 180px);
+  height: min(20vh, 180px);
+}
+.workspace-mode .sirius-stage .waveform-canvas {
+  bottom: 0;
+  width: min(32%, 220px);
+  height: 24px;
+}
+.workspace-mode .sirius-stage .central-card {
+  transform: scale(0.82);
+  transform-origin: center;
+}
+.workspace-mode .sirius-identity {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2px;
+  padding: 0 10px;
+  opacity: 0.74;
+}
+.workspace-mode .sirius-identity .sirius-next-action {
+  display: none;
+}
+.workspace-mode .task-console {
+  top: clamp(58px, 7vh, 78px);
+  width: min(700px, calc(100vw - 2 * clamp(220px, 20vw, 300px)));
+  height: min(48vh, 460px);
+}
+
+@media (max-width: 900px) {
+  .workspace-mode .sirius-dashboard {
+    width: calc(100vw - 16px);
+    grid-template-columns: minmax(150px, 0.8fr) minmax(250px, 1.2fr) minmax(150px, 0.8fr);
+    gap: 8px;
+    padding: 8px;
+  }
 }
 
 .sirius-stage {
@@ -859,6 +987,11 @@ body.hud-minimal .antique-jar { display: none; }
   filter: blur(18px);
   pointer-events: none;
   z-index: 0;
+  animation: stageHaloBreath 6s ease-in-out infinite;
+}
+@keyframes stageHaloBreath {
+  0%, 100% { opacity: 0.72; transform: translate(-50%, -50%) scale(0.96); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.03); }
 }
 
 /* Globe 3D supprimé (retour au noyau à anneaux d'or, identique à la page de démarrage) —
@@ -1549,38 +1682,49 @@ body.hud-minimal .medallion-halo { display: none; }
 }
 .cmd-send:hover { box-shadow: 0 0 18px rgba(216, 184, 117, 0.5); }
 .cmd-bar > .mic-btn {
-  flex: 0 0 72px;
-  width: 72px;
-  min-width: 72px;
-  height: 30px;
-  padding: 0;
+  flex: 0 0 82px;
+  width: 82px;
+  min-width: 82px;
+  height: 34px;
+  padding: 0 9px;
   margin: 0;
-  gap: 5px;
+  gap: 6px;
   font-family: "Orbitron", sans-serif;
-  font-size: 9px;
-  letter-spacing: 0.6px;
+  font-size: 8px;
+  letter-spacing: 0.08em;
 }
 .mic-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 30px;
-  margin-right: 8px;
-  background: rgba(6, 20, 30, 0.85);
-  border: 1px solid rgba(145, 230, 242, 0.45);
-  border-radius: 4px;
-  color: #7fdcf2;
+  width: 82px;
+  height: 34px;
+  margin: 0;
+  background: rgba(4, 17, 27, 0.94);
+  border: 1px solid rgba(145, 230, 242, 0.28);
+  border-radius: 5px;
+  color: #b7eaf3;
   cursor: pointer;
-  transition: box-shadow 0.2s, border-color 0.2s, color 0.2s;
+  box-shadow: inset 2px 0 0 rgba(145, 230, 242, 0.55);
+  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
 }
-.mic-btn:hover { border-color: var(--accent); box-shadow: 0 0 12px var(--glow); color: #d9f6ff; }
+.mic-btn::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #55717a;
+  box-shadow: 0 0 0 2px rgba(85, 113, 122, 0.14);
+}
+.mic-btn:hover { border-color: rgba(145, 230, 242, 0.68); box-shadow: inset 2px 0 0 #91e6f2, 0 0 12px rgba(145, 230, 242, 0.16); color: #effdff; }
 .mic-btn.on {
-  border-color: #ff5470;
-  color: #ff5470;
-  box-shadow: 0 0 14px rgba(255, 84, 112, 0.55);
-  animation: micPulse 1.2s ease-in-out infinite;
+  border-color: rgba(216, 184, 117, 0.72);
+  color: #f3dda4;
+  background: rgba(39, 31, 17, 0.94);
+  box-shadow: inset 2px 0 0 #d8b875, 0 0 14px rgba(216, 184, 117, 0.18);
+  animation: none;
 }
+.mic-btn.on::before { background: #d8b875; box-shadow: 0 0 8px rgba(216, 184, 117, 0.9); }
 @keyframes micPulse {
   0%, 100% { box-shadow: 0 0 8px rgba(255, 84, 112, 0.4); }
   50% { box-shadow: 0 0 20px rgba(255, 84, 112, 0.85); }
@@ -1999,6 +2143,22 @@ body.hud-minimal .medallion-halo { display: none; }
   backdrop-filter: none !important;
 }
 .sirius-root.eco .scanline { display: none; }
+
+/* En arrière-plan ou en mode économie, le HUD reste lisible mais cesse ses effets décoratifs. */
+.sirius-root.eco .core-ring,
+.sirius-root.eco .core-pulse,
+.sirius-root.eco .core-orbit,
+.sirius-root.eco .core-letter i,
+.sirius-root.eco .shud-panel,
+.sirius-root.eco .task-console::before,
+.sirius-root.backgrounded .core-ring,
+.sirius-root.backgrounded .core-pulse,
+.sirius-root.backgrounded .core-orbit,
+.sirius-root.backgrounded .core-letter i,
+.sirius-root.backgrounded .shud-panel,
+.sirius-root.backgrounded .task-console::before {
+  animation: none !important;
+}
 
 .mic-btn {
   display: inline-flex;
@@ -2889,6 +3049,36 @@ body.hud-minimal .medallion-halo { display: none; }
 .files-modal { max-width: 860px; width: min(96vw, 860px); }
 .files-bar { display: flex; align-items: center; gap: 14px; margin: 14px 0 10px; flex-wrap: wrap; }
 .files-hint { font-size: 0.74rem; color: rgba(217, 246, 255, 0.55); letter-spacing: 0.06em; }
+.files-workspace-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 12px;
+  color: #bfeaf5;
+  background: #0b1d29;
+  border: 1px solid rgba(122, 190, 204, 0.48);
+  border-radius: 4px;
+  font: 700 10px "Orbitron", sans-serif;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+.files-workspace-action:hover:not(:disabled) { border-color: #d7b369; color: #fff1c8; }
+.files-workspace-action.primary {
+  color: #06141c;
+  background: #b8e6ee;
+  border-color: #b8e6ee;
+}
+.files-workspace-action.primary:hover:not(:disabled) { background: #d7b369; border-color: #d7b369; color: #12100b; }
+.files-workspace-action:disabled { opacity: 0.6; cursor: wait; }
+.files-windows-path {
+  margin: -3px 0 10px;
+  overflow: hidden;
+  color: rgba(191, 234, 245, 0.72);
+  font: 500 12px "Rajdhani", sans-serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .files-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -3771,6 +3961,47 @@ body.hud-minimal .medallion-halo { display: none; }
   width: 448px;
   height: 344px;
 }
+.task-console {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  z-index: 1180;
+  width: min(680px, calc(100vw - 32px));
+  height: min(58vh, 560px);
+  transform: translateX(-50%);
+}
+.task-console::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 10px;
+  left: 10px;
+  height: 2px;
+  background: linear-gradient(90deg, #63d9ff, #d8b875, #9fd8c9, #63d9ff);
+  background-size: 200% 100%;
+  box-shadow: 0 0 10px rgba(145, 230, 242, 0.4);
+  animation: taskConsoleRgb 10s linear infinite;
+  pointer-events: none;
+}
+@keyframes taskConsoleRgb { to { background-position: 200% 0; } }
+.task-console .ww-bar { cursor: grab; user-select: none; }
+.task-console.dragging .ww-bar { cursor: grabbing; }
+.task-console-list {
+  height: calc(100% - 45px);
+  overflow-y: auto;
+  padding: 8px;
+}
+.task-console-row {
+  padding: 9px 10px;
+  border-bottom: 1px solid rgba(145, 230, 242, 0.14);
+}
+.task-console-row:last-child { border-bottom: 0; }
+.task-console-head { display: flex; align-items: center; gap: 8px; }
+.task-console-head strong { flex: 1; color: #edf7f8; font: 700 12px "Rajdhani", sans-serif; letter-spacing: 0.05em; }
+.task-console-head button { display: inline-grid; width: 22px; height: 22px; padding: 0; color: #9fdce6; background: transparent; border: 0; place-items: center; cursor: pointer; }
+.task-console-result { max-height: 72px; margin: 6px 0 0 16px; overflow: hidden; color: #cdeefb; font: 500 12px/1.35 "Rajdhani", sans-serif; white-space: pre-wrap; }
+.task-console-caption { display: flex; align-items: center; gap: 5px; margin: 5px 0 0 16px; color: #91e6f2; font: 600 10px "Rajdhani", sans-serif; }
+.task-console-empty { margin: 0; padding: 18px 10px; color: rgba(205, 238, 251, 0.68); font: 500 13px/1.5 "Rajdhani", sans-serif; text-align: center; }
 .tw-badge {
   flex: 0 0 auto;
   display: inline-flex;
@@ -6171,27 +6402,39 @@ body.hud-minimal .guardian-rig { display: none; }
 .boot-reactor { width: min(30vh, 250px); height: min(30vh, 250px); }
 .boot-reactor::before, .boot-reactor::after { content: none; }
 
-/* ---------- Fenêtres holographiques 3D (cyan, flottantes, inclinées) ---------- */
+/* ---------- Fenêtres de travail : terminal analytique cyan/or ---------- */
 .holo-win {
   position: fixed !important;
   right: auto;
   bottom: auto;
-  border-radius: 16px !important;
-  /* Allégé : fond plus opaque (remplace le flou d'arrière-plan), scanlines conservées */
+  border-radius: 6px !important;
   background:
-    linear-gradient(180deg, rgba(145, 230, 242, 0.10), transparent 90px) no-repeat,
-    repeating-linear-gradient(0deg, rgba(145, 230, 242, 0.025) 0 1px, transparent 1px 3px),
-    linear-gradient(165deg, rgba(8, 34, 48, 0.90), rgba(2, 12, 22, 0.94)) !important;
-  border: 1px solid rgba(145, 230, 242, 0.55);
+    linear-gradient(180deg, rgba(143, 212, 227, 0.08), transparent 72px) no-repeat,
+    #07141f !important;
+  border: 1px solid rgba(122, 190, 204, 0.48);
   box-shadow:
-    0 0 14px rgba(145, 230, 242, 0.22),
-    0 12px 30px rgba(0, 0, 0, 0.5);
+    0 16px 38px rgba(0, 0, 0, 0.56),
+    inset 0 1px 0 rgba(214, 248, 255, 0.08);
   overflow-y: auto !important;
   overflow-x: hidden;
   contain: layout paint;
   transform: none;
-  animation: zeusIn 0.45s ease-out both !important;
+  animation: zeusIn 0.22s ease-out both !important;
 }
+.holo-win::before {
+  content: "";
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: block;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, #57c7dc 0%, #d7b369 45%, #8f6fd1 72%, #57c7dc 100%);
+  background-size: 220% 100%;
+  animation: workspaceAccent 14s linear infinite;
+  pointer-events: none;
+}
+@keyframes workspaceAccent { to { background-position: 220% 0; } }
 .holo-win::-webkit-scrollbar { width: 6px; }
 .holo-win::-webkit-scrollbar-track { background: transparent; }
 .holo-win::-webkit-scrollbar-thumb { background: rgba(145, 230, 242, 0.35); border-radius: 4px; }
@@ -6210,18 +6453,18 @@ body.hud-minimal .guardian-rig { display: none; }
 .holo-manip .holo-drag { cursor: grabbing; }
 .holo-win .zeus-head, .holo-win .eu-head, .holo-win .gcal-head {
   position: sticky; top: 0; z-index: 25;
-  background: linear-gradient(180deg, rgba(9, 32, 46, 0.99), rgba(4, 16, 27, 0.98));
-  border-bottom: 1px solid rgba(242, 217, 154, 0.38);
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.38), 0 0 16px rgba(216, 184, 117, 0.08);
+  background: #0b1d29;
+  border-bottom: 1px solid rgba(122, 190, 204, 0.3);
+  box-shadow: 0 5px 12px rgba(0, 0, 0, 0.26);
 }
 .holo-win-bar {
   position: sticky; top: 0; z-index: 26;
-  display: flex; gap: 6px; align-items: center; justify-content: center;
-  padding: 9px 0 7px;
-  background: linear-gradient(180deg, rgba(145, 230, 242, 0.12), rgba(4, 20, 30, 0.6));
-  border-bottom: 1px solid rgba(145, 230, 242, 0.25);
+  display: flex; gap: 5px; align-items: center; justify-content: flex-start;
+  padding: 8px 12px;
+  background: #0b1d29;
+  border-bottom: 1px solid rgba(122, 190, 204, 0.3);
 }
-.holo-win-bar span { width: 28px; height: 3px; border-radius: 2px; background: rgba(145, 230, 242, 0.55); box-shadow: 0 0 7px rgba(145, 230, 242, 0.6); }
+.holo-win-bar span { width: 18px; height: 2px; border-radius: 0; background: rgba(145, 230, 242, 0.42); box-shadow: none; }
 .holo-win-resize {
   position: sticky !important;
   bottom: 4px;
@@ -6310,22 +6553,18 @@ body.hud-minimal .guardian-rig { display: none; }
 .setup-screen.holo-win::-webkit-scrollbar-thumb { background: rgba(145, 230, 242, 0.35); border-radius: 4px; }
 .setup-screen.holo-win .setup-close { top: 26px; right: 14px; z-index: 30; }
 
-/* Style holographique 3D pour les fenêtres flottantes natives (display, tâches, activité) */
+/* Fenêtres natives : même surface de travail que les modules. */
 .web-window, .sirius-display, .sirius-progress {
   background:
-    linear-gradient(180deg, rgba(145, 230, 242, 0.09), transparent 70px) no-repeat,
-    repeating-linear-gradient(0deg, rgba(145, 230, 242, 0.022) 0 1px, transparent 1px 3px),
-    linear-gradient(165deg, rgba(8, 34, 48, 0.74), rgba(2, 12, 22, 0.82)) !important;
-  border: 1px solid rgba(145, 230, 242, 0.55) !important;
-  border-radius: 14px !important;
-  backdrop-filter: blur(16px) saturate(1.25) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(1.25) !important;
+    linear-gradient(180deg, rgba(143, 212, 227, 0.08), transparent 70px) no-repeat,
+    #07141f !important;
+  border: 1px solid rgba(122, 190, 204, 0.48) !important;
+  border-radius: 6px !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   box-shadow:
-    inset 0 0 0 1px rgba(145, 230, 242, 0.10),
-    inset 0 0 50px rgba(145, 230, 242, 0.05),
-    0 0 24px rgba(145, 230, 242, 0.28),
-    0 0 70px rgba(145, 230, 242, 0.10),
-    0 24px 60px rgba(0, 0, 0, 0.6) !important;
+    inset 0 1px 0 rgba(214, 248, 255, 0.08),
+    0 16px 38px rgba(0, 0, 0, 0.56) !important;
 }
 .web-window { animation: ww-in 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.1); }
 .sirius-display { animation: none; }
@@ -6825,6 +7064,20 @@ body[data-phase] .center-stage::before { content: none !important; }
 .holo-platform .ring-b::before {
   display: none;
 }
+
+.sirius-root.eco .sirius-dashboard::before,
+.sirius-root.eco .sirius-dashboard::after,
+.sirius-root.eco .sirius-stage::before {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sirius-dashboard::before,
+  .sirius-dashboard::after,
+  .sirius-stage::before {
+    animation: none;
+  }
+}
 .holo-platform .ring-c {
   width: 29%;
   height: 23%;
@@ -7138,11 +7391,8 @@ body[data-phase] .center-stage::before { content: none !important; }
 }
 .sirius-footer {
   display: block;
-  position: fixed;
-  left: 50%;
-  bottom: 8px;
-  z-index: 20;
-  transform: translateX(-50%);
+  position: static;
+  margin-top: 2px;
   max-width: calc(100vw - 24px);
   color: rgba(205, 238, 251, 0.72);
   font-family: "Rajdhani", sans-serif;
@@ -7157,7 +7407,6 @@ body[data-phase] .center-stage::before { content: none !important; }
 
 @media (max-width: 640px) {
   .sirius-footer {
-    bottom: 4px;
     font-size: 9px;
     letter-spacing: 0.04em;
   }

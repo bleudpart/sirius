@@ -31,7 +31,7 @@ const CONF = {
     intro: "Solon, législateur. Exposez vos faits — le droit fera le reste.",
     placeholder: "Exposez votre situation juridique (contrat, litige, travail, bail…)",
     action: "AVIS JURIDIQUE",
-    start: "J'examine votre dossier, monsieur.",
+    start: "J'examine ton dossier.",
     done: "Voici mon avis : faits, droit, analyse, options. Tout est à l'écran.",
   },
   "PROMÉTHÉE#": {
@@ -43,7 +43,7 @@ const CONF = {
     intro: "Prométhée. Je vois la fin du projet avant son commencement. Donnez-moi votre objectif.",
     placeholder: "Décrivez votre projet (but, délai, contraintes, équipe…)",
     action: "PLAN DE PROJET",
-    start: "J'étudie votre projet, monsieur.",
+    start: "J'étudie ton projet.",
     done: "Voici votre plan : objectif, jalons, risques, actions. Tout est à l'écran.",
   },
 };

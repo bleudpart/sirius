@@ -27,6 +27,7 @@ export default function FilesPanel({ onClose }) {
   const [dragging, setDragging] = useState(null);
   const [overFolder, setOverFolder] = useState(null);
   const [viewing, setViewing] = useState(null);
+  const [windowsFolder, setWindowsFolder] = useState(() => localStorage.getItem("sirius_windows_folder") || "");
   const inputRef = useRef(null);
 
   const load = async () => {
@@ -119,6 +120,23 @@ export default function FilesPanel({ onClose }) {
     } catch { flash("Déplacement impossible."); }
   };
 
+  const chooseWindowsFolder = async () => {
+    if (!window.siriusFiles?.selectFolder) {
+      flash("L'accès aux dossiers Windows est disponible dans l'application ΣIRIUS installée.");
+      return;
+    }
+    const result = await window.siriusFiles.selectFolder();
+    if (!result?.path) return;
+    localStorage.setItem("sirius_windows_folder", result.path);
+    setWindowsFolder(result.path);
+  };
+
+  const openWindowsFolder = async () => {
+    if (!windowsFolder || !window.siriusFiles?.openFolder) return;
+    const result = await window.siriusFiles.openFolder(windowsFolder);
+    if (!result?.ok) flash(result?.error || "Impossible d'ouvrir ce dossier.");
+  };
+
   return (
     <div className="setup-screen" data-testid="sirius-files-panel" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="setup-grid-bg" />
@@ -134,13 +152,17 @@ export default function FilesPanel({ onClose }) {
 
         <DropZone onUploaded={load} />
         <div className="files-bar">
-          <button className="cmd-send" onClick={() => inputRef.current && inputRef.current.click()} disabled={busy} data-testid="files-upload-btn">
+          <button className="files-workspace-action primary" onClick={() => inputRef.current && inputRef.current.click()} disabled={busy} data-testid="files-upload-btn">
             {busy ? <Loader2 size={15} className="dg-spin" /> : <Upload size={15} />}
             {busy ? "ENVOI EN COURS..." : "AJOUTER DES FICHIERS"}
           </button>
           <input ref={inputRef} type="file" multiple style={{ display: "none" }} onChange={upload} data-testid="files-input" />
+          <button className="files-workspace-action" onClick={windowsFolder ? openWindowsFolder : chooseWindowsFolder} data-testid="files-windows-folder-btn">
+            <FolderOpen size={15} /> {windowsFolder ? "OUVRIR LE DOSSIER" : "CHOISIR UN DOSSIER"}
+          </button>
           <span className="files-hint">{files.length} fichier{files.length > 1 ? "s" : ""} · {MAX_MB} Mo max par fichier</span>
         </div>
+        {windowsFolder && <p className="files-windows-path" title={windowsFolder}>Dossier Windows : {windowsFolder}</p>}
         {msg && <div className="memory-flash" data-testid="files-flash">{msg}</div>}
 
         <div className="files-search">

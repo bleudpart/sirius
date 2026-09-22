@@ -249,7 +249,7 @@ export default function ThemisPanel({ onClose }) {
       const d = await res.json().catch(() => ({}));
       if (!res.ok) setErr(typeof d.detail === "string" ? d.detail : "Envoi refusé.");
       else if (d.piece && d.piece.note) setErr(d.piece.note);
-      else speakAsCharacter("Pièce comptable archivée et analysée, monsieur.", { pitch: 0.95, rate: 0.9 });
+      else speakAsCharacter("Pièce comptable archivée et analysée.", { pitch: 0.95, rate: 0.9 });
       await load();
     } catch (e) { setErr("Envoi impossible — backend injoignable."); }
     setUploading(false);
@@ -287,7 +287,7 @@ export default function ThemisPanel({ onClose }) {
     if (ok) {
       const num = emailDoc.number;
       setEmailDoc(null);
-      speakAsCharacter(`Le document ${num} a été transmis par e-mail, monsieur.`, { pitch: 0.95, rate: 0.9 });
+      speakAsCharacter(`Le document ${num} a été transmis par e-mail.`, { pitch: 0.95, rate: 0.9 });
     }
   };
   const totalOf = (lines, tva = 0) => {
@@ -693,7 +693,7 @@ export default function ThemisPanel({ onClose }) {
               <input className="th-input" placeholder="Adresse expéditeur (vide = identifiant)" value={byok.smtp_from || ""} onChange={(e) => setByok({ ...byok, smtp_from: e.target.value })} data-testid="themis-byok-smtp-from" />
               <input className="th-input" placeholder="Nom d’expéditeur" value={byok.smtp_name || ""} onChange={(e) => setByok({ ...byok, smtp_name: e.target.value })} data-testid="themis-byok-smtp-name" />
             </div>
-            <button className="th-btn gold" data-testid="themis-byok-save" onClick={() => { localStorage.setItem("themis_keys", JSON.stringify(byok)); speakAsCharacter("Vos clés sont scellées dans le sanctuaire local, monsieur.", { pitch: 0.95, rate: 0.88 }); }}>SCELLER LES CLÉS</button>
+            <button className="th-btn gold" data-testid="themis-byok-save" onClick={() => { localStorage.setItem("themis_keys", JSON.stringify(byok)); speakAsCharacter("Tes clés sont scellées dans le sanctuaire local.", { pitch: 0.95, rate: 0.88 }); }}>SCELLER LES CLÉS</button>
           </div>
         )}
       </div>

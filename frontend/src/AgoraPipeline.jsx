@@ -352,7 +352,7 @@ export default function AgoraPipeline({ onClose, onOpenThemis }) {
       const d = await r.json().catch(() => ({}));
       if (!r.ok || !d.doc) { setErr(typeof d.detail === "string" ? d.detail : "Génération Thémis impossible."); return; }
       cancelSpeech();
-      speakAsCharacter(`${kind === "devis" ? "Devis" : "Facture"} ${d.doc.number} transmis à Thémis, monsieur.`, { module: "HERMÈS AGORA#" });
+      speakAsCharacter(`${kind === "devis" ? "Devis" : "Facture"} ${d.doc.number} transmis à Thémis.`, { module: "HERMÈS AGORA#" });
       await load();
       if (onOpenThemis) onOpenThemis();
     } catch (e) { setErr("Génération Thémis impossible — backend injoignable."); }
@@ -368,7 +368,7 @@ export default function AgoraPipeline({ onClose, onOpenThemis }) {
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setErr(typeof d.detail === "string" ? d.detail : "Relance impossible."); setRelancing(""); return; }
       cancelSpeech();
-      speakAsCharacter(`Relance envoyée à ${d.sent_to}. Prochaine relance programmée dans sept jours, monsieur.`, { module: "HERMÈS AGORA#" });
+      speakAsCharacter(`Relance envoyée à ${d.sent_to}. Prochaine relance programmée dans sept jours.`, { module: "HERMÈS AGORA#" });
       await load();
     } catch (e) { setErr("Relance impossible — backend injoignable."); }
     setRelancing("");

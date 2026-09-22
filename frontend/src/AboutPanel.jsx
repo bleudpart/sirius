@@ -9,7 +9,7 @@ export default function AboutPanel({ onClose }) {
       <button className="about-close" onClick={onClose} data-testid="about-close-btn"><X size={14} /></button>
       <h2 className="about-title">À propos de <span className="sirius-brand-mark">Σ</span>IRIUS Assistant</h2>
       <p className="about-text">
-        <span className="sirius-brand-mark">Σ</span>IRIUS Assistant est un logiciel propriétaire développé par © 2026 Daniel Partel – Tous droits réservés.
+        <span className="sirius-brand-mark">Σ</span>IRIUS Assistant est un logiciel propriétaire développé par Daniel Partel. COPYRIGHT © 2026 – Tous droits réservés.
       </p>
       <p className="about-text">Version installée : {APP_RELEASE}</p>
     </div>

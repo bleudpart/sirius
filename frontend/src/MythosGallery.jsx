@@ -18,9 +18,9 @@ const COLOR_HEX = {
 };
 
 const CONSULT_SPEAK = {
-  "SOLON#": { start: "J'examine votre dossier, monsieur.", done: "Voici mon avis : faits, droit, analyse, options. Tout est à l'écran." },
-  "PROMÉTHÉE#": { start: "J'étudie votre projet, monsieur.", done: "Voici votre plan : objectif, jalons, risques, actions. Tout est à l'écran." },
-  "HERMÈS AGORA#": { start: "J'analyse votre marché, monsieur.", done: "Voici votre plan de vente : contexte, analyse, stratégie, actions. Tout est à l'écran." },
+  "SOLON#": { start: "J'examine ton dossier.", done: "Voici mon avis : faits, droit, analyse, options. Tout est à l'écran." },
+  "PROMÉTHÉE#": { start: "J'étudie ton projet.", done: "Voici ton plan : objectif, jalons, risques, actions. Tout est à l'écran." },
+  "HERMÈS AGORA#": { start: "J'analyse ton marché.", done: "Voici ton plan de vente : contexte, analyse, stratégie, actions. Tout est à l'écran." },
 };
 
 const DETAIL_TABS = [

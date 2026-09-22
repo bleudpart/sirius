@@ -26,15 +26,7 @@ export const progress = {
 const now = () => new Date().toLocaleTimeString("fr-FR", { hour12: false });
 const POS_KEY = "sirius_progress_pos";
 
-// Témoin de mode : une couleur par état de Sirius
-const MODES = {
-  idle: { label: "Veille", color: "#91e6f2" },
-  listening: { label: "Écoute", color: "#38bdf8" },
-  thinking: { label: "Réflexion", color: "#d8b875" },
-  speaking: { label: "Réponse", color: "#5eead4" },
-};
-
-export default function SiriusProgress({ mode = "idle" }) {
+export default function SiriusProgress() {
   const [tasks, setTasks] = useState([]);
   const panelRef = useRef(null);
   const logRef = useRef(null);
@@ -149,18 +141,12 @@ export default function SiriusProgress({ mode = "idle" }) {
   };
 
   const running = tasks.filter((t) => t.status === "running").length;
-  const m = MODES[mode] || MODES.idle;
-
   return (
     <>
       <div ref={panelRef} className={`sirius-progress ${tasks.length ? "" : "sp-compact"}`} data-testid="sirius-progress-panel">
       <div className="sp-bar" onPointerDown={onBarDown} title="Glisser pour déplacer" data-testid="sirius-progress-bar-header">
         <Activity size={13} className={running ? "sp-pulse" : ""} />
         <span className="sp-title">ΣIRIUS — ACTIVITÉ EN COURS</span>
-        <span className="sp-mode" data-testid="sirius-mode-indicator" style={{ "--mode-c": m.color }}>
-          <i className="sp-mode-bar" />
-          Mode : {m.label}
-        </span>
         {tasks.length > 0 && <span className="sp-count">{running ? `${running} TÂCHE${running > 1 ? "S" : ""}` : "TERMINÉ"}</span>}
         <button className="sp-close" onClick={openJournal} title="Journal des tâches" data-testid="sirius-progress-journal-btn"><History size={13} /></button>
         {tasks.length > 0 && <button className="sp-close" onClick={() => setTasks([])} data-testid="sirius-progress-close-btn"><X size={13} /></button>}

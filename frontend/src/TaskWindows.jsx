@@ -1,125 +1,134 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
-import { useRef, useState } from "react";
-import { X, Image as ImageIcon, Film, Cog, CheckCircle2, AlertTriangle, Loader2, FolderCheck, Mail } from "lucide-react";
-
-let zCounter = 90;
-
-const TYPE_ICON = { image: ImageIcon, video: Film, outlook: Mail };
-
-// Fenêtre de tâche contrôlée par ΣIRIUS : ouverture auto, étapes en direct, résultat intégré
-function TaskWindow({ task, onClose }) {
-  const ref = useRef(null);
-  const [z, setZ] = useState(() => ++zCounter);
-  const bringFront = () => setZ(++zCounter);
-  const Icon = TYPE_ICON[task.type] || Cog;
-
-  const onBarDown = (e) => {
-    if (e.target.closest("button")) return;
-    const el = ref.current;
-    const r = el.getBoundingClientRect();
-    const dx = e.clientX - r.left;
-    const dy = e.clientY - r.top;
-    el.classList.add("dragging");
-    bringFront();
-    const move = (ev) => {
-      el.style.left = Math.min(Math.max(0, ev.clientX - dx), window.innerWidth - 140) + "px";
-      el.style.top = Math.min(Math.max(0, ev.clientY - dy), window.innerHeight - 60) + "px";
-    };
-    const up = () => {
-      el.classList.remove("dragging");
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-    };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    e.preventDefault();
-  };
-
-  const onResizeDown = (e) => {
-    const el = ref.current;
-    const r = el.getBoundingClientRect();
-    const sx = e.clientX, sy = e.clientY;
-    const sw = r.width, sh = r.height;
-    el.classList.add("dragging");
-    bringFront();
-    const move = (ev) => {
-      el.style.width = Math.max(272, sw + ev.clientX - sx) + "px";
-      el.style.height = Math.max(192, sh + ev.clientY - sy) + "px";
-    };
-    const up = () => {
-      el.classList.remove("dragging");
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-    };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const badge = task.status === "done" ? "TERMINÉ" : task.status === "error" ? "ERREUR" : "EN COURS";
-
-  return (
-    <div
-      ref={ref}
-      className="web-window task-window"
-      style={{ left: task.x, top: task.y, zIndex: z }}
-      onPointerDown={bringFront}
-      data-testid={`task-window-${task.id}`}
-    >
-      <div className="ww-bar" onPointerDown={onBarDown} title="Glisser pour déplacer" data-testid={`task-window-bar-${task.id}`}>
-        <Icon size={13} />
-        <div className="ww-titles">
-          <span className="ww-title">{task.titre}</span>
-          <span className="ww-url">TÂCHE ΣIRIUS · {task.type.toUpperCase()}</span>
-        </div>
-        <span className={`tw-badge tw-${task.status}`} data-testid={`task-window-status-${task.id}`}>
-          {task.status === "running" && <Loader2 size={10} className="tw-spin" />}
-          {task.status === "done" && <CheckCircle2 size={10} />}
-          {task.status === "error" && <AlertTriangle size={10} />}
-          {badge}
-        </span>
-        <button onClick={() => onClose(task.id)} title="Fermer" data-testid={`task-window-close-${task.id}`}>
-          <X size={13} />
-        </button>
-      </div>
-
-      <div className={`tw-steps ${task.result ? "tw-steps-mini" : ""}`} data-testid={`task-window-steps-${task.id}`}>
-        {task.steps.map((s, i) => (
-          <div key={i} className={`tw-step tw-step-${s.state}`}>
-            <i />
-            <span>{s.label}</span>
-            {s.state === "active" && <em className="tw-cursor">▊</em>}
-          </div>
-        ))}
-      </div>
-
-      {task.result && (
-        <div className="tw-result" data-testid={`task-window-result-${task.id}`}>
-          {task.result.kind === "image" && (
-            <img src={task.result.src} alt={task.result.legende || task.titre} data-testid={`task-window-image-${task.id}`} />
-          )}
-          {task.result.kind === "video" && (
-            <video src={task.result.src} controls autoPlay loop data-testid={`task-window-video-${task.id}`} />
-          )}
-          {task.result.kind === "text" && (
-            <pre className="tw-text">{task.result.texte}</pre>
-          )}
-          {task.result.legende && <div className="tw-caption">{task.result.legende}</div>}
-        </div>
-      )}
-
-      {task.archive && (
-        <div className="tw-archive" data-testid={`task-window-archive-${task.id}`}>
-          <FolderCheck size={11} /> Archivé : {task.archive}
-        </div>
-      )}
-
-      <div className="ww-resize" onPointerDown={onResizeDown} title="Redimensionner" data-testid={`task-window-resize-${task.id}`} />
-    </div>
-  );
-}
+import { useEffect, useRef, useState } from "react";
+import { X, CheckCircle2, AlertTriangle, Loader2, FolderCheck, ListTodo } from "lucide-react";
 
 export default function TaskWindows({ tasks, onClose }) {
-  return tasks.map((t) => <TaskWindow key={t.id} task={t} onClose={onClose} />);
+  const visibleTasks = [...tasks].reverse().slice(0, 12);
+  const panelRef = useRef(null);
+  const hideTimerRef = useRef(null);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => () => {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (!tasks.length) {
+      setIsVisible(false);
+      return undefined;
+    }
+
+    const hasRunningTask = tasks.some((task) => task.status === "running");
+    if (hasRunningTask) {
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+      setIsVisible(true);
+      return undefined;
+    }
+
+    setIsVisible(true);
+    hideTimerRef.current = setTimeout(() => setIsVisible(false), 4500);
+    return () => {
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    };
+  }, [tasks]);
+
+  const startDrag = (event) => {
+    if (event.target.closest("button")) return;
+    const panel = panelRef.current;
+    if (!panel) return;
+    const rect = panel.getBoundingClientRect();
+    const offsetX = event.clientX - rect.left;
+    const offsetY = event.clientY - rect.top;
+    panel.classList.add("dragging");
+    const move = (pointerEvent) => {
+      panel.style.left = `${Math.min(Math.max(8, pointerEvent.clientX - offsetX), window.innerWidth - rect.width - 8)}px`;
+      panel.style.top = `${Math.min(Math.max(58, pointerEvent.clientY - offsetY), window.innerHeight - rect.height - 8)}px`;
+      panel.style.transform = "none";
+    };
+    const stop = () => {
+      panel.classList.remove("dragging");
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+    event.preventDefault();
+  };
+
+  const startResize = (event) => {
+    const panel = panelRef.current;
+    if (!panel) return;
+    const rect = panel.getBoundingClientRect();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startWidth = rect.width;
+    const startHeight = rect.height;
+    panel.style.left = `${rect.left}px`;
+    panel.style.top = `${rect.top}px`;
+    panel.style.transform = "none";
+    panel.classList.add("dragging");
+    const move = (pointerEvent) => {
+      const maxWidth = window.innerWidth - rect.left - 8;
+      const maxHeight = window.innerHeight - rect.top - 8;
+      panel.style.width = `${Math.min(maxWidth, Math.max(320, startWidth + pointerEvent.clientX - startX))}px`;
+      panel.style.height = `${Math.min(maxHeight, Math.max(180, startHeight + pointerEvent.clientY - startY))}px`;
+    };
+    const stop = () => {
+      panel.classList.remove("dragging");
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const closeActivity = () => {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    setIsVisible(false);
+    tasks.forEach((task) => onClose(task.id));
+  };
+
+  if (!isVisible || !tasks.length) return null;
+
+  return (
+    <section ref={panelRef} className="web-window task-window task-console" data-testid="task-console">
+      <header className="ww-bar" onPointerDown={startDrag} title="Glisser pour déplacer la console">
+        <ListTodo size={13} />
+        <div className="ww-titles">
+          <span className="ww-title">ACTIVITÉ ΣIRIUS</span>
+          <span className="ww-url">{tasks.filter((task) => task.status === "running").length} TÂCHE(S) EN COURS · {tasks.length} SUIVIE(S)</span>
+        </div>
+        <button onClick={closeActivity} title="Masquer l'activité" data-testid="task-console-close" disabled={!tasks.length}>
+          <X size={13} />
+        </button>
+      </header>
+      <div className="task-console-list">
+        {!visibleTasks.length && <p className="task-console-empty">Aucune tâche en cours. Les analyses, recherches et résultats de Sirius apparaîtront ici.</p>}
+        {visibleTasks.map((task) => {
+          const badge = task.status === "done" ? "TERMINÉ" : task.status === "error" ? "ERREUR" : "EN COURS";
+          return (
+            <article className={`task-console-row task-${task.status}`} key={task.id} data-testid={`task-window-${task.id}`}>
+              <div className="task-console-head">
+                <strong>{task.titre}</strong>
+                <span className={`tw-badge tw-${task.status}`} data-testid={`task-window-status-${task.id}`}>
+                  {task.status === "running" && <Loader2 size={10} className="tw-spin" />}
+                  {task.status === "done" && <CheckCircle2 size={10} />}
+                  {task.status === "error" && <AlertTriangle size={10} />}
+                  {badge}
+                </span>
+                <button onClick={() => onClose(task.id)} title="Retirer du suivi" data-testid={`task-window-close-${task.id}`}><X size={12} /></button>
+              </div>
+              {task.steps.slice(-3).map((step, index) => <div className={`tw-step tw-step-${step.state}`} key={index}><i /><span>{step.label}</span></div>)}
+              {task.result?.texte && <p className="task-console-result">{task.result.texte}</p>}
+              {task.result?.legende && <p className="task-console-caption">{task.result.legende}</p>}
+              {task.archive && <p className="task-console-caption"><FolderCheck size={11} /> Archivé : {task.archive}</p>}
+            </article>
+          );
+        })}
+      </div>
+      <div className="ww-resize task-console-resize" onPointerDown={startResize} title="Redimensionner" data-testid="task-console-resize" />
+    </section>
+  );
 }

@@ -2,7 +2,7 @@
 
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Mic, MicOff, Clock, Cpu, Wifi, MapPin, Calendar, X, Leaf, UserCog, Brain, Music, Repeat, RotateCcw, BarChart3, Workflow, Ruler, FolderOpen, Code2, Database, Sparkles, Eye, Landmark, Library, Orbit, Monitor, ShieldCheck, AudioLines, Radar, ShieldAlert, Camera, Fingerprint, Zap, Package, Clapperboard, Grip, Radio, Wrench, FileCode, History, Maximize, Minimize, KeyRound, Home as HomeIcon, BadgeInfo, Globe2, Hammer, TrendingUp, Newspaper, Scale, Flame, BookOpen, Sigma, AlarmClock, Power, Boxes } from "lucide-react";
+import { Mic, MicOff, Clock, Cpu, Wifi, MapPin, Calendar, X, Leaf, UserCog, Brain, Music, Repeat, RotateCcw, BarChart3, Workflow, Ruler, FolderOpen, Code2, Database, Sparkles, Eye, Landmark, Library, Orbit, Monitor, ShieldCheck, Radar, ShieldAlert, Camera, Fingerprint, Zap, Package, Clapperboard, Grip, Radio, Wrench, FileCode, History, Maximize, Minimize, KeyRound, Home as HomeIcon, BadgeInfo, Globe2, Hammer, TrendingUp, Newspaper, Scale, Flame, BookOpen, Sigma, AlarmClock, Power, Boxes } from "lucide-react";
 import {
   ArchitectPanel, SpectatorView, FilesPanel, DevCompanion, ZeusCortex, SiriusPrime, OracleDivin,
   PantheonSystem, NexusCeleste, SiriusDisplay, EuropeanaViewer, HaccpModule, KeysStatus, KeraunosPanel,
@@ -18,18 +18,15 @@ import { STATES, isLocalTimeQuestion, localAnswer, weatherInfo, pttBeep } from "
 import { MedallionRing, ReactorCore, Waveform } from "@/components/ReactorVisuals";
 import { MemoryPanel, HoloPopups, AnalyticsPanel, MusicChoice, CentralCard, BootScreen } from "@/components/HudPanels";
 import OverlayApp from "@/OverlayApp";
-import HoloScene from "@/HoloScene";
-import SanctuaryAmbience from "@/SanctuaryAmbience";
 import WebWindows from "@/WebWindows";
 import TaskWindows from "@/TaskWindows";
-import SiriusProgress, { progress } from "@/SiriusProgress";
+import { progress } from "@/SiriusProgress";
 import useTouchNav from "@/useTouchNav";
 import PwaPrompt from "@/PwaPrompt";
 import GlobalDrop from "@/GlobalDrop";
 import ProactivePanel from "@/ProactivePanel";
 import ArgusPanel, { ArgusWatcher } from "@/ArgusPanel";
 import { ModeBanner, FrugalWatcher, VisionModule } from "@/SystemModes";
-import GoldSparkles from "@/GoldSparkles";
 import CommandPalette from "@/CommandPalette";
 import ModulesMenu from "@/ModulesMenu";
 import { useAuth } from "@/AuthGate";
@@ -41,8 +38,8 @@ import { initHoloFx } from "@/holoFx";
 import { getDisplayAutoCloseDelay } from "@/displayTiming";
 import { initReadAloud } from "@/readAloud";
 import { detectMailProvider, extractContactQuery, extractEmailRecipientQuery, isContactCommand, isSendEmailCommand, isVoiceNo, isVoiceYes, voiceNumberChoice } from "@/emailComposeVoice";
-import { chooseBestVoiceTranscript, normalizeVoiceTranscript } from "@/voiceCorrections";
-import { initHoloWindows, minimizeAll } from "@/holoWindows";
+import { chooseBestVoiceTranscript, extractVoiceCommand, normalizeVoiceTranscript } from "@/voiceCorrections";
+import { initHoloWindows, minimizeAll, resetHoloWindowLayout } from "@/holoWindows";
 import { ConfirmButton } from "@/ConfirmButton";
 import { getHUDStyleVariables, renderHUD } from "@/theme";
 import { SiriusLeftColumn, SiriusRightColumn, SiriusNextAction } from "@/hud/SiriusHudPanels";
@@ -51,6 +48,24 @@ import { AmbientEngine } from "@/ambientAudio";
 import { APP_RELEASE } from "@/version";
 
 /* executeIntent moved into the real App component (see later in the file) */
+
+// Chaque recharge ouvre un espace de travail rangé. Seules les géométries
+// transitoires des fenêtres sont oubliées: mémoire, profil, clés et projets restent intacts.
+if (typeof window !== "undefined") {
+  resetHoloWindowLayout();
+  try {
+    [
+      "sirius_panel_pos",
+      "sirius_media_window_geometry_v1",
+      "sirius_display_geo_v2",
+      "sirius_progress_pos",
+    ].forEach((key) => localStorage.removeItem(key));
+    for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+      const key = localStorage.key(index);
+      if (key?.startsWith("sirius_hud_float_")) localStorage.removeItem(key);
+    }
+  } catch (_) {}
+}
 
 // HUD ΣIRIUS — interface holographique
 // Ne pas tenter de créer un WebSocket local si aucun backend n'est réellement attendu.
@@ -265,38 +280,38 @@ function App() {
       confirm(d.say || (n === 0 ? "Rien à ranger, aucune fenêtre ouverte." : n === 1 ? "C'est rangé, une fenêtre réduite en pastille." : `C'est rangé, ${n} fenêtres réduites en pastilles.`));
       return true;
     }
-    if (act === "stop_reading") { cancelSpeech(); setStatus("idle"); setText("Silence, monsieur."); return true; }
-    if (act === "vision_look") { setVisionAuto(true); setShowVision(true); confirm(d.say || "Un instant, j'observe ce que vous me montrez."); return true; }
+    if (act === "stop_reading") { cancelSpeech(); setStatus("idle"); setText("D'accord, je me tais."); return true; }
+    if (act === "vision_look") { setVisionAuto(true); setShowVision(true); confirm(d.say || "Un instant, j'observe ce que tu me montres."); return true; }
     if (act === "web_agent" && target) { launchWebAgent(d.target.trim()); return true; }
     if (act === "daily_briefing") {
-      confirm(d.say || "Je vous prépare votre résumé du jour, monsieur.");
+      confirm(d.say || "Je prépare ton résumé du jour.");
       if (runBriefingRef.current) runBriefingRef.current(true);
       return true;
     }
-    if (act === "stop_music") { if (ambientRef.current) ambientRef.current.pause(); confirm(d.say || "Musique d'ambiance coupée, monsieur."); return true; }
+    if (act === "stop_music") { if (ambientRef.current) ambientRef.current.pause(); confirm(d.say || "Musique d'ambiance coupée."); return true; }
     if (act === "play_music") { if (ambientRef.current) ambientRef.current.play().catch(() => {}); confirm(d.say || "Musique d'ambiance relancée."); return true; }
     if (act === "spotify") {
       setShowSpotifyWin(true);
-      confirm(d.say || "J'ouvre le lecteur Spotify, monsieur.");
+      confirm(d.say || "J'ouvre le lecteur Spotify.");
       return true;
     }
     if (act === "media_control") {
       setMediaIntent(d.media || {});
       setShowMediaHud(true);
-      confirm(d.say || "J'ouvre le controle multimedia, monsieur.");
+      confirm(d.say || "J'ouvre le controle multimedia.");
       return true;
     }
     if (act === "productivity_control") {
       setProductivityIntent(d.productivity || {});
       setShowProductivity(true);
-      confirm(d.say || "J'ouvre le module Productivite et Travail, monsieur.");
+      confirm(d.say || "J'ouvre le module Productivite et Travail.");
       return true;
     }
     if (act === "open_module" && target) {
       const it = moduleItemsRef.current.find((m) => m.id === target);
       if (it) { it.run(); confirm(d.say || `J'ouvre ${it.label.split("—")[0].trim()}.`); return true; }
       const extra = { setup: () => setShowSetup(true), gallery: () => setShowGallery(true), outlook: () => launchOutlookMail(), outlook_agenda: () => launchOutlookAgenda(), outlook_read: () => readMailAloud() }[target];
-      if (extra) { extra(); confirm(d.say || "C'est ouvert, monsieur."); return true; }
+      if (extra) { extra(); confirm(d.say || "C'est ouvert."); return true; }
       return openModuleByName(target);
     }
     if (act === "close_module" && target) {
@@ -319,7 +334,7 @@ function App() {
         productivity: () => setShowProductivity(false),
       };
       const fn = CLOSERS[target];
-      if (fn) { fn(); confirm(d.say || "Fenêtre fermée, monsieur."); return true; }
+      if (fn) { fn(); confirm(d.say || "Fenêtre fermée."); return true; }
       return false;
     }
     if (act === "minimize_module" && target) {
@@ -442,10 +457,15 @@ function App() {
   const speakingRef = useRef(false);
   const isBusy = useRef(false); // ⚡ Verrou anti-surchauffe / anti-doublon (partagé entre resolveIntent et handleCommand)
   const [micOn, setMicOn] = useState(false);
-  const [showVoicePanel, setShowVoicePanel] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [ecoMode, setEcoMode] = useState(() => localStorage.getItem("sirius_eco") === "1");
   useEffect(() => { localStorage.setItem("sirius_eco", ecoMode ? "1" : "0"); }, [ecoMode]);
+  const [windowHidden, setWindowHidden] = useState(() => document.hidden);
+  useEffect(() => {
+    const syncVisibility = () => setWindowHidden(document.hidden);
+    document.addEventListener("visibilitychange", syncVisibility);
+    return () => document.removeEventListener("visibilitychange", syncVisibility);
+  }, []);
   const [autoMic, setAutoMic] = useState(() => localStorage.getItem("sirius_auto_mic") === "1");
   const autoMicRef = useRef(autoMic);
   autoMicRef.current = autoMic;
@@ -591,17 +611,30 @@ function App() {
 
   const [tasks, setTasks] = useState([]);
   const taskCountRef = useRef(0);
+  const workLogReadyRef = useRef(new Map());
+  const syncWorkIntervention = useCallback((path, options = {}) => {
+    return fetch(`${API}/work-log${path}`, {
+      ...options,
+      credentials: "include",
+      headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    }).catch(() => {});
+  }, []);
   const openTask = useCallback((titre, type) => {
     const n = taskCountRef.current++;
     const id = `task-${Date.now()}-${n}`;
     progressMap[id] = progress.start(titre);
+    const started = syncWorkIntervention("", {
+      method: "POST",
+      body: JSON.stringify({ id, title: titre, task_type: type || "", project: type || "" }),
+    });
+    workLogReadyRef.current.set(id, started);
     setTasks((ts) => [...ts, {
       id, titre, type, status: "running", steps: [], result: null,
       x: Math.max(60, window.innerWidth - 640 - (n % 5) * 40),
       y: 84 + (n % 5) * 34,
     }]);
     return id;
-  }, []);
+  }, [syncWorkIntervention]);
   const patchTask = useCallback((id, fn) => {
     setTasks((ts) => ts.map((t) => (t.id === id ? fn(t) : t)));
   }, []);
@@ -616,20 +649,34 @@ function App() {
     progress.done(progressMap[id], "Tâche terminée avec succès");
     delete progressMap[id];
     moodEvent("task_done");
+    (workLogReadyRef.current.get(id) || Promise.resolve()).finally(() => {
+      syncWorkIntervention(`/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "done", result: result?.legende || result?.texte || "Tâche terminée avec succès" }),
+      });
+      workLogReadyRef.current.delete(id);
+    });
     patchTask(id, (t) => ({
       ...t, status: "done", result,
       steps: t.steps.map((s) => (s.state === "active" ? { ...s, state: "done" } : s)),
     }));
-  }, [patchTask, moodEvent]);
+  }, [patchTask, moodEvent, syncWorkIntervention]);
   const failTask = useCallback((id, label) => {
     progress.error(progressMap[id], label);
     delete progressMap[id];
     moodEvent("task_fail");
+    (workLogReadyRef.current.get(id) || Promise.resolve()).finally(() => {
+      syncWorkIntervention(`/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "error", result: label || "Intervention interrompue" }),
+      });
+      workLogReadyRef.current.delete(id);
+    });
     patchTask(id, (t) => ({
       ...t, status: "error",
       steps: [...t.steps.map((s) => (s.state === "active" ? { ...s, state: "done" } : s)), { label, state: "error" }],
     }));
-  }, [patchTask, moodEvent]);
+  }, [patchTask, moodEvent, syncWorkIntervention]);
   const closeTask = useCallback((id) => {
     setTasks((ts) => ts.filter((t) => t.id !== id));
   }, []);
@@ -1212,6 +1259,11 @@ function App() {
       mood: computeMood(),
       frugal: sysMode === "frugal",
       activity: cmdTimesRef.current?.length >= 3 ? "intense" : "exploration",
+      environment: {
+        active_tasks: tasks.filter((task) => task.status === "running").map((task) => task.titre),
+        display_open: displayOpen,
+        activity: cmdTimesRef.current?.length >= 3 ? "intense" : "exploration",
+      },
     });
 
     // -------------------------------------------------------------
@@ -1359,7 +1411,7 @@ function App() {
     speakOut(fallback);
     showOnDisplay({ type: "message", titre: "ΣIRIUS — RÉPONSE LOCALE", contenu: fallback });
 
-  }, [speakOut, keys, profile, computeMood, showOnDisplay, streamOnDisplay, sysMode]);
+  }, [speakOut, keys, profile, computeMood, showOnDisplay, streamOnDisplay, sysMode, tasks, displayOpen]);
 
   // ---- Interruption naturelle : le micro écoute PENDANT que Sirius parle ----
   const stopInterruptListener = useCallback(() => {
@@ -1511,7 +1563,7 @@ function App() {
       }
       setStatus("speaking");
       const m = r.status === 429
-        ? "Le quota d'actualités du jour est atteint, monsieur."
+        ? "Le quota d'actualités du jour est atteint."
         : topic ? `Aucune actualité trouvée sur ${topic}.` : "Les actualités sont indisponibles pour le moment.";
       setText(m); speakOut(m);
     } catch (e) {
@@ -1551,7 +1603,7 @@ function App() {
       const m = typeof d.detail === "string" ? d.detail : "Consultation commerciale impossible pour le moment.";
       setStatus("speaking"); setText(m); speakOut(m);
     } catch (e) {
-      const m = "Hermès Agora est injoignable, monsieur.";
+      const m = "Hermès Agora est injoignable.";
       setStatus("speaking"); setText(m); speakOut(m);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1865,11 +1917,11 @@ function App() {
         return;
       }
       failTask(id, d.detail || "L'agent web a échoué");
-      const msg = d.detail || "L'agent web a échoué, monsieur.";
+      const msg = d.detail || "L'agent web a échoué.";
       setStatus("speaking"); setText(msg); speakOut(msg);
     } catch (e) {
       failTask(id, "Agent web injoignable");
-      const msg = "L'agent web est injoignable, monsieur.";
+      const msg = "L'agent web est injoignable.";
       setStatus("speaking"); setText(msg); speakOut(msg);
     }
   }, [openTask, pushStep, finishTask, failTask, speakOut]);
@@ -2879,7 +2931,7 @@ function App() {
       const verb = pending.action === "archive" ? "archivé" : pending.action === "delete" ? "supprimé" : "envoyée";
       const m = ok
         ? `C'est fait : ${pending.action === "reply" ? "la réponse a été " + verb : "le message a été " + verb}.`
-        : "Microsoft Graph a refusé l'action, monsieur.";
+        : "Microsoft Graph a refusé l'action.";
       setText(m); speakOut(m);
     } catch (e) {
       setStatus("speaking");
@@ -3024,7 +3076,8 @@ function App() {
     const [next, ...rest] = queue;
     setPendingActionPlan({ ...next, queue: rest });
     setStatus("speaking");
-    const m = `Pour le message de ${next.de || "expéditeur inconnu"}, sujet « ${next.sujet || "sans objet"} », je propose : ${next.brouillon_reponse}. Dis « vas-y, envoie » ou « non ».`;
+    const category = (next.categorie || "Important").toLowerCase();
+    const m = `J'ai classé le mail de ${next.de || "cet expéditeur"}, sujet « ${next.sujet || "sans objet"} », ${category}. Voici un exemple de réponse : ${next.brouillon_reponse}. Si cela te convient, dis « vas-y, envoie » ; sinon, je l'ajuste.`;
     setText(m); speakOut(m);
   }, [speakOut]);
 
@@ -3047,7 +3100,7 @@ function App() {
         body: JSON.stringify({ text: pending.brouillon_reponse, confirm: true }),
       });
       setStatus("speaking");
-      const m = r.ok ? "C'est fait, la réponse a été envoyée." : "Microsoft Graph a refusé l'envoi, monsieur.";
+      const m = r.ok ? "C'est fait, la réponse a été envoyée." : "Microsoft Graph a refusé l'envoi.";
       setText(m); speakOut(m);
     } catch (e) {
       setStatus("speaking");
@@ -3659,7 +3712,7 @@ function App() {
     if (/(coupe|arr[êe]te|stoppe?|[ée]teins|enl[èe]ve).{0,12}(musique|ambiance|fond sonore)/.test(low)) {
       mark("ambiance off");
       if (ambientRef.current) ambientRef.current.pause();
-      const m = "Musique d'ambiance coupée, monsieur.";
+      const m = "Musique d'ambiance coupée.";
       setStatus("speaking"); setText(m); speakOut(m);
       return;
     }
@@ -3683,7 +3736,7 @@ function App() {
       na.play().catch(() => {});
       ambientRef.current = na;
       window.__siriusAmbient = na;
-      const m = choice === "gregorien" ? "Chant grégorien en ambiance, monsieur." : "Musique épique en ambiance, monsieur.";
+      const m = choice === "gregorien" ? "Chant grégorien en ambiance." : "Musique épique en ambiance.";
       setStatus("speaking"); setText(m); speakOut(m);
       return;
     }
@@ -3837,6 +3890,7 @@ function App() {
     // 01) Proactivité & Maintien de l'activité utilisateur
     lastActivityRef.current = Date.now();
     idleNotifiedRef.current = false;
+    window.dispatchEvent(new CustomEvent("sirius:activity"));
 
     if (pendingEmailCompose && handlePendingEmailCompose(command)) {
       mark("email · composition guidée");
@@ -3898,7 +3952,7 @@ function App() {
       if (/\b(non|annule|laisse|pas maintenant|surtout pas)\b/.test(low)) {
         mark("outlook · annulation");
         setStatus("speaking");
-        const m = "Action Outlook annulée, monsieur.";
+        const m = "Action Outlook annulée.";
         setText(m); speakOut(m);
         return;
       }
@@ -3932,7 +3986,7 @@ function App() {
     if (/active (la |ta )?(vision|cam[ée]ra)|que vois[- ]tu|qu'?est[- ]ce que tu vois|regarde[- ]?(moi )?(ça|ceci|cela)\b|regarde[- ]moi\b|ouvre (la |ta )?cam[ée]ra/.test(low)) {
       mark("système · vision");
       if (sysMode === "safe") {
-        const m = "Vision indisponible en mode de secours, monsieur.";
+        const m = "Vision indisponible en mode de secours.";
         setStatus("speaking"); setText(m); speakOut(m);
         return;
       }
@@ -3993,7 +4047,7 @@ function App() {
       mark("ambiance off");
       if (ambientRef.current) ambientRef.current.pause();
       setStatus("speaking");
-      const m = "Musique d'ambiance coupée, monsieur.";
+      const m = "Musique d'ambiance coupée.";
       setText(m); speakOut(m);
       return;
     }
@@ -4020,7 +4074,7 @@ function App() {
       ambientRef.current = na;
       window.__siriusAmbient = na;
       setStatus("speaking");
-      const m = choice === "gregorien" ? "Chant grégorien en ambiance, monsieur." : "Musique épique en ambiance, monsieur.";
+      const m = choice === "gregorien" ? "Chant grégorien en ambiance." : "Musique épique en ambiance.";
       setText(m); setStatus("speaking"); speakOut(m);
       return;
     }
@@ -4068,7 +4122,7 @@ function App() {
         if (d.ok === false && /pas encore connect/.test(m)) setShowKeraunos(true);
       }).catch(() => {
         progress.error(pid, "Module domotique injoignable");
-        const m = "Le module domotique ne répond pas, monsieur.";
+        const m = "Le module domotique ne répond pas.";
         setStatus("speaking"); setText(m); speakOut(m);
       });
       return;
@@ -4117,7 +4171,7 @@ function App() {
     if (/(module actualit[ée]s?|ouvre (?:les? |le )?(?:flux d'?)?actualit[ée]s?|flux d'?actualit[ée]s?|panneau (?:des? )?actualit[ée]s?)/.test(low)) {
       mark("actualités · panneau");
       setShowNews(true);
-      const m = "Voici le flux d'actualités en direct, monsieur.";
+      const m = "Voici le flux d'actualités en direct.";
       setStatus("speaking"); setText(m); speakOut(m);
       return;
     }
@@ -4125,7 +4179,7 @@ function App() {
     if (/(pipeline (?:de |commercial)?vente|pipeline commercial|mes deals|suivi des deals|mes prospects)/.test(low)) {
       mark("agora · pipeline");
       setShowAgora(true);
-      const m = "Pipeline de vente ouvert. Hermès Agora surveille vos relances, monsieur.";
+      const m = "Pipeline de vente ouvert. Hermès Agora surveille tes relances.";
       setStatus("speaking"); setText(m);
       cancelSpeech(); speakAsCharacter(m, { module: "HERMÈS AGORA#" });
       return;
@@ -4342,7 +4396,7 @@ function App() {
             body: JSON.stringify({ question: command, context: dispCtx, keys, history: dispChat.slice(-8) }),
           });
           const d = await r.json().catch(() => ({}));
-          const msg = r.ok && d.answer ? d.answer : (d.detail || "Je n'arrive pas à interroger le fichier affiché, monsieur.");
+          const msg = r.ok && d.answer ? d.answer : (d.detail || "Je n'arrive pas à interroger le fichier affiché.");
           if (r.ok && d.answer) {
             window.__siriusDisplayChat = [...dispChat, { role: "user", content: command }, { role: "assistant", content: msg }].slice(-12);
           }
@@ -4361,10 +4415,10 @@ function App() {
         try {
           const r = await fetch(`${API}/themis/bilan`);
           const d = await r.json();
-          const msg = r.ok && d.speech ? d.speech : "Le bilan financier est indisponible pour le moment, monsieur.";
+          const msg = r.ok && d.speech ? d.speech : "Le bilan financier est indisponible pour le moment.";
           setStatus("speaking"); setText(msg); speakOut(msg);
         } catch {
-          const msg = "Le module comptable de Thémis est injoignable, monsieur.";
+          const msg = "Le module comptable de Thémis est injoignable.";
           setStatus("speaking"); setText(msg); speakOut(msg);
         }
       })();
@@ -4406,7 +4460,7 @@ function App() {
       || /(?:affiche|montre|ouvre|liste|pr[ée]sente)[a-z]*(?:[- ]moi)?\s+(?:les |mes |tes |tous les |la liste des )?modules(?:\s+(?:holographiques|du panth[ée]on|de sirius))?\s*[?!.]*\s*$/.test(low)) {
       mark("mythos · galerie");
       setShowMythosGallery(true);
-      speakOut("Voici le Panthéon de mes modules, monsieur.");
+      speakOut("Voici le Panthéon de mes modules.");
       return;
     }
     // 0quindecies) HERACLES# : investigation OSINT « enquête sur X », « vérifie l'email X », « analyse le numéro X », « qui est X »
@@ -4692,6 +4746,8 @@ function App() {
     if (e) e.preventDefault();
     const text = cmd.trim();
     if (!text) return;
+    cancelSpeech();
+    speakingRef.current = false;
     processCommand(text);
     setCmd("");
   }, [cmd, processCommand]);
@@ -4722,14 +4778,14 @@ function App() {
       setStatus("idle");
       return;
     }
-    // Le micro est déjà activé manuellement → on répond à TOUT ce qui est dit.
-    // On retire juste le mot d'activation s'il est reconnu (souvent mal transcrit).
-    const wake = /\b(sirius|syrius|cirius|sirus|cyrus|serious|s[ée]rieux|cilius|syriusse|sirio)\b/gi;
-    const command = t.replace(wake, " ").replace(/\s+/g, " ").trim().replace(/^[,.\s]+/, "");
+    // En mains libres, seul « Sirius » suivi d'une vraie commande déclenche une action.
+    // Le push-to-talk reste direct, car l'appui sur ESPACE est déjà un geste intentionnel.
+    const command = extractVoiceCommand(normalizedTranscript, {
+      requireWakeWord: autoMicRef.current && !pttRef.current,
+    });
     if (!command) {
       setStatus("listening");
-      setText("Oui, je t'écoute...");
-      speakOut("Oui, je t'écoute.");
+      setText("Écoute active.");
       return;
     }
     processCommand(command);
@@ -5065,15 +5121,6 @@ function App() {
   // Référence pour relancer l'écoute depuis onSpeechEnd (mode conversation)
   startListenRef.current = startListening;
 
-  const finishVoiceCapture = useCallback(() => {
-    try {
-      if (serverRecorderRef.current?.state === "recording") serverRecorderRef.current.stop();
-      else if (recognitionRef.current) recognitionRef.current.stop();
-    } catch (error) {
-      console.error("Impossible de terminer la capture vocale :", error);
-    }
-  }, []);
-
   // ---- Talkie-walkie (push-to-talk) : maintenir = micro actif, relâcher = envoi ----
   const pttDown = useCallback(() => {
     if (pttRef.current) return;
@@ -5378,8 +5425,8 @@ function App() {
 
         const detail = late.slice(0, 4).map((x) => `${x.nom}${x.entreprise ? ` de ${x.entreprise}` : ""}`).join(", ");
         const msg = late.length === 1
-          ? `Hermès Agora, monsieur. Une relance de prospect est en retard : ${detail}. Le pipeline attend votre closing.`
-          : `Hermès Agora, monsieur. ${late.length} relances de prospects sont en retard : ${detail}. Le pipeline attend votre closing.`;
+          ? `Hermès Agora. Une relance de prospect est en retard : ${detail}. Le pipeline attend ton closing.`
+          : `Hermès Agora. ${late.length} relances de prospects sont en retard : ${detail}. Le pipeline attend ton closing.`;
 
         addPopup({ kind: "info", titre: "HERMÈS AGORA# — RELANCES EN RETARD", contenu: late.map((x) => `• ${x.nom}${x.entreprise ? ` (${x.entreprise})` : ""} — ${x.etape} — relance prévue le ${new Date(x.relance + "T00:00:00").toLocaleDateString("fr-FR")}`).join("\n") });
         setText(msg);
@@ -5672,17 +5719,6 @@ function App() {
     { id: "nummarius", group: "PANTHÉON", label: "PORTUS NUMMARIUS# — bourse & marchés", Icon: Landmark, run: () => setShowNummarius(true) },
     { id: "europeana", group: "MÉDIAS", label: "Archives Europeana", Icon: Library, run: () => setShowEuropeana(true) },
     { id: "haccp", group: "OUTILS", label: "HACCP — sécurité alimentaire", Icon: ShieldCheck, run: () => setHaccp({ sujet: "", auto: false }) },
-    {
-      id: "voice",
-      group: "SYSTÈME",
-      label: micOn ? "Reconnaissance vocale — écoute" : "Reconnaissance vocale",
-      Icon: AudioLines,
-      active: showVoicePanel,
-      run: () => {
-        setShowVoicePanel(true);
-        if (!micOnRef.current) startListening();
-      },
-    },
     { id: "prime", group: "OUTILS", label: "ΣIRIUS PRIME — mémoire", Icon: Sparkles, run: () => setShowPrime(true) },
     { id: "dev", group: "OUTILS", label: "Compagnon Dev", Icon: Code2, run: () => setShowDev(true) },
     { id: "analytics", group: "OUTILS", label: "Tableau analytique", Icon: BarChart3, run: () => setShowAnalytics(true) },
@@ -5724,7 +5760,7 @@ function App() {
 
   return (
     <div
-      className={`sirius-root ${ecoMode ? "eco" : ""} mode-${sysMode}`}
+      className={`sirius-root workspace-mode ${ecoMode ? "eco" : ""} ${windowHidden ? "backgrounded" : ""} mode-${sysMode}`}
       style={{ ...getHUDStyleVariables(), "--accent": accentColor, "--glow": glowColor, "--hud-scale": hudScale }}
       data-core-active={hudTheme.core.active}
       data-guardian-active={hudTheme.guardian.visible}
@@ -5992,25 +6028,11 @@ function App() {
         <div className="sys-indicators" data-testid="sirius-indicators">
           <span className="ind"><i className="ind-dot orange" />IA</span>
           <span className="ind"><i className="ind-dot cyan" />CLOUD</span>
-          <span className="ind"><i className={`ind-dot ${keys.groq || envGroq ? "green" : "grey"}`} />KIMI K3</span>
-          {(() => {
-            const ks = keySource || ((keys.groq || "").trim() ? "personnelle" : envGroq ? "serveur" : null);
-            if (!ks) return null;
-            const cfg = {
-              personnelle: { dot: "gold", label: "CLÉ PERSO" },
-              serveur: { dot: "cyan", label: "CLÉ SERVEUR" },
-              "repli-serveur": { dot: "orange", label: "CLÉ SERVEUR · REPLI" },
-            }[ks] || { dot: "grey", label: "CLÉ ?" };
-            return (
-              <span className="ind key-src-ind" data-testid="key-source-badge" title="Clé qui alimente le cerveau de Sirius en direct (mise à jour à chaque réponse)">
-                <i className={`ind-dot ${cfg.dot}`} />{cfg.label}
-              </span>
-            );
-          })()}
+          <span className="ind"><i className={`ind-dot ${keys.groq || envGroq ? "green" : "grey"}`} />CERVEAU</span>
         </div>
         <div className="conn-status" data-testid="sirius-connection">
           <span className={`conn-led ${connected ? "on" : "off"}`} />
-          {"IA CLOUD · KIMI K3"}
+          {"IA CLOUD"}
           {mode === "brainstorm" && <span className="mode-badge" data-testid="brainstorm-badge">BRAINSTORM</span>}
           {window.Capacitor?.getPlatform?.() === "android" && (
             <button
@@ -6096,14 +6118,14 @@ function App() {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ fields: a.prepare ? {} : { status: "active", confidence: 0.95 } }),
             }).catch(() => {});
-            speakRef.current("Information confirmée et retenue, monsieur.");
+            speakRef.current("Information confirmée et retenue.");
           }
         }}
         onSpeak={(m) => speakRef.current(m)}
       />
 
-      {/* ΣIRIUS WebBrowser : fenêtres web indépendantes, déplaçables, redimensionnables */}
-      <WebWindows windows={webWindows} onClose={closeWebWindow} />
+        {/* Les fenêtres web restent pilotables par le backend, mais ne sont plus empilées
+          dans la vue compacte principale. */}
 
       {/* ΣIRIUS DISPLAY : écran principal permanent piloté par Sirius */}
       {displayOpen && (
@@ -6117,65 +6139,8 @@ function App() {
         />
       )}
 
-      {showVoicePanel && (
-        <section className="voice-capture-panel" role="dialog" aria-label="Reconnaissance vocale ΣIRIUS" data-testid="sirius-voice-panel" data-hud-panel>
-          <header className="voice-capture-header">
-            <div>
-              <span className="voice-capture-kicker">ΣIRIUS · AUDIO LINK</span>
-              <strong>RECONNAISSANCE VOCALE</strong>
-            </div>
-            <button
-              type="button"
-              className="voice-capture-close"
-              onClick={() => {
-                stopListening();
-                setShowVoicePanel(false);
-              }}
-              aria-label="Fermer la reconnaissance vocale"
-            >
-              <X size={17} />
-            </button>
-          </header>
-
-          <div className={`voice-capture-core ${micOn ? "listening" : status === "thinking" ? "processing" : ""}`}>
-            <div className="voice-capture-rings" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-            </div>
-            <Mic size={30} />
-          </div>
-
-          <div className="voice-capture-state">
-            <span className={`voice-capture-dot ${micOn ? "on" : ""}`} />
-            {micOn ? "ÉCOUTE EN COURS" : status === "thinking" ? "TRANSCRIPTION EN COURS" : "PRÊT À ÉCOUTER"}
-          </div>
-
-          <div className="voice-capture-wave" aria-hidden="true">
-            {Array.from({ length: 18 }, (_, index) => <span key={index} />)}
-          </div>
-
-          <div className="voice-capture-transcript" aria-live="polite">
-            <span>TRANSCRIPTION</span>
-            <p>{voiceTranscript || (micOn ? "Parlez maintenant…" : "Votre dernière prise de voix apparaîtra ici.")}</p>
-          </div>
-
-          <div className="voice-capture-actions">
-            <button
-              type="button"
-              className={`voice-capture-primary ${micOn ? "recording" : ""}`}
-              onClick={micOn ? finishVoiceCapture : startListening}
-            >
-              {micOn ? <><MicOff size={16} /> TERMINER ET ENVOYER</> : <><Mic size={16} /> DÉMARRER L’ÉCOUTE</>}
-            </button>
-            <span>Maintenez aussi <b>ESPACE</b> pour parler</span>
-          </div>
-        </section>
-      )}
-
       {/* Fenêtres de tâches pilotées par ΣIRIUS (créations, rendus, étapes en direct) */}
       <TaskWindows tasks={tasks} onClose={closeTask} />
-      <SiriusProgress mode={status} />
       <PwaPrompt />
       {showKeysStatus && <KeysStatus onClose={() => setShowKeysStatus(false)} />}
       {showKeraunos && <KeraunosPanel onClose={() => setShowKeraunos(false)} />}
@@ -6359,17 +6324,6 @@ function App() {
             {autoMic ? <MicOff size={15} /> : <Mic size={15} />}
             <span>{autoMic ? "LIBRE" : "MICRO"}</span>
           </button>
-          <button
-            type="button"
-            className="voice-panel-btn"
-            onClick={() => setShowVoicePanel(true)}
-            data-testid="sirius-voice-panel-btn"
-            title="Ouvrir la reconnaissance vocale"
-            aria-label="Ouvrir la reconnaissance vocale"
-          >
-            <AudioLines size={15} />
-            <span>VOIX</span>
-          </button>
           <button type="submit" className="cmd-send" data-testid="sirius-cmd-send">ENVOYER</button>
         </form>
 
@@ -6382,9 +6336,9 @@ function App() {
             </div>
           </>
         )}
+        <footer className="sirius-footer" data-testid="sirius-footer">COPYRIGHT © 2026 <span className="sirius-footer-mark">Σ</span>IRIUS par Daniel Partel – Tous droits réservés.</footer>
       </div>
 
-      <footer className="sirius-footer" data-testid="sirius-footer">© 2026 <span className="sirius-footer-mark">Σ</span>IRIUS par Daniel Partel</footer>
       <GlobalDrop />
     </div>
   );

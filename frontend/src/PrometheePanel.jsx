@@ -30,7 +30,7 @@ const CONF = {
   intro: "Prométhée. Je vois la fin du projet avant son commencement. Donnez-moi votre objectif.",
   placeholder: "Décrivez votre projet (but, délai, contraintes, équipe…)",
   action: "PLAN DE PROJET",
-  start: "J'étudie votre projet, monsieur.",
+  start: "J'étudie ton projet.",
   done: "Voici votre plan : objectif, jalons, risques, actions. Tout est à l'écran.",
 };
 

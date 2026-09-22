@@ -1,6 +1,6 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useState, useRef } from "react";
-import { User, KeyRound, Sparkles, ExternalLink, X, Download, Upload, Music, Volume2, Brain, Monitor, RotateCcw, CheckCircle2, XCircle, Loader2, Zap, Layers, Rocket } from "lucide-react";
+import { User, KeyRound, Sparkles, ExternalLink, X, Download, Upload, Music, Volume2, Brain, Monitor, RotateCcw, CheckCircle2, XCircle, Loader2, Zap, Layers, Rocket, HardDrive } from "lucide-react";
 import { speakFr, speakAsCharacter, CHAR_PROFILES, MYTHOS_VOICES, loadCharOverrides, DEFAULT_VOICE, loadVoiceConfig } from "@/voice";
 import { HUD_DEFAULTS, loadHud, saveHud } from "@/hudPrefs";
 import { ConfirmButton } from "@/ConfirmButton";
@@ -11,6 +11,7 @@ const TABS = [
   { id: "voix", label: "VOIX", Icon: Volume2 },
   { id: "ia", label: "IA", Icon: Brain },
   { id: "hud", label: "HUD", Icon: Monitor },
+  { id: "stockage", label: "STOCKAGE", Icon: HardDrive },
   { id: "api", label: "API", Icon: KeyRound },
 ];
 const KEY_META = {
@@ -109,6 +110,17 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
   const [hud, setHud] = useState(loadHud);
   const [readAloudOn, setReadAloudOn] = useState(localStorage.getItem("sirius_read_aloud") !== "off");
   const updateHud = (patch) => setHud((h) => { const nh = { ...h, ...patch }; saveHud(nh); return nh; });
+  const [nas, setNas] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("sirius_nas")) || { path: "", enabled: false }; } catch (e) { return { path: "", enabled: false }; }
+  });
+  const [nasSaved, setNasSaved] = useState(false);
+  const saveNas = () => {
+    const next = { path: nas.path.trim(), enabled: !!nas.path.trim() };
+    setNas(next);
+    localStorage.setItem("sirius_nas", JSON.stringify(next));
+    setNasSaved(true);
+    setTimeout(() => setNasSaved(false), 2200);
+  };
 
   // Dictionnaire vocal
   const [phoneticDict, setPhoneticDict] = useState(() => {
@@ -344,7 +356,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
             <input className="setup-range" type="range" min="0.7" max="1.4" step="0.05" value={charCur.rate}
               onChange={(e) => updateChar({ rate: parseFloat(e.target.value) })} data-testid="setup-char-rate" />
             <div className="setup-actions">
-              <button type="button" className="setup-voice-test" onClick={() => speakAsCharacter(`${charSel.replace("#", "")}. Voici mon timbre de voix, monsieur.`, { module: charSel })} data-testid="setup-char-test">
+              <button type="button" className="setup-voice-test" onClick={() => speakAsCharacter(`${charSel.replace("#", "")}. Voici mon timbre de voix.`, { module: charSel })} data-testid="setup-char-test">
                 <Volume2 size={15} /> Écouter
               </button>
               <ConfirmButton className="setup-reset" label="CONFIRMER ?" title="Revenir au profil par défaut" testId="setup-char-reset" onConfirm={resetChar}>
@@ -451,6 +463,28 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
                 onConfirm={() => { saveHud({ ...HUD_DEFAULTS }); setHud({ ...HUD_DEFAULTS }); }}>
                 <RotateCcw size={13} /> RÉINITIALISER
               </ConfirmButton>
+            </div>
+          </section>
+        )}
+
+        {tab === "stockage" && (
+          <section className="setup-section setup-single" data-testid="setup-panel-stockage">
+            <label className="setup-label"><HardDrive size={13} style={{ marginRight: 6, verticalAlign: "-2px" }} />Stockage NAS <span className="setup-tag opt">préparation</span></label>
+            <p className="setup-note">Préparez le chemin du serveur. Sirius utilisera ce stockage dès que le NAS sera disponible sur votre réseau.</p>
+            <label className="setup-label">Chemin du partage ou URL WebDAV</label>
+            <input
+              className="setup-input"
+              value={nas.path}
+              onChange={(e) => setNas((current) => ({ ...current, path: e.target.value }))}
+              placeholder="\\\\NAS\Sirius ou https://nas.local/dav"
+              data-testid="setup-nas-path"
+            />
+            <p className="setup-note">Les identifiants ne sont pas enregistrés ici. Configurez les accès sur le NAS ou dans le Gestionnaire d'identifiants Windows.</p>
+            <div className="setup-actions">
+              <button type="button" className="setup-io-btn" onClick={saveNas} data-testid="setup-nas-save">
+                <HardDrive size={15} /> ENREGISTRER LE CHEMIN
+              </button>
+              {nasSaved && <span className="setup-note" data-testid="setup-nas-saved">Chemin NAS prêt pour la connexion.</span>}
             </div>
           </section>
         )}

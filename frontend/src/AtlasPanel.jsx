@@ -207,7 +207,7 @@ export default function AtlasPanel({ onClose, onSpeak, keys, onSaveKeys, initial
       const pos = await getPosition();
       setUserPos(pos);
       setTarget({ ...pos, zoom: 15 });
-      onSpeak && onSpeak("Position acquise, monsieur. Vous êtes localisé sur la carte.");
+      onSpeak && onSpeak("Position acquise. Tu es localisé sur la carte.");
     } catch { setError("Géolocalisation refusée ou indisponible."); }
     setBusy(false);
   }, [getPosition, onSpeak]);
