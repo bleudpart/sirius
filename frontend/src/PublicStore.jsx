@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, ShieldCheck, Sparkles, ArrowRight, PlayCircle, Mic, Boxes, Radio, Building2, UserRound, Zap, Crown } from "lucide-react";
+import { Check, ShieldCheck, Sparkles, ArrowRight, PlayCircle, Mic, Boxes, Radio, Building2, UserRound, Zap, Crown, Home } from "lucide-react";
 import PublicLegal from "./PublicLegal";
 import "./PublicStore.css";
 
@@ -16,12 +16,14 @@ const MATRIX_ACTIONS = [
   { icon: Mic, text: "Dictez : « Envoie le devis à Martin » → ΣIRIUS prépare et envoie le mail." },
   { icon: Boxes, text: "Dictez : « Mets à jour le stock du plat du jour » → ΣIRIUS ajuste les stocks." },
   { icon: Radio, text: "Dictez : « Relance les factures en retard » → ΣIRIUS envoie les relances." },
+  { icon: Home, text: "Dites : « Allume la lumière du salon » — ΣIRIUS contrôle votre domotique." },
 ];
 
 const WHY_DIFFERENT = [
   "Automatisation réelle des tâches — pas seulement des réponses.",
   "Intégration avec vos outils métier existants.",
   "Contrôle vocal et interface matricielle holographique.",
+  "Intégration domotique complète (Home Assistant, lumières, volets, capteurs).",
 ];
 
 export default function PublicStore() {
@@ -91,8 +93,6 @@ export default function PublicStore() {
         <h2 className="public-section-title">La matrice de ΣIRIUS</h2>
         <div className="public-core-preview">
           <div className="public-core-window" aria-label="Noyau ΣIRIUS" role="img">
-            <span className="public-core-window-title">Noyau actif</span>
-            <span className="public-core-window-status">SYS.ONLINE</span>
             <div className="public-core-art">
               <img src="/holo/ring-gold.png" alt="" className="public-core-ring public-core-ring-outer" draggable={false} loading="lazy" />
               <img src="/holo/ring-gold.png" alt="" className="public-core-ring public-core-ring-inner" draggable={false} loading="lazy" />
@@ -112,6 +112,11 @@ export default function PublicStore() {
           </video>
           <span className="public-matrix-video-badge"><PlayCircle size={14} /> Aperçu de l'interface réactive (5-7s)</span>
         </div>
+      </section>
+      <section className="public-home-automation" aria-label="Domotique intelligente">
+        <h2 className="public-section-title">DOMOTIQUE INTELLIGENTE</h2>
+        <p>ΣIRIUS contrôle votre maison : lumières, volets, prises, capteurs, scènes.</p>
+        <strong>Compatible Home Assistant.</strong>
       </section>
       <section className="public-plans" aria-label="Offres ΣIRIUS">
         <h2 className="public-section-title">Choisissez votre formule</h2>

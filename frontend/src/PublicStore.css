@@ -24,6 +24,10 @@
 .public-matrix-video{position:relative;max-width:420px;margin:26px 0 0;border:1px solid var(--store-line);background:#030d18;overflow:hidden}
 .public-matrix-video-el{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;background:#030d18}
 .public-matrix-video-badge{position:absolute;left:10px;bottom:10px;display:flex;align-items:center;gap:6px;background:rgba(6,19,33,.82);color:var(--store-gold-strong);font:700 11px "Orbitron",sans-serif;padding:6px 10px;letter-spacing:.04em}
+.public-home-automation{max-width:1180px;margin:68px auto 0;padding:28px 30px;border-top:1px solid var(--store-line);border-bottom:1px solid var(--store-line);background:linear-gradient(105deg,rgba(16,40,61,.52),rgba(8,24,39,.22));}
+.public-home-automation .public-section-title{margin-bottom:12px;color:var(--store-gold-strong);font-size:22px;letter-spacing:.08em}
+.public-home-automation p{max-width:680px;margin:0 0 8px;color:#bfe6f2;font-size:17px;line-height:1.45}
+.public-home-automation strong{color:var(--store-green);font:700 13px "Orbitron",sans-serif;letter-spacing:.04em}
 .public-plans{margin-top:56px}
 .public-plans>.public-section-title{margin-bottom:0}
 .public-plan-icon{display:flex;align-items:center;justify-content:center;width:34px;height:34px;margin-bottom:16px;border:1px solid currentColor;color:var(--store-gold-strong)}
