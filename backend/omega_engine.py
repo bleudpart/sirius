@@ -103,7 +103,8 @@ class OmegaEngine:
     def skills(self) -> list[dict]:
         result = []
         for skill_id, label, paths in self.SKILL_PROBES:
-            missing = [path for path in paths if not (self.project_dir / path).is_file()]
+            # Idem : en empaqueté, les sources ne sont pas présentes à côté de l'exécutable.
+            missing = [] if self._packaged else [path for path in paths if not (self.project_dir / path).is_file()]
             result.append(
                 {
                     "id": skill_id,
@@ -121,16 +122,20 @@ class OmegaEngine:
         for relative_path in self.REQUIRED_FILES:
             path = self.project_dir / relative_path
             if not path.is_file():
-                errors.append(
-                    self._error(
-                        "integrity",
-                        "critical",
-                        f"Fichier critique manquant : {relative_path}.",
-                        "Restaurer le fichier depuis une version validée du projet.",
-                        "manual_restore",
+                # En application empaquetée, project_dir pointe vers l'archive PyInstaller
+                # (sys._MEIPASS) : seuls frontend/build et static y sont embarqués, les
+                # sources .py/.js n'existent jamais là — ce n'est pas une anomalie à signaler.
+                if not self._packaged:
+                    errors.append(
+                        self._error(
+                            "integrity",
+                            "critical",
+                            f"Fichier critique manquant : {relative_path}.",
+                            "Restaurer le fichier depuis une version validée du projet.",
+                            "manual_restore",
+                        )
                     )
-                )
-                drift_paths.add(relative_path)
+                    drift_paths.add(relative_path)
                 continue
             expected_hash = self._integrity_baseline.get(relative_path)
             current_hash = self._file_hash(path)

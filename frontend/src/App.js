@@ -42,7 +42,7 @@ import { chooseBestVoiceTranscript, extractVoiceCommand, normalizeVoiceTranscrip
 import { initHoloWindows, minimizeAll, resetHoloWindowLayout } from "@/holoWindows";
 import { ConfirmButton } from "@/ConfirmButton";
 import { getHUDStyleVariables, renderHUD } from "@/theme";
-import { SiriusLeftColumn, SiriusRightColumn, SiriusNextAction } from "@/hud/SiriusHudPanels";
+import { SiriusInfoHub, SiriusNextAction } from "@/hud/SiriusHudPanels";
 import "@/App.css";
 import { AmbientEngine } from "@/ambientAudio";
 import { APP_RELEASE } from "@/version";
@@ -6184,12 +6184,14 @@ function App() {
         </div>
       )}
 
-      {/* Tableau de bord principal ΣIRIUS — grille 3 colonnes */}
-      <main className="sirius-dashboard">
+      {/* Tableau de bord principal ΣIRIUS — noyau central + fenêtre d'info unique */}
+      <main className="sirius-dashboard sirius-dashboard--hub">
         <aside className="sirius-column sirius-column--left">
-          <SiriusLeftColumn
+          <SiriusInfoHub
             weather={weather}
             connected={connected}
+            ecoMode={ecoMode}
+            setEcoMode={setEcoMode}
             onOpenThemis={() => setShowThemis(true)}
           />
         </aside>
@@ -6240,16 +6242,6 @@ function App() {
             </h1>
           </div>
         </section>
-
-        <aside className="sirius-column sirius-column--right">
-          <SiriusRightColumn
-            ecoMode={ecoMode}
-            setEcoMode={setEcoMode}
-            onOpenOracle={() => setShowOracle(true)}
-            onOpenThemis={() => setShowThemis(true)}
-            onOpenAgora={() => setShowAgora(true)}
-          />
-        </aside>
       </main>
 
       <div className="sirius-command-area">

@@ -1,13 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Calendar, Target, PieChart, ListChecks, Users, Bell, Settings2,
-  Scale, Sparkles, TrendingUp, ChevronRight, Cpu, Activity, Wifi, WifiOff, Clock, RotateCcw, X, Anchor,
+  Scale, Sparkles, TrendingUp, ChevronRight, Cpu, Activity, Wifi, WifiOff, Clock, RotateCcw, X, Anchor, LayoutGrid,
 } from "lucide-react";
 import HudPanel from "@/hud/HudPanel";
 import {
   useHudHiddenKeys, restoreHudPanel, hideHudPanel,
   readFloatPos, writeFloatPos, clearFloatPos,
 } from "@/hud/hudPanelState";
+
+// Sous-section d'une fenêtre HUD fusionnée : pas de drag/resize propre (c'est la
+// fenêtre englobante qui gère ça), juste un en-tête compact + séparateur.
+function InfoSection({ icon, title, children }) {
+  return (
+    <div className="shud-hub-section">
+      <div className="shud-hub-section-head">{icon}<b>{title}</b></div>
+      {children}
+    </div>
+  );
+}
 import { LiveClock, useLiveStats } from "@/liveStats";
 import "@/hud/hud.css";
 
@@ -62,10 +73,14 @@ function useApi(path, refreshMs = 300000) {
 const MOIS = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
 const JOURS = ["L", "M", "M", "J", "V", "S", "D"];
 
-function ExecutiveCalendar({ events, connected }) {
+function ExecutiveCalendar({ events, connected, inline }) {
   const [cursor, setCursor] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; });
   const [selected, setSelected] = useState(() => new Date().getDate());
   const today = new Date();
+  const Wrap = inline ? InfoSection : HudPanel;
+  const wrapProps = inline
+    ? { icon: <Calendar size={13} />, title: "Agenda Ex\u00e9cutif" }
+    : { title: "Agenda Ex\u00e9cutif", icon: <Calendar size={13} />, meta: `${MOIS[cursor.m]} ${cursor.y}`, side: "left", delay: 0, panelKey: "agenda", link: true };
 
   const eventDays = useMemo(() => {
     const set = new Set();
@@ -90,7 +105,7 @@ function ExecutiveCalendar({ events, connected }) {
   });
 
   return (
-    <HudPanel title="Agenda Exécutif" icon={<Calendar size={13} />} meta={`${MOIS[cursor.m]} ${cursor.y}`} side="left" delay={0} panelKey="agenda" link>
+    <Wrap {...wrapProps}>
       <div className="shud-cal-nav">
         <button type="button" onClick={() => move(-1)} aria-label="Mois précédent">‹</button>
         <button type="button" onClick={() => move(1)} aria-label="Mois suivant">›</button>
@@ -123,11 +138,11 @@ function ExecutiveCalendar({ events, connected }) {
           ))}
         </ul>
       )}
-    </HudPanel>
+    </Wrap>
   );
 }
 
-function DailyPriorities({ objectif, bilan }) {
+function DailyPriorities({ objectif, bilan, inline }) {
   const items = useMemo(() => {
     const list = [];
     if (objectif && objectif.montant > 0) {
@@ -142,19 +157,23 @@ function DailyPriorities({ objectif, bilan }) {
     return list.slice(0, 5);
   }, [objectif, bilan]);
 
+  const Wrap = inline ? InfoSection : HudPanel;
+  const wrapProps = inline
+    ? { icon: <Target size={13} />, title: "Priorit\u00e9s de la Journ\u00e9e" }
+    : { title: "Priorités de la Journée", icon: <Target size={13} />, side: "left", delay: 140, panelKey: "priorites", link: true };
   return (
-    <HudPanel title="Priorités de la Journée" icon={<Target size={13} />} side="left" delay={140} panelKey="priorites" link>
+    <Wrap {...wrapProps}>
       {items.map((p, i) => (
         <div className="shud-prio" key={i}>
           <div className="shud-line"><span>{p.label}</span><b>{p.pct}%</b></div>
           <div className="shud-track"><i className={p.tone} style={{ width: `${p.pct}%` }} /></div>
         </div>
       ))}
-    </HudPanel>
+    </Wrap>
   );
 }
 
-function StrategicPerformance({ objectif, market }) {
+function StrategicPerformance({ objectif, market, inline }) {
   const perf = Math.min(100, Math.max(0, Math.round((objectif && objectif.progression_pct) || 0)));
   const assets = ((market && market.assets) || []).filter((a) => typeof a.change === "number");
   const upCount = assets.filter((a) => a.change >= 0).length;
@@ -164,8 +183,12 @@ function StrategicPerformance({ objectif, market }) {
   const rest = 100 - seg1 - seg2;
   const grad = `conic-gradient(var(--sir-gold) 0 ${seg1}%, var(--sir-cyan) ${seg1}% ${seg1 + seg2}%, var(--sir-steel) ${seg1 + seg2}% 100%)`;
 
+  const Wrap = inline ? InfoSection : HudPanel;
+  const wrapProps = inline
+    ? { icon: <PieChart size={13} />, title: "Recommandations Strat\u00e9giques & Performance" }
+    : { title: <>Recommandations<br />Stratégiques &amp; Performance</>, icon: <PieChart size={13} />, side: "right", delay: 80, panelKey: "recommandations", className: "shud-wide", link: true };
   return (
-    <HudPanel title={<>Recommandations<br />Stratégiques &amp; Performance</>} icon={<PieChart size={13} />} side="right" delay={80} panelKey="recommandations" className="shud-wide" link>
+    <Wrap {...wrapProps}>
       <div className="shud-donut-row">
         <div className="shud-donut" style={{ background: grad }} role="img" aria-label={`Performance ${seg1}%, marchés ${seg2}%, restant ${rest}%`} />
         <div className="shud-legend">
@@ -180,11 +203,11 @@ function StrategicPerformance({ objectif, market }) {
           <b className={assets[0].change >= 0 ? "up" : "down"}>{assets[0].change >= 0 ? "+" : ""}{assets[0].change.toFixed(1)}%</b>
         </div>
       )}
-    </HudPanel>
+    </Wrap>
   );
 }
 
-function GoalsTracker({ objectif, bilan }) {
+function GoalsTracker({ objectif, bilan, inline }) {
   const ech = (bilan && bilan.echeances) || [];
   const retards = ech.filter((e) => e.days < 0).length;
   const proches = ech.filter((e) => e.days >= 0 && e.days <= 7).length;
@@ -193,22 +216,30 @@ function GoalsTracker({ objectif, bilan }) {
     { label: "Échéances 7 j", val: String(proches), pct: ech.length ? Math.round((proches / ech.length) * 100) : 0 },
     { label: "Retards", val: String(retards), pct: ech.length ? Math.round((retards / ech.length) * 100) : 0 },
   ];
+  const Wrap = inline ? InfoSection : HudPanel;
+  const wrapProps = inline
+    ? { icon: <ListChecks size={13} />, title: "D\u00e9terminations" }
+    : { title: "Déterminations", icon: <ListChecks size={13} />, side: "right", delay: 220, panelKey: "determinations", link: true };
   return (
-    <HudPanel title="Déterminations" icon={<ListChecks size={13} />} side="right" delay={220} panelKey="determinations" link>
+    <Wrap {...wrapProps}>
       {rows.map((r) => (
         <div className="shud-prio" key={r.label}>
           <div className="shud-line"><span>{r.label}</span><b>{r.val}</b></div>
           <div className="shud-track"><i className="gold" style={{ width: `${r.pct}%` }} /></div>
         </div>
       ))}
-    </HudPanel>
+    </Wrap>
   );
 }
 
-function PersonalResources({ connected }) {
+function PersonalResources({ connected, inline }) {
   const { cpu, ram } = useLiveStats();
+  const Wrap = inline ? InfoSection : HudPanel;
+  const wrapProps = inline
+    ? { icon: <Users size={13} />, title: "Ressources Personnelles" }
+    : { title: "Ressources Personnelles", icon: <Users size={13} />, side: "left", delay: 300, panelKey: "ressources", link: true };
   return (
-    <HudPanel title="Ressources Personnelles" icon={<Users size={13} />} side="left" delay={300} panelKey="ressources" link>
+    <Wrap {...wrapProps}>
       <div className="shud-res">
         <span className="shud-res-ico"><Cpu size={13} /></span>
         <div className="shud-res-main">
@@ -229,11 +260,11 @@ function PersonalResources({ connected }) {
           <div className="shud-line"><span>Réseau</span><b>{connected ? "Stable" : "Hors ligne"}</b></div>
         </div>
       </div>
-    </HudPanel>
+    </Wrap>
   );
 }
 
-function ActiveNotifications({ bilan, weather, connected, onOpenThemis }) {
+function ActiveNotifications({ bilan, weather, connected, onOpenThemis, inline }) {
   const notifs = useMemo(() => {
     const list = [];
     const ech = (bilan && bilan.echeances) || [];
@@ -253,8 +284,12 @@ function ActiveNotifications({ bilan, weather, connected, onOpenThemis }) {
     return list;
   }, [bilan, weather, connected, onOpenThemis]);
 
+  const Wrap = inline ? InfoSection : HudPanel;
+  const wrapProps = inline
+    ? { icon: <Bell size={13} />, title: "Notifications Actives" }
+    : { title: "Notifications Actives", icon: <Bell size={13} />, meta: String(notifs.filter((n) => n.unread).length || ""), side: "left", delay: 380, panelKey: "notifications", link: true };
   return (
-    <HudPanel title="Notifications Actives" icon={<Bell size={13} />} meta={String(notifs.filter((n) => n.unread).length || "")} side="left" delay={380} panelKey="notifications" link>
+    <Wrap {...wrapProps}>
       <ul className="shud-notifs">
         {notifs.map((n, i) => (
           <li key={i}>
@@ -266,27 +301,35 @@ function ActiveNotifications({ bilan, weather, connected, onOpenThemis }) {
           </li>
         ))}
       </ul>
-    </HudPanel>
+    </Wrap>
   );
 }
 
-function TimePanel() {
+function TimePanel({ inline }) {
+  const Wrap = inline ? InfoSection : HudPanel;
+  const wrapProps = inline
+    ? { icon: <Clock size={13} />, title: "Heure & UTC" }
+    : { title: "Heure & UTC", icon: <Clock size={13} />, side: "right", delay: 340, panelKey: "heure", className: "shud-clock" };
   return (
-    <HudPanel title="Heure & UTC" icon={<Clock size={13} />} side="right" delay={340} panelKey="heure" className="shud-clock">
+    <Wrap {...wrapProps}>
       <LiveClock />
-    </HudPanel>
+    </Wrap>
   );
 }
 
-function QuickSettings({ ecoMode, setEcoMode }) {
+function QuickSettings({ ecoMode, setEcoMode, inline }) {
   const [vol, setVol] = useState(() => Math.round(parseFloat(localStorage.getItem("sirius_ambient_volume") || "0.12") * 100));
   const applyVol = (v) => {
     setVol(v);
     localStorage.setItem("sirius_ambient_volume", String(v / 100));
     if (window.__siriusAmbient) window.__siriusAmbient.volume = v / 100;
   };
+  const Wrap = inline ? InfoSection : HudPanel;
+  const wrapProps = inline
+    ? { icon: <Settings2 size={13} />, title: "Param\u00e8tres" }
+    : { title: "Paramètres", icon: <Settings2 size={13} />, side: "right", delay: 460, panelKey: "parametres" };
   return (
-    <HudPanel title="Paramètres" icon={<Settings2 size={13} />} side="right" delay={460} panelKey="parametres">
+    <Wrap {...wrapProps}>
       <label className="shud-select">
         <span>Mode d'énergie</span>
         <select value={ecoMode ? "eco" : "normal"} onChange={(e) => setEcoMode(e.target.value === "eco")}>
@@ -303,7 +346,7 @@ function QuickSettings({ ecoMode, setEcoMode }) {
           <option value="50">50 %</option>
         </select>
       </label>
-    </HudPanel>
+    </Wrap>
   );
 }
 
@@ -472,6 +515,32 @@ function HudRestoreBar({ titles }) {
         </button>
       ))}
     </div>
+  );
+}
+
+// Fenêtre HUD unique regroupant toutes les infos (agenda, priorités, ressources,
+// notifications, recommandations, déterminations, heure, paramètres) — remplace les
+// 8 fenêtres flottantes séparées. Les modules (Oracle/Thémis/Agora/...) restent
+// accessibles via le menu déroulant MODULES, donc plus de raccourcis dupliqués ici.
+export function SiriusInfoHub({ weather, connected, ecoMode, setEcoMode, onOpenThemis }) {
+  const [cal, calErr] = useApi("/calendar/events?max_results=30");
+  const [objectif] = useApi("/agora/objectif");
+  const [bilan] = useApi("/themis/bilan");
+  const [market] = useApi("/nummarius/market");
+  const events = (cal && cal.events) || [];
+  const calConnected = !calErr && !!cal;
+
+  return (
+    <HudPanel title="Centre d'Information ΣIRIUS" icon={<LayoutGrid size={13} />} side="left" delay={0} panelKey="info-hub" className="shud-wide shud-hub">
+      <ExecutiveCalendar events={events} connected={calConnected} inline />
+      <DailyPriorities objectif={objectif} bilan={bilan} inline />
+      <StrategicPerformance objectif={objectif} market={market} inline />
+      <GoalsTracker objectif={objectif} bilan={bilan} inline />
+      <PersonalResources connected={connected} inline />
+      <ActiveNotifications bilan={bilan} weather={weather} connected={connected} onOpenThemis={onOpenThemis} inline />
+      <TimePanel inline />
+      <QuickSettings ecoMode={ecoMode} setEcoMode={setEcoMode} inline />
+    </HudPanel>
   );
 }
 

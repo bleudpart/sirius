@@ -281,6 +281,43 @@
 
 /* ---------- donut ---------- */
 .shud-wide { width: 100%; }
+
+/* Fenêtre unique « Centre d'Information » regroupant toutes les infos HUD :
+   pleine hauteur de colonne, sections empilées défilables, séparées par un
+   liseré doré discret plutôt que des fenêtres flottantes indépendantes. */
+.shud-hub {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: 100%;
+}
+.shud-hub .shud-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+}
+.shud-hub-section {
+  padding-top: 14px;
+  border-top: 1px solid rgba(216, 184, 117, 0.22);
+}
+.shud-hub-section:first-child { padding-top: 0; border-top: 0; }
+.shud-hub-section-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 9px;
+  color: var(--sir-gold-soft);
+}
+.shud-hub-section-head svg { color: var(--sir-gold); flex: 0 0 auto; }
+.shud-hub-section-head b {
+  font: 700 11px "Orbitron", sans-serif;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--sir-cyan-soft);
+}
 .shud-donut-row { display: flex; align-items: center; gap: 12px; }
 .shud-donut {
   position: relative; flex: none;
