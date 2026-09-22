@@ -70,13 +70,40 @@ export default function HudPanel({
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       const rect = el.getBoundingClientRect();
-      const pos = { left: rect.left, top: rect.top };
+      const pos = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
       setFloatPos(pos);
       writeFloatPos(key, pos);
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
     e.preventDefault();
+  };
+
+  const onResizePointerDown = (e) => {
+    const el = ref.current;
+    if (!el || !floatPos) return;
+    const rect = el.getBoundingClientRect();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    el.classList.add("shud-dragging");
+    const onMove = (ev) => {
+      const width = Math.min(window.innerWidth - rect.left - 8, Math.max(240, rect.width + ev.clientX - startX));
+      const height = Math.min(window.innerHeight - rect.top - 8, Math.max(120, rect.height + ev.clientY - startY));
+      el.style.width = `${width}px`;
+      el.style.height = `${height}px`;
+    };
+    const onUp = () => {
+      el.classList.remove("shud-dragging");
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      const next = { left: rect.left, top: rect.top, width: el.getBoundingClientRect().width, height: el.getBoundingClientRect().height };
+      setFloatPos(next);
+      writeFloatPos(key, next);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    e.preventDefault();
+    e.stopPropagation();
   };
 
   const redock = () => {
@@ -103,7 +130,10 @@ export default function HudPanel({
         "--shud-delay": `${delay}ms`,
         "--shud-tilt-x": `${tilt.x}deg`,
         "--shud-tilt-y": `${tilt.y}deg`,
-        ...(floatPos ? { position: "fixed", left: floatPos.left, top: floatPos.top, zIndex: 500, margin: 0 } : {}),
+        ...(floatPos ? {
+          position: "fixed", left: floatPos.left, top: floatPos.top, zIndex: 500, margin: 0,
+          width: floatPos.width, height: floatPos.height, boxSizing: "border-box",
+        } : {}),
       }}
       data-testid={`shud-panel-${key}`}
     >
@@ -134,6 +164,7 @@ export default function HudPanel({
         </button>
       </header>
       <div className="shud-body">{children}</div>
+      {floatPos && <div className="shud-resize" onPointerDown={onResizePointerDown} title="Redimensionner" data-testid={`shud-panel-resize-${key}`} />}
     </section>
   );
 }

@@ -27,6 +27,7 @@ const phonetic = (text) =>
     .replace(/\bsirius\b/gi, "Siriusse")
     .replace(/\bS\.I\.R\.I\.U\.S\b/gi, "Siriusse")
     .replace(/\bcortex\b/gi, "cortèxe")
+    .replace(/\bscanne\b/gi, "skanne")
     // « e-mail » devient « e mail » au nettoyage, que le TTS français lit « eu mail ».
     .replace(/\be[- ]?mails\b/gi, "imèls")
     .replace(/\be[- ]?mail\b/gi, "imèl")

@@ -54,3 +54,17 @@ export function chooseBestVoiceTranscript(alternatives) {
 
   return list.sort((a, b) => score(b) - score(a))[0].text.trim();
 }
+
+const WAKE_WORD = /\b(?:sirius|syrius|cirius|sirus|cyrus|serious|s[ée]rieux|cilius|syriusse|sirio)\b/gi;
+const SHORT_COMMANDS = new Set(["stop", "silence", "pause", "briefing", "continue", "annule", "annuler"]);
+
+export function extractVoiceCommand(text, { requireWakeWord = false } = {}) {
+  const transcript = normalizeVoiceTranscript(text).trim();
+  const hasWakeWord = new RegExp(WAKE_WORD.source, "i").test(transcript);
+  if (requireWakeWord && !hasWakeWord) return "";
+
+  const command = transcript.replace(WAKE_WORD, " ").replace(/\s+/g, " ").trim().replace(/^[,.\s]+/, "");
+  const words = command.match(/[\p{L}\p{N}]+/gu) || [];
+  if (!command || (words.length < 2 && !SHORT_COMMANDS.has(words[0]?.toLowerCase()))) return "";
+  return command;
+}

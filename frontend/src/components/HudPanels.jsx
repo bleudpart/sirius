@@ -475,7 +475,7 @@ export function CentralCard({ card, weather, onClose }) {
 
 export function BootScreen({ onDone, userName, onOpenModule }) {
   const lines = [
-    "> Initialisation du noyau S.I.R.I.U.S ...",
+    "> Initialisation du noyau Σ.I.R.I.U.S ...",
     "> Chargement des modules cognitifs ......... OK",
     "> Connexion aux capteurs système ........... OK",
     "> Calibration synthèse vocale .............. OK",
@@ -653,7 +653,7 @@ export function BootScreen({ onDone, userName, onOpenModule }) {
           <ReactorCore status="thinking" volume={0.35} color="#91e6f2" eco={false} />
         </div>
         <div className="boot-acronym" data-testid="boot-acronym">
-          {[["S", "System"], ["I", "Intelligent"], ["R", "Responsive"], ["I", "Interface"], ["U", "Universal"], ["S", "Secure"]].map(([l, w], i) => (
+          {[["Σ", "System"], ["I", "Intelligent"], ["R", "Responsive"], ["I", "Interface"], ["U", "Universal"], ["S", "Secure"]].map(([l, w], i) => (
             <span className="boot-acro-item" key={i} style={{ animationDelay: `${0.5 + i * 0.22}s` }}>
               <b>{l}</b>
               <i>{w}</i>
@@ -669,7 +669,7 @@ export function BootScreen({ onDone, userName, onOpenModule }) {
           <div className="boot-bar-fill" style={{ width: `${progress}%` }} />
         </div>
         <div className="boot-pct">{progress}%  —  touchez pour activer la voix</div>
-        <div className="boot-copyright">© 2026 ΣIRIUS par Daniel Partel – Tous droits réservés.</div>
+        <div className="boot-copyright">COPYRIGHT © 2026 ΣIRIUS par Daniel Partel – Tous droits réservés.</div>
       </div>
     </div>
   );

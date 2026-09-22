@@ -140,6 +140,18 @@
   touch-action: none;
 }
 .shud-panel.shud-dragging .shud-head { cursor: grabbing; }
+.shud-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 50%, rgba(145, 230, 242, 0.72) 50%);
+  border-bottom-right-radius: 13px;
+  touch-action: none;
+  z-index: 2;
+}
 .shud-ico { color: var(--sir-gold); display: inline-flex; }
 .shud-title {
   margin: 0;

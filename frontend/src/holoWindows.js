@@ -8,6 +8,11 @@ let cascade = 0;
 let geom = {};
 try { geom = JSON.parse(localStorage.getItem("sirius_holo_geom") || "{}"); } catch (e) { geom = {}; }
 const save = () => { try { localStorage.setItem("sirius_holo_geom", JSON.stringify(geom)); } catch (e) { /* plein */ } };
+export function resetHoloWindowLayout() {
+  geom = {};
+  cascade = 0;
+  try { localStorage.removeItem("sirius_holo_geom"); } catch (e) { /* stockage indisponible */ }
+}
 // Migration unique : oublie l'ancienne géométrie (trop grande) de la fenêtre Configuration
 try {
   if (!localStorage.getItem("sirius_holo_v2")) {
@@ -212,6 +217,10 @@ function minimize(el) {
 
 function decorate(el) {
   if (el.__holoWin || el.classList.contains("auth-screen") || el.closest(".boot-screen")) return;
+  // Une seule surface de module reste active : les précédentes sont rangées dans le dock.
+  document.querySelectorAll(".holo-win:not(.holo-minimized)").forEach((openWindow) => {
+    if (openWindow !== el) minimize(openWindow);
+  });
   el.__holoWin = true;
   el.classList.add("holo-win");
   const k = keyOf(el);

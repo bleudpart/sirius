@@ -1,4 +1,4 @@
-import { chooseBestVoiceTranscript, normalizeVoiceTranscript } from "./voiceCorrections";
+import { chooseBestVoiceTranscript, extractVoiceCommand, normalizeVoiceTranscript } from "./voiceCorrections";
 
 test("normalizes the creator name when speech recognition hears Pontel", () => {
   expect(normalizeVoiceTranscript("qui est Daniel Pontel")).toBe("qui est Daniel Partel");
@@ -20,4 +20,15 @@ test("chooses the alternative matching Sirius lexicon", () => {
     { transcript: "daniel parti", confidence: 0.71 },
     { transcript: "daniel partel", confidence: 0.66 },
   ])).toBe("Daniel Partel");
+});
+
+test("requires an actionable command after the Sirius wake word", () => {
+  expect(extractVoiceCommand("Sirius", { requireWakeWord: true })).toBe("");
+  expect(extractVoiceCommand("bruit ambiant", { requireWakeWord: true })).toBe("");
+  expect(extractVoiceCommand("Sirius ouvre les actualités", { requireWakeWord: true })).toBe("ouvre les actualités");
+});
+
+test("allows concise commands through push-to-talk", () => {
+  expect(extractVoiceCommand("briefing")).toBe("briefing");
+  expect(extractVoiceCommand("heu")).toBe("");
 });
