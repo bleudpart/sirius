@@ -830,6 +830,7 @@ body.hud-minimal .antique-jar { display: none; }
 
 .sirius-column {
   min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 11px;
@@ -844,6 +845,7 @@ body.hud-minimal .antique-jar { display: none; }
 
 .sirius-center {
   min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   overflow: visible;
@@ -869,17 +871,6 @@ body.hud-minimal .antique-jar { display: none; }
 .workspace-mode .sirius-column .shud-head {
   padding-bottom: 6px;
   margin-bottom: 7px;
-}
-.workspace-mode .sirius-identity {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 2px;
-  padding: 0 10px;
-  opacity: 0.74;
-}
-.workspace-mode .sirius-identity .sirius-next-action {
-  display: none;
 }
 .workspace-mode .task-console {
   top: clamp(58px, 7vh, 78px);
