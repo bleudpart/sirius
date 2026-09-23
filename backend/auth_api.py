@@ -216,22 +216,20 @@ async def seed_admin_and_indexes(db):
     await db.users.create_index("user_id", unique=True)
     await db.login_attempts.create_index("expires_at", expireAfterSeconds=0)
     await db.password_reset_codes.create_index("expires_at", expireAfterSeconds=0)
-    admin_email = (os.getenv("ADMIN_EMAIL") or os.getenv("SIRIUS_LOCAL_EMAIL") or "").strip().lower()
+    admin_email = (os.getenv("ADMIN_EMAIL") or os.getenv("SIRIUS_LOCAL_EMAIL") or LEGACY_UID).strip().lower()
     admin_password = (os.getenv("ADMIN_PASSWORD") or os.getenv("SIRIUS_LOCAL_PASSWORD") or "").strip()
-    if not admin_email or not admin_password:
-        return
     existing = await db.users.find_one({"email": admin_email})
     now = datetime.now(timezone.utc)
     if existing:
         updates = {"role": "admin", "name": existing.get("name") or "Daniel", "updated_at": now}
-        if not _password_valid(admin_password, existing.get("password_hash") or ""):
+        if admin_password and not _password_valid(admin_password, existing.get("password_hash") or ""):
             updates["password_hash"] = _password_hash(admin_password)
         await db.users.update_one({"email": admin_email}, {"$set": updates})
         return
     await db.users.insert_one({
         "user_id": f"user_{secrets.token_hex(12)}",
         "email": admin_email,
-        "password_hash": _password_hash(admin_password),
+        "password_hash": _password_hash(admin_password or secrets.token_urlsafe(32)),
         "name": "Daniel",
         "role": "admin",
         "provider": "email",
@@ -285,8 +283,8 @@ def make_auth_router(db):
     async def local_session(request: Request, response: Response):
         if not is_direct_local_request(request):
             raise HTTPException(status_code=403, detail="Session automatique réservée à la machine locale.")
-        email = (os.getenv("ADMIN_EMAIL") or os.getenv("SIRIUS_LOCAL_EMAIL") or "").strip().lower()
-        user = await db.users.find_one({"email": email}) if email else None
+        email = (os.getenv("ADMIN_EMAIL") or os.getenv("SIRIUS_LOCAL_EMAIL") or LEGACY_UID).strip().lower()
+        user = await db.users.find_one({"email": email})
         if not user:
             raise HTTPException(status_code=503, detail="Compte administrateur non configuré.")
         return _issue_session(response, user)
