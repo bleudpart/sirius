@@ -145,9 +145,11 @@ function AuthScreen({ onAuth }) {
   return (
     <div className="auth-screen" data-testid="auth-screen">
       <div className="auth-card">
-        <img src="/holo/sirius-title.png" alt="ΣIRIUS" className="auth-logo" onError={(e) => { e.target.style.display = "none"; e.target.nextSibling.style.display = "block"; }} />
-        <h1 className="auth-title font-divine" style={{ display: "none" }}>ΣIRIUS</h1>
-        <p className="auth-sub">Identifie-toi pour accéder au sanctuaire</p>
+        <header className="auth-brand">
+          <h1 className="auth-title">ΣIRIUS</h1>
+          <p className="auth-tagline">VOTRE ASSISTANT PRIVILÉGIÉ</p>
+        </header>
+        <p className="auth-sub">Identifiez-vous pour accéder à ΣIRIUS</p>
         <form onSubmit={resetMode ? resetPassword : submit} className="auth-form" data-testid="auth-form">
           <input type="email" placeholder="Email" value={form.email} required autoComplete="email"
             onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="auth-email-input" />
