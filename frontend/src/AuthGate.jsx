@@ -92,9 +92,11 @@ function syncLocalProfile(user) {
 }
 
 function AuthScreen({ onAuth }) {
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [form, setForm] = useState({ name: "", email: "", password: "", confirmPassword: "" });
   const [resetCode, setResetCode] = useState("");
   const [resetCodeSent, setResetCodeSent] = useState(false);
+  const [registerMode, setRegisterMode] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [resetMode, setResetMode] = useState(false);
@@ -103,9 +105,19 @@ function AuthScreen({ onAuth }) {
     e.preventDefault();
     setBusy(true); setErr("");
     try {
-      const r = await fetch(`${API}/api/auth/login`, {
+      if (registerMode && form.password !== form.confirmPassword) {
+        throw new Error("Les deux mots de passe ne correspondent pas.");
+      }
+      if (registerMode && !termsAccepted) {
+        throw new Error("Vous devez accepter les conditions générales et la politique de confidentialité.");
+      }
+      const path = registerMode ? "/api/auth/register" : "/api/auth/login";
+      const payload = registerMode
+        ? { name: form.name, email: form.email, password: form.password }
+        : { email: form.email, password: form.password };
+      const r = await fetch(`${API}${path}`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: form.email, password: form.password }),
+        body: JSON.stringify(payload),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(fmtErr(data.detail));
@@ -149,8 +161,12 @@ function AuthScreen({ onAuth }) {
           <h1 className="auth-title">ΣIRIUS</h1>
           <p className="auth-tagline">VOTRE ASSISTANT PRIVILÉGIÉ</p>
         </header>
-        <p className="auth-sub">Identifiez-vous pour accéder à ΣIRIUS</p>
+        <p className="auth-sub">{registerMode ? "Créez votre compte pour accéder à ΣIRIUS" : "Identifiez-vous pour accéder à ΣIRIUS"}</p>
         <form onSubmit={resetMode ? resetPassword : submit} className="auth-form" data-testid="auth-form">
+          {registerMode && (
+            <input type="text" placeholder="Prénom et nom" value={form.name} required autoComplete="name"
+              onChange={(e) => setForm({ ...form, name: e.target.value })} data-testid="auth-name-input" />
+          )}
           <input type="email" placeholder="Email" value={form.email} required autoComplete="email"
             onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="auth-email-input" />
           {resetMode && resetCodeSent && (
@@ -159,18 +175,41 @@ function AuthScreen({ onAuth }) {
               onChange={(e) => setResetCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
               data-testid="auth-reset-code-input" />
           )}
-          <input type="password" placeholder="Mot de passe" value={form.password} required autoComplete="current-password"
+          <input type="password" placeholder={registerMode ? "Mot de passe (6 caractères minimum)" : "Mot de passe"} value={form.password} required
+            minLength={registerMode ? 6 : undefined} autoComplete={registerMode ? "new-password" : "current-password"}
             style={resetMode && !resetCodeSent ? { display: "none" } : undefined}
             disabled={resetMode && !resetCodeSent}
             onChange={(e) => setForm({ ...form, password: e.target.value })} data-testid="auth-password-input" />
+          {registerMode && (
+            <input type="password" placeholder="Confirmez le mot de passe" value={form.confirmPassword} required
+              minLength={6} autoComplete="new-password"
+              onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+              data-testid="auth-confirm-password-input" />
+          )}
+          {registerMode && (
+            <label className="auth-terms">
+              <input type="checkbox" checked={termsAccepted} required
+                onChange={(e) => setTermsAccepted(e.target.checked)} data-testid="auth-terms-checkbox" />
+              <span>J’accepte les <a href="https://sirius-assistant.fr/conditions-generales" target="_blank" rel="noreferrer">conditions générales</a> et la <a href="https://sirius-assistant.fr/confidentialite" target="_blank" rel="noreferrer">politique de confidentialité</a>.</span>
+            </label>
+          )}
           {err && <div className="auth-error" data-testid="auth-error">{err}</div>}
           <button type="submit" className="auth-submit" disabled={busy} data-testid="auth-submit-btn">
-            <LogIn size={15} /> {resetMode ? (resetCodeSent ? "VALIDER LE NOUVEAU MOT DE PASSE" : "RECEVOIR UN CODE") : "SE CONNECTER"}
+            <LogIn size={15} /> {resetMode ? (resetCodeSent ? "VALIDER LE NOUVEAU MOT DE PASSE" : "RECEVOIR UN CODE") : (registerMode ? "CRÉER MON COMPTE" : "SE CONNECTER")}
           </button>
         </form>
-        <button className="auth-link" onClick={() => { setResetMode(!resetMode); setResetCodeSent(false); setResetCode(""); setErr(""); }}>
-          {resetMode ? "Retour à la connexion" : "Mot de passe oublié ?"}
-        </button>
+        {!registerMode && (
+          <button className="auth-link" onClick={() => { setResetMode(!resetMode); setResetCodeSent(false); setResetCode(""); setErr(""); }}>
+            {resetMode ? "Retour à la connexion" : "Mot de passe oublié ?"}
+          </button>
+        )}
+        {!resetMode && (
+          <button className="auth-switch" data-testid="auth-register-toggle"
+            onClick={() => { setRegisterMode(!registerMode); setTermsAccepted(false); setErr(""); }}>
+            {registerMode ? "J’ai déjà un compte — Se connecter" : "Première connexion — Créer mon compte"}
+          </button>
+        )}
+        <p className="auth-powered">Application propulsée par <strong>Daniel Partel</strong> © 2026 — Tous droits réservés.</p>
       </div>
     </div>
   );
@@ -222,9 +261,13 @@ export default function AuthGate({ children }) {
         const bootstrap = await requestLocalSession();
         let authenticatedUser = bootstrap.user;
         if (!bootstrap.response.ok) {
-          const response = await fetch(`${API}/api/auth/me`);
+          let response = await fetch(`${API}/api/auth/me`);
+          if (!response.ok) {
+            response = await fetch(`${API}/api/auth/refresh`, { method: "POST" });
+          }
           if (!response.ok) throw new Error("Session ΣIRIUS indisponible.");
           authenticatedUser = await response.json();
+          rememberAccessToken(authenticatedUser);
         }
         if (!cancelled) {
           syncLocalProfile(authenticatedUser);

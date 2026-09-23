@@ -5710,11 +5710,22 @@ function App() {
     },
   });
 
+  const captureSiriusInterface = async () => {
+    if (!window.siriusDesktop?.captureInterface) {
+      showTouchToast("CAPTURE DISPONIBLE SUR WINDOWS");
+      return;
+    }
+    const result = await window.siriusDesktop.captureInterface();
+    showTouchToast(result?.ok ? "CAPTURE ENREGISTRÉE" : (result?.error || "CAPTURE IMPOSSIBLE"));
+  };
+
   const moduleItems = [
     { id: "reload", group: "SYSTÈME", label: "Recharger ΣIRIUS", Icon: RotateCcw, run: () => { window.__siriusBootPlayed = false; window.location.reload(); } },
     { id: "display", group: "MÉDIAS", label: "ΣIRIUS DISPLAY", Icon: Monitor, active: displayOpen, run: () => { pinDisplay(); setDisplayOpen((o) => !o); } },
     { id: "media-modules", group: "MÉDIAS", label: "Modules multimédia", Icon: Clapperboard, active: displayOpen && display.type === "media", run: () => showOnDisplay({ type: "media", titre: "MODULES MULTIMÉDIA" }) },
     { id: "files", group: "MÉDIAS", label: "Médiathèque", Icon: FolderOpen, run: () => setShowFiles(true) },
+    { id: "info-hub", group: "OUTILS", label: "Centre d'information SIRIUS", Icon: BadgeInfo, run: () => restoreHudPanel("info-hub") },
+    { id: "capture-interface", group: "OUTILS", label: "Capture de l'interface", Icon: Camera, mobile: false, run: captureSiriusInterface },
     { id: "architect", group: "OUTILS", label: "Architecte visuel", Icon: Workflow, run: () => { setArchitectPrompt(""); setShowArchitect(true); } },
     { id: "plans", group: "OUTILS", label: "Plans 2D (PLANS#)", Icon: Ruler, run: () => { setPlansPrompt(""); setShowPlans(true); } },
     { id: "photo3d", group: "OUTILS", label: "Photos → Objet 3D (PHOTO3D#)", Icon: Boxes, run: () => setShowPhoto3D(true) },

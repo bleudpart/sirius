@@ -334,6 +334,17 @@ def make_auth_router(db):
         await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"last_activity": now}})
         return _issue_session(response, user)
 
+    @router.post("/refresh")
+    async def refresh_session(request: Request, response: Response):
+        token = request.cookies.get("refresh_token") or ""
+        if not token:
+            raise HTTPException(status_code=401, detail="Session expirée.")
+        payload = _decode_token(token, "refresh")
+        user = await db.users.find_one({"user_id": payload.get("sub"), "disabled": {"$ne": True}})
+        if not user:
+            raise HTTPException(status_code=401, detail="Compte indisponible.")
+        return _issue_session(response, user)
+
     @router.post("/password-reset/request")
     async def password_reset_request(data: PasswordResetRequest):
         email = _normalize_email(data.email)

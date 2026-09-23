@@ -1,5 +1,6 @@
 // © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 const { app, BrowserWindow, session, shell, Menu, globalShortcut, ipcMain, dialog } = require("electron");
+const fs = require("fs/promises");
 const path = require("path");
 const {
   closeMediaHudWindow,
@@ -232,6 +233,21 @@ app.whenReady().then(async () => {
     if (typeof folderPath !== "string" || !folderPath.trim()) return { ok: false, error: "Dossier invalide." };
     const error = await shell.openPath(folderPath);
     return error ? { ok: false, error } : { ok: true };
+  });
+  ipcMain.handle("sirius-capture-interface", async () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return { ok: false, error: "Fenêtre SIRIUS indisponible." };
+    try {
+      const image = await mainWindow.webContents.capturePage();
+      const captureFolder = path.join(app.getPath("pictures"), "SIRIUS Captures");
+      await fs.mkdir(captureFolder, { recursive: true });
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const capturePath = path.join(captureFolder, `SIRIUS-${timestamp}.png`);
+      await fs.writeFile(capturePath, image.toPNG());
+      shell.showItemInFolder(capturePath);
+      return { ok: true, path: capturePath };
+    } catch (error) {
+      return { ok: false, error: error.message || "Capture impossible." };
+    }
   });
 
   // Menu contextuel (clic droit) avec Copier / Coller

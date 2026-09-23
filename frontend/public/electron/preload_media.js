@@ -22,3 +22,7 @@ contextBridge.exposeInMainWorld("siriusFiles", {
   openFolder: (folderPath) => ipcRenderer.invoke("sirius-files-open-folder", folderPath),
 });
 
+contextBridge.exposeInMainWorld("siriusDesktop", {
+  captureInterface: () => ipcRenderer.invoke("sirius-capture-interface"),
+});
+
