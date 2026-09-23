@@ -855,17 +855,6 @@ body.hud-minimal .antique-jar { display: none; }
   position: relative;
   min-width: 0;
 }
-.workspace-mode .sirius-dashboard {
-  width: min(1120px, calc(100vw - 28px));
-  margin-inline: auto;
-  grid-template-columns: minmax(180px, 0.82fr) minmax(360px, 1.45fr) minmax(180px, 0.82fr);
-  gap: 14px;
-  padding: 12px 14px 10px;
-  border: 1px solid rgba(145, 230, 242, 0.18);
-  border-radius: 18px;
-  background: linear-gradient(145deg, rgba(8, 23, 37, 0.56), rgba(2, 8, 15, 0.42));
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.26), inset 0 0 34px rgba(145, 230, 242, 0.035);
-}
 .workspace-mode .sirius-dashboard--hub {
   grid-template-columns: minmax(280px, 0.92fr) minmax(420px, 1.7fr);
 }
@@ -880,23 +869,6 @@ body.hud-minimal .antique-jar { display: none; }
 .workspace-mode .sirius-column .shud-head {
   padding-bottom: 6px;
   margin-bottom: 7px;
-}
-.workspace-mode .sirius-stage {
-  min-height: 0;
-  flex: 0 0 clamp(150px, 25vh, 230px);
-}
-.workspace-mode .sirius-stage .reactor-wrap {
-  width: min(20vh, 180px);
-  height: min(20vh, 180px);
-}
-.workspace-mode .sirius-stage .waveform-canvas {
-  bottom: 0;
-  width: min(32%, 220px);
-  height: 24px;
-}
-.workspace-mode .sirius-stage .central-card {
-  transform: scale(0.82);
-  transform-origin: center;
 }
 .workspace-mode .sirius-identity {
   position: absolute;
@@ -913,15 +885,6 @@ body.hud-minimal .antique-jar { display: none; }
   top: clamp(58px, 7vh, 78px);
   width: min(700px, calc(100vw - 2 * clamp(220px, 20vw, 300px)));
   height: min(48vh, 460px);
-}
-
-@media (max-width: 900px) {
-  .workspace-mode .sirius-dashboard {
-    width: calc(100vw - 16px);
-    grid-template-columns: minmax(150px, 0.8fr) minmax(250px, 1.2fr) minmax(150px, 0.8fr);
-    gap: 8px;
-    padding: 8px;
-  }
 }
 
 .sirius-stage {
