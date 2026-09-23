@@ -1,12 +1,20 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Logiciel protégé.
 // Centralisation du pipeline réseau HTTP & Timeout de sécurité
 
-export const BACKEND_BASE_URL = (process.env.REACT_APP_BACKEND_URL || "http://127.0.0.1:8001")
+const isNativeApp = typeof window !== "undefined"
+  && window.location.hostname === "localhost"
+  && window.location.protocol === "https:";
+const defaultBackendUrl = isNativeApp ? "https://api.sirius-assistant.fr" : "http://127.0.0.1:8001";
+
+export const BACKEND_BASE_URL = (process.env.REACT_APP_BACKEND_URL || defaultBackendUrl)
   .replace(/\/+$/, "");
 export const API_BASE_URL = `${BACKEND_BASE_URL}/api`;
 
 export const resolveBackendUrl = (url) => {
   if (typeof url !== "string") return url;
+  if (isNativeApp && /^http:\/\/(?:127\.0\.0\.1|localhost):8001(?=\/|$)/.test(url)) {
+    return url.replace(/^http:\/\/(?:127\.0\.0\.1|localhost):8001/, BACKEND_BASE_URL);
+  }
   if (/^\/api(?:\/|$)/.test(url)) return `${BACKEND_BASE_URL}${url}`;
   if (/^undefined\/api(?:\/|$)/.test(url)) {
     return `${BACKEND_BASE_URL}/${url.slice("undefined/".length)}`;

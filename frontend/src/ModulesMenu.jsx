@@ -8,6 +8,8 @@ const GROUPS = ["PANTHÉON", "OUTILS", "MÉDIAS", "SYSTÈME"];
 
 export default function ModulesMenu({ open, onClose, items }) {
   const ref = useRef(null);
+  const compactLayout = typeof window !== "undefined" && window.innerWidth <= 1023;
+  const visibleItems = compactLayout ? items.filter((item) => item.mobile !== false) : items;
   useEffect(() => {
     if (!open) return;
     const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
@@ -21,11 +23,11 @@ export default function ModulesMenu({ open, onClose, items }) {
   return (
     <div className="modmenu" ref={ref} data-testid="modules-menu">
       <div className="modmenu-head">
-        <span><Grip size={13} /> MODULES · {items.length}</span>
+        <span><Grip size={13} /> MODULES · {visibleItems.length}</span>
         <button onClick={onClose} data-testid="modules-menu-close"><X size={14} /></button>
       </div>
       {GROUPS.map((g) => {
-        const list = items.filter((it) => (it.group || "OUTILS") === g);
+        const list = visibleItems.filter((it) => (it.group || "OUTILS") === g);
         if (!list.length) return null;
         return (
           <div key={g} className="modmenu-group" data-testid={`modules-menu-group-${g}`}>

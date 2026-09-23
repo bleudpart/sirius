@@ -1,0 +1,123 @@
+.mobile-navigation {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  .mobile-navigation {
+    position: fixed;
+    z-index: 850;
+    display: flex;
+    background: rgba(3, 13, 23, 0.97);
+    border-color: rgba(126, 231, 255, 0.2);
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.38);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .mobile-navigation-item {
+    position: relative;
+    min-width: 48px;
+    min-height: 48px;
+    border: 0;
+    color: #89a9b8;
+    background: transparent;
+    font: 600 10px/1 "Rajdhani", sans-serif;
+    letter-spacing: 0;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-navigation-item,
+  .mobile-navigation-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .mobile-navigation-item {
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .mobile-navigation-item.active {
+    color: #dffbff;
+  }
+
+  .mobile-navigation-item.active::after {
+    content: "";
+    position: absolute;
+    background: #91e6f2;
+    box-shadow: 0 0 12px rgba(145, 230, 242, 0.8);
+  }
+
+  .mobile-navigation-icon {
+    width: 32px;
+    height: 28px;
+    border-radius: 8px;
+  }
+
+  .mobile-navigation-item.active .mobile-navigation-icon {
+    color: #91e6f2;
+    background: rgba(145, 230, 242, 0.12);
+  }
+
+  .mobile-navigation-item.primary .mobile-navigation-icon {
+    width: 44px;
+    height: 44px;
+    color: #07121c;
+    background: #d8b875;
+    box-shadow: 0 0 20px rgba(216, 184, 117, 0.35);
+    border-radius: 50%;
+  }
+}
+
+@media (max-width: 599px) {
+  .mobile-navigation {
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: calc(68px + env(safe-area-inset-bottom, 0px));
+    padding: 4px max(4px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(4px, env(safe-area-inset-left, 0px));
+    border-top: 1px solid rgba(126, 231, 255, 0.2);
+  }
+
+  .mobile-navigation-item {
+    flex: 1 1 20%;
+  }
+
+  .mobile-navigation-item.active::after {
+    top: 0;
+    width: 26px;
+    height: 2px;
+  }
+
+  .mobile-navigation-item.primary {
+    transform: translateY(-10px);
+  }
+}
+
+@media (min-width: 600px) and (max-width: 1023px) {
+  .mobile-navigation {
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: calc(72px + env(safe-area-inset-left, 0px));
+    padding: max(64px, env(safe-area-inset-top, 0px)) 6px max(12px, env(safe-area-inset-bottom, 0px)) env(safe-area-inset-left, 0px);
+    flex-direction: column;
+    justify-content: center;
+    gap: 12px;
+    border-right: 1px solid rgba(126, 231, 255, 0.2);
+  }
+
+  .mobile-navigation-item {
+    width: 60px;
+    min-height: 58px;
+  }
+
+  .mobile-navigation-item.active::after {
+    top: 14px;
+    right: -6px;
+    width: 2px;
+    height: 28px;
+  }
+}

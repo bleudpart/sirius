@@ -29,6 +29,7 @@ import ArgusPanel, { ArgusWatcher } from "@/ArgusPanel";
 import { ModeBanner, FrugalWatcher, VisionModule } from "@/SystemModes";
 import CommandPalette from "@/CommandPalette";
 import ModulesMenu from "@/ModulesMenu";
+import MobileNavigation from "@/MobileNavigation";
 import { useAuth } from "@/AuthGate";
 import { App as CapacitorApp } from "@capacitor/app";
 import { speakFr, cancelSpeech, speakSeries, speakAsCharacter } from "@/voice";
@@ -43,6 +44,8 @@ import { initHoloWindows, minimizeAll, resetHoloWindowLayout } from "@/holoWindo
 import { ConfirmButton } from "@/ConfirmButton";
 import { getHUDStyleVariables, renderHUD } from "@/theme";
 import { SiriusInfoHub, SiriusNextAction } from "@/hud/SiriusHudPanels";
+import { restoreHudPanel } from "@/hud/hudPanelState";
+import { BACKEND_BASE_URL } from "@/lib/api";
 import "@/App.css";
 import { AmbientEngine } from "@/ambientAudio";
 import { APP_RELEASE } from "@/version";
@@ -69,11 +72,10 @@ if (typeof window !== "undefined") {
 
 // HUD ΣIRIUS — interface holographique
 // Ne pas tenter de créer un WebSocket local si aucun backend n'est réellement attendu.
-const WS_URL = process.env.REACT_APP_WS_URL || (
-  typeof window !== "undefined" && window.location && window.location.hostname !== "localhost"
-    ? "ws://127.0.0.1:8001/api/ws"
-    : ""
-);
+const NATIVE_APP = typeof window !== "undefined"
+  && window.location.hostname === "localhost"
+  && window.location.protocol === "https:";
+const WS_URL = process.env.REACT_APP_WS_URL || (NATIVE_APP ? "wss://api.sirius-assistant.fr/api/ws" : "");
 const ARGUS_ALERT_DISMISS_MS = 30 * 60 * 1000;
 
 // Silence après lequel une phrase dictée est considérée terminée et envoyée au traitement.
@@ -82,8 +84,7 @@ const PHRASE_SILENCE_MS = 1200;
 // Correspondance tâche ΣIRIUS -> fenêtre de progression globale
 const progressMap = {};
 
-// ⚡ FIX : Fallback explicite vers http://127.0.0.1:8001 si la variable d'env est vide
-const BACKEND_BASE = process.env.REACT_APP_BACKEND_URL || "http://127.0.0.1:8001";
+const BACKEND_BASE = BACKEND_BASE_URL;
 const API = BACKEND_BASE + "/api";
 const DAILY_BRIEFING_CACHE_MS = 30 * 60 * 1000;
 const BRIEFING_CONTEXT_TTL_MS = 3 * 24 * 60 * 60 * 1000;
@@ -890,10 +891,12 @@ function App() {
 
   // Assistant d'installation : lancé automatiquement au premier démarrage (profil créé, jamais installé)
   useEffect(() => {
+    if (NATIVE_APP || window.innerWidth <= 1023) return undefined;
     if (profile && (profile.name || profile.prenom) && !localStorage.getItem("sirius_installed")) {
       const t = setTimeout(() => setShowInstall(true), 12000);
       return () => clearTimeout(t);
     }
+    return undefined;
   }, [profile]);
 
 // Vérification automatique des clés API au démarrage : annonce vocale des clés invalides
@@ -5669,9 +5672,12 @@ function App() {
     { label: "HACCP", get: () => !!haccp, set: (v) => setHaccp(v ? { sujet: "", auto: false } : null) },
   ];
   const [touchToast, setTouchToast] = useState(null);
+  const [mobileDestination, setMobileDestination] = useState("home");
+  const commandInputRef = useRef(null);
   const [hudScale, setHudScale] = useState(() => {
-    const saved = Number(localStorage.getItem("sirius_hud_scale"));
-    if (Number.isFinite(saved)) return Math.min(1.1, Math.max(0.8, saved));
+    const storedScale = localStorage.getItem("sirius_hud_scale");
+    const saved = Number(storedScale);
+    if (storedScale !== null && Number.isFinite(saved)) return Math.min(1.1, Math.max(0.8, saved));
     return window.innerWidth <= 900 ? 0.82 : 1;
   });
   const hudScaleStartRef = useRef(hudScale);
@@ -5736,7 +5742,7 @@ function App() {
     { id: "locus", group: "PANTHÉON", label: "LOCUS# — géolocalisation", Icon: MapPin, run: () => setShowLocus(true) },
     { id: "atlas", group: "PANTHÉON", label: "ATLAS# — carte & navigation", Icon: Globe2, run: () => { setAtlasQuery(""); setAtlasRoute(null); setShowAtlas(true); } },
     { id: "heracles", group: "PANTHÉON", label: "HERACLES# — investigation OSINT", Icon: Fingerprint, run: () => setShowHeracles(true) },
-    { id: "hephaistos", group: "PANTHÉON", label: "HÉPHAÏSTOS# — auto-maintenance & diagnostic", Icon: Hammer, run: () => setShowHephaistos(true) },
+    { id: "hephaistos", group: "PANTHÉON", label: "HÉPHAÏSTOS# — auto-maintenance & diagnostic", Icon: Hammer, mobile: false, run: () => setShowHephaistos(true) },
     { id: "mythos", group: "PANTHÉON", label: "Galerie MYTHOS", Icon: MythosLogo, run: () => setShowMythosGallery(true) },
     { id: "trailer", group: "MÉDIAS", label: "TRAILER# — clichés cinématiques", Icon: Clapperboard, run: () => setShowTrailer(true) },
     { id: "promo", group: "MÉDIAS", label: "PROMO# — storyboard vidéo réseaux sociaux", Icon: Radio, run: () => setShowPromo(true) },
@@ -5747,9 +5753,9 @@ function App() {
     { id: "calliope", group: "PANTHÉON", label: "CALLIOPE# — bibliothèque audio", Icon: BookOpen, run: () => setShowCalliope(true) },
     { id: "pythagore", group: "PANTHÉON", label: "PYTHAGORE# — mathématiques & géométrie", Icon: Sigma, run: () => setShowPythagore(true) },
     { id: "news", group: "MÉDIAS", label: "ACTUALITÉS — flux en direct", Icon: Newspaper, run: () => setShowNews(true) },
-    { id: "packager", group: "OUTILS", label: "PACKAGER# — livrable multi-plateforme", Icon: Package, run: () => setShowPackager(true) },
-    { id: "install", group: "SYSTÈME", label: "Assistant d'installation", Icon: Wrench, run: () => setShowInstall(true) },
-    { id: "scripts", group: "OUTILS", label: "Bibliothèque de scripts", Icon: FileCode, run: () => setShowScripts(true) },
+    { id: "packager", group: "OUTILS", label: "PACKAGER# — livrable multi-plateforme", Icon: Package, mobile: false, run: () => setShowPackager(true) },
+    { id: "install", group: "SYSTÈME", label: "Assistant d'installation", Icon: Wrench, mobile: false, run: () => setShowInstall(true) },
+    { id: "scripts", group: "OUTILS", label: "Bibliothèque de scripts", Icon: FileCode, mobile: false, run: () => setShowScripts(true) },
     { id: "vision", group: "MÉDIAS", label: "Vision caméra", Icon: Camera, active: showVision, run: () => setShowVision(!showVision) },
     { id: "productivity", group: "OUTILS", label: "PRODUCTIVITE & TRAVAIL — documents, code, notes, taches", Icon: Workflow, active: showProductivity, run: () => { setProductivityIntent(null); setShowProductivity(true); } },
     { id: "media", group: "MÉDIAS", label: "MEDIA PROXY — lecteurs et controles", Icon: Radio, active: showMediaHud, run: () => { setMediaIntent(null); setShowMediaHud(true); } },
@@ -5758,9 +5764,28 @@ function App() {
   ];
   moduleItemsRef.current = moduleItems;
 
+  const navigateMobile = (destination) => {
+    if (destination === "modules") {
+      setShowModulesMenu(true);
+      setMobileDestination(destination);
+      return;
+    }
+    if (destination === "profile") {
+      setShowSetup(true);
+      setMobileDestination(destination);
+      return;
+    }
+    if (destination === "info") restoreHudPanel("info-hub");
+    setShowModulesMenu(false);
+    setMobileDestination(destination === "assistant" ? "home" : destination);
+    if (destination === "assistant") {
+      window.setTimeout(() => commandInputRef.current?.focus(), 0);
+    }
+  };
+
   return (
     <div
-      className={`sirius-root workspace-mode ${ecoMode ? "eco" : ""} ${windowHidden ? "backgrounded" : ""} mode-${sysMode}`}
+      className={`sirius-root workspace-mode mobile-section-${mobileDestination} ${ecoMode ? "eco" : ""} ${windowHidden ? "backgrounded" : ""} mode-${sysMode}`}
       style={{ ...getHUDStyleVariables(), "--accent": accentColor, "--glow": glowColor, "--hud-scale": hudScale }}
       data-core-active={hudTheme.core.active}
       data-guardian-active={hudTheme.guardian.visible}
@@ -6279,6 +6304,7 @@ function App() {
             <Camera size={15} />
           </button>
           <input
+            ref={commandInputRef}
             className="cmd-input"
             type="text"
             value={cmd}
@@ -6330,6 +6356,8 @@ function App() {
         )}
         <footer className="sirius-footer" data-testid="sirius-footer">COPYRIGHT © 2026 <span className="sirius-footer-mark">Σ</span>IRIUS par Daniel Partel – Tous droits réservés.</footer>
       </div>
+
+      <MobileNavigation active={showModulesMenu ? "modules" : mobileDestination} onNavigate={navigateMobile} />
 
       <GlobalDrop />
     </div>

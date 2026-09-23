@@ -111,6 +111,8 @@ frontend/node_modules/electron/dist/electron
 .env
 .env.*
 *.env
+*.jks
+*.keystore
 backend/contacts_cache.json
 credentials.json
 *.key

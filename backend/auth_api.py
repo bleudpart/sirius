@@ -1,5 +1,6 @@
-"""Local-first authenticated session boundary for ΣIRIUS."""
+"""Authenticated multi-user session boundary for SIRIUS."""
 
+import asyncio
 import base64
 import hashlib
 import hmac
@@ -7,27 +8,27 @@ import ipaddress
 import json
 import os
 import secrets
+import smtplib
+import ssl
 import time
+from datetime import datetime, timedelta, timezone
+from email.message import EmailMessage
 from typing import Optional
 
+import bcrypt
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
-
-router = APIRouter(prefix="/auth", tags=["auth"])
 LEGACY_UID = "daniel@sirius.local"
 _LOCAL_HOSTS = {"127.0.0.1", "::1", "localhost"}
 _FORWARDED_HEADERS = {"forwarded", "x-forwarded-for", "x-forwarded-host", "x-real-ip"}
 _ACCESS_TTL_SECONDS = 12 * 60 * 60
 _REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60
+_LOCK_SECONDS = 15 * 60
+_RESET_TTL_SECONDS = 10 * 60
 
 
 def _load_or_create_secret() -> bytes:
-    """Secret HMAC stable : env prioritaire, sinon persisté dans le dossier de données.
-
-    Sans persistance, un secret aléatoire par process invaliderait toutes les sessions
-    à chaque redémarrage du backend.
-    """
     env_secret = os.getenv("SIRIUS_AUTH_SECRET")
     if env_secret:
         return env_secret.encode("utf-8")
@@ -47,58 +48,47 @@ def _load_or_create_secret() -> bytes:
             pass
         return generated.encode("utf-8")
     except Exception:
-        # Dernier recours : secret éphémère (sessions invalidées au redémarrage).
         return secrets.token_urlsafe(48).encode("utf-8")
 
 
 _AUTH_SECRET = _load_or_create_secret()
-_LOCAL_EMAIL = (os.getenv("SIRIUS_LOCAL_EMAIL") or LEGACY_UID).strip().lower()
-_LOCAL_PASSWORD = (os.getenv("SIRIUS_LOCAL_PASSWORD") or "").strip()
 
 
 class LoginRequest(BaseModel):
     email: str
-    password: Optional[str] = None
+    password: str
+
+
+class RegisterRequest(LoginRequest):
+    name: str = ""
 
 
 class PasswordResetRequest(BaseModel):
     email: str
+
+
+class PasswordResetConfirm(BaseModel):
+    email: str
+    code: str
     password: str
 
 
-def _password_override_path():
+def _normalize_email(value: str) -> str:
+    email = (value or "").strip().lower()
+    if "@" not in email or len(email) > 254:
+        raise HTTPException(status_code=400, detail="Adresse email invalide.")
+    return email
+
+
+def _password_hash(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("ascii")
+
+
+def _password_valid(password: str, encoded: str) -> bool:
     try:
-        from runtime_paths import data_dir
-
-        return data_dir() / ".local_password_hash"
-    except Exception:
-        return None
-
-
-def _password_matches(password: str) -> bool:
-    override_path = _password_override_path()
-    if override_path and override_path.exists():
-        try:
-            salt, expected = override_path.read_text(encoding="utf-8").strip().split(":", 1)
-            derived = hashlib.scrypt(password.encode("utf-8"), salt=bytes.fromhex(salt), n=16384, r=8, p=1)
-            return hmac.compare_digest(derived.hex(), expected)
-        except (OSError, ValueError):
-            return False
-    return not _LOCAL_PASSWORD or hmac.compare_digest(password, _LOCAL_PASSWORD)
-
-
-def _store_password(password: str):
-    path = _password_override_path()
-    if path is None:
-        raise HTTPException(status_code=500, detail="Stockage local indisponible.")
-    salt = secrets.token_bytes(16)
-    derived = hashlib.scrypt(password.encode("utf-8"), salt=salt, n=16384, r=8, p=1)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(f"{salt.hex()}:{derived.hex()}", encoding="utf-8")
-    try:
-        os.chmod(path, 0o600)
-    except OSError:
-        pass
+        return bcrypt.checkpw(password.encode("utf-8"), encoded.encode("ascii"))
+    except (ValueError, TypeError):
+        return False
 
 
 def is_direct_local_request(request: Request) -> bool:
@@ -154,18 +144,6 @@ def _decode_token(token: str, expected_type: str = "access") -> dict:
     return payload
 
 
-def _user(payload: dict) -> dict:
-    email = payload.get("email") or LEGACY_UID
-    return {
-        "email": email,
-        "user_id": payload.get("sub") or email,
-        "name": "Daniel" if email == LEGACY_UID else email.split("@", 1)[0],
-        "role": payload.get("role") or "user",
-        "provider": "local",
-        "preferences": {},
-    }
-
-
 def create_access_token(user_id, email: str | None = None, role: str = "user") -> str:
     if isinstance(user_id, dict):
         data = user_id
@@ -184,101 +162,300 @@ def create_refresh_token(user_id, email: str | None = None, role: str = "user") 
     return _token(str(user_id), email or str(user_id), role, _REFRESH_TTL_SECONDS, "refresh")
 
 
-def _set_cookies(response: Response, access_token: str, refresh_token: Optional[str] = None):
-    cookie_options = {
-        "httponly": True,
-        "secure": os.getenv("SIRIUS_COOKIE_SECURE", "").strip() == "1",
-        "samesite": "strict",
-        "path": "/",
+def _public_user(document: dict) -> dict:
+    email = document.get("email") or LEGACY_UID
+    return {
+        "email": email,
+        "user_id": document.get("user_id") or email,
+        "name": document.get("name") or email.split("@", 1)[0],
+        "role": document.get("role") or "user",
+        "provider": document.get("provider") or "email",
+        "preferences": document.get("preferences") if isinstance(document.get("preferences"), dict) else {},
+        "disabled": bool(document.get("disabled")),
     }
-    response.set_cookie("access_token", access_token, max_age=_ACCESS_TTL_SECONDS, **cookie_options)
+
+
+def _set_cookies(response: Response, access_token: str, refresh_token: Optional[str] = None):
+    options = {"httponly": True, "secure": True, "samesite": "none", "path": "/"}
+    response.set_cookie("access_token", access_token, max_age=_ACCESS_TTL_SECONDS, **options)
     if refresh_token:
-        response.set_cookie("refresh_token", refresh_token, max_age=_REFRESH_TTL_SECONDS, **cookie_options)
+        response.set_cookie("refresh_token", refresh_token, max_age=_REFRESH_TTL_SECONDS, **options)
+
+
+def _issue_session(response: Response, user: dict) -> dict:
+    access = create_access_token(user)
+    refresh = create_refresh_token(user)
+    _set_cookies(response, access, refresh)
+    return {**_public_user(user), "access_token": access}
 
 
 async def require_user(request: Request, db=None) -> dict:
-    del db
-    # Cookie d'abord ; fallback Authorization: Bearer quand le cookie SameSite
-    # n'est pas rejoué (page localhost:3000 → API 127.0.0.1:8001 = cross-site).
     token = request.cookies.get("access_token") or ""
     if not token:
-        auth_header = request.headers.get("authorization") or ""
-        if auth_header.lower().startswith("bearer "):
-            token = auth_header[7:].strip()
-    return _user(_decode_token(token))
+        authorization = request.headers.get("authorization") or ""
+        if authorization.lower().startswith("bearer "):
+            token = authorization[7:].strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentification requise.")
+    payload = _decode_token(token)
+    user = {"user_id": payload.get("sub"), "email": payload.get("email"), "role": payload.get("role") or "user"}
+    if db is not None:
+        stored = await db.users.find_one({"user_id": user["user_id"]})
+        if not stored or stored.get("disabled"):
+            raise HTTPException(status_code=401, detail="Compte indisponible.")
+        return _public_user(stored)
+    return _public_user(user)
 
 
 async def resolve_user_id(request: Request, db=None) -> str:
     return (await require_user(request, db))["user_id"]
 
 
-@router.post("/local-session")
-async def local_session(request: Request, response: Response):
-    if not is_direct_local_request(request):
-        raise HTTPException(status_code=403, detail="Session automatique réservée à la machine locale.")
-    access = create_access_token(_LOCAL_EMAIL, _LOCAL_EMAIL, "admin")
-    refresh = create_refresh_token(_LOCAL_EMAIL, _LOCAL_EMAIL, "admin")
-    _set_cookies(response, access, refresh)
-    return {**_user({"sub": _LOCAL_EMAIL, "email": _LOCAL_EMAIL, "role": "admin"}), "access_token": access}
+async def seed_admin_and_indexes(db):
+    await db.users.create_index("email", unique=True)
+    await db.users.create_index("user_id", unique=True)
+    await db.login_attempts.create_index("expires_at", expireAfterSeconds=0)
+    await db.password_reset_codes.create_index("expires_at", expireAfterSeconds=0)
+    admin_email = (os.getenv("ADMIN_EMAIL") or os.getenv("SIRIUS_LOCAL_EMAIL") or "").strip().lower()
+    admin_password = (os.getenv("ADMIN_PASSWORD") or os.getenv("SIRIUS_LOCAL_PASSWORD") or "").strip()
+    if not admin_email or not admin_password:
+        return
+    existing = await db.users.find_one({"email": admin_email})
+    now = datetime.now(timezone.utc)
+    if existing:
+        updates = {"role": "admin", "name": existing.get("name") or "Daniel", "updated_at": now}
+        if not _password_valid(admin_password, existing.get("password_hash") or ""):
+            updates["password_hash"] = _password_hash(admin_password)
+        await db.users.update_one({"email": admin_email}, {"$set": updates})
+        return
+    await db.users.insert_one({
+        "user_id": f"user_{secrets.token_hex(12)}",
+        "email": admin_email,
+        "password_hash": _password_hash(admin_password),
+        "name": "Daniel",
+        "role": "admin",
+        "provider": "email",
+        "preferences": {},
+        "disabled": False,
+        "created_at": now,
+        "updated_at": now,
+    })
 
 
-@router.post("/login")
-async def login(data: LoginRequest, request: Request, response: Response):
-    if not is_direct_local_request(request):
-        raise HTTPException(status_code=403, detail="Connexion locale refusée depuis cette machine.")
-    if data.email.strip().lower() != _LOCAL_EMAIL:
-        raise HTTPException(status_code=401, detail="Identifiants invalides.")
-    if not _password_matches(data.password or ""):
-        raise HTTPException(status_code=401, detail="Identifiants invalides.")
-    access = create_access_token(_LOCAL_EMAIL, _LOCAL_EMAIL, "admin")
-    refresh = create_refresh_token(_LOCAL_EMAIL, _LOCAL_EMAIL, "admin")
-    _set_cookies(response, access, refresh)
-    return {**_user({"sub": _LOCAL_EMAIL, "email": _LOCAL_EMAIL, "role": "admin"}), "access_token": access}
+async def _send_reset_email(email: str, code: str):
+    host = (os.getenv("SIRIUS_SMTP_HOST") or "").strip()
+    sender = (os.getenv("SIRIUS_SMTP_FROM") or os.getenv("SIRIUS_SMTP_USER") or "").strip()
+    if not host or not sender:
+        raise HTTPException(status_code=503, detail="Service email temporairement indisponible.")
+    port = int(os.getenv("SIRIUS_SMTP_PORT") or "587")
+    username = (os.getenv("SIRIUS_SMTP_USER") or "").strip()
+    password = os.getenv("SIRIUS_SMTP_PASSWORD") or ""
+    use_ssl = os.getenv("SIRIUS_SMTP_SSL", "").strip() == "1"
+    message = EmailMessage()
+    message["From"] = sender
+    message["To"] = email
+    message["Subject"] = "Votre code de récupération SIRIUS"
+    message.set_content(
+        f"Votre code de récupération SIRIUS est : {code}\n\n"
+        "Ce code expire dans 10 minutes. Si vous n'êtes pas à l'origine de cette demande, ignorez ce message."
+    )
+
+    def send():
+        if use_ssl:
+            client = smtplib.SMTP_SSL(host, port, timeout=20, context=ssl.create_default_context())
+        else:
+            client = smtplib.SMTP(host, port, timeout=20)
+        with client:
+            if not use_ssl:
+                client.starttls(context=ssl.create_default_context())
+            if username:
+                client.login(username, password)
+            client.send_message(message)
+
+    try:
+        await asyncio.to_thread(send)
+    except (OSError, smtplib.SMTPException) as error:
+        raise HTTPException(status_code=503, detail="Envoi du code impossible pour le moment.") from error
 
 
-@router.post("/reset-password")
-async def reset_password(data: PasswordResetRequest, request: Request):
-    if not is_direct_local_request(request):
-        raise HTTPException(status_code=403, detail="Réinitialisation réservée à la machine locale.")
-    email = data.email.strip().lower()
-    password = data.password.strip()
-    if email != _LOCAL_EMAIL:
-        raise HTTPException(status_code=400, detail="Adresse email incorrecte.")
-    if len(password) < 8:
-        raise HTTPException(status_code=400, detail="Le mot de passe doit contenir au moins 8 caractères.")
-    _store_password(password)
-    return {"status": "password_updated"}
+def make_auth_router(db):
+    router = APIRouter(prefix="/auth", tags=["auth"])
 
+    @router.post("/local-session")
+    async def local_session(request: Request, response: Response):
+        if not is_direct_local_request(request):
+            raise HTTPException(status_code=403, detail="Session automatique réservée à la machine locale.")
+        email = (os.getenv("ADMIN_EMAIL") or os.getenv("SIRIUS_LOCAL_EMAIL") or "").strip().lower()
+        user = await db.users.find_one({"email": email}) if email else None
+        if not user:
+            raise HTTPException(status_code=503, detail="Compte administrateur non configuré.")
+        return _issue_session(response, user)
 
-@router.get("/me")
-async def get_current_user(request: Request):
-    return await require_user(request)
+    @router.post("/register")
+    async def register(data: RegisterRequest, response: Response):
+        email = _normalize_email(data.email)
+        password = data.password.strip()
+        if len(password) < 6:
+            raise HTTPException(status_code=400, detail="Le mot de passe doit contenir au moins 6 caractères.")
+        if await db.users.find_one({"email": email}):
+            raise HTTPException(status_code=409, detail="Un compte existe déjà avec cette adresse.")
+        now = datetime.now(timezone.utc)
+        user = {
+            "user_id": f"user_{secrets.token_hex(12)}",
+            "email": email,
+            "password_hash": _password_hash(password),
+            "name": data.name.strip()[:120] or email.split("@", 1)[0],
+            "role": "user",
+            "provider": "email",
+            "preferences": {},
+            "disabled": False,
+            "created_at": now,
+            "updated_at": now,
+        }
+        await db.users.insert_one(user)
+        return _issue_session(response, user)
 
+    @router.post("/login")
+    async def login(data: LoginRequest, response: Response):
+        email = _normalize_email(data.email)
+        identifier = f"login:{email}"
+        now = datetime.now(timezone.utc)
+        attempt = await db.login_attempts.find_one({"identifier": identifier})
+        if attempt and attempt.get("count", 0) >= 5 and attempt.get("expires_at", now) > now:
+            raise HTTPException(status_code=429, detail="Trop de tentatives. Réessayez dans 15 minutes.")
+        user = await db.users.find_one({"email": email})
+        if not user or user.get("disabled") or not _password_valid(data.password, user.get("password_hash") or ""):
+            count = int((attempt or {}).get("count") or 0) + 1
+            await db.login_attempts.update_one(
+                {"identifier": identifier},
+                {"$set": {"count": count, "expires_at": now + timedelta(seconds=_LOCK_SECONDS)}},
+                upsert=True,
+            )
+            raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect.")
+        await db.login_attempts.delete_one({"identifier": identifier})
+        await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"last_activity": now}})
+        return _issue_session(response, user)
 
-@router.post("/logout")
-async def logout(response: Response):
-    response.delete_cookie("access_token", path="/")
-    response.delete_cookie("refresh_token", path="/")
-    return {"status": "logged_out"}
+    @router.post("/password-reset/request")
+    async def password_reset_request(data: PasswordResetRequest):
+        email = _normalize_email(data.email)
+        now = datetime.now(timezone.utc)
+        existing = await db.password_reset_codes.find_one({"email": email})
+        if existing and existing.get("requested_at", now) > now - timedelta(seconds=60):
+            raise HTTPException(status_code=429, detail="Veuillez attendre une minute avant de redemander un code.")
+        user = await db.users.find_one({"email": email, "disabled": {"$ne": True}})
+        if user:
+            code = f"{secrets.randbelow(1_000_000):06d}"
+            code_hash = hmac.new(_AUTH_SECRET, f"{email}:{code}".encode("utf-8"), hashlib.sha256).hexdigest()
+            await db.password_reset_codes.update_one(
+                {"email": email},
+                {"$set": {
+                    "email": email,
+                    "code_hash": code_hash,
+                    "attempts": 0,
+                    "requested_at": now,
+                    "expires_at": now + timedelta(seconds=_RESET_TTL_SECONDS),
+                }},
+                upsert=True,
+            )
+            await _send_reset_email(email, code)
+        return {"ok": True, "message": "Si ce compte existe, un code vient d'être envoyé."}
 
+    @router.post("/password-reset/confirm")
+    async def password_reset_confirm(data: PasswordResetConfirm):
+        email = _normalize_email(data.email)
+        password = data.password.strip()
+        if len(password) < 8:
+            raise HTTPException(status_code=400, detail="Le mot de passe doit contenir au moins 8 caractères.")
+        record = await db.password_reset_codes.find_one({"email": email})
+        now = datetime.now(timezone.utc)
+        if not record or record.get("expires_at", now) <= now or int(record.get("attempts") or 0) >= 5:
+            raise HTTPException(status_code=400, detail="Code invalide ou expiré.")
+        expected = hmac.new(_AUTH_SECRET, f"{email}:{data.code.strip()}".encode("utf-8"), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(expected, record.get("code_hash") or ""):
+            await db.password_reset_codes.update_one({"email": email}, {"$inc": {"attempts": 1}})
+            raise HTTPException(status_code=400, detail="Code invalide ou expiré.")
+        result = await db.users.update_one(
+            {"email": email, "disabled": {"$ne": True}},
+            {"$set": {"password_hash": _password_hash(password), "updated_at": now}},
+        )
+        await db.password_reset_codes.delete_one({"email": email})
+        await db.login_attempts.delete_one({"identifier": f"login:{email}"})
+        if not result.modified_count:
+            raise HTTPException(status_code=400, detail="Code invalide ou expiré.")
+        return {"ok": True}
 
-@router.put("/profile")
-async def update_profile(data: dict, request: Request):
-    user = await require_user(request)
-    return {
-        **user,
-        "name": str(data.get("name") or user["name"])[:120],
-        "preferences": data.get("preferences") if isinstance(data.get("preferences"), dict) else {},
-    }
+    @router.get("/me")
+    async def current_user(request: Request):
+        return await require_user(request, db)
 
+    @router.post("/logout")
+    async def logout(response: Response):
+        response.delete_cookie("access_token", path="/")
+        response.delete_cookie("refresh_token", path="/")
+        return {"ok": True}
 
-def make_auth_router(*args, **kwargs):
+    @router.put("/profile")
+    async def update_profile(data: dict, request: Request):
+        user = await require_user(request, db)
+        updates = {"updated_at": datetime.now(timezone.utc)}
+        if isinstance(data.get("name"), str):
+            updates["name"] = data["name"].strip()[:120]
+        if isinstance(data.get("preferences"), dict):
+            updates["preferences"] = data["preferences"]
+        await db.users.update_one({"user_id": user["user_id"]}, {"$set": updates})
+        stored = await db.users.find_one({"user_id": user["user_id"]})
+        return _public_user(stored)
+
     return router
 
 
-def make_admin_router(*args, **kwargs):
+def make_admin_router(db):
+    router = APIRouter(prefix="/admin", tags=["admin"])
+
+    async def require_admin(request: Request):
+        user = await require_user(request, db)
+        if user["role"] != "admin":
+            raise HTTPException(status_code=403, detail="Accès administrateur requis.")
+        return user
+
+    @router.get("/users")
+    async def list_users(request: Request):
+        await require_admin(request)
+        users = []
+        async for document in db.users.find({}):
+            user = _public_user(document)
+            uid = user["user_id"]
+            last_activity = document.get("last_activity") or document.get("created_at") or datetime.now(timezone.utc)
+            user["activity"] = {
+                "messages": await db.sirius_chats.count_documents({"user_id": uid}),
+                "last_activity": int(last_activity.timestamp()),
+                "facts": await db.local_memory.count_documents({"user_id": uid}),
+                "deals": await db.agora_deals.count_documents({"user_id": uid}),
+                "transactions": await db.payment_transactions.count_documents({"user_id": uid}),
+                "themis_docs": await db.themis_docs.count_documents({"user_id": uid}),
+                "themis_clients": await db.themis_clients.count_documents({"user_id": uid}),
+            }
+            users.append(user)
+        return {"users": users, "total": len(users)}
+
+    @router.put("/users/{user_id}/disable")
+    async def disable_user(user_id: str, request: Request):
+        await require_admin(request)
+        stored = await db.users.find_one({"user_id": user_id})
+        if not stored:
+            raise HTTPException(status_code=404, detail="Compte introuvable.")
+        await db.users.update_one({"user_id": user_id}, {"$set": {"disabled": not bool(stored.get("disabled"))}})
+        return {"ok": True}
+
+    @router.delete("/users/{user_id}")
+    async def delete_user(user_id: str, request: Request):
+        admin = await require_admin(request)
+        if user_id == admin["user_id"]:
+            raise HTTPException(status_code=400, detail="Le compte administrateur actif ne peut pas être supprimé.")
+        result = await db.users.delete_one({"user_id": user_id})
+        if not result.deleted_count:
+            raise HTTPException(status_code=404, detail="Compte introuvable.")
+        return {"ok": True}
+
     return router
-
-
-async def seed_admin_and_indexes(*args, **kwargs):
-    return None

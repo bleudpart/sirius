@@ -57,8 +57,37 @@
 }
 
 @media (max-width: 640px) {
-  .modmenu { width: calc(100vw - 24px); right: 12px; resize: none; }
+  .modmenu {
+    position: fixed;
+    top: calc(56px + env(safe-area-inset-top, 0px));
+    right: 0;
+    bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+    left: 0;
+    width: auto;
+    height: auto;
+    min-width: 0;
+    max-width: none;
+    max-height: none;
+    resize: none;
+    border-width: 1px 0 0;
+    border-radius: 0;
+  }
   .modmenu-grid { grid-template-columns: 1fr; }
+  .modmenu-head { position: sticky; top: 0; z-index: 2; min-height: 48px; background: rgba(4, 16, 28, 0.98); }
+  .modmenu-head button { width: 48px; height: 48px; }
+  .modmenu-item { min-height: 52px; padding: 10px 14px; font-size: 14px; }
+}
+
+@media (min-width: 641px) and (max-width: 1023px) {
+  .modmenu {
+    position: fixed;
+    top: 12px;
+    bottom: 12px;
+    left: calc(84px + env(safe-area-inset-left, 0px));
+    right: auto;
+    height: auto;
+    resize: none;
+  }
 }
 
 /* Groupes de modules (ergonomie : groupement logique) */

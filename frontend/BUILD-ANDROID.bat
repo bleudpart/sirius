@@ -30,7 +30,19 @@ if errorlevel 1 (
 )
 
 echo.
-if /i "%~1"=="release" (
+if /i "%~1"=="play" (
+    if "%SIRIUS_ANDROID_KEYSTORE%"=="" (
+        echo [ERREUR] Signature Google Play absente.
+        echo Definissez SIRIUS_ANDROID_KEYSTORE, SIRIUS_ANDROID_STORE_PASSWORD,
+        echo SIRIUS_ANDROID_KEY_ALIAS et SIRIUS_ANDROID_KEY_PASSWORD.
+        exit /b 1
+    )
+    echo [2/2] Generation de l'Android App Bundle signe pour Google Play...
+    pushd android
+    call gradlew.bat bundleRelease
+    popd
+    set "APK_PATH=android\app\build\outputs\bundle\release\app-release.aab"
+) else if /i "%~1"=="release" (
     echo [2/2] Generation de l'APK release...
     pushd android
     call gradlew.bat assembleRelease
@@ -50,6 +62,6 @@ if errorlevel 1 (
 )
 
 echo.
-echo APK genere : %CD%\%APK_PATH%
+echo Fichier Android genere : %CD%\%APK_PATH%
 start "" "%CD%\%APK_PATH%"
 endlocal

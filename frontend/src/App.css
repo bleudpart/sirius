@@ -815,13 +815,20 @@ body.hud-minimal .antique-jar { display: none; }
   transition: transform 0.12s ease-out;
 }
 
-/* Fenêtre d'info unique (Centre d'Information) : une seule colonne, plus large,
-   remplace l'ancienne grille 3 colonnes à 8 fenêtres flottantes séparées. */
+/* La fenêtre d'information se superpose au HUD sans déplacer le noyau central. */
 .sirius-dashboard--hub {
-  grid-template-columns: minmax(280px, clamp(280px, 24vw, 360px)) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
 }
-.sirius-dashboard--hub .sirius-column--left { grid-column: 1; }
-.sirius-dashboard--hub .sirius-center { grid-column: 2; }
+.sirius-dashboard--hub .sirius-column--left {
+  position: absolute;
+  inset: 8px auto auto clamp(8px, 1.4vw, 18px);
+  z-index: 20;
+  width: min(360px, calc(100% - 16px));
+  height: calc(100% - 56px);
+}
+.sirius-dashboard--hub .sirius-center {
+  grid-column: 1;
+}
 
 @keyframes dashboardSweep {
   0%, 62% { background-position: -120% 0; }
@@ -858,7 +865,7 @@ body.hud-minimal .antique-jar { display: none; }
   min-width: 0;
 }
 .workspace-mode .sirius-dashboard--hub {
-  grid-template-columns: minmax(280px, 0.92fr) minmax(420px, 1.7fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 .workspace-mode .sirius-column {
   gap: 8px;
@@ -7626,3 +7633,81 @@ body[data-phase] .center-stage::before { content: none !important; }
 .fp-pro-host svg { width: 100%; height: 100%; }
 .fp-plan-host { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; border-radius: 10px; overflow: hidden; }
 .fp-plan-host svg { width: 100%; height: 100%; }
+
+/* ===== Navigation adaptative Android : téléphone, tablette et fenêtres redimensionnées ===== */
+@media (max-width: 1023px) {
+  .sirius-root {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .auth-chip,
+  [data-testid="sirius-fullscreen-btn"],
+  [data-testid="sirius-modules-btn"],
+  [data-testid="sirius-profile-btn"],
+  .sirius-mobile-exit {
+    display: none;
+  }
+
+  .sirius-root.mobile-section-info .sirius-dashboard {
+    transform: none;
+  }
+
+  .sirius-root.mobile-section-info .sirius-column--left {
+    position: absolute;
+    inset: 8px;
+    z-index: 40;
+    display: flex;
+    width: auto;
+    height: auto;
+    max-height: none;
+    padding: 0;
+  }
+
+  .sirius-root.mobile-section-info .sirius-center {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .sirius-root.mobile-section-info .shud-hub {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+  }
+
+  .sirius-root.mobile-section-info .shud-hub .shud-close {
+    display: none;
+  }
+}
+
+@media (max-width: 599px) {
+  .sirius-root {
+    padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .sirius-root.mobile-section-info {
+    grid-template-rows: 56px minmax(0, 1fr);
+    grid-template-areas: "top" "dashboard";
+  }
+
+  .sirius-root.mobile-section-info .sirius-dashboard {
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .sirius-command-area {
+    padding-bottom: 4px;
+  }
+
+  .sirius-footer {
+    display: none;
+  }
+
+  .sirius-root.mobile-section-info .sirius-command-area {
+    display: none;
+  }
+}
+
+@media (min-width: 600px) and (max-width: 1023px) {
+  .sirius-root {
+    padding-left: calc(72px + env(safe-area-inset-left, 0px));
+  }
+}

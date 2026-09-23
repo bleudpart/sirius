@@ -7,10 +7,10 @@ const config = {
   webDir: "build",
   bundledWebRuntime: false,
   android: {
-    allowMixedContent: true,
+    allowMixedContent: false,
   },
   server: {
-    androidScheme: "http",
+    androidScheme: "https",
   },
 };
 

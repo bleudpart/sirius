@@ -6,8 +6,7 @@ import { BACKEND_BASE_URL, resolveBackendUrl } from "@/lib/api";
 
 const API = BACKEND_BASE_URL;
 const BACKEND_URL_PREFIX = `${BACKEND_BASE_URL.replace(/\/$/, "")}/`;
-// Temporary local bypass while the replacement authentication flow is prepared.
-const TEMPORARY_AUTH_BYPASS = true;
+const TEMPORARY_AUTH_BYPASS = process.env.NODE_ENV !== "production";
 export const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 
@@ -93,7 +92,9 @@ function syncLocalProfile(user) {
 }
 
 function AuthScreen({ onAuth }) {
-  const [form, setForm] = useState({ email: "danielpartel@hotmail.com", password: "" });
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [resetCode, setResetCode] = useState("");
+  const [resetCodeSent, setResetCodeSent] = useState(false);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [resetMode, setResetMode] = useState(false);
@@ -114,22 +115,29 @@ function AuthScreen({ onAuth }) {
     } catch (e2) { setErr(e2.message); setBusy(false); }
   };
 
-  const microsoftLogin = () => {
-    window.location.href = `${API}/api/auth/microsoft/login`;
-  };
-
   const resetPassword = async (e) => {
     e.preventDefault();
     setBusy(true); setErr("");
     try {
-      const r = await fetch(`${API}/api/auth/reset-password`, {
+      const path = resetCodeSent ? "/api/auth/password-reset/confirm" : "/api/auth/password-reset/request";
+      const payload = resetCodeSent
+        ? { email: form.email, code: resetCode, password: form.password }
+        : { email: form.email };
+      const r = await fetch(`${API}${path}`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: form.email, password: form.password }),
+        body: JSON.stringify(payload),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(fmtErr(data.detail));
-      setResetMode(false);
-      setErr("Mot de passe modifié. Tu peux maintenant te connecter.");
+      if (!resetCodeSent) {
+        setResetCodeSent(true);
+        setErr(data.message || "Un code vient d'être envoyé par email.");
+      } else {
+        setResetMode(false);
+        setResetCodeSent(false);
+        setResetCode("");
+        setErr("Mot de passe modifié. Tu peux maintenant te connecter.");
+      }
     } catch (e2) { setErr(e2.message); }
     finally { setBusy(false); }
   };
@@ -143,19 +151,23 @@ function AuthScreen({ onAuth }) {
         <form onSubmit={resetMode ? resetPassword : submit} className="auth-form" data-testid="auth-form">
           <input type="email" placeholder="Email" value={form.email} required autoComplete="email"
             onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="auth-email-input" />
+          {resetMode && resetCodeSent && (
+            <input type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6}
+              placeholder="Code à 6 chiffres" value={resetCode} required
+              onChange={(e) => setResetCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              data-testid="auth-reset-code-input" />
+          )}
           <input type="password" placeholder="Mot de passe" value={form.password} required autoComplete="current-password"
+            style={resetMode && !resetCodeSent ? { display: "none" } : undefined}
+            disabled={resetMode && !resetCodeSent}
             onChange={(e) => setForm({ ...form, password: e.target.value })} data-testid="auth-password-input" />
           {err && <div className="auth-error" data-testid="auth-error">{err}</div>}
           <button type="submit" className="auth-submit" disabled={busy} data-testid="auth-submit-btn">
-            <LogIn size={15} /> {resetMode ? "MODIFIER LE MOT DE PASSE" : "SE CONNECTER"}
+            <LogIn size={15} /> {resetMode ? (resetCodeSent ? "VALIDER LE NOUVEAU MOT DE PASSE" : "RECEVOIR UN CODE") : "SE CONNECTER"}
           </button>
         </form>
-        <button className="auth-link" onClick={() => { setResetMode(!resetMode); setErr(""); }}>
+        <button className="auth-link" onClick={() => { setResetMode(!resetMode); setResetCodeSent(false); setResetCode(""); setErr(""); }}>
           {resetMode ? "Retour à la connexion" : "Mot de passe oublié ?"}
-        </button>
-        <button className="auth-google" onClick={microsoftLogin} data-testid="auth-microsoft-btn">
-          <svg width="15" height="15" viewBox="0 0 24 24"><path fill="#f35325" d="M1 1h10v10H1z"/><path fill="#81bc06" d="M13 1h10v10H13z"/><path fill="#05a6f0" d="M1 13h10v10H1z"/><path fill="#ffba08" d="M13 13h10v10H13z"/></svg>
-          CONTINUER AVEC MICROSOFT
         </button>
       </div>
     </div>
