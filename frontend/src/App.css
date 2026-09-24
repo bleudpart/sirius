@@ -554,6 +554,21 @@ body.hud-minimal .antique-jar { display: none; }
   gap: 8px;
   color: #8fb6c9;
 }
+.hud-version-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(145, 230, 242, 0.55);
+  background: linear-gradient(180deg, rgba(16, 28, 38, 0.96), rgba(8, 17, 25, 0.9));
+  color: #eaf9ff;
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 1.6px;
+  font-weight: 800;
+  box-shadow: 0 0 10px rgba(145, 230, 242, 0.18), inset 0 0 10px rgba(145, 230, 242, 0.10);
+}
 .conn-led { width: 8px; height: 8px; border-radius: 50%; }
 .conn-led.on { background: #91e6f2; box-shadow: 0 0 10px #91e6f2; }
 .conn-led.off { background: #d8b875; box-shadow: 0 0 10px #d8b875; animation: blink 2s infinite; }

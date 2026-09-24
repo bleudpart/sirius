@@ -48,7 +48,7 @@ import { restoreHudPanel } from "@/hud/hudPanelState";
 import { BACKEND_BASE_URL } from "@/lib/api";
 import "@/App.css";
 import { AmbientEngine } from "@/ambientAudio";
-import { APP_RELEASE } from "@/version";
+import { APP_RELEASE, APP_VERSION } from "@/version";
 
 /* executeIntent moved into the real App component (see later in the file) */
 
@@ -6102,6 +6102,7 @@ function App() {
         <div className="conn-status" data-testid="sirius-connection">
           <span className={`conn-led ${connected ? "on" : "off"}`} />
           {"IA CLOUD"}
+          <span className="hud-version-badge" title={APP_RELEASE}>v{APP_VERSION}</span>
           {mode === "brainstorm" && <span className="mode-badge" data-testid="brainstorm-badge">BRAINSTORM</span>}
           
           {/* Connection status badge */}
