@@ -56,6 +56,7 @@ import { APP_RELEASE } from "@/version";
 // transitoires des fenêtres sont oubliées: mémoire, profil, clés et projets restent intacts.
 if (typeof window !== "undefined") {
   resetHoloWindowLayout();
+  restoreHudPanel("info-hub");
   try {
     [
       "sirius_panel_pos",
