@@ -158,7 +158,13 @@ function AuthScreen({ onAuth }) {
     <div className="auth-screen" data-testid="auth-screen">
       <div className="auth-card">
         <header className="auth-brand">
-          <h1 className="auth-title">ΣIRIUS</h1>
+          <div className="auth-brand-main">
+            <span className="auth-core-logo" aria-hidden="true">
+              <img src="/holo/ring-gold.png" alt="" draggable={false} />
+              <i />
+            </span>
+            <h1 className="auth-title">ΣIRIUS</h1>
+          </div>
           <p className="auth-tagline">VOTRE ASSISTANT PRIVILÉGIÉ</p>
         </header>
         <p className="auth-sub">{registerMode ? "Créez votre compte pour accéder à ΣIRIUS" : "Identifiez-vous pour accéder à ΣIRIUS"}</p>
