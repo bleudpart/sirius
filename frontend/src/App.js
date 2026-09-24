@@ -4787,6 +4787,11 @@ function App() {
     setKeys(newKeys);
     localStorage.setItem("sirius_profile", JSON.stringify(newProfile));
     localStorage.setItem("sirius_keys", JSON.stringify(newKeys));
+    fetch(`${API}/auth/profile`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newProfile.name }),
+    }).catch(() => {});
     setShowSetup(false);
     if (offerConnections) setShowConnections(true);
     setText(`${greetByPhase(newProfile.name)} Tous mes systèmes sont en ligne.`);
