@@ -2,7 +2,7 @@
 
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Mic, MicOff, Clock, Cpu, Wifi, MapPin, Calendar, X, Leaf, UserCog, Brain, Music, Repeat, RotateCcw, BarChart3, Workflow, Ruler, FolderOpen, Code2, Database, Sparkles, Eye, Landmark, Library, Orbit, Monitor, ShieldCheck, Radar, ShieldAlert, Camera, Fingerprint, Zap, Package, Clapperboard, Grip, Radio, Wrench, FileCode, History, Maximize, Minimize, KeyRound, Home as HomeIcon, BadgeInfo, Globe2, Hammer, TrendingUp, Newspaper, Scale, Flame, BookOpen, Sigma, AlarmClock, Power, Boxes } from "lucide-react";
+import { Mic, MicOff, Clock, Cpu, Wifi, MapPin, Calendar, X, Leaf, UserCog, Brain, Music, Repeat, RotateCcw, BarChart3, Workflow, Ruler, FolderOpen, Code2, Database, Sparkles, Eye, Landmark, Library, Orbit, Monitor, ShieldCheck, Radar, ShieldAlert, Camera, Fingerprint, Zap, Package, Clapperboard, Grip, Radio, Wrench, FileCode, History, Maximize, Minimize, KeyRound, Home as HomeIcon, BadgeInfo, Globe2, Hammer, TrendingUp, Newspaper, Scale, Flame, BookOpen, Sigma, AlarmClock, Power, Boxes, Link2 } from "lucide-react";
 import {
   ArchitectPanel, SpectatorView, FilesPanel, DevCompanion, ZeusCortex, SiriusPrime, OracleDivin,
   PantheonSystem, NexusCeleste, SiriusDisplay, EuropeanaViewer, HaccpModule, KeysStatus, KeraunosPanel,
@@ -10,7 +10,7 @@ import {
   AtlasPanel, HeraclesPanel, HephaistosPanel, MythosGallery, ConsultPanel, PrometheePanel, CalliopePanel, CalendarPanel,
   FaceIdPanel, PythagorePanel, PackagerPanel, TrailerGallery, SiriusSetup, PromoPanel, ThemisPanel,
   AdminPanel, PortusNummarius, AgoraPipeline, NewsPanel, ReveilPanel, SpotifyPanel, MediaHUD, ProductivityPanel,
-  FloorPlanPanel, Photo3DPanel,
+  FloorPlanPanel, Photo3DPanel, ConnectionsPanel,
 } from "@/lazyModules";
 import { pushStats, pushSimStats } from "@/liveStats";
 import { formatLocalDate, formatLocalTime, getLocalDateKey } from "@/dateTime";
@@ -776,6 +776,7 @@ function App() {
   const [showPromethee, setShowPromethee] = useState(false);
   const [showCalliope, setShowCalliope] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [showConnections, setShowConnections] = useState(false);
   const [showFaceId, setShowFaceId] = useState(false);
   const [showReveil, setShowReveil] = useState(false);
   const [showSpotifyWin, setShowSpotifyWin] = useState(false);
@@ -2144,15 +2145,8 @@ function App() {
 
   // ---- Outlook (Microsoft Graph) : emails + calendrier dans des fenêtres HUD ----
   const connectOutlook = useCallback(() => {
-    // Popup (pas noopener/noreferrer : la popup doit garder window.opener pour prévenir
-    // cet onglet via postMessage une fois connectée, cf. _ms_popup_response côté backend).
-    // Sans ça, la redirection finale rechargeait le SPA en plein dans CET onglet-popup,
-    // ce qui démarrait une deuxième instance complète de ΣIRIUS ("un nouveau ΣIRIUS démarre").
-    window.open(`${API}/auth/microsoft/login`, "outlook-auth", "width=520,height=720");
-    setStatus("speaking");
-    const m = "Connecte-toi à Outlook dans la fenêtre qui s'ouvre...";
-    setText(m); speakOut(m);
-  }, [speakOut]);
+    setShowConnections(true);
+  }, []);
 
   // Lecture vocale des derniers mails Outlook (Microsoft Graph par utilisateur, repli sur l'ancien connecteur)
   const readMailAloud = useCallback(async () => {
@@ -2201,34 +2195,9 @@ function App() {
     setText(spoken); speakOut(spoken);
   }, [openTask, pushStep, finishTask, failTask, speakOut, msFetch]);
 
-  // Connexion du compte Google (Agenda + Gmail). Le callback Google redirige vers le SPA :
-  // on navigue dans cet onglet plutôt qu'en popup, qui démarrerait un second ΣIRIUS.
-  const connectGoogle = useCallback(async () => {
-    // Un compte « connecté » peut n'avoir que l'agenda : dans ce cas il FAUT réautoriser.
-    // On ne bloque la relance que si tous les droits utiles sont déjà accordés.
-    try {
-      const s = await fetch(`${API}/calendar/status`, { credentials: "include" });
-      const st = await s.json().catch(() => ({}));
-      if (s.ok && st.connected && st.gmail && st.gmail_send && st.contacts) {
-        setStatus("speaking");
-        const m = `Ton compte Google est déjà connecté${st.email ? ` avec ${st.email}` : ""}. Que veux-tu que je fasse ?`;
-        setText(m); speakOut(m);
-        return;
-      }
-    } catch (e) { /* statut indisponible : on tente la connexion */ }
-    setStatus("speaking");
-    const m = "J'ouvre la connexion à ton compte Google. Autorise l'accès, puis ΣIRIUS redémarre avec Gmail et l'Agenda.";
-    setText(m); speakOut(m);
-    try {
-      const r = await fetch(`${API}/oauth/calendar/login`, { credentials: "include" });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok || !d.authorization_url) throw new Error(d.detail || "URL d'autorisation indisponible.");
-      setTimeout(() => { window.location.href = d.authorization_url; }, 2600);
-    } catch (e) {
-      const msg = "Je n'arrive pas à lancer la connexion Google. Vérifie les identifiants Google dans les réglages.";
-      setStatus("speaking"); setText(msg); speakOut(msg);
-    }
-  }, [speakOut]);
+  const connectGoogle = useCallback(() => {
+    setShowConnections(true);
+  }, []);
 
   // Lecture des mails Gmail (compte Google connecté via l'Agenda) : voix + fenêtre HUD
   const readGmailAloud = useCallback(async (openOnly = false) => {
@@ -2240,7 +2209,8 @@ function App() {
       setStatus("speaking");
       if (r.status === 401) {
         failTask(id, "Compte Google non connecté");
-        const m = "Ton compte Google n'est pas connecté. Dis « connecte Google » et j'ouvre l'autorisation.";
+        setShowConnections(true);
+        const m = "Votre compte Google n'est pas connecté. Le Centre des connexions est ouvert.";
         setText(m); speakOut(m);
         return;
       }
@@ -2489,8 +2459,9 @@ function App() {
       if (!r.ok) {
         failTask(id, d.detail || "Lecture impossible");
         setStatus("speaking");
+        if (r.status === 401 || r.status === 409) setShowConnections(true);
         const m = r.status === 401 || r.status === 409
-          ? "Ton compte Outlook n'est pas encore connecté. Dis « connecte Outlook », puis authentifie-toi avec Microsoft."
+          ? "Votre compte Outlook n'est pas connecté. Le Centre des connexions est ouvert."
           : (d.detail || "Je n'arrive pas à lire Outlook pour le moment.");
         setText(m); speakOut(m);
         return;
@@ -5726,6 +5697,7 @@ function App() {
     { id: "media-modules", group: "MÉDIAS", label: "Modules multimédia", Icon: Clapperboard, active: displayOpen && display.type === "media", run: () => showOnDisplay({ type: "media", titre: "MODULES MULTIMÉDIA" }) },
     { id: "files", group: "MÉDIAS", label: "Médiathèque", Icon: FolderOpen, run: () => setShowFiles(true) },
     { id: "info-hub", group: "OUTILS", label: "Centre d'information SIRIUS", Icon: BadgeInfo, run: () => restoreHudPanel("info-hub") },
+    { id: "connections", group: "OUTILS", label: "Comptes & connexions", Icon: Link2, run: () => setShowConnections(true) },
     { id: "capture-interface", group: "OUTILS", label: "Capture de l'interface", Icon: Camera, mobile: false, run: captureSiriusInterface },
     { id: "architect", group: "OUTILS", label: "Architecte visuel", Icon: Workflow, run: () => { setArchitectPrompt(""); setShowArchitect(true); } },
     { id: "plans", group: "OUTILS", label: "Plans 2D (PLANS#)", Icon: Ruler, run: () => { setPlansPrompt(""); setShowPlans(true); } },
@@ -5967,6 +5939,7 @@ function App() {
       {showPromethee && <PrometheePanel onClose={() => setShowPromethee(false)} />}
       {showCalliope && <CalliopePanel onClose={() => setShowCalliope(false)} />}
       {showCalendar && <CalendarPanel onClose={() => setShowCalendar(false)} />}
+      {showConnections && <ConnectionsPanel onClose={() => setShowConnections(false)} />}
       {showFaceId && (
         <FaceIdPanel
           onClose={() => setShowFaceId(false)}

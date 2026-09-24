@@ -706,8 +706,7 @@ class SendMailIn(BaseModel):
 def make_microsoft_router(db):
     router = APIRouter()
 
-    @router.get("/auth/microsoft/login")
-    async def microsoft_login(request: Request):
+    async def _authorization_url(request: Request) -> str:
         cid, _, redirect = _conf()
         state = secrets.token_urlsafe(32)
         verifier, challenge = _pkce()
@@ -733,7 +732,15 @@ def make_microsoft_router(db):
             "code_challenge": challenge, "code_challenge_method": "S256",
             "prompt": "consent",
         })
-        return RedirectResponse(f"{AUTHORIZE_URL}?{params}", status_code=302)
+        return f"{AUTHORIZE_URL}?{params}"
+
+    @router.get("/auth/microsoft/login")
+    async def microsoft_login(request: Request):
+        return RedirectResponse(await _authorization_url(request), status_code=302)
+
+    @router.get("/auth/microsoft/authorize")
+    async def microsoft_authorize(request: Request):
+        return {"authorization_url": await _authorization_url(request)}
 
     @router.get("/auth/callback/microsoft-entra-id")
     async def microsoft_callback(response: Response, code: str = "", state: str = "", error: str = "", error_description: str = ""):

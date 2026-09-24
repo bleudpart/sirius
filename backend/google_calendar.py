@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 
 import email_intel
@@ -34,6 +34,17 @@ logger = logging.getLogger("sirius.google")
 # build React figé), pas l'application réellement utilisée. On redirige donc explicitement
 # vers l'origine du SPA — voir le même correctif dans microsoft_graph.py.
 FRONTEND_URL = (os.environ.get("FRONTEND_URL") or "http://localhost:3000").rstrip("/")
+
+
+def _external_oauth_result(ok: bool, provider: str) -> HTMLResponse:
+    title = f"{provider} connecté" if ok else f"Connexion {provider} interrompue"
+    message = "Vous pouvez revenir dans ΣIRIUS." if ok else "Revenez dans ΣIRIUS pour réessayer."
+    color = "#91e6f2" if ok else "#f2d99a"
+    return HTMLResponse(
+        "<html><body style='margin:0;background:#030a13;color:#d5f6ff;font-family:sans-serif;"
+        "display:grid;place-items:center;min-height:100vh;text-align:center'>"
+        f"<main><h2 style='color:{color}'>{title}</h2><p>{message}</p></main></body></html>"
+    )
 
 
 def _client_conf():
@@ -130,7 +141,7 @@ def make_gcal_router(db):
         return tokens["access_token"]
 
     @router.get("/oauth/calendar/login")
-    async def gcal_login(request: Request):
+    async def gcal_login(request: Request, external: bool = False):
         cid, _ = _client_conf()
         # Comme pour Microsoft (microsoft_graph.py) : le "state" doit être un jeton opaque
         # généré côté serveur et lié à l'utilisateur résolu ICI, jamais l'uid brut envoyé
@@ -145,6 +156,7 @@ def make_gcal_router(db):
         state = secrets.token_urlsafe(32)
         await db.oauth_states.insert_one({
             "_id": f"gcal:{state}", "uid": uid,
+            "external": external,
             "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
         })
         from urllib.parse import urlencode
@@ -162,11 +174,12 @@ def make_gcal_router(db):
 
     @router.get("/oauth/calendar/callback")
     async def gcal_callback(request: Request, code: str = "", error: str = "", state: str = ""):
+        st = await db.oauth_states.find_one_and_delete({"_id": f"gcal:{state}"}) if state else None
+        external = bool((st or {}).get("external"))
         if error or not code:
-            return RedirectResponse(f"{FRONTEND_URL}/?gcal=error")
-        st = await db.oauth_states.find_one_and_delete({"_id": f"gcal:{state}"})
+            return _external_oauth_result(False, "Google") if external else RedirectResponse(f"{FRONTEND_URL}/?gcal=error")
         if not st or datetime.fromisoformat(st["expires_at"]) < datetime.now(timezone.utc):
-            return RedirectResponse(f"{FRONTEND_URL}/?gcal=error")
+            return _external_oauth_result(False, "Google") if external else RedirectResponse(f"{FRONTEND_URL}/?gcal=error")
         uid = st["uid"]
         cid, csec = _client_conf()
         async with httpx.AsyncClient(timeout=20) as cx:
@@ -181,7 +194,7 @@ def make_gcal_router(db):
                 },
             )
             if r.status_code != 200:
-                return RedirectResponse(f"{FRONTEND_URL}/?gcal=error")
+                return _external_oauth_result(False, "Google") if external else RedirectResponse(f"{FRONTEND_URL}/?gcal=error")
             tokens = r.json()
             u = await cx.get(
                 "https://www.googleapis.com/oauth2/v2/userinfo",
@@ -194,7 +207,7 @@ def make_gcal_router(db):
             {"$set": {"tokens": tokens, "email": email, "expires_at": expires_at, "connected_at": datetime.now(timezone.utc).isoformat()}},
             upsert=True,
         )
-        return RedirectResponse(f"{FRONTEND_URL}/?gcal=connected")
+        return _external_oauth_result(True, "Google") if external else RedirectResponse(f"{FRONTEND_URL}/?gcal=connected")
 
     @router.get("/calendar/status")
     async def gcal_status(request: Request):
@@ -212,6 +225,11 @@ def make_gcal_router(db):
             "gmail_send": "gmail.send" in granted,
             "contacts": "contacts.readonly" in granted,
         }
+
+    @router.post("/calendar/disconnect")
+    async def gcal_disconnect(request: Request):
+        await db.google_calendar.delete_one({"_id": await _uid(request)})
+        return {"ok": True}
 
     @router.get("/calendar/events")
     async def gcal_events(request: Request, max_results: int = 10):
