@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap");
+
 :root { --store-ink:#d5f6ff; --store-green:#91e6f2; --store-lime:#ffd35c; --store-paper:#061321; --store-line:rgba(243,197,87,.42); --store-panel:#10283d; --store-gold:#e7b94f; --store-gold-strong:#ffe18a; }
 .public-store { min-height:100vh; color:var(--store-ink); background:linear-gradient(rgba(44,127,157,.1) 1px,transparent 1px),linear-gradient(90deg,rgba(44,127,157,.1) 1px,transparent 1px),radial-gradient(circle at 50% 34%,rgba(21,105,139,.25),transparent 38%),linear-gradient(180deg,#020a12 0%,#041321 52%,#02080f 100%); background-size:32px 32px,32px 32px,auto,auto; font-family:"Rajdhani",sans-serif; padding:0 6vw 38px; }
 .public-nav { display:flex; justify-content:space-between; align-items:center; max-width:1180px; margin:auto; padding:28px 0; border-bottom:1px solid var(--store-line); font-family:"Orbitron",sans-serif; }
@@ -99,3 +101,68 @@
 .public-core-window::before,.public-core-window::after{content:none}
 .public-core-art::after{content:none}
 .public-plan,.public-checkout{border-color:var(--store-line)}
+
+/* Storefront refresh: the grid declared on .public-store above remains unchanged. */
+.public-store { font-family:"Inter",sans-serif; padding-bottom:72px; }
+.public-nav { max-width:1240px; padding:28px 0; }
+.public-brand { font-family:"Cinzel",serif; font-size:25px; }
+.public-hero { max-width:980px; margin:118px auto 54px; padding:0; text-align:center; }
+.public-hero h1 { max-width:none; font:600 clamp(48px,6.8vw,82px)/1.04 "Cinzel",serif; letter-spacing:0; }
+.public-hero h1 em { font-style:normal; }
+.public-value { max-width:650px; margin:24px auto; color:#c6e9f4; font:400 clamp(18px,2.2vw,23px)/1.45 "Inter",sans-serif; text-shadow:none; }
+.public-benefits { display:flex; flex-wrap:wrap; justify-content:center; gap:9px; margin:0 auto 28px; }
+.public-benefits span { padding:8px 12px; border:1px solid rgba(145,230,242,.24); color:#d6f4fb; background:rgba(7,26,41,.6); border-radius:6px; font:500 13px "Inter",sans-serif; }
+.public-hero-actions { display:flex; justify-content:center; gap:12px; }
+.public-primary-cta,.public-secondary-cta { min-height:48px; display:inline-flex; align-items:center; justify-content:center; gap:9px; padding:0 20px; border-radius:6px; font:600 14px "Inter",sans-serif; text-decoration:none; transition:transform .2s,box-shadow .2s,background .2s; }
+.public-primary-cta { color:#061321; background:linear-gradient(135deg,var(--store-gold-strong),var(--store-gold)); box-shadow:0 12px 24px rgba(216,184,117,.2); }
+.public-secondary-cta { color:#eaf9ff; border:1px solid rgba(145,230,242,.46); background:rgba(7,27,43,.7); }
+.public-primary-cta:hover,.public-secondary-cta:hover { transform:translateY(-2px); }
+.public-hud-hero { max-width:1240px; margin:0 auto 54px; padding:0; border:0; }
+.public-hud-hero .hud-preview { max-width:1040px; margin:0 auto; border-color:rgba(145,230,242,.45); border-radius:8px; overflow:hidden; box-shadow:0 28px 70px rgba(0,0,0,.52),0 0 40px rgba(79,194,255,.18),0 0 30px rgba(216,184,117,.13); }
+.public-hud-hero .hud-preview img { margin:0; }
+.public-metrics { max-width:1120px; display:grid; grid-template-columns:repeat(4,1fr); gap:1px; margin:0 auto 118px; border:1px solid rgba(145,230,242,.18); background:rgba(145,230,242,.18); }
+.public-metrics div { min-height:112px; display:flex; flex-direction:column; justify-content:center; padding:22px; background:rgba(4,18,31,.89); }
+.public-metrics strong { color:var(--store-gold-strong); font:600 clamp(17px,2vw,25px)/1.2 "Cinzel",serif; }
+.public-metrics span { margin-top:7px; color:#9bc8d7; font-size:12px; }
+.public-matrix,.public-plans,.public-checkout,.public-trust,.public-why { max-width:1120px; }
+.public-matrix { margin:0 auto 118px; }
+.public-section-intro { display:flex; align-items:center; gap:14px; margin-bottom:30px; }
+.public-section-icon { width:44px; height:44px; display:grid; place-items:center; color:var(--store-gold-strong); border:1px solid rgba(231,185,79,.52); background:rgba(56,42,20,.34); border-radius:6px; }
+.public-section-title { margin:0; font:600 clamp(26px,3vw,36px)/1.15 "Cinzel",serif; }
+.public-section-intro p { margin:5px 0 0; color:#99c4d2; font-size:15px; }
+.public-core-preview { padding:24px; border:1px solid rgba(145,230,242,.18); background:rgba(5,22,36,.66); border-radius:8px; }
+.public-core-preview span { font:400 16px/1.55 "Inter",sans-serif; }
+.public-matrix-actions { max-width:none; grid-template-columns:repeat(4,1fr); gap:12px; }
+.public-matrix-actions li { min-height:100px; flex-direction:column; justify-content:center; gap:10px; padding:16px; border:1px solid rgba(145,230,242,.22); background:rgba(8,29,45,.7); border-radius:7px; font:500 14px/1.35 "Inter",sans-serif; }
+.public-matrix-actions li svg { margin:0; color:var(--store-gold-strong); }
+.public-matrix-video { display:none; }
+.public-plans { grid-template-columns:repeat(3,1fr); gap:18px; margin:0 auto 118px; }
+.public-plans>.public-section-title { margin:0 0 16px; }
+.public-plan { min-height:410px; padding:28px 24px; border-radius:8px; font-family:"Inter",sans-serif; }
+.public-plan-name { font-size:27px; margin-bottom:10px; }
+.public-plan-tagline { min-height:42px; margin:0 0 20px; font-size:13px; }
+.public-plan.featured,.public-plan-pro { border:1px solid var(--store-gold); box-shadow:0 22px 45px rgba(0,0,0,.36),0 0 32px rgba(216,184,117,.16); transform:translateY(-10px); }
+.public-plan.featured:hover,.public-plan-pro:hover { transform:translateY(-14px); }
+.public-popular { top:14px; right:14px; border-radius:4px; background:var(--store-gold-strong); font-family:"Inter",sans-serif; }
+.public-features { margin-top:20px; font:400 13px/1.35 "Inter",sans-serif; }
+.public-checkout { max-width:840px; margin:0 auto 118px; padding:34px; border-radius:8px; }
+.public-checkout .public-section-title { margin-bottom:24px; }
+.public-checkout label { font-family:"Inter",sans-serif; }
+.public-form-row input { border-radius:6px; font-family:"Inter",sans-serif; }
+.public-form-row button,.public-demo-link,.public-paypal-btn { border-radius:6px; font-family:"Inter",sans-serif; }
+.public-trust { margin:0 auto 104px; border:0; padding:0; }
+.public-trust h2 { font:600 clamp(26px,3vw,36px)/1.15 "Cinzel",serif; text-align:center; margin:0 0 26px; }
+.public-testimonials { gap:18px; margin:0; }
+.public-testimonial { min-height:170px; padding:24px; border-radius:8px; background:rgba(9,30,46,.76); font:400 15px/1.55 "Inter",sans-serif; box-shadow:0 14px 30px rgba(0,0,0,.16); }
+.public-testimonial>svg { color:var(--store-gold-strong); }
+.public-testimonial cite { font:600 12px "Inter",sans-serif; }
+.public-why { margin:0 auto 100px; }
+.public-why>.public-section-title { text-align:center; margin-bottom:28px; }
+.public-why-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; }
+.public-why-grid article { min-height:210px; padding:26px; border:1px solid rgba(145,230,242,.22); border-radius:8px; background:linear-gradient(145deg,rgba(15,47,68,.76),rgba(5,20,33,.9)); }
+.public-why-grid article>svg { color:var(--store-gold-strong); }
+.public-why-grid h3 { margin:22px 0 10px; color:#f3fbff; font:600 18px "Cinzel",serif; }
+.public-why-grid p { margin:0; color:#a8d0dc; font:400 14px/1.55 "Inter",sans-serif; }
+.public-footer { font-family:"Inter",sans-serif; }
+@media(max-width:800px){.public-hero{margin:66px auto 34px}.public-hero h1{font-size:46px}.public-hud-hero{margin-bottom:35px}.public-metrics{grid-template-columns:1fr 1fr;margin-bottom:72px}.public-matrix{margin-bottom:72px}.public-core-preview{flex-direction:column}.public-matrix-actions{grid-template-columns:1fr 1fr}.public-plans{grid-template-columns:1fr;margin-bottom:72px}.public-plan.featured,.public-plan-pro{transform:none}.public-checkout{margin-bottom:72px;padding:24px 18px}.public-why-grid{grid-template-columns:1fr}.public-trust,.public-why{margin-bottom:72px}}
+@media(max-width:480px){.public-hero-actions{flex-direction:column}.public-primary-cta,.public-secondary-cta{width:100%}.public-metrics{grid-template-columns:1fr}.public-matrix-actions{grid-template-columns:1fr}}
