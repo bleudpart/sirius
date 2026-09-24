@@ -8,6 +8,7 @@ import Analysis3D from "./Analysis3D";
 import ModulesMedia from "./ModulesMedia";
 import { cleanTextForDisplay } from "./voice";
 import MediaPlayer from "@/components/MediaPlayer";
+import ProviderLogo from "@/components/ProviderLogo";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const GEO_KEY = "sirius_display_geo_v2";
@@ -55,7 +56,7 @@ function EmailCard({ mail, onOpen }) {
       {mail.apercu && <div className="sd-email-preview">{mail.apercu}</div>}
       <div className="sd-email-footer">
         <span className={`sd-email-badge ${mail.categorie === "Critique" ? "crit" : mail.categorie === "Important" ? "imp" : ""}`}>{mail.categorie || (mail.lu ? "Lu" : "Non lu")}</span>
-        <span className="sd-email-source">{mail.source === "gmail" ? "Gmail" : "Outlook"}</span>
+        <span className="sd-email-source"><ProviderLogo provider={mail.source === "gmail" ? "gmail" : "outlook"} size={14} />{mail.source === "gmail" ? "Gmail" : "Outlook"}</span>
       </div>
     </button>
   );
@@ -79,7 +80,7 @@ function ContactCard({ contact, onPick }) {
       <div className="sd-contact-name">
         <ContactRound size={15} /> {contact.nom || "Contact sans nom"}
         {contact.source && (
-          <span className={`sd-contact-src ${contact.source}`}>{contact.source === "gmail" ? "GMAIL" : "OUTLOOK"}</span>
+          <span className={`sd-contact-src ${contact.source}`}><ProviderLogo provider={contact.source === "gmail" ? "gmail" : "outlook"} size={13} />{contact.source === "gmail" ? "GMAIL" : "OUTLOOK"}</span>
         )}
       </div>
       {(contact.poste || contact.entreprise) && (

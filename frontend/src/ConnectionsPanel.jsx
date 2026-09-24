@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { Browser } from "@capacitor/browser";
-import { CalendarDays, Check, Loader2, Mail, RefreshCw, Unplug, X } from "lucide-react";
+import { Check, Loader2, RefreshCw, Unplug, X } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api";
+import ProviderLogo from "@/components/ProviderLogo";
 import "./ConnectionsPanel.css";
 
 const PROVIDERS = {
   google: {
     label: "Google",
     detail: "Gmail · Agenda · Contacts",
-    Icon: Mail,
+    logo: "google",
     statusPath: "/calendar/status",
     authorizePath: "/oauth/calendar/login?external=true",
     disconnectPath: "/calendar/disconnect",
@@ -16,7 +17,7 @@ const PROVIDERS = {
   microsoft: {
     label: "Microsoft",
     detail: "Outlook · Agenda · Contacts",
-    Icon: CalendarDays,
+    logo: "microsoft",
     statusPath: "/microsoft/status",
     authorizePath: "/auth/microsoft/authorize",
     disconnectPath: "/microsoft/disconnect",
@@ -118,7 +119,7 @@ export default function ConnectionsPanel({ onClose }) {
             const waiting = pending === key;
             return (
               <article className={`connection-item ${providerStatus.connected ? "connected" : ""}`} key={key}>
-                <span className="connection-icon"><provider.Icon size={22} /></span>
+                <span className="connection-icon"><ProviderLogo provider={provider.logo} size={25} title={provider.label} /></span>
                 <div className="connection-main">
                   <h2>{provider.label}</h2>
                   <p>{provider.detail}</p>
@@ -133,7 +134,7 @@ export default function ConnectionsPanel({ onClose }) {
                   </button>
                 ) : (
                   <button type="button" className="connection-action" onClick={() => connect(key)} disabled={waiting || providerStatus.loading}>
-                    {waiting ? <Loader2 size={15} className="spin" /> : <provider.Icon size={15} />}
+                    {waiting ? <Loader2 size={15} className="spin" /> : <ProviderLogo provider={provider.logo} size={16} />}
                     {waiting ? "Autorisation en cours" : `Connecter ${provider.label}`}
                   </button>
                 )}

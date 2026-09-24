@@ -49,6 +49,7 @@ import { BACKEND_BASE_URL } from "@/lib/api";
 import "@/App.css";
 import { AmbientEngine } from "@/ambientAudio";
 import { APP_RELEASE, APP_VERSION } from "@/version";
+import ProviderLogo from "@/components/ProviderLogo";
 
 /* executeIntent moved into the real App component (see later in the file) */
 
@@ -6118,8 +6119,8 @@ function App() {
             title="État des connexions (Google & Outlook)"
             aria-label="Statut des connexions"
           >
-            <span className={`conn-dot google ${connectionStatus.google ? "active" : ""}`} title={connectionStatus.google ? "Google connecté" : "Google non connecté"} />
-            <span className={`conn-dot outlook ${connectionStatus.microsoft ? "active" : ""}`} title={connectionStatus.microsoft ? "Outlook connecté" : "Outlook non connecté"} />
+            <span className={`conn-brand google ${connectionStatus.google ? "active" : ""}`} title={connectionStatus.google ? "Google connecté" : "Google non connecté"}><ProviderLogo provider="google" size={15} /></span>
+            <span className={`conn-brand outlook ${connectionStatus.microsoft ? "active" : ""}`} title={connectionStatus.microsoft ? "Outlook connecté" : "Outlook non connecté"}><ProviderLogo provider="outlook" size={15} /></span>
           </button>
           
           {window.Capacitor?.getPlatform?.() === "android" && (

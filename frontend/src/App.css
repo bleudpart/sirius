@@ -584,21 +584,22 @@ body.hud-minimal .antique-jar { display: none; }
 
 /* Connection status badge */
 .profile-btn.conn-badge {
-  display: inline-flex; gap: 4px; width: auto; padding: 0 8px;
+  display: inline-flex; gap: 7px; width: auto; padding: 0 8px;
   align-items: center; justify-content: center;
 }
-.conn-dot {
-  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
-  background: rgba(100, 150, 170, 0.6); 
-  box-shadow: inset 0 0 2px rgba(0, 0, 0, 0.3);
-  transition: background 0.3s, box-shadow 0.3s;
+.conn-brand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.38;
+  filter: grayscale(1);
+  transition: filter 0.3s, opacity 0.3s, transform 0.3s;
 }
-.conn-dot.active {
-  background: #2dd4bf; 
-  box-shadow: 0 0 6px #2dd4bf, inset 0 0 2px rgba(0, 0, 0, 0.3);
+.conn-brand.active {
+  opacity: 1;
+  filter: none;
+  transform: scale(1.08);
 }
-.conn-dot.google { }
-.conn-dot.outlook { }
 
 .profile-btn.sirius-shutdown-btn {
   color: #d8b875;
@@ -4528,7 +4529,7 @@ body.hud-minimal .medallion-halo { display: none; }
 }
 .sd-email-badge.imp { color: #d4af37; border-color: rgba(212, 175, 55, 0.5); }
 .sd-email-badge.crit { color: #ff8080; border-color: rgba(255, 90, 90, 0.6); }
-.sd-email-source { font-size: 9px; letter-spacing: 0.06em; color: rgba(226, 248, 255, 0.4); }
+.sd-email-source { display: inline-flex; align-items: center; gap: 4px; font-size: 9px; letter-spacing: 0.06em; color: rgba(226, 248, 255, 0.4); }
 .sd-draft {
   display: flex;
   flex-direction: column;
@@ -4673,6 +4674,9 @@ body.hud-minimal .medallion-halo { display: none; }
   font-weight: 600;
 }
 .sd-contact-src {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   margin-left: auto;
   flex: none;
   padding: 1px 6px;

@@ -1,6 +1,7 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 import { useEffect, useState, useCallback } from "react";
 import { X, Calendar, Plus, RefreshCw, LogOut, ExternalLink, Trash2 } from "lucide-react";
+import ProviderLogo from "@/components/ProviderLogo";
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
@@ -73,7 +74,7 @@ export default function CalendarPanel({ onClose }) {
   return (
     <div className="prime-screen" data-testid="calendar-panel">
       <header className="zeus-head">
-        <div className="zeus-title font-divine"><Calendar size={20} /> AGENDA — GOOGLE CALENDAR</div>
+        <div className="zeus-title font-divine"><ProviderLogo provider="google" size={20} title="Google" /> AGENDA — GOOGLE CALENDAR</div>
         <button className="setup-close zeus-close" onClick={onClose} data-testid="calendar-close-btn"><X size={18} /></button>
       </header>
 
@@ -82,7 +83,7 @@ export default function CalendarPanel({ onClose }) {
           <div className="gcal-connect" data-testid="calendar-connect-block">
             <p>Connectez votre compte Google pour consulter et créer vos événements depuis ΣIRIUS.</p>
             <button className="cmd-send" onClick={connect} data-testid="calendar-connect-btn">
-              CONNECTER GOOGLE CALENDAR
+              <ProviderLogo provider="google" size={16} /> CONNECTER GOOGLE CALENDAR
             </button>
           </div>
         )}
