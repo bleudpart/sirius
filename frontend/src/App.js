@@ -4819,7 +4819,7 @@ function App() {
       return;
     }
     processCommand(command);
-  }, [processCommand, speakOut]);
+  }, [processCommand]);
 
   // Référence stable vers handleTranscript pour la reconnaissance vocale
   const handleTranscriptRef = useRef(null);
@@ -5005,7 +5005,7 @@ function App() {
     stopListening();
     if (ambientRef.current) ambientRef.current.pause();
     await CapacitorApp.exitApp();
-  }, [cancelSpeech, stopListening]);
+  }, [stopListening]);
 
   // Démarre l'écoute via la reconnaissance vocale du navigateur (instantanée, gratuite)
   const startListening = useCallback(() => {
