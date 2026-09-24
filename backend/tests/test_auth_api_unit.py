@@ -126,6 +126,21 @@ def test_register_login_and_lockout():
     assert locked.value.status_code == 429
 
 
+def test_register_rejects_weak_or_oversized_passwords():
+    db = Database()
+    register = endpoint(auth_api.make_auth_router(db), "/auth/register")
+
+    from starlette.responses import Response
+
+    for password in ("short7!", "x" * 73):
+        with pytest.raises(HTTPException) as failure:
+            asyncio.run(register(
+                auth_api.RegisterRequest(email="client@example.test", password=password, name="Client"),
+                Response(),
+            ))
+        assert failure.value.status_code == 400
+
+
 def test_password_reset_code_is_hashed_and_changes_password(monkeypatch):
     db = Database()
     router = auth_api.make_auth_router(db)

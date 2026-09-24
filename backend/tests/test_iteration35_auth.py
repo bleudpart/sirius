@@ -88,7 +88,7 @@ class TestAuthenticationAPI:
             timeout=20,
         )
         assert short.status_code == 400
-        assert "6" in short.json().get("detail", "")
+        assert "8" in short.json().get("detail", "")
         duplicate = requests.post(
             f"{BASE_URL}/api/auth/register",
             json={"email": accounts["a"]["email"], "password": "Another#2026", "name": "Duplicate"},

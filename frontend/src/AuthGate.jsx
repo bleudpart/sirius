@@ -181,14 +181,14 @@ function AuthScreen({ onAuth }) {
               onChange={(e) => setResetCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
               data-testid="auth-reset-code-input" />
           )}
-          <input type="password" placeholder={registerMode ? "Mot de passe (6 caractères minimum)" : "Mot de passe"} value={form.password} required
-            minLength={registerMode ? 6 : undefined} autoComplete={registerMode ? "new-password" : "current-password"}
+          <input type="password" placeholder={registerMode ? "Mot de passe (8 caractères minimum)" : "Mot de passe"} value={form.password} required
+            minLength={registerMode ? 8 : undefined} autoComplete={registerMode ? "new-password" : "current-password"}
             style={resetMode && !resetCodeSent ? { display: "none" } : undefined}
             disabled={resetMode && !resetCodeSent}
             onChange={(e) => setForm({ ...form, password: e.target.value })} data-testid="auth-password-input" />
           {registerMode && (
             <input type="password" placeholder="Confirmez le mot de passe" value={form.confirmPassword} required
-              minLength={6} autoComplete="new-password"
+              minLength={8} autoComplete="new-password"
               onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
               data-testid="auth-confirm-password-input" />
           )}

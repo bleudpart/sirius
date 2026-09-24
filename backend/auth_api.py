@@ -26,6 +26,8 @@ _ACCESS_TTL_SECONDS = 12 * 60 * 60
 _REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60
 _LOCK_SECONDS = 15 * 60
 _RESET_TTL_SECONDS = 10 * 60
+_PASSWORD_MIN_LENGTH = 8
+_BCRYPT_MAX_PASSWORD_BYTES = 72
 
 
 def _load_or_create_secret() -> bytes:
@@ -89,6 +91,17 @@ def _password_valid(password: str, encoded: str) -> bool:
         return bcrypt.checkpw(password.encode("utf-8"), encoded.encode("ascii"))
     except (ValueError, TypeError):
         return False
+
+
+def _validate_new_password(password: str) -> str:
+    if len(password) < _PASSWORD_MIN_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Le mot de passe doit contenir au moins {_PASSWORD_MIN_LENGTH} caractères.",
+        )
+    if len(password.encode("utf-8")) > _BCRYPT_MAX_PASSWORD_BYTES:
+        raise HTTPException(status_code=400, detail="Le mot de passe est trop long.")
+    return password
 
 
 def is_direct_local_request(request: Request) -> bool:
@@ -292,9 +305,7 @@ def make_auth_router(db):
     @router.post("/register")
     async def register(data: RegisterRequest, response: Response):
         email = _normalize_email(data.email)
-        password = data.password.strip()
-        if len(password) < 6:
-            raise HTTPException(status_code=400, detail="Le mot de passe doit contenir au moins 6 caractères.")
+        password = _validate_new_password(data.password)
         if await db.users.find_one({"email": email}):
             raise HTTPException(status_code=409, detail="Un compte existe déjà avec cette adresse.")
         now = datetime.now(timezone.utc)
@@ -373,9 +384,7 @@ def make_auth_router(db):
     @router.post("/password-reset/confirm")
     async def password_reset_confirm(data: PasswordResetConfirm):
         email = _normalize_email(data.email)
-        password = data.password.strip()
-        if len(password) < 8:
-            raise HTTPException(status_code=400, detail="Le mot de passe doit contenir au moins 8 caractères.")
+        password = _validate_new_password(data.password)
         record = await db.password_reset_codes.find_one({"email": email})
         now = datetime.now(timezone.utc)
         if not record or record.get("expires_at", now) <= now or int(record.get("attempts") or 0) >= 5:
