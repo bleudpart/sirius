@@ -144,7 +144,10 @@ export default function ConnectionsPanel({ onClose }) {
 
         {pending && <p className="connections-wait">Revenez dans ΣIRIUS après avoir validé l’autorisation.</p>}
         {error && <p className="connections-error" role="alert">{error}</p>}
-        <button type="button" className="connections-refresh" onClick={refresh}><RefreshCw size={14} /> Actualiser</button>
+        <div className="connections-footer-actions">
+          <button type="button" className="connections-refresh" onClick={refresh}><RefreshCw size={14} /> Actualiser</button>
+          <button type="button" className="connections-later" onClick={onClose}>Plus tard</button>
+        </div>
       </main>
     </div>
   );

@@ -47,9 +47,10 @@ function KeyField({ k, value, status, onChange, onTest }) {
   );
 }
 
-// Écran de configuration — 5 onglets : PROFIL / VOIX / IA / HUD / API (ergonomie Bastien & Scapin).
-export default function SiriusSetup({ initialProfile, initialKeys, onComplete, onCancel }) {
+// Écran de configuration — les réglages techniques restent réservés à l'administrateur.
+export default function SiriusSetup({ initialProfile, initialKeys, onComplete, onCancel, showAdvanced = false }) {
   const [tab, setTab] = useState("profil");
+  const visibleTabs = showAdvanced ? TABS : TABS.filter((item) => item.id !== "api");
   const [profile, setProfile] = useState({
     name: "", age: "", profession: "", city: "", gender: "", interests: "", style: "",
     ...(initialProfile || {}),
@@ -225,12 +226,12 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
           <Sparkles size={26} />
           <div>
             <h1 className="setup-title">CONFIGURATION DE ΣIRIUS</h1>
-            <p className="setup-sub">Personnalisez votre assistant. Tout reste sur votre ordinateur.</p>
+            <p className="setup-sub">Personnalisez votre assistant. Aucun réglage technique n’est obligatoire.</p>
           </div>
         </div>
 
         <div className="setup-tabs" data-testid="setup-tabs">
-          {TABS.map((t) => (
+          {visibleTabs.map((t) => (
             <button key={t.id} type="button" className={`setup-tab ${tab === t.id ? "active" : ""}`} onClick={() => setTab(t.id)} data-testid={`setup-tab-${t.id}`}>
               <t.Icon size={14} /> {t.label}
             </button>
@@ -489,7 +490,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
           </section>
         )}
 
-        {tab === "api" && (
+        {showAdvanced && tab === "api" && (
           <section className="setup-section setup-single" data-testid="setup-panel-api">
             <p className="setup-note">Chaque clé reste privée sur votre PC. Testez chaque clé avant d'enregistrer.</p>
             {Object.keys(KEY_META).map((k) => (

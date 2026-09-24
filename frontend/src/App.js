@@ -4729,11 +4729,13 @@ function App() {
 
   // Enregistrement du profil + clés (1er lancement ou modification)
   const handleSetupComplete = useCallback((newProfile, newKeys) => {
+    const offerConnections = !localStorage.getItem("sirius_connections_onboarding_done");
     setProfile(newProfile);
     setKeys(newKeys);
     localStorage.setItem("sirius_profile", JSON.stringify(newProfile));
     localStorage.setItem("sirius_keys", JSON.stringify(newKeys));
     setShowSetup(false);
+    if (offerConnections) setShowConnections(true);
     setText(`${greetByPhase(newProfile.name)} Tous mes systèmes sont en ligne.`);
   }, []);
   
@@ -5820,6 +5822,7 @@ function App() {
           initialKeys={keys}
           onComplete={handleSetupComplete}
           onCancel={() => setShowSetup(false)}
+          showAdvanced={authUser?.role === "admin" && !NATIVE_APP}
         />
       )}
 
@@ -5939,7 +5942,10 @@ function App() {
       {showPromethee && <PrometheePanel onClose={() => setShowPromethee(false)} />}
       {showCalliope && <CalliopePanel onClose={() => setShowCalliope(false)} />}
       {showCalendar && <CalendarPanel onClose={() => setShowCalendar(false)} />}
-      {showConnections && <ConnectionsPanel onClose={() => setShowConnections(false)} />}
+      {showConnections && <ConnectionsPanel onClose={() => {
+        localStorage.setItem("sirius_connections_onboarding_done", "1");
+        setShowConnections(false);
+      }} />}
       {showFaceId && (
         <FaceIdPanel
           onClose={() => setShowFaceId(false)}

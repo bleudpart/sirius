@@ -98,7 +98,10 @@
 .connection-action { grid-column: 2 / -1; justify-self: stretch; }
 .connection-action.secondary { color: #cceaf4; border-color: rgba(145, 230, 242, 0.34); background: rgba(145, 230, 242, 0.08); }
 .connection-action:disabled { opacity: 0.65; cursor: wait; }
-.connections-refresh { margin-top: 16px; padding: 0 14px; color: #bcdde8; border-color: rgba(145, 230, 242, 0.28); background: rgba(16, 40, 61, 0.7); }
+.connections-footer-actions { display:flex; align-items:center; gap:10px; margin-top:16px; }
+.connections-refresh { margin:0; padding: 0 14px; color: #bcdde8; border-color: rgba(145, 230, 242, 0.28); background: rgba(16, 40, 61, 0.7); }
+.connections-later { min-height:44px; padding:0 16px; border:0; color:#9fc3d0; background:transparent; font:700 12px "Rajdhani",sans-serif; cursor:pointer; }
+.connections-later:hover { color:#fff; }
 .connections-wait, .connections-error { margin: 16px 0 0; text-align: center; font-size: 13px; }
 .connections-wait { color: #d5f6ff; }
 .connections-error { color: #ffb4a2; }
