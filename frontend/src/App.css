@@ -566,6 +566,25 @@ body.hud-minimal .antique-jar { display: none; }
   transition: color 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
 .profile-btn:hover { color: #eafaff; border-color: var(--accent); box-shadow: 0 0 12px var(--glow); }
+
+/* Connection status badge */
+.profile-btn.conn-badge {
+  display: inline-flex; gap: 4px; width: auto; padding: 0 8px;
+  align-items: center; justify-content: center;
+}
+.conn-dot {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: rgba(100, 150, 170, 0.6); 
+  box-shadow: inset 0 0 2px rgba(0, 0, 0, 0.3);
+  transition: background 0.3s, box-shadow 0.3s;
+}
+.conn-dot.active {
+  background: #2dd4bf; 
+  box-shadow: 0 0 6px #2dd4bf, inset 0 0 2px rgba(0, 0, 0, 0.3);
+}
+.conn-dot.google { }
+.conn-dot.outlook { }
+
 .profile-btn.sirius-shutdown-btn {
   color: #d8b875;
   border-color: rgba(216, 184, 117, 0.58);

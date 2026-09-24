@@ -226,6 +226,18 @@ def make_gcal_router(db):
             "contacts": "contacts.readonly" in granted,
         }
 
+    @router.post("/calendar/refresh")
+    async def gcal_refresh(request: Request):
+        """Attempt silent token refresh (no user interaction required)."""
+        uid = await _uid(request)
+        try:
+            # This will refresh the token if needed via _get_token logic
+            await _get_token(uid)
+            return {"ok": True, "refreshed": True}
+        except Exception as e:
+            logger.warning("[GOOGLE] silent refresh failed for %s: %s", uid, str(e))
+            return {"ok": False, "error": "token_refresh_failed"}
+
     @router.post("/calendar/disconnect")
     async def gcal_disconnect(request: Request):
         await db.google_calendar.delete_one({"_id": await _uid(request)})

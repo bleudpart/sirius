@@ -367,6 +367,24 @@ function App() {
     setMemory(arr);
     localStorage.setItem("sirius_memory", JSON.stringify(arr));
   }, []);
+  
+  // Connection status badge for Google & Microsoft (checked every 3s)
+  const [connectionStatus, setConnectionStatus] = useState({ google: false, microsoft: false });
+  useEffect(() => {
+    const checkStatus = async () => {
+      try {
+        const [gRes, mRes] = await Promise.all([
+          fetch(`${API}/calendar/status`, { credentials: "include" }).then(r => r.ok ? r.json() : { connected: false }).catch(() => ({ connected: false })),
+          fetch(`${API}/auth/microsoft/status`, { credentials: "include" }).then(r => r.ok ? r.json() : { connected: false }).catch(() => ({ connected: false })),
+        ]);
+        setConnectionStatus({ google: gRes.connected || false, microsoft: mRes.connected || false });
+      } catch (e) {}
+    };
+    checkStatus();
+    const timer = setInterval(checkStatus, 3000);
+    return () => clearInterval(timer);
+  }, []);
+
   const [showSetup, setShowSetup] = useState(() => !localStorage.getItem("sirius_profile"));
   const [showMemory, setShowMemory] = useState(false);
   const [musicChoice, setMusicChoice] = useState(null);
@@ -421,6 +439,41 @@ function App() {
     if (token) headers.Authorization = "Bearer " + token;
     return fetch(`${API}${path}`, { ...options, headers });
   }, [saveMsAuth]);
+
+  // Attempt silent token refresh if we get a 401
+  const msFetchWithRefresh = useCallback(async (path, options = {}) => {
+    let resp = await msFetch(path, options);
+    if (resp.status === 401) {
+      try {
+        const refreshResp = await fetch(`${API}/microsoft/refresh`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        });
+        if (refreshResp.ok) {
+          resp = await msFetch(path, options);
+        }
+      } catch (e) {}
+    }
+    return resp;
+  }, [msFetch]);
+
+  const fetchWithRefresh = useCallback(async (path, options = {}) => {
+    let resp = await fetch(`${API}${path}`, options);
+    if (resp.status === 401) {
+      try {
+        const refreshResp = await fetch(`${API}/calendar/refresh`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        });
+        if (refreshResp.ok) {
+          resp = await fetch(`${API}${path}`, options);
+        }
+      } catch (e) {}
+    }
+    return resp;
+  }, []);
   const userName = (profile?.name || "").trim();
   const [status, setStatus] = useState("idle");
   const [booting, setBooting] = useState(true);
@@ -6050,6 +6103,19 @@ function App() {
           <span className={`conn-led ${connected ? "on" : "off"}`} />
           {"IA CLOUD"}
           {mode === "brainstorm" && <span className="mode-badge" data-testid="brainstorm-badge">BRAINSTORM</span>}
+          
+          {/* Connection status badge */}
+          <button
+            className="profile-btn conn-badge"
+            onClick={() => setShowConnections(true)}
+            data-testid="sirius-connection-badge"
+            title="État des connexions (Google & Outlook)"
+            aria-label="Statut des connexions"
+          >
+            <span className={`conn-dot google ${connectionStatus.google ? "active" : ""}`} title={connectionStatus.google ? "Google connecté" : "Google non connecté"} />
+            <span className={`conn-dot outlook ${connectionStatus.microsoft ? "active" : ""}`} title={connectionStatus.microsoft ? "Outlook connecté" : "Outlook non connecté"} />
+          </button>
+          
           {window.Capacitor?.getPlatform?.() === "android" && (
             <button
               className="profile-btn sirius-mobile-exit"

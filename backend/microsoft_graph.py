@@ -738,6 +738,21 @@ def make_microsoft_router(db):
     async def microsoft_login(request: Request):
         return RedirectResponse(await _authorization_url(request), status_code=302)
 
+    @router.get("/auth/microsoft/status")
+    async def microsoft_status(request: Request):
+        """Check if user has connected Microsoft account (returns live status)."""
+        uid = await _uid(request)
+        doc = await db.microsoft_oauth.find_one({"_id": uid})
+        if not doc or not doc.get("access_token"):
+            return {"connected": False}
+        now = datetime.now(timezone.utc)
+        if datetime.fromisoformat(doc.get("expires_at", "2020-01-01T00:00:00+00:00")) < now:
+            return {"connected": False}  # expired token counts as disconnected
+        return {
+            "connected": True,
+            "email": doc.get("email", ""),
+        }
+
     @router.get("/auth/microsoft/authorize")
     async def microsoft_authorize(request: Request):
         return {"authorization_url": await _authorization_url(request)}
@@ -975,6 +990,17 @@ def make_microsoft_router(db):
     async def microsoft_calendar_today(request: Request):
         user = await require_user(request, db)
         return {"events": await ms_today_events(db, user["user_id"])}
+
+    @router.post("/microsoft/refresh")
+    async def microsoft_refresh(request: Request):
+        """Attempt silent token refresh (no user interaction required)."""
+        user = await require_user(request, db)
+        try:
+            await _access_token(db, user["user_id"])
+            return {"ok": True, "refreshed": True}
+        except Exception as e:
+            logger.warning("[MICROSOFT] silent refresh failed for %s: %s", user["user_id"], str(e))
+            return {"ok": False, "error": "token_refresh_failed"}
 
     @router.post("/microsoft/disconnect")
     async def microsoft_disconnect(request: Request):
