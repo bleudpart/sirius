@@ -697,7 +697,10 @@ async def keys_check_post(request: KeysCheckRequest):
 
 
 @api_router.get("/admin/read_file")
-async def read_file(file_path: str):
+async def read_file(file_path: str, request: Request):
+    user = await require_user(request, db)
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Accès administrateur requis.")
     # Sécurité basique : on s'assure qu'on ne lit que des fichiers autorisés du projet
     if file_path not in ["server.py", "sirius_brain.py"]:
         raise HTTPException(status_code=403, detail="Fichier non autorisé à la lecture.")
@@ -891,7 +894,7 @@ async def analyze_file(file_id: str, req: FileAnalyzeIn, request: Request):
         logger.error(f"[FILES] Analyse IA échouée: {e}")
         raise HTTPException(status_code=502, detail="L'analyse IA a échoué, réessayez.")
     analyse["at"] = datetime.now(timezone.utc).isoformat()
-    await db.files.update_one({"id": file_id}, {"$set": {"analyse": analyse}})
+    await db.files.update_one({"id": file_id, **_file_scope(uid)}, {"$set": {"analyse": analyse}})
     return {"ok": True, "analyse": analyse}
 
 from fastapi import Form
@@ -992,6 +995,7 @@ class WebAgentIn(BaseModel):
     url: str = ""
     selector: str = ""
     text: str = ""
+    keys: dict = {}
 
 
 def _url_publique(u: str) -> bool:
@@ -1022,7 +1026,9 @@ async def webagent_run(req: WebAgentIn, request: Request):
     if target and not _url_publique(target):
         raise HTTPException(status_code=400, detail="URL non autorisée, monsieur.")
     from webagent import executer_tache_web
-    result = await executer_tache_web(query=q, url=target, selector=req.selector, text=req.text)
+    user_keys = req.keys or {}
+    serp_key = user_keys.get("serp") or user_keys.get("serpapi")
+    result = await executer_tache_web(query=q, url=target, selector=req.selector, text=req.text, serp_key=serp_key)
     if not result.get("succes"):
         raise HTTPException(status_code=502, detail=result.get("message", "L'agent web a échoué, monsieur."))
     shot = result.pop("image")
@@ -1118,7 +1124,7 @@ async def file_update(file_id: str, req: FileUpdateIn, request: Request):
             logger.error(f"[FILES] Réécriture échouée: {e}")
             raise HTTPException(status_code=502, detail="Le stockage n'a pas accepté la modification, réessayez.")
     now = datetime.now(timezone.utc).isoformat()
-    await db.files.update_one({"id": file_id}, {"$set": {"size": len(data), "updated_at": now}})
+    await db.files.update_one({"id": file_id, **_file_scope(uid)}, {"$set": {"size": len(data), "updated_at": now}})
     return {"ok": True, "size": len(data), "updated_at": now}
 
 # Alias générique demandé : /api/upload → même logique que /api/files/upload
@@ -1324,7 +1330,7 @@ async def archive_rename(archive_id: str, req: RenameArchiveRequest, request: Re
     old = rec.get("original_filename") or ""
     ext = old.rsplit(".", 1)[-1] if "." in old else "bin"
     fichier = f"{_slug(nom)}.{ext}"
-    await db.files.update_one({"id": archive_id}, {"$set": {"nom": nom[:200], "original_filename": fichier}})
+    await db.files.update_one({"id": archive_id, **_file_scope(uid)}, {"$set": {"nom": nom[:200], "original_filename": fichier}})
     return {"id": archive_id, "dossier": rec.get("dossier"), "fichier": fichier}
 
 @api_router.get("/archive/list")

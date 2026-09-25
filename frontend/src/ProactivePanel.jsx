@@ -44,7 +44,14 @@ export default function ProactivePanel({ onAction, onSpeak }) {
       evaluate("activity");
     };
     window.addEventListener("sirius:activity", onActivity);
-    return () => window.removeEventListener("sirius:activity", onActivity);
+    // Certaines suggestions dépendent de l'heure (briefing du matin, habitudes horaires) et
+    // doivent réapparaître même sans interaction utilisateur — sans ce minuteur, une app restée
+    // ouverte et inactive ne les proposerait jamais tant qu'aucun événement "activity" ne survient.
+    const timer = window.setInterval(() => evaluate("timer"), 10 * 60 * 1000);
+    return () => {
+      window.removeEventListener("sirius:activity", onActivity);
+      window.clearInterval(timer);
+    };
   }, [evaluate]);
 
   const remove = (id) => setSuggestions((l) => l.filter((s) => s.id !== id));
