@@ -678,7 +678,9 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
     Groq formule la réponse utilisateur ; Kimi 2.6 apporte une réflexion en mode profond.
     """
     keys = keys or {}
-    k3_key = keys.get("k3") or ENV_K3_KEY
+    k3_key = (keys.get("k3") or keys.get("groq")) or ENV_K3_KEY
+    user_groq_key = (keys.get("groq_key") or "").strip()
+    groq_key = ENV_GROQ_LLM_KEY or user_groq_key
     serp_key = keys.get("serp") or ENV_SERP_KEY
     is_turbo = (mode or "normal").lower() == "turbo"
 
@@ -701,7 +703,7 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
     reflection = await _kimi_reflect(prompt, profile, memory, mode, mood, k3_key, environment) if deep_mode and k3_key else ""
     research = await _research_briefing_follow_up(prompt, keys.get("serp") or keys.get("serpapi") or serp_key)
 
-    if not file_snippets and not web_snippets and ENV_GROQ_LLM_KEY:
+    if not file_snippets and not web_snippets and groq_key:
         sys_prompt = build_system_prompt(profile=profile, memory=memory, mode=mode, mood=mood, environment=environment)
         if reflection:
             sys_prompt += "\n\nNOTES DE RÉFLEXION PRIVÉES :\n" + reflection
@@ -718,7 +720,7 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
         # Réutilise le client HTTP partagé (pool de connexions conservé entre requêtes) plutôt
         # que d'en recréer un neuf à chaque appel — évite le handshake TLS répété et réduit la
         # latence perçue. Le timeout reste ajustable par appel (turbo vs normal).
-        client_groq = client or AsyncOpenAI(api_key=ENV_GROQ_LLM_KEY, base_url=GROQ_LLM_ENDPOINT, max_retries=0)
+        client_groq = client if (client and not user_groq_key) else AsyncOpenAI(api_key=groq_key, base_url=GROQ_LLM_ENDPOINT, max_retries=0)
 
         # Historique resserré : 10 tours à 800 caractères (au lieu de 20 tours à 2000) — la
         # mémoire épisodique condensée prend déjà le relais pour le contexte plus ancien.
@@ -770,8 +772,8 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
                 logger.warning(f"{tag} {model_name} refusé : {repr(e)}")
         if last_error:
             logger.warning(f"{tag} Repli suite à : {repr(last_error)}")
-    elif not ENV_GROQ_LLM_KEY:
-        logger.warning(f"{tag} GROQ_API_KEY absente, retour local.")
+    elif not groq_key:
+        logger.warning(f"{tag} Aucune clé Groq disponible, retour local.")
 
     if k3_key:
         try:
@@ -831,7 +833,9 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
     pour ne jamais retarder la réponse parlée.
     """
     is_turbo = (mode or "normal").lower() == "turbo"
-    k3_key = (keys or {}).get("k3") or ENV_K3_KEY
+    k3_key = (keys or {}).get("k3") or (keys or {}).get("groq") or ENV_K3_KEY
+    user_groq_key = ((keys or {}).get("groq_key") or "").strip()
+    groq_key = ENV_GROQ_LLM_KEY or user_groq_key
     serp_key = (keys or {}).get("serp") or (keys or {}).get("serpapi") or ENV_SERP_KEY
 
     # ⚡ APPRENTISSAGE INSTANTANÉ : mémorisation/correction sans aller-retour LLM.
@@ -844,7 +848,7 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
             yield f"C'est mémorisé instantanément : {fact}."
         return
 
-    if not ENV_GROQ_LLM_KEY and not k3_key:
+    if not groq_key and not k3_key:
         logger.warning("[ΣIRIUS:STREAM] Aucune clé LLM disponible, retour local.")
         yield "Je n'ai pas pu générer de réponse pour le moment. Réessaie dans un instant."
         return
@@ -866,7 +870,10 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
     # Réponse conversationnelle parlée : pas besoin de 4096 tokens (~3000 mots) par défaut,
     # ça n'a jamais de sens à l'oral et ça ne fait qu'allonger le pire cas de génération.
     max_tokens = 512 if is_turbo else 1200
-    client_groq = client or AsyncOpenAI(api_key=ENV_GROQ_LLM_KEY, base_url=GROQ_LLM_ENDPOINT, max_retries=0) if ENV_GROQ_LLM_KEY else None
+    client_groq = (
+        (client if (client and not user_groq_key) else AsyncOpenAI(api_key=groq_key, base_url=GROQ_LLM_ENDPOINT, max_retries=0))
+        if groq_key else None
+    )
 
     # Historique resserré : 10 tours (au lieu de 20) à 800 caractères (au lieu de 2000) — la
     # mémoire épisodique condensée prend déjà le relais pour le contexte plus ancien, inutile

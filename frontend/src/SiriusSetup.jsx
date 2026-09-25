@@ -15,7 +15,8 @@ const TABS = [
   { id: "api", label: "API", Icon: KeyRound },
 ];
 const KEY_META = {
-  groq: { service: "k3", label: "Clé Kimi K3 (Moonshot)", tag: "cerveau · optionnelle", url: "https://platform.moonshot.cn/console/api-keys", ph: "sk-...", note: "Sans clé personnelle, Sirius utilise la clé du serveur." },
+  groq_key: { service: "groq_real", label: "Clé Groq (réponses IA — principale)", tag: "cerveau principal · recommandée", url: "https://console.groq.com/keys", ph: "gsk_...", note: "Gratuite, obtenue en 30 secondes sur console.groq.com. C'est la clé la plus importante pour que ΣIRIUS réponde immédiatement." },
+  groq: { service: "k3", label: "Clé Kimi K3 (Moonshot)", tag: "réflexion approfondie · optionnelle", url: "https://platform.moonshot.cn/console/api-keys", ph: "sk-...", note: "Facultative : n'ajoute que le mode réflexion approfondie. Sans clé, ΣIRIUS répond déjà normalement si la clé Groq est renseignée." },
   serp: { service: "serp", label: "Clé SerpAPI", tag: "recherche web", url: "https://serpapi.com/manage-api-key", ph: "...", note: "Infos du web en temps réel (météo, actualités)." },
   fal: { service: "fal", label: "Clé fal.ai", tag: "clips vidéo", url: "https://fal.ai/dashboard/keys", ph: "...", note: "Génération de clips vidéo uniquement." },
   gmaps: { service: "gmaps", label: "Clé Google Maps", tag: "géocodage LOCUS#", url: "https://console.cloud.google.com/apis/credentials", ph: "AIza...", note: "Sans clé : Nominatim/OpenStreetMap (gratuit)." },
@@ -28,7 +29,7 @@ function KeyField({ k, value, status, onChange, onTest }) {
   return (
     <div className="setup-keyfield">
       <label className="setup-label">
-        {meta.label} <span className={`setup-tag ${k === "groq" ? "" : "opt"}`}>{meta.tag}</span>
+        {meta.label} <span className={`setup-tag ${k === "groq_key" ? "" : "opt"}`}>{meta.tag}</span>
         <a className="setup-link" href={meta.url} target="_blank" rel="noreferrer">obtenir <ExternalLink size={11} /></a>
       </label>
       <div className="setup-keyrow">
@@ -56,6 +57,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
     ...(initialProfile || {}),
   });
   const [keys, setKeys] = useState({
+    groq_key: (initialKeys && initialKeys.groq_key) || "",
     groq: (initialKeys && initialKeys.groq) || "",
     serp: (initialKeys && initialKeys.serp) || "",
     fal: (initialKeys && initialKeys.fal) || "",
@@ -498,16 +500,16 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
             ))}
             <div className="setup-actions">
               <ConfirmButton className="setup-reset danger" label="CONFIRMER ?" title="Effacer toutes les clés" testId="setup-reset-keys"
-                onConfirm={() => { setKeys({ groq: "", serp: "", fal: "", gmaps: "", alphavantage: "" }); setKeyStatus({}); }}>
+                onConfirm={() => { setKeys({ groq_key: "", groq: "", serp: "", fal: "", gmaps: "", alphavantage: "" }); setKeyStatus({}); }}>
                 <RotateCcw size={13} /> EFFACER LES CLÉS
               </ConfirmButton>
             </div>
           </section>
         )}
 
-        {!keys.groq.trim() && tab === "api" && (
+        {!(keys.groq_key || "").trim() && tab === "api" && (
           <div className="setup-warn" data-testid="setup-warn-nogroq">
-            Sans clé personnelle, Sirius utilise la clé du serveur — il répond toujours via l'IA connectée.
+            Sans clé Groq personnelle, Sirius utilise la clé du serveur si elle est configurée — sinon il ne pourra pas répondre.
           </div>
         )}
 

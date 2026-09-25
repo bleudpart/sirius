@@ -727,6 +727,10 @@ async def keys_validate(body: KeyValidateIn):
                 r = await cx.get(f"{K3_ENDPOINT}/models", headers={"Authorization": f"Bearer {k}"})
                 return {"ok": r.status_code == 200,
                         "message": "Clé Kimi K3 valide." if r.status_code == 200 else f"Clé refusée par Moonshot ({r.status_code})."}
+            if s in ("groq_real", "groq-real", "groqreal"):
+                r = await cx.get("https://api.groq.com/openai/v1/models", headers={"Authorization": f"Bearer {k}"})
+                return {"ok": r.status_code == 200,
+                        "message": "Clé Groq valide." if r.status_code == 200 else f"Clé refusée par Groq ({r.status_code})."}
             if s in ("serp", "serpapi"):
                 r = await cx.get("https://serpapi.com/account.json", params={"api_key": k})
                 return {"ok": r.status_code == 200,
