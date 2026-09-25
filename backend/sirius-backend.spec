@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
@@ -22,6 +23,16 @@ datas.extend(collect_data_files("ezdxf"))
 static_dir = backend_dir / "static"
 if static_dir.exists():
     datas.append((str(static_dir), "static"))
+
+# Le webagent (recherche invisible via Playwright) a besoin d'un vrai Chromium
+# sur le poste client, sans dépendre d'un téléchargement réseau au premier lancement.
+# On embarque uniquement le dossier "chromium-*" (pas ffmpeg/headless-shell/winldd,
+# inutilisés par webagent.py) depuis le cache local où `playwright install chromium`
+# l'a déposé sur la machine de build.
+playwright_cache = Path(os.environ.get("LOCALAPPDATA", "")) / "ms-playwright"
+for entry in sorted(playwright_cache.glob("chromium-*")) if playwright_cache.exists() else []:
+    if entry.is_dir() and "headless_shell" not in entry.name:
+        datas.append((str(entry), f"playwright-browsers/{entry.name}"))
 
 analysis = Analysis(
     [str(backend_dir / "desktop_backend.py")],
