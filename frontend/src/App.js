@@ -549,15 +549,6 @@ function App() {
     fetch(`${API}/chat/status`).then((r) => r.json()).then((d) => {
       setEnvGroq(!!d.groq_env);
       envGroqRef.current = !!d.groq_env;
-      // Clé Google Maps du projet (backend/.env) : Atlas fonctionne sans saisie manuelle
-      if (d.gmaps_env) {
-        setKeys((k) => {
-          if (k.gmaps) return k;
-          const nk = { ...k, gmaps: d.gmaps_env };
-          localStorage.setItem("sirius_keys", JSON.stringify(nk));
-          return nk;
-        });
-      }
     }).catch(() => {});
   }, []);
   // ΣIRIUS DISPLAY : panneau piloté par Sirius — s'ouvre automatiquement, se ferme après

@@ -1962,7 +1962,7 @@ from outlook_graph import make_outlook_router
 async def chat_status():
     import sirius_brain as _sb
     gmaps_env = (os.environ.get("GOOGLE_MAPS_API_KEY") or os.environ.get("MAPS_PLATFORM_API_Key") or "").strip()
-    return {"groq_env": bool(_sb.ENV_K3_KEY), "gmaps_env": gmaps_env}
+    return {"groq_env": bool(_sb.ENV_K3_KEY), "gmaps_env": bool(gmaps_env)}
 
 api_router.include_router(make_outlook_router(db))
 
