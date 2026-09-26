@@ -799,8 +799,8 @@ def dossier_for(content_type: str, ext: str) -> str:
     return "Autres"
 
 def _file_scope(uid):
-    """Isolation par utilisateur (les anciens fichiers sans user_id restent visibles)."""
-    return {"$or": [{"user_id": uid}, {"user_id": {"$exists": False}}]}
+    """Isolation stricte des fichiers par utilisateur."""
+    return {"user_id": uid}
 
 
 @api_router.post("/files/upload")
