@@ -1,3 +1,4 @@
+import { loadApiKeys } from "@/apiKeyStorage";
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useEffect, useRef, useState } from "react";
 import {
@@ -158,7 +159,7 @@ export default function OracleDivin({ onClose }) {
 
   useEffect(() => {
     let avKey = "", waPhone = "", waKey = "";
-    try { avKey = (JSON.parse(localStorage.getItem("sirius_keys")) || {}).alphavantage || ""; } catch { avKey = ""; }
+    avKey = loadApiKeys().alphavantage || "";
     try {
       const n = JSON.parse(localStorage.getItem("sirius_notif")) || {};
       if (n.whatsapp && n.waNum && n.waKey) { waPhone = n.waNum; waKey = n.waKey; }

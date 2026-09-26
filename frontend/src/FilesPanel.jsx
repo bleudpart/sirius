@@ -1,3 +1,4 @@
+import { loadApiKeys } from "@/apiKeyStorage";
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useEffect, useRef, useState } from "react";
 import { FolderOpen, X, Upload, Trash2, Download, FileText, Music, Image as ImageIcon, File as FileIcon, Loader2, Sparkles, ChevronUp, Search, FolderPlus } from "lucide-react";
@@ -80,7 +81,7 @@ export default function FilesPanel({ onClose }) {
   const analyze = async (f) => {
     setAnaBusy(f.id);
     let keys = {};
-    try { keys = JSON.parse(localStorage.getItem("sirius_keys")) || {}; } catch { keys = {}; }
+    keys = loadApiKeys();
     try {
       const resp = await fetch(`${API}/files/${f.id}/analyze`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ keys }),

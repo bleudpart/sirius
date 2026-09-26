@@ -1,3 +1,4 @@
+import { loadApiKeys } from "@/apiKeyStorage";
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // PYTHAGORE# — Mathématiques & géométrie : calcul exact (vocal), géométrie visuelle, tracé, explications, historique.
 import { useEffect, useRef, useState } from "react";
@@ -168,7 +169,7 @@ export default function PythagorePanel({ onClose }) {
     setBusy(true); setAnswer("");
     try {
       let keys = {};
-      try { keys = JSON.parse(localStorage.getItem("sirius_keys")) || {}; } catch (e) { keys = {}; }
+      keys = loadApiKeys();
       const r = await fetch(`${API}/mythos/consult`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

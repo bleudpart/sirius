@@ -1,3 +1,4 @@
+import { loadApiKeys } from "@/apiKeyStorage";
 // © 2026 Daniel Partel – ΣIRIUS Assistant. THÉMIS# — gestion d'entreprise (devis, factures, commandes, clients, compta, stocks, pièces PDF/OCR, modèles, BYOK).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -236,7 +237,7 @@ export default function ThemisPanel({ onClose }) {
     setImportingStatement(false);
   };
 
-  const groqKey = () => { try { return (JSON.parse(localStorage.getItem("sirius_keys")) || {}).groq || ""; } catch (e) { return ""; } };
+  const groqKey = () => loadApiKeys().groq || "";
 
   const uploadPiece = async (file) => {
     if (!file || uploading) return;

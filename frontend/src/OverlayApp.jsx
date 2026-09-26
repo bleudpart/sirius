@@ -5,7 +5,14 @@ import { speakFr } from "@/voice";
 import "@/App.css";
 
 const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
-const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d; } catch { return d; } };
+const load = (k, d) => {
+  try {
+    const storage = k === "sirius_keys" ? sessionStorage : localStorage;
+    return JSON.parse(storage.getItem(k)) || d;
+  } catch {
+    return d;
+  }
+};
 const today = () => new Date().toISOString().slice(0, 10);
 
 // Overlay transparent type Spotlight (Alt+Espace dans l'app Electron)

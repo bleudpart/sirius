@@ -312,6 +312,10 @@ _RATE: dict[str, deque[float]] = {}
 
 def _rate_ok(ip: str, limit: int = 30, window: int = 60) -> bool:
     now = time.monotonic()
+    if len(_RATE) > 10000:
+        stale = [key for key, values in _RATE.items() if not values or values[-1] <= now - window]
+        for key in stale:
+            _RATE.pop(key, None)
     q = _RATE.setdefault(ip, deque())
     cutoff = now - window
     while q and q[0] <= cutoff:
@@ -786,6 +790,23 @@ MAX_FILE_MB = 20
 
 DOC_EXTS = {"pdf", "doc", "docx", "txt", "md", "csv", "xls", "xlsx", "ppt", "pptx", "json", "rtf", "odt", "log"}
 
+def _validate_upload_content(ext: str, content_type: str, data: bytes) -> None:
+    """Refuse les exécutables évidents et vérifie les formats binaires déclarés."""
+    if data[:2] in (b"MZ", b"\x7fE") or data[:4] in (b"\xfe\xed\xfa\xce", b"\xcf\xfa\xed\xfe"):
+        raise HTTPException(status_code=415, detail="Type de fichier exécutable non autorisé.")
+    ct = (content_type or "").split(";", 1)[0].strip().lower()
+    signatures = {
+        "application/pdf": data.startswith(b"%PDF-"),
+        "image/png": data.startswith(b"\x89PNG\r\n\x1a\n"),
+        "image/jpeg": data.startswith(b"\xff\xd8\xff"),
+        "image/gif": data.startswith((b"GIF87a", b"GIF89a")),
+        "image/webp": data.startswith(b"RIFF") and data[8:12] == b"WEBP",
+    }
+    if ct in signatures and not signatures[ct]:
+        raise HTTPException(status_code=415, detail="Le contenu ne correspond pas au type déclaré.")
+    if ext in {"docx", "xlsx", "pptx", "odt"} and not data.startswith(b"PK"):
+        raise HTTPException(status_code=415, detail="Archive bureautique invalide.")
+
 def dossier_for(content_type: str, ext: str) -> str:
     ct = (content_type or "").lower()
     if ct.startswith("image/"):
@@ -816,6 +837,7 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
         ext = "bin"  # neutralise toute tentative de traversée de chemin via le nom de fichier
     path = f"{APP_NAME}/uploads/{uuid.uuid4()}.{ext}"
     content_type = file.content_type or "application/octet-stream"
+    _validate_upload_content(ext, content_type, data)
     try:
         result = put_object(path, data, content_type)
     except Exception as e:
@@ -889,8 +911,9 @@ async def analyze_file(file_id: str, req: FileAnalyzeIn, request: Request):
 from fastapi import Form
 
 @api_router.post("/display/analyze")
-async def display_analyze(file: UploadFile = File(...), keys: str = Form("{}")):
+async def display_analyze(request: Request, file: UploadFile = File(...), keys: str = Form("{}")):
     """Analyse IA d'un fichier déposé dans le ΣIRIUS DISPLAY (non stocké) + phrase à prononcer."""
+    await require_user(request, db)
     try:
         keys_d = json.loads(keys or "{}")
     except Exception:
@@ -899,6 +922,8 @@ async def display_analyze(file: UploadFile = File(...), keys: str = Form("{}")):
     if len(data) > 12 * 1048576:
         raise HTTPException(status_code=413, detail="Fichier trop volumineux pour l'analyse (12 Mo max).")
     ct = (file.content_type or "").lower()
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else "bin"
+    _validate_upload_content(ext if re.fullmatch(r"[a-z0-9]{1,8}", ext) else "bin", ct, data)
     try:
         if ct.startswith("image/"):
             import base64 as b64mod

@@ -10,7 +10,8 @@ const ACTIVE_STAGES = ["PROSPECTION", "QUALIFICATION", "PROPOSITION", "NÉGOCIAT
 const SCENARIOS = ["Objection prix", "Concurrent moins cher", "Pas de besoin identifié", "Décideur absent", "Délai repoussé"];
 const euro = (v) => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v || 0);
 const today = () => new Date().toISOString().slice(0, 10);
-const getKeys = () => { try { return JSON.parse(localStorage.getItem("sirius_keys")) || {}; } catch (e) { return {}; } };
+import { loadApiKeys } from "@/apiKeyStorage";
+const getKeys = () => loadApiKeys();
 const getSmtp = () => {
   try {
     const b = JSON.parse(localStorage.getItem("themis_keys")) || {};
@@ -245,7 +246,7 @@ export default function AgoraPipeline({ onClose, onOpenThemis }) {
   // Historique des encaissements + relances impayés
   const smtpConf = () => {
     let k = {};
-    try { k = JSON.parse(localStorage.getItem("sirius_keys")) || {}; } catch (e) { k = {}; }
+    k = loadApiKeys();
     if (!(k.smtp_host || "").trim()) return null;
     return { host: k.smtp_host.trim(), port: Number(k.smtp_port || 587), user: k.smtp_user || "", password: k.smtp_pass || "", from_email: k.smtp_from || "", from_name: k.smtp_name || "HERMÈS AGORA — ΣIRIUS" };
   };

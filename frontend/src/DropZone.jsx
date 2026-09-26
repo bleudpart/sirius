@@ -1,3 +1,4 @@
+import { loadApiKeys } from "@/apiKeyStorage";
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Upload, HardDrive, ClipboardPaste, Loader2 } from "lucide-react";
@@ -32,7 +33,7 @@ const ANALYZABLE = (ct) => (ct || "").startsWith("image/") || (ct || "").startsW
 // Analyse IA automatique en arrière-plan des fichiers déposés
 export function autoAnalyze(records) {
   let keys = {};
-  try { keys = JSON.parse(localStorage.getItem("sirius_keys")) || {}; } catch { keys = {}; }
+  keys = loadApiKeys();
   (records || []).filter((r) => r && ANALYZABLE(r.content_type)).forEach((r) => {
     const pid = progress.start(`Analyse IA — ${r.original_filename}`, { silent: true });
     progress.log(pid, "Lecture du fichier et interrogation de l'IA…", 35);

@@ -33,6 +33,7 @@ import MobileNavigation from "@/MobileNavigation";
 import { useAuth } from "@/AuthGate";
 import { App as CapacitorApp } from "@capacitor/app";
 import { speakFr, cancelSpeech, speakSeries, speakAsCharacter } from "@/voice";
+import { loadApiKeys, saveApiKeys } from "@/apiKeyStorage";
 import { loadHud, applyHud } from "@/hudPrefs";
 import { initUiSounds } from "@/uiSounds";
 import { initHoloFx } from "@/holoFx";
@@ -190,7 +191,7 @@ const loadProfile = () => {
   try { return JSON.parse(localStorage.getItem("sirius_profile")) || null; } catch { return null; }
 };
 const loadKeys = () => {
-  try { return JSON.parse(localStorage.getItem("sirius_keys")) || {}; } catch { return {}; }
+  return loadApiKeys();
 };
 // Mémoire long terme datée : accepte l'ancien format (chaînes) et le nouveau ({t, d})
 const loadMemory = () => {
@@ -955,7 +956,7 @@ function App() {
     
     const t = setTimeout(async () => {
       try {
-        const k = JSON.parse(localStorage.getItem("sirius_keys")) || {};
+        const k = loadApiKeys();
         const r = await fetch(`${API}/keys/check`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1633,7 +1634,7 @@ function App() {
     speakAsCharacter("Hermès Agora. J'analyse ton affaire.", AGORA_VOICE);
     try {
       let ks = {};
-      try { ks = JSON.parse(localStorage.getItem("sirius_keys")) || {}; } catch (e) { ks = {}; }
+      ks = loadApiKeys();
       const r = await fetch(`${API}/mythos/consult`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ module: "HERMÈS AGORA#", question, keys: ks }),
@@ -4778,7 +4779,7 @@ function App() {
     setProfile(newProfile);
     setKeys(newKeys);
     localStorage.setItem("sirius_profile", JSON.stringify(newProfile));
-    localStorage.setItem("sirius_keys", JSON.stringify(newKeys));
+    saveApiKeys(newKeys);
     fetch(`${API}/auth/profile`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -5970,7 +5971,7 @@ function App() {
           onClose={() => { setShowAtlas(false); setAtlasQuery(""); setAtlasRoute(null); }}
           onSpeak={(m) => speakRef.current(m)}
           keys={keys}
-          onSaveKeys={(gk) => { const nk = { ...keys, gmaps: gk }; setKeys(nk); localStorage.setItem("sirius_keys", JSON.stringify(nk)); }}
+          onSaveKeys={(gk) => { const nk = { ...keys, gmaps: gk }; setKeys(nk); saveApiKeys(nk); }}
           initialQuery={atlasQuery}
           initialRoute={atlasRoute}
         />

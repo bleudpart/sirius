@@ -1,3 +1,4 @@
+import { loadApiKeys } from "@/apiKeyStorage";
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useEffect, useState } from "react";
 import { X, Volume2, ArrowRight } from "lucide-react";import { speakAsCharacter, cancelSpeech, CHAR_PROFILES } from "@/voice";
@@ -160,7 +161,7 @@ export default function MythosGallery({ onClose, onOpenModule, initialModule = n
                       speakAsCharacter((CONSULT_SPEAK[sel.module] || CONSULT_SPEAK["PROMÉTHÉE#"]).start, CHAR_VOICES[sel.module] || {});
                       try {
                         let keys = {};
-                        try { keys = JSON.parse(localStorage.getItem("sirius_keys")) || {}; } catch (e) { keys = {}; }
+                        keys = loadApiKeys();
                         const r = await fetch(`${API}/mythos/consult`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ module: sel.module, question: consultQ, keys }) });
                         const d = await r.json().catch(() => ({}));
                         if (r.ok && d.reponse) {

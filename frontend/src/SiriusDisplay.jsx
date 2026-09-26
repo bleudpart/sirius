@@ -1,3 +1,4 @@
+import { loadApiKeys } from "@/apiKeyStorage";
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useRef, useState, useEffect, useCallback } from "react";
 import { gsap } from "gsap";
@@ -250,7 +251,7 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
     progress.log(pid, "Sirius examine le fichier…", 35);
     try {
       let keys = {};
-      try { keys = JSON.parse(localStorage.getItem("sirius_keys")) || {}; } catch { keys = {}; }
+      keys = loadApiKeys();
       const form = new FormData();
       form.append("file", file);
       form.append("keys", JSON.stringify(keys));

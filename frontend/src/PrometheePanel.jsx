@@ -1,3 +1,4 @@
+import { loadApiKeys } from "@/apiKeyStorage";
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // PROMÉTHÉE# — Gestion de projet : objectif, jalons, risques, actions. Historique cloud (MongoDB),
 // export PDF et envoi par email (SMTP Thémis). Dédié à Prométhée (voir ConsultPanel pour Solon).
@@ -13,7 +14,7 @@ const OLD_LOCAL_KEY = "sirius_consult_history";
 
 const smtpConf = () => {
   let k = {};
-  try { k = JSON.parse(localStorage.getItem("sirius_keys")) || {}; } catch (e) { k = {}; }
+  k = loadApiKeys();
   if (!(k.smtp_host || "").trim()) return null;
   return {
     host: k.smtp_host.trim(), port: Number(k.smtp_port || 587),
@@ -89,7 +90,7 @@ export default function PrometheePanel({ onClose }) {
     speakAsCharacter(CONF.start, { module: MODULE });
     try {
       let keys = {};
-      try { keys = JSON.parse(localStorage.getItem("sirius_keys")) || {}; } catch (e) { keys = {}; }
+      keys = loadApiKeys();
       const r = await fetch(`${API}/mythos/consult`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
