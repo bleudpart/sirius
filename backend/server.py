@@ -193,7 +193,7 @@ app = FastAPI(title="Sirius Backend API", version="1.0.0", lifespan=_lifespan)
 # Imports des modules Sirius
 from storage import put_object, get_object, APP_NAME
 from local_memory import list_facts, add_fact, delete_fact, update_fact, log_event, prime_overview, log_service, list_service_log, recall_facts, learn_fact, recent_episodes
-from auth_api import is_direct_local_request, resolve_user_id, require_user  # noqa: E402
+from auth_api import _decode_token, is_direct_local_request, resolve_user_id, require_user  # noqa: E402
 from omega_engine import OmegaEngine  # noqa: E402
 from version_info import APP_NAME, APP_RELEASE, APP_VERSION  # noqa: E402
 
@@ -245,10 +245,7 @@ def _admin_token_matches(candidate: str | None) -> bool:
 
 @app.get("/health")
 async def health_check():
-    """Sonde de santé agrégée : liveness + état DB, tâches de fond et clés présentes.
-
-    N'expose jamais de valeur de secret — uniquement des booléens de présence.
-    """
+    """Sonde de santé agrégée : liveness, état DB et tâches de fond."""
     checks = {}
 
     checks["database"] = db.backend_name
@@ -263,14 +260,6 @@ async def health_check():
 
     checks["push_watch"] = "running" if (_watch_task and not _watch_task.done()) else "stopped"
     checks["omega_watch"] = "running" if (_omega_task and not _omega_task.done()) else "stopped"
-
-    keys = {
-        "llm": bool(os.getenv("GROQ_KEY") or os.getenv("GROQ_API_KEY") or os.getenv("K3_API_KEY") or os.getenv("DANIEL_DEV_K3") or os.getenv("GEMINI_API_KEY")),
-        "groq": bool(os.getenv("GROQ_KEY") or os.getenv("GROQ_API_KEY")),
-        "kimi": bool(os.getenv("K3_API_KEY") or os.getenv("DANIEL_DEV_K3")),
-        "serpapi": bool(os.getenv("SERP_API_KEY")),
-        "spotify": bool(os.getenv("SPOTIFY_CLIENT_ID")),
-    }
 
     try:
         from push_notifications import subscriber_count
@@ -288,7 +277,6 @@ async def health_check():
         "version": APP_VERSION,
         "release": APP_RELEASE,
         "checks": checks,
-        "keys": keys,
         "breakers": breakers_snapshot(),
         "push_subscribers": subscribers,
     }
@@ -705,13 +693,14 @@ async def read_file(file_path: str, request: Request):
     if file_path not in ["server.py", "sirius_brain.py"]:
         raise HTTPException(status_code=403, detail="Fichier non autorisé à la lecture.")
         
-    if not os.path.exists(file_path):
+    target = (SOURCE_DIR / file_path).resolve()
+    if target.parent != SOURCE_DIR or not target.exists():
         raise HTTPException(status_code=404, detail="Fichier introuvable")
         
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(target, "r", encoding="utf-8") as f:
             content = f.read()
-        return {"status": "success", "file_path": file_path, "content": content}
+        return {"status": "success", "file_path": target.name, "content": content}
     except Exception as e:
   
        raise HTTPException(status_code=500, detail=str(e))
@@ -2039,7 +2028,7 @@ api_router.include_router(make_memory_router(db, require_user, resolve_user_id))
 api_router.include_router(make_stub_router())
 api_router.include_router(make_spotify_router())
 api_router.include_router(make_infos_router())
-api_router.include_router(make_pantheon_oracle_router(db, _rate_ok))
+api_router.include_router(make_pantheon_oracle_router(db, _rate_ok, require_user))
 api_router.include_router(make_voice_io_router())
 api_router.include_router(make_hephaistos_router(db))
 api_router.include_router(make_feedback_router())
@@ -2255,6 +2244,19 @@ from fastapi import WebSocket, WebSocketDisconnect
 
 @api_router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    token = websocket.cookies.get("access_token")
+    if not token:
+        authorization = websocket.headers.get("authorization", "")
+        if authorization.lower().startswith("bearer "):
+            token = authorization[7:].strip()
+    if not token:
+        await websocket.close(code=1008, reason="Authentification requise")
+        return
+    try:
+        _decode_token(token, expected_type="access")
+    except HTTPException:
+        await websocket.close(code=1008, reason="Session invalide")
+        return
     await websocket.accept()
     try:
         while True:

@@ -79,11 +79,12 @@ async def _send_callmebot(phone: str, apikey: str, text: str) -> str:
     return body_txt
 
 
-def make_pantheon_oracle_router(db, rate_ok):
+def make_pantheon_oracle_router(db, rate_ok, require_user):
     router = APIRouter(tags=["pantheon-oracle"])
 
     @router.get("/cortex/stats")
-    async def cortex_stats():
+    async def cortex_stats(request: Request):
+        await require_user(request, db)
         import sqlite3 as _sq
         from local_memory import DB_PATH as _LMDB
         t0 = time.perf_counter()
@@ -127,7 +128,8 @@ def make_pantheon_oracle_router(db, rate_ok):
         }
 
     @router.get("/pantheon/windows")
-    async def pantheon_windows():
+    async def pantheon_windows(request: Request):
+        await require_user(request, db)
         procs = []
         for p in psutil.process_iter(["pid", "name", "memory_percent", "status"]):
             try:
@@ -143,7 +145,8 @@ def make_pantheon_oracle_router(db, rate_ok):
         return {"processes": procs[:12], "total": len(procs)}
 
     @router.delete("/pantheon/process/{pid}")
-    async def pantheon_kill(pid: int):
+    async def pantheon_kill(pid: int, request: Request):
+        await require_user(request, db)
         try:
             psutil.Process(pid).terminate()
             log_service("SYSTÈME", f"Processus {pid} terminé", "OK")
@@ -153,7 +156,8 @@ def make_pantheon_oracle_router(db, rate_ok):
             raise HTTPException(status_code=400, detail=f"Impossible de terminer ce processus : {e}")
 
     @router.get("/pantheon/connectivity")
-    async def pantheon_connectivity():
+    async def pantheon_connectivity(request: Request):
+        await require_user(request, db)
         services = [{"name": "NOYAU ΣIRIUS", "status": "CONNECTÉ", "latency": 1, "real": True}]
         checks = [
             ("MÉTÉO", "https://api.open-meteo.com/v1/forecast?latitude=48.85&longitude=2.35&current=temperature_2m"),
@@ -179,7 +183,8 @@ def make_pantheon_oracle_router(db, rate_ok):
         return {"services": services}
 
     @router.post("/notify/whatsapp")
-    async def notify_whatsapp(body: WhatsAppNotifyIn):
+    async def notify_whatsapp(body: WhatsAppNotifyIn, request: Request):
+        await require_user(request, db)
         phone = body.phone.strip()
         if not phone or not body.apikey.strip() or not body.text.strip():
             raise HTTPException(status_code=400, detail="Numéro, clé CallMeBot et message requis.")
@@ -214,12 +219,14 @@ def make_pantheon_oracle_router(db, rate_ok):
             raise HTTPException(status_code=500, detail="Analyse impossible, réessayez.")
 
     @router.get("/pantheon/history")
-    async def pantheon_history():
+    async def pantheon_history(request: Request):
+        await require_user(request, db)
         return {"log": list_service_log(25)}
 
     @router.get("/oracle/overview")
     async def oracle_overview(request: Request, lat: float = 48.85, lon: float = 2.35, av_key: str = "",
                               wa_phone: str = "", wa_key: str = "", light: int = 0):
+        await require_user(request, db)
         import random as _rd
         today = datetime.now(timezone.utc).date()
         seed = int(today.strftime("%Y%m%d"))
