@@ -51,7 +51,7 @@ function KeyField({ k, value, status, onChange, onTest }) {
 // Écran de configuration — les réglages techniques restent réservés à l'administrateur.
 export default function SiriusSetup({ initialProfile, initialKeys, onComplete, onCancel, showAdvanced = false }) {
   const [tab, setTab] = useState("profil");
-  const visibleTabs = showAdvanced ? TABS : TABS.filter((item) => item.id !== "api");
+  const visibleTabs = TABS;
   const [profile, setProfile] = useState({
     name: "", age: "", profession: "", city: "", gender: "", interests: "", style: "",
     ...(initialProfile || {}),
@@ -492,7 +492,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
           </section>
         )}
 
-        {showAdvanced && tab === "api" && (
+        {tab === "api" && (
           <section className="setup-section setup-single" data-testid="setup-panel-api">
             <p className="setup-note">Chaque clé reste privée sur votre PC. Testez chaque clé avant d'enregistrer.</p>
             {Object.keys(KEY_META).map((k) => (

@@ -479,6 +479,7 @@ function App() {
   const userName = (profile?.name || "").trim();
   const [status, setStatus] = useState("idle");
   const [booting, setBooting] = useState(true);
+  const finishBoot = useCallback(() => setBooting(false), []);
   const volume = undefined; // → statusPulseRef.current.volume (sans re-render)
   const [text, setText] = useState(
     `${greetByPhase(userName)} Tous mes systèmes sont en ligne. ${APP_RELEASE}.`
@@ -5758,7 +5759,7 @@ function App() {
     { id: "files", group: "MÉDIAS", label: "Médiathèque", Icon: FolderOpen, run: () => setShowFiles(true) },
     { id: "info-hub", group: "OUTILS", label: "Centre d'information SIRIUS", Icon: BadgeInfo, run: () => restoreHudPanel("info-hub") },
     { id: "connections", group: "OUTILS", label: "Comptes & connexions", Icon: Link2, run: () => setShowConnections(true) },
-    { id: "capture-interface", group: "OUTILS", label: "Capture de l'interface", Icon: Camera, mobile: false, run: captureSiriusInterface },
+    { id: "capture-interface", group: "OUTILS", label: "Capture de l'interface", Icon: Camera, run: captureSiriusInterface },
     { id: "architect", group: "OUTILS", label: "Architecte visuel", Icon: Workflow, run: () => { setArchitectPrompt(""); setShowArchitect(true); } },
     { id: "plans", group: "OUTILS", label: "Plans 2D (PLANS#)", Icon: Ruler, run: () => { setPlansPrompt(""); setShowPlans(true); } },
     { id: "photo3d", group: "OUTILS", label: "Photos → Objet 3D (PHOTO3D#)", Icon: Boxes, run: () => setShowPhoto3D(true) },
@@ -5859,7 +5860,7 @@ function App() {
       <span className="corner bl" />
       <span className="corner br" />
 
-      {booting && <BootScreen userName={userName} onDone={() => setBooting(false)} onOpenModule={(id) => {
+      {booting && <BootScreen userName={userName} onDone={finishBoot} onOpenModule={(id) => {
         const openers = { argus: setShowArgus, atlas: setShowAtlas, oracle: setShowOracle, heracles: setShowHeracles, hephaistos: setShowHephaistos, keraunos: setShowKeraunos, locus: setShowLocus, pantheon: setShowPantheon, cortex: setShowCortex, themis: setShowThemis, nummarius: setShowNummarius };
         if (id === "solon") { setShowSolon(true); return; }
         if (id === "calliope") { setShowCalliope(true); return; }
