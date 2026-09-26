@@ -89,6 +89,7 @@ backend/proc_id.txt
 
 # Local SIRIUS Doctor snapshots
 /backend/backups/sirius_doctor/
+audit-report.json
 
 # Archive files and large assets
 **/*.zip

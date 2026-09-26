@@ -86,6 +86,7 @@
   "scripts": {
     "start": "craco start",
     "build": "craco build",
+    "audit:sirius": "python ../scripts/sirius_audit.py",
     "test": "craco test",
     "electron": "electron .",
     "mobile:build": "node scripts/build-mobile.js",
