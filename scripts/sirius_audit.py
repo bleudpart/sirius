@@ -75,7 +75,8 @@ def main() -> int:
         "static_security_contracts": check_static_contracts(),
     }
     if not args.skip_build:
-        ok, output = run(["npm", "run", "build"], FRONTEND)
+        npm_command = "npm.cmd" if sys.platform == "win32" else "npm"
+        ok, output = run([npm_command, "run", "build"], FRONTEND)
         if not ok:
             checks["frontend_build"] = [output]
     checks["bundle_performance"] = check_bundle()
