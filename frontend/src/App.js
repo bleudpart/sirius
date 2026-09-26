@@ -5880,7 +5880,7 @@ function App() {
           initialKeys={keys}
           onComplete={handleSetupComplete}
           onCancel={() => setShowSetup(false)}
-          showAdvanced={authUser?.role === "admin" && !NATIVE_APP}
+          showAdvanced={authUser?.role === "admin"}
         />
       )}
 
