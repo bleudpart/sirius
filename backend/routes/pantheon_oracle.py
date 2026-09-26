@@ -415,6 +415,7 @@ def make_pantheon_oracle_router(db, rate_ok):
         if ms_unread:
             parts.append(f"Outlook : {ms_unread} mail{'s' if ms_unread > 1 else ''} non lu{'s' if ms_unread > 1 else ''}.")
         live_titles = []
+        live_sport_titles = []
         from routes.infos import NEWS_API_KEY, _fetch_headlines
         if NEWS_API_KEY:
             try:
@@ -424,12 +425,21 @@ def make_pantheon_oracle_router(db, rate_ok):
                     parts.append("Actualités : " + ". ".join(live_titles[:3]) + ".")
             except Exception:
                 pass
+            try:
+                sport = await _fetch_headlines(q="sport", limit=5)
+                live_sport_titles = [a["titre"] for a in sport["articles"][:5] if a["titre"]]
+                if live_sport_titles:
+                    parts.append("Sport : " + ". ".join(live_sport_titles[:2]) + ".")
+            except Exception:
+                pass
         if not live_titles:
             fallback_titles = [str(item.get("text", "")).strip() for item in news[:3] if item.get("text")]
             if fallback_titles:
                 parts.append("Actualités : " + ". ".join(fallback_titles) + ".")
             else:
                 parts.append("Actualités : aucune donnée disponible pour le moment.")
+        if not live_sport_titles:
+            parts.append("Sport : aucune actualité sportive vérifiée disponible pour le moment.")
         point_attention = (
             f"la volatilité de {crypto[0]['name']}" if crypto and crypto[0].get("volatile")
             else "l'équilibre entre vos priorités et votre charge prévue"
@@ -445,13 +455,14 @@ def make_pantheon_oracle_router(db, rate_ok):
                     "crypto_eur": crypto,
                     "marches_actions": stocks,
                     "actualites_titres": live_titles or [n.get("text", "") for n in news],
+                    "actualites_sportives": live_sport_titles,
                     "lune": moon,
                     "evenements_celestes": upcoming,
                     "habitudes_utilisateur": personal,
                     "agenda_microsoft": ms_events,
                     "mails_outlook_non_lus": ms_unread,
                 })
-                required_sections = ("météo", "march", "crypto", "actualité", "ciel", "journée", "synthèse")
+                required_sections = ("météo", "march", "crypto", "actualité", "sport", "ciel", "journée", "synthèse")
                 normalized_enriched = enriched.lower()
                 if enriched and all(section in normalized_enriched for section in required_sections):
                     briefing_txt = enriched
