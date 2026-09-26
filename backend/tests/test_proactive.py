@@ -35,8 +35,8 @@ def test_projet_recent_genere_une_suggestion(memory_db):
 def test_briefing_suggere_le_matin_seulement(memory_db):
     matin = proactive.evaluate("u1", now=_at_hour(8))
     soir = proactive.evaluate("u1", now=_at_hour(20))
-    assert any(s["title"] == "Briefing du jour" for s in matin["suggestions"])
-    assert not any(s["title"] == "Briefing du jour" for s in soir["suggestions"])
+    assert any(s["title"] == "Infos du jour" for s in matin["suggestions"])
+    assert not any(s["title"] == "Infos du jour" for s in soir["suggestions"])
 
 
 def test_briefing_pas_resuggere_apres_usage(memory_db):

@@ -320,10 +320,10 @@ export default function OracleDivin({ onClose }) {
       <div className="prime-sub">CENTRE DE PRÉDICTIONS — {data ? data.date : "CONSULTATION DES ASTRES..."}</div>
 
       <div className="prime-grid oracle-grid">
-        {/* Briefing du matin */}
+        {/* Infos du jour */}
         <section className="prime-card oracle-wide" data-testid="oracle-briefing">
           <div className="zc-section-title">
-            <Sunrise size={12} style={{ marginRight: 6 }} />BRIEFING DU MATIN
+            <Sunrise size={12} style={{ marginRight: 6 }} />INFOS DU JOUR
             {!briefing.loading && (
               <button className="oracle-3d-btn" onClick={() => setShow3D(true)} data-testid="oracle-3d-btn">
                 <Boxes size={11} /> VUE 3D

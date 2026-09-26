@@ -109,13 +109,13 @@ def _candidates(user_id: str, now) -> list:
     if 6 <= local_now.hour <= 10 and not briefing_today:
         items.append({
             "kind": "briefing",
-            "title": "Briefing du jour",
-            "description": "Ton briefing du matin n'a pas encore été lancé : météo, marchés, actus et ta journée.",
+            "title": "Infos du jour",
+            "description": "Les infos du jour n'ont pas encore été lancées : météo, marchés, actus et ta journée.",
             "urgency": "moyenne",
             "reason": "Il est entre 6 h et 10 h et le briefing quotidien n'a pas été demandé aujourd'hui.",
             "benefit": "Démarrer la journée avec l'essentiel en 2 minutes, sans rien chercher.",
             "confidence": 0.8,
-            "action": {"type": "command", "text": "briefing du jour"},
+            "action": {"type": "command", "text": "infos du jour"},
         })
 
     # 2) Projets actifs (récents ou renforcés)

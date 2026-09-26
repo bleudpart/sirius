@@ -374,7 +374,7 @@ def make_pantheon_oracle_router(db, rate_ok):
         except Exception as e:
             logger.error(f"[ORACLE] Microsoft 365: {e}")
 
-        parts = ["Briefing du jour."]
+        parts = ["Infos du jour."]
         if weather:
             parts.append(f"Météo : {weather[0]['tmin']} à {weather[0]['tmax']} degrés aujourd'hui.")
         else:

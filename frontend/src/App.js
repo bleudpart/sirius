@@ -201,7 +201,7 @@ const loadMemory = () => {
 };
 const todayStr = () => getLocalDateKey();
 
-const DAILY_BRIEFING_COMMAND = /^\s*(?:(?:mon|le)\s+)?(?:briefing(?:\s+(?:quotidien|du jour|matinal))?|r[ée]sum[ée](?:[-\s]+moi)?(?:\s+(?:la|ma|du)\s+)?journ[ée]e?|fais[-\s]+moi\s+le\s+point(?:\s+sur\s+(?:ma\s+)?journ[ée]e?)?|qu'est[-\s]ce\s+qui\s+m'attend(?:\s+aujourd'hui)?|(?:mes\s+)?priorit[ée]s\s+du\s+jour|quoi\s+de\s+neuf\s+aujourd'hui)\s*[?.!]*\s*$/i;
+const DAILY_BRIEFING_COMMAND = /^\s*(?:(?:mon|le|les)\s+)?(?:briefing(?:\s+(?:quotidien|du jour|matinal))?|infos\s+du\s+jour|actualit[ée]s?\s+internationales?|br[èe]ves\s+internationales?|r[ée]sum[ée](?:[-\s]+moi)?(?:\s+(?:la|ma|du)\s+)?journ[ée]e?|fais[-\s]+moi\s+le\s+point(?:\s+sur\s+(?:ma\s+)?journ[ée]e?)?|qu'est[-\s]ce\s+qui\s+m'attend(?:\s+aujourd'hui)?|(?:mes\s+)?priorit[ée]s\s+du\s+jour|quoi\s+de\s+neuf\s+aujourd'hui)\s*[?.!]*\s*$/i;
 
 // Verbe exprimant une demande de liaison de compte, quelle que soit la tournure employée.
 const CONNECT_VERB = /\b(?:connect\w*|connexion|reconnect\w*|relie|relier|associe|associer|autorise|autoriser|lie|lier|branche|brancher)\b/i;
@@ -3571,7 +3571,7 @@ function App() {
     isBusy.current = true;
     const normalized = command.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     const localIntent = (() => {
-      if (DAILY_BRIEFING_COMMAND.test(command)) return { action: "daily_briefing", say: "Je prépare le briefing quotidien." };
+      if (DAILY_BRIEFING_COMMAND.test(command)) return { action: "daily_briefing", say: "Je prépare les infos du jour." };
       if (/\b(?:silence|tais[- ]toi|arrete\s+(?:de\s+)?(?:parler|lire|lecture))\b/.test(normalized)) return { action: "stop_reading" };
       if (/\b(?:range|reduis|minimise)\b.*\b(?:tout|fenetres?|modules?)\b/.test(normalized)) return { action: "minimize_all" };
       if (/\b(?:coupe|arrete)\b.*\b(?:musique|ambiance)\b/.test(normalized)) return { action: "stop_music" };
@@ -4582,7 +4582,7 @@ function App() {
         const time = `${String(h).padStart(2, "0")}:${String(mn).padStart(2, "0")}`;
         localStorage.setItem("sirius_reveil", JSON.stringify({ on: true, time }));
         localStorage.removeItem("sirius_reveil_last");
-        const m = `Réveil matinal réglé à ${h} heure${h > 1 ? "s" : ""}${mn ? ` ${mn}` : ""}. Je lancerai ton briefing, la météo et tes mails à cette heure.`;
+        const m = `Réveil matinal réglé à ${h} heure${h > 1 ? "s" : ""}${mn ? ` ${mn}` : ""}. Je lancerai les infos du jour, la météo et tes mails à cette heure.`;
         setStatus("speaking"); setText(m); speakOut(m);
         return;
       }
@@ -5480,7 +5480,7 @@ function App() {
   const runBriefingDisplay = useCallback(async (force = false) => {
     if (briefingInFlightRef.current) return;
     briefingInFlightRef.current = true;
-    const pid = progress.start("Briefing du jour", { silent: true });
+    const pid = progress.start("Infos du jour", { silent: true });
     progress.log(pid, "Collecte des actualités et de la veille…", 25);
     try {
       try {
@@ -5489,7 +5489,7 @@ function App() {
           localStorage.setItem("sirius_last_briefing", todayStr());
           localStorage.setItem("sirius_last_briefing_context", JSON.stringify({ saved_at: cached.saved_at, text: cached.msg.slice(-12000) }));
           streamDisplayIdRef.current = null;
-          streamOnDisplay(cached.displayMsg || cached.msg, true, "BRIEFING QUOTIDIEN");
+          streamOnDisplay(cached.displayMsg || cached.msg, true, "INFOS DU JOUR");
           setStatus("speaking");
           setText(cached.msg);
           speakOut(cached.msg);
@@ -5631,7 +5631,7 @@ function App() {
           localStorage.setItem("sirius_last_briefing_context", JSON.stringify({ saved_at: savedAt, text: msg.slice(-12000) }));
           localStorage.setItem("sirius_daily_briefing_cache", JSON.stringify({ date: todayStr(), saved_at: savedAt, msg, displayMsg }));
           streamDisplayIdRef.current = null; // nouvelle fenêtre dédiée au briefing, révélée progressivement
-          streamOnDisplay(displayMsg, true, "BRIEFING QUOTIDIEN");
+          streamOnDisplay(displayMsg, true, "INFOS DU JOUR");
           setStatus("speaking");
           setText(msg);
           speakOut(msg);
