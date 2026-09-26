@@ -6,6 +6,7 @@ import { BACKEND_BASE_URL, resolveBackendUrl } from "@/lib/api";
 
 const API = BACKEND_BASE_URL;
 const BACKEND_URL_PREFIX = `${BACKEND_BASE_URL.replace(/\/$/, "")}/`;
+const LOCAL_BACKEND = /^(https?:\/\/)?(?:127\.0\.0\.1|localhost)(?::\d+)?$/i.test(BACKEND_BASE_URL);
 const TEMPORARY_AUTH_BYPASS = process.env.NODE_ENV !== "production";
 export const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
@@ -111,10 +112,11 @@ function AuthScreen({ onAuth }) {
       if (registerMode && !termsAccepted) {
         throw new Error("Vous devez accepter les conditions générales et la politique de confidentialité.");
       }
-      const path = registerMode ? "/api/auth/register" : "/api/auth/login";
+      const localLogin = LOCAL_BACKEND && !registerMode && !form.email.trim();
+      const path = registerMode ? "/api/auth/register" : localLogin ? "/api/auth/local-login" : "/api/auth/login";
       const payload = registerMode
         ? { name: form.name, email: form.email, password: form.password }
-        : { email: form.email, password: form.password };
+        : localLogin ? { password: form.password } : { email: form.email, password: form.password };
       const r = await fetch(`${API}${path}`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -173,7 +175,8 @@ function AuthScreen({ onAuth }) {
             <input type="text" placeholder="Prénom et nom" value={form.name} required autoComplete="name"
               onChange={(e) => setForm({ ...form, name: e.target.value })} data-testid="auth-name-input" />
           )}
-          <input type="email" placeholder="Email" value={form.email} required autoComplete="email"
+          <input type="email" placeholder={LOCAL_BACKEND ? "Email (facultatif en local)" : "Email"} value={form.email}
+            required={!LOCAL_BACKEND || registerMode} autoComplete="email"
             onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="auth-email-input" />
           {resetMode && resetCodeSent && (
             <input type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6}
@@ -201,7 +204,7 @@ function AuthScreen({ onAuth }) {
           )}
           {err && <div className="auth-error" data-testid="auth-error">{err}</div>}
           <button type="submit" className="auth-submit" disabled={busy} data-testid="auth-submit-btn">
-            <LogIn size={15} /> {resetMode ? (resetCodeSent ? "VALIDER LE NOUVEAU MOT DE PASSE" : "RECEVOIR UN CODE") : (registerMode ? "CRÉER MON COMPTE" : "SE CONNECTER")}
+            <LogIn size={15} /> {resetMode ? (resetCodeSent ? "VALIDER LE NOUVEAU MOT DE PASSE" : "RECEVOIR UN CODE") : (registerMode ? "CRÉER MON COMPTE" : (LOCAL_BACKEND && !form.email.trim() ? "SE CONNECTER AU PC" : "SE CONNECTER"))}
           </button>
         </form>
         {!registerMode && (

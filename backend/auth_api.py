@@ -61,6 +61,10 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class LocalLoginRequest(BaseModel):
+    password: str
+
+
 class RegisterRequest(LoginRequest):
     name: str = ""
 
@@ -300,6 +304,16 @@ def make_auth_router(db):
         user = await db.users.find_one({"email": email})
         if not user:
             raise HTTPException(status_code=503, detail="Compte administrateur non configuré.")
+        return _issue_session(response, user)
+
+    @router.post("/local-login")
+    async def local_login(data: LocalLoginRequest, request: Request, response: Response):
+        if not is_direct_local_request(request):
+            raise HTTPException(status_code=403, detail="Connexion locale réservée à la machine locale.")
+        email = (os.getenv("ADMIN_EMAIL") or os.getenv("SIRIUS_LOCAL_EMAIL") or LEGACY_UID).strip().lower()
+        user = await db.users.find_one({"email": email})
+        if not user or user.get("disabled") or not _password_valid(data.password, user.get("password_hash") or ""):
+            raise HTTPException(status_code=401, detail="Mot de passe local incorrect.")
         return _issue_session(response, user)
 
     @router.post("/register")
