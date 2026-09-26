@@ -5618,7 +5618,14 @@ function App() {
               } catch (e) { /* anticipation cognitive indisponible — briefing sans plans d'action */ }
             })(),
           ]);
-          const msg = `${salut}${meteoAtlas}${agendaTxt}${rappelsTxt}${haccpTxt}${mailTxt}${planTxt} ${d.briefing}${objAgora}${bourseTxt}`;
+          const alertParts = [rappelsTxt, haccpTxt, mailTxt, agendaTxt, planTxt].filter(Boolean);
+          const contextParts = [meteoAtlas, bourseTxt, objAgora, ` ${d.briefing}`].filter(Boolean);
+          const daySeed = Number(todayStr().replace(/-/g, "")) || 0;
+          const rotation = daySeed % contextParts.length;
+          const rotatedContext = contextParts.length
+            ? contextParts.slice(rotation).concat(contextParts.slice(0, rotation))
+            : [];
+          const msg = `${salut}${alertParts.join("")}${rotatedContext.join("")}`;
           const displayMsg = planCards ? `${msg}\n\n— Plans d'action proposés —\n${planCards}` : msg;
           const savedAt = Date.now();
           localStorage.setItem("sirius_last_briefing_context", JSON.stringify({ saved_at: savedAt, text: msg.slice(-12000) }));
