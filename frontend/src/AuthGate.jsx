@@ -84,6 +84,16 @@ const fmtErr = (d) => {
   return String(d.msg || d);
 };
 
+async function readResponseData(response) {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { detail: text };
+  }
+}
+
 function syncLocalProfile(user) {
   try {
     const p = JSON.parse(localStorage.getItem("sirius_profile")) || {};
@@ -121,7 +131,7 @@ function AuthScreen({ onAuth }) {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await r.json();
+      const data = await readResponseData(r);
       if (!r.ok) throw new Error(fmtErr(data.detail));
       rememberAccessToken(data);
       syncLocalProfile(data);
@@ -141,7 +151,7 @@ function AuthScreen({ onAuth }) {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await r.json();
+      const data = await readResponseData(r);
       if (!r.ok) throw new Error(fmtErr(data.detail));
       if (!resetCodeSent) {
         setResetCodeSent(true);
