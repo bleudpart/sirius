@@ -105,19 +105,26 @@ export default function PantheonSystem({ onClose, keys }) {
     if (ocrBusy) return;
     setOcrError(""); setOcrResult("");
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-      const track = stream.getVideoTracks()[0];
-      const video = document.createElement("video");
-      video.srcObject = stream;
-      await video.play();
-      await new Promise((res) => setTimeout(res, 400));
-      const scale = Math.min(1, 1280 / video.videoWidth);
-      const cv = document.createElement("canvas");
-      cv.width = video.videoWidth * scale;
-      cv.height = video.videoHeight * scale;
-      cv.getContext("2d").drawImage(video, 0, 0, cv.width, cv.height);
-      track.stop();
-      const b64 = cv.toDataURL("image/jpeg", 0.75).split(",")[1];
+      let b64;
+      if (window.siriusDesktop?.captureScreen) {
+        const capture = await window.siriusDesktop.captureScreen();
+        if (!capture?.ok) throw new Error(capture?.error || "Capture impossible.");
+        b64 = capture.image;
+      } else {
+        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        const track = stream.getVideoTracks()[0];
+        const video = document.createElement("video");
+        video.srcObject = stream;
+        await video.play();
+        await new Promise((res) => setTimeout(res, 400));
+        const scale = Math.min(1, 1280 / video.videoWidth);
+        const cv = document.createElement("canvas");
+        cv.width = video.videoWidth * scale;
+        cv.height = video.videoHeight * scale;
+        cv.getContext("2d").drawImage(video, 0, 0, cv.width, cv.height);
+        track.stop();
+        b64 = cv.toDataURL("image/jpeg", 0.75).split(",")[1];
+      }
       setOcrBusy(true);
       const r = await fetch(`${API}/pantheon/ocr`, {
         method: "POST",

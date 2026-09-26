@@ -528,6 +528,7 @@ export function BootScreen({ onDone, userName, onOpenModule }) {
     // Garde anti-écho : une seule présentation vocale par chargement de page
     if (!window.__siriusBootSpoken) {
       window.__siriusBootSpoken = true;
+      playIntroSpeech();
     } else {
       setSpeechDone(true);
     }

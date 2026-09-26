@@ -1,5 +1,5 @@
 // © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
-const { app, BrowserWindow, session, shell, Menu, globalShortcut, ipcMain, dialog } = require("electron");
+const { app, BrowserWindow, session, shell, Menu, globalShortcut, ipcMain, dialog, desktopCapturer } = require("electron");
 const fs = require("fs/promises");
 const path = require("path");
 const {
@@ -245,6 +245,20 @@ app.whenReady().then(async () => {
       await fs.writeFile(capturePath, image.toPNG());
       shell.showItemInFolder(capturePath);
       return { ok: true, path: capturePath };
+    } catch (error) {
+      return { ok: false, error: error.message || "Capture impossible." };
+    }
+  });
+  ipcMain.handle("sirius-capture-screen", async () => {
+    try {
+      const { width, height } = require("electron").screen.getPrimaryDisplay().size;
+      const sources = await desktopCapturer.getSources({
+        types: ["screen"],
+        thumbnailSize: { width, height },
+      });
+      const source = sources[0];
+      if (!source?.thumbnail || source.thumbnail.isEmpty()) return { ok: false, error: "Aucun écran disponible." };
+      return { ok: true, image: source.thumbnail.toDataURL().split(",", 2)[1] };
     } catch (error) {
       return { ok: false, error: error.message || "Capture impossible." };
     }
