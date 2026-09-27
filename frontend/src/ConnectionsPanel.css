@@ -33,9 +33,10 @@
 
 .connections-header h1 {
   margin: 4px 0 0;
-  color: #fff;
-  font: 600 clamp(20px, 4vw, 28px) "Cinzel", serif;
-  letter-spacing: 0;
+  color: #ffe6a3;
+  font: 900 clamp(18px, 3vw, 22px) "Orbitron", sans-serif;
+  letter-spacing: 2px;
+  text-shadow: 0 0 12px rgba(255, 205, 100, 0.8), 0 0 32px rgba(216, 184, 117, 0.42);
 }
 
 .connections-header button {
