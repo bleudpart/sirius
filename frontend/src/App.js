@@ -5751,6 +5751,14 @@ function App() {
     const result = await window.siriusDesktop.captureInterface();
     showTouchToast(result?.ok ? "CAPTURE ENREGISTRÉE" : (result?.error || "CAPTURE IMPOSSIBLE"));
   };
+  const openCaptureFolder = async () => {
+    if (!window.siriusDesktop?.openCaptureFolder) {
+      showTouchToast("DOSSIER DISPONIBLE SUR WINDOWS");
+      return;
+    }
+    const result = await window.siriusDesktop.openCaptureFolder();
+    showTouchToast(result?.ok ? "DOSSIER DES CAPTURES OUVERT" : (result?.error || "DOSSIER INACCESSIBLE"));
+  };
 
   const moduleItems = [
     { id: "reload", group: "SYSTÈME", label: "Recharger ΣIRIUS", Icon: RotateCcw, run: () => { window.__siriusBootPlayed = false; window.location.reload(); } },
@@ -5760,6 +5768,7 @@ function App() {
     { id: "info-hub", group: "OUTILS", label: "Centre d'information SIRIUS", Icon: BadgeInfo, run: () => restoreHudPanel("info-hub") },
     { id: "connections", group: "OUTILS", label: "Comptes & connexions", Icon: Link2, run: () => setShowConnections(true) },
     { id: "capture-interface", group: "OUTILS", label: "Capture de l'interface", Icon: Camera, run: captureSiriusInterface },
+    { id: "open-capture-folder", group: "OUTILS", label: "Ouvrir le dossier des captures", Icon: FolderOpen, run: openCaptureFolder },
     { id: "architect", group: "OUTILS", label: "Architecte visuel", Icon: Workflow, run: () => { setArchitectPrompt(""); setShowArchitect(true); } },
     { id: "plans", group: "OUTILS", label: "Plans 2D (PLANS#)", Icon: Ruler, run: () => { setPlansPrompt(""); setShowPlans(true); } },
     { id: "photo3d", group: "OUTILS", label: "Photos → Objet 3D (PHOTO3D#)", Icon: Boxes, run: () => setShowPhoto3D(true) },

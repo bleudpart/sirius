@@ -249,6 +249,16 @@ app.whenReady().then(async () => {
       return { ok: false, error: error.message || "Capture impossible." };
     }
   });
+  ipcMain.handle("sirius-open-capture-folder", async () => {
+    const captureFolder = path.join(app.getPath("pictures"), "SIRIUS Captures");
+    try {
+      await fs.mkdir(captureFolder, { recursive: true });
+      const error = await shell.openPath(captureFolder);
+      return error ? { ok: false, error } : { ok: true, path: captureFolder };
+    } catch (error) {
+      return { ok: false, error: error.message || "Dossier des captures inaccessible." };
+    }
+  });
   ipcMain.handle("sirius-capture-screen", async () => {
     try {
       const { width, height } = require("electron").screen.getPrimaryDisplay().size;

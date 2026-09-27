@@ -25,5 +25,6 @@ contextBridge.exposeInMainWorld("siriusFiles", {
 contextBridge.exposeInMainWorld("siriusDesktop", {
   captureInterface: () => ipcRenderer.invoke("sirius-capture-interface"),
   captureScreen: () => ipcRenderer.invoke("sirius-capture-screen"),
+  openCaptureFolder: () => ipcRenderer.invoke("sirius-open-capture-folder"),
 });
 
