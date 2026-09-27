@@ -1744,17 +1744,16 @@ body.hud-minimal .medallion-halo { display: none; }
 }
 .cmd-send:hover { box-shadow: 0 0 18px rgba(216, 184, 117, 0.5); }
 .cmd-bar > .mic-btn {
-  flex: 0 0 82px;
-  width: 82px;
-  min-width: 82px;
+  flex: 0 0 36px;
+  width: 36px;
   height: 34px;
-  padding: 0 9px;
+  min-width: 36px;
+  padding: 0;
   margin: 0;
-  gap: 6px;
-  font-family: "Orbitron", sans-serif;
-  font-size: 8px;
-  letter-spacing: 0.08em;
+  gap: 0;
 }
+.cmd-bar > .mic-btn span { display: none; }
+.cmd-bar > .mic-btn::before { display: none; }
 .mic-btn {
   display: inline-flex;
   align-items: center;
