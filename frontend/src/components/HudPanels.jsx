@@ -551,7 +551,7 @@ export function BootScreen({ onDone, userName, onOpenModule }) {
       });
       padRef.current = { ctx, master };
     } catch (e) {}
-    // Sécurité : on ne bloque jamais plus de 16 s si la voix ne répond pas.
+    // Sécurité : on laisse la présentation être regardée avant le repli automatique.
     const safety = setTimeout(() => setSpeechDone(true), 16000);
     const hardStop = setTimeout(() => {
       setLoaded(true);
@@ -559,7 +559,7 @@ export function BootScreen({ onDone, userName, onOpenModule }) {
       setClosing(true);
       stopPad();
       setTimeout(onDone, 500);
-    }, 18000);
+    }, 30000);
     const step = 520;
     const dur = lines.length * step + 600;
     let i = 0;
@@ -577,14 +577,6 @@ export function BootScreen({ onDone, userName, onOpenModule }) {
     return () => { clearInterval(lineTimer); clearInterval(progTimer); clearTimeout(safety); clearTimeout(hardStop); stopPad(); };
   }, [lines.length, onDone]); // eslint-disable-line react-hooks/exhaustive-deps
 
-// Sur Windows, le chargement visuel ne doit jamais rester bloqué par la synthèse vocale.
-  useEffect(() => {
-    if (!loaded || closing || isAndroid) return;
-    setClosing(true);
-    stopPad();
-    const closeTimer = setTimeout(onDone, 700);
-    return () => clearTimeout(closeTimer);
-  }, [loaded, closing, isAndroid, onDone]);
   // Chargé à 100 % mais voix jamais démarrée (autoplay bloqué / onend muet) → fermeture après 2,5 s
   useEffect(() => {
     if (!loaded || speechDone) return;
@@ -641,8 +633,6 @@ export function BootScreen({ onDone, userName, onOpenModule }) {
       <div className="boot-center">
         <div className="boot-reactor" data-testid="boot-reactor">
           <div className="core-rings" aria-hidden="true">
-            <img src="/holo/sirius-emblem-proposal.svg" alt="" className="core-ring outer" draggable={false} />
-            <img src="/holo/sirius-emblem-proposal.svg" alt="" className="core-ring inner" draggable={false} />
             <div className="core-pulse" />
             <div className="core-orbit">
               {["Σ", "Δ", "Ω", "Θ", "Φ"].map((l, i) => (

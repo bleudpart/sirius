@@ -2,7 +2,7 @@
 
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Mic, MicOff, Clock, Cpu, Wifi, MapPin, Calendar, X, Leaf, UserCog, Brain, Music, Repeat, RotateCcw, BarChart3, Workflow, Ruler, FolderOpen, Code2, Database, Sparkles, Eye, Landmark, Library, Orbit, Monitor, ShieldCheck, Radar, ShieldAlert, Camera, Fingerprint, Zap, Package, Clapperboard, Grip, Radio, Wrench, FileCode, History, Maximize, Minimize, KeyRound, Home as HomeIcon, BadgeInfo, Globe2, Hammer, TrendingUp, Newspaper, Scale, Flame, BookOpen, Sigma, AlarmClock, Power, Boxes, Link2, Building2 } from "lucide-react";
+import { Mic, MicOff, Clock, Cpu, Wifi, MapPin, Calendar, X, Leaf, UserCog, Brain, Music, Repeat, RotateCcw, BarChart3, Workflow, Ruler, FolderOpen, Code2, Database, Sparkles, Eye, Landmark, Library, Orbit, Monitor, ShieldCheck, Radar, ShieldAlert, Camera, ImageDown, Fingerprint, Zap, Package, Clapperboard, Grip, Radio, Wrench, FileCode, History, Maximize, Minimize, KeyRound, Home as HomeIcon, BadgeInfo, Globe2, Hammer, TrendingUp, Newspaper, Scale, Flame, BookOpen, Sigma, AlarmClock, Power, Boxes, Link2, Building2 } from "lucide-react";
 import {
   ArchitectPanel, SpectatorView, FilesPanel, DevCompanion, ZeusCortex, SiriusPrime, OracleDivin,
   PantheonSystem, NexusCeleste, SiriusDisplay, EuropeanaViewer, HaccpModule, KeysStatus, KeraunosPanel,
@@ -6168,6 +6168,16 @@ function App() {
             title="Mode photo : ajouter une image de référence"
             aria-label="Mode photo"
             data-testid="sirius-top-image-btn"
+          >
+            <ImageDown size={15} />
+          </button>
+          <button
+            type="button"
+            className="profile-btn top-tool-btn"
+            onClick={captureSiriusInterface}
+            title="Capturer l'écran du HUD"
+            aria-label="Capturer l'écran du HUD"
+            data-testid="sirius-capture-btn"
           >
             <Camera size={15} />
           </button>
