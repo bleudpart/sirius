@@ -172,7 +172,7 @@ function AuthScreen({ onAuth }) {
         <header className="auth-brand">
           <div className="auth-brand-main">
             <span className="auth-core-logo" aria-hidden="true">
-              <img src="/holo/ring-gold.png" alt="" draggable={false} />
+              <img src="/holo/sirius-emblem-proposal.svg" alt="" draggable={false} />
               <i />
             </span>
             <h1 className="auth-title">ΣIRIUS</h1>

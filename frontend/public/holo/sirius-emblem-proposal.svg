@@ -38,10 +38,11 @@
   <rect width="256" height="256" rx="18" fill="url(#hud-bg)"/>
   <rect width="256" height="256" rx="18" fill="url(#hud-light)"/>
   <rect width="256" height="256" rx="18" fill="url(#hud-grid)"/>
-  <rect class="gold-border" x="16" y="16" width="224" height="224" rx="11" fill="none" stroke="#d8b875" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+  <rect class="gold-border" x="16" y="16" width="224" height="224" rx="11" fill="none" stroke="#d8b875" stroke-width="2" vector-effect="non-scaling-stroke"/>
   <image class="ring-outer" href="ring-gold.png" x="53" y="28" width="150" height="150" preserveAspectRatio="xMidYMid meet"/>
   <image class="ring-inner" href="ring-gold.png" x="64" y="39" width="128" height="128" preserveAspectRatio="xMidYMid meet"/>
   <circle class="pulse-outer" cx="128" cy="103" r="39" fill="url(#core)" filter="url(#glow)"/>
   <circle class="pulse-inner" cx="128" cy="103" r="23" fill="#91e6f2" fill-opacity=".72" filter="url(#glow)"/>
-  <text x="128" y="208" text-anchor="middle" fill="#d8b875" font-family="Cinzel, Georgia, serif" font-size="24" font-weight="700" letter-spacing="3">ΣIRIUS</text>
+  <text x="128" y="208" text-anchor="middle" fill="#d8b875" font-family="Cinzel, Georgia, serif" font-size="29" font-weight="700" letter-spacing="5">ΣIRIUS</text>
+  <text x="128" y="228" text-anchor="middle" fill="#d8b875" font-family="Cinzel, Georgia, serif" font-size="9" font-weight="600" letter-spacing="2">ASSISTANT PERSONNEL</text>
 </svg>

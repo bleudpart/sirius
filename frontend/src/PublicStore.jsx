@@ -144,8 +144,8 @@ export default function PublicStore() {
         <div className="public-core-preview">
           <div className="public-core-window" aria-label="Noyau ΣIRIUS" role="img">
             <div className="public-core-art">
-              <img src="/holo/ring-gold.png" alt="" className="public-core-ring public-core-ring-outer" draggable={false} loading="lazy" />
-              <img src="/holo/ring-gold.png" alt="" className="public-core-ring public-core-ring-inner" draggable={false} loading="lazy" />
+              <img src="/holo/sirius-emblem-proposal.svg" alt="" className="public-core-ring public-core-ring-outer" draggable={false} loading="lazy" />
+              <img src="/holo/sirius-emblem-proposal.svg" alt="" className="public-core-ring public-core-ring-inner" draggable={false} loading="lazy" />
               <div className="public-core-scan-band" aria-hidden="true" />
               <div className="public-core-heart matrix-circle" />
             </div>
