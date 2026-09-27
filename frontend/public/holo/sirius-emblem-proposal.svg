@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="hud-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#102f43"/>
+      <stop offset="0.55" stop-color="#061a2a"/>
+      <stop offset="1" stop-color="#03101c"/>
+    </linearGradient>
+    <pattern id="hud-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#91e6f2" stroke-opacity="0.15" stroke-width="1"/>
+    </pattern>
+    <radialGradient id="hud-light" cx="50%" cy="32%" r="70%">
+      <stop offset="0" stop-color="#167b9b" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#061321" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="core" cx="50%" cy="45%" r="58%">
+      <stop offset="0" stop-color="#d7fbff"/>
+      <stop offset="0.3" stop-color="#91e6f2"/>
+      <stop offset="0.72" stop-color="#167b9b" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#061321" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <style>
+      .ring-outer { transform-origin: 128px 103px; animation: core-spin 28s linear infinite; }
+      .ring-inner { transform-origin: 128px 103px; animation: core-spin-rev 18s linear infinite; opacity: .8; }
+      .pulse-outer { transform-origin: 128px 103px; animation: pulse 2.6s ease-in-out infinite; }
+      .pulse-inner { transform-origin: 128px 103px; animation: pulse-inner 2.6s ease-in-out infinite .18s; }
+      .gold-border { animation: border-glow 3.8s ease-in-out infinite; }
+      @keyframes core-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      @keyframes core-spin-rev { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
+      @keyframes pulse { 0%, 100% { transform: scale(.88); opacity: .78; } 50% { transform: scale(1.08); opacity: 1; } }
+      @keyframes pulse-inner { 0%, 100% { transform: scale(.82); opacity: .82; } 50% { transform: scale(1.16); opacity: 1; } }
+      @keyframes border-glow { 0%, 100% { opacity: .48; } 50% { opacity: .9; } }
+    </style>
+  </defs>
+  <rect width="256" height="256" rx="18" fill="url(#hud-bg)"/>
+  <rect width="256" height="256" rx="18" fill="url(#hud-light)"/>
+  <rect width="256" height="256" rx="18" fill="url(#hud-grid)"/>
+  <rect class="gold-border" x="16" y="16" width="224" height="224" rx="11" fill="none" stroke="#d8b875" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+  <image class="ring-outer" href="ring-gold.png" x="53" y="28" width="150" height="150" preserveAspectRatio="xMidYMid meet"/>
+  <image class="ring-inner" href="ring-gold.png" x="64" y="39" width="128" height="128" preserveAspectRatio="xMidYMid meet"/>
+  <circle class="pulse-outer" cx="128" cy="103" r="39" fill="url(#core)" filter="url(#glow)"/>
+  <circle class="pulse-inner" cx="128" cy="103" r="23" fill="#91e6f2" fill-opacity=".72" filter="url(#glow)"/>
+  <text x="128" y="208" text-anchor="middle" fill="#d8b875" font-family="Cinzel, Georgia, serif" font-size="24" font-weight="700" letter-spacing="3">ΣIRIUS</text>
+</svg>
