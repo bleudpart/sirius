@@ -592,6 +592,10 @@ body.hud-minimal .antique-jar { display: none; }
   transition: color 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
 .profile-btn:hover { color: #eafaff; border-color: var(--accent); box-shadow: 0 0 12px var(--glow); }
+.top-tool-btn { color: #a8d6cf; border-color: rgba(128, 190, 178, 0.34); }
+.top-tool-btn:hover { color: #d7f4e9; border-color: rgba(128, 190, 178, 0.72); box-shadow: 0 0 12px rgba(128, 190, 178, 0.2); }
+.top-tool-btn.on { color: #b9eee0; border-color: rgba(128, 190, 178, 0.78); background: rgba(61, 117, 105, 0.24); box-shadow: 0 0 12px rgba(128, 190, 178, 0.28); }
+.top-image-btn.on { color: #b9d9f0; border-color: rgba(126, 177, 213, 0.72); background: rgba(47, 89, 123, 0.24); box-shadow: 0 0 12px rgba(126, 177, 213, 0.24); }
 
 /* Connection status badge */
 .profile-btn.conn-badge {
@@ -1727,9 +1731,10 @@ body.hud-minimal .medallion-halo { display: none; }
 }
 .cmd-input::placeholder { color: #4f7385; }
 .cmd-send {
-  font-family: "Orbitron", sans-serif;
-  font-size: 11px;
-  letter-spacing: 2px;
+  font-family: "Cinzel", serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0;
   color: #03060c;
   /* Même effet or liquide scintillant que le lettrage ΣIRIUS (.sirius-title) : dégradé animé
      + lueur pulsante, pour une identité de marque cohérente sur le bouton d'envoi. */
@@ -1737,7 +1742,10 @@ body.hud-minimal .medallion-halo { display: none; }
   background-size: 240% auto;
   border: none;
   border-radius: 3px;
-  padding: 8px 16px;
+  width: 34px;
+  height: 30px;
+  padding: 0;
+  line-height: 1;
   cursor: pointer;
   transition: filter 0.25s;
   animation: goldSheen 5.5s ease-in-out infinite, goldPulse 3s ease-in-out infinite;

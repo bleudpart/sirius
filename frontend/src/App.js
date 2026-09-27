@@ -6159,6 +6159,32 @@ function App() {
             <Grip size={15} />
           </button>
           <button
+            type="button"
+            className={`profile-btn top-tool-btn top-image-btn ${imageReference ? "on" : ""}`}
+            onClick={() => imageReferenceInputRef.current?.click()}
+            title="Mode photo : ajouter une image de référence"
+            aria-label="Mode photo"
+            data-testid="sirius-top-image-btn"
+          >
+            <Camera size={15} />
+          </button>
+          <button
+            type="button"
+            className={`profile-btn top-tool-btn top-mic-btn ${autoMic ? "on" : ""}`}
+            onClick={() => {
+              const next = !autoMicRef.current;
+              setAutoMic(next);
+              if (next) startListening();
+              else stopListening();
+            }}
+            title={autoMic ? "Désactiver le mode mains libres" : "Activer le mode mains libres"}
+            aria-label={autoMic ? "Désactiver le mode mains libres" : "Activer le mode mains libres"}
+            aria-pressed={autoMic}
+            data-testid="sirius-top-mic-btn"
+          >
+            {autoMic ? <MicOff size={15} /> : <Mic size={15} />}
+          </button>
+          <button
             className="profile-btn profile-btn-pinned"
             onClick={() => setShowSetup(true)}
             data-testid="sirius-profile-btn"
@@ -6365,16 +6391,6 @@ function App() {
             onChange={(event) => selectImageReference(event.target.files?.[0])}
             data-testid="sirius-image-reference-input"
           />
-          <button
-            type="button"
-            className={`image-reference-btn ${imageReference ? "active" : ""}`}
-            onClick={() => imageReferenceInputRef.current?.click()}
-            title="Ajouter une image de référence pour Nano Banana"
-            aria-label="Ajouter une image de référence"
-            data-testid="sirius-image-reference-btn"
-          >
-            <Camera size={15} />
-          </button>
           <input
             ref={commandInputRef}
             className="cmd-input"
@@ -6397,24 +6413,7 @@ function App() {
             <Radio size={15} />
             <span>{pttActive ? "À VOUS" : "ESPACE"}</span>
           </button>
-          <button
-            type="button"
-            className={`mic-btn ${autoMic ? "on" : ""}`}
-            onClick={() => {
-              const next = !autoMicRef.current;
-              setAutoMic(next);
-              if (next) startListening();
-              else stopListening();
-            }}
-            data-testid="sirius-global-mic-toggle"
-            title={autoMic ? "Désactiver le mode mains libres" : "Activer le mode mains libres"}
-            aria-label={autoMic ? "Désactiver le mode mains libres" : "Activer le mode mains libres"}
-            aria-pressed={autoMic}
-          >
-            {autoMic ? <MicOff size={15} /> : <Mic size={15} />}
-            <span>{autoMic ? "LIBRE" : "MICRO"}</span>
-          </button>
-          <button type="submit" className="cmd-send" data-testid="sirius-cmd-send">ENVOYER</button>
+          <button type="submit" className="cmd-send" data-testid="sirius-cmd-send" aria-label="Envoyer la commande" title="Envoyer la commande">→</button>
         </form>
 
         {/* Indicateur talkie-walkie : transmission en cours */}
