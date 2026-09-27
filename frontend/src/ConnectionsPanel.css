@@ -37,6 +37,11 @@
   font: 900 clamp(18px, 3vw, 22px) "Orbitron", sans-serif;
   letter-spacing: 2px;
   text-shadow: 0 0 12px rgba(255, 205, 100, 0.8), 0 0 32px rgba(216, 184, 117, 0.42);
+  animation: connectionsTitleGoldPulse 4.5s ease-in-out infinite;
+}
+@keyframes connectionsTitleGoldPulse {
+  0%, 100% { opacity: 0.9; text-shadow: 0 0 10px rgba(255, 205, 100, 0.55), 0 0 24px rgba(216, 184, 117, 0.28); }
+  50% { opacity: 1; text-shadow: 0 0 16px rgba(255, 225, 145, 0.95), 0 0 36px rgba(216, 184, 117, 0.52); }
 }
 
 .connections-header button {
