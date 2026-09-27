@@ -595,8 +595,7 @@ export function BootScreen({ onDone, userName, onOpenModule }) {
   return (
 
     <div className={`boot-screen ${closing ? "closing" : ""}`} data-testid="boot-screen" onClick={() => {
-      if (isAndroid && !speechStartedRef.current) { playIntroSpeech(); return; }
-      if (!speechStartedRef.current && !speechDone) { playIntroSpeech(); return; }
+      if (!speechStartedRef.current) { playIntroSpeech(); return; }
       setClosing(true); stopPad(); setTimeout(onDone, 500);
     }}>
       <div className="boot-grid" />

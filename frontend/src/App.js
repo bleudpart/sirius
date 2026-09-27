@@ -6108,7 +6108,6 @@ function App() {
         <div className="conn-status" data-testid="sirius-connection">
           <span className={`conn-led ${connected ? "on" : "off"}`} />
           {"IA CLOUD"}
-          <span className="hud-version-badge" title={APP_RELEASE}>v{APP_VERSION}</span>
           {mode === "brainstorm" && <span className="mode-badge" data-testid="brainstorm-badge">BRAINSTORM</span>}
           
           {/* Connection status badge */}
@@ -6418,7 +6417,10 @@ function App() {
             </div>
           </>
         )}
-        <footer className="sirius-footer" data-testid="sirius-footer">COPYRIGHT © 2026 <span className="sirius-footer-mark">Σ</span>IRIUS par Daniel Partel – Tous droits réservés.</footer>
+        <footer className="sirius-footer" data-testid="sirius-footer">
+          COPYRIGHT © 2026 <span className="sirius-footer-mark">Σ</span>IRIUS par Daniel Partel – Tous droits réservés.
+          <span className="hud-version-badge footer-version-badge" title={APP_RELEASE}>v{APP_VERSION}</span>
+        </footer>
       </div>
 
       <MobileNavigation active={showModulesMenu ? "modules" : mobileDestination} onNavigate={navigateMobile} />

@@ -569,6 +569,17 @@ body.hud-minimal .antique-jar { display: none; }
   font-weight: 800;
   box-shadow: 0 0 10px rgba(145, 230, 242, 0.18), inset 0 0 10px rgba(145, 230, 242, 0.10);
 }
+.footer-version-badge {
+  margin-left: 8px;
+  padding: 2px 6px;
+  border-color: rgba(205, 238, 251, 0.5);
+  background: rgba(205, 238, 251, 0.08);
+  color: rgba(205, 238, 251, 0.72);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  box-shadow: none;
+  vertical-align: 1px;
+}
 .conn-led { width: 8px; height: 8px; border-radius: 50%; }
 .conn-led.on { background: #91e6f2; box-shadow: 0 0 10px #91e6f2; }
 .conn-led.off { background: #d8b875; box-shadow: 0 0 10px #d8b875; animation: blink 2s infinite; }
