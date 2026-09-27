@@ -36,11 +36,8 @@ def make_overlay(page_number):
 
     if page_number == 1:
         # Fill the existing editor fields without inventing a legal status or SIREN.
-        c.drawString(130, PAGE_HEIGHT - 234, "319 boulevard de la Boissière")
-        c.drawString(130, PAGE_HEIGHT - 245, "93110 Seine-Saint-Denis")
-        c.drawString(130, PAGE_HEIGHT - 276, "danielpartel@hotmail.com")
-        c.drawString(130, PAGE_HEIGHT - 287, "danielsirius.pro2026@gmail.com")
-        c.drawString(130, PAGE_HEIGHT - 298, "Tél. : 06 60 66 74 36")
+        c.drawString(90, PAGE_HEIGHT - 234, "319 boulevard de la Boissière")
+        c.drawString(90, PAGE_HEIGHT - 245, "93110 Seine-Saint-Denis")
 
     c.setStrokeColorRGB(0.65, 0.65, 0.65)
     c.setLineWidth(0.35)

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">ΣIRIUS - proposition monochrome</title>
+  <desc id="desc">Symbole Sigma monochrome pour documents professionnels.</desc>
+  <circle cx="256" cy="220" r="142" fill="none" stroke="#111111" stroke-width="10"/>
+  <path d="M174 145h164M174 145l112 75-112 75h164" fill="none" stroke="#111111" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="256" cy="220" r="8" fill="#111111"/>
+  <text x="256" y="402" text-anchor="middle" fill="#111111" font-family="Cinzel, Georgia, serif" font-size="54" font-weight="600" letter-spacing="8">ΣIRIUS</text>
+</svg>

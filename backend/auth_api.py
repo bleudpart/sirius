@@ -21,7 +21,7 @@ import bcrypt
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from cryptography.fernet import Fernet, InvalidToken
-import pyotp
+import sirius_totp as pyotp
 from pydantic import BaseModel
 
 LEGACY_UID = "daniel@sirius.local"
