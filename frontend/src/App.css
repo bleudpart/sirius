@@ -3581,6 +3581,78 @@ body.hud-minimal .medallion-halo { display: none; }
   color: #e3c98e;
   text-shadow: 0 0 18px rgba(255, 190, 60, 0.7), 0 0 40px rgba(255, 160, 30, 0.4);
 }
+.enterprise-title {
+  font-family: "Cinzel", serif;
+  color: #d8b875;
+  text-shadow: 0 0 12px rgba(216, 184, 117, 0.75), 0 0 30px rgba(216, 184, 117, 0.38);
+}
+.enterprise-tools {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  max-width: 1100px;
+  margin: 12px auto 0;
+  padding: 0 24px;
+}
+.enterprise-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 180px;
+  min-height: 38px;
+  padding: 0 10px;
+  color: #d8b875;
+  background: rgba(4, 18, 28, 0.82);
+  border: 1px solid rgba(145, 230, 242, 0.3);
+  border-radius: 7px;
+}
+.enterprise-search input { min-width: 0; width: 100%; border: 0; outline: 0; background: transparent; color: #eafaff; }
+.enterprise-tools select { min-height: 38px; max-width: 220px; padding: 0 10px; color: #d9e6ec; background: rgba(4, 18, 28, 0.82); border: 1px solid rgba(145, 230, 242, 0.3); border-radius: 7px; }
+.enterprise-print { flex: 0 0 38px; min-height: 38px; }
+.enterprise-admin-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 280px); gap: 18px; }
+.enterprise-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: 8px; }
+.enterprise-stat { display: flex; flex-direction: column; gap: 3px; padding: 10px; background: rgba(4, 18, 28, 0.62); border: 1px solid rgba(145, 230, 242, 0.22); border-radius: 7px; }
+.enterprise-stat b { color: #f2d99a; font: 700 20px "Orbitron", sans-serif; }
+.enterprise-stat span, .enterprise-license span, .enterprise-license small { color: #9fc5d6; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+.enterprise-license { display: flex; flex-direction: column; gap: 8px; padding: 0 0 0 18px; border-left: 1px solid rgba(216, 184, 117, 0.32); }
+.enterprise-license b { color: #f2d99a; font: 700 18px "Cinzel", serif; }
+.enterprise-license small { text-transform: none; letter-spacing: 0; }
+.enterprise-site-form { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.enterprise-site-form input { flex: 1 1 180px; min-width: 0; }
+.enterprise-sites { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
+.enterprise-site { display: flex; align-items: center; gap: 8px; padding: 10px; color: #d9e6ec; background: rgba(4, 18, 28, 0.62); border: 1px solid rgba(145, 230, 242, 0.22); border-radius: 7px; }
+.enterprise-site span { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.enterprise-site small { color: #8fb4c2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.enterprise-site em { color: #5ee0aa; font-size: 9px; font-style: normal; letter-spacing: 0.08em; }
+.enterprise-integrations { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; }
+.enterprise-integration { display: flex; align-items: center; gap: 10px; justify-content: space-between; padding: 10px; background: rgba(4, 18, 28, 0.62); border: 1px solid rgba(145, 230, 242, 0.22); border-radius: 7px; }
+.enterprise-integration span { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.enterprise-integration small { color: #8fb4c2; }
+.enterprise-integration em { flex: 0 0 auto; color: #f0b85a; font-size: 9px; font-style: normal; letter-spacing: 0.08em; }
+.enterprise-integration em.connected { color: #5ee0aa; }
+.enterprise-integration em.offline { color: #f08c8c; }
+.mfa-setup { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin: 10px 0; padding: 14px; color: #d9e6ec; background: rgba(4, 18, 28, 0.72); border: 1px solid rgba(216, 184, 117, 0.4); border-radius: 8px; }
+.mfa-setup small { max-width: 300px; color: #9fc5d6; line-height: 1.4; }
+@media (max-width: 640px) {
+  .enterprise-admin-grid { grid-template-columns: 1fr; }
+  .enterprise-license { padding: 12px 0 0; border-left: 0; border-top: 1px solid rgba(216, 184, 117, 0.32); }
+  .enterprise-tools { align-items: stretch; flex-wrap: wrap; padding: 0 14px; }
+  .enterprise-search { flex-basis: 100%; }
+  .enterprise-tools select { flex: 1; max-width: none; }
+  .enterprise-print { flex-basis: 42px; }
+  [data-testid="enterprise-panel"] .admin-table-wrap { overflow-x: auto; }
+  [data-testid="enterprise-panel"] .admin-table { min-width: 620px; }
+}
+@media print {
+  body * { visibility: hidden !important; }
+  [data-testid="enterprise-panel"], [data-testid="enterprise-panel"] * { visibility: visible !important; }
+  [data-testid="enterprise-panel"] { position: static !important; width: 100% !important; min-height: auto !important; color: #111 !important; background: #fff !important; }
+  [data-testid="enterprise-panel"] .zeus-head { position: static; color: #111; }
+  [data-testid="enterprise-panel"] .enterprise-tools, [data-testid="enterprise-panel"] .setup-primary, [data-testid="enterprise-panel"] .setup-close, [data-testid="enterprise-panel"] .file-btn { display: none !important; }
+  [data-testid="enterprise-panel"] .setup-card { break-inside: avoid; color: #111; background: #fff; border: 1px solid #bbb; box-shadow: none; }
+  [data-testid="enterprise-panel"] .admin-table { color: #111; }
+}
 .zeus-close { position: absolute; right: 22px; top: 16px; }
 
 .zeus-panel {
@@ -4826,6 +4898,9 @@ body.hud-minimal .medallion-halo { display: none; }
 .hc-body { max-width: 1100px; margin: 0 auto 24px; width: calc(100% - 48px); animation: none; transform: none; }
 .hc-section { display: flex; flex-direction: column; gap: 10px; }
 .hc-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.hc-dictation-field { display: flex; align-items: center; gap: 4px; flex: 1 1 220px; min-width: 180px; }
+.hc-dictation-field .cmd-input { min-width: 0; flex: 1; }
+.hc-dictation-field .memory-icon-btn.on { color: #f43f5e; border-color: rgba(244, 63, 94, 0.7); box-shadow: 0 0 12px rgba(244, 63, 94, 0.35); }
 .hc-form .cmd-input { flex: 1 1 130px; min-width: 110px; }
 .hc-form .hc-wide { flex: 2 1 260px; }
 .hc-select { appearance: auto; }

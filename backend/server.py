@@ -159,7 +159,12 @@ async def _run_vector_warmup_loop_delayed():
 @asynccontextmanager
 async def _lifespan(_app):
     # --- Démarrage ---
-    global _watch_task, _omega_task, _episodic_task, _vector_task
+    global _watch_task, _omega_task, _episodic_task, _vector_task, client
+    # TestClient et les redémarrages Electron créent plusieurs cycles de vie dans
+    # le même processus : Motor ne peut pas être réutilisé après client.close().
+    if _DB_MODE != "local":
+        client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=1500)
+        db.use(client[db_name])
     # Base documentaire : MongoDB si joignable, sinon docstore SQLite local.
     await _select_database_backend()
     from auth_api import seed_admin_and_indexes
@@ -2013,6 +2018,8 @@ api_router.include_router(make_gcal_router(db))
 from auth_api import make_auth_router, make_admin_router
 api_router.include_router(make_auth_router(db))
 api_router.include_router(make_admin_router(db))
+from enterprise import make_enterprise_router
+api_router.include_router(make_enterprise_router(db))
 from microsoft_graph import make_microsoft_router
 api_router.include_router(make_microsoft_router(db))
 from nummarius_api import make_nummarius_router

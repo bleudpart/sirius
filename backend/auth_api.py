@@ -5,18 +5,23 @@ import base64
 import hashlib
 import hmac
 import ipaddress
+import io
 import json
 import os
 import secrets
 import smtplib
 import ssl
 import time
+import zipfile
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 from typing import Optional
 
 import bcrypt
 from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi.responses import StreamingResponse
+from cryptography.fernet import Fernet, InvalidToken
+import pyotp
 from pydantic import BaseModel
 
 LEGACY_UID = "daniel@sirius.local"
@@ -59,10 +64,12 @@ _AUTH_SECRET = _load_or_create_secret()
 class LoginRequest(BaseModel):
     email: str
     password: str
+    code: str = ""
 
 
 class LocalLoginRequest(BaseModel):
     password: str
+    code: str = ""
 
 
 class RegisterRequest(LoginRequest):
@@ -77,6 +84,14 @@ class PasswordResetConfirm(BaseModel):
     email: str
     code: str
     password: str
+
+
+class PrivacyDeleteRequest(BaseModel):
+    confirm: bool = False
+
+
+class MfaCodeRequest(BaseModel):
+    code: str
 
 
 def _normalize_email(value: str) -> str:
@@ -186,14 +201,38 @@ def _public_user(document: dict) -> dict:
         "user_id": document.get("user_id") or email,
         "name": document.get("name") or email.split("@", 1)[0],
         "role": document.get("role") or "user",
+        "company_id": document.get("company_id") or None,
         "provider": document.get("provider") or "email",
         "preferences": document.get("preferences") if isinstance(document.get("preferences"), dict) else {},
         "disabled": bool(document.get("disabled")),
+        "mfa_enabled": bool(document.get("mfa_enabled")),
     }
 
 
+def _mfa_cipher():
+    return Fernet(base64.urlsafe_b64encode(hashlib.sha256(_AUTH_SECRET).digest()))
+
+
+def _encrypt_mfa_secret(secret: str) -> str:
+    return _mfa_cipher().encrypt(secret.encode("ascii")).decode("ascii")
+
+
+def _decrypt_mfa_secret(value: str) -> str:
+    return _mfa_cipher().decrypt(value.encode("ascii")).decode("ascii")
+
+
+def _mfa_valid(user: dict, code: str) -> bool:
+    if not user.get("mfa_enabled"):
+        return True
+    try:
+        secret = _decrypt_mfa_secret(user.get("mfa_secret_enc") or "")
+        return pyotp.TOTP(secret).verify((code or "").strip(), valid_window=1)
+    except (InvalidToken, ValueError):
+        return False
+
+
 def _set_cookies(response: Response, access_token: str, refresh_token: Optional[str] = None):
-    options = {"httponly": True, "secure": True, "samesite": "none", "path": "/"}
+    options = {"httponly": True, "secure": True, "samesite": "strict", "path": "/"}
     response.set_cookie("access_token", access_token, max_age=_ACCESS_TTL_SECONDS, **options)
     if refresh_token:
         response.set_cookie("refresh_token", refresh_token, max_age=_REFRESH_TTL_SECONDS, **options)
@@ -228,9 +267,26 @@ async def resolve_user_id(request: Request, db=None) -> str:
     return (await require_user(request, db))["user_id"]
 
 
+async def _ensure_unique_index(collection, field: str):
+    """Upgrade a legacy non-unique user index without breaking startup."""
+    if not hasattr(collection, "list_indexes"):
+        await collection.create_index(field, unique=True)
+        return
+    indexes = await collection.list_indexes().to_list(None)
+    expected_key = {field: 1}
+    for index in indexes:
+        if index.get("key") != expected_key:
+            continue
+        if index.get("unique"):
+            return
+        await collection.drop_index(index["name"])
+        break
+    await collection.create_index(field, unique=True)
+
+
 async def seed_admin_and_indexes(db):
-    await db.users.create_index("email", unique=True)
-    await db.users.create_index("user_id", unique=True)
+    await _ensure_unique_index(db.users, "email")
+    await _ensure_unique_index(db.users, "user_id")
     await db.login_attempts.create_index("expires_at", expireAfterSeconds=0)
     await db.password_reset_codes.create_index("expires_at", expireAfterSeconds=0)
     admin_email = (os.getenv("ADMIN_EMAIL") or os.getenv("SIRIUS_LOCAL_EMAIL") or LEGACY_UID).strip().lower()
@@ -304,6 +360,8 @@ def make_auth_router(db):
         user = await db.users.find_one({"email": email})
         if not user:
             raise HTTPException(status_code=503, detail="Compte administrateur non configuré.")
+        if user.get("mfa_enabled"):
+            raise HTTPException(status_code=401, detail="Code MFA requis.")
         return _issue_session(response, user)
 
     @router.post("/local-login")
@@ -314,6 +372,8 @@ def make_auth_router(db):
         user = await db.users.find_one({"email": email})
         if not user or user.get("disabled") or not _password_valid(data.password, user.get("password_hash") or ""):
             raise HTTPException(status_code=401, detail="Mot de passe local incorrect.")
+        if not _mfa_valid(user, data.code):
+            raise HTTPException(status_code=401, detail="Code MFA requis ou invalide.")
         return _issue_session(response, user)
 
     @router.post("/register")
@@ -355,6 +415,8 @@ def make_auth_router(db):
                 upsert=True,
             )
             raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect.")
+        if not _mfa_valid(user, data.code):
+            raise HTTPException(status_code=401, detail="Code MFA requis ou invalide.")
         await db.login_attempts.delete_one({"identifier": identifier})
         await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"last_activity": now}})
         return _issue_session(response, user)
@@ -426,6 +488,69 @@ def make_auth_router(db):
         response.delete_cookie("access_token", path="/")
         response.delete_cookie("refresh_token", path="/")
         return {"ok": True}
+
+    @router.post("/mfa/setup")
+    async def mfa_setup(request: Request):
+        user = await require_user(request, db)
+        secret = pyotp.random_base32()
+        await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"mfa_pending_secret_enc": _encrypt_mfa_secret(secret)}})
+        uri = pyotp.TOTP(secret).provisioning_uri(name=user["email"], issuer_name="SIRIUS")
+        return {"secret": secret, "otpauth_url": uri}
+
+    @router.post("/mfa/enable")
+    async def mfa_enable(data: MfaCodeRequest, request: Request):
+        user = await require_user(request, db)
+        stored = await db.users.find_one({"user_id": user["user_id"]})
+        try:
+            secret = _decrypt_mfa_secret(stored.get("mfa_pending_secret_enc") or "")
+        except (InvalidToken, ValueError):
+            raise HTTPException(status_code=400, detail="Commencez d'abord la configuration MFA.")
+        if not pyotp.TOTP(secret).verify(data.code.strip(), valid_window=1):
+            raise HTTPException(status_code=400, detail="Code MFA invalide.")
+        await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"mfa_secret_enc": _encrypt_mfa_secret(secret), "mfa_enabled": True}, "$unset": {"mfa_pending_secret_enc": ""}})
+        return {"ok": True, "mfa_enabled": True}
+
+    @router.post("/mfa/disable")
+    async def mfa_disable(data: MfaCodeRequest, request: Request):
+        user = await require_user(request, db)
+        stored = await db.users.find_one({"user_id": user["user_id"]})
+        if not _mfa_valid(stored, data.code):
+            raise HTTPException(status_code=400, detail="Code MFA invalide.")
+        await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"mfa_enabled": False}, "$unset": {"mfa_secret_enc": "", "mfa_pending_secret_enc": ""}})
+        return {"ok": True, "mfa_enabled": False}
+
+    @router.get("/privacy/export")
+    async def export_personal_data(request: Request):
+        user = await require_user(request, db)
+        user_id = user["user_id"]
+        export = {"profile": {key: value for key, value in user.items() if key not in {"access_token", "password_hash"}}, "collections": {}}
+        for collection_name in ("sirius_chats", "local_memory", "episodic_memory", "user_files", "agora_deals", "themis_docs", "themis_clients", "payment_transactions", "enterprise_members", "enterprise_audit"):
+            collection = getattr(db, collection_name, None)
+            if collection is not None:
+                export["collections"][collection_name] = await collection.find({"user_id": user_id}, {"_id": 0}).to_list(10000)
+        export["exported_at"] = datetime.now(timezone.utc).isoformat()
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("sirius-personal-data.json", json.dumps(export, ensure_ascii=False, default=str, indent=2))
+        buffer.seek(0)
+        return StreamingResponse(buffer, media_type="application/zip", headers={"Content-Disposition": 'attachment; filename="sirius-personal-data.zip"'})
+
+    @router.delete("/privacy/account")
+    async def delete_personal_account(body: PrivacyDeleteRequest, request: Request):
+        user = await require_user(request, db)
+        if not body.confirm:
+            raise HTTPException(status_code=400, detail="Confirmation explicite requise.")
+        if user.get("role") == "admin":
+            raise HTTPException(status_code=403, detail="Le compte administrateur doit être désactivé par un autre administrateur.")
+        user_id = user["user_id"]
+        for collection_name in ("sirius_chats", "local_memory", "episodic_memory", "user_files", "agora_deals", "themis_docs", "themis_clients", "payment_transactions", "enterprise_audit"):
+            collection = getattr(db, collection_name, None)
+            if collection is not None:
+                await collection.delete_many({"user_id": user_id})
+        if hasattr(db, "enterprise_members"):
+            await db.enterprise_members.delete_many({"user_id": user_id})
+        await db.users.delete_one({"user_id": user_id})
+        return {"ok": True, "message": "Compte et données personnelles supprimés."}
 
     @router.put("/profile")
     async def update_profile(data: dict, request: Request):

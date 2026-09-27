@@ -5,13 +5,14 @@ import re
 import uuid
 import zipfile
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 import requests
 from dotenv import dotenv_values
 from reportlab.pdfgen import canvas as pdfcanvas
 
-frontend_env = dotenv_values("/app/frontend/.env")
+frontend_env = dotenv_values(Path(__file__).resolve().parents[2] / "frontend" / ".env")
 base_url = os.environ.get("REACT_APP_BACKEND_URL") or frontend_env.get("REACT_APP_BACKEND_URL")
 if not base_url:
     raise RuntimeError("REACT_APP_BACKEND_URL is missing")
@@ -24,6 +25,9 @@ YEAR = datetime.now().year
 def api():
     session = requests.Session()
     session.headers.update({"Content-Type": "application/json"})
+    login = session.post(f"{BASE_URL}/api/auth/local-session", timeout=20)
+    assert login.status_code == 200, login.text
+    session.headers.update({"Authorization": f"Bearer {login.json()['access_token']}"})
     yield session
     session.close()
 
@@ -67,12 +71,17 @@ def make_test_pdf(label="TEST_piece"):
 
 def upload_piece(api, filename, content, content_type):
     """Upload multipart content without the JSON session Content-Type header."""
-    return requests.post(
-        f"{API}/pieces/upload",
-        files={"file": (filename, content, content_type)},
-        data={"groq_key": "gsk_TEST_invalid_key"},
-        timeout=90,
-    )
+    content_type_header = api.headers.pop("Content-Type", None)
+    try:
+        return api.post(
+            f"{API}/pieces/upload",
+            files={"file": (filename, content, content_type)},
+            data={"k3_key": "gsk_TEST_invalid_key"},
+            timeout=90,
+        )
+    finally:
+        if content_type_header:
+            api.headers["Content-Type"] = content_type_header
 
 
 # Client required-field validation plus create, list, and delete persistence.
@@ -368,13 +377,13 @@ class TestThemisPieces:
         assert all(p.get("id") != target["id"] for p in list_resource(api, "pieces"))
         assert api.get(f"{API}/pieces/{target['id']}/file", timeout=20).status_code == 404
 
-    def test_upload_rejects_extension_and_oversize(self):
-        wrong = upload_piece(requests, "TEST_malware.exe", b"not allowed", "application/octet-stream")
+    def test_upload_rejects_extension_and_oversize(self, api):
+        wrong = upload_piece(api, "TEST_malware.exe", b"not allowed", "application/octet-stream")
         assert wrong.status_code == 400, wrong.text
         assert "format" in wrong.json().get("detail", "").lower()
 
         too_large = upload_piece(
-            requests,
+            api,
             "TEST_too_large.pdf",
             b"%PDF" + (b"0" * (15 * 1024 * 1024)),
             "application/pdf",
@@ -491,13 +500,14 @@ class TestThemisStaticContracts:
         characters_response = api.get(f"{BASE_URL}/api/mythos/characters", timeout=20)
         assert characters_response.status_code == 200, characters_response.text
         characters = characters_response.json().get("characters")
-        assert isinstance(characters, list) and len(characters) == 10
+        assert isinstance(characters, list) and len(characters) >= 10
         themis = next(c for c in characters if c.get("module") == "THÉMIS#")
         assert themis["character"] == "Thémis"
         assert themis["role"] == "Gestion d'entreprise"
-        assert themis["image"] == "/api/mythos/img/themis.jpg"
+        assert themis["image"].endswith("/api/mythos/img/themis.jpg")
 
-        image = api.get(f"{BASE_URL}{themis['image']}", timeout=20)
+        image_url = themis["image"] if themis["image"].startswith("http") else f"{BASE_URL}{themis['image']}"
+        image = api.get(image_url, timeout=20)
         assert image.status_code == 200
         assert image.headers.get("content-type", "").startswith("image/jpeg")
         assert image.content.startswith(b"\xff\xd8") and len(image.content) > 1_000

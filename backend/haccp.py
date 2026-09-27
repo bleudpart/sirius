@@ -3,9 +3,12 @@
 import uuid
 import io
 from datetime import datetime, timezone, date, timedelta
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, StringConstraints
 from typing import Optional, List, Annotated
+
+from auth_api import require_user
+from enterprise import record_audit, require_permission
 
 ReqStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
@@ -102,7 +105,19 @@ class DocIn(BaseModel):
 class AuditIn(BaseModel):
     date_debut: Optional[str] = None
     date_fin: Optional[str] = None
-    inclure_sections: List[str] = ["trace", "temp", "pms", "nc", "clean", "allerg", "docs"]
+    inclure_sections: List[str] = ["trace", "temp", "pms", "nc", "clean", "allerg", "docs", "controls"]
+
+
+class ControlIn(BaseModel):
+    type: ReqStr = "contrôle général"
+    objet: ReqStr
+    resultat: str = "conforme"
+    anomalie: Optional[str] = ""
+    action_corrective: Optional[str] = ""
+
+
+class ControlValidation(BaseModel):
+    commentaire: Optional[str] = ""
 
 
 def trace_status(item):
@@ -141,35 +156,76 @@ FREQ_DAYS = {"quotidien": 1, "hebdomadaire": 7, "mensuel": 30}
 def make_haccp_router(db):
     r = APIRouter(prefix="/haccp")
 
+    async def data_scope(request: Request):
+        """Scope authenticated data while keeping legacy local calls compatible."""
+        authorization = request.headers.get("authorization") or ""
+        has_token = bool(request.cookies.get("access_token") or authorization.lower().startswith("bearer "))
+        if not has_token:
+            return {}
+        try:
+            user = await require_user(request, db)
+        except HTTPException:
+            raise
+        if user.get("company_id"):
+            membership = await db.enterprise_members.find_one({"company_id": user["company_id"], "user_id": user["user_id"]}, {"_id": 0})
+            require_permission(membership or {}, "haccp")
+            return {"company_id": user["company_id"]}
+        return {"user_id": user["user_id"]}
+
+    def with_scope(document, scope):
+        if scope:
+            document.update(scope)
+        return document
+
+    async def audit_change(request, scope, action, resource, resource_id, details=None):
+        if scope.get("company_id"):
+            user = await require_user(request, db)
+            await record_audit(
+                db,
+                company_id=scope["company_id"],
+                user=user,
+                action=action,
+                resource=resource,
+                resource_id=resource_id,
+                details=details,
+            )
+
     # ---------- 1. Traçabilité & étiquetage ----------
     @r.get("/trace")
-    async def list_trace():
-        items = await db.haccp_trace.find({}, NO_ID).sort("created_at", -1).to_list(300)
+    async def list_trace(request: Request):
+        scope = await data_scope(request)
+        items = await db.haccp_trace.find(scope, NO_ID).sort("created_at", -1).to_list(300)
         for it in items:
             it["statut"] = trace_status(it)
         return {"items": items}
 
     @r.post("/trace")
-    async def add_trace(body: TraceIn):
+    async def add_trace(body: TraceIn, request: Request):
+        scope = await data_scope(request)
         doc = body.model_dump()
         doc.update({"id": str(uuid.uuid4()), "created_at": now_iso(),
                     "date_reception": doc.get("date_reception") or today()})
+        with_scope(doc, scope)
         await db.haccp_trace.insert_one(dict(doc))
+        await audit_change(request, scope, "haccp.trace.create", "trace", doc["id"], {"produit": doc["produit"]})
         doc["statut"] = trace_status(doc)
         return doc
 
     @r.delete("/trace/{item_id}")
-    async def del_trace(item_id: str):
-        await db.haccp_trace.delete_one({"id": item_id})
+    async def del_trace(item_id: str, request: Request):
+        scope = await data_scope(request)
+        await db.haccp_trace.delete_one({"id": item_id, **scope})
         return {"ok": True}
 
     # ---------- 2. Températures ----------
     @r.get("/equipements")
-    async def list_equip():
-        items = await db.haccp_equip.find({}, NO_ID).to_list(100)
+    async def list_equip(request: Request):
+        scope = await data_scope(request)
+        items = await db.haccp_equip.find(scope, NO_ID).to_list(100)
         if not items:
             for nom, typ in EQUIP_DEFAULTS:
                 doc = {"id": str(uuid.uuid4()), "nom": nom, "type": typ, "created_at": now_iso()}
+                with_scope(doc, scope)
                 await db.haccp_equip.insert_one(dict(doc))
                 items.append(doc)
         for it in items:
@@ -180,103 +236,129 @@ def make_haccp_router(db):
         return {"items": items}
 
     @r.post("/equipements")
-    async def add_equip(body: EquipIn):
+    async def add_equip(body: EquipIn, request: Request):
+        scope = await data_scope(request)
         if body.type not in TEMP_RANGES:
             raise HTTPException(status_code=400, detail="Type invalide (frigo, congelateur, chaud)")
         doc = {"id": str(uuid.uuid4()), "nom": body.nom, "type": body.type, "created_at": now_iso()}
+        with_scope(doc, scope)
         await db.haccp_equip.insert_one(dict(doc))
         lo, hi = TEMP_RANGES[body.type]
         doc.update({"min": lo, "max": hi, "dernier_releve": None})
         return doc
 
     @r.delete("/equipements/{item_id}")
-    async def del_equip(item_id: str):
-        await db.haccp_equip.delete_one({"id": item_id})
-        await db.haccp_temp.delete_many({"equipement_id": item_id})
+    async def del_equip(item_id: str, request: Request):
+        scope = await data_scope(request)
+        await db.haccp_equip.delete_one({"id": item_id, **scope})
+        await db.haccp_temp.delete_many({"equipement_id": item_id, **scope})
         return {"ok": True}
 
     @r.get("/temperatures")
-    async def list_temp(equipement_id: Optional[str] = None):
-        q = {"equipement_id": equipement_id} if equipement_id else {}
+    async def list_temp(request: Request, equipement_id: Optional[str] = None):
+        scope = await data_scope(request)
+        q = {"equipement_id": equipement_id, **scope} if equipement_id else scope
         items = await db.haccp_temp.find(q, NO_ID).sort("created_at", -1).to_list(120)
         return {"items": items}
 
     @r.post("/temperatures")
-    async def add_temp(body: TempIn):
-        eq = await db.haccp_equip.find_one({"id": body.equipement_id}, NO_ID)
+    async def add_temp(body: TempIn, request: Request):
+        scope = await data_scope(request)
+        eq = await db.haccp_equip.find_one({"id": body.equipement_id, **scope}, NO_ID)
         if not eq:
             raise HTTPException(status_code=404, detail="Équipement introuvable")
         lo, hi = TEMP_RANGES.get(eq["type"], (0, 4))
         doc = {"id": str(uuid.uuid4()), "equipement_id": body.equipement_id, "equipement": eq["nom"],
                "valeur": body.valeur, "releve_par": body.releve_par or "",
                "conforme": lo <= body.valeur <= hi, "created_at": now_iso()}
+        with_scope(doc, scope)
         await db.haccp_temp.insert_one(dict(doc))
+        await audit_change(request, scope, "haccp.temperature.create", "temperature", doc["id"], {"conforme": doc["conforme"]})
         if not doc["conforme"]:
             nc = {"id": str(uuid.uuid4()), "type": "température",
                   "description": f"{eq['nom']} : {body.valeur}°C hors plage [{lo} ; {hi}]°C",
                   "action_corrective": "", "gravite": "majeure", "statut": "ouverte",
                   "created_at": now_iso(), "cloture_le": None, "auto": True}
+            with_scope(nc, scope)
             await db.haccp_nc.insert_one(dict(nc))
         return doc
 
     # ---------- 3. Plan de maîtrise sanitaire ----------
     @r.get("/pms")
-    async def list_pms():
-        items = await db.haccp_pms.find({}, NO_ID).sort("categorie", 1).to_list(200)
+    async def list_pms(request: Request):
+        scope = await data_scope(request)
+        items = await db.haccp_pms.find(scope, NO_ID).sort("categorie", 1).to_list(200)
         if not items:
             for cat, code, intitule in PMS_DEFAULTS:
-                doc = {"id": str(uuid.uuid4()), "categorie": cat, "code": code, "intitule": intitule,
-                       "statut": "a_verifier", "derniere_revision": None, "created_at": now_iso()}
+                doc = {
+                    "id": str(uuid.uuid4()),
+                    "categorie": cat,
+                    "code": code,
+                    "intitule": intitule,
+                    "statut": "a_verifier",
+                    "derniere_revision": None,
+                    "created_at": now_iso(),
+                }
+                with_scope(doc, scope)
                 await db.haccp_pms.insert_one(dict(doc))
                 items.append(doc)
         return {"items": items}
 
     @r.patch("/pms/{item_id}")
-    async def patch_pms(item_id: str, body: PmsPatch):
+    async def patch_pms(item_id: str, body: PmsPatch, request: Request):
+        scope = await data_scope(request)
         if body.statut not in ("en_place", "a_mettre_a_jour", "a_verifier"):
             raise HTTPException(status_code=400, detail="Statut invalide")
         res = await db.haccp_pms.update_one(
-            {"id": item_id}, {"$set": {"statut": body.statut, "derniere_revision": today()}})
+            {"id": item_id, **scope}, {"$set": {"statut": body.statut, "derniere_revision": today()}})
         if not res.matched_count:
             raise HTTPException(status_code=404, detail="Élément introuvable")
         return {"ok": True, "statut": body.statut, "derniere_revision": today()}
 
     # ---------- 4. Non-conformités ----------
     @r.get("/nc")
-    async def list_nc():
-        items = await db.haccp_nc.find({}, NO_ID).sort("created_at", -1).to_list(300)
+    async def list_nc(request: Request):
+        scope = await data_scope(request)
+        items = await db.haccp_nc.find(scope, NO_ID).sort("created_at", -1).to_list(300)
         return {"items": items}
 
     @r.post("/nc")
-    async def add_nc(body: NcIn):
+    async def add_nc(body: NcIn, request: Request):
+        scope = await data_scope(request)
         doc = body.model_dump()
         doc.update({"id": str(uuid.uuid4()), "statut": "ouverte", "cloture_le": None,
                     "auto": False, "created_at": now_iso()})
+        with_scope(doc, scope)
         await db.haccp_nc.insert_one(dict(doc))
+        await audit_change(request, scope, "haccp.nc.create", "non_conformite", doc["id"])
         return doc
 
     @r.patch("/nc/{item_id}/cloture")
-    async def close_nc(item_id: str, body: Optional[dict] = None):
+    async def close_nc(item_id: str, request: Request, body: Optional[dict] = None):
+        scope = await data_scope(request)
         action = (body or {}).get("action_corrective", "")
         upd = {"statut": "cloturee", "cloture_le": now_iso()}
         if action:
             upd["action_corrective"] = action
-        res = await db.haccp_nc.update_one({"id": item_id}, {"$set": upd})
+        res = await db.haccp_nc.update_one({"id": item_id, **scope}, {"$set": upd})
         if not res.matched_count:
             raise HTTPException(status_code=404, detail="Non-conformité introuvable")
+        await audit_change(request, scope, "haccp.nc.close", "non_conformite", item_id)
         return {"ok": True}
 
     @r.delete("/nc/{item_id}")
-    async def del_nc(item_id: str):
-        await db.haccp_nc.delete_one({"id": item_id})
+    async def del_nc(item_id: str, request: Request):
+        scope = await data_scope(request)
+        await db.haccp_nc.delete_one({"id": item_id, **scope})
         return {"ok": True}
 
     # ---------- 5. Nettoyage & désinfection ----------
     @r.get("/nettoyage/taches")
-    async def list_clean():
-        items = await db.haccp_clean.find({}, NO_ID).to_list(200)
+    async def list_clean(request: Request):
+        scope = await data_scope(request)
+        items = await db.haccp_clean.find(scope, NO_ID).to_list(200)
         for it in items:
-            last = await db.haccp_clean_log.find({"tache_id": it["id"]}, NO_ID).sort("created_at", -1).to_list(1)
+            last = await db.haccp_clean_log.find({"tache_id": it["id"], **scope}, NO_ID).sort("created_at", -1).to_list(1)
             it["dernier_nettoyage"] = last[0]["created_at"] if last else None
             days = FREQ_DAYS.get(it.get("frequence", "quotidien"), 1)
             if not last:
@@ -287,88 +369,138 @@ def make_haccp_router(db):
         return {"items": items}
 
     @r.post("/nettoyage/taches")
-    async def add_clean(body: CleanTaskIn):
+    async def add_clean(body: CleanTaskIn, request: Request):
+        scope = await data_scope(request)
         doc = body.model_dump()
         doc.update({"id": str(uuid.uuid4()), "created_at": now_iso()})
+        with_scope(doc, scope)
         await db.haccp_clean.insert_one(dict(doc))
         doc.update({"dernier_nettoyage": None, "a_faire": True})
         return doc
 
     @r.delete("/nettoyage/taches/{item_id}")
-    async def del_clean(item_id: str):
-        await db.haccp_clean.delete_one({"id": item_id})
-        await db.haccp_clean_log.delete_many({"tache_id": item_id})
+    async def del_clean(item_id: str, request: Request):
+        scope = await data_scope(request)
+        await db.haccp_clean.delete_one({"id": item_id, **scope})
+        await db.haccp_clean_log.delete_many({"tache_id": item_id, **scope})
         return {"ok": True}
 
     @r.post("/nettoyage/logs")
-    async def add_clean_log(body: CleanLogIn):
+    async def add_clean_log(body: CleanLogIn, request: Request):
+        scope = await data_scope(request)
         doc = {"id": str(uuid.uuid4()), "tache_id": body.tache_id,
                "fait_par": body.fait_par or "", "created_at": now_iso()}
+        with_scope(doc, scope)
         await db.haccp_clean_log.insert_one(dict(doc))
         return doc
 
     # ---------- 6. Allergènes ----------
     @r.get("/allergenes")
-    async def list_allerg():
-        items = await db.haccp_allerg.find({}, NO_ID).sort("plat", 1).to_list(300)
+    async def list_allerg(request: Request):
+        scope = await data_scope(request)
+        items = await db.haccp_allerg.find(scope, NO_ID).sort("plat", 1).to_list(300)
         return {"items": items, "liste_14": ALLERGENES_14}
 
     @r.post("/allergenes")
-    async def add_allerg(body: AllergeneIn):
+    async def add_allerg(body: AllergeneIn, request: Request):
+        scope = await data_scope(request)
         doc = {"id": str(uuid.uuid4()), "plat": body.plat,
                "allergenes": [a for a in body.allergenes if a in ALLERGENES_14],
                "created_at": now_iso()}
+        with_scope(doc, scope)
         await db.haccp_allerg.insert_one(dict(doc))
         return doc
 
     @r.delete("/allergenes/{item_id}")
-    async def del_allerg(item_id: str):
-        await db.haccp_allerg.delete_one({"id": item_id})
+    async def del_allerg(item_id: str, request: Request):
+        scope = await data_scope(request)
+        await db.haccp_allerg.delete_one({"id": item_id, **scope})
         return {"ok": True}
 
     # ---------- 7. Documentation obligatoire ----------
     @r.get("/documents")
-    async def list_docs():
-        items = await db.haccp_docs.find({}, NO_ID).sort("created_at", -1).to_list(200)
+    async def list_docs(request: Request):
+        scope = await data_scope(request)
+        items = await db.haccp_docs.find(scope, NO_ID).sort("created_at", -1).to_list(200)
         for it in items:
             it["statut"] = doc_status(it)
         return {"items": items}
 
     @r.post("/documents")
-    async def add_doc(body: DocIn):
+    async def add_doc(body: DocIn, request: Request):
+        scope = await data_scope(request)
         doc = body.model_dump()
         doc.update({"id": str(uuid.uuid4()), "created_at": now_iso()})
+        with_scope(doc, scope)
         await db.haccp_docs.insert_one(dict(doc))
+        await audit_change(request, scope, "haccp.document.create", "document", doc["id"], {"nom": doc["nom"]})
         doc["statut"] = doc_status(doc)
         return doc
 
     @r.delete("/documents/{item_id}")
-    async def del_doc(item_id: str):
-        await db.haccp_docs.delete_one({"id": item_id})
+    async def del_doc(item_id: str, request: Request):
+        scope = await data_scope(request)
+        await db.haccp_docs.delete_one({"id": item_id, **scope})
         return {"ok": True}
+
+    # ---------- 8. Fiches de contrôle et validation ----------
+    @r.get("/controls")
+    async def list_controls(request: Request):
+        scope = await data_scope(request)
+        items = await db.haccp_controls.find(scope, NO_ID).sort("created_at", -1).to_list(300)
+        return {"items": items}
+
+    @r.post("/controls")
+    async def add_control(body: ControlIn, request: Request):
+        scope = await data_scope(request)
+        if body.resultat not in {"conforme", "non_conforme", "sans_objet"}:
+            raise HTTPException(status_code=422, detail="Résultat de contrôle invalide.")
+        if body.resultat == "non_conforme" and not body.anomalie.strip():
+            raise HTTPException(status_code=422, detail="Décrivez l'anomalie constatée.")
+        doc = body.model_dump()
+        doc.update({"id": str(uuid.uuid4()), "statut": "a_valider", "valide_par": "", "valide_le": None, "created_at": now_iso()})
+        with_scope(doc, scope)
+        await db.haccp_controls.insert_one(dict(doc))
+        await audit_change(request, scope, "haccp.control.create", "control", doc["id"], {"type": doc["type"], "resultat": doc["resultat"]})
+        return doc
+
+    @r.patch("/controls/{item_id}/validate")
+    async def validate_control(item_id: str, body: ControlValidation, request: Request):
+        scope = await data_scope(request)
+        user = await require_user(request, db) if scope.get("company_id") else None
+        update = {"statut": "valide", "valide_le": now_iso(), "valide_par": (user or {}).get("email") or (user or {}).get("user_id") or "local"}
+        if body.commentaire.strip():
+            update["commentaire_validation"] = body.commentaire.strip()
+        result = await db.haccp_controls.update_one({"id": item_id, **scope}, {"$set": update})
+        if not result.matched_count:
+            raise HTTPException(status_code=404, detail="Fiche de contrôle introuvable.")
+        await audit_change(request, scope, "haccp.control.validate", "control", item_id)
+        return {"ok": True, **update}
 
     # ---------- Vue d'ensemble ----------
     @r.get("/overview")
-    async def overview():
-        traces = await db.haccp_trace.find({}, NO_ID).to_list(300)
+    async def overview(request: Request):
+        scope = await data_scope(request)
+        traces = await db.haccp_trace.find(scope, NO_ID).to_list(300)
         dlc_alertes = sum(1 for t in traces if trace_status(t) in ("expire", "bientot"))
-        nc_ouvertes = await db.haccp_nc.count_documents({"statut": "ouverte"})
-        docs = await db.haccp_docs.find({}, NO_ID).to_list(200)
+        nc_ouvertes = await db.haccp_nc.count_documents({"statut": "ouverte", **scope})
+        docs = await db.haccp_docs.find(scope, NO_ID).to_list(200)
         docs_alertes = sum(1 for d in docs if doc_status(d) in ("expire", "bientot"))
         start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
-        temp_nc = await db.haccp_temp.count_documents({"conforme": False, "created_at": {"$gte": start}})
+        temp_nc = await db.haccp_temp.count_documents({"conforme": False, "created_at": {"$gte": start}, **scope})
         return {"dlc_alertes": dlc_alertes, "nc_ouvertes": nc_ouvertes,
                 "docs_alertes": docs_alertes, "temp_non_conformes_jour": temp_nc}
 
     @r.post("/audit")
-    async def audit_pdf(body: AuditIn):
+    async def audit_pdf(body: AuditIn, request: Request):
+        scope = await data_scope(request)
         fin = body.date_fin or today()
         debut = body.date_debut or (date.today() - timedelta(days=30)).isoformat()
         if debut > fin:
             raise HTTPException(status_code=422, detail="La date de début doit précéder la date de fin.")
         sections = set(body.inclure_sections or [])
-        window = {"created_at": {"$gte": debut, "$lte": f"{fin}T23:59:59+00:00"}}
-        report = ["RAPPORT D'AUDIT HACCP", f"Période auditée : {debut} au {fin}", ""]
+        window = {"created_at": {"$gte": debut, "$lte": f"{fin}T23:59:59+00:00"}, **scope}
+        report = ["RAPPORT D'AUDIT HACCP", f"Période auditée : {debut} au {fin}", "", "SOURCES : registres HACCP SIRIUS de l'entreprise, horodatés et filtrés sur la période sélectionnée.", "VALIDATION HUMAINE : les fiches doivent être vérifiées par un responsable avant tout usage officiel.", ""]
         if "trace" in sections:
             traces = await db.haccp_trace.find(window, NO_ID).to_list(300)
             report.append(f"Traçabilité : {len(traces)} réception(s) enregistrée(s).")
@@ -377,7 +509,7 @@ def make_haccp_router(db):
             non_conformes = sum(1 for item in temperatures if not item.get("conforme", True))
             report.append(f"Températures : {len(temperatures)} relevé(s), {non_conformes} non conforme(s).")
         if "pms" in sections:
-            pms = await db.haccp_pms.find({}, NO_ID).to_list(300)
+            pms = await db.haccp_pms.find(scope, NO_ID).to_list(300)
             en_place = sum(1 for item in pms if item.get("statut") == "en_place")
             report.append(f"PMS : {en_place}/{len(pms)} procédure(s) en place.")
         if "nc" in sections:
@@ -385,19 +517,25 @@ def make_haccp_router(db):
             ouvertes = sum(1 for item in ncs if item.get("statut", "ouverte") == "ouverte")
             report.append(f"Non-conformités : {len(ncs)} déclarée(s), {ouvertes} ouverte(s).")
         if "clean" in sections:
-            tasks = await db.haccp_clean.find({}, NO_ID).to_list(300)
+            tasks = await db.haccp_clean.find(scope, NO_ID).to_list(300)
             logs = await db.haccp_clean_log.find(window, NO_ID).to_list(500)
             report.append(f"Nettoyage : {len(tasks)} tâche(s) définie(s), {len(logs)} réalisation(s) enregistrée(s).")
         if "allerg" in sections:
-            allergens = await db.haccp_allerg.find({}, NO_ID).to_list(300)
+            allergens = await db.haccp_allerg.find(scope, NO_ID).to_list(300)
             report.append(f"Allergènes : {len(allergens)} fiche(s) plat enregistrée(s), référentiel de 14 allergènes UE.")
         if "docs" in sections:
-            documents = await db.haccp_docs.find({}, NO_ID).to_list(300)
+            documents = await db.haccp_docs.find(scope, NO_ID).to_list(300)
             valid = sum(1 for item in documents if doc_status(item) == "valide")
             report.append(f"Documentation : {valid}/{len(documents)} document(s) valide(s).")
+        if "controls" in sections:
+            controls = await db.haccp_controls.find(window, NO_ID).to_list(300)
+            pending = sum(1 for item in controls if item.get("statut") != "valide")
+            validated = len(controls) - pending
+            report.append(f"Fiches de contrôle : {len(controls)} fiche(s), {validated} validée(s), {pending} à valider.")
         report.extend(["", "Document de synthèse généré par SIRIUS.", "Cet outil prépare un audit interne et ne constitue pas une certification officielle."])
         from themis_pdf import build_consult_pdf
         pdf = build_consult_pdf("PANTHÉON", "Audit HACCP", "\n".join(report), date.today().strftime("%d/%m/%Y"))
+        await audit_change(request, scope, "haccp.audit.generate", "audit", "", {"date_debut": debut, "date_fin": fin})
         return Response(content=pdf.getvalue(), media_type="application/pdf",
                         headers={"Content-Disposition": f'attachment; filename="audit_haccp_{today()}.pdf"'})
 

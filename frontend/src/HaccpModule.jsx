@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   X, ClipboardCheck, Tag, Thermometer, ShieldCheck, AlertTriangle, SprayCan,
-  Wheat, FileText, Plus, Trash2, Check, Printer, FileDown,
+  Wheat, FileText, Plus, Trash2, Check, Printer, FileDown, Mic,
 } from "lucide-react";
 import SectionSheets from "./HaccpSheets";
 
@@ -37,6 +37,7 @@ const TABS = [
   { key: "clean", label: "NETTOYAGE", Icon: SprayCan },
   { key: "allerg", label: "ALLERGÈNES", Icon: Wheat },
   { key: "docs", label: "DOCUMENTS", Icon: FileText },
+  { key: "controls", label: "CONTRÔLES", Icon: ClipboardCheck },
   { key: "sheets", label: "FEUILLES", Icon: Printer },
   { key: "audit", label: "AUDIT PDF", Icon: FileDown },
 ];
@@ -59,7 +60,7 @@ function SectionTrace() {
       load();
     } catch (e) {}
   };
-  const del = async (id) => { await api(`/trace/${id}`, { method: "DELETE" }).catch(() => {}); load(); };
+  const del = async (id) => { if (!window.confirm("Supprimer cette réception de la traçabilité ?")) return; await api(`/trace/${id}`, { method: "DELETE" }).catch(() => {}); load(); };
 
   return (
     <div className="hc-section" data-testid="haccp-section-trace">
@@ -230,8 +231,8 @@ function SectionNc() {
       load();
     } catch (e) {}
   };
-  const close = async (id) => { await api(`/nc/${id}/cloture`, { method: "PATCH", body: JSON.stringify({}) }).catch(() => {}); load(); };
-  const del = async (id) => { await api(`/nc/${id}`, { method: "DELETE" }).catch(() => {}); load(); };
+  const close = async (id) => { if (!window.confirm("Clôturer cette non-conformité ? Vérifiez l'action corrective avant validation.")) return; await api(`/nc/${id}/cloture`, { method: "PATCH", body: JSON.stringify({}) }).catch(() => {}); load(); };
+  const del = async (id) => { if (!window.confirm("Supprimer définitivement cette non-conformité ?")) return; await api(`/nc/${id}`, { method: "DELETE" }).catch(() => {}); load(); };
   return (
     <div className="hc-section" data-testid="haccp-section-nc">
       <div className="hc-form">
@@ -278,7 +279,7 @@ function SectionClean() {
     } catch (e) {}
   };
   const done = async (id) => { await api("/nettoyage/logs", { method: "POST", body: JSON.stringify({ tache_id: id }) }).catch(() => {}); load(); };
-  const del = async (id) => { await api(`/nettoyage/taches/${id}`, { method: "DELETE" }).catch(() => {}); load(); };
+  const del = async (id) => { if (!window.confirm("Supprimer cette tâche du plan de nettoyage ?")) return; await api(`/nettoyage/taches/${id}`, { method: "DELETE" }).catch(() => {}); load(); };
   return (
     <div className="hc-section" data-testid="haccp-section-clean">
       <div className="hc-form">
@@ -329,7 +330,7 @@ function SectionAllerg() {
       load();
     } catch (e) {}
   };
-  const del = async (id) => { await api(`/allergenes/${id}`, { method: "DELETE" }).catch(() => {}); load(); };
+  const del = async (id) => { if (!window.confirm("Supprimer cette fiche allergènes ?")) return; await api(`/allergenes/${id}`, { method: "DELETE" }).catch(() => {}); load(); };
   return (
     <div className="hc-section" data-testid="haccp-section-allerg">
       <div className="hc-form">
@@ -372,7 +373,7 @@ function SectionDocs() {
       load();
     } catch (e) {}
   };
-  const del = async (id) => { await api(`/documents/${id}`, { method: "DELETE" }).catch(() => {}); load(); };
+  const del = async (id) => { if (!window.confirm("Supprimer ce document du registre ?")) return; await api(`/documents/${id}`, { method: "DELETE" }).catch(() => {}); load(); };
   return (
     <div className="hc-section" data-testid="haccp-section-docs">
       <div className="hc-form">
@@ -400,12 +401,60 @@ function SectionDocs() {
   );
 }
 
+function SectionControls() {
+  const [items, setItems] = useState([]);
+  const [listening, setListening] = useState("");
+  const [form, setForm] = useState({ type: "température", objet: "", resultat: "conforme", anomalie: "", action_corrective: "" });
+  const load = useCallback(() => api("/controls").then((d) => setItems(d.items || [])).catch(() => {}), []);
+  useEffect(() => { load(); }, [load]);
+
+  const dictate = (field) => {
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Recognition) { window.dispatchEvent(new CustomEvent("haccp-error", { detail: "La dictée vocale n'est pas disponible dans ce navigateur." })); return; }
+    const recognition = new Recognition();
+    recognition.lang = "fr-FR"; recognition.interimResults = false; recognition.maxAlternatives = 1;
+    setListening(field);
+    recognition.onresult = (event) => setForm((current) => ({ ...current, [field]: event.results[0][0].transcript }));
+    recognition.onerror = () => setListening("");
+    recognition.onend = () => setListening("");
+    recognition.start();
+  };
+
+  const add = async () => {
+    if (!form.objet.trim()) { requireField(); return; }
+    try { await api("/controls", { method: "POST", body: JSON.stringify(form) }); setForm({ type: "température", objet: "", resultat: "conforme", anomalie: "", action_corrective: "" }); load(); } catch (e) {}
+  };
+  const validate = async (id) => { await api(`/controls/${id}/validate`, { method: "PATCH", body: JSON.stringify({}) }).catch(() => {}); load(); };
+
+  return (
+    <div className="hc-section" data-testid="haccp-section-controls">
+      <p className="pantheon-hint">Créez une fiche, dictez ou saisissez le contrôle, documentez l'anomalie et son action corrective, puis faites valider la fiche.</p>
+      <div className="hc-form">
+        <select className="cmd-input hc-select" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>{["température", "réception", "nettoyage", "hygiène", "DLC", "autre"].map((type) => <option key={type}>{type}</option>)}</select>
+        <div className="hc-dictation-field"><input className="cmd-input hc-wide" placeholder="Objet du contrôle *" value={form.objet} onChange={(e) => setForm({ ...form, objet: e.target.value })} /><button className={`memory-icon-btn ${listening === "objet" ? "on" : ""}`} onClick={() => dictate("objet")} title="Dicter l'objet"><Mic size={14} /></button></div>
+        <select className="cmd-input hc-select" value={form.resultat} onChange={(e) => setForm({ ...form, resultat: e.target.value })}><option value="conforme">Conforme</option><option value="non_conforme">Non conforme</option><option value="sans_objet">Sans objet</option></select>
+        <div className="hc-dictation-field"><input className="cmd-input hc-wide" placeholder="Anomalie constatée" value={form.anomalie} onChange={(e) => setForm({ ...form, anomalie: e.target.value })} /><button className="memory-icon-btn" onClick={() => dictate("anomalie")} title="Dicter l'anomalie"><Mic size={14} /></button></div>
+        <div className="hc-dictation-field"><input className="cmd-input hc-wide" placeholder="Action corrective proposée" value={form.action_corrective} onChange={(e) => setForm({ ...form, action_corrective: e.target.value })} /><button className="memory-icon-btn" onClick={() => dictate("action_corrective")} title="Dicter l'action corrective"><Mic size={14} /></button></div>
+        <button className="cmd-send" onClick={add}><Plus size={14} /> ENREGISTRER LA FICHE</button>
+      </div>
+      <div className="prime-scroll hc-list">
+        {items.map((item) => <div className="hc-row" key={item.id} data-testid={`haccp-control-row-${item.id}`}>
+          <Dot tone={item.statut === "valide" ? "ok" : item.resultat === "non_conforme" ? "ko" : "warn"} />
+          <div className="hc-row-main"><b>{item.type.toUpperCase()} · {item.objet}</b><span>{item.resultat === "non_conforme" ? `Anomalie : ${item.anomalie || "—"} · Action : ${item.action_corrective || "à définir"}` : "Contrôle conforme"} · {fmtDT(item.created_at)}{item.valide_par ? ` · validé par ${item.valide_par}` : ""}</span></div>
+          {item.statut !== "valide" && <button className="hc-badge ok" onClick={() => validate(item.id)}>VALIDER</button>}
+        </div>)}
+        {!items.length && <div className="memory-empty">Aucune fiche de contrôle. Commencez une saisie ci-dessus.</div>}
+      </div>
+    </div>
+  );
+}
+
 function SectionAudit() {
   const [dateDebut, setDateDebut] = useState("");
   const [dateFin, setDateFin] = useState("");
   const [busy, setBusy] = useState(false);
-  const [sections, setSections] = useState({ trace: true, temp: true, pms: true, nc: true, clean: true, allerg: true, docs: true });
-  const labels = { trace: "Traçabilité", temp: "Températures", pms: "PMS", nc: "Non-conformités", clean: "Nettoyage", allerg: "Allergènes", docs: "Documents" };
+  const [sections, setSections] = useState({ trace: true, temp: true, pms: true, nc: true, clean: true, allerg: true, docs: true, controls: true });
+  const labels = { trace: "Traçabilité", temp: "Températures", pms: "PMS", nc: "Non-conformités", clean: "Nettoyage", allerg: "Allergènes", docs: "Documents", controls: "Fiches de contrôle" };
 
   const generate = async () => {
     setBusy(true);
@@ -447,7 +496,7 @@ function SectionAudit() {
   );
 }
 
-const SECTIONS = { trace: SectionTrace, temp: SectionTemp, pms: SectionPms, nc: SectionNc, clean: SectionClean, allerg: SectionAllerg, docs: SectionDocs, sheets: SectionSheets, audit: SectionAudit };
+const SECTIONS = { trace: SectionTrace, temp: SectionTemp, pms: SectionPms, nc: SectionNc, clean: SectionClean, allerg: SectionAllerg, docs: SectionDocs, controls: SectionControls, sheets: SectionSheets, audit: SectionAudit };
 
 export default function HaccpModule({ onClose }) {
   const [tab, setTab] = useState("trace");

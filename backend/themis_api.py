@@ -68,6 +68,7 @@ class ItemIn(BaseModel):
 
 class StockDelta(BaseModel):
     delta: int
+    reason: str = "ajustement manuel"
 
 
 class DocIn(BaseModel):
@@ -326,6 +327,7 @@ def make_themis_router(db):
         doc = body.dict()
         doc.update({"id": str(uuid.uuid4()), "user_id": uid, "created_at": now_iso()})
         await db.themis_items.insert_one(dict(doc))
+        await db.themis_stock_movements.insert_one({"id": str(uuid.uuid4()), "item_id": doc["id"], "user_id": uid, "delta": doc["stock"], "before": 0, "after": doc["stock"], "reason": "stock initial", "created_at": now_iso()})
         return {"ok": True, "item": doc}
 
     @r.put("/items/{iid}/stock")
@@ -334,9 +336,20 @@ def make_themis_router(db):
         it = await db.themis_items.find_one({"id": iid, "user_id": uid}, NO_ID)
         if not it:
             raise HTTPException(status_code=404, detail="Article introuvable")
-        ns = max(0, int(it.get("stock", 0)) + body.delta)
+        before = int(it.get("stock", 0))
+        ns = max(0, before + body.delta)
         await db.themis_items.update_one({"id": iid, "user_id": uid}, {"$set": {"stock": ns}})
+        await db.themis_stock_movements.insert_one({"id": str(uuid.uuid4()), "item_id": iid, "user_id": uid, "delta": body.delta, "before": before, "after": ns, "reason": body.reason.strip()[:160] or "ajustement manuel", "created_at": now_iso()})
         return {"ok": True, "stock": ns}
+
+    @r.get("/items/{iid}/movements")
+    async def stock_movements(iid: str, request: Request):
+        uid = await _uid(request)
+        item = await db.themis_items.find_one({"id": iid, "user_id": uid}, NO_ID)
+        if not item:
+            raise HTTPException(status_code=404, detail="Article introuvable")
+        movements = await db.themis_stock_movements.find({"item_id": iid, "user_id": uid}, NO_ID).sort("created_at", -1).to_list(500)
+        return {"item": item, "movements": movements}
 
     @r.delete("/items/{iid}")
     async def del_item(iid: str, request: Request):

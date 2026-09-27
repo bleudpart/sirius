@@ -8,8 +8,14 @@ import auth_api
 import server
 
 
-def test_local_session_sets_hardened_cookies():
-    client = TestClient(server.app)
+@pytest.fixture(scope="module")
+def api_client():
+    with TestClient(server.app) as client:
+        yield client
+
+
+def test_local_session_sets_hardened_cookies(api_client):
+    client = api_client
 
     response = client.post("/api/auth/local-session")
 
@@ -21,8 +27,8 @@ def test_local_session_sets_hardened_cookies():
     assert client.cookies.get("refresh_token")
 
 
-def test_local_session_rejects_forwarded_requests():
-    client = TestClient(server.app)
+def test_local_session_rejects_forwarded_requests(api_client):
+    client = api_client
 
     response = client.post(
         "/api/auth/local-session",
@@ -32,14 +38,14 @@ def test_local_session_rejects_forwarded_requests():
     assert response.status_code == 403
 
 
-def test_me_requires_a_signed_session():
-    response = TestClient(server.app).get("/api/auth/me")
+def test_me_requires_a_signed_session(api_client):
+    response = api_client.get("/api/auth/me")
 
     assert response.status_code == 401
 
 
-def test_local_session_returns_bearer_token_in_body():
-    client = TestClient(server.app)
+def test_local_session_returns_bearer_token_in_body(api_client):
+    client = api_client
 
     response = client.post("/api/auth/local-session")
 
@@ -47,10 +53,10 @@ def test_local_session_returns_bearer_token_in_body():
     assert response.json().get("access_token")
 
 
-def test_me_accepts_bearer_token_without_cookie():
+def test_me_accepts_bearer_token_without_cookie(api_client):
     # Simule le navigateur qui ne rejoue pas le cookie SameSite cross-site :
     # le header Authorization doit suffire.
-    client = TestClient(server.app)
+    client = api_client
     token = client.post("/api/auth/local-session").json()["access_token"]
     client.cookies.clear()
 

@@ -2,6 +2,7 @@ import asyncio
 from datetime import datetime, timezone
 
 import bcrypt
+import pyotp
 import pytest
 from fastapi import HTTPException
 
@@ -92,6 +93,16 @@ def test_seed_admin_hashes_and_reconciles_password(monkeypatch):
     asyncio.run(auth_api.seed_admin_and_indexes(db))
     assert len(db.users.documents) == 1
     assert bcrypt.checkpw(b"second-password", db.users.documents[0]["password_hash"].encode())
+
+
+def test_mfa_secret_is_encrypted_and_validates_totp():
+    secret = pyotp.random_base32()
+    user = {"mfa_enabled": True, "mfa_secret_enc": auth_api._encrypt_mfa_secret(secret)}
+    code = pyotp.TOTP(secret).now()
+
+    assert auth_api._mfa_valid(user, code)
+    assert not auth_api._mfa_valid(user, "000000")
+    assert secret not in user["mfa_secret_enc"]
 
 
 def test_register_login_and_lockout():

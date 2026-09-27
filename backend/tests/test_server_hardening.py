@@ -1,26 +1,33 @@
 from fastapi.testclient import TestClient
+import pytest
 
 import server
 
 
-def authenticated_client():
-    client = TestClient(server.app)
+@pytest.fixture(scope="module")
+def api_client():
+    with TestClient(server.app) as client:
+        yield client
+
+
+def authenticated_client(client):
     response = client.post("/api/auth/local-session")
     assert response.status_code == 200
+    client.headers.update({"Authorization": f"Bearer {response.json()['access_token']}"})
     return client
 
 
-def test_omega_skills_registry_exposes_twelve_active_skills():
-    response = authenticated_client().get("/api/omega/skills")
+def test_omega_skills_registry_exposes_twelve_active_skills(api_client):
+    response = authenticated_client(api_client).get("/api/omega/skills")
 
     assert response.status_code == 200
     assert response.json()["state"] == "active"
     assert len(response.json()["skills"]) == 12
 
 
-def test_self_patch_and_reload_are_disabled_by_default(monkeypatch):
+def test_self_patch_and_reload_are_disabled_by_default(api_client, monkeypatch):
     monkeypatch.setattr(server, "SELF_PATCH_ENABLED", False)
-    client = authenticated_client()
+    client = authenticated_client(api_client)
 
     patch = client.post(
         "/api/self/patch",
@@ -36,10 +43,10 @@ def test_self_patch_and_reload_are_disabled_by_default(monkeypatch):
     assert reload_response.status_code == 503
 
 
-def test_self_patch_rejects_invalid_token_and_path_traversal(monkeypatch):
+def test_self_patch_rejects_invalid_token_and_path_traversal(api_client, monkeypatch):
     monkeypatch.setattr(server, "SELF_PATCH_ENABLED", True)
     monkeypatch.setattr(server, "ADMIN_TOKEN", "configured-secret")
-    client = authenticated_client()
+    client = authenticated_client(api_client)
 
     invalid_token = client.post(
         "/api/self/patch",
@@ -56,10 +63,10 @@ def test_self_patch_rejects_invalid_token_and_path_traversal(monkeypatch):
     assert traversal.status_code == 403
 
 
-def test_self_patch_validates_python_before_writing(monkeypatch):
+def test_self_patch_validates_python_before_writing(api_client, monkeypatch):
     monkeypatch.setattr(server, "SELF_PATCH_ENABLED", True)
     monkeypatch.setattr(server, "ADMIN_TOKEN", "configured-secret")
-    client = authenticated_client()
+    client = authenticated_client(api_client)
 
     response = client.post(
         "/api/self/patch",
@@ -70,9 +77,9 @@ def test_self_patch_validates_python_before_writing(monkeypatch):
     assert response.status_code == 400
 
 
-def test_runtime_reports_cannot_be_cleared_without_admin_token(monkeypatch):
+def test_runtime_reports_cannot_be_cleared_without_admin_token(api_client, monkeypatch):
     monkeypatch.setattr(server, "ADMIN_TOKEN", "configured-secret")
-    client = authenticated_client()
+    client = authenticated_client(api_client)
 
     denied = client.post(
         "/api/argus/fix",
@@ -89,7 +96,7 @@ def test_runtime_reports_cannot_be_cleared_without_admin_token(monkeypatch):
     assert allowed.json()["ok"] is True
 
 
-def test_self_patch_can_be_rolled_back_atomically(tmp_path, monkeypatch):
+def test_self_patch_can_be_rolled_back_atomically(api_client, tmp_path, monkeypatch):
     target = tmp_path / "server.py"
     target.write_text("value = 'original'\n", encoding="utf-8")
     monkeypatch.setattr(server, "ROOT_DIR", tmp_path)
@@ -97,7 +104,7 @@ def test_self_patch_can_be_rolled_back_atomically(tmp_path, monkeypatch):
     monkeypatch.setattr(server, "ALLOWED_FILES", {"server.py": target})
     monkeypatch.setattr(server, "SELF_PATCH_ENABLED", True)
     monkeypatch.setattr(server, "ADMIN_TOKEN", "configured-secret")
-    client = authenticated_client()
+    client = authenticated_client(api_client)
 
     patched = client.post(
         "/api/self/patch",
@@ -120,7 +127,7 @@ def test_self_patch_can_be_rolled_back_atomically(tmp_path, monkeypatch):
     assert target.read_text(encoding="utf-8") == "value = 'original'\n"
 
 
-def test_patch_and_reload_scan_for_new_drift_before_acting(monkeypatch):
+def test_patch_and_reload_scan_for_new_drift_before_acting(api_client, monkeypatch):
     class FrozenOmega:
         def scan(self):
             return {"engine": {"frozen": True}}
@@ -128,7 +135,7 @@ def test_patch_and_reload_scan_for_new_drift_before_acting(monkeypatch):
     monkeypatch.setattr(server, "omega", FrozenOmega())
     monkeypatch.setattr(server, "SELF_PATCH_ENABLED", True)
     monkeypatch.setattr(server, "ADMIN_TOKEN", "configured-secret")
-    client = authenticated_client()
+    client = authenticated_client(api_client)
 
     patch = client.post(
         "/api/self/patch",
@@ -144,10 +151,10 @@ def test_patch_and_reload_scan_for_new_drift_before_acting(monkeypatch):
     assert reload_response.status_code == 409
 
 
-def test_automatic_reload_remains_disabled_when_patch_mode_is_enabled(monkeypatch):
+def test_automatic_reload_remains_disabled_when_patch_mode_is_enabled(api_client, monkeypatch):
     monkeypatch.setattr(server, "SELF_PATCH_ENABLED", True)
     monkeypatch.setattr(server, "ADMIN_TOKEN", "configured-secret")
-    client = authenticated_client()
+    client = authenticated_client(api_client)
 
     response = client.post(
         "/api/self/reload",

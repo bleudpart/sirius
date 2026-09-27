@@ -34,9 +34,12 @@ jobs:
         working-directory: frontend
       - name: Backend syntax and focused tests
         run: |
-          python -m py_compile server.py sirius_brain.py proactive.py routes/pantheon_oracle.py
-          python -m pytest tests/test_proactive.py tests/test_briefing_intent.py -q
+          python -m py_compile server.py sirius_brain.py proactive.py enterprise.py routers/files.py routes/pantheon_oracle.py
+          python -m pytest tests/test_proactive.py tests/test_briefing_intent.py tests/test_enterprise.py tests/test_sirius_doctor.py tests/test_auth_api_unit.py tests/test_server_hardening.py -q
         working-directory: backend
+      - name: Frontend automated tests
+        run: npm test -- --watchAll=false --runInBand
+        working-directory: frontend
       - name: Run SIRIUS audit
         run: python scripts/sirius_audit.py
       - name: Upload audit report

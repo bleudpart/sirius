@@ -72,6 +72,8 @@ Le HUD s'ouvre sur `http://localhost:3000` et parle au backend local `127.0.0.1:
 
 Guide détaillé : [INSTALL-SIRIUS.md](./INSTALL-SIRIUS.md)
 
+Pour le déploiement en petite entreprise : [GUIDE-ENTREPRISE.md](./GUIDE-ENTREPRISE.md)
+
 ---
 
 ## Sécurité qualité avec SonarQube

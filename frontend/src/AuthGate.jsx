@@ -1,7 +1,8 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // Porte d'authentification : connexion email/mot de passe + Microsoft, profil et déconnexion.
 import { useEffect, useState, createContext, useContext } from "react";
-import { LogIn, LogOut, User, Save } from "lucide-react";
+import { Download, LogIn, LogOut, Trash2, User, Save } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { BACKEND_BASE_URL, resolveBackendUrl } from "@/lib/api";
 
 const API = BACKEND_BASE_URL;
@@ -104,6 +105,7 @@ function syncLocalProfile(user) {
 
 function AuthScreen({ onAuth }) {
   const [form, setForm] = useState({ name: "", email: "", password: "", confirmPassword: "" });
+  const [mfaCode, setMfaCode] = useState("");
   const [resetCode, setResetCode] = useState("");
   const [resetCodeSent, setResetCodeSent] = useState(false);
   const [registerMode, setRegisterMode] = useState(false);
@@ -126,7 +128,7 @@ function AuthScreen({ onAuth }) {
       const path = registerMode ? "/api/auth/register" : localLogin ? "/api/auth/local-login" : "/api/auth/login";
       const payload = registerMode
         ? { name: form.name, email: form.email, password: form.password }
-        : localLogin ? { password: form.password } : { email: form.email, password: form.password };
+        : localLogin ? { password: form.password, code: mfaCode } : { email: form.email, password: form.password, code: mfaCode };
       const r = await fetch(`${API}${path}`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -199,6 +201,7 @@ function AuthScreen({ onAuth }) {
             style={resetMode && !resetCodeSent ? { display: "none" } : undefined}
             disabled={resetMode && !resetCodeSent}
             onChange={(e) => setForm({ ...form, password: e.target.value })} data-testid="auth-password-input" />
+          {!registerMode && !resetMode && <input type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="Code MFA (si activé)" value={mfaCode} onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))} data-testid="auth-mfa-code-input" />}
           {registerMode && (
             <input type="password" placeholder="Confirmez le mot de passe" value={form.confirmPassword} required
               minLength={8} autoComplete="new-password"
@@ -238,12 +241,39 @@ export function ProfilePanel({ user, onClose, onUpdate, onLogout }) {
   const [name, setName] = useState(user.name || "");
   const [notes, setNotes] = useState((user.preferences || {}).notes || "");
   const [saved, setSaved] = useState(false);
+  const [mfaSetup, setMfaSetup] = useState(null);
+  const [mfaCode, setMfaCode] = useState("");
   const save = async () => {
     const r = await fetch(`${API}/api/auth/profile`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, preferences: { ...(user.preferences || {}), notes } }),
     });
     if (r.ok) { const u = await r.json(); syncLocalProfile(u); onUpdate(u); setSaved(true); setTimeout(() => setSaved(false), 2000); }
+  };
+  const exportData = async () => {
+    const response = await fetch(`${API}/api/auth/privacy/export`);
+    if (!response.ok) return;
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a"); link.href = url; link.download = "sirius-personal-data.zip"; link.click();
+    URL.revokeObjectURL(url);
+  };
+  const deleteAccount = async () => {
+    if (user.role === "admin" || !window.confirm("Supprimer définitivement votre compte et vos données personnelles ?")) return;
+    const response = await fetch(`${API}/api/auth/privacy/account`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirm: true }) });
+    if (response.ok) onLogout();
+  };
+  const setupMfa = async () => {
+    const response = await fetch(`${API}/api/auth/mfa/setup`, { method: "POST" });
+    if (response.ok) setMfaSetup(await response.json());
+  };
+  const enableMfa = async () => {
+    const response = await fetch(`${API}/api/auth/mfa/enable`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: mfaCode }) });
+    if (response.ok) { setMfaSetup(null); setMfaCode(""); onUpdate({ ...user, mfa_enabled: true }); }
+  };
+  const disableMfa = async () => {
+    const response = await fetch(`${API}/api/auth/mfa/disable`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: mfaCode }) });
+    if (response.ok) { setMfaCode(""); onUpdate({ ...user, mfa_enabled: false }); }
   };
   return (
     <div className="prime-screen" data-testid="profile-panel">
@@ -254,6 +284,10 @@ export function ProfilePanel({ user, onClose, onUpdate, onLogout }) {
       <div className="gcal-body">
         <div className="profile-row"><span>EMAIL</span><b data-testid="profile-email">{user.email}</b></div>
         <div className="profile-row"><span>CONNEXION</span><b>{user.provider === "google" ? "Google" : user.provider === "microsoft" ? "Microsoft" : "Email + mot de passe"}</b></div>
+        <div className="profile-row"><span>AUTHENTIFICATION RENFORCÉE</span><b>{user.mfa_enabled ? "MFA ACTIVÉ" : "MFA NON ACTIVÉ"}</b></div>
+        {!user.mfa_enabled && !mfaSetup && <button className="file-btn" onClick={setupMfa}><User size={13} /> ACTIVER LE MFA</button>}
+        {mfaSetup && <div className="mfa-setup"><QRCodeSVG value={mfaSetup.otpauth_url} size={150} /><small>Scannez ce QR avec votre application d'authentification, puis saisissez le code.</small><input className="profile-input" inputMode="numeric" maxLength={6} placeholder="Code à 6 chiffres" value={mfaCode} onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))} /><button className="auth-submit" onClick={enableMfa}>VALIDER LE MFA</button></div>}
+        {user.mfa_enabled && <div className="mfa-setup"><input className="profile-input" inputMode="numeric" maxLength={6} placeholder="Code MFA pour désactiver" value={mfaCode} onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))} /><button className="file-btn danger" onClick={disableMfa}>DÉSACTIVER LE MFA</button></div>}
         <label className="profile-label">PRÉNOM / NOM AFFICHÉ</label>
         <input className="profile-input" value={name} onChange={(e) => setName(e.target.value)} data-testid="profile-name-input" />
         <label className="profile-label">PRÉFÉRENCES PERSONNELLES (Sirius en tiendra compte)</label>
@@ -261,7 +295,9 @@ export function ProfilePanel({ user, onClose, onUpdate, onLogout }) {
           onChange={(e) => setNotes(e.target.value)} data-testid="profile-notes-input" />
         <div className="gcal-toolbar">
           <button className="auth-submit" style={{ width: "auto", padding: "10px 18px" }} onClick={save} data-testid="profile-save-btn"><Save size={14} /> {saved ? "ENREGISTRÉ ✓" : "ENREGISTRER"}</button>
+          <button className="file-btn" onClick={exportData} title="Exporter mes données" data-testid="profile-export-btn"><Download size={13} /> EXPORTER MES DONNÉES</button>
           <button className="file-btn danger" onClick={onLogout} data-testid="profile-logout-btn"><LogOut size={13} /> DÉCONNEXION</button>
+          {user.role !== "admin" && <button className="file-btn danger" onClick={deleteAccount} title="Supprimer mon compte" data-testid="profile-delete-btn"><Trash2 size={13} /> SUPPRIMER MON COMPTE</button>}
         </div>
       </div>
     </div>

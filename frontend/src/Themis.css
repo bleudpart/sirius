@@ -103,6 +103,12 @@ select.th-input option { background: #0a1420; }
 .th-low td { background: rgba(180, 60, 30, 0.08); }
 .th-stock-cell { display: flex; align-items: center; gap: 8px; }
 .th-stock-cell b { color: #f2d99a; min-width: 24px; text-align: center; }
+.th-movement-panel { margin-top: 14px; padding: 12px; border: 1px solid rgba(216,184,117,0.35); border-radius: 8px; background: rgba(4,18,28,0.55); }
+.th-movement-panel .th-section-title { display: flex; justify-content: space-between; align-items: center; }
+.th-movement { display: grid; grid-template-columns: 48px 1fr auto; gap: 8px; align-items: center; padding: 7px 0; border-bottom: 1px solid rgba(145,230,242,0.12); font-size: 11px; }
+.th-movement small { color: #8fb4c2; }
+.th-green { color: #5ee0aa; }
+.th-red { color: #f08c8c; }
 .th-compta { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: #9fc5d6; }
 
 .th-templates { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }

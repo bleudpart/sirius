@@ -2,14 +2,14 @@
 
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Mic, MicOff, Clock, Cpu, Wifi, MapPin, Calendar, X, Leaf, UserCog, Brain, Music, Repeat, RotateCcw, BarChart3, Workflow, Ruler, FolderOpen, Code2, Database, Sparkles, Eye, Landmark, Library, Orbit, Monitor, ShieldCheck, Radar, ShieldAlert, Camera, Fingerprint, Zap, Package, Clapperboard, Grip, Radio, Wrench, FileCode, History, Maximize, Minimize, KeyRound, Home as HomeIcon, BadgeInfo, Globe2, Hammer, TrendingUp, Newspaper, Scale, Flame, BookOpen, Sigma, AlarmClock, Power, Boxes, Link2 } from "lucide-react";
+import { Mic, MicOff, Clock, Cpu, Wifi, MapPin, Calendar, X, Leaf, UserCog, Brain, Music, Repeat, RotateCcw, BarChart3, Workflow, Ruler, FolderOpen, Code2, Database, Sparkles, Eye, Landmark, Library, Orbit, Monitor, ShieldCheck, Radar, ShieldAlert, Camera, Fingerprint, Zap, Package, Clapperboard, Grip, Radio, Wrench, FileCode, History, Maximize, Minimize, KeyRound, Home as HomeIcon, BadgeInfo, Globe2, Hammer, TrendingUp, Newspaper, Scale, Flame, BookOpen, Sigma, AlarmClock, Power, Boxes, Link2, Building2 } from "lucide-react";
 import {
   ArchitectPanel, SpectatorView, FilesPanel, DevCompanion, ZeusCortex, SiriusPrime, OracleDivin,
   PantheonSystem, NexusCeleste, SiriusDisplay, EuropeanaViewer, HaccpModule, KeysStatus, KeraunosPanel,
   AboutPanel, EspacePanel, ArchiveGallery, MemoryManager, InstallWizard, ScriptInstaller, LocusPanel,
   AtlasPanel, HeraclesPanel, HephaistosPanel, MythosGallery, ConsultPanel, PrometheePanel, CalliopePanel, CalendarPanel,
   FaceIdPanel, PythagorePanel, PackagerPanel, TrailerGallery, SiriusSetup, PromoPanel, ThemisPanel,
-  AdminPanel, PortusNummarius, AgoraPipeline, NewsPanel, ReveilPanel, SpotifyPanel, MediaHUD, ProductivityPanel,
+  AdminPanel, EnterprisePanel, PortusNummarius, AgoraPipeline, NewsPanel, ReveilPanel, SpotifyPanel, MediaHUD, ProductivityPanel,
   FloorPlanPanel, Photo3DPanel, ConnectionsPanel,
 } from "@/lazyModules";
 import { pushStats, pushSimStats } from "@/liveStats";
@@ -839,6 +839,7 @@ function App() {
   const [showAbout, setShowAbout] = useState(false);
   const [showEspace, setShowEspace] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
+  const [showEnterprise, setShowEnterprise] = useState(false);
   const [showNummarius, setShowNummarius] = useState(false);
   const authUser = (useAuth() || {}).user;
   // Plein écran global du HUD (API Fullscreen du navigateur)
@@ -5815,6 +5816,7 @@ function App() {
     { id: "media", group: "MÉDIAS", label: "MEDIA PROXY — lecteurs et controles", Icon: Radio, active: showMediaHud, run: () => { setMediaIntent(null); setShowMediaHud(true); } },
     { id: "spotify", group: "MÉDIAS", label: spotify ? "Spotify — lecteur intégré" : "Spotify — lecteur (connexion requise)", Icon: Music, active: spotify, run: () => setShowSpotifyWin(true) },
     ...(authUser?.role === "admin" ? [{ id: "admin", group: "SYSTÈME", label: "ADMINISTRATION — comptes & activité", Icon: ShieldCheck, run: () => setShowAdmin(true) }] : []),
+    ...(authUser ? [{ id: "enterprise", group: "SYSTÈME", label: "SIRIUS ENTREPRISE — équipe, audit & sauvegardes", Icon: Building2, run: () => setShowEnterprise(true) }] : []),
   ];
   moduleItemsRef.current = moduleItems;
 
@@ -6058,6 +6060,7 @@ function App() {
       )}
       {showPythagore && <PythagorePanel onClose={() => setShowPythagore(false)} />}
       {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
+      {showEnterprise && <EnterprisePanel onClose={() => setShowEnterprise(false)} />}
       {showNummarius && <PortusNummarius onClose={() => setShowNummarius(false)} />}
       {showNews && <NewsPanel onClose={() => setShowNews(false)} />}
       {argusAlert && (

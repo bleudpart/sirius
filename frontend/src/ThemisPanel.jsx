@@ -2,7 +2,7 @@ import { loadApiKeys } from "@/apiKeyStorage";
 // © 2026 Daniel Partel – ΣIRIUS Assistant. THÉMIS# — gestion d'entreprise (devis, factures, commandes, clients, compta, stocks, pièces PDF/OCR, modèles, BYOK).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, LayoutDashboard, FileText, Package, Users, Coins, Boxes, LayoutTemplate, KeyRound, Plus, Trash2, ArrowRightLeft, Minus, FileDown, Archive, Upload, Eye, Bell, AlertTriangle, Mail, Download, Calculator, Landmark } from "lucide-react";
+import { X, LayoutDashboard, FileText, Package, Users, Coins, Boxes, LayoutTemplate, KeyRound, Plus, Trash2, ArrowRightLeft, Minus, FileDown, Archive, Upload, Eye, Bell, AlertTriangle, Mail, Download, Calculator, Landmark, History } from "lucide-react";
 import { ConfirmButton } from "@/ConfirmButton";
 import { speakAsCharacter } from "@/voice";
 import "./Themis.css";
@@ -113,6 +113,9 @@ export default function ThemisPanel({ onClose }) {
   const [orderForm, setOrderForm] = useState({ client_id: "", lines: [{ label: "", qty: 1, unit_price: 0 }] });
   const [clientForm, setClientForm] = useState({ name: "", company: "", email: "", phone: "", address: "" });
   const [itemForm, setItemForm] = useState({ name: "", ref: "", price: 0, stock: 0, alert: 5 });
+  const [stockReason, setStockReason] = useState("ajustement manuel");
+  const [movementItem, setMovementItem] = useState(null);
+  const [movements, setMovements] = useState([]);
   const [payForm, setPayForm] = useState({ doc_id: "", amount: "", method: "virement" });
   const [emailDoc, setEmailDoc] = useState(null);
   const [emailForm, setEmailForm] = useState({ to: "", subject: "", message: "", mail_type: "envoi" });
@@ -171,6 +174,11 @@ export default function ThemisPanel({ onClose }) {
     setErr("");
     load();
     return true;
+  };
+
+  const showMovements = async (item) => {
+    const response = await fetch(`${API}/items/${item.id}/movements`);
+    if (response.ok) { const data = await response.json(); setMovementItem(data.item); setMovements(data.movements || []); }
   };
 
   const postAccounting = async (path, body) => {
@@ -632,6 +640,7 @@ export default function ThemisPanel({ onClose }) {
                 <input className="th-input th-qty" type="number" placeholder="Stock" value={itemForm.stock} onChange={(e) => setItemForm({ ...itemForm, stock: e.target.value })} title="Stock initial" data-testid="themis-item-stock" />
                 <input className="th-input th-qty" type="number" placeholder="Seuil" value={itemForm.alert} onChange={(e) => setItemForm({ ...itemForm, alert: e.target.value })} title="Seuil d’alerte" data-testid="themis-item-alert" />
               </div>
+              <input className="th-input" placeholder="Motif des mouvements" value={stockReason} onChange={(e) => setStockReason(e.target.value)} />
               <button className="th-btn gold" data-testid="themis-item-create" disabled={!itemForm.name} onClick={async () => {
                 const ok = await post("items", { ...itemForm, price: Number(itemForm.price), stock: Number(itemForm.stock), alert: Number(itemForm.alert) });
                 if (ok) setItemForm({ name: "", ref: "", price: 0, stock: 0, alert: 5 });
@@ -643,15 +652,16 @@ export default function ThemisPanel({ onClose }) {
                   <tr key={i.id} className={i.stock <= i.alert ? "th-low" : ""}>
                     <td><b className="th-gold">{i.name}</b> <small>{i.ref}</small></td><td>{EUR(i.price)}</td>
                     <td className="th-stock-cell">
-                      <button className="th-icon-btn" onClick={() => post(`items/${i.id}/stock`, { delta: -1 }, "PUT")} data-testid={`themis-stock-minus-${i.name}`}><Minus size={11} /></button>
+                      <button className="th-icon-btn" onClick={() => post(`items/${i.id}/stock`, { delta: -1, reason: stockReason }, "PUT")} data-testid={`themis-stock-minus-${i.name}`}><Minus size={11} /></button>
                       <b>{i.stock}</b>
-                      <button className="th-icon-btn" onClick={() => post(`items/${i.id}/stock`, { delta: 1 }, "PUT")} data-testid={`themis-stock-plus-${i.name}`}><Plus size={11} /></button>
+                      <button className="th-icon-btn" onClick={() => post(`items/${i.id}/stock`, { delta: 1, reason: stockReason }, "PUT")} data-testid={`themis-stock-plus-${i.name}`}><Plus size={11} /></button>
                     </td>
                     <td>{i.stock <= i.alert && <span className="th-badge s-refusé">STOCK BAS</span>}</td>
-                    <td><ConfirmButton className="th-icon-btn" onConfirm={() => post(`items/${i.id}`, null, "DELETE")} testId={`themis-item-del-${i.name}`}><Trash2 size={12} /></ConfirmButton></td>
+                    <td><button className="th-icon-btn" onClick={() => showMovements(i)} title="Historique des mouvements"><History size={12} /></button><ConfirmButton className="th-icon-btn" onConfirm={() => post(`items/${i.id}`, null, "DELETE")} testId={`themis-item-del-${i.name}`}><Trash2 size={12} /></ConfirmButton></td>
                   </tr>
                 ))}
               </tbody></table>
+              {movementItem && <div className="th-movement-panel"><div className="th-section-title">HISTORIQUE · {movementItem.name}<button className="th-icon-btn" onClick={() => setMovementItem(null)}><X size={12} /></button></div>{movements.map((movement) => <div className="th-movement" key={movement.id}><b className={movement.delta < 0 ? "th-red" : "th-green"}>{movement.delta > 0 ? "+" : ""}{movement.delta}</b><span>{movement.reason}</span><small>{movement.before} → {movement.after} · {isoToFr(movement.created_at)}</small></div>)}</div>}
             </div>
           </div>
         )}

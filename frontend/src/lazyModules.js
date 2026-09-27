@@ -60,6 +60,7 @@ export const SiriusSetup = wrap(() => import("@/SiriusSetup"));
 export const PromoPanel = wrap(() => import("@/PromoPanel"));
 export const ThemisPanel = wrap(() => import("@/ThemisPanel"));
 export const AdminPanel = wrap(() => import("@/AdminPanel"));
+export const EnterprisePanel = wrap(() => import("@/EnterprisePanel"));
 export const PortusNummarius = wrap(() => import("@/PortusNummarius"));
 export const AgoraPipeline = wrap(() => import("@/AgoraPipeline"));
 export const NewsPanel = wrap(() => import("@/NewsPanel"));
