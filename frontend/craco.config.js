@@ -193,6 +193,18 @@ let webpackConfig = {
         ],
       };
 
+      if (process.env.NODE_ENV === "production") {
+        const terser = webpackConfig.optimization?.minimizer?.find(
+          (plugin) => plugin?.constructor?.name === "TerserPlugin",
+        );
+        if (terser?.options) terser.options.parallel = false;
+      }
+
+      webpackConfig.ignoreWarnings = [
+        ...(webpackConfig.ignoreWarnings || []),
+        (warning) => /Critical dependency: require function is used in a way in which dependencies cannot be statically extracted/.test(warning.message || ""),
+      ];
+
       // Add health check plugin to webpack if enabled
       if (config.enableHealthCheck && healthPluginInstance) {
         webpackConfig.plugins.push(healthPluginInstance);
