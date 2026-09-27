@@ -21,6 +21,14 @@ try {
     localStorage.setItem("sirius_holo_v2", "1");
   }
 } catch (e) { /* stockage indisponible */ }
+// Migration v3 : les anciennes tailles réduites masquaient le contenu des modules.
+try {
+  if (!localStorage.getItem("sirius_holo_v3")) {
+    geom = {};
+    save();
+    localStorage.setItem("sirius_holo_v3", "1");
+  }
+} catch (e) { /* stockage indisponible */ }
 
 const keyOf = (el) => el.getAttribute("data-testid") || (el.className || "win").split(" ")[0];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));

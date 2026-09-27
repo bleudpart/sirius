@@ -3751,10 +3751,15 @@ body.hud-minimal .medallion-halo { display: none; }
 .oracle-title {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 24px;
+  gap: 8px;
+  font-size: 19px;
   color: #e3c98e;
   text-shadow: 0 0 18px rgba(255, 190, 60, 0.7), 0 0 40px rgba(255, 160, 30, 0.4);
+}
+.oracle-title .th-logo {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
 }
 .oracle-grid { grid-template-columns: 1fr 1fr; }
 .oracle-wide { grid-column: 1 / -1; }
