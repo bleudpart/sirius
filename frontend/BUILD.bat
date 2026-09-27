@@ -124,6 +124,18 @@ if %errorlevel% neq 0 (
 )
 
 echo.
+echo  Verification du frontend embarque...
+echo.
+call python "..\scripts\verify_packaged_frontend.py"
+if %errorlevel% neq 0 (
+    echo.
+    echo  [ERREUR] Le frontend embarque ne correspond pas au build React.
+    echo  Le paquet est refuse pour eviter de distribuer une ancienne interface.
+    pause
+    exit /b
+)
+
+echo.
 echo  [4/4] Generation de l'installeur Windows (.exe)...
 echo.
 if "%PM%"=="yarn" (

@@ -98,7 +98,7 @@
     "mobile:ios": "npm run mobile:sync && npx cap open ios",
     "version:bump": "node scripts/bump-patch-version.js",
     "version:bump:dry-run": "node scripts/bump-patch-version.js --dry-run",
-    "backend:build": "python -m PyInstaller --noconfirm --clean --distpath ../backend/dist --workpath ../backend/build/desktop-sidecar ../backend/sirius-backend.spec",
+    "backend:build": "python -m PyInstaller --noconfirm --clean --distpath ../backend/dist --workpath ../backend/build/desktop-sidecar ../backend/sirius-backend.spec && python ../scripts/verify_packaged_frontend.py",
     "electron:build": "npm run backend:build && electron-builder --win nsis portable",
     "release:auto": "npm run version:bump && npm run build && npm run backend:build && electron-builder --win nsis portable --publish always",
     "release": "electron-builder --win nsis portable --publish always"
