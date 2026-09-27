@@ -1,9 +1,9 @@
 import { FaMicrosoft } from "react-icons/fa6";
-import { SiGmail, SiGoogle } from "react-icons/si";
+import { SiGmail } from "react-icons/si";
 import "./ProviderLogo.css";
 
 const PROVIDER_ICONS = {
-  google: SiGoogle,
+  google: SiGmail,
   gmail: SiGmail,
   microsoft: FaMicrosoft,
   outlook: FaMicrosoft,

@@ -1,6 +1,7 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useState, useRef } from "react";
 import { User, KeyRound, Sparkles, ExternalLink, X, Download, Upload, Music, Volume2, Brain, Monitor, RotateCcw, CheckCircle2, XCircle, Loader2, Zap, Layers, Rocket, HardDrive } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { speakFr, speakAsCharacter, CHAR_PROFILES, MYTHOS_VOICES, loadCharOverrides, DEFAULT_VOICE, loadVoiceConfig } from "@/voice";
 import { HUD_DEFAULTS, loadHud, saveHud } from "@/hudPrefs";
 import { ConfirmButton } from "@/ConfirmButton";
@@ -279,6 +280,13 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
               <option value="spotify">Toujours Spotify</option>
               <option value="youtube">Toujours YouTube</option>
             </select>
+            <div className="setup-store-qr" data-testid="setup-store-qr">
+              <QRCodeSVG value="https://sirius-assistant.fr/" size={92} bgColor="#dff8ff" fgColor="#061321" level="M" includeMargin />
+              <div>
+                <b>RETROUVER ΣIRIUS</b>
+                <span>Scannez pour découvrir le store SIRIUS.</span>
+              </div>
+            </div>
           </section>
         )}
 
