@@ -633,6 +633,8 @@ export function BootScreen({ onDone, userName, onOpenModule }) {
       <div className="boot-center">
         <div className="boot-reactor" data-testid="boot-reactor">
           <div className="core-rings" aria-hidden="true">
+            <img src="/holo/ring-gold.png" alt="" className="core-ring outer" draggable={false} />
+            <img src="/holo/ring-gold.png" alt="" className="core-ring inner" draggable={false} />
             <div className="core-pulse" />
             <div className="core-orbit">
               {["Σ", "Δ", "Ω", "Θ", "Φ"].map((l, i) => (

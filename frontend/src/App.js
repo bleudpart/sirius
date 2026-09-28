@@ -5745,12 +5745,37 @@ function App() {
   });
 
   const captureSiriusInterface = async () => {
-    if (!window.siriusDesktop?.captureInterface) {
-      showTouchToast("CAPTURE DISPONIBLE SUR WINDOWS");
+    if (window.siriusDesktop?.captureInterface) {
+      const result = await window.siriusDesktop.captureInterface();
+      showTouchToast(result?.ok ? "CAPTURE ENREGISTRÉE" : (result?.error || "CAPTURE IMPOSSIBLE"));
       return;
     }
-    const result = await window.siriusDesktop.captureInterface();
-    showTouchToast(result?.ok ? "CAPTURE ENREGISTRÉE" : (result?.error || "CAPTURE IMPOSSIBLE"));
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      showTouchToast("CAPTURE NON DISPONIBLE DANS CE NAVIGATEUR");
+      return;
+    }
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 1 }, audio: false });
+      const video = document.createElement("video");
+      video.srcObject = stream;
+      video.muted = true;
+      await video.play();
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+      stream.getTracks().forEach((track) => track.stop());
+      const link = document.createElement("a");
+      link.download = `sirius-capture-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+      showTouchToast("CAPTURE ENREGISTRÉE");
+    } catch (error) {
+      stream?.getTracks().forEach((track) => track.stop());
+      showTouchToast(error?.name === "NotAllowedError" ? "CAPTURE ANNULÉE" : "CAPTURE IMPOSSIBLE");
+    }
   };
   const openCaptureFolder = async () => {
     if (!window.siriusDesktop?.openCaptureFolder) {
