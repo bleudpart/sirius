@@ -2,41 +2,16 @@
 // Voix de Sirius — synthèse locale ou Google Cloud TTS avec basculement
 // automatique sur la synthèse du navigateur si la clé est absente ou l'API indisponible.
 import { Capacitor } from "@capacitor/core";
+import { applyFrenchPhonetics } from "./phoneticFr";
 
 const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
 const TTS_REQUEST_TIMEOUT_MS = 8000;
 const MALE = /(paul|henri|thomas|nicolas|claude|mathieu|guillaume|daniel|jerome|male|homme|man|wavenet-d|wavenet-b|standard-b|standard-d)/i;
 const FEMALE = /(female|femme|amelie|audrey|marie|julie|celine|hortense|denise|eloise|charline|virginie|chantal|neural2-f|neural2-a|neural2-c|neural2-e|wavenet-a|wavenet-c|wavenet-e)/i;
 
-// Triche phonétique : « Sirius » se prononce mal → on dit « Siriusse » (l'écrit reste « Sirius »)
-// + dictionnaire vocal personnalisé (écran Profil, localStorage "sirius_phonetic")
-const customPhonetic = (text) => {
-  let out = text;
-  try {
-    const dict = JSON.parse(localStorage.getItem("sirius_phonetic")) || [];
-    dict.forEach(({ mot, dit }) => {
-      if (!mot || !dit) return;
-      const esc = mot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      out = out.replace(new RegExp(`(?<![\\p{L}\\p{N}_])${esc}(?![\\p{L}\\p{N}_])`, "giu"), dit);
-    });
-  } catch (e) { /* dictionnaire invalide ignoré */ }
-  return out;
-};
-const phonetic = (text) =>
-  customPhonetic(String(text))
-    .replace(/\bsirius\b/gi, "Siriusse")
-    .replace(/\bS\.I\.R\.I\.U\.S\b/gi, "Siriusse")
-    .replace(/\bcortex\b/gi, "cortèxe")
-    // « scan / scans / scanne » étaient lus à l'anglaise (« skæn ») : graphie française forcée.
-    .replace(/\bscann?e?s?\b/gi, "skane")
-    // « Roger » lu « rodjeur » à l'anglaise au lieu du prénom français.
-    .replace(/\bRoger\b/gi, "Rojé")
-    // « e-mail » devient « e mail » au nettoyage, que le TTS français lit « eu mail ».
-    .replace(/\be[- ]?mails\b/gi, "imèls")
-    .replace(/\be[- ]?mail\b/gi, "imèl")
-    // Prénoms étrangers : le « ee » final se lit « é » en français, alors qu'il se dit « i »
-    // (Shivanee → Chivani). Limité aux mots capitalisés pour ne pas toucher au vocabulaire courant.
-    .replace(/(\p{Lu}\p{L}*?)ee\b/gu, "$1i");
+// Triche phonétique : lexique français intégré (sigles, anglicismes, noms propres)
+// + dictionnaire vocal personnalisé (écran Profil, localStorage "sirius_phonetic").
+const phonetic = (text) => applyFrenchPhonetics(text);
 
 // Nettoyage du texte avant synthèse vocale : retire l'habillage Markdown (astérisques,
 // tirets de liste, titres #, `code`, liens…) et les symboles pour que le moteur TTS lise
