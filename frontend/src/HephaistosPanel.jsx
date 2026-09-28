@@ -16,6 +16,47 @@ const GROUPS = [
   { key: "integrations", label: "INTÉGRATIONS EXTERNES", Icon: Plug },
 ];
 
+function HephHealthGraph({ report }) {
+  if (!report?.summary) return null;
+  const summary = report.summary;
+  const groups = GROUPS.map(({ key, label }) => {
+    const items = report.groups?.[key] || [];
+    const passed = items.filter((item) => item.status === "OK").length;
+    return { key, label, passed, total: items.length, rate: items.length ? Math.round(passed / items.length * 100) : 0 };
+  });
+  const circumference = 2 * Math.PI * 44;
+  const offset = circumference * (1 - summary.rate / 100);
+  return (
+    <section className="prime-card heph-dashboard" data-testid="hephaistos-dashboard">
+      <div className="heph-kpis">
+        <div><span>TAUX GLOBAL</span><b>{summary.rate}%</b><i>{summary.state}</i></div>
+        <div><span>MODULES TESTÉS</span><b>{summary.total}</b><i>{summary.passed} validés</i></div>
+        <div><span>DURÉE</span><b>{summary.duration_ms}<small> ms</small></b><i>mesure réelle</i></div>
+        <div><span>ÉCHECS</span><b className={summary.failed ? "risk" : "good"}>{summary.failed}</b><i>{summary.failed ? "à traiter" : "aucun"}</i></div>
+      </div>
+      <div className="heph-health-grid">
+        <div className="heph-health-ring">
+          <svg viewBox="0 0 112 112" aria-label={`Santé globale ${summary.rate}%`}>
+            <circle cx="56" cy="56" r="44" fill="none" stroke="rgba(255,255,255,.07)" strokeWidth="8" />
+            <circle cx="56" cy="56" r="44" fill="none" stroke={summary.rate >= 70 ? "#6fae9f" : "#b0728a"} strokeWidth="8" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={offset} transform="rotate(-90 56 56)" />
+            <text x="56" y="61" textAnchor="middle" className="heph-ring-value">{summary.rate}%</text>
+          </svg>
+          <span>SANTÉ DU SYSTÈME</span>
+        </div>
+        <div className="heph-group-bars">
+          {groups.map((group, index) => (
+            <div className="heph-group-bar" key={group.key}>
+              <span>{group.label}</span>
+              <div className="heph-bar-track"><i style={{ width: `${group.rate}%`, background: ["#7fb2d4", "#6fae9f", "#c2925a"][index] }} /></div>
+              <b>{group.passed}/{group.total}</b>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function HephaistosPanel({ onClose, onSpeak }) {
   const [char, setChar] = useState(null);
   useEffect(() => {
@@ -152,6 +193,8 @@ export default function HephaistosPanel({ onClose, onSpeak }) {
             </div>
           )}
         </section>
+
+        <HephHealthGraph report={report} />
 
         {report && GROUPS.map(({ key, label, Icon }) => (
           <section className="prime-card heph-group" key={key} data-testid={`hephaistos-group-${key}`}>

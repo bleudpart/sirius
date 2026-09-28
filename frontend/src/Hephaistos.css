@@ -1,10 +1,12 @@
 /* © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France). */
 /* HÉPHAÏSTOS — auto-maintenance, thème or & cyan */
 .mythos-avatar {
-  width: 280px;
-  display: block;
-  margin: 0 auto;
-  filter: drop-shadow(0 0 34px var(--mythos-color, #ffffff88));
+  width: 170px;
+  max-height: 24vh;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid rgba(217, 165, 60, 0.55);
+  filter: drop-shadow(0 0 22px var(--mythos-color, #ffffff55));
 }
 .heph-body {
   position: relative; z-index: 3;
@@ -13,6 +15,38 @@
   overflow-y: auto; max-height: calc(100vh - 140px);
 }
 .heph-control { display: flex; flex-direction: column; gap: 14px; }
+
+.heph-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: linear-gradient(180deg, rgba(13, 27, 43, 0.92), rgba(7, 18, 29, 0.82));
+  border-color: rgba(216, 184, 117, 0.28);
+}
+.heph-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.heph-kpis > div { padding: 4px 14px 12px; border-right: 1px solid rgba(255, 255, 255, 0.06); }
+.heph-kpis > div:last-child { border-right: 0; }
+.heph-kpis span { display: block; color: #54707f; font: 600 9px "Rajdhani", sans-serif; letter-spacing: 0.14em; }
+.heph-kpis b { display: block; margin-top: 4px; color: #ffe6a3; font: 600 25px "Rajdhani", sans-serif; }
+.heph-kpis b small { color: #7b97ac; font-size: 12px; }
+.heph-kpis b.good { color: #6fae9f; }
+.heph-kpis b.risk { color: #b0728a; }
+.heph-kpis i { color: #7b97ac; font: normal 10px "Rajdhani", sans-serif; }
+.heph-health-grid { display: grid; grid-template-columns: 150px 1fr; gap: 22px; align-items: center; }
+.heph-health-ring { display: grid; justify-items: center; gap: 4px; color: #54707f; font: 600 8px "Rajdhani", sans-serif; letter-spacing: 0.12em; text-align: center; }
+.heph-health-ring svg { width: 112px; height: 112px; }
+.heph-health-ring circle:nth-child(2) { transition: stroke-dashoffset 1s cubic-bezier(.22,.8,.3,1); }
+.heph-ring-value { fill: #ffe6a3; font: 600 20px "Rajdhani", sans-serif; }
+.heph-group-bars { display: flex; flex-direction: column; gap: 12px; }
+.heph-group-bar { display: grid; grid-template-columns: 145px 1fr 42px; align-items: center; gap: 10px; color: #d3e6f1; font-size: 12px; }
+.heph-group-bar > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.heph-bar-track { height: 8px; overflow: hidden; background: rgba(255, 255, 255, 0.06); }
+.heph-bar-track i { display: block; height: 100%; transition: width 1s cubic-bezier(.22,.8,.3,1); }
+.heph-group-bar b { color: #7b97ac; text-align: right; font-size: 11px; }
 
 .heph-run {
   display: inline-flex; align-items: center; justify-content: center; gap: 10px;
