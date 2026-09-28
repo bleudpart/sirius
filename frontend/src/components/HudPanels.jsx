@@ -512,6 +512,14 @@ export function BootScreen({ onDone, userName, onOpenModule, connected }) {
   const [loaded, setLoaded] = useState(false);
   const [speechDone, setSpeechDone] = useState(false);
   const speechStartedRef = useRef(false);
+  // Le socket met un instant à répondre : annoncer le décompte immédiatement ferait dire
+  // « 4 sur 5 » à la voix pendant que l'écran affiche déjà 5 sur 5.
+  const [checksSettled, setChecksSettled] = useState(false);
+  useEffect(() => {
+    if (connected) { setChecksSettled(true); return undefined; }
+    const t = setTimeout(() => setChecksSettled(true), 2500);
+    return () => clearTimeout(t);
+  }, [connected]);
   const padRef = useRef(null);
   const isAndroid = Capacitor.getPlatform() === "android";
   const introSpeech = "Système. Intelligent. Réactif. Interface. Universel. Sécurisé. " +
@@ -544,6 +552,7 @@ export function BootScreen({ onDone, userName, onOpenModule, connected }) {
   };
 
   useEffect(() => {
+    if (!checksSettled) return undefined;
     // Présentation vocale : voix française grave et posée, style bande-annonce
     // (équivalents français des mots de l'acronyme : mêmes initiales S.I.R.I.U.S,
     //  la voix française butait sur les mots anglais comme « Responsive »)
@@ -597,7 +606,7 @@ export function BootScreen({ onDone, userName, onOpenModule, connected }) {
       if (p >= 100) { setLoaded(true); clearInterval(progTimer); }
     }, 40);
     return () => { clearInterval(lineTimer); clearInterval(progTimer); clearTimeout(safety); clearTimeout(hardStop); stopPad(); };
-  }, [lines.length, onDone]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [lines.length, onDone, checksSettled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Chargé à 100 % mais voix jamais démarrée (autoplay bloqué / onend muet) → fermeture après 2,5 s
   useEffect(() => {
