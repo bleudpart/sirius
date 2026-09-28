@@ -39,7 +39,7 @@
   color: #d8b875;
   border-bottom: 1px solid rgba(216, 184, 117, 0.25);
 }
-.atlas-title { font-family: "Orbitron", sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; flex: 1; text-shadow: 0 0 8px rgba(216, 184, 117, 0.4); }
+.atlas-title { font-family: "Cinzel", serif; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; flex: 1; text-shadow: 0 0 8px rgba(216, 184, 117, 0.4); }
 .atlas-chip {
   font-family: "Orbitron", sans-serif; font-size: 10px; letter-spacing: 0.1em; color: #f2d99a;
   border: 1px solid rgba(216, 184, 117, 0.55); border-radius: 9px; padding: 2px 8px; white-space: nowrap;

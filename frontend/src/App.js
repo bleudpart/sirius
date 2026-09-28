@@ -3560,7 +3560,7 @@ function App() {
   }, [speakOut]);
 
   // Actions ponctuelles (rechargement, capture, caméra) : jamais ouvertes dans une cascade.
-  const CASCADE_SKIP = useMemo(() => new Set(["reload", "capture-interface", "open-capture-folder", "vision", "install", "packager"]), []);
+  const CASCADE_SKIP = useMemo(() => new Set(["reload", "capture-interface", "capture-region", "open-capture-folder", "vision", "install", "packager"]), []);
 
   // Ouverture en cascade : les fenêtres se déploient une à une pour rester lisibles.
   const openModulesCascade = useCallback((rawFilter = "") => {
@@ -5784,8 +5784,55 @@ function App() {
     },
   });
 
-  const captureSiriusInterface = async () => {
-    if (window.siriusDesktop?.captureInterface) {
+  // Sélection d'une zone du HUD à la souris : renvoie le rectangle en pixels CSS, ou null si annulé.
+  const selectCaptureRegion = () => new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "capture-region-overlay";
+    const hint = document.createElement("span");
+    hint.className = "capture-region-hint";
+    hint.textContent = "Glissez pour choisir la zone · Échap pour annuler";
+    const box = document.createElement("div");
+    box.className = "capture-region-box";
+    overlay.append(hint, box);
+    document.body.appendChild(overlay);
+
+    let startX = 0;
+    let startY = 0;
+    let drawing = false;
+    const rectOf = (e) => ({
+      x: Math.min(startX, e.clientX),
+      y: Math.min(startY, e.clientY),
+      w: Math.abs(e.clientX - startX),
+      h: Math.abs(e.clientY - startY),
+    });
+    const finish = (rect) => {
+      document.removeEventListener("keydown", onKey, true);
+      overlay.remove();
+      resolve(rect);
+    };
+    const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); finish(null); } };
+    document.addEventListener("keydown", onKey, true);
+    overlay.addEventListener("mousedown", (e) => {
+      drawing = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      hint.style.opacity = "0";
+      Object.assign(box.style, { left: `${startX}px`, top: `${startY}px`, width: "0px", height: "0px", opacity: "1" });
+    });
+    overlay.addEventListener("mousemove", (e) => {
+      if (!drawing) return;
+      const r = rectOf(e);
+      Object.assign(box.style, { left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.h}px` });
+    });
+    overlay.addEventListener("mouseup", (e) => {
+      if (!drawing) return finish(null);
+      const r = rectOf(e);
+      finish(r.w > 8 && r.h > 8 ? r : null);
+    });
+  });
+
+  const captureSiriusInterface = async (region = null) => {
+    if (!region && window.siriusDesktop?.captureInterface) {
       const result = await window.siriusDesktop.captureInterface();
       showTouchToast(result?.ok ? "CAPTURE ENREGISTRÉE" : (result?.error || "CAPTURE IMPOSSIBLE"));
       return;
@@ -5796,16 +5843,37 @@ function App() {
     }
     let stream;
     try {
-      stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 1 }, audio: false });
+      // preferCurrentTab aligne l'image capturée sur la fenêtre : indispensable pour recadrer.
+      stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 1 }, audio: false, preferCurrentTab: true });
       const video = document.createElement("video");
       video.srcObject = stream;
       video.muted = true;
+      video.playsInline = true;
+      // Les dimensions ne sont connues qu'après loadedmetadata : sans cette attente le canvas fait 0×0.
+      if (!video.videoWidth) {
+        await new Promise((resolve, reject) => {
+          video.onloadedmetadata = resolve;
+          video.onerror = () => reject(new Error("flux vidéo illisible"));
+          setTimeout(() => reject(new Error("délai dépassé")), 5000);
+        });
+      }
       await video.play();
-      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      // getSettings() donne la taille réelle de la source ; videoWidth peut rester à une valeur
+      // transitoire minuscule et produire une capture vide.
+      const settings = stream.getVideoTracks()[0]?.getSettings() || {};
+      const frameW = settings.width || video.videoWidth;
+      const frameH = settings.height || video.videoHeight;
+      if (!frameW || !frameH || frameW < 16 || frameH < 16) throw new Error("dimensions indisponibles");
+
+      const scale = frameW / window.innerWidth;
+      const crop = region
+        ? { sx: region.x * scale, sy: region.y * scale, sw: region.w * scale, sh: region.h * scale }
+        : { sx: 0, sy: 0, sw: frameW, sh: frameH };
       const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.width = Math.max(1, Math.round(crop.sw));
+      canvas.height = Math.max(1, Math.round(crop.sh));
+      canvas.getContext("2d").drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, canvas.width, canvas.height);
       stream.getTracks().forEach((track) => track.stop());
       const link = document.createElement("a");
       link.download = `sirius-capture-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
@@ -5826,6 +5894,12 @@ function App() {
     showTouchToast(result?.ok ? "DOSSIER DES CAPTURES OUVERT" : (result?.error || "DOSSIER INACCESSIBLE"));
   };
 
+  const captureSiriusRegion = async () => {
+    const region = await selectCaptureRegion();
+    if (!region) { showTouchToast("CAPTURE ANNULÉE"); return; }
+    await captureSiriusInterface(region);
+  };
+
   const moduleItems = [
     { id: "reload", group: "SYSTÈME", label: "Recharger ΣIRIUS", Icon: RotateCcw, run: () => { window.__siriusBootPlayed = false; window.location.reload(); } },
     { id: "display", group: "MÉDIAS", label: "ΣIRIUS DISPLAY", Icon: Monitor, active: displayOpen, run: () => { pinDisplay(); setDisplayOpen((o) => !o); } },
@@ -5833,7 +5907,8 @@ function App() {
     { id: "files", group: "MÉDIAS", label: "Médiathèque", Icon: FolderOpen, run: () => setShowFiles(true) },
     { id: "info-hub", group: "OUTILS", label: "Centre d'information SIRIUS", Icon: BadgeInfo, run: () => restoreHudPanel("info-hub") },
     { id: "connections", group: "OUTILS", label: "Comptes & connexions", Icon: Link2, run: () => setShowConnections(true) },
-    { id: "capture-interface", group: "OUTILS", label: "Capture de l'interface", Icon: Camera, run: captureSiriusInterface },
+    { id: "capture-interface", group: "OUTILS", label: "Capture de l'interface", Icon: Camera, run: () => captureSiriusInterface() },
+    { id: "capture-region", group: "OUTILS", label: "Capture d'une zone (souris)", Icon: Camera, run: captureSiriusRegion },
     { id: "open-capture-folder", group: "OUTILS", label: "Ouvrir le dossier des captures", Icon: FolderOpen, run: openCaptureFolder },
     { id: "architect", group: "OUTILS", label: "Architecte visuel", Icon: Workflow, run: () => { setArchitectPrompt(""); setShowArchitect(true); } },
     { id: "plans", group: "OUTILS", label: "Plans 2D (PLANS#)", Icon: Ruler, run: () => { setPlansPrompt(""); setShowPlans(true); } },
@@ -6239,7 +6314,7 @@ function App() {
           <button
             type="button"
             className="profile-btn top-tool-btn"
-            onClick={captureSiriusInterface}
+            onClick={() => captureSiriusInterface()}
             title="Capturer l'écran du HUD"
             aria-label="Capturer l'écran du HUD"
             data-testid="sirius-capture-btn"

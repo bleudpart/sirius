@@ -24,7 +24,7 @@
   color: #d8b875;
   border-bottom: 1px solid rgba(216, 184, 117, 0.3);
 }
-.p3d-title { font-family: "Orbitron", sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-shadow: 0 0 8px rgba(216, 184, 117, 0.4); }
+.p3d-title { font-family: "Cinzel", serif; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-shadow: 0 0 8px rgba(216, 184, 117, 0.4); }
 .p3d-close {
   margin-left: auto;
   display: inline-flex; align-items: center; justify-content: center;

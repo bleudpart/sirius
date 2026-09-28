@@ -7979,3 +7979,35 @@ body[data-phase] .center-stage::before { content: none !important; }
     padding-left: calc(72px + env(safe-area-inset-left, 0px));
   }
 }
+
+/* Sélection d'une zone du HUD à la souris pour la capture */
+.capture-region-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  cursor: crosshair;
+  background: rgba(3, 10, 18, 0.42);
+  backdrop-filter: blur(1px);
+}
+.capture-region-hint {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 18px;
+  color: #ffe6a3;
+  font: 700 12px "Cinzel", serif;
+  letter-spacing: 0.12em;
+  border: 1px solid var(--gold-soft);
+  background: rgba(6, 16, 27, 0.9);
+  box-shadow: 0 0 16px rgba(216, 184, 117, 0.3);
+  transition: opacity 0.2s;
+}
+.capture-region-box {
+  position: absolute;
+  opacity: 0;
+  border: 1px solid var(--gold-light);
+  background: rgba(216, 184, 117, 0.12);
+  box-shadow: 0 0 18px rgba(216, 184, 117, 0.45), inset 0 0 22px rgba(216, 184, 117, 0.12);
+  pointer-events: none;
+}

@@ -79,7 +79,7 @@
 
 .connection-item.connected { border-color: rgba(216, 184, 117, 0.55); }
 .connection-icon { width: 48px; height: 48px; display: grid; place-items: center; border: 1px solid rgba(145, 230, 242, 0.34); border-radius: 8px; color: #91e6f2; }
-.connection-main h2 { margin: 0; color: #fff; font: 700 16px "Orbitron", sans-serif; letter-spacing: 0; }
+.connection-main h2 { margin: 0; color: #ffe6a3; font: 700 17px "Cinzel", serif; letter-spacing: 0.04em; }
 .connection-main p { margin: 4px 0 0; color: #a9cfdd; font-size: 13px; }
 .connection-main small { display: block; margin-top: 4px; color: #f2d99a; font-size: 12px; }
 .connection-state { justify-self: end; display: inline-flex; align-items: center; gap: 5px; color: #9fd3e8; font-size: 12px; }
