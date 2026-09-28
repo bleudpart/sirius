@@ -18,7 +18,7 @@ from datetime import datetime, timedelta, timezone
 from local_memory import _conn, _local_datetime
 
 MODES = ("proactif",)
-_MODE_LIMITS = {"proactif": 4}
+_MODE_LIMITS = {"proactif": 6}
 _SNOOZE_HOURS = 4
 _PROJECT_WINDOW_DAYS = 21
 _EPISODE_WINDOW_HOURS = 48
@@ -196,7 +196,133 @@ def _candidates(user_id: str, now) -> list:
             "action": {"type": "command", "text": intent},
         })
 
+    items.extend(_task_candidates(user_id, now, local_now))
+    items.extend(_service_candidates(now))
+    items.extend(_next_step_candidates(user_id))
     return items
+
+
+def _task_candidates(user_id: str, now, local_now) -> list:
+    """Tâches échues ou dues aujourd'hui : la source la plus actionnable qui existait déjà en base."""
+    items = []
+    today = local_now.date().isoformat()
+    with _conn() as con:
+        rows = [dict(r) for r in con.execute(
+            "SELECT id, title, status, priority, due_at FROM productivity_tasks "
+            "WHERE user_id = ? AND due_at IS NOT NULL AND due_at <> '' "
+            "AND LOWER(COALESCE(status,'')) NOT IN ('done','termine','terminé','annule','annulé') "
+            "ORDER BY due_at ASC LIMIT 20",
+            (user_id,),
+        ).fetchall()]
+
+    late = [r for r in rows if (r["due_at"] or "")[:10] < today]
+    due_today = [r for r in rows if (r["due_at"] or "")[:10] == today]
+
+    if late:
+        first = late[0]
+        titles = ", ".join(r["title"] for r in late[:3])
+        items.append({
+            "kind": f"tache-retard:{first['id']}",
+            "title": f"{len(late)} tâche{'s' if len(late) > 1 else ''} en retard",
+            "description": f"Échéance dépassée : {titles}.",
+            "urgency": "haute",
+            "reason": f"{len(late)} tâche(s) ont une échéance antérieure à aujourd'hui et ne sont pas clôturées.",
+            "benefit": "Rattraper le retard avant qu'il ne s'accumule.",
+            "confidence": 0.9,
+            "action": {"type": "command", "text": f"Aide-moi à traiter la tâche en retard : {first['title']}"},
+        })
+
+    if due_today:
+        first = due_today[0]
+        items.append({
+            "kind": f"tache-jour:{first['id']}",
+            "title": f"{len(due_today)} tâche{'s' if len(due_today) > 1 else ''} à rendre aujourd'hui",
+            "description": f"À traiter aujourd'hui : {', '.join(r['title'] for r in due_today[:3])}.",
+            "urgency": "moyenne",
+            "reason": "Ces tâches ont leur échéance fixée à la date du jour.",
+            "benefit": "Terminer la journée sans échéance manquée.",
+            "confidence": 0.85,
+            "action": {"type": "command", "text": f"Prépare la tâche du jour : {first['title']}"},
+        })
+    return items
+
+
+def _service_candidates(now) -> list:
+    """Dégradation réelle d'un service dans le journal des dernières 24 h."""
+    since = (now - timedelta(hours=24)).isoformat()
+    with _conn() as con:
+        rows = [dict(r) for r in con.execute(
+            "SELECT service, COUNT(*) AS total, "
+            "SUM(CASE WHEN UPPER(COALESCE(status,'')) <> 'OK' THEN 1 ELSE 0 END) AS ko "
+            "FROM service_log WHERE service IS NOT NULL AND created_at >= ? "
+            "GROUP BY service HAVING total >= 5 AND ko * 2 >= total "
+            "ORDER BY ko DESC LIMIT 1",
+            (since,),
+        ).fetchall()]
+    items = []
+    for row in rows:
+        rate = round(row["ko"] / row["total"] * 100)
+        items.append({
+            "kind": f"service:{row['service']}",
+            "title": f"Service {row['service']} dégradé",
+            "description": f"{rate} % d'échecs sur les dernières 24 h ({row['ko']} sur {row['total']}).",
+            "urgency": "haute",
+            "reason": f"Le journal de service enregistre {row['ko']} échecs sur {row['total']} appels depuis 24 h.",
+            "benefit": "Corriger avant que la panne ne bloque une action importante.",
+            "confidence": 0.85,
+            "action": {"type": "command", "text": "lance un diagnostic complet"},
+        })
+    return items
+
+
+def _next_step_candidates(user_id: str) -> list:
+    """Prédit la suite probable : après l'intention courante, quelle intention suit d'ordinaire ?"""
+    with _conn() as con:
+        seq = [r["intent"] or "" for r in con.execute(
+            "SELECT intent FROM events WHERE user_id = ? ORDER BY created_at DESC LIMIT 400",
+            (user_id,),
+        ).fetchall()]
+    if len(seq) < 10:
+        return []
+    chrono = seq[::-1]
+
+    def successors_of(target):
+        acc, tot = {}, 0
+        for a, b in zip(chrono, chrono[1:]):
+            if a == target and b and b != target:
+                acc[b] = acc.get(b, 0) + 1
+                tot += 1
+        return acc, tot
+
+    # La toute dernière intention n'a parfois aucune suite connue : on remonte alors
+    # les intentions récentes jusqu'à en trouver une réellement documentée.
+    seen = []
+    for intent in seq[:12]:
+        if intent and intent not in seen:
+            seen.append(intent)
+
+    for rank, last in enumerate(seen):
+        successors, total = successors_of(last)
+        if total < 3:
+            continue
+        nxt, n = max(successors.items(), key=lambda kv: kv[1])
+        confidence = n / total
+        # Une intention très fréquente disperse ses suites : exiger 40 % l'écarterait toujours.
+        # On retient donc un appui absolu suffisant avec une part nettement au-dessus du hasard.
+        if n < 4 or confidence < 0.2:
+            continue
+        contexte = "ta dernière commande" if rank == 0 else f"« {last} », ta commande récente"
+        return [{
+            "kind": f"suite:{last}->{nxt}",
+            "title": "Suite habituelle",
+            "description": f"Après {contexte}, tu enchaînes le plus souvent sur « {nxt} ». Je prépare ?",
+            "urgency": "faible",
+            "reason": f"Sur {total} enchaînements observés après « {last} », {n} mènent à « {nxt} » ({round(confidence * 100)} %).",
+            "benefit": "Gagner une étape en anticipant la suite logique.",
+            "confidence": round(min(0.9, confidence), 2),
+            "action": {"type": "command", "text": nxt},
+        }]
+    return []
 
 
 _URGENCY_ORDER = {"haute": 0, "moyenne": 1, "faible": 2}
@@ -228,6 +354,24 @@ def _intervention(item: dict) -> dict:
             "decision": "reprendre",
             "message": "Je peux reprendre ce dossier là où nous nous étions arrêtés et remettre les priorités à plat.",
             "alternative": "Je peux aussi préparer un résumé court avant de reprendre l'action.",
+        }
+    if kind in ("tache-retard", "tache-jour"):
+        return {
+            "decision": "agir",
+            "message": "Je peux ouvrir la tâche, résumer ce qu'il reste à faire et préparer le livrable.",
+            "alternative": "Sinon, je peux seulement replanifier l'échéance à une date tenable.",
+        }
+    if kind == "service":
+        return {
+            "decision": "agir",
+            "message": "Je peux lancer un diagnostic complet et isoler la cause des échecs.",
+            "alternative": "Je peux aussi me contenter de surveiller et t'alerter si le taux se dégrade encore.",
+        }
+    if kind == "suite":
+        return {
+            "decision": "proposer",
+            "message": "Je peux enchaîner directement sur cette étape, comme d'habitude.",
+            "alternative": "Si ce n'est pas la suite voulue cette fois, dis-moi simplement par quoi commencer.",
         }
     return {
         "decision": "proposer",

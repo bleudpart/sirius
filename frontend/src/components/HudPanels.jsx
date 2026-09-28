@@ -1,7 +1,7 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // Panneaux HUD autonomes extraits d'App.js : mémoire, pop-ups holographiques,
 // analytique, choix musical, jauges, météo flottante, carte centrale et écran de boot.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Activity, BarChart3, Brain, Check, Database, MapPin, Music, Pencil, Plus, Thermometer, Trash2, Wind, X, Youtube, Cloud } from "lucide-react";
 
 import { weatherInfo } from "@/appLogic";
@@ -413,7 +413,7 @@ export function Ring({ label, v }) {
 }
 
 export function CentralCard({ card, weather, onClose }) {
-  const { cpu, ram } = useLiveStats();
+  const { cpu, ram, live } = useLiveStats();
   let title = "";
   let body = null;
   if (card.type === "time") {
@@ -445,8 +445,8 @@ export function CentralCard({ card, weather, onClose }) {
     title = "DIAGNOSTIC SYSTÈME";
     body = (
       <div className="cc-sys">
-        <Ring label="CPU" v={Math.round(cpu)} />
-        <Ring label="RAM" v={Math.round(ram)} />
+        <Ring label="CPU" v={live && cpu != null ? Math.round(cpu) : 0} />
+        <Ring label="RAM" v={live && ram != null ? Math.round(ram) : 0} />
         <Ring label="RÉSEAU" v={99} />
       </div>
     );
@@ -473,17 +473,39 @@ export function CentralCard({ card, weather, onClose }) {
   );
 }
 
-export function BootScreen({ onDone, userName, onOpenModule }) {
-  const lines = [
-    "> Initialisation du noyau Σ.I.R.I.U.S ...",
-    "> Chargement des modules cognitifs ......... OK",
-    "> Connexion aux capteurs système ........... OK",
-    "> Calibration synthèse vocale .............. OK",
-    "> Activation reconnaissance vocale ......... OK",
-    "> Établissement liaison WebSocket .......... OK",
-    "> Protocoles de sécurité ................... OK",
-    userName ? `> Bienvenue, ${userName}. Système opérationnel.` : "> Système opérationnel.",
-  ];
+export function BootScreen({ onDone, userName, onOpenModule, connected }) {
+  // Chaque ligne annonce l'état réellement constaté : afficher « OK » sans vérifier
+  // ferait mentir l'écran de démarrage (la liaison peut échouer pendant qu'il défile).
+  const checks = useMemo(() => {
+    const speech = typeof window !== "undefined" && "speechSynthesis" in window;
+    const recog = typeof window !== "undefined"
+      && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
+    const secure = typeof window !== "undefined" && window.isSecureContext;
+    return [
+      { label: "Initialisation du noyau Σ.I.R.I.U.S", state: null },
+      { label: "Chargement des modules cognitifs", state: true },
+      { label: "Calibration synthèse vocale", state: speech },
+      { label: "Activation reconnaissance vocale", state: recog },
+      { label: "Établissement liaison WebSocket", state: !!connected },
+      { label: "Protocoles de sécurité", state: !!secure },
+    ];
+  }, [connected]);
+
+  const okCount = checks.filter((c) => c.state === true).length;
+  const total = checks.filter((c) => c.state !== null).length;
+
+  const lines = useMemo(() => {
+    const dots = (label) => ".".repeat(Math.max(3, 42 - label.length));
+    const rows = checks.map((c) => (
+      c.state === null
+        ? `> ${c.label} ...`
+        : `> ${c.label} ${dots(c.label)} ${c.state ? "OK" : "INDISPONIBLE"}`
+    ));
+    rows.push(userName
+      ? `> Bienvenue, ${userName}. ${okCount}/${total} services opérationnels.`
+      : `> ${okCount}/${total} services opérationnels.`);
+    return rows;
+  }, [checks, okCount, total, userName]);
   const [shown, setShown] = useState(0);
   const [progress, setProgress] = useState(0);
   const [closing, setClosing] = useState(false);
@@ -494,7 +516,7 @@ export function BootScreen({ onDone, userName, onOpenModule }) {
   const isAndroid = Capacitor.getPlatform() === "android";
   const introSpeech = "Système. Intelligent. Réactif. Interface. Universel. Sécurisé. " +
     "Je suis Sirius... façonné par mon créateur, Daniel Partel. " +
-    "Sirius scanne tous ses services... Tous mes services sont opérationnels... à votre disposition.";
+    `Sirius scanne tous ses services... ${okCount} services sur ${total} sont opérationnels... à votre disposition.`;
   const playIntroSpeech = () => {
     try {
       const pad = padRef.current;

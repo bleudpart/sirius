@@ -234,7 +234,9 @@ function GoalsTracker({ objectif, bilan, inline }) {
 }
 
 function PersonalResources({ connected, inline }) {
-  const { cpu, ram } = useLiveStats();
+  const { cpu, ram, live } = useLiveStats();
+  const pct = (v) => (live && v != null ? Math.round(v) : null);
+  const label = (v) => (pct(v) == null ? "—" : `${pct(v)}%`);
   const Wrap = inline ? InfoSection : HudPanel;
   const wrapProps = inline
     ? { icon: <Users size={13} />, title: "Ressources Personnelles" }
@@ -244,15 +246,15 @@ function PersonalResources({ connected, inline }) {
       <div className="shud-res">
         <span className="shud-res-ico"><Cpu size={13} /></span>
         <div className="shud-res-main">
-          <div className="shud-line"><span>Processeur</span><b>{Math.round(cpu)}%</b></div>
-          <div className="shud-track"><i className="cyan" style={{ width: `${Math.round(cpu)}%` }} /></div>
+          <div className="shud-line"><span>Processeur</span><b>{label(cpu)}</b></div>
+          <div className="shud-track"><i className="cyan" style={{ width: `${pct(cpu) ?? 0}%` }} /></div>
         </div>
       </div>
       <div className="shud-res">
         <span className="shud-res-ico"><Activity size={13} /></span>
         <div className="shud-res-main">
-          <div className="shud-line"><span>Mémoire</span><b>{Math.round(ram)}%</b></div>
-          <div className="shud-track"><i className="cyan" style={{ width: `${Math.round(ram)}%` }} /></div>
+          <div className="shud-line"><span>Mémoire</span><b>{label(ram)}</b></div>
+          <div className="shud-track"><i className="cyan" style={{ width: `${pct(ram) ?? 0}%` }} /></div>
         </div>
       </div>
       <div className="shud-res">

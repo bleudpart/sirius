@@ -12,7 +12,7 @@ import {
   AdminPanel, EnterprisePanel, PortusNummarius, AgoraPipeline, NewsPanel, ReveilPanel, SpotifyPanel, MediaHUD, ProductivityPanel,
   FloorPlanPanel, Photo3DPanel, ConnectionsPanel,
 } from "@/lazyModules";
-import { pushStats, pushSimStats } from "@/liveStats";
+import { pushStats, setStatsOffline } from "@/liveStats";
 import { formatLocalDate, formatLocalTime, getLocalDateKey } from "@/dateTime";
 import { STATES, isLocalTimeQuestion, localAnswer, weatherInfo, pttBeep } from "@/appLogic";
 import { MedallionRing, ReactorCore, Waveform } from "@/components/ReactorVisuals";
@@ -1115,14 +1115,6 @@ function App() {
     infoPanels: true,
   });
 
-  // Stats simulées (remplacées par le backend si connecté) — via bus liveStats, sans re-render du HUD
-  useEffect(() => {
-    const id = setInterval(() => {
-      if (!backendStatsActiveRef.current) pushSimStats();
-    }, 1500);
-    return () => clearInterval(id);
-  }, []);
-
   // Volume animé en mode parole — écrit dans la ref du pouls, sans re-render
   useEffect(() => {
     if (status !== "speaking" || connected) return;
@@ -1203,6 +1195,7 @@ function App() {
       };
       ws.onclose = () => {
         backendStatsActiveRef.current = false;
+        setStatsOffline();
         setConnected(false);
         if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
         wsRef.current = null;
@@ -6011,7 +6004,7 @@ function App() {
       <span className="corner bl" />
       <span className="corner br" />
 
-      {booting && <BootScreen userName={userName} onDone={finishBoot} onOpenModule={(id) => {
+      {booting && <BootScreen userName={userName} connected={connected} onDone={finishBoot} onOpenModule={(id) => {
         const openers = { argus: setShowArgus, atlas: setShowAtlas, oracle: setShowOracle, heracles: setShowHeracles, hephaistos: setShowHephaistos, keraunos: setShowKeraunos, locus: setShowLocus, pantheon: setShowPantheon, cortex: setShowCortex, themis: setShowThemis, nummarius: setShowNummarius };
         if (id === "solon") { setShowSolon(true); return; }
         if (id === "calliope") { setShowCalliope(true); return; }

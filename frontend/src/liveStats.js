@@ -4,19 +4,24 @@ import { useEffect, useState } from "react";
 import { Cpu, Activity } from "lucide-react";
 import { formatLocalDate, formatLocalTime, formatUtcTime } from "./dateTime";
 
-let stats = { cpu: 12, ram: 43 };
+// Les mesures ne sont affichées que si elles viennent réellement du backend : hors ligne,
+// on annonce l'indisponibilité plutôt que d'afficher un chiffre inventé.
+let stats = { cpu: null, ram: null, live: false };
 const subs = new Set();
 
-export function pushStats(patch) {
-  stats = { ...stats, ...patch };
+function notify() {
   subs.forEach((fn) => fn(stats));
 }
 
-export function pushSimStats() {
-  pushStats({
-    cpu: Math.max(4, Math.min(96, stats.cpu + (Math.random() - 0.5) * 14)),
-    ram: Math.max(20, Math.min(92, stats.ram + (Math.random() - 0.5) * 6)),
-  });
+export function pushStats(patch) {
+  stats = { ...stats, ...patch, live: true };
+  notify();
+}
+
+export function setStatsOffline() {
+  if (!stats.live) return;
+  stats = { ...stats, live: false };
+  notify();
 }
 
 export function useLiveStats() {
@@ -102,11 +107,13 @@ export function LiveClock({ variant = "hud" }) {
 }
 
 export function CpuRamMini() {
-  const { cpu, ram } = useLiveStats();
+  const { cpu, ram, live } = useLiveStats();
+  const show = (v) => (live && v != null ? `${Math.round(v)}%` : "—");
+  const hint = live ? undefined : "Mesure indisponible : backend hors ligne";
   return (
     <>
-      <div className="stat-line"><Cpu size={13} /><span>CPU</span><b data-testid="stat-cpu">{Math.round(cpu)}%</b></div>
-      <div className="stat-line"><Activity size={13} /><span>RAM</span><b data-testid="stat-ram">{Math.round(ram)}%</b></div>
+      <div className="stat-line" title={hint}><Cpu size={13} /><span>CPU</span><b data-testid="stat-cpu">{show(cpu)}</b></div>
+      <div className="stat-line" title={hint}><Activity size={13} /><span>RAM</span><b data-testid="stat-ram">{show(ram)}</b></div>
     </>
   );
 }
