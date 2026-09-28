@@ -514,6 +514,8 @@ function App() {
   const pttRef = useRef(false);
   const speakingRef = useRef(false);
   const isBusy = useRef(false); // ⚡ Verrou anti-surchauffe / anti-doublon (partagé entre resolveIntent et handleCommand)
+  // handleCommand est redéfini à chaque rendu : la référence évite que processCommand ne fige une version périmée.
+  const handleCommandRef = useRef(null);
   const [micOn, setMicOn] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [ecoMode, setEcoMode] = useState(() => localStorage.getItem("sirius_eco") === "1");
@@ -3884,8 +3886,9 @@ function App() {
 
     mark("analyse...");
 
-  // Lancement de la résolution d'intention
-    resolveIntent(enrichedCommand);
+  // Routage des modules (galerie, HACCP, ATLAS, médiathèque…) puis résolution d'intention en dernier recours
+    if (handleCommandRef.current) handleCommandRef.current(enrichedCommand);
+    else resolveIntent(enrichedCommand);
   }, [
     resolveIntent, speakOut, readGmailAloud, sendGmail, launchUnifiedSearch, connectOutlook, connectGoogle, launchOutlookMail, launchOutlookContacts, launchGoogleContacts,
     launchOutlookIntent, launchOutlookCreateEvent, launchOutlookAgenda, readMailAloud,
@@ -4480,7 +4483,7 @@ function App() {
     }
     // 0septdecies) Galerie MYTHOS : « galerie mythos », « montre les personnages », « affiche les modules », « le panthéon », « les dieux »
     if (/(galerie mythos|montre[- ]?(moi)? les personnages|(le\s+)?panth[ée]on des dieux|montre[- ]?(moi)? les dieux|galerie des personnages)/.test(low)
-      || /(?:affiche|montre|ouvre|liste|pr[ée]sente)[a-z]*(?:[- ]moi)?\s+(?:les |mes |tes |tous les |la liste des )?modules(?:\s+(?:holographiques|du panth[ée]on|de sirius))?\s*[?!.]*\s*$/.test(low)) {
+      || /(?:affiche|montre|ouvre|liste|pr[ée]sente)[a-z]*(?:[- ]moi)?\s+(?:les |mes |tes |tous les |la liste des )?modules\b.*$/.test(low)) {
       mark("mythos · galerie");
       setShowMythosGallery(true);
       speakOut("Voici le Panthéon de mes modules.");
@@ -4763,7 +4766,11 @@ function App() {
       speakOut(msg);
       return;
     }
+
+    // Aucun module ne correspond : on bascule sur la compréhension naturelle.
+    await resolveIntent(command);
   };
+  handleCommandRef.current = handleCommand;
 
   const sendCommand = useCallback((e) => {
     if (e) e.preventDefault();
@@ -5643,7 +5650,9 @@ function App() {
   }, [streamOnDisplay, speakOut, userName, profile, msFetch, presentNextActionPlan]);
   useEffect(() => { runBriefingRef.current = runBriefingDisplay; }, [runBriefingDisplay]);
   useEffect(() => {
+    // Briefing uniquement sur demande : activable via sirius_briefing_auto = "1".
     if (booting || showSetup || briefingDoneRef.current) return;
+    if (localStorage.getItem("sirius_briefing_auto") !== "1") return;
     if (localStorage.getItem("sirius_last_briefing") === todayStr()) return;
     briefingDoneRef.current = true;
     const id = setTimeout(() => runBriefingDisplay(), 1800);

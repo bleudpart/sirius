@@ -609,8 +609,8 @@ body.hud-minimal .antique-jar { display: none; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  opacity: 0.38;
-  filter: grayscale(1);
+  opacity: 0.85;
+  filter: grayscale(0.35);
   transition: filter 0.3s, opacity 0.3s, transform 0.3s;
 }
 .conn-brand.active {

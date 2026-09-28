@@ -741,7 +741,12 @@ def make_microsoft_router(db):
     @router.get("/auth/microsoft/status")
     async def microsoft_status(request: Request):
         """Check if user has connected Microsoft account (returns live status)."""
-        uid = await _uid(request)
+        try:
+            uid = await resolve_user_id(request, db)
+        except HTTPException:
+            if not is_direct_local_request(request):
+                return {"connected": False}
+            uid = LEGACY_UID
         doc = await db.microsoft_oauth.find_one({"_id": uid})
         if not doc or not doc.get("access_token"):
             return {"connected": False}

@@ -710,7 +710,9 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
         # En mode turbo : un seul modèle rapide et un timeout court. En mode normal : tous les modèles
         # de repli disponibles et un délai plus généreux, pour privilégier la qualité de réponse.
         models_to_try = GROQ_FALLBACK_MODELS[:1] if is_turbo else GROQ_FALLBACK_MODELS
-        timeout = 10.0 if is_turbo else 30.0
+        # 15 s suffisent largement pour 1200 tokens sur Groq : au-delà, le modèle est bloqué et
+        # attendre 30 s par modèle ne fait qu'empiler la latence avant le repli.
+        timeout = 10.0 if is_turbo else 15.0
         # Réponse conversationnelle : 4096 tokens (~3000 mots) n'a jamais de sens à l'oral et ne
         # fait qu'allonger le pire cas de génération pour rien. Ce chemin classique (voie de
         # secours HTTP simple, sans flux) reste couvert par un plafond bien plus réaliste.
@@ -864,7 +866,7 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
         sys_prompt += "\n\nNOTES DE RÉFLEXION PRIVÉES :\n" + reflection
     if research:
         sys_prompt += "\n\nSOURCES WEB RÉCENTES POUR LA QUESTION DE SUIVI :\n" + research
-    timeout = 10.0 if is_turbo else 30.0
+    timeout = 10.0 if is_turbo else 15.0
     # Réponse conversationnelle parlée : pas besoin de 4096 tokens (~3000 mots) par défaut,
     # ça n'a jamais de sens à l'oral et ça ne fait qu'allonger le pire cas de génération.
     max_tokens = 512 if is_turbo else 1200
