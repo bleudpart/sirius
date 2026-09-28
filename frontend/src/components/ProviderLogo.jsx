@@ -1,12 +1,18 @@
 import { FaMicrosoft } from "react-icons/fa6";
-import { SiGmail } from "react-icons/si";
+import { SiGoogle, SiGmail } from "react-icons/si";
 import "./ProviderLogo.css";
 
+const OutlookMark = () => (
+  <span className="outlook-mark" aria-hidden="true">
+    <i /><i /><i /><i />
+  </span>
+);
+
 const PROVIDER_ICONS = {
-  google: SiGmail,
+  google: SiGoogle,
   gmail: SiGmail,
   microsoft: FaMicrosoft,
-  outlook: FaMicrosoft,
+  outlook: OutlookMark,
 };
 
 export default function ProviderLogo({ provider, size = 20, title = "" }) {
