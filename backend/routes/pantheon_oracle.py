@@ -5,7 +5,7 @@ PANTHEON SYSTEM (processus, connectivité, OCR, WhatsApp)."""
 import logging
 import os
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import httpx
 import psutil
@@ -125,6 +125,111 @@ def make_pantheon_oracle_router(db, rate_ok, require_user):
                 "intuition": max(8, pct(["suggestion", "briefing", "météo", "musique"])),
             },
             "intents": [{"name": k, "count": v} for k, v in intents.items()],
+        }
+
+    @router.get("/cortex/dashboard")
+    async def cortex_dashboard(request: Request, days: int = 30):
+        """Séries mesurées du tableau de bord ZEUS CORTEX.
+
+        Tout provient de la base : aucune valeur n'est simulée. Les blocs sans source
+        mesurable (latence par module) ne sont volontairement pas exposés.
+        """
+        await require_user(request, db)
+        import sqlite3 as _sq
+        from local_memory import DB_PATH as _LMDB
+
+        days = max(7, min(90, days))
+        start = (datetime.now(timezone.utc) - timedelta(days=days - 1)).date()
+        con = _sq.connect(_LMDB)
+        try:
+            rows = con.execute(
+                "SELECT substr(created_at,1,10) AS d, COUNT(*) FROM events "
+                "WHERE substr(created_at,1,10) >= ? GROUP BY d",
+                (start.isoformat(),),
+            ).fetchall()
+            per_day = dict(rows)
+            timeline = []
+            for i in range(days):
+                key = (start + timedelta(days=i)).isoformat()
+                timeline.append({"date": key, "count": per_day.get(key, 0)})
+
+            # weekday/hour sont déjà stockés à l'insertion : pas de recalcul de fuseau.
+            heat_rows = con.execute(
+                "SELECT weekday, hour, COUNT(*) FROM events "
+                "WHERE weekday IS NOT NULL AND hour IS NOT NULL GROUP BY weekday, hour"
+            ).fetchall()
+            heatmap = [[0] * 24 for _ in range(7)]
+            for wd, hr, n in heat_rows:
+                if 0 <= wd < 7 and 0 <= hr < 24:
+                    heatmap[wd][hr] = n
+
+            journal = [
+                {"at": at, "intent": intent or "libre", "text": (text or "")[:120]}
+                for text, intent, at in con.execute(
+                    "SELECT text, intent, created_at FROM events ORDER BY created_at DESC LIMIT 12"
+                )
+            ]
+
+            fact_rows = con.execute(
+                "SELECT substr(created_at,1,10) AS d, COUNT(*) FROM facts GROUP BY d ORDER BY d"
+            ).fetchall()
+            before = sum(n for d, n in fact_rows if d < start.isoformat())
+            per_day_facts = {d: n for d, n in fact_rows if d >= start.isoformat()}
+            memory, running = [], before
+            for i in range(days):
+                key = (start + timedelta(days=i)).isoformat()
+                running += per_day_facts.get(key, 0)
+                memory.append({"date": key, "total": running})
+
+            services = [
+                {"service": svc, "calls": calls, "errors": errors,
+                 "ok_rate": round((calls - errors) / calls * 100, 1) if calls else 0.0,
+                 "last": last}
+                for svc, calls, errors, last in con.execute(
+                    "SELECT service, COUNT(*), "
+                    "SUM(CASE WHEN UPPER(COALESCE(status,'')) <> 'OK' THEN 1 ELSE 0 END), "
+                    "MAX(created_at) FROM service_log WHERE service IS NOT NULL "
+                    "GROUP BY service ORDER BY COUNT(*) DESC LIMIT 8"
+                )
+            ]
+
+            # Enchaînements : paires d'intentions consécutives dans l'ordre chronologique.
+            seq = [r[0] or "libre" for r in con.execute(
+                "SELECT intent FROM events ORDER BY created_at DESC LIMIT 400"
+            )][::-1]
+            pairs: dict[tuple[str, str], int] = {}
+            for a, b in zip(seq, seq[1:]):
+                if a != b:
+                    pairs[(a, b)] = pairs.get((a, b), 0) + 1
+            flows = [
+                {"from": a, "to": b, "count": n}
+                for (a, b), n in sorted(pairs.items(), key=lambda kv: kv[1], reverse=True)[:8]
+            ]
+
+            first_event, last_event = con.execute(
+                "SELECT MIN(created_at), MAX(created_at) FROM events"
+            ).fetchone()
+        finally:
+            con.close()
+
+        peak_hour, peak_count = None, 0
+        for hr in range(24):
+            total = sum(heatmap[wd][hr] for wd in range(7))
+            if total > peak_count:
+                peak_hour, peak_count = hr, total
+
+        return {
+            "days": days,
+            "timeline": timeline,
+            "heatmap": heatmap,
+            "journal": journal,
+            "memory": memory,
+            "services": services,
+            "flows": flows,
+            "peak": {"hour": peak_hour, "count": peak_count},
+            # Permet à l'interface d'annoncer une periode vide au lieu d'afficher un graphe plat sans explication.
+            "range": {"first": first_event, "last": last_event},
+            "generated_at": datetime.now(timezone.utc).isoformat(),
         }
 
     @router.get("/pantheon/windows")
