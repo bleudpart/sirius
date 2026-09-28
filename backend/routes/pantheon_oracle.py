@@ -232,6 +232,62 @@ def make_pantheon_oracle_router(db, rate_ok, require_user):
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
 
+    @router.get("/nexus/graph")
+    async def nexus_graph(request: Request, limit: int = 26):
+        """Carte réelle des modules : taille des nœuds et liens observés dans les événements."""
+        await require_user(request, db)
+        import sqlite3 as _sq
+        from local_memory import DB_PATH as _LMDB
+
+        limit = max(4, min(48, limit))
+        t0 = time.perf_counter()
+        con = _sq.connect(_LMDB)
+        try:
+            nodes = [
+                {"id": name or "libre", "count": count, "last": last}
+                for name, count, last in con.execute(
+                    "SELECT COALESCE(NULLIF(intent,''),'libre'), COUNT(*), MAX(created_at) "
+                    "FROM events GROUP BY 1 ORDER BY 2 DESC LIMIT ?",
+                    (limit,),
+                )
+            ]
+            keep = {n["id"] for n in nodes}
+            # Historique complet : se limiter aux derniers événements masquait la majorité des liaisons.
+            seq = [r[0] or "libre" for r in con.execute(
+                "SELECT intent FROM events ORDER BY created_at"
+            )]
+            pairs: dict[tuple[str, str], int] = {}
+            for a, b in zip(seq, seq[1:]):
+                if a != b and a in keep and b in keep:
+                    pairs[(a, b)] = pairs.get((a, b), 0) + 1
+            edges = [
+                {"from": a, "to": b, "count": n}
+                for (a, b), n in sorted(pairs.items(), key=lambda kv: kv[1], reverse=True)[:90]
+            ]
+            services = [
+                {"service": svc, "calls": calls, "errors": errors,
+                 "ok_rate": round((calls - errors) / calls * 100, 1) if calls else 0.0}
+                for svc, calls, errors in con.execute(
+                    "SELECT service, COUNT(*), "
+                    "SUM(CASE WHEN UPPER(COALESCE(status,'')) <> 'OK' THEN 1 ELSE 0 END) "
+                    "FROM service_log WHERE service IS NOT NULL GROUP BY service ORDER BY COUNT(*) DESC LIMIT 6"
+                )
+            ]
+        finally:
+            con.close()
+
+        total_calls = sum(s["calls"] for s in services)
+        total_err = sum(s["errors"] for s in services)
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "services": services,
+            "db_ms": round((time.perf_counter() - t0) * 1000, 1),
+            # Santé globale = taux de succès réellement journalisé, pas une valeur décorative.
+            "health": round((total_calls - total_err) / total_calls * 100, 1) if total_calls else None,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
     @router.get("/pantheon/windows")
     async def pantheon_windows(request: Request):
         await require_user(request, db)

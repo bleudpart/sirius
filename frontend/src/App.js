@@ -6229,7 +6229,7 @@ function App() {
 
       {showPantheon && <PantheonSystem onClose={() => setShowPantheon(false)} keys={keys} />}
 
-      {showNexus && <NexusCeleste onClose={() => setShowNexus(false)} />}
+      {showNexus && <NexusCeleste onClose={() => setShowNexus(false)} mood={computeMood()} status={status} />}
 
       {haccp && <HaccpModule onClose={() => setHaccp(null)} />}
 
