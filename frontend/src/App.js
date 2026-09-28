@@ -497,6 +497,8 @@ function App() {
   const imageReferenceInputRef = useRef(null);
   const wsRef = useRef(null);
   const backendStatsActiveRef = useRef(false);
+  // Garde-fou : une seule tentative de renouvellement de jeton par cycle de connexion.
+  const wsRefreshedRef = useRef(false);
   const spotifyRequestRef = useRef(false);
   const briefingInFlightRef = useRef(false);
   const recognitionRef = useRef(null);
@@ -1166,6 +1168,7 @@ function App() {
       wsRef.current = ws;
       ws.onopen = () => {
         attempt = 0;
+        wsRefreshedRef.current = false;
         backendStatsActiveRef.current = true;
         setConnected(true);
         // Keepalive : évite les fermetures silencieuses pour inactivité
@@ -1193,12 +1196,21 @@ function App() {
           }
         } catch (e) {}
       };
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         backendStatsActiveRef.current = false;
         setStatsOffline();
         setConnected(false);
         if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
         wsRef.current = null;
+        // 1008 = authentification refusée. Le jeton d'accès dure 12 h alors qu'il n'était
+        // renouvelé qu'au démarrage : sans ce rafraîchissement, la liaison ne revenait jamais.
+        if (event && event.code === 1008 && !wsRefreshedRef.current) {
+          wsRefreshedRef.current = true;
+          fetch(`${API}/auth/refresh`, { method: "POST", credentials: "include" })
+            .catch(() => {})
+            .finally(() => { attempt = 0; scheduleReconnect(); });
+          return;
+        }
         scheduleReconnect();
       };
       ws.onerror = () => {

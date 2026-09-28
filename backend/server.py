@@ -2274,6 +2274,24 @@ async def self_reload(
 # Route WebSocket sur le routeur /api
 from fastapi import WebSocket, WebSocketDisconnect
 
+
+async def _stream_system_stats(websocket: WebSocket):
+    """Émet les mesures système réelles : le HUD écoutait « system_stats » que personne n'envoyait."""
+    import psutil as _ps
+
+    try:
+        while True:
+            await websocket.send_json({
+                "action": "system_stats",
+                "cpu": _ps.cpu_percent(interval=None),
+                "ram": _ps.virtual_memory().percent,
+            })
+            await asyncio.sleep(3)
+    except (WebSocketDisconnect, RuntimeError, asyncio.CancelledError):
+        return
+    except Exception as exc:
+        logger.warning("[WS] diffusion des mesures interrompue : %r", exc)
+
 @api_router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     token = websocket.cookies.get("access_token")
@@ -2281,15 +2299,27 @@ async def websocket_endpoint(websocket: WebSocket):
         authorization = websocket.headers.get("authorization", "")
         if authorization.lower().startswith("bearer "):
             token = authorization[7:].strip()
+    if token:
+        try:
+            _decode_token(token, expected_type="access")
+        except HTTPException:
+            token = None
+    if not token:
+        # Un cookie « Secure » n'est pas transmis sur le schéma ws:// : en local, le jeton
+        # d'accès manque alors que le jeton de rafraîchissement, lui, arrive. On l'accepte
+        # pour identifier la session — il transite déjà sur cette même connexion.
+        refresh = websocket.cookies.get("refresh_token")
+        if refresh:
+            try:
+                _decode_token(refresh, expected_type="refresh")
+                token = refresh
+            except HTTPException:
+                token = None
     if not token:
         await websocket.close(code=1008, reason="Authentification requise")
         return
-    try:
-        _decode_token(token, expected_type="access")
-    except HTTPException:
-        await websocket.close(code=1008, reason="Session invalide")
-        return
     await websocket.accept()
+    stats_task = asyncio.create_task(_stream_system_stats(websocket))
     try:
         while True:
             raw = await websocket.receive_text()
@@ -2305,10 +2335,14 @@ async def websocket_endpoint(websocket: WebSocket):
                     "app": data["app"],
                     "display": data["display"]
                 })
+            elif action == "ping":
+                await websocket.send_json({"action": "pong"})
             else:
                 await websocket.send_text(json.dumps({"status": "connected", "message": "Sirius WS actif"}))
     except WebSocketDisconnect:
         logger.info("Client Sirius déconnecté du WebSocket")
+    finally:
+        stats_task.cancel()
 
 
 # Expose aussi le WebSocket sur la racine /ws (compatibilité frontend)
