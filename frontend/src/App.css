@@ -6287,7 +6287,7 @@ body[data-phase="dawn"] .antique-guardian { filter: brightness(1.12) contrast(1.
 /* ===== Modules SOLON# / PROMÉTHÉE# : consultation plein écran ===== */
 .consult-layout {
   display: grid;
-  grid-template-columns: minmax(240px, 340px) 1fr;
+  grid-template-columns: minmax(150px, 180px) 1fr;
   gap: 26px;
   max-width: 1080px;
   margin: 0 auto;
@@ -6296,7 +6296,7 @@ body[data-phase="dawn"] .antique-guardian { filter: brightness(1.12) contrast(1.
 }
 .consult-portrait { display: flex; flex-direction: column; gap: 12px; align-items: center; }
 .consult-portrait img {
-  width: 100%; border-radius: 12px;
+  width: 100%; max-height: 25vh; object-fit: cover; border-radius: 12px;
   border: 1px solid rgba(217, 165, 60, 0.55);
   box-shadow: 0 0 26px rgba(216, 184, 117, 0.22), 0 18px 44px rgba(0, 0, 0, 0.6);
 }
