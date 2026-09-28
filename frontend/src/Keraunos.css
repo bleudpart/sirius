@@ -4,9 +4,11 @@
   position: fixed;
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  width: min(600px, 94vw);
+  width: min(900px, 94vw);
   max-height: 80vh;
-  display: flex; flex-direction: column;
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   z-index: 96;
   /* Même verre holographique cyan que les fenêtres du HUD (.shud-panel), au lieu du fond plus
      opaque et de l'accent or utilisés jusqu'ici. */
@@ -30,6 +32,7 @@
   padding: 10px 12px;
   color: #d8b875;
   border-bottom: 1px solid rgba(216, 184, 117, 0.25);
+  grid-column: 1 / -1;
 }
 .kr-title { font-family: "Cinzel", serif; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; flex: 1; text-shadow: 0 0 8px rgba(216, 184, 117, 0.4); }
 .kr-count {
@@ -46,6 +49,30 @@
 .kr-icon-btn:hover { color: #f2d99a; border-color: rgba(216, 184, 117, 0.55); }
 
 .kr-config { padding: 14px 16px 16px; overflow-y: auto; }
+.kr-content { min-width: 0; min-height: 0; overflow: auto; }
+.kr-character {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 18px 16px 20px;
+  border-right: 1px solid rgba(216, 184, 117, 0.24);
+  background: linear-gradient(180deg, rgba(216, 184, 117, 0.08), rgba(4, 16, 28, 0.22));
+}
+.kr-character img {
+  display: block;
+  width: 170px;
+  max-width: 100%;
+  max-height: 34vh;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid rgba(217, 165, 60, 0.68);
+  box-shadow: 0 0 26px rgba(216, 184, 117, 0.22), 0 18px 44px rgba(0, 0, 0, 0.6);
+}
+.kr-character strong { color: #ffe6a3; font: 700 14px "Cinzel", serif; letter-spacing: 0.14em; }
+.kr-character span { color: #7eeaff; font: 600 8px "Rajdhani", sans-serif; letter-spacing: 0.12em; text-align: center; }
 .kr-help { font-size: 12px; color: #bfe9f8; line-height: 1.5; margin: 0 0 12px; }
 .kr-help b { color: #f2d99a; }
 .kr-label {
@@ -134,6 +161,9 @@
 .kr-empty { color: #88b6c8; font-size: 12px; padding: 18px; text-align: center; }
 
 @media (max-width: 640px) {
-  .kr-panel { width: calc(100vw - 16px); max-height: 86vh; }
+  .kr-panel { width: calc(100vw - 16px); max-height: 86vh; grid-template-columns: 1fr; grid-template-rows: auto auto minmax(0, 1fr); }
+  .kr-character { grid-column: 1; grid-row: 2; border-right: 0; border-bottom: 1px solid rgba(216, 184, 117, 0.24); padding: 12px; }
+  .kr-character img { width: 132px; max-height: 22vh; }
+  .kr-content { grid-column: 1; grid-row: 3; }
   .kr-slider { width: 60px; }
 }

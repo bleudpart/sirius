@@ -495,7 +495,8 @@ body.hud-minimal .antique-jar { display: none; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 155px 0 32px;
+  /* Réserve la largeur de .auth-chip (fixe, à droite) : 155 px la laissaient recouvrir le dernier bouton. */
+  padding: 0 210px 0 32px;
   z-index: 3;
 }
 .brand-tag {
@@ -6309,6 +6310,50 @@ body[data-phase="dawn"] .antique-guardian { filter: brightness(1.12) contrast(1.
   .consult-portrait img { max-width: 300px; }
 }
 
+/* ===== Modules du Panthéon : même disposition que SOLON#, portrait en colonne =====
+   Ces panneaux placent l'avatar en frère direct du corps. Une grille de deux colonnes
+   reproduit .consult-layout sans toucher au balisage : le portrait ne peut donc plus
+   passer sous les pastilles ni sous les onglets, contrairement au positionnement absolu. */
+.prime-screen:has(> .mythos-avatar) {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  column-gap: 22px;
+  align-content: start;
+}
+.prime-screen:has(> .mythos-avatar) > header,
+.prime-screen:has(> .mythos-avatar) > .holo-win-resize,
+.prime-screen:has(> .mythos-avatar) > .read-aloud-bar {
+  grid-column: 1 / -1;
+}
+.prime-screen:has(> .mythos-avatar) > .mythos-avatar {
+  position: static;
+  grid-column: 1;
+  grid-row: span 2;
+  width: 100%;
+  max-height: 25vh;
+  object-fit: cover;
+  margin: 16px 0 0 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(217, 165, 60, 0.55);
+  box-shadow: 0 0 26px rgba(216, 184, 117, 0.22), 0 18px 44px rgba(0, 0, 0, 0.6);
+}
+.prime-screen:has(> .mythos-avatar) > *:not(header):not(.mythos-avatar):not(.holo-win-resize):not(.read-aloud-bar) {
+  grid-column: 2;
+  margin-left: 0;
+  max-width: none;
+}
+@media (max-width: 820px) {
+  .prime-screen:has(> .mythos-avatar) { grid-template-columns: 1fr; }
+  .prime-screen:has(> .mythos-avatar) > .mythos-avatar {
+    grid-row: auto;
+    width: 170px;
+    margin: 14px auto 0;
+  }
+  .prime-screen:has(> .mythos-avatar) > *:not(header):not(.mythos-avatar):not(.holo-win-resize):not(.read-aloud-bar) {
+    grid-column: 1;
+  }
+}
+
 /* ===== Éclat au survol : étincelles d'or (noyau & gardien) ===== */
 .gold-sparkle-layer { position: fixed; inset: 0; pointer-events: none; z-index: 60; overflow: hidden; }
 .gold-sparkle {
@@ -7787,21 +7832,21 @@ body[data-phase] .center-stage::before { content: none !important; }
   position: relative;
   overflow: hidden;
 }
-/* Liseré supérieur repris de .holo-win::before */
+/* Liseré supérieur doré, accordé au cadre des fenêtres */
 .profile-btn::before {
   content: "";
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 2px;
-  background: linear-gradient(90deg, #57c7dc 0%, #d7b369 45%, #8f6fd1 72%, #57c7dc 100%);
-  opacity: 0.55;
+  background: linear-gradient(90deg, rgba(216, 184, 117, 0) 0%, #d8b875 30%, #ffe6a3 50%, #d8b875 70%, rgba(216, 184, 117, 0) 100%);
+  opacity: 0.8;
   pointer-events: none;
   transition: opacity 0.2s;
 }
 .profile-btn:hover {
   color: var(--sirius-cyan-light) !important;
-  border-color: rgba(122, 190, 204, 0.85) !important;
-  box-shadow: inset 0 1px 0 rgba(214, 248, 255, 0.14), 0 0 16px rgba(122, 190, 204, 0.3) !important;
+  border-color: rgba(216, 184, 117, 0.8) !important;
+  box-shadow: inset 0 1px 0 rgba(214, 248, 255, 0.14), 0 0 16px rgba(216, 184, 117, 0.3) !important;
 }
 .profile-btn:hover::before { opacity: 1; }
 .profile-btn:focus-visible { outline: 2px solid var(--sirius-cyan); outline-offset: 2px; }
@@ -8026,4 +8071,53 @@ body[data-phase] .center-stage::before { content: none !important; }
   background: rgba(216, 184, 117, 0.12);
   box-shadow: 0 0 18px rgba(216, 184, 117, 0.45), inset 0 0 22px rgba(216, 184, 117, 0.12);
   pointer-events: none;
+}
+
+/* Portrait lateral des modules du Pantheon, sur le modele de PROMETHEE :
+   l'image sort du flux, le contenu se decale pour lui laisser sa colonne. */
+.prime-screen:has(> .mythos-avatar),
+.atlas-panel:has(> .mythos-avatar) { position: relative; }
+
+.prime-screen:has(> .mythos-avatar) > *:not(header):not(.mythos-avatar):not(.mythos-backdrop):not(.prime-stars):not(.read-aloud-bar):not(.holo-win-resize):not(.holo-win-bar) {
+  padding-left: 206px;
+}
+
+@media (max-width: 900px) {
+  .mythos-avatar {
+    position: static;
+    margin: 10px auto 0;
+    width: 132px;
+    max-height: 18vh;
+  }
+  .prime-screen:has(> .mythos-avatar) > *:not(header):not(.mythos-avatar):not(.mythos-backdrop):not(.prime-stars):not(.read-aloud-bar):not(.holo-win-resize):not(.holo-win-bar) {
+    padding-left: 0;
+  }
+}
+
+/* Le portrait suit la grille de SOLON# : il reste dans sa colonne et ne recouvre
+   ni les pastilles, ni les onglets, ni le contenu du module. */
+.prime-screen:has(> img.mythos-avatar) > img.mythos-avatar,
+.atlas-panel:has(> img.mythos-avatar) > img.mythos-avatar {
+  position: static !important;
+  grid-column: 1;
+  grid-row: span 2;
+  width: 170px !important;
+  max-width: 170px;
+  max-height: 24vh;
+  margin: 16px 0 0 90px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid rgba(217, 165, 60, 0.65);
+  box-shadow: 0 0 26px rgba(216, 184, 117, 0.22), 0 18px 44px rgba(0, 0, 0, 0.6);
+}
+.prime-screen:has(> img.mythos-avatar) > *:not(header):not(img.mythos-avatar):not(.mythos-backdrop):not(.prime-stars):not(.read-aloud-bar):not(.holo-win-resize):not(.holo-win-bar),
+.atlas-panel:has(> img.mythos-avatar) > *:not(header):not(img.mythos-avatar):not(.mythos-backdrop):not(.prime-stars):not(.read-aloud-bar):not(.holo-win-resize):not(.holo-win-bar) {
+  grid-column: 2;
+  padding-left: 0;
+  margin-left: 0;
+  max-width: none;
+}
+@media (max-width: 900px) {
+  .prime-screen > img.mythos-avatar,
+  .atlas-panel > img.mythos-avatar { position: static !important; margin: 14px auto 0; }
 }

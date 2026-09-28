@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 820" role="img" aria-labelledby="title desc">
+  <title id="title">Kéraunos — proposition réaliste</title>
+  <desc id="desc">Gardien réaliste de la foudre domestique, cadré dans un écran holographique bronze et cyan.</desc>
+  <defs>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#07131f" stop-opacity=".08"/>
+      <stop offset=".65" stop-color="#06111b" stop-opacity=".15"/>
+      <stop offset="1" stop-color="#02070d" stop-opacity=".9"/>
+    </linearGradient>
+    <radialGradient id="halo">
+      <stop offset="0" stop-color="#64e5ff" stop-opacity=".22"/>
+      <stop offset=".55" stop-color="#d8b875" stop-opacity=".08"/>
+      <stop offset="1" stop-color="#06111b" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="cyanGlow"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="goldGlow"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <clipPath id="portrait"><rect x="108" y="86" width="424" height="622" rx="14"/></clipPath>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" fill="none" stroke="#75d7ef" stroke-opacity=".08"/></pattern>
+  </defs>
+
+  <rect width="640" height="820" fill="#06111b"/>
+  <rect x="24" y="24" width="592" height="772" fill="url(#grid)"/>
+  <ellipse cx="320" cy="358" rx="275" ry="350" fill="url(#halo)"/>
+
+  <g clip-path="url(#portrait)">
+    <rect x="108" y="86" width="424" height="622" fill="#091522"/>
+    <image href="/holo/gardien-realiste.jpg" x="108" y="86" width="424" height="622" preserveAspectRatio="xMidYMid slice"/>
+    <rect x="108" y="86" width="424" height="622" fill="url(#shade)"/>
+    <path d="M118 622C226 574 380 590 522 532V708H108Z" fill="#02070d" opacity=".62"/>
+    <path d="M146 206L226 136M494 206L414 136M130 464L216 394M510 464L424 394" stroke="#64e5ff" stroke-width="2" opacity=".4" filter="url(#cyanGlow)"/>
+  </g>
+
+  <!-- cadre du portrait -->
+  <rect x="108" y="86" width="424" height="622" rx="14" fill="none" stroke="#d8b875" stroke-opacity=".78" stroke-width="2"/>
+  <rect x="117" y="95" width="406" height="604" rx="9" fill="none" stroke="#64e5ff" stroke-opacity=".34" stroke-width="1"/>
+  <path d="M92 138V92H138M502 92h46v46M92 656v46h46M502 702h46v-46" fill="none" stroke="#ffe6a3" stroke-width="2"/>
+
+  <!-- réseau et éclairs, plus discrets que le portrait -->
+  <g fill="none" stroke="#64e5ff" stroke-width="2" opacity=".8" filter="url(#cyanGlow)">
+    <path d="M64 258L108 236L136 258"/>
+    <path d="M576 258L532 236L504 258"/>
+    <path d="M70 530L108 510L145 530"/>
+    <path d="M570 530L532 510L495 530"/>
+  </g>
+  <g fill="#d8b875" filter="url(#goldGlow)">
+    <circle cx="64" cy="258" r="4"/><circle cx="576" cy="258" r="4"/><circle cx="70" cy="530" r="4"/><circle cx="570" cy="530" r="4"/>
+  </g>
+  <path d="M78 360L102 344L92 371L113 364L82 410L90 380L70 387Z" fill="#ffe6a3" opacity=".8" filter="url(#goldGlow)"/>
+  <path d="M562 360L538 344L548 371L527 364L558 410L550 380L570 387Z" fill="#ffe6a3" opacity=".8" filter="url(#goldGlow)"/>
+
+  <text x="320" y="752" fill="#ffe6a3" font-family="Cinzel, serif" font-size="24" letter-spacing="5" text-anchor="middle">KÉRAUNOS#</text>
+  <text x="320" y="780" fill="#7eeaff" font-family="Rajdhani, sans-serif" font-size="11" letter-spacing="3" text-anchor="middle">GARDIEN DE LA FOUDRE DOMESTIQUE</text>
+</svg>

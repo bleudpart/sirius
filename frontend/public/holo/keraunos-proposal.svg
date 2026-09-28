@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 820" role="img" aria-labelledby="title desc">
+  <title id="title">Kéraunos, gardien de la foudre domestique</title>
+  <desc id="desc">Portrait holographique bronze et cyan d'un gardien technique entouré d'un réseau électrique domestique.</desc>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="35%" r="70%">
+      <stop offset="0" stop-color="#17354a"/>
+      <stop offset="0.55" stop-color="#0b1c2a"/>
+      <stop offset="1" stop-color="#030a12"/>
+    </radialGradient>
+    <linearGradient id="bronze" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff0b5"/>
+      <stop offset="0.24" stop-color="#d8b875"/>
+      <stop offset="0.52" stop-color="#7d5225"/>
+      <stop offset="0.78" stop-color="#e0bd79"/>
+      <stop offset="1" stop-color="#5e3e21"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#eaffff"/>
+      <stop offset="0.35" stop-color="#7eeaff"/>
+      <stop offset="1" stop-color="#2189b2"/>
+    </linearGradient>
+    <linearGradient id="cloak" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#153b51"/>
+      <stop offset="1" stop-color="#06121d"/>
+    </linearGradient>
+    <filter id="glowCyan" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glowGold" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#76cfe4" stroke-opacity=".1" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <rect width="640" height="820" fill="url(#bg)"/>
+  <rect x="28" y="28" width="584" height="764" fill="url(#grid)" opacity=".55"/>
+  <path d="M42 84V42H84M556 42h42v42M42 736v42h42M556 778h42v-42" fill="none" stroke="#d8b875" stroke-width="2"/>
+
+  <!-- réseau domestique -->
+  <g fill="none" stroke="#58d9f3" stroke-width="2" opacity=".55" filter="url(#glowCyan)">
+    <path d="M66 210L145 156L208 214L274 145"/>
+    <path d="M574 210L496 156L432 214L368 145"/>
+    <path d="M66 560L142 620L204 566L260 650"/>
+    <path d="M574 560L498 620L436 566L380 650"/>
+  </g>
+  <g fill="#c9f8ff" filter="url(#glowCyan)">
+    <circle cx="66" cy="210" r="4"/><circle cx="145" cy="156" r="4"/><circle cx="208" cy="214" r="4"/><circle cx="274" cy="145" r="4"/>
+    <circle cx="574" cy="210" r="4"/><circle cx="496" cy="156" r="4"/><circle cx="432" cy="214" r="4"/><circle cx="368" cy="145" r="4"/>
+    <circle cx="66" cy="560" r="4"/><circle cx="142" cy="620" r="4"/><circle cx="204" cy="566" r="4"/><circle cx="260" cy="650" r="4"/>
+    <circle cx="574" cy="560" r="4"/><circle cx="498" cy="620" r="4"/><circle cx="436" cy="566" r="4"/><circle cx="380" cy="650" r="4"/>
+  </g>
+
+  <!-- halo technique -->
+  <ellipse cx="320" cy="356" rx="208" ry="276" fill="none" stroke="#d8b875" stroke-opacity=".38" stroke-width="2"/>
+  <ellipse cx="320" cy="356" rx="188" ry="254" fill="none" stroke="#64dff7" stroke-opacity=".3" stroke-width="1" stroke-dasharray="4 12"/>
+  <path d="M116 346C150 190 222 104 320 100C418 104 490 190 524 346" fill="none" stroke="#d8b875" stroke-opacity=".55" stroke-width="3"/>
+
+  <!-- manteau -->
+  <path d="M174 748C184 603 205 493 252 444L320 412L388 444C435 493 456 603 466 748Z" fill="url(#cloak)" stroke="#c79d59" stroke-opacity=".75" stroke-width="3"/>
+  <path d="M207 748C218 594 247 490 320 449C393 490 422 594 433 748" fill="none" stroke="#63d9ef" stroke-opacity=".42" stroke-width="2"/>
+  <path d="M255 470L230 728M385 470L410 728" stroke="#d8b875" stroke-opacity=".4" stroke-width="2"/>
+
+  <!-- épaules blindées -->
+  <path d="M180 490Q216 438 270 440L252 526Q205 534 170 566Z" fill="url(#bronze)" stroke="#ffe6a3" stroke-opacity=".7" stroke-width="2"/>
+  <path d="M460 490Q424 438 370 440L388 526Q435 534 470 566Z" fill="url(#bronze)" stroke="#ffe6a3" stroke-opacity=".7" stroke-width="2"/>
+  <path d="M190 500L245 478M450 500L395 478" stroke="#48d8f4" stroke-width="3" filter="url(#glowCyan)"/>
+
+  <!-- tête / masque -->
+  <path d="M238 211Q320 148 402 211L390 374Q372 432 320 450Q268 432 250 374Z" fill="#0a1723" stroke="url(#bronze)" stroke-width="5"/>
+  <path d="M258 231Q320 184 382 231L374 350Q357 399 320 414Q283 399 266 350Z" fill="#102b3b" stroke="#65dff5" stroke-opacity=".65" stroke-width="2"/>
+  <!-- crête de foudre -->
+  <path d="M320 154L294 202L315 197L298 242L346 184L326 190Z" fill="#ffe6a3" filter="url(#glowGold)"/>
+  <!-- yeux du masque -->
+  <path d="M275 278L310 266L300 292L273 300Z" fill="#c9f8ff" filter="url(#glowCyan)"/>
+  <path d="M365 278L330 266L340 292L367 300Z" fill="#c9f8ff" filter="url(#glowCyan)"/>
+  <path d="M279 322Q320 342 361 322" fill="none" stroke="#d8b875" stroke-width="3"/>
+  <path d="M320 253V382" stroke="#62dff6" stroke-opacity=".45" stroke-width="2"/>
+  <circle cx="320" cy="320" r="7" fill="#ffe6a3" filter="url(#glowGold)"/>
+
+  <!-- coeur domotique -->
+  <path d="M320 454L350 485L320 516L290 485Z" fill="#0b2635" stroke="#d8b875" stroke-width="3"/>
+  <path d="M302 485H338M320 467V503" stroke="#65e3fa" stroke-width="3" filter="url(#glowCyan)"/>
+  <path d="M320 516V600M290 485L238 548M350 485L402 548" fill="none" stroke="#65e3fa" stroke-width="2" opacity=".8"/>
+
+  <!-- éclairs périphériques -->
+  <g fill="none" stroke="#ffe6a3" stroke-width="3" filter="url(#glowGold)">
+    <path d="M122 286L150 270L139 300L163 292L128 340L137 308L114 316Z"/>
+    <path d="M518 286L490 270L501 300L477 292L512 340L503 308L526 316Z"/>
+  </g>
+
+  <text x="320" y="770" fill="#ffe6a3" font-family="Cinzel, serif" font-size="22" letter-spacing="5" text-anchor="middle">KÉRAUNOS#</text>
+  <text x="320" y="795" fill="#7eeaff" font-family="Rajdhani, sans-serif" font-size="11" letter-spacing="3" text-anchor="middle">GARDIEN DE LA FOUDRE DOMESTIQUE</text>
+</svg>

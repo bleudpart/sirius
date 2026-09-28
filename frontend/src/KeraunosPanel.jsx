@@ -166,7 +166,7 @@ export default function KeraunosPanel({ onClose }) {
   const nbOn = entities.filter((e) => e.state === "on").length;
 
   return (
-    <div className="kr-panel" data-testid="keraunos-panel">
+    <div className="kr-panel kr-panel-with-hero" data-testid="keraunos-panel">
       <div className="kr-bar">
         <Home size={14} />
         <span className="kr-title">KERAUNOS# — DOMOTIQUE</span>
@@ -177,6 +177,13 @@ export default function KeraunosPanel({ onClose }) {
         <button className="kr-icon-btn" onClick={onClose} data-testid="keraunos-close-btn"><X size={14} /></button>
       </div>
 
+      <aside className="kr-character" aria-label="Kéraunos">
+        <img src="/holo/keraunos-proposal-realistic.svg" alt="Kéraunos, gardien de la foudre domestique" />
+        <strong>KÉRAUNOS#</strong>
+        <span>GARDIEN DE LA FOUDRE DOMESTIQUE</span>
+      </aside>
+
+      <div className="kr-content">
       {loading ? (
         <div className="kr-empty">Initialisation…</div>
       ) : showConfig ? (
@@ -210,6 +217,7 @@ export default function KeraunosPanel({ onClose }) {
           </div>
         </>
       )}
+      </div>
     </div>
   );
 }
