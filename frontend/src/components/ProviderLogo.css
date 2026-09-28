@@ -13,13 +13,3 @@
   height: 100%;
   display: block;
 }
-
-.provider-logo-google { color: #4285f4; }
-.provider-logo-gmail { color: #ea4335; }
-.provider-logo-microsoft { color: #00a4ef; }
-.provider-logo-outlook { color: #0078d4; }
-.outlook-mark { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 1px; width: 82%; height: 82%; padding: 1px; background: #0078d4; }
-.outlook-mark i:nth-child(1) { background: #0078d4; }
-.outlook-mark i:nth-child(2) { background: #28a8ea; }
-.outlook-mark i:nth-child(3) { background: #0b78c8; }
-.outlook-mark i:nth-child(4) { background: #50c8f5; }

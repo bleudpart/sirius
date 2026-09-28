@@ -1,7 +1,7 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { Mic, MicOff, Clock, Cpu, Wifi, MapPin, Calendar, X, Leaf, UserCog, Brain, Music, Repeat, RotateCcw, BarChart3, Workflow, Ruler, FolderOpen, Code2, Database, Sparkles, Eye, Landmark, Library, Orbit, Monitor, ShieldCheck, Radar, ShieldAlert, Camera, ImageDown, Fingerprint, Zap, Package, Clapperboard, Grip, Radio, Wrench, FileCode, History, Maximize, Minimize, KeyRound, Home as HomeIcon, BadgeInfo, Globe2, Hammer, TrendingUp, Newspaper, Scale, Flame, BookOpen, Sigma, AlarmClock, Power, Boxes, Link2, Building2 } from "lucide-react";
 import {
   ArchitectPanel, SpectatorView, FilesPanel, DevCompanion, ZeusCortex, SiriusPrime, OracleDivin,
@@ -3559,6 +3559,28 @@ function App() {
     return false;
   }, [speakOut]);
 
+  // Actions ponctuelles (rechargement, capture, caméra) : jamais ouvertes dans une cascade.
+  const CASCADE_SKIP = useMemo(() => new Set(["reload", "capture-interface", "open-capture-folder", "vision", "install", "packager"]), []);
+
+  // Ouverture en cascade : les fenêtres se déploient une à une pour rester lisibles.
+  const openModulesCascade = useCallback((rawFilter = "") => {
+    const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const filter = norm(rawFilter).trim();
+    const items = (moduleItemsRef.current || []).filter((it) => {
+      if (CASCADE_SKIP.has(it.id)) return false;
+      if (!filter) return true;
+      return norm(`${it.label} ${it.id} ${it.group}`).includes(filter);
+    });
+    if (!items.length) return false;
+    items.forEach((it, i) => {
+      setTimeout(() => { try { it.run(); } catch (e) { /* module indisponible : on poursuit la cascade */ } }, i * 280);
+    });
+    const msg = `J'ouvre ${items.length} modules en cascade.`;
+    setText(msg);
+    speakOut(msg);
+    return true;
+  }, [speakOut, CASCADE_SKIP]);
+
 // Compréhension naturelle : commandes simples en local, Groq réservé aux intents ambigus.
   const resolveIntent = useCallback(async (command) => {
     if (!command || isBusy.current) return;
@@ -4481,6 +4503,15 @@ function App() {
       setShowPackager(true);
       return;
     }
+    // 0septdecies bis) Ouverture d'un module quelconque, à l'unité ou en cascade
+    const OPEN_VERB = /(?:ouvre|ouvrir|affiche|afficher|montre|montrer|lance|lancer|d[ée]ploie|d[ée]ployer|pr[ée]sente|pr[ée]senter)/;
+    const cascadeM = low.match(new RegExp(`^(?:sirius[, ]*)?${OPEN_VERB.source}\\w*(?:[- ]moi)?\\s+(?:tous\\s+|toutes\\s+|l'ensemble\\s+(?:de\\s+)?)?(?:les\\s+|tes\\s+|mes\\s+)?(.*?)\\s*modules?\\b(.*)$`));
+    if (cascadeM && /(en cascade|tous|toutes|l'ensemble|un par un|un a un|un à un)/.test(low)) {
+      if (openModulesCascade(cascadeM[1])) { mark("modules · cascade"); return; }
+    }
+    const moduleM = low.match(new RegExp(`^(?:sirius[, ]*)?${OPEN_VERB.source}\\w*(?:[- ]moi)?\\s+(?:le\\s+|la\\s+|l'|mon\\s+|ma\\s+)?module\\s+(.+)$`));
+    if (moduleM && openModuleByName(moduleM[1])) { mark("module · ouverture"); return; }
+
     // 0septdecies) Galerie MYTHOS : « galerie mythos », « montre les personnages », « affiche les modules », « le panthéon », « les dieux »
     if (/(galerie mythos|montre[- ]?(moi)? les personnages|(le\s+)?panth[ée]on des dieux|montre[- ]?(moi)? les dieux|galerie des personnages)/.test(low)
       || /(?:affiche|montre|ouvre|liste|pr[ée]sente)[a-z]*(?:[- ]moi)?\s+(?:les |mes |tes |tous les |la liste des )?modules\b.*$/.test(low)) {
