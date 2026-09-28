@@ -3,13 +3,22 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "frontend" / "build" / "static" / "js"
 PACKAGED = ROOT / "backend" / "dist" / "sirius-backend" / "_internal" / "frontend" / "build" / "static" / "js"
+VERSION_FILE = ROOT / "frontend" / "src" / "version.js"
 REQUIRED_MARKERS = ("sirius-setup", "capture-interface")
+
+
+def expected_version() -> str:
+    match = re.search(r'APP_VERSION\s*=\s*"([^"]+)"', VERSION_FILE.read_text(encoding="utf-8"))
+    if not match:
+        raise RuntimeError(f"APP_VERSION introuvable dans {VERSION_FILE}")
+    return match.group(1)
 
 
 def newest_bundle(directory: Path) -> Path:
@@ -38,7 +47,15 @@ def main() -> int:
     missing = [marker for marker in REQUIRED_MARKERS if marker not in bundle_text]
     if missing:
         raise RuntimeError(f"Packaged frontend is missing required markers: {', '.join(missing)}")
-    print(f"Packaged frontend verified: {packaged.name} sha256={packaged_hash}")
+    # Le test de hachage ci-dessus compare le paquet a frontend/build : il ne voit pas un
+    # frontend/build lui-meme perime. La version embarquee doit donc etre verifiee a part.
+    version = expected_version()
+    if version not in bundle_text:
+        raise RuntimeError(
+            f"Packaged frontend carries a stale version: {version} absent du bundle. "
+            "Relancer 'npm run build' avant l'empaquetage."
+        )
+    print(f"Packaged frontend verified: {packaged.name} v{version} sha256={packaged_hash}")
     return 0
 
 
