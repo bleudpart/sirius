@@ -27,7 +27,10 @@ const phonetic = (text) =>
     .replace(/\bsirius\b/gi, "Siriusse")
     .replace(/\bS\.I\.R\.I\.U\.S\b/gi, "Siriusse")
     .replace(/\bcortex\b/gi, "cortèxe")
-    .replace(/\bscanne\b/gi, "skanne")
+    // « scan / scans / scanne » étaient lus à l'anglaise (« skæn ») : graphie française forcée.
+    .replace(/\bscann?e?s?\b/gi, "skane")
+    // « Roger » lu « rodjeur » à l'anglaise au lieu du prénom français.
+    .replace(/\bRoger\b/gi, "Rojé")
     // « e-mail » devient « e mail » au nettoyage, que le TTS français lit « eu mail ».
     .replace(/\be[- ]?mails\b/gi, "imèls")
     .replace(/\be[- ]?mail\b/gi, "imèl")
