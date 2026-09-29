@@ -1,10 +1,12 @@
 /* © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France). */
 /* ATLAS# — carte & navigation Google Maps holographique */
 .mythos-avatar {
-  width: 280px;
-  display: block;
-  margin: 0 auto;
-  filter: drop-shadow(0 0 34px var(--mythos-color, #ffffff88));
+  width: 170px;
+  max-height: 24vh;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid rgba(217, 165, 60, 0.55);
+  filter: drop-shadow(0 0 22px var(--mythos-color, #ffffff55));
 }
 .atlas-panel {
   position: fixed;

@@ -1,5 +1,5 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   X, Database, Search, Star, Trash2, Pencil, Check, Download, ScrollText,
   BrainCircuit, AlertTriangle, CheckCircle2, Loader2,
