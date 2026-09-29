@@ -6518,7 +6518,7 @@ function App() {
                 title="Cliquez sur ΣIRIUS pour écouter une citation philosophique"
               >
                 <span className="sirius-wordmark">ΣIRIUS</span>
-                <span className="sirius-tagline">ΣIRIUS : VOTRE ASSISTANT PRIVILÉGIÉ</span>
+                <span className="sirius-tagline">VOTRE ASSISTANT PRIVILÉGIÉ</span>
               </button>
             </h1>
           </div>

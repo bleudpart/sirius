@@ -1201,9 +1201,31 @@ body.hud-minimal .antique-jar { display: none; }
   cursor: pointer;
   pointer-events: auto;
 }
+.sirius-wordmark {
+  display: block;
+  color: #ffe6a3;
+  font: 700 clamp(38px, 7vh, 76px) "Cinzel", serif;
+  letter-spacing: 0.18em;
+  line-height: 0.95;
+  text-shadow: 0 0 18px rgba(216, 184, 117, 0.5), 0 0 42px rgba(126, 231, 255, 0.16);
+}
+.sirius-tagline {
+  display: block;
+  margin-top: 12px;
+  color: #91e6f2;
+  font: 600 11px "Rajdhani", sans-serif;
+  letter-spacing: 0.3em;
+  line-height: 1.2;
+  text-align: center;
+  opacity: 0.9;
+}
 .sirius-title-button:focus-visible {
   outline: 1px solid rgba(216, 184, 117, 0.75);
   outline-offset: 6px;
+}
+@media (max-width: 900px) {
+  .sirius-wordmark { font-size: clamp(30px, 9vw, 48px); }
+  .sirius-tagline { margin-top: 8px; font-size: 9px; letter-spacing: 0.2em; }
 }
 @media (max-width: 900px) { .sirius-title-img { height: clamp(44px, 9vh, 80px); } }
 @keyframes goldPulse {
