@@ -58,14 +58,18 @@ function HephHealthGraph({ report }) {
 }
 
 export default function HephaistosPanel({ onClose, onSpeak }) {
-  const [char, setChar] = useState(null);
+  const [char, setChar] = useState({
+    character: "Héphaïstos",
+    image: "/holo/hephaistos.jpg",
+  });
   useEffect(() => {
     fetch((process.env.REACT_APP_BACKEND_URL || "") + "/api/mythos/characters")
       .then(r => r.json())
       .then(d => {
-        const p = d.characters.find(c => c.module === "HÉPHAÏSTOS#");
+        const p = (Array.isArray(d.characters) ? d.characters : []).find(c => c.module === "HÉPHAÏSTOS#");
         setChar(p);
-      });
+      })
+      .catch(() => {});
   }, []);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(0);
