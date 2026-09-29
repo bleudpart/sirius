@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "frontend" / "build" / "static" / "js"
 PACKAGED = ROOT / "backend" / "dist" / "sirius-backend" / "_internal" / "frontend" / "build" / "static" / "js"
 VERSION_FILE = ROOT / "frontend" / "src" / "version.js"
+PACKAGE_FILE = ROOT / "frontend" / "package.json"
 REQUIRED_MARKERS = ("sirius-setup", "capture-interface")
 
 
@@ -19,6 +20,17 @@ def expected_version() -> str:
     if not match:
         raise RuntimeError(f"APP_VERSION introuvable dans {VERSION_FILE}")
     return match.group(1)
+
+
+def release_version() -> str:
+    package = __import__("json").loads(PACKAGE_FILE.read_text(encoding="utf-8"))
+    source = expected_version()
+    if package.get("version") != source:
+        raise RuntimeError(
+            f"Release metadata mismatch: package.json={package.get('version')} "
+            f"but version.js={source}. Run the synchronized version bump."
+        )
+    return source
 
 
 def newest_bundle(directory: Path) -> Path:
@@ -49,7 +61,7 @@ def main() -> int:
         raise RuntimeError(f"Packaged frontend is missing required markers: {', '.join(missing)}")
     # Le test de hachage ci-dessus compare le paquet a frontend/build : il ne voit pas un
     # frontend/build lui-meme perime. La version embarquee doit donc etre verifiee a part.
-    version = expected_version()
+    version = release_version()
     if version not in bundle_text:
         raise RuntimeError(
             f"Packaged frontend carries a stale version: {version} absent du bundle. "

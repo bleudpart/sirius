@@ -22,6 +22,8 @@ function nextPatch(version) {
 
 const packageJsonPath = path.join(root, "package.json");
 const packageLockPath = path.join(root, "package-lock.json");
+const frontendVersionPath = path.join(root, "src", "version.js");
+const backendVersionPath = path.join(root, "..", "backend", "version_info.py");
 const packageJson = readJson(packageJsonPath);
 const newVersion = nextPatch(packageJson.version);
 
@@ -36,6 +38,13 @@ if (!dryRun) {
       packageLock.packages[""].version = newVersion;
     }
     writeJson(packageLockPath, packageLock);
+  }
+
+  for (const file of [frontendVersionPath, backendVersionPath]) {
+    let source = fs.readFileSync(file, "utf8");
+    source = source.replace(/APP_VERSION\s*=\s*["']([^"']+)["']/, `APP_VERSION = "${newVersion}"`);
+    source = source.replace(/APP_RELEASE\s*=\s*["']([^"']+)["']/, `APP_RELEASE = "ΣIRIUS ${newVersion}"`);
+    fs.writeFileSync(file, source, "utf8");
   }
 }
 
