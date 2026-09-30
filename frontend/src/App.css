@@ -1589,21 +1589,63 @@ body.hud-minimal .medallion-halo { display: none; }
 .profile-row b { color: #f2d99a; }
 .profile-label { font-family: "Orbitron", sans-serif; font-size: 10px; letter-spacing: 0.08em; color: #91e6f2; margin-top: 4px; }
 .profile-input { width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(145, 230, 242, 0.3); border-radius: 6px; color: #eafaff; padding: 10px 13px; font-family: "Rajdhani", sans-serif; font-size: 15px; resize: vertical; }
+.profile-signature-settings { display: flex; flex-direction: column; gap: 9px; padding: 16px; border: 1px solid rgba(145, 230, 242, 0.24); border-left: 2px solid #d7b369; border-radius: 6px; background: rgba(7, 20, 31, 0.72); }
+.profile-signature-settings h3 { margin: 0; color: #d7b369; font: 600 11px "Orbitron", sans-serif; }
+.profile-signature-settings p { margin: 0 0 3px; color: #a8bac2; font: 13px/1.45 "Rajdhani", sans-serif; }
+.profile-signature-settings .profile-label { margin-top: 2px; }
+.profile-save-error { color: #ffaaa1; font: 13px/1.4 "Rajdhani", sans-serif; }
 @media (max-width: 900px) { .auth-chip { right: 12px; top: 60px; } }
 
 /* FACE ID — reconnaissance faciale locale */
-.faceid-body { max-width: 620px; margin: 20px auto; padding: 0 18px; display: flex; flex-direction: column; gap: 14px; align-items: center; }
-.faceid-privacy { font-size: 12px; color: #9fd3e8; font-style: italic; text-align: center; }
-.faceid-nocam { text-align: center; padding: 40px 26px; border: 1px dashed rgba(216, 184, 117, 0.45); border-radius: 12px; background: rgba(6, 16, 26, 0.6); color: #f2d99a; display: flex; flex-direction: column; gap: 10px; align-items: center; max-width: 460px; }
-.faceid-nocam p { color: #cdeefb; font-size: 14px; }
-.faceid-videowrap { position: relative; border: 1px solid rgba(145, 230, 242, 0.4); border-radius: 10px; overflow: hidden; box-shadow: 0 0 24px rgba(145, 230, 242, 0.2); }
-.faceid-video { display: block; width: min(480px, 86vw); }
-.faceid-badge { position: absolute; left: 10px; bottom: 10px; padding: 5px 12px; border-radius: 20px; font-family: "Orbitron", sans-serif; font-size: 10px; letter-spacing: 0.08em; }
-.faceid-badge.ok { background: rgba(145, 230, 242, 0.2); border: 1px solid #91e6f2; color: #91e6f2; }
-.faceid-badge.ko { background: rgba(251, 113, 133, 0.15); border: 1px solid rgba(251, 113, 133, 0.6); color: #fb7185; }
-.faceid-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: center; }
-.faceid-actions .cmd-send { display: inline-flex; align-items: center; gap: 8px; }
-.faceid-msg { font-size: 13px; color: #f2d99a; text-align: center; }
+.faceid-body { width: min(1080px, 100%); margin: 12px auto 24px; padding: 0 20px; display: flex; flex-direction: column; gap: 16px; color: #e8f3f6; }
+.faceid-overview { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 4px 2px 14px; border-bottom: 1px solid rgba(145, 230, 242, 0.16); }
+.faceid-kicker, .faceid-card-head > span:first-child { display: inline-flex; align-items: center; gap: 7px; color: #91e6f2; font: 600 10px "Orbitron", sans-serif; }
+.faceid-overview h2 { margin: 8px 0 4px; color: #f3d99a; font: 600 18px "Orbitron", sans-serif; }
+.faceid-overview p { max-width: 640px; margin: 0; color: #a8bdc7; font: 14px/1.45 "Rajdhani", sans-serif; }
+.faceid-privacy { display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto; padding: 8px 10px; border: 1px solid rgba(145, 230, 242, 0.28); border-radius: 5px; color: #91e6f2; font: 600 9px "Orbitron", sans-serif; }
+.faceid-workspace { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(245px, .8fr); gap: 14px; align-items: stretch; }
+.faceid-camera-card, .faceid-side-panel { min-width: 0; border: 1px solid rgba(145, 230, 242, 0.2); border-radius: 6px; background: rgba(5, 17, 27, 0.72); }
+.faceid-card-head { min-height: 42px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 13px; border-bottom: 1px solid rgba(145, 230, 242, 0.12); }
+.faceid-state { display: inline-flex; align-items: center; gap: 7px; color: #9eabb2; font: 600 9px "Orbitron", sans-serif; }
+.faceid-state i, .faceid-statusline i { width: 7px; height: 7px; display: inline-block; border-radius: 50%; background: #87929a; }
+.faceid-state.ready i, .faceid-statusline .active i { background: #69deb9; box-shadow: 0 0 8px rgba(105, 222, 185, .65); }
+.faceid-state.error i, .faceid-state.nocam i { background: #f28b82; }
+.faceid-state.connecting i, .faceid-state.init i { background: #f3d99a; animation: faceidPulse 1.2s ease-in-out infinite; }
+.faceid-stage { position: relative; display: grid; place-items: center; width: 100%; aspect-ratio: 16 / 9; min-height: 220px; overflow: hidden; background-color: #030b12; background-image: linear-gradient(rgba(89, 157, 174, .07) 1px, transparent 1px), linear-gradient(90deg, rgba(89, 157, 174, .07) 1px, transparent 1px); background-size: 32px 32px; }
+.faceid-video { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.faceid-reticle { position: absolute; z-index: 1; width: min(38%, 210px); aspect-ratio: .78; display: grid; place-items: start center; padding-top: 8px; border: 1px solid rgba(145, 230, 242, .72); border-radius: 46% 46% 42% 42% / 38% 38% 52% 52%; color: rgba(145, 230, 242, .9); pointer-events: none; box-shadow: 0 0 0 999px rgba(2, 9, 15, .14); }
+.faceid-stage-state { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 420px; padding: 24px; color: #91e6f2; text-align: center; }
+.faceid-stage-state strong { color: #eff7f8; font: 600 12px "Orbitron", sans-serif; }
+.faceid-stage-state span { color: #a8bdc7; font: 14px/1.4 "Rajdhani", sans-serif; }
+.faceid-stage-state.nocam, .faceid-stage-state.error { color: #f3d99a; }
+.faceid-badge { position: absolute; z-index: 3; left: 10px; bottom: 10px; max-width: calc(100% - 20px); padding: 7px 10px; border: 1px solid rgba(145, 230, 242, .45); border-radius: 4px; background: rgba(3, 11, 18, .88); color: #d8e8ec; font: 600 9px "Orbitron", sans-serif; }
+.faceid-badge.ok { border-color: #69deb9; color: #69deb9; }
+.faceid-badge.scan { border-color: #f3d99a; color: #f3d99a; }
+.faceid-badge.idle { color: #a8bdc7; }
+.faceid-camera-foot { display: flex; justify-content: space-between; gap: 12px; padding: 9px 12px; color: #94a8b1; font: 12px/1.35 "Rajdhani", sans-serif; }
+.faceid-camera-foot > span:last-child { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; color: #7dcbb9; font: 600 8px "Orbitron", sans-serif; }
+.faceid-side-panel { display: flex; flex-direction: column; padding: 12px; gap: 10px; }
+.faceid-stat { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 34px; padding-bottom: 8px; border-bottom: 1px solid rgba(145, 230, 242, .11); }
+.faceid-stat span { display: inline-flex; align-items: center; gap: 6px; color: #93aab4; font: 600 8px "Orbitron", sans-serif; }
+.faceid-stat b { color: #91e6f2; font: 600 9px "Orbitron", sans-serif; text-align: right; }
+.faceid-profile { display: flex; flex-direction: column; gap: 5px; padding: 11px; border-left: 2px solid #d7b369; background: rgba(215, 179, 105, .06); }
+.faceid-profile > span { color: #c4a86c; font: 600 8px "Orbitron", sans-serif; }
+.faceid-profile strong { color: #f3f6f6; font: 600 15px "Rajdhani", sans-serif; }
+.faceid-profile small { color: #9dafb7; font: 12px/1.35 "Rajdhani", sans-serif; }
+.faceid-actions { display: flex; flex-direction: column; align-items: stretch; gap: 8px; margin-top: auto; }
+.faceid-actions .cmd-send, .faceid-actions .file-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 36px; }
+.faceid-statusline { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 22px; padding: 10px 12px; border-top: 1px solid rgba(145, 230, 242, .16); color: #9dafb7; font: 600 8px "Orbitron", sans-serif; }
+.faceid-statusline > span { display: inline-flex; align-items: center; gap: 7px; }
+.faceid-statusline b { color: #f3d99a; }
+@keyframes faceidPulse { 50% { opacity: .35; } }
+@media (max-width: 760px) {
+  .faceid-body { padding: 0 12px; gap: 12px; }
+  .faceid-overview { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .faceid-workspace { grid-template-columns: 1fr; }
+  .faceid-stage { min-height: 190px; }
+  .faceid-side-panel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .faceid-profile, .faceid-actions { grid-column: 1 / -1; }
+}
 
 
 /* Panneaux flottants déplaçables */

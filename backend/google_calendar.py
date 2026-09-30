@@ -16,7 +16,9 @@ from pydantic import BaseModel
 import email_intel
 import contacts_cache
 from auth_api import resolve_user_id, LEGACY_UID, is_direct_local_request
-from email_signature import append_signature_text
+from email.message import EmailMessage
+
+from email_signature import add_signature_to_message, load_signature_identity
 
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 AUTH_URL = "https://accounts.google.com/o/oauth2/auth"
@@ -433,13 +435,25 @@ def make_gcal_router(db):
                 mails.append({**mail, **verdict})
             return {"non_lus": non_lus, "mails": mails, "total": len(mails)}
 
-    def _build_raw_message(to: str, subject: str, body: str, in_reply_to: str = "", references: str = "") -> str:
+    def _build_raw_message(
+        to: str,
+        subject: str,
+        body: str,
+        in_reply_to: str = "",
+        references: str = "",
+        signature_name=None,
+        signature_email=None,
+    ) -> str:
         """Construit un message RFC 2822 encodé en base64url, comme exigé par
         l'API Gmail (users.messages.send attend un champ "raw")."""
         import base64
-        from email.mime.text import MIMEText
-
-        msg = MIMEText(body, "plain", "utf-8")
+        msg = EmailMessage()
+        add_signature_to_message(
+            msg,
+            body,
+            signature_name=signature_name,
+            signature_email=signature_email,
+        )
         msg["to"] = to
         msg["subject"] = subject
         if in_reply_to:
@@ -452,10 +466,11 @@ def make_gcal_router(db):
         """Envoie un nouvel e-mail Gmail, avec la signature ΣIRIUS HUD ajoutée automatiquement."""
         uid = await _uid(request)
         token = await _get_token(uid)
+        identity = await load_signature_identity(db, uid)
         to = (req.to or "").strip()
         if not to:
             raise HTTPException(status_code=400, detail="Destinataire manquant")
-        raw = _build_raw_message(to, req.subject, append_signature_text(req.body))
+        raw = _build_raw_message(to, req.subject, req.body, **identity)
         async with httpx.AsyncClient(timeout=20) as cx:
             r = await cx.post(
                 f"{GMAIL_API}/messages/send",
@@ -471,6 +486,7 @@ def make_gcal_router(db):
         """Répond à un e-mail Gmail existant (même fil de discussion), signature ΣIRIUS HUD incluse."""
         uid = await _uid(request)
         token = await _get_token(uid)
+        identity = await load_signature_identity(db, uid)
         async with httpx.AsyncClient(timeout=20) as cx:
             mr = await cx.get(
                 f"{GMAIL_API}/messages/{message_id}",
@@ -490,7 +506,7 @@ def make_gcal_router(db):
             message_id_hdr = _header(headers, "Message-ID")
             references = _header(headers, "References")
             thread_id = m.get("threadId")
-            raw = _build_raw_message(to, subject, append_signature_text(req.body), message_id_hdr, references)
+            raw = _build_raw_message(to, subject, req.body, message_id_hdr, references, **identity)
             payload = {"raw": raw}
             if thread_id:
                 payload["threadId"] = thread_id

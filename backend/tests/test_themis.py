@@ -575,6 +575,33 @@ class TestThemisEmailErrors:
 
 
 # Monthly dashboard accounting and one-click ZIP export with CSV/file contents.
+def test_branded_accounting_archive_keeps_csv_format_intact():
+    from themis_api import build_accounting_export_zip
+
+    archive_bytes = build_accounting_export_zip(
+        [{"name": "Société Exemple", "email": "contact@example.test"}],
+        [{"id": "doc-1", "number": "FAC-2026-001", "kind": "facture", "total_ttc": 120}],
+        [],
+        [{"doc_id": "doc-1", "amount": 120, "method": "carte", "created_at": "2026-09-29"}],
+        [],
+        signature_name="Camille Martin",
+        signature_email="camille@example.fr",
+    )
+
+    with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
+        names = set(archive.namelist())
+        assert {"LISEZ-MOI.txt", "signature-espace-travail.png"}.issubset(names)
+        readme = archive.read("LISEZ-MOI.txt").decode("utf-8")
+        assert "Message envoyé par ΣIRIUS, assistant de Camille Martin · THÉMIS" in readme
+        assert "camille@example.fr" in readme
+        assert "M. Daniel Partel" not in readme
+        assert archive.read("signature-espace-travail.png").startswith(b"\x89PNG\r\n\x1a\n")
+        clients_csv = archive.read("clients.csv")
+        assert clients_csv.startswith(b"\xef\xbb\xbfNom;Soci\xc3\xa9t\xc3\xa9;")
+        assert "Société Exemple" in clients_csv.decode("utf-8-sig")
+        assert "Document préparé par" not in clients_csv.decode("utf-8-sig")
+
+
 class TestThemisMonthlyAndExport:
     def test_monthly_series_and_accounting_export(self, api, created):
         before_response = api.get(f"{API}/stats", timeout=20)
@@ -655,6 +682,12 @@ class TestThemisMonthlyAndExport:
                 "paiements.csv", "pieces.csv", "ecritures.csv",
             }
             assert csv_names.issubset(names)
+            assert "LISEZ-MOI.txt" in names
+            assert "signature-espace-travail.png" in names
+            readme = archive.read("LISEZ-MOI.txt").decode("utf-8")
+            assert "Document préparé par ΣIRIUS · THÉMIS" in readme
+            assert "Tous droits réservés" in readme
+            assert archive.read("signature-espace-travail.png").startswith(b"\x89PNG\r\n\x1a\n")
             stored_piece = f"pieces/{piece['id']}-{filename}"
             assert stored_piece in names
             assert archive.read(stored_piece).startswith(b"%PDF")

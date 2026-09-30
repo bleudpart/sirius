@@ -20,7 +20,7 @@ from pydantic import BaseModel
 
 import email_intel
 import contacts_cache
-from email_signature import append_signature_text
+from email_signature import graph_reply_signature, graph_signature, signature_identity
 from auth_api import (
     create_access_token, create_refresh_token, _set_cookies, require_user,
     resolve_user_id, LEGACY_UID, is_direct_local_request,
@@ -937,7 +937,23 @@ def make_microsoft_router(db):
             raise HTTPException(status_code=400, detail="Le texte de la réponse est vide.")
         if not payload.confirm:
             return {"requiresConfirmation": True, "preview": text, "message": "Confirmez-vous l'envoi de cette réponse ?"}
-        await _graph_write(db, user["user_id"], "POST", f"/me/messages/{message_id}/reply", {"comment": append_signature_text(text)})
+        draft = await _graph_write(db, user["user_id"], "POST", f"/me/messages/{message_id}/createReply", {})
+        draft_id = draft.get("id")
+        if not draft_id:
+            raise HTTPException(status_code=502, detail="Brouillon de réponse Outlook impossible à créer.")
+        quoted = await _graph_get(
+            db,
+            user["user_id"],
+            f"/me/messages/{draft_id}",
+            params={"$select": "id,body"},
+            headers={"Prefer": 'outlook.body-content-type="html"'},
+        )
+        identity = signature_identity(user)
+        signed_body, attachments = graph_reply_signature(text, quoted.get("body"), **identity)
+        await _graph_write(db, user["user_id"], "PATCH", f"/me/messages/{draft_id}", {"body": signed_body})
+        for attachment in attachments:
+            await _graph_write(db, user["user_id"], "POST", f"/me/messages/{draft_id}/attachments", attachment)
+        await _graph_write(db, user["user_id"], "POST", f"/me/messages/{draft_id}/send")
         return {"ok": True}
 
     @router.post("/microsoft/mail/send")
@@ -954,12 +970,16 @@ def make_microsoft_router(db):
         preview = {"to": to, "subject": subject, "body": body}
         if not payload.confirm:
             return {"requiresConfirmation": True, "preview": preview, "message": "Confirmez-vous l'envoi de cet e-mail ?"}
+        signature_body, attachments = graph_signature(body, **signature_identity(user))
+        message = {
+            "subject": subject,
+            "body": signature_body,
+            "toRecipients": [{"emailAddress": {"address": to}}],
+        }
+        if attachments:
+            message["attachments"] = attachments
         await _graph_write(db, user["user_id"], "POST", "/me/sendMail", {
-            "message": {
-                "subject": subject,
-                "body": {"contentType": "Text", "content": append_signature_text(body)},
-                "toRecipients": [{"emailAddress": {"address": to}}],
-            },
+            "message": message,
             "saveToSentItems": True,
         })
         return {"ok": True, "message": f"E-mail envoyé à {to}."}

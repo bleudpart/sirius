@@ -487,6 +487,273 @@ async def _research_briefing_follow_up(prompt: str, serp_key: str = "") -> str:
     return "\n".join(excerpts)
 
 
+_PRICE_QUESTION_RE = re.compile(r"\b(prix|tarif|cout|coute|valeur)\b", re.I)
+_QUANTITY_QUESTION_RE = re.compile(r"\bcombien\b", re.I)
+_PRICE_UNIT_RE = re.compile(r"\b(kg|kilo(?:gramme)?s?|litre?s?|au\s+poids|a\s+la\s+piece|a\s+l[' ]unite)\b", re.I)
+_FOOD_PRODUCT_RE = re.compile(
+    r"\b(faux[ -]?filet|entrec[oô]te|filet|viande|boeuf|b[œo]uf|agneau|porc|veau|poulet|"
+    r"steak|boucherie|poisson|saumon|thon|fromage|beurre|lait|oeuf|œuf|fruit|legume|l[ée]gume|"
+    r"pomme|tomate|pain|cafe|caf[ée]|huile|produit\s+alimentaire)\b",
+    re.I,
+)
+_FACTUAL_QUESTION_RE = re.compile(
+    r"^\s*(?:quel(?:le|s|les)?|qui|que|quoi|où|ou|quand|combien|combien de|"
+    r"combien coute|combien coûte|est[- ]ce que|c['’]est quoi|donne[- ]moi (?:le|la|les|un|une)?)\b",
+    re.I,
+)
+_CURRENT_INFO_RE = re.compile(
+    r"\b(actuellement|aujourd['’]hui|en ce moment|maintenant|cette semaine|ce mois[- ]ci|"
+    r"demain|ce soir|cette ann[ée]e|r[ée]cent(?:e|s|es)?|dernier(?:e|s|es)?|"
+    r"actu(?:alit[ée]s?)?|cours actuel|prix actuel|m[ée]t[ée]o|temp[ée]rature|horaires? d['’ ]ouverture|"
+    r"ouvert(?:e|s|es)? aujourd['’]hui|taux de change|cours de l[' ]action|disponibilit[ée])\b",
+    re.I,
+)
+_NON_FACTUAL_SHORT_RE = re.compile(
+    r"^\s*(?:bonjour|salut|merci|qui suis[- ]je|qui es[- ]tu|que sais[- ]tu sur moi|"
+    r"raconte(?:[- ]moi)?|ecris(?:[- ]moi)?|[ée]cris(?:[- ]moi)?|traduis|calcule|"
+    r"r[ée]sous|additionne|soustrais)\b",
+    re.I,
+)
+
+
+def is_current_price_question(prompt: str) -> bool:
+    """Identify current product/food prices that benefit from a fresh web lookup."""
+    text = str(prompt or "")
+    has_price = bool(_PRICE_QUESTION_RE.search(text))
+    asks_quantity = bool(_QUANTITY_QUESTION_RE.search(text))
+    asks_by_measure = bool(_PRICE_UNIT_RE.search(text))
+    names_food = bool(_FOOD_PRODUCT_RE.search(text))
+    word_count = len(_normalize_search_text(text).split())
+    return (has_price and word_count >= 2) or (asks_quantity and (asks_by_measure or names_food))
+
+
+def is_targeted_factual_question(prompt: str) -> bool:
+    """Route concise fact questions and current-world lookups to search in every mode."""
+    text = " ".join(str(prompt or "").split())
+    normalized = _normalize_search_text(text)
+    words = normalized.split()
+    if not words or _NON_FACTUAL_SHORT_RE.search(normalized):
+        return False
+    if is_current_price_question(normalized) or _CURRENT_INFO_RE.search(normalized):
+        return True
+    if _PRICE_QUESTION_RE.search(normalized) and len(words) >= 2:
+        return True
+    if len(words) < 3:
+        return False
+    return bool(_FACTUAL_QUESTION_RE.search(normalized))
+
+
+def _normalize_search_text(text: str) -> str:
+    import unicodedata
+
+    normalized = unicodedata.normalize("NFD", str(text or "").lower())
+    return "".join(char for char in normalized if unicodedata.category(char) != "Mn")
+
+
+def _price_product_terms(prompt: str):
+    text = _normalize_search_text(prompt).replace("'", " ")
+    text = re.sub(
+        r"\b(prix|tarif|combien|coute|cout|actuel|actuellement|valeur|quel|quelle|quels|quelles|est|"
+        r"nouveau|nouvelle|dernier|derniere|modele)\b",
+        " ",
+        text,
+    )
+    text = re.sub(r"\b(?:au|a|par)\s+(?:kg|kilo(?:gramme)?s?|litre?s?)\b", " ", text)
+    text = re.sub(r"\b(?:de|du|des|d|un|une|le|la|les|l|en|au|aux|chez|france|francais|francaise|"
+                  r"paris|lyon|marseille|toulouse|boucherie|supermarche|alimentaire)\b", " ", text)
+    return [token for token in re.sub(r"[^a-z0-9-]+", " ", text).split() if len(token) > 2]
+
+
+def _current_price_search_query(prompt: str) -> str:
+    product = " ".join(_price_product_terms(prompt)) or " ".join(str(prompt or "").split())
+    if _PRICE_UNIT_RE.search(prompt):
+        return f"{product} prix au kg supermarché boucherie France"
+    return f'"{product}" prix actuel France tarif consommateur'
+
+
+def _format_price_sources(results, prompt: str = "") -> str:
+    excerpts = []
+    product_terms = _price_product_terms(prompt) if is_current_price_question(prompt) else []
+    wants_per_kilo = bool(re.search(r"\b(?:kg|kilo(?:gramme)?s?)\b", _normalize_search_text(prompt)))
+    per_kilo_re = re.compile(
+        r"(?:€\s*(?:/\s*)?(?:le\s+)?kg|/\s*kg|par\s+kg|au\s+kg|prix.{0,24}(?:kg|kilo))",
+        re.I,
+    )
+    for result in (results or [])[:5]:
+        title = str(result.get("title") or "").strip()
+        snippet = str(result.get("snippet") or "").strip()
+        source_name = str(result.get("source") or "").strip()
+        source_link = str(result.get("link") or "").strip()
+        source = f"{source_name} ({source_link})" if source_name and source_link else source_name or source_link
+        title_content = _normalize_search_text(title).replace("-", " ")
+        snippet_content = _normalize_search_text(snippet).replace("-", " ")
+        if product_terms:
+            in_title = all(term.replace("-", " ") in title_content for term in product_terms)
+            in_snippet = all(term.replace("-", " ") in snippet_content for term in product_terms)
+            if not in_title and not in_snippet:
+                continue
+        if wants_per_kilo and not per_kilo_re.search(f"{title} {snippet}"):
+            continue
+        if wants_per_kilo and product_terms and not in_title:
+            product_phrase = r"\s*".join(re.escape(term).replace(r"\-", r"\s*-?\s*") for term in product_terms)
+            price_context = re.compile(rf"{product_phrase}.{{0,60}}(?:€|eur)", re.I | re.S)
+            if not price_context.search(snippet):
+                continue
+        if title or snippet:
+            excerpts.append(f"- {title} | {source}\n  {snippet[:500]}")
+    return "\n".join(excerpts)
+
+
+async def _research_current_prices(prompt: str, serp_key: str = "", *, timeout: float = 5.5) -> str:
+    if not is_targeted_factual_question(prompt):
+        return ""
+    try:
+        from webagent import serp_results
+
+        search_query = (
+            _current_price_search_query(prompt)
+            if is_current_price_question(prompt)
+            else " ".join(str(prompt or "").split())
+        )
+        results = await asyncio.wait_for(
+            serp_results(search_query, serp_key or ENV_SERP_KEY),
+            timeout=timeout,
+        )
+    except Exception as error:
+        logger.warning("[ΣIRIUS:PRICE] recherche web indisponible : %r", error)
+        return ""
+    return _format_price_sources(results, prompt)
+
+
+def _targeted_answer_guidance(sources: str, prompt: str = "") -> str:
+    today = time.strftime("%d/%m/%Y")
+    if sources:
+        return (
+            f"\n\nRECHERCHE WEB EFFECTUÉE LE {today}. Réponds d'abord directement à la question, en donnant "
+            "le fait, la valeur ou la fourchette utile. Appuie-toi sur les extraits ci-dessous et cite brièvement "
+            "un ou deux titres/sites avec leur URL lorsqu'elle est fournie. Pour les prix, respecte l'unité "
+            "demandée (ex. €/kg), distingue les qualités/enseignes et ne transforme pas un prix promotionnel "
+            "en prix moyen. Pour les données divergentes, donne une fourchette et explique l'écart. N'invente "
+            "aucun fait absent des sources et ne renvoie jamais l'utilisateur faire la recherche lui-même.\n"
+            "SOURCES ET EXTRAITS :\n" + sources
+        )
+    return (
+        f"\n\nQUESTION FACTUELLE CIBLÉE, sans résultat web exploitable le {today}. Réponds quand même avec "
+        "le meilleur fait vérifiable de tes connaissances et ne demande pas à l'utilisateur d'aller chercher "
+        "l'information lui-même. Si la réponse dépend d'une donnée actuelle (dont un prix), précise qu'elle "
+        "n'a pas pu être vérifiée en direct. Pour un prix, fournis une fourchette indicative dans l'unité "
+        "demandée seulement si tu as une base raisonnable ; sinon explique brièvement cette limite et donne "
+        "un repère utile sur les facteurs de variation. N'invente ni valeur prétendument actuelle ni source. "
+        "Ne pose une question de précision qu'après avoir répondu au mieux avec les éléments disponibles."
+    )
+
+
+def _source_records(sources: str):
+    records = []
+    for block in re.split(r"(?m)^- ", sources or ""):
+        lines = [line.strip() for line in block.splitlines() if line.strip()]
+        if not lines:
+            continue
+        title, _, publisher = lines[0].partition(" | ")
+        snippet = " ".join(lines[1:])
+        records.append({"title": title.strip(), "publisher": publisher.strip(), "snippet": snippet})
+    return records
+
+
+def _extract_per_kilo_prices(sources: str):
+    amount_pattern = re.compile(
+        r"(?<![\d.,])(?P<amount>\d{1,3}(?:[ .]\d{3})*(?:[,.]\d{1,2})?)\s*"
+        r"(?:€\s*(?:/\s*(?:le\s+)?)?kg|€/\s*kg|/\s*kg|par\s+kg|euros?\s+le\s+kg)",
+        re.I,
+    )
+    prices = []
+    for record in _source_records(sources):
+        for match in amount_pattern.finditer(record["snippet"]):
+            raw = match.group("amount").replace(" ", "")
+            if "," in raw and "." in raw:
+                raw = raw.replace(".", "").replace(",", ".") if raw.rfind(",") > raw.rfind(".") else raw.replace(",", "")
+            else:
+                raw = raw.replace(",", ".")
+            try:
+                amount = float(raw)
+            except ValueError:
+                continue
+            if 1 <= amount <= 1000:
+                prices.append({**record, "amount": amount})
+    return prices
+
+
+def _format_eur_amount(amount: float) -> str:
+    return f"{amount:,.2f}".replace(",", " ").replace(".", ",").replace(" ", ".")
+
+
+def _answer_from_research(prompt: str, sources: str) -> str:
+    records = _source_records(sources)
+    if not records:
+        return "Je n'ai pas de résultat assez fiable pour répondre sans inventer."
+    if is_current_price_question(prompt) and re.search(r"\b(?:kg|kilo)\b", _normalize_search_text(prompt)):
+        prices = _extract_per_kilo_prices(sources)
+        if prices:
+            low = min(price["amount"] for price in prices)
+            high = max(price["amount"] for price in prices)
+            citations = []
+            seen = set()
+            for price in sorted(prices, key=lambda item: item["amount"]):
+                reference = price["publisher"] or price["title"]
+                key = (round(price["amount"], 2), reference)
+                if key in seen:
+                    continue
+                seen.add(key)
+                citations.append(f"{_format_eur_amount(price['amount'])} €/kg ({reference})")
+                if len(citations) == 3:
+                    break
+            if low == high:
+                price_range = f"environ {_format_eur_amount(low)} €/kg"
+            else:
+                price_range = f"entre {_format_eur_amount(low)} et {_format_eur_amount(high)} €/kg"
+            return (
+                f"J'ai trouvé un repère concret : {price_range}. Détail des offres : "
+                + "; ".join(citations)
+                + ". Les prix diffèrent selon la maturation, la qualité et le magasin ; ce sont des tarifs "
+                "en ligne susceptibles de varier localement."
+            )
+    excerpts = []
+    for record in records[:3]:
+        detail = record["snippet"] or record["title"]
+        source = record["publisher"] or record["title"]
+        excerpts.append(f"{detail} (source : {source})")
+    return "Voici les résultats utiles que j'ai trouvés : " + " ; ".join(excerpts)
+
+
+_SEARCH_DEFLECTION_RE = re.compile(
+    r"\b(?:allez\s+(?:voir|consulter|chercher)|consultez\s+(?:un|une|les|le|la|des)\s+|"
+    r"rendez[- ]vous\s+sur|recherchez\s+(?:sur|sur internet)|faites\s+une\s+recherche|"
+    r"je\s+vous\s+invite\s+.{0,30}(?:consulter|rechercher|chercher)|"
+    r"vous\s+devrez\s+.{0,30}(?:consulter|chercher|v[ée]rifier)|"
+    r"contactez\s+(?:votre|un|une)\s+(?:revendeur|magasin|boucher)|"
+    r"pour\s+plus\s+de\s+pr[ée]cision.{0,40}(?:revendeur|magasin|vendeur))\b",
+    re.I,
+)
+
+
+def _finalize_targeted_answer(prompt: str, answer: str, sources: str) -> str:
+    if not sources or not is_targeted_factual_question(prompt):
+        return answer
+    deflecting = bool(_SEARCH_DEFLECTION_RE.search(_normalize_search_text(answer)))
+    missing_per_kilo = (
+        is_current_price_question(prompt)
+        and re.search(r"\b(?:kg|kilo)\b", _normalize_search_text(prompt))
+        and not _extract_per_kilo_prices_from_text(answer)
+    )
+    if deflecting or missing_per_kilo:
+        return _answer_from_research(prompt, sources)
+    return answer
+
+
+def _extract_per_kilo_prices_from_text(text: str):
+    return _extract_per_kilo_prices(f"- Réponse | source\n  {text}")
+
+
 async def _kimi_reflect(prompt, profile=None, memory=None, mode="normal", mood=None, key=None, environment=None):
     """Produit une analyse privée que Groq utilise pour formuler une réponse approfondie."""
     client_k3 = k3_client(key)
@@ -679,7 +946,7 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
     k3_key = (keys.get("k3") or keys.get("groq")) or ENV_K3_KEY
     user_groq_key = (keys.get("groq_key") or "").strip()
     groq_key = ENV_GROQ_LLM_KEY or user_groq_key
-    serp_key = keys.get("serp") or ENV_SERP_KEY
+    serp_key = keys.get("serp") or keys.get("serpapi") or ENV_SERP_KEY
     is_turbo = (mode or "normal").lower() == "turbo"
 
     # ⚡ APPRENTISSAGE INSTANTANÉ : mémorisation/correction sans aller-retour LLM.
@@ -700,6 +967,11 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
     deep_mode = (mode or "normal").lower() == "profond"
     reflection = await _kimi_reflect(prompt, profile, memory, mode, mood, k3_key, environment) if deep_mode and k3_key else ""
     research = await _research_briefing_follow_up(prompt, keys.get("serp") or keys.get("serpapi") or serp_key)
+    targeted_research = await _research_current_prices(
+        prompt,
+        serp_key,
+        timeout=4.5 if is_turbo else 7.0,
+    )
 
     if not file_snippets and not web_snippets and groq_key:
         sys_prompt = build_system_prompt(profile=profile, memory=memory, mode=mode, mood=mood, environment=environment)
@@ -707,6 +979,8 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
             sys_prompt += "\n\nNOTES DE RÉFLEXION PRIVÉES :\n" + reflection
         if research:
             sys_prompt += "\n\nSOURCES WEB RÉCENTES POUR LA QUESTION DE SUIVI :\n" + research
+        if is_targeted_factual_question(prompt):
+            sys_prompt += _targeted_answer_guidance(targeted_research, prompt)
         # En mode turbo : un seul modèle rapide et un timeout court. En mode normal : tous les modèles
         # de repli disponibles et un délai plus généreux, pour privilégier la qualité de réponse.
         models_to_try = GROQ_FALLBACK_MODELS[:1] if is_turbo else GROQ_FALLBACK_MODELS
@@ -762,10 +1036,12 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
                 )
                 raw_json = resp.choices[0].message.content.strip()
                 answer, memories, popups = _parse_structured(raw_json)
+                answer = _finalize_targeted_answer(prompt, answer, targeted_research)
                 return {
                     "reponse": answer,
                     "memoire": memories,
-                    "popups": popups
+                    "popups": popups,
+                    "used_search": bool(research or targeted_research),
                 }
             except Exception as e:
                 last_error = e
@@ -784,6 +1060,10 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
                 mood=mood,
                 environment=environment,
             )
+            if research:
+                sys_prompt += "\n\nSOURCES WEB RÉCENTES POUR LA QUESTION DE SUIVI :\n" + research
+            if is_targeted_factual_question(prompt):
+                sys_prompt += _targeted_answer_guidance(targeted_research, prompt)
             history_messages = []
             for turn in (history or [])[-10:]:
                 role = turn.get("role") if isinstance(turn, dict) else None
@@ -808,15 +1088,25 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
             )
             raw_json = resp.choices[0].message.content.strip()
             answer, memories, popups = _parse_structured(raw_json)
-            return {"reponse": answer, "memoire": memories, "popups": popups}
+            answer = _finalize_targeted_answer(prompt, answer, targeted_research)
+            return {
+                "reponse": answer,
+                "memoire": memories,
+                "popups": popups,
+                "used_search": bool(research or targeted_research),
+            }
         except Exception as e:
             logger.warning(f"{tag} Repli Kimi refusé : {repr(e)}")
 
     # Repli standard si l'appel au LLM n'a pas abouti
+    fallback_answer = "Je n'ai pas pu générer de réponse pour le moment. Réessaie dans un instant."
+    if targeted_research:
+        fallback_answer = _answer_from_research(prompt, targeted_research)
     return {
-        "reponse": "Je n'ai pas pu générer de réponse pour le moment. Réessaie dans un instant.",
+        "reponse": fallback_answer,
         "memoire": [],
-        "popups": []
+        "popups": [],
+        "used_search": bool(research or targeted_research),
     }
 
 
@@ -848,11 +1138,6 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
             yield f"C'est mémorisé instantanément : {fact}."
         return
 
-    if not groq_key and not k3_key:
-        logger.warning("[ΣIRIUS:STREAM] Aucune clé LLM disponible, retour local.")
-        yield "Je n'ai pas pu générer de réponse pour le moment. Réessaie dans un instant."
-        return
-
     sys_prompt = build_system_prompt(profile=profile, memory=memory, mode=mode, mood=mood, environment=environment)
     plain_instruction = (
         "\n\nRéponds directement en langage naturel, sans JSON, sans habillage, sans listes à puces "
@@ -861,11 +1146,25 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
     deep_mode = (mode or "normal").lower() == "profond"
     reflection = await _kimi_reflect(prompt, profile, memory, mode, mood, k3_key, environment) if deep_mode and k3_key else ""
     research = await _research_briefing_follow_up(prompt, serp_key)
+    targeted_research = await _research_current_prices(
+        prompt,
+        serp_key,
+        timeout=4.5 if is_turbo else 7.0,
+    )
+    if not groq_key and not k3_key:
+        logger.warning("[ΣIRIUS:STREAM] Aucune clé LLM disponible, retour local.")
+        if targeted_research:
+            yield _answer_from_research(prompt, targeted_research)
+        else:
+            yield "Je n'ai pas pu générer de réponse pour le moment. Réessaie dans un instant."
+        return
     models_to_try = GROQ_FALLBACK_MODELS[:1] if is_turbo else GROQ_FALLBACK_MODELS
     if reflection:
         sys_prompt += "\n\nNOTES DE RÉFLEXION PRIVÉES :\n" + reflection
     if research:
         sys_prompt += "\n\nSOURCES WEB RÉCENTES POUR LA QUESTION DE SUIVI :\n" + research
+    if is_targeted_factual_question(prompt):
+        sys_prompt += _targeted_answer_guidance(targeted_research, prompt)
     timeout = 10.0 if is_turbo else 15.0
     # Réponse conversationnelle parlée : pas besoin de 4096 tokens (~3000 mots) par défaut,
     # ça n'a jamais de sens à l'oral et ça ne fait qu'allonger le pire cas de génération.
@@ -887,6 +1186,7 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
 
     last_error = None
     for model_name in models_to_try if client_groq else []:
+        buffered_targeted_answer = []
         try:
             stream = await client_groq.chat.completions.create(
                 model=model_name,
@@ -906,7 +1206,13 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
             async for chunk in stream:
                 delta = chunk.choices[0].delta.content if chunk.choices else None
                 if delta:
-                    yield delta
+                    if targeted_research and is_targeted_factual_question(prompt):
+                        buffered_targeted_answer.append(delta)
+                    else:
+                        yield delta
+            if buffered_targeted_answer:
+                draft = "".join(buffered_targeted_answer).strip()
+                yield _finalize_targeted_answer(prompt, draft, targeted_research)
             return
         except Exception as e:
             last_error = e
@@ -928,11 +1234,14 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
             )
             answer = (result.get("reponse") or "").strip()
             if answer:
-                yield answer
+                yield _finalize_targeted_answer(prompt, answer, targeted_research)
                 return
         except Exception as e:
             logger.warning(f"[ΣIRIUS:STREAM] Repli Kimi refusé : {repr(e)}")
-    yield "Je n'ai pas pu générer de réponse pour le moment. Réessaie dans un instant."
+    if targeted_research:
+        yield _answer_from_research(prompt, targeted_research)
+    else:
+        yield "Je n'ai pas pu générer de réponse pour le moment. Réessaie dans un instant."
 
 
 async def extract_memory_background(prompt, answer):

@@ -8,8 +8,11 @@ import pymupdf as fitz
 
 from reportlab.lib.colors import HexColor, white
 from reportlab.lib.pagesizes import A4
+from reportlab.lib.utils import ImageReader
+from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.pdfgen import canvas as pdfcanvas
 
+from email_signature import WORKSPACE_LOGO, signature_image, signature_lines
 from sirius_brain import ENV_K3_KEY, K3_MODEL, k3_client
 
 VISION_MODEL = None  # kimi-k3 gère texte + vision
@@ -35,7 +38,27 @@ def _eur(n):
     return f"{float(n or 0):,.2f} €".replace(",", " ").replace(".", ",")
 
 
-def build_doc_pdf(doc, emetteur=""):
+def _draw_workspace_logo(c, x, y, size=46):
+    image = signature_image(WORKSPACE_LOGO)
+    if not image:
+        return x
+    c.drawImage(ImageReader(io.BytesIO(image)), x, y, width=size, height=size, mask="auto")
+    return x + size + 10
+
+
+def _draw_header_text(c, text, x, y, max_width, *, font="Helvetica-Bold", size=20, min_size=12):
+    text = str(text or "")
+    while size > min_size and stringWidth(text, font, size) > max_width:
+        size -= 1
+    if stringWidth(text, font, size) > max_width:
+        while text and stringWidth(text + "...", font, size) > max_width:
+            text = text[:-1]
+        text = text.rstrip() + "..."
+    c.setFont(font, size)
+    c.drawString(x, y, text)
+
+
+def build_doc_pdf(doc, emetteur="", signature_name=None, signature_email=None):
     """Génère un devis/facture PDF professionnel (A4) selon le modèle choisi."""
     style = TEMPLATE_STYLES.get(doc.get("template", "antique"), TEMPLATE_STYLES["antique"])
     accent, band = HexColor(style["accent"]), HexColor(style["band"])
@@ -51,8 +74,8 @@ def build_doc_pdf(doc, emetteur=""):
     c.setFillColor(accent)
     c.rect(0, h - 100, w, 4, stroke=0, fill=1)
     c.setFillColor(white)
-    c.setFont("Helvetica-Bold", 22)
-    c.drawString(40, h - 52, emetteur or "ΣIRIUS ENTERPRISE")
+    brand_x = _draw_workspace_logo(c, 34, h - 78)
+    _draw_header_text(c, emetteur or "ΣIRIUS ENTERPRISE", brand_x, h - 52, w - brand_x - 190, size=20)
     c.setFillColor(accent)
     c.setFont("Helvetica-Bold", 16)
     c.drawRightString(w - 40, h - 44, f"{kind} {doc.get('number', '')}")
@@ -62,7 +85,7 @@ def build_doc_pdf(doc, emetteur=""):
     if doc.get("due_date"):
         c.drawRightString(w - 40, h - 76, f"Échéance : {doc['due_date']}")
     c.setFont("Helvetica-Oblique", 8)
-    c.drawString(40, h - 76, f"Modèle {style['label']} — généré par ΣIRIUS · THÉMIS")
+    c.drawString(brand_x, h - 76, f"Modèle {style['label']} — généré par ΣIRIUS · THÉMIS")
 
     y = h - 140
     c.setFillColor(accent)
@@ -137,6 +160,9 @@ def build_doc_pdf(doc, emetteur=""):
     c.setFillColor(grey)
     c.setFont("Helvetica", 8)
     c.drawCentredString(w / 2, 26, f"{kind} {doc.get('number', '')} — statut : {doc.get('status', '')} — document généré par ΣIRIUS · module THÉMIS")
+    contact_email = signature_lines(signature_name, signature_email)[3]
+    c.setFont("Helvetica", 7)
+    c.drawCentredString(w / 2, 13, contact_email)
     c.showPage()
     c.save()
     return buf.getvalue()
@@ -212,7 +238,7 @@ async def extract_piece(filename, data, k3_key=None):
     return out
 
 
-def build_consult_pdf(module, question, reponse, date_str=""):
+def build_consult_pdf(module, question, reponse, date_str="", signature_name=None, signature_email=None):
     """PDF élégant « antique or » pour un avis de Solon ou un plan de Prométhée."""
     import textwrap
     conf = {
@@ -221,6 +247,7 @@ def build_consult_pdf(module, question, reponse, date_str=""):
     }
     name, kind, sub = conf.get(module, ("PANTHÉON", "CONSULTATION", "ΣIRIUS"))
     gold, band, dark, grey = HexColor("#b8860b"), HexColor("#1a1206"), HexColor("#222222"), HexColor("#666666")
+    contact_email = signature_lines(signature_name, signature_email)[3]
     buf = io.BytesIO()
     c = pdfcanvas.Canvas(buf, pagesize=A4)
     w, h = A4
@@ -231,11 +258,11 @@ def build_consult_pdf(module, question, reponse, date_str=""):
         c.setFillColor(gold)
         c.rect(0, h - 96, w, 4, stroke=0, fill=1)
         c.setFillColor(white)
-        c.setFont("Helvetica-Bold", 20)
-        c.drawString(40, h - 46, f"{name} — {kind}")
+        brand_x = _draw_workspace_logo(c, 32, h - 78, size=44)
+        _draw_header_text(c, f"{name} — {kind}", brand_x, h - 46, w - brand_x - 140)
         c.setFillColor(gold)
         c.setFont("Helvetica-Oblique", 9)
-        c.drawString(40, h - 64, sub)
+        c.drawString(brand_x, h - 64, sub)
         c.setFillColor(white)
         c.setFont("Helvetica", 9)
         if date_str:
@@ -243,6 +270,7 @@ def build_consult_pdf(module, question, reponse, date_str=""):
         c.drawRightString(w - 40, h - 62, "ΣIRIUS · PANTHÉON")
         c.setFont("Helvetica-Oblique", 8)
         c.setFillColor(grey)
+        c.drawString(40, 28, contact_email)
         c.drawRightString(w - 40, 28, f"Page {page}")
         c.setFillColor(gold)
         c.setLineWidth(0.8)
@@ -295,22 +323,23 @@ def build_consult_pdf(module, question, reponse, date_str=""):
     return buf
 
 
-def build_receipt_pdf(tx):
+def build_receipt_pdf(tx, signature_name=None, signature_email=None):
     """Reçu de paiement élégant au style Thémis (bandeau sombre, or)."""
     gold, band, dark, grey = HexColor("#b8860b"), HexColor("#1a1206"), HexColor("#222222"), HexColor("#666666")
     buf = io.BytesIO()
     c = pdfcanvas.Canvas(buf, pagesize=A4)
     w, h = A4
+    contact_email = signature_lines(signature_name, signature_email)[3]
     c.setFillColor(band)
     c.rect(0, h - 100, w, 100, stroke=0, fill=1)
     c.setFillColor(gold)
     c.rect(0, h - 104, w, 4, stroke=0, fill=1)
     c.setFillColor(white)
-    c.setFont("Helvetica-Bold", 22)
-    c.drawString(40, h - 52, "REÇU DE PAIEMENT")
+    brand_x = _draw_workspace_logo(c, 34, h - 80, size=48)
+    _draw_header_text(c, "REÇU DE PAIEMENT", brand_x, h - 52, w - brand_x - 150, size=20)
     c.setFillColor(gold)
     c.setFont("Helvetica-Oblique", 9)
-    c.drawString(40, h - 72, "HERMÈS AGORA — ΣIRIUS · PANTHÉON")
+    c.drawString(brand_x, h - 72, "HERMÈS AGORA — ΣIRIUS · PANTHÉON")
     c.setFillColor(white)
     c.setFont("Helvetica", 9)
     date_pay = (tx.get("updated_at") or "")[:10]
@@ -363,6 +392,7 @@ def build_receipt_pdf(tx):
     c.line(40, 40, w - 40, 40)
     c.setFillColor(grey)
     c.setFont("Helvetica-Oblique", 8)
+    c.drawString(40, 28, contact_email)
     c.drawRightString(w - 40, 28, "ΣIRIUS · HERMÈS AGORA")
     c.save()
     buf.seek(0)

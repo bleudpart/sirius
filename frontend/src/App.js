@@ -15,6 +15,7 @@ import {
 import { pushStats, setStatsOffline } from "@/liveStats";
 import { formatLocalDate, formatLocalTime, getLocalDateKey } from "@/dateTime";
 import { STATES, isLocalTimeQuestion, localAnswer, weatherInfo, pttBeep } from "@/appLogic";
+import { executeModuleOpen, MODULE_ALIASES } from "@/moduleCommandRouting";
 import { MedallionRing, ReactorCore, Waveform } from "@/components/ReactorVisuals";
 import { MemoryPanel, HoloPopups, AnalyticsPanel, MusicChoice, CentralCard, BootScreen } from "@/components/HudPanels";
 import OverlayApp from "@/OverlayApp";
@@ -199,6 +200,13 @@ const loadMemory = () => {
     const raw = JSON.parse(localStorage.getItem("sirius_memory")) || [];
     return raw.map((m) => (typeof m === "string" ? { t: m, d: null } : m)).filter((m) => m && m.t);
   } catch { return []; }
+};
+const signaturePreviewText = (user) => {
+  const preferences = user?.preferences || {};
+  const name = preferences.signature_name || user?.name || "M. Daniel Partel";
+  const accountEmail = user?.email && !user.email.toLowerCase().endsWith("@sirius.local") ? user.email : "";
+  const email = preferences.signature_email || accountEmail || "danielsirius.pro2026@gmail.com";
+  return `\n\n—\nMessage envoyé par ΣIRIUS, assistant de ${name}\nE-mail : ${email}\n© 2026 ΣIRIUS par ${name} — Tous droits réservés.`;
 };
 const todayStr = () => getLocalDateKey();
 
@@ -2338,7 +2346,7 @@ function App() {
       showOnDisplay({
         type: "message",
         titre: "E-MAIL ENVOYÉ — GMAIL",
-        contenu: `À : ${to}\nObjet : ${subject || "Message envoyé par ΣIRIUS"}\n\n${body || ""}\n\n—\nMessage envoyé par ΣIRIUS, assistant de Daniel Partel`,
+        contenu: `À : ${to}\nObjet : ${subject || "Message envoyé par ΣIRIUS"}\n\n${body || ""}${signaturePreviewText(authUser)}`,
       });
       const m = `E-mail Gmail envoyé à ${to}.`;
       setText(m); speakOut(m);
@@ -2348,7 +2356,7 @@ function App() {
       const m = "Je n'arrive pas à joindre Gmail pour le moment.";
       setText(m); speakOut(m);
     }
-  }, [openTask, pushStep, finishTask, failTask, speakOut, showOnDisplay]);
+  }, [openTask, pushStep, finishTask, failTask, speakOut, showOnDisplay, authUser]);
 
   const sendOutlookEmail = useCallback(async (to, subject, body) => {
     const id = openTask("OUTLOOK — ENVOI", "outlook");
@@ -2381,7 +2389,7 @@ function App() {
       showOnDisplay({
         type: "message",
         titre: "E-MAIL ENVOYÉ — OUTLOOK",
-        contenu: `À : ${to}\nObjet : ${subject || "Message envoyé par ΣIRIUS"}\n\n${body || ""}\n\n—\nMessage envoyé par ΣIRIUS, assistant de Daniel Partel`,
+        contenu: `À : ${to}\nObjet : ${subject || "Message envoyé par ΣIRIUS"}\n\n${body || ""}${signaturePreviewText(authUser)}`,
       });
       const m = `C'est envoyé à ${to} avec ma signature SIRIUS.`;
       setText(m); speakOut(m);
@@ -2393,7 +2401,7 @@ function App() {
       setText(m); speakOut(m);
       return false;
     }
-  }, [openTask, pushStep, finishTask, failTask, speakOut, msFetch, showOnDisplay]);
+  }, [openTask, pushStep, finishTask, failTask, speakOut, msFetch, showOnDisplay, authUser]);
 
   // Clic sur une pastille de contact : ΣIRIUS reprend la main sur la composition,
   // au lieu de laisser le navigateur ouvrir le client mail du système.
@@ -3525,44 +3533,25 @@ function App() {
   // Ouverture / restauration vocale d'un module (« ouvre la bourse », « affiche thémis »)
   const moduleItemsRef = useRef([]);
   const openModuleByName = useCallback((raw) => {
-    const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    const t = norm(raw).replace(/[?!.]+$/, "").trim();
-    if (!t || t.length < 3) return false;
-    const words = t.split(/\s+/).filter((w) => w.length > 3);
-    const matches = (hay) => hay.includes(t) || (words.length > 0 && words.every((w) => hay.includes(w)));
-    // 1) fenêtre réduite en pastille → restaurer
-    for (const p of document.querySelectorAll(".holo-dock-pill")) {
-      if (matches(norm(p.textContent))) {
-        p.click();
-        const msg = "Je restaure la fenêtre.";
-        setText(msg);
-        speakOut(msg);
-        return true;
-      }
-    }
-    // 2) module du panthéon par libellé / id / alias
-    const ALIASES = {
-      nummarius: "bourse marches finances actions cryptos portus",
-      cortex: "zeus cerveau",
-      themis: "facturation factures devis clients stocks",
-      admin: "administration comptes utilisateurs",
-      gcal: "calendrier agenda google",
-      display: "ecran display",
-      oracle: "oracle previsions",
-      memorymgr: "souvenirs memoire",
-    };
-    for (const it of moduleItemsRef.current) {
-      const hay = norm(`${it.label} ${it.id} ${ALIASES[it.id] || ""}`);
-      if (matches(hay)) {
-        it.run();
-        const msg = `J'ouvre ${it.label.split("—")[0].trim()}.`;
-        setText(msg);
-        speakOut(msg);
-        return true;
-      }
-    }
-    return false;
-  }, [speakOut]);
+    const item = executeModuleOpen(
+      raw,
+      moduleItemsRef.current,
+      MODULE_ALIASES,
+      document.querySelectorAll(".holo-dock-pill"),
+      (module) => {
+        if (module.id === "display") { pinDisplay(); setDisplayOpen(true); }
+        else if (module.id === "vision") setShowVision(true);
+        else module.run();
+      },
+    );
+    if (!item) return false;
+
+    const surface = item.id === "display" ? "ΣIRIUS Display" : "le HUD";
+    const msg = `J'ouvre ${item.label.split("—")[0].trim()} dans ${surface}.`;
+    setText(msg);
+    speakOut(msg);
+    return true;
+  }, [speakOut, pinDisplay]);
 
   // Actions ponctuelles (rechargement, capture, caméra) : jamais ouvertes dans une cascade.
   const CASCADE_SKIP = useMemo(() => new Set(["reload", "capture-interface", "capture-region", "open-capture-folder", "vision", "install", "packager"]), []);
@@ -4788,7 +4777,7 @@ function App() {
       return;
     }
     // Ouverture / restauration vocale d'un module : « ouvre la bourse », « affiche thémis »
-    const openM = low.match(/^(?:sirius[, ]*)?(?:ouvre|ouvrir|affiche|afficher|restaure|restaurer|rouvre)\s+(?:le |la |les |l'|mon |ma |une? )?(?:module |fen[êe]tre |panneau )?(.+)$/);
+    const openM = low.match(/^(?:sirius[, ]*)?(?:ouvre|ouvrir|affiche|afficher|montre|montrer|lance|lancer|deploie|deployer|presente|presenter|restaure|restaurer|rouvre)\w*(?:[- ]moi)?\s+(?:le |la |les |l'|mon |ma |une? )?(?:module |fen[êe]tre |panneau )?(.+)$/);
     if (openM && openModuleByName(openM[1])) {
       mark("ouverture module");
       return;

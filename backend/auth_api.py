@@ -8,6 +8,7 @@ import ipaddress
 import io
 import json
 import os
+import re
 import secrets
 import smtplib
 import ssl
@@ -559,7 +560,23 @@ def make_auth_router(db):
         if isinstance(data.get("name"), str):
             updates["name"] = data["name"].strip()[:120]
         if isinstance(data.get("preferences"), dict):
-            updates["preferences"] = data["preferences"]
+            preferences = {**(user.get("preferences") or {}), **data["preferences"]}
+            if "signature_name" in preferences:
+                if not isinstance(preferences["signature_name"], str):
+                    raise HTTPException(status_code=422, detail="Nom de signature invalide.")
+                preferences["signature_name"] = preferences["signature_name"].strip()[:120]
+                if not preferences["signature_name"]:
+                    raise HTTPException(status_code=422, detail="Le nom de signature ne peut pas être vide.")
+            if "signature_email" in preferences:
+                signature_email = preferences["signature_email"]
+                if (
+                    not isinstance(signature_email, str)
+                    or len(signature_email.strip()) > 254
+                    or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", signature_email.strip())
+                ):
+                    raise HTTPException(status_code=422, detail="Adresse de signature invalide.")
+                preferences["signature_email"] = signature_email.strip().lower()
+            updates["preferences"] = preferences
         await db.users.update_one({"user_id": user["user_id"]}, {"$set": updates})
         stored = await db.users.find_one({"user_id": user["user_id"]})
         return _public_user(stored)

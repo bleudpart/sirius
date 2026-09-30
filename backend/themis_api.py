@@ -14,7 +14,13 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field, field_validator
 
-from email_signature import append_signature_text
+from email_signature import (
+    WORKSPACE_LOGO,
+    add_signature_to_message,
+    load_signature_identity,
+    signature_image,
+    signature_lines,
+)
 from themis_pdf import build_doc_pdf, extract_piece
 
 NO_ID = {"_id": 0}
@@ -237,13 +243,23 @@ class BatchRelanceIn(BaseModel):
     smtp: Optional[SmtpConf] = None
 
 
-def _send_smtp(conf: SmtpConf, to: str, subject: str, body: str, pdf_bytes: bytes, pdf_name: str):
+def _send_smtp(
+    conf: SmtpConf,
+    to: str,
+    subject: str,
+    body: str,
+    pdf_bytes: bytes,
+    pdf_name: str,
+    *,
+    signature_name=None,
+    signature_email=None,
+):
     msg = EmailMessage()
     sender = conf.from_email or conf.user
     msg["From"] = f"{conf.from_name} <{sender}>" if conf.from_name else sender
     msg["To"] = to
     msg["Subject"] = subject
-    msg.set_content(append_signature_text(body))
+    add_signature_to_message(msg, body, signature_name=signature_name, signature_email=signature_email)
     if pdf_bytes:
         msg.add_attachment(pdf_bytes, maintype="application", subtype="pdf", filename=pdf_name)
     if int(conf.port) == 465:
@@ -260,6 +276,93 @@ def _send_smtp(conf: SmtpConf, to: str, subject: str, body: str, pdf_bytes: byte
             if conf.user:
                 s.login(conf.user, conf.password)
             s.send_message(msg)
+
+
+def build_accounting_export_zip(
+    clients,
+    docs,
+    orders,
+    payments,
+    pieces,
+    *,
+    files_dir=FILES_DIR,
+    signature_name=None,
+    signature_email=None,
+):
+    doc_num = {document["id"]: document.get("number", "") for document in docs}
+
+    def sheet(rows, headers, getters):
+        out = io.StringIO()
+        writer = csv.writer(out, delimiter=";")
+        writer.writerow(headers)
+        for row in rows:
+            writer.writerow([getter(row) for getter in getters])
+        return "\ufeff" + out.getvalue()
+
+    entries = []
+    for payment in payments:
+        entries.append((
+            str(payment.get("created_at", ""))[:10],
+            f"Encaissement {doc_num.get(payment.get('doc_id'), 'divers')} ({payment.get('method', '')})",
+            "",
+            f"{payment.get('amount', 0):.2f}",
+        ))
+    for piece in pieces:
+        entries.append((
+            piece.get("date") or str(piece.get("created_at", ""))[:10],
+            f"Fournisseur {piece.get('fournisseur') or piece.get('filename', '')} {piece.get('numero', '')} [{piece.get('status', '')}]",
+            f"{float(piece.get('total_ttc', 0) or 0):.2f}",
+            "",
+        ))
+    entries.sort(key=lambda entry: entry[0])
+    signature_line, email_line, copyright_line, _ = signature_lines(signature_name, signature_email)
+
+    archive_buffer = io.BytesIO()
+    with zipfile.ZipFile(archive_buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "LISEZ-MOI.txt",
+            "EXPORT COMPTABLE THÉMIS — ΣIRIUS\n"
+            f"Préparé le {datetime.now().strftime('%d/%m/%Y à %H:%M')}.\n\n"
+            "L'archive contient les tableaux CSV prêts à importer et les pièces jointes disponibles.\n"
+            "Les fichiers CSV sont conservés sans ligne de signature afin de préserver leur importabilité.\n\n"
+            f"{signature_line} · THÉMIS\n"
+            f"{email_line}\n"
+            f"{copyright_line}\n",
+        )
+        brand_image = signature_image(WORKSPACE_LOGO)
+        if brand_image:
+            archive.writestr("signature-espace-travail.png", brand_image)
+        archive.writestr("clients.csv", sheet(clients,
+            ["Nom", "Société", "E-mail", "Téléphone", "Adresse", "Créé le"],
+            [lambda row: row.get("name", ""), lambda row: row.get("company", ""), lambda row: row.get("email", ""),
+             lambda row: row.get("phone", ""), lambda row: row.get("address", ""), lambda row: str(row.get("created_at", ""))[:10]]))
+        archive.writestr("documents.csv", sheet(docs,
+            ["Numéro", "Type", "Client", "Total HT", "TVA", "Total TTC", "Réglé", "Statut", "Échéance", "Créé le"],
+            [lambda row: row.get("number", ""), lambda row: row.get("kind", ""), lambda row: row.get("client_name", ""),
+             lambda row: f"{row.get('total_ht', 0):.2f}", lambda row: f"{row.get('tva_amount', 0):.2f}",
+             lambda row: f"{row.get('total_ttc', 0):.2f}", lambda row: f"{row.get('paid', 0):.2f}",
+             lambda row: row.get("status", ""), lambda row: row.get("due_date", ""), lambda row: str(row.get("created_at", ""))[:10]]))
+        archive.writestr("commandes.csv", sheet(orders,
+            ["Numéro", "Client", "Total", "Statut", "Créée le"],
+            [lambda row: row.get("number", ""), lambda row: row.get("client_name", ""), lambda row: f"{row.get('total', 0):.2f}",
+             lambda row: row.get("status", ""), lambda row: str(row.get("created_at", ""))[:10]]))
+        archive.writestr("paiements.csv", sheet(payments,
+            ["Date", "Montant", "Méthode", "Facture", "Note"],
+            [lambda row: str(row.get("created_at", ""))[:10], lambda row: f"{row.get('amount', 0):.2f}",
+             lambda row: row.get("method", ""), lambda row: doc_num.get(row.get("doc_id"), ""), lambda row: row.get("note", "")]))
+        archive.writestr("pieces.csv", sheet(pieces,
+            ["Fournisseur", "Numéro", "Date", "Total HT", "TVA", "Total TTC", "Statut", "Fichier"],
+            [lambda row: row.get("fournisseur", ""), lambda row: row.get("numero", ""), lambda row: row.get("date", ""),
+             lambda row: f"{float(row.get('total_ht', 0) or 0):.2f}", lambda row: f"{float(row.get('tva', 0) or 0):.2f}",
+             lambda row: f"{float(row.get('total_ttc', 0) or 0):.2f}", lambda row: row.get("status", ""), lambda row: row.get("filename", "")]))
+        archive.writestr("ecritures.csv", sheet(entries,
+            ["Date", "Libellé", "Débit", "Crédit"],
+            [lambda entry: entry[0], lambda entry: entry[1], lambda entry: entry[2], lambda entry: entry[3]]))
+        for piece in pieces:
+            path = os.path.join(files_dir, f"{piece['id']}.{piece['ext']}")
+            if os.path.isfile(path):
+                archive.write(path, f"pieces/{piece['id']}-{piece.get('filename') or 'fichier'}")
+    return archive_buffer.getvalue()
 
 
 def _totals(lines: List[Line], tva: float):
@@ -442,27 +545,38 @@ def make_themis_router(db):
     @r.get("/docs/{did}/pdf")
     async def doc_pdf(did: str, request: Request, emetteur: str = ""):
         uid = await _uid(request)
+        identity = await load_signature_identity(db, uid)
         d = await db.themis_docs.find_one({"id": did, "user_id": uid}, NO_ID)
         if not d:
             raise HTTPException(status_code=404, detail="Document introuvable")
-        pdf = build_doc_pdf(d, emetteur=emetteur)
+        pdf = build_doc_pdf(d, emetteur=emetteur, **identity)
         return Response(content=pdf, media_type="application/pdf",
                         headers={"Content-Disposition": f'inline; filename="{d["number"]}.pdf"'})
 
     @r.post("/docs/{did}/email")
     async def email_doc(did: str, body: EmailIn, request: Request):
         uid = await _uid(request)
+        identity = await load_signature_identity(db, uid)
         d = await db.themis_docs.find_one({"id": did, "user_id": uid}, NO_ID)
         if not d:
             raise HTTPException(status_code=404, detail="Document introuvable")
-        pdf = build_doc_pdf(d, emetteur=body.emetteur)
+        pdf = build_doc_pdf(d, emetteur=body.emetteur, **identity)
         kind = "Facture" if d["kind"] == "facture" else "Devis"
         subject = body.subject.strip() or f"{kind} {d['number']}"
         message = body.message.strip() or (
             f"Bonjour,\n\nVeuillez trouver ci-joint votre {kind.lower()} {d['number']} "
             f"d'un montant de {float(d.get('total_ttc', 0)):.2f} € TTC.\n\nCordialement.")
         try:
-            await asyncio.to_thread(_send_smtp, body.smtp, body.to, subject, message, pdf, f"{d['number']}.pdf")
+            await asyncio.to_thread(
+                _send_smtp,
+                body.smtp,
+                body.to,
+                subject,
+                message,
+                pdf,
+                f"{d['number']}.pdf",
+                **identity,
+            )
         except smtplib.SMTPAuthenticationError:
             raise HTTPException(status_code=400, detail="Authentification SMTP refusée : vérifiez l'identifiant et le mot de passe (pour Gmail, utilisez un mot de passe d'application).")
         except OSError as e:
@@ -481,6 +595,7 @@ def make_themis_router(db):
     @r.post("/relances")
     async def batch_relances(body: BatchRelanceIn, request: Request):
         uid = await _uid(request)
+        identity = await load_signature_identity(db, uid)
         today_date = datetime.now(timezone.utc).date()
         docs = await db.themis_docs.find({"user_id": uid, "kind": "facture"}, NO_ID).to_list(2000)
         clients = {c["id"]: c for c in await db.themis_clients.find({"user_id": uid}, NO_ID).to_list(2000)}
@@ -511,8 +626,17 @@ def make_themis_router(db):
             subject = f"Relance — Facture {candidate['number']}"
             message = f"Bonjour,\n\nSauf erreur de notre part, la facture {candidate['number']} d'un montant restant de {candidate['remaining']:.2f} EUR demeure impayée. Merci de procéder à son règlement.\n\nCordialement,\n{body.emetteur or 'THÉMIS'}"
             try:
-                pdf = build_doc_pdf(doc, emetteur=body.emetteur)
-                await asyncio.to_thread(_send_smtp, body.smtp, candidate["email"], subject, message, pdf, f"{candidate['number']}.pdf")
+                pdf = build_doc_pdf(doc, emetteur=body.emetteur, **identity)
+                await asyncio.to_thread(
+                    _send_smtp,
+                    body.smtp,
+                    candidate["email"],
+                    subject,
+                    message,
+                    pdf,
+                    f"{candidate['number']}.pdf",
+                    **identity,
+                )
                 await db.themis_docs.update_one({"id": candidate["id"], "user_id": uid}, {"$push": {"emails": {"to": candidate["email"], "subject": subject, "type": "relance", "date": now_iso()}}})
                 sent.append(candidate["id"])
             except Exception as error:
@@ -664,62 +788,15 @@ def make_themis_router(db):
     @r.get("/export")
     async def export_comptable(request: Request):
         uid = await _uid(request)
+        identity = await load_signature_identity(db, uid)
         clients = await db.themis_clients.find({"user_id": uid}, NO_ID).to_list(2000)
         docs = await db.themis_docs.find({"user_id": uid}, NO_ID).to_list(2000)
         orders = await db.themis_orders.find({"user_id": uid}, NO_ID).to_list(2000)
         payments = await db.themis_payments.find({"user_id": uid}, NO_ID).to_list(5000)
         pieces = await db.themis_pieces.find({"user_id": uid}, NO_ID).to_list(2000)
-        doc_num = {d["id"]: d.get("number", "") for d in docs}
-
-        def sheet(rows, headers, getters):
-            out = io.StringIO()
-            wr = csv.writer(out, delimiter=";")
-            wr.writerow(headers)
-            for row in rows:
-                wr.writerow([g(row) for g in getters])
-            return "\ufeff" + out.getvalue()
-
-        ecritures = []
-        for p in payments:
-            ecritures.append((str(p.get("created_at", ""))[:10], f"Encaissement {doc_num.get(p.get('doc_id'), 'divers')} ({p.get('method', '')})", "", f"{p.get('amount', 0):.2f}"))
-        for p in pieces:
-            ecritures.append((p.get("date") or str(p.get("created_at", ""))[:10], f"Fournisseur {p.get('fournisseur') or p.get('filename', '')} {p.get('numero', '')} [{p.get('status', '')}]", f"{float(p.get('total_ttc', 0) or 0):.2f}", ""))
-        ecritures.sort(key=lambda e: e[0])
-
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-            z.writestr("clients.csv", sheet(clients,
-                ["Nom", "Société", "E-mail", "Téléphone", "Adresse", "Créé le"],
-                [lambda c: c.get("name", ""), lambda c: c.get("company", ""), lambda c: c.get("email", ""),
-                 lambda c: c.get("phone", ""), lambda c: c.get("address", ""), lambda c: str(c.get("created_at", ""))[:10]]))
-            z.writestr("documents.csv", sheet(docs,
-                ["Numéro", "Type", "Client", "Total HT", "TVA", "Total TTC", "Réglé", "Statut", "Échéance", "Créé le"],
-                [lambda d: d.get("number", ""), lambda d: d.get("kind", ""), lambda d: d.get("client_name", ""),
-                 lambda d: f"{d.get('total_ht', 0):.2f}", lambda d: f"{d.get('tva_amount', 0):.2f}",
-                 lambda d: f"{d.get('total_ttc', 0):.2f}", lambda d: f"{d.get('paid', 0):.2f}",
-                 lambda d: d.get("status", ""), lambda d: d.get("due_date", ""), lambda d: str(d.get("created_at", ""))[:10]]))
-            z.writestr("commandes.csv", sheet(orders,
-                ["Numéro", "Client", "Total", "Statut", "Créée le"],
-                [lambda o: o.get("number", ""), lambda o: o.get("client_name", ""), lambda o: f"{o.get('total', 0):.2f}",
-                 lambda o: o.get("status", ""), lambda o: str(o.get("created_at", ""))[:10]]))
-            z.writestr("paiements.csv", sheet(payments,
-                ["Date", "Montant", "Méthode", "Facture", "Note"],
-                [lambda p: str(p.get("created_at", ""))[:10], lambda p: f"{p.get('amount', 0):.2f}",
-                 lambda p: p.get("method", ""), lambda p: doc_num.get(p.get("doc_id"), ""), lambda p: p.get("note", "")]))
-            z.writestr("pieces.csv", sheet(pieces,
-                ["Fournisseur", "Numéro", "Date", "Total HT", "TVA", "Total TTC", "Statut", "Fichier"],
-                [lambda p: p.get("fournisseur", ""), lambda p: p.get("numero", ""), lambda p: p.get("date", ""),
-                 lambda p: f"{float(p.get('total_ht', 0) or 0):.2f}", lambda p: f"{float(p.get('tva', 0) or 0):.2f}",
-                 lambda p: f"{float(p.get('total_ttc', 0) or 0):.2f}", lambda p: p.get("status", ""), lambda p: p.get("filename", "")]))
-            z.writestr("ecritures.csv", sheet(ecritures,
-                ["Date", "Libellé", "Débit", "Crédit"],
-                [lambda e: e[0], lambda e: e[1], lambda e: e[2], lambda e: e[3]]))
-            for p in pieces:
-                path = os.path.join(FILES_DIR, f"{p['id']}.{p['ext']}")
-                if os.path.isfile(path):
-                    z.write(path, f"pieces/{p['id']}-{p.get('filename') or 'fichier'}")
+        archive_bytes = build_accounting_export_zip(clients, docs, orders, payments, pieces, **identity)
         name = f"themis-export-comptable-{datetime.now().strftime('%Y%m%d')}.zip"
-        return Response(content=buf.getvalue(), media_type="application/zip",
+        return Response(content=archive_bytes, media_type="application/zip",
                         headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
     # ---------- BILAN FINANCIER & ÉCHÉANCES (pour Sirius) ----------

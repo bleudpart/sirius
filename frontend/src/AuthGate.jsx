@@ -240,15 +240,47 @@ function AuthScreen({ onAuth }) {
 export function ProfilePanel({ user, onClose, onUpdate, onLogout }) {
   const [name, setName] = useState(user.name || "");
   const [notes, setNotes] = useState((user.preferences || {}).notes || "");
+  const [signatureName, setSignatureName] = useState((user.preferences || {}).signature_name || (user.name === "Daniel Partel" ? "M. Daniel Partel" : user.name) || "");
+  const defaultSignatureEmail = user.email && !user.email.toLowerCase().endsWith("@sirius.local")
+    ? user.email
+    : "danielsirius.pro2026@gmail.com";
+  const [signatureEmail, setSignatureEmail] = useState((user.preferences || {}).signature_email || defaultSignatureEmail);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [mfaSetup, setMfaSetup] = useState(null);
   const [mfaCode, setMfaCode] = useState("");
   const save = async () => {
-    const r = await fetch(`${API}/api/auth/profile`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, preferences: { ...(user.preferences || {}), notes } }),
-    });
-    if (r.ok) { const u = await r.json(); syncLocalProfile(u); onUpdate(u); setSaved(true); setTimeout(() => setSaved(false), 2000); }
+    const normalizedName = signatureName.trim();
+    const normalizedEmail = signatureEmail.trim();
+    if (!normalizedName) { setSaveError("Indiquez le nom à afficher dans vos signatures."); return; }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalizedEmail)) { setSaveError("Indiquez une adresse e-mail valide pour vos signatures."); return; }
+    setSaving(true);
+    setSaveError("");
+    try {
+      const r = await fetch(`${API}/api/auth/profile`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          preferences: {
+            ...(user.preferences || {}),
+            notes,
+            signature_name: normalizedName,
+            signature_email: normalizedEmail,
+          },
+        }),
+      });
+      const updated = await readResponseData(r);
+      if (!r.ok) throw new Error(fmtErr(updated.detail) || "Enregistrement du profil impossible.");
+      syncLocalProfile(updated);
+      onUpdate(updated);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (error) {
+      setSaveError(error.message || "Enregistrement du profil impossible.");
+    } finally {
+      setSaving(false);
+    }
   };
   const exportData = async () => {
     const response = await fetch(`${API}/api/auth/privacy/export`);
@@ -290,11 +322,22 @@ export function ProfilePanel({ user, onClose, onUpdate, onLogout }) {
         {user.mfa_enabled && <div className="mfa-setup"><input className="profile-input" inputMode="numeric" maxLength={6} placeholder="Code MFA pour désactiver" value={mfaCode} onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))} /><button className="file-btn danger" onClick={disableMfa}>DÉSACTIVER LE MFA</button></div>}
         <label className="profile-label">PRÉNOM / NOM AFFICHÉ</label>
         <input className="profile-input" value={name} onChange={(e) => setName(e.target.value)} data-testid="profile-name-input" />
+        <section className="profile-signature-settings" aria-labelledby="profile-signature-title">
+          <h3 id="profile-signature-title">SIGNATURES DES MESSAGES ET DOCUMENTS</h3>
+          <p>Ces coordonnées apparaissent sur vos e-mails et documents. Elles ne changent ni votre compte ni votre adresse de connexion Gmail ou Outlook.</p>
+          <label className="profile-label" htmlFor="profile-signature-name">NOM AFFICHÉ</label>
+          <input id="profile-signature-name" className="profile-input" value={signatureName} maxLength={120}
+            onChange={(e) => setSignatureName(e.target.value)} autoComplete="name" data-testid="profile-signature-name" />
+          <label className="profile-label" htmlFor="profile-signature-email">ADRESSE DE CONTACT</label>
+          <input id="profile-signature-email" className="profile-input" type="email" value={signatureEmail} maxLength={254}
+            onChange={(e) => setSignatureEmail(e.target.value)} autoComplete="email" data-testid="profile-signature-email" />
+          {saveError && <div className="profile-save-error" role="alert">{saveError}</div>}
+        </section>
         <label className="profile-label">PRÉFÉRENCES PERSONNELLES (Sirius en tiendra compte)</label>
         <textarea className="profile-input" rows={4} value={notes} placeholder="Ex. : je préfère des réponses courtes, je travaille dans la restauration…"
           onChange={(e) => setNotes(e.target.value)} data-testid="profile-notes-input" />
         <div className="gcal-toolbar">
-          <button className="auth-submit" style={{ width: "auto", padding: "10px 18px" }} onClick={save} data-testid="profile-save-btn"><Save size={14} /> {saved ? "ENREGISTRÉ ✓" : "ENREGISTRER"}</button>
+          <button className="auth-submit" style={{ width: "auto", padding: "10px 18px" }} onClick={save} disabled={saving} data-testid="profile-save-btn"><Save size={14} /> {saving ? "ENREGISTREMENT…" : saved ? "ENREGISTRÉ ✓" : "ENREGISTRER"}</button>
           <button className="file-btn" onClick={exportData} title="Exporter mes données" data-testid="profile-export-btn"><Download size={13} /> EXPORTER MES DONNÉES</button>
           <button className="file-btn danger" onClick={onLogout} data-testid="profile-logout-btn"><LogOut size={13} /> DÉCONNEXION</button>
           {user.role !== "admin" && <button className="file-btn danger" onClick={deleteAccount} title="Supprimer mon compte" data-testid="profile-delete-btn"><Trash2 size={13} /> SUPPRIMER MON COMPTE</button>}

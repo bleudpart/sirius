@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse, HTMLResponse
 from pydantic import BaseModel
 
-from email_signature import append_signature_text
+from email_signature import graph_signature, load_signature_identity
 from auth_api import resolve_user_id, LEGACY_UID, is_direct_local_request
 
 MS_AUTH = "https://login.microsoftonline.com/common/oauth2/v2.0"
@@ -193,11 +193,16 @@ def make_outlook_router(db):
     async def send_mail(req: SendMailReq, request: Request):
         uid = await resolve_user_id(request, db)
         tok = await get_token(uid)
-        payload = {"message": {
+        identity = await load_signature_identity(db, uid)
+        signature_body, attachments = graph_signature(req.body, **identity)
+        message = {
             "subject": req.subject,
-            "body": {"contentType": "Text", "content": append_signature_text(req.body)},
+            "body": signature_body,
             "toRecipients": [{"emailAddress": {"address": req.to}}],
-        }, "saveToSentItems": "true"}
+        }
+        if attachments:
+            message["attachments"] = attachments
+        payload = {"message": message, "saveToSentItems": "true"}
         async with httpx.AsyncClient(timeout=25) as cx:
             r = await cx.post(f"{GRAPH}/me/sendMail", json=payload, headers={"Authorization": f"Bearer {tok}"})
         if r.status_code not in (200, 202):
@@ -247,11 +252,16 @@ def make_outlook_router(db):
             raise HTTPException(status_code=400, detail="Destinataire manquant")
         subject = parameters.get("subject") or "Message envoyé par ΣIRIUS"
         body = parameters.get("body") or ""
-        payload = {"message": {
+        identity = await load_signature_identity(db, uid)
+        signature_body, attachments = graph_signature(body, **identity)
+        message = {
             "subject": subject,
-            "body": {"contentType": "Text", "content": append_signature_text(body)},
+            "body": signature_body,
             "toRecipients": [{"emailAddress": {"address": to}}],
-        }, "saveToSentItems": "true"}
+        }
+        if attachments:
+            message["attachments"] = attachments
+        payload = {"message": message, "saveToSentItems": "true"}
         async with httpx.AsyncClient(timeout=25) as cx:
             r = await cx.post(f"{GRAPH}/me/sendMail", json=payload, headers={"Authorization": f"******"})
         if r.status_code not in (200, 202):

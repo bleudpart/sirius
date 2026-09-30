@@ -9,6 +9,8 @@ import stripe
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, EmailStr
 
+from email_signature import load_signature_identity
+
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 _LOCAL_CHECKOUT_ORIGINS = {"http://localhost:3000", "http://127.0.0.1:3000"}
@@ -316,6 +318,7 @@ def make_payments_router(db):
     @r.get("/payments/receipt/{session_id}")
     async def payment_receipt(session_id: str, request: Request):
         uid = await _uid(request)
+        identity = await load_signature_identity(db, uid)
         tx = await db.payment_transactions.find_one({"session_id": session_id, "user_id": uid}, {"_id": 0})
         if not tx:
             raise HTTPException(status_code=404, detail="Transaction introuvable.")
@@ -325,7 +328,7 @@ def make_payments_router(db):
             raise HTTPException(status_code=400, detail="Le paiement n'est pas encore confirmé — pas de reçu.")
         from themis_pdf import build_receipt_pdf
         from fastapi.responses import StreamingResponse
-        buf = build_receipt_pdf(tx)
+        buf = build_receipt_pdf(tx, **identity)
         return StreamingResponse(buf, media_type="application/pdf",
                                  headers={"Content-Disposition": 'attachment; filename="recu-paiement.pdf"'})
 

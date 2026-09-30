@@ -8,6 +8,7 @@ from pydantic import BaseModel, StringConstraints
 from typing import Optional, List, Annotated
 
 from auth_api import require_user
+from email_signature import signature_identity
 from enterprise import record_audit, require_permission
 
 ReqStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -534,7 +535,16 @@ def make_haccp_router(db):
             report.append(f"Fiches de contrôle : {len(controls)} fiche(s), {validated} validée(s), {pending} à valider.")
         report.extend(["", "Document de synthèse généré par SIRIUS.", "Cet outil prépare un audit interne et ne constitue pas une certification officielle."])
         from themis_pdf import build_consult_pdf
-        pdf = build_consult_pdf("PANTHÉON", "Audit HACCP", "\n".join(report), date.today().strftime("%d/%m/%Y"))
+        identity = {}
+        if request.cookies.get("access_token") or (request.headers.get("authorization") or "").lower().startswith("bearer "):
+            identity = signature_identity(await require_user(request, db))
+        pdf = build_consult_pdf(
+            "PANTHÉON",
+            "Audit HACCP",
+            "\n".join(report),
+            date.today().strftime("%d/%m/%Y"),
+            **identity,
+        )
         await audit_change(request, scope, "haccp.audit.generate", "audit", "", {"date_debut": debut, "date_fin": fin})
         return Response(content=pdf.getvalue(), media_type="application/pdf",
                         headers={"Content-Disposition": f'attachment; filename="audit_haccp_{today()}.pdf"'})

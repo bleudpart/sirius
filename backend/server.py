@@ -382,6 +382,7 @@ async def chat(req: ChatRequest, request: Request):
             answer = autonomous_action["technical_comment"]
             memories = []
             popups = []
+            used_search = False
         else:
             # ⚡ Appel direct à ask_sirius (cerveau unique)
             result = await ask_sirius(
@@ -397,7 +398,7 @@ async def chat(req: ChatRequest, request: Request):
             answer = result.get("reponse", "")
             memories = result.get("memoire", [])
             popups = result.get("popups", [])
-        used_search = False  # géré en interne dans ask_sirius
+            used_search = bool(result.get("used_search", False))
 
         brain_ms = int((time.perf_counter() - t0) * 1000)
         logger.info(f"[CHAT] Réponse générée en {brain_ms} ms")

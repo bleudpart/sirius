@@ -105,6 +105,47 @@ def test_mfa_secret_is_encrypted_and_validates_totp():
     assert secret not in user["mfa_secret_enc"]
 
 
+def test_profile_signature_identity_saves_preferences_without_changing_login(monkeypatch):
+    db = Database()
+    db.users.documents.append({
+        "user_id": "user_1",
+        "email": "login@example.test",
+        "name": "Compte Camille",
+        "preferences": {"notes": "Réponses concises"},
+    })
+
+    async def authenticated_user(_request, _db):
+        return {
+            "user_id": "user_1",
+            "email": "login@example.test",
+            "name": "Compte Camille",
+            "preferences": {"notes": "Réponses concises"},
+        }
+
+    monkeypatch.setattr(auth_api, "require_user", authenticated_user)
+    update_profile = endpoint(auth_api.make_auth_router(db), "/auth/profile")
+    request = object()
+
+    updated = asyncio.run(update_profile({
+        "name": "Compte Camille",
+        "preferences": {
+            "signature_name": "Camille Martin",
+            "signature_email": "Camille@Example.fr",
+        },
+    }, request))
+
+    assert updated["email"] == "login@example.test"
+    assert updated["preferences"]["notes"] == "Réponses concises"
+    assert updated["preferences"]["signature_name"] == "Camille Martin"
+    assert updated["preferences"]["signature_email"] == "camille@example.fr"
+
+    with pytest.raises(HTTPException) as failure:
+        asyncio.run(update_profile({
+            "preferences": {"signature_email": "not-an-email"},
+        }, request))
+    assert failure.value.status_code == 422
+
+
 def test_register_login_and_lockout():
     db = Database()
     router = auth_api.make_auth_router(db)
