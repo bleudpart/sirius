@@ -16,6 +16,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from local_memory import _conn, _local_datetime
+from productivite.store import ProductivityStore
 
 MODES = ("proactif",)
 _MODE_LIMITS = {"proactif": 6}
@@ -206,14 +207,7 @@ def _task_candidates(user_id: str, now, local_now) -> list:
     """Tâches échues ou dues aujourd'hui : la source la plus actionnable qui existait déjà en base."""
     items = []
     today = local_now.date().isoformat()
-    with _conn() as con:
-        rows = [dict(r) for r in con.execute(
-            "SELECT id, title, status, priority, due_at FROM productivity_tasks "
-            "WHERE user_id = ? AND due_at IS NOT NULL AND due_at <> '' "
-            "AND LOWER(COALESCE(status,'')) NOT IN ('done','termine','terminé','annule','annulé') "
-            "ORDER BY due_at ASC LIMIT 20",
-            (user_id,),
-        ).fetchall()]
+    rows = ProductivityStore().due_tasks(user_id)
 
     late = [r for r in rows if (r["due_at"] or "")[:10] < today]
     due_today = [r for r in rows if (r["due_at"] or "")[:10] == today]

@@ -219,6 +219,17 @@ class ProductivityStore:
                 ).fetchall()
         return [dict(row) for row in rows]
 
+    def due_tasks(self, user_id: str, limit: int = 20) -> list[dict]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT id, title, status, priority, due_at FROM productivity_tasks "
+                "WHERE user_id = ? AND due_at IS NOT NULL AND due_at <> '' "
+                "AND LOWER(COALESCE(status,'')) NOT IN ('done','termine','terminé','annule','annulé') "
+                "ORDER BY due_at ASC LIMIT ?",
+                (self._safe_user_id(user_id), limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def get_task(self, user_id: str, task_id: str) -> dict | None:
         with self._connect() as connection:
             row = connection.execute(

@@ -69,6 +69,10 @@ def init_local_db():
             "status TEXT NOT NULL, result TEXT NOT NULL DEFAULT '', date_key TEXT NOT NULL, "
             "started_at TEXT NOT NULL, completed_at TEXT)"
         )
+        con.execute(
+            "CREATE TABLE IF NOT EXISTS service_log ("
+            "id TEXT PRIMARY KEY, service TEXT, action TEXT, status TEXT, created_at TEXT)"
+        )
         # Rappel sémantique : vecteurs d'embedding mis en cache localement.
         con.execute(
             "CREATE TABLE IF NOT EXISTS fact_vectors ("
@@ -606,10 +610,6 @@ init_local_db()
 def log_service(service: str, action: str, status: str):
     with _conn() as con:
         con.execute(
-            "CREATE TABLE IF NOT EXISTS service_log ("
-            "id TEXT PRIMARY KEY, service TEXT, action TEXT, status TEXT, created_at TEXT)"
-        )
-        con.execute(
             "INSERT INTO service_log (id, service, action, status, created_at) VALUES (?, ?, ?, ?, ?)",
             (str(uuid.uuid4()), service[:40], action[:120], status[:20],
              datetime.now(timezone.utc).isoformat()),
@@ -618,10 +618,6 @@ def log_service(service: str, action: str, status: str):
 
 def list_service_log(limit: int = 25):
     with _conn() as con:
-        con.execute(
-            "CREATE TABLE IF NOT EXISTS service_log ("
-            "id TEXT PRIMARY KEY, service TEXT, action TEXT, status TEXT, created_at TEXT)"
-        )
         rows = con.execute(
             "SELECT * FROM service_log ORDER BY created_at DESC LIMIT ?", (limit,)
         ).fetchall()

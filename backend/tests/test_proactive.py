@@ -5,11 +5,13 @@ import pytest
 
 import local_memory
 import proactive
+from productivite.store import ProductivityStore
 
 
 @pytest.fixture()
 def memory_db(tmp_path, monkeypatch):
     monkeypatch.setattr(local_memory, "DB_PATH", tmp_path / "test_memory.db")
+    monkeypatch.setenv("SIRIUS_PRODUCTIVITY_DB", str(tmp_path / "test_productivity.db"))
     local_memory.init_local_db()
     proactive.init_proactive_db()
     return local_memory
@@ -30,6 +32,18 @@ def test_projet_recent_genere_une_suggestion(memory_db):
     result = proactive.evaluate("u1", now=_at_hour(14))
     assert result["settings"]["mode"] == "proactif"
     assert any("audit HACCP" in s["description"] for s in result["suggestions"])
+
+def test_taches_dues_proviennent_du_stockage_productivite(memory_db):
+    store = ProductivityStore()
+    store.create_task("u1", "Préparer le dossier", due_at="2020-01-01")
+    store.create_task("u2", "Tâche d'un autre utilisateur", due_at="2020-01-01")
+    store.create_task("u1", "Tâche terminée", status="done", due_at="2020-01-01")
+
+    result = proactive.evaluate("u1", now=_at_hour(14))
+    overdue = next(s for s in result["suggestions"] if s["source"] == "tache-retard")
+    assert "Préparer le dossier" in overdue["description"]
+    assert "autre utilisateur" not in overdue["description"]
+    assert "Tâche terminée" not in overdue["description"]
 
 
 def test_briefing_suggere_le_matin_seulement(memory_db):
