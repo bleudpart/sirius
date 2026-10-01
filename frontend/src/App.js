@@ -10,7 +10,7 @@ import {
   AtlasPanel, HeraclesPanel, HephaistosPanel, MythosGallery, ConsultPanel, PrometheePanel, CalliopePanel, CalendarPanel,
   FaceIdPanel, PythagorePanel, PackagerPanel, TrailerGallery, SiriusSetup, PromoPanel, ThemisPanel,
   AdminPanel, EnterprisePanel, PortusNummarius, AgoraPipeline, NewsPanel, ReveilPanel, SpotifyPanel, MediaHUD, ProductivityPanel,
-  FloorPlanPanel, Photo3DPanel, ConnectionsPanel,
+  FloorPlanPanel, Photo3DPanel, ConnectionsPanel, WorkModulesPanel,
 } from "@/lazyModules";
 import { pushStats, setStatsOffline } from "@/liveStats";
 import { formatLocalDate, formatLocalTime, getLocalDateKey } from "@/dateTime";
@@ -37,6 +37,9 @@ import { speakFr, cancelSpeech, speakSeries, speakAsCharacter } from "@/voice";
 import { loadApiKeys, saveApiKeys } from "@/apiKeyStorage";
 import { loadHud, applyHud } from "@/hudPrefs";
 import { initUiSounds } from "@/uiSounds";
+import { createModuleRegistry } from "@/moduleRegistry";
+import { WORK_MODULES } from "@/workModules";
+import { createWindowController } from "@/windowController";
 import { initHoloFx } from "@/holoFx";
 import { getDisplayAutoCloseDelay } from "@/displayTiming";
 import { initReadAloud } from "@/readAloud";
@@ -327,26 +330,18 @@ function App() {
       return openModuleByName(target);
     }
     if (act === "close_module" && target) {
-      const CLOSERS = {
-        display: () => setDisplayOpen(false), files: () => setShowFiles(false), architect: () => setShowArchitect(false),
-        pantheon: () => setShowPantheon(false), cortex: () => setShowCortex(false), nexus: () => setShowNexus(false),
-        oracle: () => setShowOracle(false), nummarius: () => setShowNummarius(false), europeana: () => setShowEuropeana(false),
-        haccp: () => setHaccp(null), prime: () => setShowPrime(false), dev: () => setShowDev(false),
-        analytics: () => setShowAnalytics(false), memory: () => setShowMemory(false), memorymgr: () => setShowMemoryMgr(false),
-        argus: () => setShowArgus(false), keys: () => setShowKeysStatus(false), gcal: () => setShowCalendar(false),
-        faceid: () => setShowFaceId(false), keraunos: () => setShowKeraunos(false), espace: () => setShowEspace(false),
-        about: () => setShowAbout(false), locus: () => setShowLocus(false), atlas: () => setShowAtlas(false),
-        heracles: () => setShowHeracles(false), hephaistos: () => setShowHephaistos(false), mythos: () => setShowMythosGallery(false),
-        trailer: () => setShowTrailer(false), promo: () => setShowPromo(false), themis: () => setShowThemis(false),
-        agora: () => setShowAgora(false), solon: () => setShowSolon(false), promethee: () => setShowPromethee(false),
-        calliope: () => setShowCalliope(false), pythagore: () => setShowPythagore(false), news: () => setShowNews(false),
-        packager: () => setShowPackager(false), install: () => setShowInstall(false), scripts: () => setShowScripts(false),
-        vision: () => setShowVision(false), admin: () => setShowAdmin(false), setup: () => setShowSetup(false),
-        gallery: () => setShowGallery(false), spotify: () => setShowSpotifyWin(false), media: () => setShowMediaHud(false),
-        productivity: () => setShowProductivity(false),
-      };
-      const fn = CLOSERS[target];
-      if (fn) { fn(); confirm(d.say || "Fenêtre fermée."); return true; }
+      const controller = createWindowController({
+        setDisplayOpen, setShowFiles, setShowArchitect, setShowPantheon, setShowCortex, setShowNexus,
+        setShowOracle, setShowNummarius, setShowEuropeana, setHaccp, setShowPrime, setShowDev,
+        setShowAnalytics, setShowMemory, setShowMemoryMgr, setShowArgus, setShowKeysStatus, setShowCalendar,
+        setShowFaceId, setShowKeraunos, setShowEspace, setShowAbout, setShowLocus, setShowAtlas,
+        setShowHeracles, setShowHephaistos, setShowMythosGallery, setShowTrailer, setShowPromo, setShowThemis,
+        setShowAgora, setShowSolon, setShowPromethee, setShowCalliope, setShowPythagore, setShowNews,
+        setShowPackager, setShowInstall, setShowScripts, setShowVision, setShowAdmin, setShowSetup,
+        setShowGallery, setShowSpotifyWin, setShowMediaHud, setShowProductivity,
+        setActiveWorkModule, setShowPlans, setShowPhoto3D, setShowConnections, setShowReveil, setShowEnterprise,
+      });
+      if (controller.close(target)) { confirm(d.say || "Fenêtre fermée."); return true; }
       return false;
     }
     if (act === "minimize_module" && target) {
@@ -378,21 +373,36 @@ function App() {
     localStorage.setItem("sirius_memory", JSON.stringify(arr));
   }, []);
   
-  // Connection status badge for Google & Microsoft (checked every 3s)
+  // Connection status badge for Google & Microsoft: bounded polling, no overlap, paused in background.
   const [connectionStatus, setConnectionStatus] = useState({ google: false, microsoft: false });
   useEffect(() => {
+    let stopped = false;
+    let requestController = null;
+    let timer = null;
     const checkStatus = async () => {
+      if (stopped || document.hidden) return;
+      requestController?.abort();
+      requestController = new AbortController();
       try {
         const [gRes, mRes] = await Promise.all([
-          fetch(`${API}/calendar/status`, { credentials: "include" }).then(r => r.ok ? r.json() : { connected: false }).catch(() => ({ connected: false })),
-          fetch(`${API}/auth/microsoft/status`, { credentials: "include" }).then(r => r.ok ? r.json() : { connected: false }).catch(() => ({ connected: false })),
+          fetch(`${API}/calendar/status`, { credentials: "include", signal: requestController.signal }).then(r => r.ok ? r.json() : { connected: false }).catch(() => ({ connected: false })),
+          fetch(`${API}/auth/microsoft/status`, { credentials: "include", signal: requestController.signal }).then(r => r.ok ? r.json() : { connected: false }).catch(() => ({ connected: false })),
         ]);
-        setConnectionStatus({ google: gRes.connected || false, microsoft: mRes.connected || false });
-      } catch (e) {}
+        if (!stopped) setConnectionStatus({ google: gRes.connected || false, microsoft: mRes.connected || false });
+      } catch (error) {
+        if (error.name !== "AbortError" && !stopped) setConnectionStatus({ google: false, microsoft: false });
+      }
     };
     checkStatus();
-    const timer = setInterval(checkStatus, 3000);
-    return () => clearInterval(timer);
+    const onVisibility = () => { if (!document.hidden) checkStatus(); };
+    document.addEventListener("visibilitychange", onVisibility);
+    timer = setInterval(checkStatus, 30000);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+      requestController?.abort();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, []);
 
   const [showSetup, setShowSetup] = useState(() => !localStorage.getItem("sirius_profile"));
@@ -833,6 +843,7 @@ function App() {
   const [showAgora, setShowAgora] = useState(false);
   const [showSolon, setShowSolon] = useState(false);
   const [showPromethee, setShowPromethee] = useState(false);
+  const [activeWorkModule, setActiveWorkModule] = useState(null);
   const [showCalliope, setShowCalliope] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [showConnections, setShowConnections] = useState(false);
@@ -5894,64 +5905,37 @@ function App() {
     await captureSiriusInterface(region);
   };
 
-  const moduleItems = [
-    { id: "reload", group: "SYSTÈME", label: "Recharger ΣIRIUS", Icon: RotateCcw, run: () => { window.__siriusBootPlayed = false; window.location.reload(); } },
-    { id: "display", group: "MÉDIAS", label: "ΣIRIUS DISPLAY", Icon: Monitor, active: displayOpen, run: () => { pinDisplay(); setDisplayOpen((o) => !o); } },
-    { id: "media-modules", group: "MÉDIAS", label: "Modules multimédia", Icon: Clapperboard, active: displayOpen && display.type === "media", run: () => showOnDisplay({ type: "media", titre: "MODULES MULTIMÉDIA" }) },
-    { id: "files", group: "MÉDIAS", label: "Médiathèque", Icon: FolderOpen, run: () => setShowFiles(true) },
-    { id: "info-hub", group: "OUTILS", label: "Centre d'information SIRIUS", Icon: BadgeInfo, run: () => restoreHudPanel("info-hub") },
-    { id: "connections", group: "OUTILS", label: "Comptes & connexions", Icon: Link2, run: () => setShowConnections(true) },
-    { id: "capture-interface", group: "OUTILS", label: "Capture de l'interface", Icon: Camera, run: () => captureSiriusInterface() },
-    { id: "capture-region", group: "OUTILS", label: "Capture d'une zone (souris)", Icon: Camera, run: captureSiriusRegion },
-    { id: "open-capture-folder", group: "OUTILS", label: "Ouvrir le dossier des captures", Icon: FolderOpen, run: openCaptureFolder },
-    { id: "architect", group: "OUTILS", label: "Architecte visuel", Icon: Workflow, run: () => { setArchitectPrompt(""); setShowArchitect(true); } },
-    { id: "plans", group: "OUTILS", label: "Plans 2D (PLANS#)", Icon: Ruler, run: () => { setPlansPrompt(""); setShowPlans(true); } },
-    { id: "photo3d", group: "OUTILS", label: "Photos → Objet 3D (PHOTO3D#)", Icon: Boxes, run: () => setShowPhoto3D(true) },
-    { id: "pantheon", group: "PANTHÉON", label: "PANTHEON SYSTEM", Icon: PantheonLogo, run: () => setShowPantheon(true) },
-    { id: "cortex", group: "PANTHÉON", label: "ZEUS CORTEX# — intelligence centrale", Icon: Zap, run: () => setShowCortex(true) },
-    { id: "nexus", group: "PANTHÉON", label: "NEXUS CÉLESTE", Icon: Orbit, run: () => setShowNexus(true) },
-    { id: "oracle", group: "PANTHÉON", label: "ORACLE DIVIN", Icon: Eye, run: () => setShowOracle(true) },
-    { id: "nummarius", group: "PANTHÉON", label: "PORTUS NUMMARIUS# — bourse & marchés", Icon: Landmark, run: () => setShowNummarius(true) },
-    { id: "europeana", group: "MÉDIAS", label: "Archives Europeana", Icon: Library, run: () => setShowEuropeana(true) },
-    { id: "haccp", group: "OUTILS", label: "HACCP — sécurité alimentaire", Icon: ShieldCheck, run: () => setHaccp({ sujet: "", auto: false }) },
-    { id: "prime", group: "OUTILS", label: "ΣIRIUS PRIME — mémoire", Icon: Sparkles, run: () => setShowPrime(true) },
-    { id: "dev", group: "OUTILS", label: "Compagnon Dev", Icon: Code2, run: () => setShowDev(true) },
-    { id: "analytics", group: "OUTILS", label: "Tableau analytique", Icon: BarChart3, run: () => setShowAnalytics(true) },
-    { id: "memory", group: "OUTILS", label: "Ce que Sirius sait sur moi", Icon: Brain, run: () => setShowMemory(true) },
-    { id: "memorymgr", group: "OUTILS", label: "Gestion de la mémoire", Icon: Database, run: () => setShowMemoryMgr(true) },
-    { id: "argus", group: "PANTHÉON", label: "ARGUS — surveillance système", Icon: Radar, run: () => setShowArgus(true) },
-    { id: "journal", group: "OUTILS", label: "Journal des tâches", Icon: History, run: () => window.dispatchEvent(new Event("sirius-journal-open")) },
-    { id: "keys", group: "SYSTÈME", label: "Statut des clés API", Icon: KeyRound, run: () => setShowKeysStatus(true) },
-    { id: "gcal", group: "OUTILS", label: "AGENDA — Google Calendar", Icon: Calendar, run: () => setShowCalendar(true) },
-    { id: "faceid", group: "SYSTÈME", label: "FACE ID — reconnaissance faciale locale", Icon: Fingerprint, run: () => setShowFaceId(true) },
-    { id: "reveil", group: "SYSTÈME", label: "RÉVEIL MATINAL — briefing & mails à l'heure choisie", Icon: AlarmClock, run: () => setShowReveil(true) },
-    { id: "keraunos", group: "PANTHÉON", label: "KERAUNOS# — domotique", Icon: HomeIcon, run: () => setShowKeraunos(true) },
-    { id: "espace", group: "MÉDIAS", label: "ESPACE — système solaire 3D", Icon: Globe2, run: () => setShowEspace(true) },
-    { id: "about", group: "SYSTÈME", label: "À propos / Informations légales", Icon: BadgeInfo, run: () => setShowAbout(true) },
-    { id: "locus", group: "PANTHÉON", label: "LOCUS# — géolocalisation", Icon: MapPin, run: () => setShowLocus(true) },
-    { id: "atlas", group: "PANTHÉON", label: "ATLAS# — carte & navigation", Icon: Globe2, run: () => { setAtlasQuery(""); setAtlasRoute(null); setShowAtlas(true); } },
-    { id: "heracles", group: "PANTHÉON", label: "HERACLES# — investigation OSINT", Icon: Fingerprint, run: () => setShowHeracles(true) },
-    { id: "hephaistos", group: "PANTHÉON", label: "HÉPHAÏSTOS# — auto-maintenance & diagnostic", Icon: Hammer, mobile: false, run: () => setShowHephaistos(true) },
-    { id: "mythos", group: "PANTHÉON", label: "Galerie MYTHOS", Icon: MythosLogo, run: () => setShowMythosGallery(true) },
-    { id: "trailer", group: "MÉDIAS", label: "TRAILER# — clichés cinématiques", Icon: Clapperboard, run: () => setShowTrailer(true) },
-    { id: "promo", group: "MÉDIAS", label: "PROMO# — storyboard vidéo réseaux sociaux", Icon: Radio, run: () => setShowPromo(true) },
-    { id: "themis", group: "PANTHÉON", label: "THÉMIS# — gestion d'entreprise (devis, factures, stocks)", Icon: ThemisLogo, run: () => setShowThemis(true) },
-    { id: "agora", group: "PANTHÉON", label: "HERMÈS AGORA# — pipeline de vente", Icon: TrendingUp, run: () => setShowAgora(true) },
-    { id: "solon", group: "PANTHÉON", label: "SOLON# — conseil juridique", Icon: Scale, run: () => setShowSolon(true) },
-    { id: "promethee", group: "PANTHÉON", label: "PROMÉTHÉE# — gestion de projet", Icon: Flame, run: () => setShowPromethee(true) },
-    { id: "calliope", group: "PANTHÉON", label: "CALLIOPE# — bibliothèque audio", Icon: BookOpen, run: () => setShowCalliope(true) },
-    { id: "pythagore", group: "PANTHÉON", label: "PYTHAGORE# — mathématiques & géométrie", Icon: Sigma, run: () => setShowPythagore(true) },
-    { id: "news", group: "MÉDIAS", label: "ACTUALITÉS — flux en direct", Icon: Newspaper, run: () => setShowNews(true) },
-    { id: "packager", group: "OUTILS", label: "PACKAGER# — livrable multi-plateforme", Icon: Package, mobile: false, run: () => setShowPackager(true) },
-    { id: "install", group: "SYSTÈME", label: "Assistant d'installation", Icon: Wrench, mobile: false, run: () => setShowInstall(true) },
-    { id: "scripts", group: "OUTILS", label: "Bibliothèque de scripts", Icon: FileCode, mobile: false, run: () => setShowScripts(true) },
-    { id: "vision", group: "MÉDIAS", label: "Vision caméra", Icon: Camera, active: showVision, run: () => setShowVision(!showVision) },
-    { id: "productivity", group: "OUTILS", label: "PRODUCTIVITE & TRAVAIL — documents, code, notes, taches", Icon: Workflow, active: showProductivity, run: () => { setProductivityIntent(null); setShowProductivity(true); } },
-    { id: "media", group: "MÉDIAS", label: "MEDIA PROXY — lecteurs et controles", Icon: Radio, active: showMediaHud, run: () => { setMediaIntent(null); setShowMediaHud(true); } },
-    { id: "spotify", group: "MÉDIAS", label: spotify ? "Spotify — lecteur intégré" : "Spotify — lecteur (connexion requise)", Icon: Music, active: spotify, run: () => setShowSpotifyWin(true) },
-    ...(authUser?.role === "admin" ? [{ id: "admin", group: "SYSTÈME", label: "ADMINISTRATION — comptes & activité", Icon: ShieldCheck, run: () => setShowAdmin(true) }] : []),
-    ...(authUser ? [{ id: "enterprise", group: "SYSTÈME", label: "SIRIUS ENTREPRISE — équipe, audit & sauvegardes", Icon: Building2, run: () => setShowEnterprise(true) }] : []),
-  ];
+  const moduleItems = createModuleRegistry({
+    icons: { RotateCcw, Monitor, Clapperboard, FolderOpen, BadgeInfo, Link2, Camera, Workflow, Ruler, Boxes,
+      PantheonLogo, Zap, Orbit, Eye, Landmark, Library, ShieldCheck, Sparkles, Code2, BarChart3, Brain, Database,
+      Radar, History, KeyRound, Calendar, Fingerprint, AlarmClock, HomeIcon, Globe2, Hammer, MythosLogo, Radio,
+      ThemisLogo, TrendingUp, Scale, Flame, BookOpen, Sigma, Newspaper, Package, Wrench, FileCode, Music, Building2 },
+    state: { displayOpen, displayType: display.type, showVision, showProductivity, showMediaHud, spotify },
+    user: authUser,
+    actions: {
+      reload: () => { window.__siriusBootPlayed = false; window.location.reload(); },
+      toggleDisplay: () => { pinDisplay(); setDisplayOpen((open) => !open); },
+      showMediaModules: () => showOnDisplay({ type: "media", titre: "MODULES MULTIMÉDIA" }),
+      openFiles: () => setShowFiles(true), openInfoHub: () => restoreHudPanel("info-hub"), openConnections: () => setShowConnections(true),
+      captureInterface: () => captureSiriusInterface(), captureRegion: captureSiriusRegion, openCaptureFolder,
+      openArchitect: () => { setArchitectPrompt(""); setShowArchitect(true); }, openPlans: () => { setPlansPrompt(""); setShowPlans(true); },
+      openPhoto3d: () => setShowPhoto3D(true), openPantheon: () => setShowPantheon(true), openCortex: () => setShowCortex(true),
+      openNexus: () => setShowNexus(true), openOracle: () => setShowOracle(true), openNummarius: () => setShowNummarius(true),
+      openEuropeana: () => setShowEuropeana(true), openHaccp: () => setHaccp({ sujet: "", auto: false }), openPrime: () => setShowPrime(true),
+      openDev: () => setShowDev(true), openAnalytics: () => setShowAnalytics(true), openMemory: () => setShowMemory(true),
+      openMemoryManager: () => setShowMemoryMgr(true), openArgus: () => setShowArgus(true), openJournal: () => window.dispatchEvent(new Event("sirius-journal-open")),
+      openKeys: () => setShowKeysStatus(true), openCalendar: () => setShowCalendar(true), openFaceId: () => setShowFaceId(true), openReveil: () => setShowReveil(true),
+      openKeraunos: () => setShowKeraunos(true), openEspace: () => setShowEspace(true), openAbout: () => setShowAbout(true), openLocus: () => setShowLocus(true),
+      openAtlas: () => { setAtlasQuery(""); setAtlasRoute(null); setShowAtlas(true); }, openHeracles: () => setShowHeracles(true), openHephaistos: () => setShowHephaistos(true),
+      openMythos: () => setShowMythosGallery(true), openTrailer: () => setShowTrailer(true), openPromo: () => setShowPromo(true), openThemis: () => setShowThemis(true),
+      openAgora: () => setShowAgora(true), openSolon: () => setShowSolon(true), openPromethee: () => setShowPromethee(true), openCalliope: () => setShowCalliope(true),
+      openPythagore: () => setShowPythagore(true), openNews: () => setShowNews(true), openPackager: () => setShowPackager(true), openInstall: () => setShowInstall(true),
+      openScripts: () => setShowScripts(true), toggleVision: () => setShowVision((open) => !open),
+      openProductivity: () => { setProductivityIntent(null); setShowProductivity(true); }, openMedia: () => { setMediaIntent(null); setShowMediaHud(true); },
+      openSpotify: () => setShowSpotifyWin(true), openAdmin: () => setShowAdmin(true), openEnterprise: () => setShowEnterprise(true),
+      openWorkModule: setActiveWorkModule,
+    },
+  });
   moduleItemsRef.current = moduleItems;
 
   const navigateMobile = (destination) => {
@@ -6006,6 +5990,7 @@ function App() {
       <span className="corner br" />
 
       {booting && <BootScreen userName={userName} connected={connected} onDone={finishBoot} onOpenModule={(id) => {
+        if (WORK_MODULES.some((module) => module.id === id)) { setActiveWorkModule(id); return; }
         const openers = { argus: setShowArgus, atlas: setShowAtlas, oracle: setShowOracle, heracles: setShowHeracles, hephaistos: setShowHephaistos, keraunos: setShowKeraunos, locus: setShowLocus, pantheon: setShowPantheon, cortex: setShowCortex, themis: setShowThemis, nummarius: setShowNummarius };
         if (id === "solon") { setShowSolon(true); return; }
         if (id === "calliope") { setShowCalliope(true); return; }
@@ -6144,6 +6129,12 @@ function App() {
       {showAgora && <AgoraPipeline onClose={() => setShowAgora(false)} onOpenThemis={() => { setShowAgora(false); setShowThemis(true); }} />}
       {showSolon && <ConsultPanel module="SOLON#" onClose={() => setShowSolon(false)} />}
       {showPromethee && <PrometheePanel onClose={() => setShowPromethee(false)} />}
+      {activeWorkModule && <WorkModulesPanel key={`${authUser?.id || authUser?._id || authUser?.email || "local"}-${activeWorkModule}`} initialModule={activeWorkModule} user={authUser} onClose={() => setActiveWorkModule(null)} onOpenExisting={(id) => {
+        if (id === "promethee") setShowPromethee(true);
+        if (id === "themis") setShowThemis(true);
+        if (id === "plans") setShowPlans(true);
+        setActiveWorkModule(null);
+      }} />}
       {showCalliope && <CalliopePanel onClose={() => setShowCalliope(false)} />}
       {showCalendar && <CalendarPanel onClose={() => setShowCalendar(false)} />}
       {showConnections && <ConnectionsPanel onClose={() => {

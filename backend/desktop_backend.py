@@ -7,8 +7,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-from runtime_paths import project_dir
-
 
 def _windows_sirius_processes() -> list[int]:
     """Retourne les PIDs des processus SIRIUS déjà en cours sur Windows."""
@@ -116,6 +114,12 @@ def _prepare_runtime() -> None:
     os.environ["SIRIUS_DATA_DIR"] = str(data_dir)
     os.environ["SIRIUS_PACKAGED"] = "1"
 
+    # Chromium embarqué par sirius-backend.spec sous playwright-browsers/.
+    bundle_dir = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+    browsers_dir = bundle_dir / "playwright-browsers"
+    if browsers_dir.is_dir():
+        os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", str(browsers_dir))
+
     secret_file = data_dir / "auth-secret"
     try:
         secret = secret_file.read_text(encoding="ascii").strip()
@@ -131,14 +135,6 @@ def _prepare_runtime() -> None:
     if not secret:
         raise RuntimeError("Le secret de session ΣIRIUS est vide.")
     os.environ.setdefault("SIRIUS_AUTH_SECRET", secret)
-
-    # Le webagent (recherche invisible via Playwright) doit trouver Chromium
-    # à l'intérieur du bundle PyInstaller, sans compter sur un téléchargement
-    # réseau sur le poste client (voir sirius-backend.spec pour les binaires).
-    if getattr(sys, "frozen", False):
-        bundled_browsers = project_dir() / "playwright-browsers"
-        if bundled_browsers.exists():
-            os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", str(bundled_browsers))
 
 
 def main() -> None:

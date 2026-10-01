@@ -1462,17 +1462,17 @@ body.hud-minimal .medallion-halo { display: none; }
 @property --auth-border-angle { syntax:"<angle>"; inherits:false; initial-value:0deg; }
 @keyframes authBorderOrbit { to { --auth-border-angle:360deg; } }
 @media (prefers-reduced-motion: reduce) {
-  .auth-card::before,
-  .auth-core-logo img,
-  .auth-core-logo i { animation:none; }
+  .auth-card::before { animation:none; }
 }
 .auth-brand { text-align: center; }
 .auth-brand-main { display:flex; align-items:center; justify-content:center; gap:12px; }
-.auth-core-logo { position:relative; display:grid; place-items:center; width:52px; height:52px; flex:0 0 52px; filter:drop-shadow(0 0 8px rgba(216,184,117,.55)); }
-.auth-core-logo img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; animation:authCoreSpin 10s linear infinite; }
-.auth-core-logo i { width:21px; height:21px; border-radius:50%; background:radial-gradient(circle at 35% 28%,#fff 0%,#d9fbff 20%,#8beaff 42%,#25c2f0 67%,#0874a7 100%); box-shadow:0 0 8px rgba(145,230,242,.95),0 0 20px rgba(60,179,255,.72),inset 0 0 7px rgba(255,255,255,.72); animation:authCorePulse 1.8s ease-in-out infinite; }
-@keyframes authCoreSpin { to { transform:rotate(360deg); } }
-@keyframes authCorePulse { 0%,100% { transform:scale(.9); opacity:.86; } 50% { transform:scale(1.12); opacity:1; } }
+.auth-core-logo { position:relative; display:block; width:52px; height:52px; flex:0 0 52px; clip-path:circle(50%); }
+.auth-core-logo .core-rings { inset:0; }
+.auth-core-logo .core-letter i { font-size:4px; }
+.auth-core-logo .reactor-canvas {
+  -webkit-mask-image: radial-gradient(circle, #000 0%, #000 40%, transparent 56%);
+  mask-image: radial-gradient(circle, #000 0%, #000 40%, transparent 56%);
+}
 .auth-title {
   margin: 0 -7px 0 0;
   font-family: "Cinzel", "Orbitron", serif;
@@ -5868,15 +5868,20 @@ body.hud-minimal .medallion-halo { display: none; }
 /* Présentation des modules — typographie antique, à côté de l'animation du boot */
 .boot-modules {
   position: absolute;
-  right: clamp(24px, 7vw, 130px);
+  right: clamp(16px, 2vw, 36px);
   top: 50%;
   transform: translateY(-50%);
-  display: flex; flex-direction: column; gap: 11px;
-  z-index: 3; pointer-events: none;
-  padding-left: 22px;
+  display: flex; flex-direction: column; gap: 4px;
+  width: min(23vw, 250px);
+  max-height: calc(100dvh - 80px);
+  overflow-y: auto;
+  z-index: 3;
+  padding: 4px 6px 4px 16px;
 
   border-left: 1px solid rgba(216, 184, 117, 0.35);
 }
+.boot-modules::-webkit-scrollbar { width: 4px; }
+.boot-modules::-webkit-scrollbar-thumb { background: rgba(216, 184, 117, 0.45); }
 .boot-modules-title {
   font-size: 15px; color: #d8b875; letter-spacing: 0.22em;
   text-shadow: 0 0 12px rgba(216, 184, 117, 0.5);
@@ -5908,6 +5913,10 @@ body.hud-minimal .medallion-halo { display: none; }
 .boot-module-role {
   font-family: "Rajdhani", sans-serif;
   font-size: 11px; color: #7fb6cc; letter-spacing: 0.06em;
+}
+@media (min-width: 1500px) {
+  .boot-modules { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: min(33vw, 520px); column-gap: 12px; }
+  .boot-modules-title { grid-column: 1 / -1; }
 }
 @keyframes bootModIn { to { opacity: 1; transform: translateX(0); } }
 

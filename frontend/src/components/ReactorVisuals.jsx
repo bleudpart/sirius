@@ -5,6 +5,21 @@ import { useEffect, useRef, useState } from "react";
 
 import { STATES } from "@/appLogic";
 
+export function CoreRings() {
+  return (
+    <div className="core-rings" aria-hidden="true">
+      <img src="/holo/ring-gold.png" alt="" className="core-ring outer" draggable={false} />
+      <img src="/holo/ring-gold.png" alt="" className="core-ring inner" draggable={false} />
+      <div className="core-pulse" />
+      <div className="core-orbit">
+        {["Σ", "Δ", "Ω", "Θ", "Φ"].map((letter, index) => (
+          <span key={letter} className="core-letter" style={{ "--i": index }}><i>{letter}</i></span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Anneau d'or réel superposé au médaillon du trône — même rotation que la page de présentation
 export function MedallionRing({ status }) {
   const [box, setBox] = useState(null);

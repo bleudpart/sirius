@@ -1,0 +1,68 @@
+export function createWindowController(setters, display) {
+  const closers = {
+    display: () => setters.setDisplayOpen(false),
+    files: () => setters.setShowFiles(false),
+    plans: () => setters.setShowPlans?.(false),
+    photo3d: () => setters.setShowPhoto3D?.(false),
+    connections: () => setters.setShowConnections?.(false),
+    reveil: () => setters.setShowReveil?.(false),
+    enterprise: () => setters.setShowEnterprise?.(false),
+    architect: () => setters.setShowArchitect(false),
+    pantheon: () => setters.setShowPantheon(false),
+    cortex: () => setters.setShowCortex(false),
+    nexus: () => setters.setShowNexus(false),
+    oracle: () => setters.setShowOracle(false),
+    nummarius: () => setters.setShowNummarius(false),
+    europeana: () => setters.setShowEuropeana(false),
+    haccp: () => setters.setHaccp(null),
+    prime: () => setters.setShowPrime(false),
+    dev: () => setters.setShowDev(false),
+    analytics: () => setters.setShowAnalytics(false),
+    memory: () => setters.setShowMemory(false),
+    memorymgr: () => setters.setShowMemoryMgr(false),
+    argus: () => setters.setShowArgus(false),
+    keys: () => setters.setShowKeysStatus(false),
+    gcal: () => setters.setShowCalendar(false),
+    faceid: () => setters.setShowFaceId(false),
+    keraunos: () => setters.setShowKeraunos(false),
+    espace: () => setters.setShowEspace(false),
+    about: () => setters.setShowAbout(false),
+    locus: () => setters.setShowLocus(false),
+    atlas: () => setters.setShowAtlas(false),
+    heracles: () => setters.setShowHeracles(false),
+    hephaistos: () => setters.setShowHephaistos(false),
+    mythos: () => setters.setShowMythosGallery(false),
+    trailer: () => setters.setShowTrailer(false),
+    promo: () => setters.setShowPromo(false),
+    themis: () => setters.setShowThemis(false),
+    agora: () => setters.setShowAgora(false),
+    solon: () => setters.setShowSolon(false),
+    promethee: () => setters.setShowPromethee(false),
+    ...Object.fromEntries(["workflows", "pricing", "dossiers", "audit", "documents", "planning"].map((id) => [id, () => setters.setActiveWorkModule(null)])),
+    calliope: () => setters.setShowCalliope(false),
+    pythagore: () => setters.setShowPythagore(false),
+    news: () => setters.setShowNews(false),
+    packager: () => setters.setShowPackager(false),
+    install: () => setters.setShowInstall(false),
+    scripts: () => setters.setShowScripts(false),
+    vision: () => setters.setShowVision(false),
+    admin: () => setters.setShowAdmin(false),
+    setup: () => setters.setShowSetup(false),
+    gallery: () => setters.setShowGallery(false),
+    spotify: () => setters.setShowSpotifyWin(false),
+    media: () => setters.setShowMediaHud(false),
+    productivity: () => setters.setShowProductivity(false),
+  };
+
+  return {
+    close(target) {
+      const close = closers[target];
+      if (!close) return false;
+      close();
+      return true;
+    },
+    closeDisplay: closers.display,
+    closers,
+    display,
+  };
+}

@@ -4,9 +4,10 @@ import {
   X, CheckCircle2, XCircle, Loader2, RotateCcw, Monitor, Mic, Server,
   BrainCircuit, LayoutDashboard, Boxes, Rocket, ChevronRight, Code2,
 } from "lucide-react";
+import { BACKEND_BASE_URL } from "@/lib/api";
 import "./InstallWizard.css";
 
-const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
+const API = `${BACKEND_BASE_URL}/api`;
 
 const STEPS = [
   { id: "environment", label: "ENVIRONNEMENT", icon: Monitor },
@@ -73,9 +74,13 @@ export default function InstallWizard({ onClose, onSpeak, keys }) {
       const r = await fetch(`${API}/install/step`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ step, context }),
       });
-      const d = await r.json();
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        throw new Error(d.detail || `Le backend a répondu HTTP ${r.status}.`);
+      }
       setResults((res) => ({ ...res, [step]: d }));
       setRunning(false);
       if (d.status === "ok" && d.next) {
@@ -87,7 +92,12 @@ export default function InstallWizard({ onClose, onSpeak, keys }) {
     } catch (e) {
       setResults((res) => ({
         ...res,
-        [step]: { step, message: "Backend ΣIRIUS injoignable. Solution : vérifiez que le serveur est démarré (port 8001).", status: "error", next: step },
+        [step]: {
+          step,
+          message: `Vérification impossible : ${e.message || "erreur réseau inconnue"}`,
+          status: "error",
+          next: step,
+        },
       }));
       setRunning(false);
     }

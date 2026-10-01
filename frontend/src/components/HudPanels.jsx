@@ -5,10 +5,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Activity, BarChart3, Brain, Check, Database, MapPin, Music, Pencil, Plus, Thermometer, Trash2, Wind, X, Youtube, Cloud } from "lucide-react";
 
 import { weatherInfo } from "@/appLogic";
-import { ReactorCore } from "@/components/ReactorVisuals";
+import { CoreRings, ReactorCore } from "@/components/ReactorVisuals";
 import { LiveClock, LiveDate, useLiveStats } from "@/liveStats";
 import { getLocalDateKey } from "@/dateTime";
 import { speakCinematic, cleanTextForDisplay } from "@/voice";
+import { WORK_MODULES } from "@/workModules";
 import { Capacitor } from "@capacitor/core";
 
 const BACKEND_BASE = process.env.REACT_APP_BACKEND_URL || "http://127.0.0.1:8001";
@@ -634,6 +635,7 @@ export function BootScreen({ onDone, userName, onOpenModule, connected }) {
           ["themis", "THÉMIS", "Gestion d'entreprise"],
           ["solon", "SOLON", "Conseil juridique"],
           ["promethee", "PROMÉTHÉE", "Gestion de projet"],
+          ...WORK_MODULES.map(({ id, label, description }) => [id, label, description]),
           ["calliope", "CALLIOPE", "Bibliothèque audio"],
           ["pythagore", "PYTHAGORE", "Mathématiques & géométrie"],
           ["agora", "HERMÈS AGORA", "Expert en vente"],
@@ -655,6 +657,11 @@ export function BootScreen({ onDone, userName, onOpenModule, connected }) {
               setClosing(true); stopPad();
               setTimeout(() => { onDone(); onOpenModule && onOpenModule(id); }, 450);
             }}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter" && e.key !== " ") return;
+              e.preventDefault();
+              e.currentTarget.click();
+            }}
           >
             <span className="boot-module-name font-divine">{name}</span>
             <span className="boot-module-role">{role}</span>
@@ -663,16 +670,7 @@ export function BootScreen({ onDone, userName, onOpenModule, connected }) {
       </div>
       <div className="boot-center">
         <div className="boot-reactor" data-testid="boot-reactor">
-          <div className="core-rings" aria-hidden="true">
-            <img src="/holo/ring-gold.png" alt="" className="core-ring outer" draggable={false} />
-            <img src="/holo/ring-gold.png" alt="" className="core-ring inner" draggable={false} />
-            <div className="core-pulse" />
-            <div className="core-orbit">
-              {["Σ", "Δ", "Ω", "Θ", "Φ"].map((l, i) => (
-                <span key={l} className="core-letter" style={{ "--i": i }}><i>{l}</i></span>
-              ))}
-            </div>
-          </div>
+          <CoreRings />
           <ReactorCore status="thinking" volume={0.35} color="#91e6f2" eco={false} />
         </div>
         <div className="boot-acronym" data-testid="boot-acronym">

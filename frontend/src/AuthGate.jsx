@@ -4,6 +4,7 @@ import { useEffect, useState, createContext, useContext } from "react";
 import { Download, LogIn, LogOut, Trash2, User, Save } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { BACKEND_BASE_URL, resolveBackendUrl } from "@/lib/api";
+import { CoreRings, ReactorCore } from "@/components/ReactorVisuals";
 
 const API = BACKEND_BASE_URL;
 const BACKEND_URL_PREFIX = `${BACKEND_BASE_URL.replace(/\/$/, "")}/`;
@@ -174,8 +175,8 @@ function AuthScreen({ onAuth }) {
         <header className="auth-brand">
           <div className="auth-brand-main">
             <span className="auth-core-logo" aria-hidden="true">
-              <img src="/holo/sirius-emblem-proposal.svg" alt="" draggable={false} />
-              <i />
+              <CoreRings />
+              <ReactorCore status="thinking" volume={0.35} color="#91e6f2" eco={false} />
             </span>
             <h1 className="auth-title">ΣIRIUS</h1>
           </div>

@@ -69,3 +69,4 @@ export const SpotifyPanel = wrap(() => import("@/SpotifyPanel"));
 export const MediaHUD = wrap(() => import("@/components/MediaHUD"));
 export const ProductivityPanel = wrap(() => import("@/ProductivityPanel"));
 export const ConnectionsPanel = wrap(() => import("@/ConnectionsPanel"));
+export const WorkModulesPanel = wrap(() => import("@/WorkModulesPanel"));

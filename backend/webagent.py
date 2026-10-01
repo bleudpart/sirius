@@ -118,7 +118,11 @@ async def executer_tache_web(query="", url="", selector="", text="", serp_key=No
         if results:
             target_url = results[0]["link"]
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
+        launch_options = {"headless": True, "args": ["--no-sandbox", "--disable-dev-shm-usage"]}
+        if os.getenv("SIRIUS_PACKAGED") == "1":
+            # Seul le Chromium complet est embarqué (pas chromium_headless_shell).
+            launch_options["channel"] = "chromium"
+        browser = await p.chromium.launch(**launch_options)
         page = await browser.new_page(viewport={"width": 1280, "height": 800}, user_agent=UA, locale="fr-FR")
         try:
             captured = False
