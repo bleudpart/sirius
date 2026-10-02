@@ -1,6 +1,7 @@
 import "./PublicLegal.css";
+import privacyPolicy from "./privacyPolicy.json";
 
-const CONTACT_EMAIL = "danielpartel@hotmail.com";
+const CONTACT_EMAIL = "danielsirius.pro2026@gmail.com";
 
 const CONTENT = {
   "/mentions-legales": {
@@ -23,16 +24,7 @@ const CONTENT = {
       ["Limites du service", "ΣIRIUS est un outil d'assistance. Les fonctions de suivi comptable, de gestion et de conformité ne remplacent pas un expert-comptable, une obligation déclarative, un conseil juridique ou une validation réglementaire."],
     ],
   },
-  "/confidentialite": {
-    title: "Politique de confidentialité",
-    sections: [
-      ["Données traitées", "ΣIRIUS traite l'adresse e-mail utilisée pour l'achat, les informations nécessaires à la licence et les données que vous choisissez de fournir dans le service."],
-      ["Finalités", "Ces données servent à fournir la licence, gérer le paiement, assurer le support et sécuriser le fonctionnement du service."],
-      ["Sous-traitants", "Stripe traite les paiements. Render héberge le site et l'API. MongoDB Atlas est utilisé pour la persistance des données du service."],
-      ["Vos droits", "Vous pouvez demander l'accès, la rectification, l'export ou la suppression de vos données en écrivant à " + CONTACT_EMAIL + "."],
-      ["Conservation", "Les données sont conservées pendant la durée nécessaire au service, aux obligations légales et à la résolution d'éventuels litiges."],
-    ],
-  },
+  "/confidentialite": privacyPolicy,
 };
 
 export default function PublicLegal() {
@@ -43,7 +35,7 @@ export default function PublicLegal() {
       <p>ΣIRIUS</p>
       <h1>{page.title}</h1>
       {page.sections.map(([heading, text]) => <section key={heading}><h2>{heading}</h2><p>{text}</p></section>)}
-      <p className="public-legal-updated">Dernière mise à jour : 20 septembre 2026.</p>
+      <p className="public-legal-updated">Dernière mise à jour : {page.updated || "20 septembre 2026"}.</p>
     </article>
   </main>;
 }

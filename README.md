@@ -189,6 +189,50 @@ Liste complète des modules et dates : [MODULES_SIRIUS.txt](./MODULES_SIRIUS.txt
   Ne versionne jamais le keystore ni ses mots de passe. Pour une application
   déjà publiée, utilise sa clé d'upload existante, pas une nouvelle clé.
   La signature ne remplace pas les validations et exigences de la Play Console.
+  L'image de présentation de la fiche Play Store est
+  `frontend/public/play-feature-1024x500.png` (1 024 × 500, PNG RGB sans transparence).
+  Pour la régénérer depuis le logo commun :
+  `powershell -ExecutionPolicy Bypass -File frontend\scripts\generate-play-feature.ps1`
+  depuis la racine du dépôt.
+  La page de confidentialité est préparée pour publication à
+  `https://sirius-assistant.fr/confidentialite.html`, sans connexion ni JavaScript.
+  Son contenu commun à la page HTML et à la vue React est dans
+  `frontend/src/privacyPolicy.json` ; `npm run build` régénère le HTML via
+  `frontend/scripts/generate-privacy-page.js`. Avant une soumission Play Store,
+  vérifier les prestataires réellement activés, les durées et procédures de
+  conservation/suppression et les garanties de transfert du déploiement en ligne :
+  le code seul ne prouve pas cette configuration opérationnelle.
+  Le panneau Administration repère les comptes à examiner après 12 mois
+  calendaires sans activité authentifiée auprès du serveur. Le suivi commence
+  au plus tôt lors de sa première activation pour chaque compte : l'ancienne
+  date de connexion ne prouve pas l'inactivité. Les comptes administrateurs
+  nécessitent un examen distinct. L'usage hors ligne n'est pas mesuré.
+  Aucune purge automatique n'est exécutée. Avant de supprimer un compte,
+  vérifier l'activité réelle et traiter séparément les dossiers, fichiers,
+  copies locales et éléments soumis à une obligation de conservation.
+  Les boutons de suppression utilisateur et administrateur enregistrent une
+  demande dans `account_deletion_requests`, visible dans Administration. La
+  réponse HTTP 202 indique `pending_review` et `account_deleted: false` :
+  ni le compte ni ses données ne sont effacés, aucun abonnement n'est résilié.
+  Ce parcours remplace la suppression partielle antérieure. Il ne constitue pas
+  encore une procédure complète d'effacement : le responsable doit traiter
+  chaque demande, définir les exceptions de conservation et vérifier les fichiers,
+  documents partagés, stockages distincts et prestataires avant clôture.
+  Dans Administration, **EXAMINER** charge le plan d'effacement. Désactiver
+  d'abord le compte, attendre la fin de ses opérations et traiter séparément
+  tout blocage (entreprise, pièces comptables, paiements/licences, Photo3D,
+  fichiers partagés). Ne pas effacer des justificatifs soumis à conservation
+  simplement pour lever un blocage : documenter leur fondement et leur échéance
+  dans la procédure du responsable, puis les traiter dans un stockage approprié.
+  Le bouton final exige l'identifiant exact et deux validations humaines.
+  Il efface seulement les collections personnelles explicitement prévues,
+  leurs fichiers sous `UPLOADS_DIR`, les jetons de connexion prévus et la mémoire
+  SQLite du compte sur ce serveur. Les copies d'appareils, prestataires,
+  sauvegardes et stockages non couverts sont à traiter séparément.
+  Une erreur laisse le compte désactivé et la demande `failed` pour nouvel examen ;
+  `processing` indique une exécution en cours ou interrompue qui exige un contrôle
+  avant toute reprise. La réponse `scope: reviewed_server_data` ne certifie pas
+  l'effacement des copies externes. Aucun compte réel ne doit servir aux tests.
 - **Son de démarrage personnalisé** : place un fichier `boot-sound.mp3` (libre de droits) dans `frontend/public/`. Activable dans **Configuration → « Son de démarrage »**.
 - **Sauvegarde de la mémoire locale** (SQLite) avec Sirius Doctor :
   ```

@@ -213,7 +213,7 @@ function AuthScreen({ onAuth }) {
             <label className="auth-terms">
               <input type="checkbox" checked={termsAccepted} required
                 onChange={(e) => setTermsAccepted(e.target.checked)} data-testid="auth-terms-checkbox" />
-              <span>J’accepte les <a href="https://sirius-assistant.fr/conditions-generales" target="_blank" rel="noreferrer">conditions générales</a> et la <a href="https://sirius-assistant.fr/confidentialite" target="_blank" rel="noreferrer">politique de confidentialité</a>.</span>
+              <span>J’accepte les <a href="https://sirius-assistant.fr/conditions-generales" target="_blank" rel="noreferrer">conditions générales</a> et la <a href="https://sirius-assistant.fr/confidentialite.html" target="_blank" rel="noreferrer">politique de confidentialité</a>.</span>
             </label>
           )}
           {err && <div className="auth-error" data-testid="auth-error">{err}</div>}
@@ -292,9 +292,17 @@ export function ProfilePanel({ user, onClose, onUpdate, onLogout }) {
     URL.revokeObjectURL(url);
   };
   const deleteAccount = async () => {
-    if (user.role === "admin" || !window.confirm("Supprimer définitivement votre compte et vos données personnelles ?")) return;
-    const response = await fetch(`${API}/api/auth/privacy/account`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirm: true }) });
-    if (response.ok) onLogout();
+    if (user.role === "admin" || !window.confirm("Demander la suppression de votre compte et de vos données personnelles ? Un examen manuel est nécessaire avant leur effacement.")) return;
+    setSaveError("");
+    try {
+      const response = await fetch(`${API}/api/auth/privacy/account`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirm: true }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.detail || "Demande de suppression impossible.");
+      if (result.account_deleted === true) onLogout();
+      else window.alert(result.message || "La suppression n’est pas confirmée. Contactez danielsirius.pro2026@gmail.com.");
+    } catch (error) {
+      setSaveError(error.message || "Demande de suppression impossible.");
+    }
   };
   const setupMfa = async () => {
     const response = await fetch(`${API}/api/auth/mfa/setup`, { method: "POST" });
@@ -340,8 +348,9 @@ export function ProfilePanel({ user, onClose, onUpdate, onLogout }) {
         <div className="gcal-toolbar">
           <button className="auth-submit" style={{ width: "auto", padding: "10px 18px" }} onClick={save} disabled={saving} data-testid="profile-save-btn"><Save size={14} /> {saving ? "ENREGISTREMENT…" : saved ? "ENREGISTRÉ ✓" : "ENREGISTRER"}</button>
           <button className="file-btn" onClick={exportData} title="Exporter mes données" data-testid="profile-export-btn"><Download size={13} /> EXPORTER MES DONNÉES</button>
+          <a className="file-btn" href="https://sirius-assistant.fr/confidentialite.html" target="_blank" rel="noreferrer">CONFIDENTIALITÉ</a>
           <button className="file-btn danger" onClick={onLogout} data-testid="profile-logout-btn"><LogOut size={13} /> DÉCONNEXION</button>
-          {user.role !== "admin" && <button className="file-btn danger" onClick={deleteAccount} title="Supprimer mon compte" data-testid="profile-delete-btn"><Trash2 size={13} /> SUPPRIMER MON COMPTE</button>}
+          {user.role !== "admin" && <button className="file-btn danger" onClick={deleteAccount} title="Demander la suppression après examen manuel" data-testid="profile-delete-btn"><Trash2 size={13} /> DEMANDER LA SUPPRESSION</button>}
         </div>
       </div>
     </div>

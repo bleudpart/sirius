@@ -130,6 +130,7 @@ def delete_user_data(user_id: str):
         )
         con.execute("DELETE FROM facts WHERE user_id = ?", (user_id,))
         con.execute("DELETE FROM events WHERE user_id = ?", (user_id,))
+        con.execute("DELETE FROM episodes WHERE user_id = ?", (user_id,))
         media_events_exists = con.execute(
             "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'media_events'"
         ).fetchone()

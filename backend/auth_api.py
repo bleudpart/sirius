@@ -1,6 +1,7 @@
 """Authenticated multi-user session boundary for SIRIUS."""
 
 import asyncio
+import calendar
 import base64
 import hashlib
 import hmac
@@ -24,6 +25,7 @@ from fastapi.responses import StreamingResponse
 from cryptography.fernet import Fernet, InvalidToken
 import sirius_totp as pyotp
 from pydantic import BaseModel
+from account_deletion import DeletionReview, deletion_plan, finalize_account_deletion, request_account_deletion
 
 LEGACY_UID = "daniel@sirius.local"
 _LOCAL_HOSTS = {"127.0.0.1", "::1", "localhost"}
@@ -246,6 +248,34 @@ def _issue_session(response: Response, user: dict) -> dict:
     return {**_public_user(user), "access_token": access}
 
 
+def _activity_datetime(value) -> datetime:
+    if isinstance(value, str):
+        value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if not isinstance(value, datetime):
+        raise ValueError("Date de suivi absente ou invalide.")
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+
+
+def _inactivity_review(document: dict, now: datetime) -> dict:
+    if document.get("role") == "admin":
+        return {"status": "excluded", "reason": "Compte administrateur : examen distinct requis."}
+    try:
+        started = _activity_datetime(document.get("inactivity_tracking_started_at"))
+        activity = _activity_datetime(document.get("last_activity") or started)
+        reference = max(started, activity)
+        due = reference.replace(
+            year=reference.year + 1,
+            day=min(reference.day, calendar.monthrange(reference.year + 1, reference.month)[1]),
+        )
+    except (ValueError, OverflowError) as exc:
+        return {"status": "unknown", "reason": f"Suivi à vérifier : {exc}"}
+    return {
+        "status": "review_required" if now >= due else "observing",
+        "review_after": due.isoformat(),
+        "reason": "Examen humain requis ; aucune suppression automatique.",
+    }
+
+
 async def require_user(request: Request, db=None) -> dict:
     token = request.cookies.get("access_token") or ""
     if not token:
@@ -260,6 +290,15 @@ async def require_user(request: Request, db=None) -> dict:
         stored = await db.users.find_one({"user_id": user["user_id"]})
         if not stored or stored.get("disabled"):
             raise HTTPException(status_code=401, detail="Compte indisponible.")
+        now = datetime.now(timezone.utc)
+        updates = {"last_activity": now}
+        if stored.get("inactivity_tracking_started_at") is None:
+            updates["inactivity_tracking_started_at"] = now
+        # Compare-and-set prevents an older concurrent request overwriting newer activity.
+        await db.users.update_one(
+            {"user_id": user["user_id"], "last_activity": stored.get("last_activity")},
+            {"$set": updates},
+        )
         return _public_user(stored)
     return _public_user(user)
 
@@ -536,22 +575,14 @@ def make_auth_router(db):
         buffer.seek(0)
         return StreamingResponse(buffer, media_type="application/zip", headers={"Content-Disposition": 'attachment; filename="sirius-personal-data.zip"'})
 
-    @router.delete("/privacy/account")
+    @router.delete("/privacy/account", status_code=202)
     async def delete_personal_account(body: PrivacyDeleteRequest, request: Request):
         user = await require_user(request, db)
         if not body.confirm:
             raise HTTPException(status_code=400, detail="Confirmation explicite requise.")
-        if user.get("role") == "admin":
-            raise HTTPException(status_code=403, detail="Le compte administrateur doit être désactivé par un autre administrateur.")
-        user_id = user["user_id"]
-        for collection_name in ("sirius_chats", "local_memory", "episodic_memory", "user_files", "agora_deals", "themis_docs", "themis_clients", "payment_transactions", "enterprise_audit"):
-            collection = getattr(db, collection_name, None)
-            if collection is not None:
-                await collection.delete_many({"user_id": user_id})
-        if hasattr(db, "enterprise_members"):
-            await db.enterprise_members.delete_many({"user_id": user_id})
-        await db.users.delete_one({"user_id": user_id})
-        return {"ok": True, "message": "Compte et données personnelles supprimés."}
+        return await request_account_deletion(
+            db, user_id=user["user_id"], requested_by=user["user_id"],
+        )
 
     @router.put("/profile")
     async def update_profile(data: dict, request: Request):
@@ -597,10 +628,24 @@ def make_admin_router(db):
     async def list_users(request: Request):
         await require_admin(request)
         users = []
+        now = datetime.now(timezone.utc)
         async for document in db.users.find({}):
+            if document.get("inactivity_tracking_started_at") is None:
+                await db.users.update_one(
+                    {"user_id": document["user_id"], "inactivity_tracking_started_at": None},
+                    {"$set": {"inactivity_tracking_started_at": now}},
+                )
+                document["inactivity_tracking_started_at"] = now
             user = _public_user(document)
             uid = user["user_id"]
-            last_activity = document.get("last_activity") or document.get("created_at") or datetime.now(timezone.utc)
+            last_activity = _activity_datetime(document.get("last_activity") or document.get("created_at") or now)
+            user["created_at"] = _activity_datetime(document.get("created_at") or now).isoformat()
+            user["inactivity_review"] = _inactivity_review(document, now)
+            deletion_request = await db.account_deletion_requests.find_one({"user_id": uid})
+            user["deletion_request"] = (
+                {"status": deletion_request["status"], "requested_at": deletion_request["requested_at"]}
+                if deletion_request else None
+            )
             user["activity"] = {
                 "messages": await db.sirius_chats.count_documents({"user_id": uid}),
                 "last_activity": int(last_activity.timestamp()),
@@ -619,17 +664,31 @@ def make_admin_router(db):
         stored = await db.users.find_one({"user_id": user_id})
         if not stored:
             raise HTTPException(status_code=404, detail="Compte introuvable.")
+        deletion = await db.account_deletion_requests.find_one({"user_id": user_id})
+        if deletion and stored.get("disabled"):
+            raise HTTPException(status_code=409, detail="Demande de suppression ouverte : réactivation interdite avant examen.")
         await db.users.update_one({"user_id": user_id}, {"$set": {"disabled": not bool(stored.get("disabled"))}})
         return {"ok": True}
 
-    @router.delete("/users/{user_id}")
+    @router.get("/users/{user_id}/deletion-plan")
+    async def account_deletion_plan(user_id: str, request: Request):
+        await require_admin(request)
+        return await deletion_plan(db, user_id)
+
+    @router.post("/users/{user_id}/finalize-deletion")
+    async def complete_account_deletion(user_id: str, body: DeletionReview, request: Request):
+        admin = await require_admin(request)
+        if user_id == admin["user_id"]:
+            raise HTTPException(status_code=400, detail="Le compte administrateur actif ne peut pas être supprimé.")
+        return await finalize_account_deletion(db, user_id=user_id, review=body)
+
+    @router.delete("/users/{user_id}", status_code=202)
     async def delete_user(user_id: str, request: Request):
         admin = await require_admin(request)
         if user_id == admin["user_id"]:
             raise HTTPException(status_code=400, detail="Le compte administrateur actif ne peut pas être supprimé.")
-        result = await db.users.delete_one({"user_id": user_id})
-        if not result.deleted_count:
-            raise HTTPException(status_code=404, detail="Compte introuvable.")
-        return {"ok": True}
+        return await request_account_deletion(
+            db, user_id=user_id, requested_by=admin["user_id"],
+        )
 
     return router
