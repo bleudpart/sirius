@@ -1,7 +1,8 @@
+$ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 
 $frontend = Split-Path $PSScriptRoot -Parent
-$sourcePath = Join-Path $frontend 'public/icon-apk-source.png'
+$sourcePath = Join-Path $frontend 'public/icon-source.png'
 $resources = Join-Path $frontend 'android/app/src/main/res'
 $source = [System.Drawing.Image]::FromFile($sourcePath)
 
@@ -16,8 +17,8 @@ try {
         $directory = Join-Path $resources "mipmap-$($density.Name)"
         foreach ($variant in @(
             @{ Name = 'ic_launcher.png'; Size = $density.Size; Scale = 1; Round = $false },
-            @{ Name = 'ic_launcher_round.png'; Size = $density.Size; Scale = 0.68; Round = $true },
-            @{ Name = 'ic_launcher_foreground.png'; Size = $density.Foreground; Scale = (2 / 3); Round = $false }
+            @{ Name = 'ic_launcher_round.png'; Size = $density.Size; Scale = 0.85; Round = $true },
+            @{ Name = 'ic_launcher_foreground.png'; Size = $density.Foreground; Scale = 0.85; Round = $false }
         )) {
             $size = [int]$variant.Size
             $bitmap = [System.Drawing.Bitmap]::new($size, $size)

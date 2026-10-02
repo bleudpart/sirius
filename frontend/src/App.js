@@ -1053,7 +1053,7 @@ function App() {
   // Pouls synchronisé avec le réacteur 2D (même formule que ReactorCore)
   const statusPulseRef = useRef({ status: "idle", volume: 0.15 });
   useEffect(() => {
-    let raf;
+    let timer = null;
     const t0 = performance.now();
     const tick = () => {
       const t = (performance.now() - t0) / 1000;
@@ -1061,10 +1061,19 @@ function App() {
       pulseRef.current = s.status === "speaking"
         ? Math.min(1, s.volume)
         : 0.18 + 0.12 * Math.sin(t * 1.6) + (s.status === "thinking" ? 0.2 : 0);
-      raf = requestAnimationFrame(tick);
+      timer = setTimeout(tick, 33);
     };
-    tick();
-    return () => cancelAnimationFrame(raf);
+    const onVisibility = () => {
+      if (document.hidden) {
+        clearTimeout(timer);
+        timer = null;
+      } else if (timer === null) {
+        tick();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    onVisibility();
+    return () => { document.removeEventListener("visibilitychange", onVisibility); clearTimeout(timer); };
   }, []);
 
   const now = undefined; // horloge rendue par <LiveClock/> / <LiveDate/>

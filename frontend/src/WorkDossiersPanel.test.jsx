@@ -30,7 +30,9 @@ test("shows sourced proposals and never performs the proposed business action au
     const path = new URL(url, "http://localhost").pathname;
     let body;
     let status = 200;
-    if (path.endsWith("/proposals") && !options) body = {
+    if (path.endsWith("/review-queue") && !options?.method) body = { items: [], truncated: false };
+    else if (path.endsWith("/day") && !options?.method) body = { proposals: proposals.filter((item) => !dismissed.has(item.id)), commitments: [], on: "2026-10-02", verified_at: "2026-10-02T12:00:00Z", missing_info: [], read_only: true };
+    else if (path.endsWith("/proposals") && !options?.method) body = {
       proposals: proposals.filter((item) => !dismissed.has(item.id)),
       integrations: [
         { module: "themis", label: "Commerce et courrier professionnel", available: true, detail: "Stocks et factures." },
@@ -38,13 +40,13 @@ test("shows sourced proposals and never performs the proposed business action au
         { module: "outlook", label: "Boîte Outlook", available: false, detail: "Les messages entrants Outlook ne sont pas encore analysés." },
       ],
     };
-    else if (path.endsWith("/work-dossiers") && !options) body = { dossiers };
+    else if (path.endsWith("/work-dossiers") && !options?.method) body = { dossiers };
     else if (path.endsWith("/work-dossiers") && options?.method === "POST") {
       const input = JSON.parse(options.body);
       dossiers = [{ id: "d1", title: input.title, category: input.category, notes: [], sources: [] }];
       body = { dossier: dossiers[0] };
       status = 201;
-    } else if (path.endsWith("/proposals/stock-key/dismiss")) {
+    } else if (path.endsWith("/proposals/stock-key/review")) {
       dismissed.add("stock-key");
       body = { dismissed: true };
     } else if (path.includes("/d1/proposals/")) {
@@ -70,7 +72,7 @@ const invoice = { source: { kind: "facture", id: "invoice-1", module: "themis" }
 const haccp = { source: { kind: "haccp_nonconformity", id: "nc-1", module: "haccp" },
   data: { type: "Température", description: "Frigo hors plage" }, fingerprint: "nc-v1" };
 
-async function workspace({ entries = [], sources = [stock, invoice, haccp], failWrite = false, suggestions, unavailableSources = 0 } = {}) {
+async function workspace({ entries = [], sources = [stock, invoice, haccp], failWrite = false, suggestions, unavailableSources = 0, proposals = [], day, dayFailure = false, preparationResponse, reviewQueue = [], clientTimeline } = {}) {
   const originalFetch = global.fetch;
   const dossiers = [{ id: "d1", title: "Boutique", category: "commerce", notes: [], sources: sources.map((item) => item.source) },
     { id: "d2", title: "Chantier", category: "chantier", notes: [], sources: [] }];
@@ -79,8 +81,17 @@ async function workspace({ entries = [], sources = [stock, invoice, haccp], fail
   const openHaccp = jest.fn();
   global.fetch = jest.fn(async (url, options) => {
     const path = new URL(url, "http://localhost").pathname.replace(/^.*\/work-dossiers/, "");
-    if (!options) {
-      const body = path === "" ? { dossiers } : path === "/proposals" ? { proposals: [], integrations: [] } : {
+    if (!options?.method) {
+      if (path === "/day" && dayFailure) return { ok: false, status: 503, json: async () => ({ detail: "Journée indisponible" }) };
+      const body = path === "" ? { dossiers } : path === "/proposals" ? { proposals, integrations: [] }
+        : path === "/review-queue" ? { items: reviewQueue, truncated: false }
+        : path.endsWith("/client-events") ? clientTimeline || { events: [], followups: [], truncated: false }
+        : path === "/day" ? day || {
+        on: "2026-10-02", verified_at: "2026-10-02T12:00:00Z", proposals,
+        commitments: entries.filter((entry) => entry.kind === "commitment" && entry.status === "confirmed").map((entry) => ({
+          ...entry.content, dossier_id: "d1", entry_id: entry.id, task_id: null, status: "confirmed",
+        })), proposal_date_basis: "live_today", missing_info: [], read_only: true,
+      } : path.endsWith("/decision-journal") ? { decisions: entries.filter((entry) => entry.kind === "architect_decision"), change_impact: [], read_only: true } : {
         dossier: dossiers.find((item) => path.includes(item.id)),
         entries: path.includes("d1") ? entries : [], sources: path.includes("d1") ? sources : [],
         suggestions: suggestions || [{ kind: "missing_next_step", entry_id: entries[0]?.id }],
@@ -94,12 +105,14 @@ async function workspace({ entries = [], sources = [stock, invoice, haccp], fail
     const body = options.body ? JSON.parse(options.body) : undefined;
     writes.push({ path, method: options.method, body });
     if (failWrite) return { ok: false, status: 409, json: async () => ({ detail: "La source a changé ; préparer une nouvelle proposition." }) };
+    if (preparationResponse && path.endsWith(preparationResponse.path)) return { ok: true, json: async () => preparationResponse.body };
     if (path.endsWith("/simulations")) return { ok: true, json: async () => ({
       source: stock.source, assumptions: { quantity_delta: body.quantity_delta, other_movements: 0 },
       result: { stock_before: 2, stock_after: 7, below_alert: false }, persisted: false, executed: false,
     }) };
     return { ok: true, json: async () => ({ entry: { id: "new-entry" } }) };
   });
+
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
@@ -126,6 +139,75 @@ async function workspace({ entries = [], sources = [stock, invoice, haccp], fail
     cleanup: () => { act(() => root.unmount()); container.remove(); global.fetch = originalFetch; } };
 }
 
+const explainedProposal = {
+    id: "stock-proposal", title: "Vérifier le papier", reason: "Stock sous le seuil configuré",
+    source: { ...stock.source, label: "Papier" },
+    proposed_action: { module: "themis", label: "Examiner le stock" },
+    why_suggested: { source: stock.source, rule: "stock <= alert", threshold: 3, observed: 2, verified_at: "2026-10-02T12:00:00Z", missing_info: ["Délai fournisseur"] },
+  };
+
+  test("daily overview unifies sourced signals and active commitments, with transparent métier preparation", async () => {
+    const ui = await workspace({ proposals: [explainedProposal], entries: [{
+      id: "active", kind: "commitment", status: "confirmed",
+      content: { text: "Appeler le fournisseur", owner: "Camille", due_date: "2026-10-03" }, sources: [],
+    }, {
+      id: "done", kind: "commitment", status: "completed",
+      content: { text: "Ancien appel", owner: "Camille" }, sources: [],
+    }] });
+    try {
+      const day = ui.container.querySelector('[aria-label="Vue journée"]');
+      expect(day.textContent).toContain("Vérifier le papier");
+      expect(day.textContent).toContain("Appeler le fournisseur");
+      expect(day.textContent).not.toContain("Ancien appel");
+      expect(day.textContent).toContain("dossiers autorisés");
+      const evidence = ui.container.querySelector(".work-dossiers-evidence");
+      expect(evidence.textContent).toContain("Pourquoi cette proposition ?");
+      expect(evidence.textContent).toContain("stock <= alert");
+      expect(evidence.textContent).toContain("2. Vérifié dans les données");
+      expect(evidence.textContent).toContain("Délai fournisseur");
+      const cards = ui.container.querySelector('[aria-label="Préparations par métier"]');
+      expect(cards.querySelectorAll("article")).toHaveLength(6);
+      expect(cards.textContent).toContain("stock : 2");
+      expect(cards.textContent).toContain("aucune couverture en jours calculable");
+      expect(cards.textContent).toContain("n'atteste pas la conformité");
+      expect(ui.writes).toHaveLength(0);
+    } finally { ui.cleanup(); }
+  });
+
+  test.each([
+    ["Reporter avec un motif", "deferred"],
+    ["Écarter avec un motif", "rejected"],
+  ])("proposal %s requires rationale and dossier-bound authenticated review", async (label, outcome) => {
+    const ui = await workspace({ proposals: [explainedProposal] });
+    try {
+      await ui.click(label);
+      expect(ui.button("Relire cette décision").disabled).toBe(true);
+      await ui.change(ui.field("Motif de la décision"), "Attendre le délai du fournisseur");
+      await ui.click("Relire cette décision");
+      expect(ui.writes).toHaveLength(0);
+      expect(ui.container.querySelector('[aria-label="Validation avant enregistrement"]').textContent).toContain("Attendre le délai");
+      await ui.click("Valider l'enregistrement");
+      expect(ui.writes).toEqual([{ path: "/proposals/stock-proposal/review", method: "POST", body: {
+        outcome, rationale: "Attendre le délai du fournisseur",
+      } }]);
+      const writeOptions = global.fetch.mock.calls.find(([, options]) => options?.method === "POST")[1];
+      expect(writeOptions.credentials).toBe("include");
+      expect(ui.container.textContent).toContain("Vérifier le papier");
+    } finally { ui.cleanup(); }
+  });
+
+  test("proposal decisions reset when changing dossiers and missing evidence is never invented", async () => {
+    const ui = await workspace({ sources: [], proposals: [{ ...explainedProposal, why_suggested: undefined }] });
+    try {
+      expect(ui.container.querySelector(".work-dossiers-evidence").textContent).toContain("Non renseigné");
+      await ui.click("Reporter avec un motif");
+      await ui.change(ui.field("Motif de la décision"), "Attendre");
+      await ui.click("Chantier · Chantier");
+      expect(ui.field("Motif de la décision")).toBeUndefined();
+      expect(ui.writes).toHaveLength(0);
+      expect(ui.container.querySelector('[aria-label="Préparations par métier"]').textContent).toContain("Aucune source suivie");
+    } finally { ui.cleanup(); }
+  });
 test("selected work thread shows decision rationale, actor, sources, commitments and changes without writes", async () => {
   const ui = await workspace({ entries: [
     { id: "decision-1", kind: "decision", status: "confirmed", content: {
@@ -293,7 +375,13 @@ async function legacyAssertions(openThemis, proposals) {
     await act(async () => { button("Préparer la relance dans THÉMIS").click(); });
     expect(openThemis.mock.calls[1]).toEqual([proposals[1].source]);
     expect(openThemis.mock.calls[1][0]).toBe(proposals[1].source);
-    await act(async () => { button("Ignorer ce signal").click(); });
+    await act(async () => { button("Écarter avec un motif").click(); });
+    const rationale = [...container.querySelectorAll("label")].find((node) => node.firstChild.textContent === "Motif de la décision").querySelector("textarea");
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(rationale, "Vérifié sur place");
+      rationale.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => { button("Relire cette décision").click(); });
     await act(async () => { button("Valider l'enregistrement").click(); });
     expect(container.textContent).not.toContain("Stock bas : Papier");
     expect(openThemis).toHaveBeenCalledTimes(2);
@@ -443,5 +531,343 @@ test("decision identity uses only server-derived author and legacy entries canno
     expect(ui.container.textContent).not.toContain("Unverified owner");
     expect(ui.container.textContent).not.toContain("Unverified recorder");
     expect(ui.writes).toHaveLength(0);
+  } finally { ui.cleanup(); }
+});
+
+test("server day includes another dossier's confirmed task, source rationale and partial-data warnings", async () => {
+  const ui = await workspace({ day: {
+    on: "2026-10-02", verified_at: "2026-10-02T12:00:00Z", proposals: [explainedProposal],
+    commitments: [{ dossier_id: "d2", entry_id: "meeting-1", task_id: "task-1", text: "Relire le plan",
+      owner: "Alex", due_date: null, status: "confirmed", why_suggested: {
+        source: { kind: "meeting", id: "meeting-1" }, rule: "confirmed_task", observed: "confirmed", threshold: null,
+        verified_at: "2026-10-02T12:00:00Z", missing_info: ["Échéance"],
+      } }], truncated: true, missing_info: ["Source de stock indisponible"],
+  } });
+  try {
+    const day = ui.container.querySelector('[aria-label="Vue journée"]');
+    expect(day.textContent).toContain("Relire le plan");
+    expect(day.textContent).toContain("confirmed_task");
+    expect(day.textContent).toContain("Échéance manquante");
+    expect(day.textContent).toContain("Synthèse limitée");
+    expect(day.textContent).toContain("Source de stock indisponible");
+    await ui.click("Ouvrir le dossier : Chantier");
+    expect(ui.container.textContent).toContain("Chantier · fil de travail");
+    expect(ui.writes).toHaveLength(0);
+  } finally { ui.cleanup(); }
+});
+
+test("failed day request explicitly falls back to selected dossier, never a complete-success synthesis", async () => {
+  const ui = await workspace({ dayFailure: true });
+  try {
+    expect(ui.container.querySelector('[aria-label="Vue journée"]').textContent).toContain("Vue journée indisponible");
+    expect(ui.container.textContent).toContain("dossier sélectionné uniquement");
+    expect(ui.writes).toHaveLength(0);
+  } finally { ui.cleanup(); }
+});
+
+test("failed day request shows only due confirmed commitments and confirmed meeting tasks", async () => {
+  const past = new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10);
+  const future = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+  const ui = await workspace({ dayFailure: true, entries: [
+    { id: "due", kind: "commitment", status: "confirmed", content: { text: "Appeler aujourd'hui", owner: "Alex", due_date: past } },
+    { id: "future", kind: "commitment", status: "confirmed", content: { text: "Appeler plus tard", owner: "Alex", due_date: future } },
+    { id: "proposed", kind: "commitment", status: "proposed", content: { text: "Non validé", owner: "Alex" } },
+    { id: "meeting", kind: "meeting", status: "confirmed", content: { title: "Point", notes: "Notes", tasks: [
+      { id: "task-due", status: "confirmed", text: "Vérifier le plan", owner: "Alex", due_date: past },
+      { id: "task-future", status: "confirmed", text: "Vérifier plus tard", owner: "Alex", due_date: future },
+    ] } },
+  ] });
+  try {
+    const day = ui.container.querySelector('[aria-label="Vue journée"]');
+    expect(day.textContent).toContain("2 engagement(s) actif(s)");
+    expect(day.textContent).toContain("Appeler aujourd'hui");
+    expect(day.textContent).toContain("Vérifier le plan");
+    expect(day.textContent).not.toContain("Appeler plus tard");
+    expect(day.textContent).not.toContain("Non validé");
+    expect(day.textContent).not.toContain("Vérifier plus tard");
+  } finally { ui.cleanup(); }
+});
+
+test("deferred global proposal review sends exact optional resume date and refreshes day", async () => {
+  const ui = await workspace({ proposals: [explainedProposal] });
+  try {
+    await ui.click("Reporter avec un motif");
+    await ui.change(ui.field("Motif de la décision"), "Attendre une réponse");
+    await ui.change(ui.field("Date de reprise (facultative)"), "2027-01-01");
+    await ui.click("Relire cette décision");
+    expect(ui.writes).toHaveLength(0);
+    await ui.click("Valider l'enregistrement");
+    expect(ui.writes[0]).toEqual({ path: "/proposals/stock-proposal/review", method: "POST",
+      body: { outcome: "deferred", rationale: "Attendre une réponse", resume_on: "2027-01-01" } });
+    expect(global.fetch.mock.calls.filter(([url]) => url.endsWith("/day")).length).toBeGreaterThan(1);
+  } finally { ui.cleanup(); }
+});
+
+test.each([
+  ["accounting-review", "facture:invoice-1", { source: { kind: "facture", id: "invoice-1" } },
+    { source: invoice.source, sourced_facts: invoice.data, remaining: null, overdue: null, due_date: null,
+      missing_info: ["payment_evidence_ledger"], questions: ["Demander le justificatif"], persisted: false, executed: false }, "Solde : Non renseigné"],
+  ["stock-coverage", "stock:item-1", { source: { kind: "stock", id: "item-1" }, horizon_days: 7 },
+    { source: stock.source, sourced_facts: stock.data, sales_observation: null, units_per_day: null, coverage_days: null,
+      horizon_days: 7, assumptions: ["Aucun mouvement futur connu"], missing_info: ["verified_sales_velocity"], persisted: false, executed: false }, "couverture (jours) : Non renseigné"],
+])("review-gated %s keeps missing evidence unknown and uses exact selected source", async (mode, source, body, response, expected) => {
+  const ui = await workspace({ preparationResponse: { path: `/${mode}`, body: response } });
+  try {
+    await ui.change(ui.field("Préparation"), mode);
+    await ui.change(ui.field("Source de la préparation"), source);
+    await ui.click("Relire la préparation");
+    expect(ui.writes).toHaveLength(0);
+    await ui.click("Lancer la préparation");
+    expect(ui.writes).toEqual([{ path: `/d1/${mode}`, method: "POST", body }]);
+    expect(ui.container.querySelector('[aria-label="Résultat de la préparation"]').textContent).toContain(expected);
+    expect(ui.container.textContent).toContain(response.missing_info[0]);
+  } finally { ui.cleanup(); }
+});
+
+test("stock coverage only sends sales after explicit checked observation with time-zone verification", async () => {
+  const ui = await workspace({ preparationResponse: { path: "/stock-coverage", body: {
+    source: stock.source, units_per_day: 2, coverage_days: 1, horizon_days: 7, missing_info: [],
+    sales_observation: { sold_units: 4 }, assumptions: ["Aucun autre mouvement"], persisted: false, executed: false,
+  } } });
+  try {
+    await ui.change(ui.field("Préparation"), "stock-coverage");
+    await ui.change(ui.field("Source de la préparation"), "stock:item-1");
+    await act(async () => ui.container.querySelector('input[type="checkbox"]').click());
+    await ui.click("Relire la préparation");
+    expect(ui.writes).toHaveLength(0);
+    expect(ui.container.textContent).toContain("L'observation de ventes nécessite");
+    await ui.change(ui.field("Unités vendues"), "4");
+    await ui.change(ui.field("Début des ventes"), "2026-09-01");
+    await ui.change(ui.field("Fin des ventes"), "2026-09-02");
+    await ui.change(ui.field("Preuve de ventes"), "Registre signé");
+    await ui.change(ui.field("Ventes vérifiées le"), "2026-09-03T10:00");
+    await ui.click("Relire la préparation");
+    await ui.click("Lancer la préparation");
+    expect(ui.writes[0].body).toEqual({
+      source: { kind: "stock", id: "item-1" }, horizon_days: 7,
+      sales: { sold_units: 4, period_start: "2026-09-01", period_end: "2026-09-02",
+        evidence: "Registre signé", verified_at: new Date("2026-09-03T10:00").toISOString(), verified: true },
+    });
+    expect(ui.container.textContent).toContain("non attestée indépendamment");
+  } finally { ui.cleanup(); }
+});
+
+test("architect decision keeps plan constraints and impacts human-declared, journal is a read", async () => {
+  const ui = await workspace();
+  try {
+    await ui.change(ui.field("Titre de la modification"), "Déplacer la cloison");
+    await ui.change(ui.field("Justification architecte"), "Préserver la circulation");
+    await ui.change(ui.field("Alternatives (une par ligne)"), "Garder le plan\nDéplacer la cloison");
+    await ui.change(ui.field("Contraintes de plan / devis (une par ligne)"), "Plan version 3 à vérifier");
+    await ui.change(ui.field("Impacts déclarés, non déduits (un par ligne)"), "Devis à revoir");
+    await ui.click("Relire la préparation");
+    expect(ui.writes).toHaveLength(0);
+    await ui.click("Enregistrer la proposition");
+    expect(ui.writes[0]).toEqual({ path: "/d1/architect-decisions", method: "POST", body: {
+      title: "Déplacer la cloison", outcome: "deferred", rationale: "Préserver la circulation",
+      alternatives: ["Garder le plan", "Déplacer la cloison"], constraints: ["Plan version 3 à vérifier"], declared_impacts: ["Devis à revoir"],
+    } });
+    await ui.click("Voir le journal architecte");
+    expect(ui.container.querySelector('[aria-label="Journal des décisions architecte"]')).toBeTruthy();
+    expect(ui.writes).toHaveLength(1);
+  } finally { ui.cleanup(); }
+});
+
+test("architect links explicit plan, devis and milestone versions without inventing documents", async () => {
+  const ui = await workspace();
+  try {
+    await ui.change(ui.field("Titre de la modification"), "Modifier le plan");
+    await ui.change(ui.field("Justification architecte"), "Accès à revoir");
+    await ui.change(ui.field("Alternatives (une par ligne)"), "Plan initial");
+    await ui.change(ui.field("Référence plan (déclarée)"), "Plan A");
+    await ui.click("Relire la préparation");
+    expect(ui.writes).toHaveLength(0);
+    expect(ui.container.textContent).toContain("référence et la version du plan");
+    await ui.change(ui.field("Version plan (déclarée)"), "v3");
+    await ui.change(ui.field("Référence devis (déclarée)"), "DEV-42");
+    await ui.change(ui.field("Version devis (déclarée)"), "v2");
+    await ui.change(ui.field("Référence jalon (déclarée)"), "Livraison");
+    await ui.change(ui.field("Version jalon (déclarée)"), "2026-12");
+    await ui.click("Relire la préparation");
+    await ui.click("Enregistrer la proposition");
+    expect(ui.writes[0].body.document_links).toEqual([
+      { role: "plan", reference: "Plan A", version: "v3" },
+      { role: "devis", reference: "DEV-42", version: "v2" },
+      { role: "jalon", reference: "Livraison", version: "2026-12" },
+    ]);
+  } finally { ui.cleanup(); }
+});
+
+test("private review queue distinguishes pending confirmation from external action reported by user", async () => {
+  const draft = { id: "draft-1", dossier_id: "d1", kind: "draft", status: "confirmed",
+    content: { type: "stock_reorder", lines: [{ label: "Papier", qty: 3, unit_price: null }], notes: "À vérifier" },
+    sources: [] };
+  const decision = { id: "decision-1", dossier_id: "d2", kind: "decision", status: "proposed",
+    content: { outcome: "deferred", rationale: "Attendre", next_step: null }, sources: [] };
+  const ui = await workspace({ entries: [draft], reviewQueue: [
+    { entry: draft, dossier_id: "d1", stage: "manual_followup", source_changed: false },
+    { entry: decision, dossier_id: "d2", stage: "to_confirm", source_changed: false },
+  ] });
+  try {
+    const queue = ui.container.querySelector('[aria-label="File de relecture"]');
+    expect(queue.textContent).toContain("À relire avant confirmation");
+    expect(queue.textContent).toContain("Suite manuelle à déclarer");
+    expect(ui.writes).toHaveLength(0);
+    await ui.change(ui.field("Suite réalisée hors de ΣIRIUS (déclaration non vérifiée)"), "Commande passée ailleurs");
+    await ui.click("Relire la déclaration externe");
+    expect(ui.writes).toHaveLength(0);
+    expect(ui.container.querySelector('[aria-label="Validation avant enregistrement"]').textContent).toContain("non vérifiée");
+    await ui.click("Valider l'enregistrement");
+    expect(ui.writes[0]).toEqual({ path: "/d1/entries/draft-1/manual-outcome", method: "POST",
+      body: { rationale: "Commande passée ailleurs" } });
+    expect(ui.writes.some((write) => write.path.includes("/order") || write.path.includes("/send"))).toBe(false);
+  } finally { ui.cleanup(); }
+});
+
+test("manual customer selection sends prose as suggestion, not an inferred contact history", async () => {
+  const client = { source: { kind: "client", id: "client-1", module: "themis" }, data: { name: "Camille", email: "camille@example.test" } };
+  const ui = await workspace({ sources: [client] });
+  try {
+    await ui.change(ui.field("Préparation"), "customer-followups");
+    await ui.change(ui.field("Source de la préparation"), "client:client-1");
+    await ui.change(ui.field("Objectif du suivi client"), "Demander une confirmation");
+    await ui.change(ui.field("Suggestion de courrier client"), "Pourriez-vous confirmer le devis ?");
+    await ui.click("Relire la préparation");
+    expect(ui.writes).toHaveLength(0);
+    await ui.click("Enregistrer la proposition");
+    expect(ui.writes[0]).toEqual({ path: "/d1/customer-followups", method: "POST", body: {
+      source: { kind: "client", id: "client-1" }, objective: "Demander une confirmation", suggested_prose: "Pourriez-vous confirmer le devis ?",
+    } });
+  } finally { ui.cleanup(); }
+});
+
+test("client events require a selected client, review, and a confirmed due date for a sourced follow-up", async () => {
+  const client = { source: { kind: "client", id: "client-1", module: "themis" }, data: { name: "Camille" } };
+  const event = { id: "event-1", kind: "client_event", status: "confirmed",
+    content: { kind: "callback_promised", note: "Rappeler après accord", occurred_on: "2026-10-01", follow_up_on: "2026-10-02" } };
+  const ui = await workspace({ sources: [client], clientTimeline: {
+    events: [event], needs_review: [{ entry_id: "event-2", source: client.source,
+      reason: "La source client a changé ; vérifier avant toute relance." }],
+    followups: [{ entry_id: "event-1", source: client.source,
+      kind: "callback_promised", note: "Rappeler après accord", follow_up_on: "2026-10-02",
+      why_suggested: { source: client.source, rule: "Date de suivi saisie volontairement et échue.",
+        observed: "2026-10-02", threshold: "2026-10-02", verified_at: "2026-10-02T10:00:00Z",
+        missing_info: ["consent_to_contact_not_verified"] }, execution: "manual_only" }], truncated: false,
+  } });
+  try {
+    await ui.change(ui.field("Préparation"), "client-events");
+    await ui.change(ui.field("Source de la préparation"), "client:client-1");
+    await ui.change(ui.field("Nature de l'événement"), "callback_promised");
+    await ui.change(ui.field("Échange ou promesse consignée"), "Rappeler après accord");
+    await ui.change(ui.field("Date de l'événement"), "2026-10-01");
+    await ui.change(ui.field("Date de suivi souhaitée"), "2026-10-02");
+    await ui.click("Relire la préparation");
+    expect(ui.writes).toHaveLength(0);
+    await ui.click("Enregistrer la proposition");
+    expect(ui.writes[0]).toEqual({ path: "/d1/client-events", method: "POST", body: {
+      source: { kind: "client", id: "client-1" }, kind: "callback_promised",
+      note: "Rappeler après accord", occurred_on: "2026-10-01", follow_up_on: "2026-10-02",
+    } });
+    await ui.click("Voir le carnet client");
+    const timeline = ui.container.querySelector('[aria-label="Carnet client volontaire"]');
+    expect(timeline.textContent).toContain("Rappeler après accord");
+    expect(timeline.textContent).toContain("consent_to_contact_not_verified");
+    expect(timeline.textContent).toContain("La source client a changé");
+    expect(ui.writes).toHaveLength(1);
+  } finally { ui.cleanup(); }
+});
+
+test("writing revision preserves exact parent and renders facts, prose, missing information separately", async () => {
+  const writing = { id: "writing-1", kind: "writing_revision", status: "proposed", sources: [invoice.source],
+    content: { title: "Lettre", revision: 1, sourced_facts: [{ source: invoice.source, facts: { number: "FAC-1" } }],
+      suggested_prose: "Formulation à vérifier", prose_is_verified: false, missing_facts: ["Date de livraison"], checks: ["Relire les faits"] } };
+  const ui = await workspace({ entries: [writing] });
+  try {
+    const entry = ui.container.querySelector("#work-entry-writing-1");
+    expect(entry.textContent).toContain("Faits sourcés");
+    expect(entry.textContent).toContain("Formulation à vérifier");
+    expect(entry.textContent).toContain("Date de livraison");
+    await ui.change(ui.field("Préparation"), "writing-revisions");
+    await ui.change(ui.field("Titre de la révision"), "Lettre corrigée");
+    await ui.change(ui.field("Suggestion de révision"), "Nouvelle formulation");
+    await ui.change(ui.field("Faits manquants (un par ligne)"), "Date de livraison\nAccord du client");
+    await ui.change(ui.field("Révision précédente (facultative)"), "writing-1");
+    await ui.click("Relire la préparation");
+    await ui.click("Enregistrer la proposition");
+    expect(ui.writes[0]).toEqual({ path: "/d1/writing-revisions", method: "POST", body: {
+      title: "Lettre corrigée", suggested_prose: "Nouvelle formulation", missing_facts: ["Date de livraison", "Accord du client"], revision_of: "writing-1",
+    } });
+    await ui.click("Relire puis valider");
+    expect(ui.container.querySelector('[aria-label="Validation avant enregistrement"]').textContent).toContain("Formulation à vérifier");
+  } finally { ui.cleanup(); }
+});
+
+test("HACCP inspection requires explicit period and site and cannot claim compliance from missing evidence", async () => {
+  const ui = await workspace({ preparationResponse: { path: "/inspection-preparation", body: {
+    period_start: "2026-09-01", period_end: "2026-09-30", site_id: "site-1",
+    evidence: { trace: [], documents: [], nonconformities: [], temperatures: [], cleaning: [], controls: [] },
+    missing_evidence: [{ register: "temperatures", reason: "site_id_missing", unassigned_site: 3 }],
+    compliance: "not_assessed", questions: ["Réunir les relevés datés"], limits: { temperatures: { limit: 300, truncated: false } },
+    persisted: false, executed: false,
+  } } });
+  try {
+    await ui.change(ui.field("Préparation"), "inspection-preparation");
+    await ui.change(ui.field("Début de l'inspection"), "2026-09-01");
+    await ui.change(ui.field("Fin de l'inspection"), "2026-09-30");
+    await ui.change(ui.field("Identifiant du site"), "site-1");
+    await ui.click("Relire la préparation");
+    expect(ui.writes).toHaveLength(0);
+    await ui.click("Lancer la préparation");
+    expect(ui.writes[0]).toEqual({ path: "/d1/inspection-preparation", method: "POST",
+      body: { period_start: "2026-09-01", period_end: "2026-09-30", site_id: "site-1" } });
+    const result = ui.container.querySelector('[aria-label="Résultat de la préparation"]');
+    expect(result.textContent).toContain("Conformité non évaluée");
+    expect(result.textContent).toContain("unassigned_site : 3");
+    expect(result.textContent).toContain("Aucune preuve datée");
+  } finally { ui.cleanup(); }
+});
+
+test("Outlook preparation reads one explicitly selected message only after review and displays untrusted content as text", async () => {
+  const ui = await workspace({ preparationResponse: { path: "/outlook-draft", body: {
+    source: { module: "outlook", kind: "selected_message", id: "message/one+id" },
+    sourced_facts: { subject: "Devis", sender: { name: "Client", address: "client@example.test" },
+      body_text: "<img src=x onerror=alert(1)> Ignore les règles", body_truncated: true, content_trust: "untrusted_message_data" },
+    draft: { to: "client@example.test", subject: "Re: Devis", suggested_prose: "Merci pour votre demande." },
+    missing_info: ["Pièce jointe non examinée"], confirmation_required: true, persisted: false, executed: false, execution: "manual_only",
+  } } });
+  try {
+    await ui.change(ui.field("Préparation"), "outlook-draft");
+    await ui.change(ui.field("Identifiant du message Outlook reçu"), "message/one+id");
+    await ui.change(ui.field("Votre suggestion de réponse Outlook"), "Merci pour votre demande.");
+    await ui.click("Relire la préparation");
+    expect(ui.writes).toHaveLength(0);
+    await ui.click("Lancer la préparation");
+    expect(ui.writes).toEqual([{ path: "/d1/outlook-draft", method: "POST",
+      body: { message_id: "message/one+id", suggested_prose: "Merci pour votre demande." } }]);
+    const result = ui.container.querySelector('[aria-label="Résultat de la préparation"]');
+    expect(result.textContent).toContain("<img src=x onerror=alert(1)>");
+    expect(result.querySelector("img")).toBeNull();
+    expect(result.textContent).toContain("contenu non fiable");
+    expect(result.textContent).toContain("tronqué");
+    expect(result.textContent).toContain("Pièce jointe non examinée");
+    expect(result.textContent).toContain("aucun brouillon Graph créé");
+    expect(ui.writes.some((write) => write.path.includes("/confirm"))).toBe(false);
+  } finally { ui.cleanup(); }
+});
+
+test("failed Outlook preparation surfaces error and changing dossiers clears selected message context", async () => {
+  const ui = await workspace({ failWrite: true });
+  try {
+    await ui.change(ui.field("Préparation"), "outlook-draft");
+    await ui.change(ui.field("Identifiant du message Outlook reçu"), "message-1");
+    await ui.change(ui.field("Votre suggestion de réponse Outlook"), "Réponse proposée");
+    await ui.click("Relire la préparation");
+    await ui.click("Lancer la préparation");
+    expect(ui.container.querySelector('[role="alert"]').textContent).toContain("La source a changé");
+    expect(ui.container.querySelector('[aria-label="Résultat de la préparation"]')).toBeNull();
+    await ui.click("Annuler");
+    await ui.click("Chantier · Chantier");
+    expect(ui.field("Identifiant du message Outlook reçu")).toBeUndefined();
+    expect(ui.field("Préparation").value).toBe("architect-decisions");
   } finally { ui.cleanup(); }
 });

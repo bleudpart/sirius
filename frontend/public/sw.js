@@ -1,6 +1,6 @@
 // © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 // Service worker SIRIUS — installable (PWA) + hors ligne de base
-const CACHE = "sirius-v5";
+const CACHE = "sirius-v6";
 const SHELL = [
   "/",
   "/manifest.json",

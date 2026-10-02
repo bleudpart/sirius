@@ -12,11 +12,19 @@ function Bomb() {
   throw new Error("explosion contrôlée");
 }
 
+function MissingChunk() {
+  const error = new Error("Loading CSS chunk 6376 failed");
+  error.name = "ChunkLoadError";
+  throw error;
+}
+
 describe("FdeErrorBoundary", () => {
   let container;
   let consoleSpy;
+  let originalFetch;
 
   beforeEach(() => {
+    originalFetch = global.fetch;
     container = document.createElement("div");
     document.body.appendChild(container);
     // React log l'erreur capturée : silence attendu pour un test de crash volontaire.
@@ -25,6 +33,7 @@ describe("FdeErrorBoundary", () => {
   });
 
   afterEach(() => {
+    global.fetch = originalFetch;
     consoleSpy.mockRestore();
     container.remove();
   });
@@ -68,5 +77,32 @@ describe("FdeErrorBoundary", () => {
     expect(fallback).not.toBeNull();
     expect(fallback.textContent).toContain("MODULE ISOLÉ PAR FDE_OMEGA");
     expect(fallback.querySelector("button")).not.toBeNull();
+  });
+
+  test("a missing chunk waits for the local server rather than retrying against a stopped backend", async () => {
+    global.fetch = jest.fn().mockRejectedValue(new TypeError("Failed to fetch"));
+    const root = createRoot(container);
+    act(() => root.render(<FdeErrorBoundary module="oracle"><MissingChunk /></FdeErrorBoundary>));
+    await act(async () => {
+      container.querySelector(".fde-module-error button").click();
+    });
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringMatching(/\/health$/), expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    expect(container.querySelector('[role="status"]').textContent).toContain("Le serveur local ne répond pas encore");
+    expect(container.querySelector(".fde-module-error button").disabled).toBe(false);
+    act(() => root.unmount());
+  });
+
+  test("a degraded backend does not count as a successful recovery", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true, json: async () => ({ status: "degraded", checks: { mongo: "down" } }),
+    });
+    const root = createRoot(container);
+    act(() => root.render(<FdeErrorBoundary module="oracle"><MissingChunk /></FdeErrorBoundary>));
+    await act(async () => { container.querySelector(".fde-module-error button").click(); });
+    expect(container.querySelector('[role="status"]').textContent).toContain("dégradé");
+    expect(container.querySelector(".fde-module-error button").disabled).toBe(false);
+    act(() => root.unmount());
   });
 });

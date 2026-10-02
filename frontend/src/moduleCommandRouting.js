@@ -28,7 +28,7 @@ export const MODULE_ALIASES = {
   workflows: "ariane orchestration parcours etapes actions",
   pricing: "plutos tarifs prix fournisseurs comparaison",
   dossiers: "mnemosyne dossiers archives clients",
-  "dossiers-pro": "dossiers intelligents propositions priorites travail",
+  "dossiers-pro": "dossiers intelligents propositions priorites travail journee sirius",
   "sport-coach": "asclepios sport bien etre fitness entrainement musculation prise de masse coach sportif seance",
   audit: "nemesis tracabilite historique modifications",
   documents: "thot lecture classement documents texte",

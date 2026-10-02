@@ -39,6 +39,7 @@ test("intelligent dossier has a distinct registry action", () => {
   entry.run();
   expect(openWorkDossiers).toHaveBeenCalledTimes(1);
   expect(MODULE_ALIASES["dossiers-pro"]).toContain("intelligents");
+  expect(findModuleForCommand("ouvre la journée sirius", [entry], MODULE_ALIASES).item).toBe(entry);
 });
 
 test.each([
