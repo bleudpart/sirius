@@ -228,7 +228,7 @@ export default function PublicStore() {
       <footer className="public-footer">
         <p className="public-slogan">ΣIRIUS. Le travail, automatisé.</p>
         <p className="public-footer-secure"><ShieldCheck size={13} /> Paiement sécurisé 256 bits</p>
-        © 2026 ΣIRIUS par Daniel Partel · <a href="/mentions-legales">Mentions légales</a> · <a href="/conditions-generales">Conditions générales</a> · <a href="/confidentialite.html">Confidentialité</a>
+        © 2026 ΣIRIUS par Daniel Partel · <a href="/mentions-legales">Mentions légales</a> · <a href="/conditions-generales">Conditions générales</a> · <a href="/confidentialite.html">Confidentialité</a> · <a href="/suppression-compte.html">Suppression du compte</a>
       </footer>
     </main>
   );

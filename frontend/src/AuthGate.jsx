@@ -349,6 +349,7 @@ export function ProfilePanel({ user, onClose, onUpdate, onLogout }) {
           <button className="auth-submit" style={{ width: "auto", padding: "10px 18px" }} onClick={save} disabled={saving} data-testid="profile-save-btn"><Save size={14} /> {saving ? "ENREGISTREMENT…" : saved ? "ENREGISTRÉ ✓" : "ENREGISTRER"}</button>
           <button className="file-btn" onClick={exportData} title="Exporter mes données" data-testid="profile-export-btn"><Download size={13} /> EXPORTER MES DONNÉES</button>
           <a className="file-btn" href="https://sirius-assistant.fr/confidentialite.html" target="_blank" rel="noreferrer">CONFIDENTIALITÉ</a>
+          <a className="file-btn" href="https://sirius-assistant.fr/suppression-compte.html" target="_blank" rel="noreferrer">AIDE À LA SUPPRESSION DU COMPTE</a>
           <button className="file-btn danger" onClick={onLogout} data-testid="profile-logout-btn"><LogOut size={13} /> DÉCONNEXION</button>
           {user.role !== "admin" && <button className="file-btn danger" onClick={deleteAccount} title="Demander la suppression après examen manuel" data-testid="profile-delete-btn"><Trash2 size={13} /> DEMANDER LA SUPPRESSION</button>}
         </div>

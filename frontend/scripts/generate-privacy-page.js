@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const policy = require("../src/privacyPolicy.json");
+const deletionPage = require("../src/accountDeletionPage.json");
 
 function escapeHtml(value) {
   return value.replace(/[&<>"']/g, (character) => ({
@@ -17,7 +18,7 @@ function renderPrivacyPage(data) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="Politique de confidentialité de ΣIRIUS et coordonnées du responsable du traitement.">
+<meta name="description" content="${escapeHtml(data.title)} et coordonnées du responsable du traitement.">
 <title>${escapeHtml(data.title)}</title>
 <style>
 body{margin:0;background:#051320;color:#e7eff5;font:17px/1.65 system-ui,sans-serif}
@@ -28,19 +29,21 @@ p{overflow-wrap:anywhere}footer{margin-top:28px;color:#aec2cf}
 </style>
 </head>
 <body><main>
-<nav><a href="/">ΣIRIUS — Retour au site</a></nav>
+<nav><a href="/">ΣIRIUS — Retour au site</a> · <a href="/confidentialite.html">Confidentialité</a> · <a href="/suppression-compte.html">Suppression du compte</a></nav>
 <h1>${escapeHtml(data.title)}</h1>
 ${sections}
 <footer>Dernière mise à jour : ${escapeHtml(data.updated)}.<br>
-<a href="mailto:danielsirius.pro2026@gmail.com">Contacter le responsable</a></footer>
+<a href="mailto:danielsirius.pro2026@gmail.com${data.requestSubject ? `?subject=${escapeHtml(encodeURIComponent(data.requestSubject))}` : ""}">${data.requestSubject ? "Préparer mon e-mail de demande de suppression" : "Contacter le responsable"}</a></footer>
 </main></body></html>
 `;
 }
 
 if (require.main === module) {
-  const output = path.join(__dirname, "../public/confidentialite.html");
-  fs.writeFileSync(output, renderPrivacyPage(policy), "utf8");
-  console.log(`Politique HTML generee : ${output}`);
+  for (const [filename, data] of [["confidentialite.html", policy], ["suppression-compte.html", deletionPage]]) {
+    const output = path.join(__dirname, "../public", filename);
+    fs.writeFileSync(output, renderPrivacyPage(data), "utf8");
+    console.log(`Page HTML generee : ${output}`);
+  }
 }
 
 module.exports = { escapeHtml, renderPrivacyPage };

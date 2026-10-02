@@ -1,6 +1,6 @@
 // © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 // Service worker SIRIUS — installable (PWA) + hors ligne de base
-const CACHE = "sirius-v7";
+const CACHE = "sirius-v8";
 const SHELL = [
   "/",
   "/manifest.json",
@@ -33,8 +33,8 @@ self.addEventListener("fetch", (event) => {
   const req = event.request;
   // Jamais de cache pour les appels API ni les requêtes non-GET
   if (req.method !== "GET" || req.url.includes("/api/")) return;
-  // The standalone policy must never replace the offline application shell.
-  if (new URL(req.url).pathname === "/confidentialite.html") return;
+  // Standalone legal pages must never replace the offline application shell.
+  if (["/confidentialite.html", "/suppression-compte.html"].includes(new URL(req.url).pathname)) return;
 
   // Navigation : réseau d'abord, sinon shell hors ligne
   if (req.mode === "navigate") {

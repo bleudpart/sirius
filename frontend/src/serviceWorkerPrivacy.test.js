@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
 
-test("standalone privacy navigation bypasses the application shell cache", () => {
+test.each(["confidentialite.html", "suppression-compte.html"])("standalone %s navigation bypasses the application shell cache", (filename) => {
   const listeners = {};
   const fetch = jest.fn().mockResolvedValue({ clone: () => ({}) });
   const put = jest.fn();
@@ -13,7 +13,7 @@ test("standalone privacy navigation bypasses the application shell cache", () =>
   });
   const respondWith = jest.fn();
   listeners.fetch({
-    request: { method: "GET", mode: "navigate", url: "https://sirius-assistant.fr/confidentialite.html?test=1" },
+    request: { method: "GET", mode: "navigate", url: `https://sirius-assistant.fr/${filename}?test=1` },
     respondWith,
   });
   expect(respondWith).not.toHaveBeenCalled();

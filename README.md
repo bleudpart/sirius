@@ -202,6 +202,12 @@ Liste complète des modules et dates : [MODULES_SIRIUS.txt](./MODULES_SIRIUS.txt
   vérifier les prestataires réellement activés, les durées et procédures de
   conservation/suppression et les garanties de transfert du déploiement en ligne :
   le code seul ne prouve pas cette configuration opérationnelle.
+  Ce même générateur prépare `https://sirius-assistant.fr/suppression-compte.html`
+  depuis `frontend/src/accountDeletionPage.json`. Cette page publique explique
+  la demande par e-mail sans connexion et les limites de l'effacement.
+  Vérifier sa mise en ligne avant de saisir son URL dans Play Console.
+  Les catégories, fondements et durées des exceptions de conservation doivent
+  encore être arrêtés par le responsable avant validation finale de la déclaration.
   Le panneau Administration repère les comptes à examiner après 12 mois
   calendaires sans activité authentifiée auprès du serveur. Le suivi commence
   au plus tôt lors de sa première activation pour chaque compte : l'ancienne
