@@ -20,7 +20,7 @@ import psutil
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse, Response
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Literal
 
 from auth_api import require_user
 from promo_shots import PROMO_SHOTS
@@ -292,7 +292,7 @@ class SuggestSettingsIn(BaseModel):
     mode: Optional[str] = None
 
 class SystemModeIn(BaseModel):
-    mode: str
+    mode: Literal["normal", "frugal", "safe"]
     trigger: Optional[str] = "manual"
     cause: Optional[str] = ""
 
@@ -535,20 +535,51 @@ MYTHOS_CHARACTERS = [
         "column": {"enabled": True}, "jug": False,
         "consult": {"placeholder": "Décrivez votre situation de vente (produit, cible, objection, deal en cours…)", "action": "PLAN DE VENTE"},
     },
+    {
+        "module": "ASCLÉPIOS#", "character": "Asclépios", "role": "Coach sport & bien-être",
+        "image": "/api/mythos/img/asclepios.png",
+        "details": "Asclépios accompagne la remise en mouvement et le renforcement avec des séances pédagogiques illustrées, adaptées au temps et au matériel disponibles. Le journal reste local ; aucun conseil médical ni contrôle de posture n'est fourni.",
+        "voiceIntro": "Je suis Asclépios. Avançons à ton rythme : choisis un objectif, puis découvre une séance guidée sans forcer.",
+        "bio": "Dans la mythologie grecque, Asclépios est associé à la médecine et au bâton entouré d'un serpent. Dans ΣIRIUS, son rôle est limité à l'accompagnement pédagogique du mouvement et du bien-être : il ne pose aucun diagnostic et ne remplace pas un professionnel de santé.",
+        "capacites": ["Séances guidées de 15, 25 ou 40 minutes", "Remise en mouvement et renforcement", "Parcours de pratique régulière pour la prise de masse", "Schémas indicatifs et consignes détaillées", "Ressenti et journal local par compte"],
+        "style": {"color": "doré", "opacity": 0.5, "position": "right", "silhouette": "bâton d'Asclépios et serpent", "texture": "hologramme or et cyan"},
+        "column": {"enabled": True}, "jug": False,
+    },
 ]
 
 def make_modules_router(db):
     r = APIRouter()
 
+    @r.get("/system/diagnostic")
+    async def system_diagnostic(request: Request):
+        await require_user(request, db)
+        cpu = await asyncio.to_thread(psutil.cpu_percent, interval=0.1)
+        ram = psutil.virtual_memory().percent
+        return {
+            "cpu": cpu,
+            "ram": ram,
+            "responseText": f"État du serveur ΣIRIUS : processeur à {cpu:.0f} %, mémoire à {ram:.0f} %.",
+        }
+
+    @r.post("/system/mode")
+    async def set_system_mode(data: SystemModeIn, request: Request):
+        await require_user(request, db)
+        labels = {
+            "normal": "Retour au fonctionnement normal.",
+            "frugal": "Mode frugal de l'interface activé.",
+            "safe": "Mode de secours de l'interface activé.",
+        }
+        return {"mode": data.mode, "responseText": labels[data.mode]}
+
     @r.get("/mythos")
     @r.get("/mythos/characters")
-    def get_mythos():
+    def get_mythos(request: Request):
         formatted_chars = []
         for char in MYTHOS_CHARACTERS:
             c = dict(char)
             if "image" in c and c["image"]:
                 filename = c["image"].split("/")[-1].split("?")[0]
-                c["image"] = f"http://localhost:8001/api/mythos/img/{filename}"
+                c["image"] = str(request.url_for("get_mythos_image", filename=filename))
             formatted_chars.append(c)
 
         return {

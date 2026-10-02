@@ -6,13 +6,16 @@ import { progress } from "@/SiriusProgress";
 
 const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
 
-export function ModeBanner({ mode, cause, onExit, onDiagnostic }) {
+export function ModeBanner({ mode, cause, connection, onExit, onDiagnostic }) {
+  const connectionText = connection === "confirmed" ? "Serveur joint" :
+    connection === "unavailable" ? "Serveur indisponible · mode local" : "Mode local · connexion en cours";
   if (mode === "safe") {
     return (
       <div className="mode-banner safe" data-testid="safe-mode-banner">
         <ShieldOff size={13} />
         <span className="mode-banner-title">MODE RESTREINT</span>
         <span className="mode-banner-cause">{cause ? `— ${cause.slice(0, 90)}` : "— capacité réduite, priorité à la stabilité"}</span>
+        <span className="mode-banner-connection" role="status">{connectionText}</span>
         <button className="mode-banner-btn" onClick={onDiagnostic} data-testid="safe-diagnostic-btn">
           <Stethoscope size={10} /> DIAGNOSTIC
         </button>
@@ -28,6 +31,7 @@ export function ModeBanner({ mode, cause, onExit, onDiagnostic }) {
         <BatteryLow size={12} />
         <span className="mode-banner-title">MODE FRUGAL</span>
         <span className="mode-banner-cause">— animations réduites, réponses courtes</span>
+        <span className="mode-banner-connection" role="status">{connectionText}</span>
         <button className="mode-banner-btn" onClick={onExit} data-testid="frugal-exit-btn">
           <Power size={10} /> DÉSACTIVER
         </button>

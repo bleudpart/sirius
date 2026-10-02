@@ -8194,3 +8194,4 @@ body[data-phase] .center-stage::before { content: none !important; }
   .prime-screen > img.mythos-avatar,
   .atlas-panel > img.mythos-avatar { position: static !important; margin: 14px auto 0; }
 }
+.hc-source-focus { background: rgba(145, 230, 242, 0.15); outline: 1px solid #91e6f2; }

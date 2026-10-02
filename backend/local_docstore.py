@@ -19,6 +19,7 @@ API couverte (celle réellement utilisée par le backend) :
 import json
 import re
 import sqlite3
+from contextlib import closing
 import threading
 from datetime import date, datetime
 
@@ -383,21 +384,22 @@ class LocalDocStore:
 
     def _scan(self, collection: str, query=None, limit=None):
         where_sql, params = self._where_from_indexed_query(collection, query or {})
-        with self._conn() as con:
-            rows = con.execute(
+        with closing(self._conn()) as con:
+            cursor = con.execute(
                 f"SELECT pk, doc FROM documents WHERE {where_sql} ORDER BY pk", tuple(params)
-            ).fetchall()
-        found = 0
-        for row in rows:
-            try:
-                doc = json.loads(row["doc"])
-            except Exception:
-                continue
-            if _matches(doc, query or {}):
-                yield row["pk"], doc
-                found += 1
-                if limit and found >= limit:
-                    return
+            )
+            found = 0
+            while rows := cursor.fetchmany(128):
+                for row in rows:
+                    try:
+                        doc = json.loads(row["doc"])
+                    except Exception:
+                        continue
+                    if _matches(doc, query or {}):
+                        yield row["pk"], doc
+                        found += 1
+                        if limit and found >= limit:
+                            return
 
     def _insert(self, collection: str, document: dict) -> int:
         document.pop("_id", None)

@@ -1,5 +1,6 @@
 """Tests du docstore SQLite local (compatibilité motor/MongoDB)."""
 import asyncio
+import sqlite3
 
 import pytest
 
@@ -23,6 +24,28 @@ def test_insert_et_find_one(store):
     doc = run(store.users.find_one({"email": "a@b.c"}))
     assert doc["id"] == "u1" and doc["role"] == "admin"
     assert run(store.users.find_one({"email": "absent@x.y"})) is None
+
+
+def test_find_one_streams_rows_instead_of_loading_the_collection(store, monkeypatch):
+    for index in range(200):
+        run(store.users.insert_one({"id": str(index)}))
+
+    class NoFetchAllCursor(sqlite3.Cursor):
+        def fetchall(self):
+            raise AssertionError("find_one must not load the whole collection")
+
+    class StreamingConnection(sqlite3.Connection):
+        def execute(self, statement, parameters=()):
+            return self.cursor(factory=NoFetchAllCursor).execute(statement, parameters)
+
+    def connect():
+        connection = sqlite3.connect(store._path, factory=StreamingConnection)
+        connection.row_factory = sqlite3.Row
+        return connection
+
+    monkeypatch.setattr(store, "_conn", connect)
+    assert run(store.users.find_one({"id": "0"}))["id"] == "0"
+    assert run(store.users.find_one({"id": "199"}))["id"] == "199"
 
 
 def test_insert_ne_mute_pas_le_document(store):

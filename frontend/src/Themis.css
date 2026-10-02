@@ -103,6 +103,7 @@ select.th-input option { background: #0a1420; }
 .s-accepté, .s-payé { color: #ffd75e; border-color: rgba(216, 184, 117, 0.6); }
 .s-refusé { color: #ff9a9a; border-color: rgba(255, 120, 80, 0.5); }
 .th-low td { background: rgba(180, 60, 30, 0.08); }
+.th-source-focus td { background: rgba(145, 230, 242, 0.15); border-top: 1px solid #91e6f2; border-bottom: 1px solid #91e6f2; }
 .th-stock-cell { display: flex; align-items: center; gap: 8px; }
 .th-stock-cell b { color: #f2d99a; min-width: 24px; text-align: center; }
 .th-movement-panel { margin-top: 14px; padding: 12px; border: 1px solid rgba(216,184,117,0.35); border-radius: 8px; background: rgba(4,18,28,0.55); }

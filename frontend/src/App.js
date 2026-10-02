@@ -2,7 +2,7 @@
 
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { Mic, MicOff, Clock, Cpu, Wifi, MapPin, Calendar, X, Leaf, UserCog, Brain, Music, Repeat, RotateCcw, BarChart3, Workflow, Ruler, FolderOpen, Code2, Database, Sparkles, Eye, Landmark, Library, Orbit, Monitor, ShieldCheck, Radar, ShieldAlert, Camera, ImageDown, Fingerprint, Zap, Package, Clapperboard, Grip, Radio, Wrench, FileCode, History, Maximize, Minimize, KeyRound, Home as HomeIcon, BadgeInfo, Globe2, Hammer, TrendingUp, Newspaper, Scale, Flame, BookOpen, Sigma, AlarmClock, Power, Boxes, Link2, Building2 } from "lucide-react";
+import { Mic, MicOff, Clock, Cpu, Wifi, MapPin, Calendar, X, Leaf, UserCog, Brain, Music, Repeat, RotateCcw, BarChart3, Workflow, Ruler, FolderOpen, Code2, Database, Sparkles, Eye, Landmark, Library, Orbit, Monitor, ShieldCheck, Radar, ShieldAlert, Camera, ImageDown, Fingerprint, Zap, Package, Clapperboard, Grip, Radio, Wrench, FileCode, History, Maximize, Minimize, KeyRound, Home as HomeIcon, BadgeInfo, Globe2, Hammer, TrendingUp, Newspaper, Scale, Flame, BookOpen, Sigma, AlarmClock, Power, Boxes, Link2, Building2, Activity } from "lucide-react";
 import {
   ArchitectPanel, SpectatorView, FilesPanel, DevCompanion, ZeusCortex, SiriusPrime, OracleDivin,
   PantheonSystem, NexusCeleste, SiriusDisplay, EuropeanaViewer, HaccpModule, KeysStatus, KeraunosPanel,
@@ -10,7 +10,7 @@ import {
   AtlasPanel, HeraclesPanel, HephaistosPanel, MythosGallery, ConsultPanel, PrometheePanel, CalliopePanel, CalendarPanel,
   FaceIdPanel, PythagorePanel, PackagerPanel, TrailerGallery, SiriusSetup, PromoPanel, ThemisPanel,
   AdminPanel, EnterprisePanel, PortusNummarius, AgoraPipeline, NewsPanel, ReveilPanel, SpotifyPanel, MediaHUD, ProductivityPanel,
-  FloorPlanPanel, Photo3DPanel, ConnectionsPanel, WorkModulesPanel,
+  FloorPlanPanel, Photo3DPanel, ConnectionsPanel, WorkModulesPanel, WorkDossiersPanel, SportCoachPanel,
 } from "@/lazyModules";
 import { pushStats, setStatsOffline } from "@/liveStats";
 import { formatLocalDate, formatLocalTime, getLocalDateKey } from "@/dateTime";
@@ -28,6 +28,8 @@ import GlobalDrop from "@/GlobalDrop";
 import ProactivePanel from "@/ProactivePanel";
 import ArgusPanel, { ArgusWatcher } from "@/ArgusPanel";
 import { ModeBanner, FrugalWatcher, VisionModule } from "@/SystemModes";
+import { startModuleCascade } from "@/moduleCascade";
+import { startWakeSequence } from "@/wakeSequence";
 import CommandPalette from "@/CommandPalette";
 import ModulesMenu from "@/ModulesMenu";
 import MobileNavigation from "@/MobileNavigation";
@@ -291,6 +293,7 @@ function App() {
     const confirm = (msg) => { setStatus("speaking"); setText(msg); speakOut(msg); };
     const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     if (act === "minimize_all") {
+      cancelCascadeRef.current();
       const n = minimizeAll();
       confirm(d.say || (n === 0 ? "Rien à ranger, aucune fenêtre ouverte." : n === 1 ? "C'est rangé, une fenêtre réduite en pastille." : `C'est rangé, ${n} fenêtres réduites en pastilles.`));
       return true;
@@ -330,6 +333,7 @@ function App() {
       return openModuleByName(target);
     }
     if (act === "close_module" && target) {
+      cancelCascadeRef.current();
       const controller = createWindowController({
         setDisplayOpen, setShowFiles, setShowArchitect, setShowPantheon, setShowCortex, setShowNexus,
         setShowOracle, setShowNummarius, setShowEuropeana, setHaccp, setShowPrime, setShowDev,
@@ -339,7 +343,7 @@ function App() {
         setShowAgora, setShowSolon, setShowPromethee, setShowCalliope, setShowPythagore, setShowNews,
         setShowPackager, setShowInstall, setShowScripts, setShowVision, setShowAdmin, setShowSetup,
         setShowGallery, setShowSpotifyWin, setShowMediaHud, setShowProductivity,
-        setActiveWorkModule, setShowPlans, setShowPhoto3D, setShowConnections, setShowReveil, setShowEnterprise,
+        setActiveWorkModule, setShowPlans, setShowPhoto3D, setShowConnections, setShowReveil, setShowEnterprise, setShowWorkDossiers, setShowSportCoach,
       });
       if (controller.close(target)) { confirm(d.say || "Fenêtre fermée."); return true; }
       return false;
@@ -819,6 +823,8 @@ function App() {
   const activeArgusAlertKeyRef = useRef("");
   const [sysMode, setSysMode] = useState("normal");
   const [sysCause, setSysCause] = useState("");
+  const [modeConnection, setModeConnection] = useState("local");
+  const modeRequestRef = useRef(0);
   const [frugalManual, setFrugalManual] = useState(null);
   const [showVision, setShowVision] = useState(false);
   const [visionAuto, setVisionAuto] = useState(false);
@@ -844,6 +850,10 @@ function App() {
   const [showSolon, setShowSolon] = useState(false);
   const [showPromethee, setShowPromethee] = useState(false);
   const [activeWorkModule, setActiveWorkModule] = useState(null);
+  const [showWorkDossiers, setShowWorkDossiers] = useState(false);
+  const [showSportCoach, setShowSportCoach] = useState(false);
+  const [themisSource, setThemisSource] = useState(null);
+  const [haccpSource, setHaccpSource] = useState(null);
   const [showCalliope, setShowCalliope] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [showConnections, setShowConnections] = useState(false);
@@ -893,18 +903,49 @@ function App() {
 
   // Modes système : secours / frugal (JSON strict côté serveur)
   const setSystemMode = useCallback(async (mode, trigger = "manual", cause = "") => {
+    const requestId = ++modeRequestRef.current;
     setSysMode(mode);
     setSysCause(mode === "normal" ? "" : cause);
-    if (mode !== "frugal") setFrugalManual(mode === "normal" ? null : frugalManual);
+    setModeConnection("local");
+    if (mode === "normal") setFrugalManual(null);
+    if (mode === "frugal" && trigger === "manual") setFrugalManual(true);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
     try {
       const r = await fetch(`${API}/system/mode`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode, trigger, cause }),
+        signal: controller.signal,
       });
-      return await r.json();
-    } catch (e) { return null; }
-  }, [frugalManual]);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const result = await r.json();
+      if (result.mode !== mode || !result.responseText) throw new Error("Réponse invalide");
+      if (modeRequestRef.current === requestId) setModeConnection("confirmed");
+      return result;
+    } catch (error) {
+      const responseText = `Mode ${mode} appliqué dans l'interface, mais confirmation du serveur indisponible : ${error.message}.`;
+      if (modeRequestRef.current === requestId) {
+        setModeConnection("unavailable");
+        setText(responseText);
+      }
+      return { error: true, responseText };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }, []);
+
+  const getSystemDiagnostic = useCallback(async () => {
+    try {
+      const response = await fetch(`${API}/system/diagnostic`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      if (!data.responseText) throw new Error("Réponse invalide");
+      return data.responseText;
+    } catch (error) {
+      return `Diagnostic indisponible : ${error.message}. Réessaie plus tard.`;
+    }
+  }, []);
 
   // ARGUS : réparations déléguées au HUD (severe/critical côté client)
   const handleArgusClientAction = useCallback((fixId) => {
@@ -3567,6 +3608,9 @@ function App() {
   // Actions ponctuelles (rechargement, capture, caméra) : jamais ouvertes dans une cascade.
   const CASCADE_SKIP = useMemo(() => new Set(["reload", "capture-interface", "capture-region", "open-capture-folder", "vision", "install", "packager"]), []);
 
+  const cancelCascadeRef = useRef(() => {});
+  useEffect(() => () => cancelCascadeRef.current(), []);
+
   // Ouverture en cascade : les fenêtres se déploient une à une pour rester lisibles.
   const openModulesCascade = useCallback((rawFilter = "") => {
     const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -3577,9 +3621,8 @@ function App() {
       return norm(`${it.label} ${it.id} ${it.group}`).includes(filter);
     });
     if (!items.length) return false;
-    items.forEach((it, i) => {
-      setTimeout(() => { try { it.run(); } catch (e) { /* module indisponible : on poursuit la cascade */ } }, i * 280);
-    });
+    cancelCascadeRef.current();
+    cancelCascadeRef.current = startModuleCascade(items);
     const msg = `J'ouvre ${items.length} modules en cascade.`;
     setText(msg);
     speakOut(msg);
@@ -4013,7 +4056,6 @@ function App() {
     
     if (sysMode !== "normal" && /\bmode normal\b|d[ée]sactive le mode (secours|frugal|restreint)|frugal off/.test(low)) {
       mark("système · retour normal");
-      setFrugalManual(null);
       setSystemMode("normal", "manual").then((d) => {
         const m = (d && d.responseText) || "Retour au fonctionnement normal.";
         setStatus("speaking"); setText(m); speakOut(m);
@@ -4022,18 +4064,17 @@ function App() {
     }
     if (/\bmode frugal\b|frugal on/.test(low)) {
       mark("système · mode frugal");
-      setFrugalManual(true);
-      setSystemMode("frugal", "manual", "activation manuelle").then(() => {
-        const m = "Mode frugal activé : animations réduites, réponses courtes, appels IA limités.";
+      setSystemMode("frugal", "manual", "activation manuelle").then((d) => {
+        const m = d?.error ? d.responseText : "Mode frugal activé : animations réduites, réponses courtes, appels IA limités.";
         setStatus("speaking"); setText(m); speakOut(m);
       });
       return;
     }
     if (/^diagnostic( syst[èe]me)?$|pourquoi es[- ]tu en mode (secours|restreint)/.test(low.trim())) {
       mark("système · diagnostic");
-      fetch(`${API}/system/diagnostic`).then((r) => r.json()).then((d) => {
-        setStatus("speaking"); setText(d.responseText); speakOut(d.responseText);
-      }).catch(() => {});
+      getSystemDiagnostic().then((message) => {
+        setStatus("speaking"); setText(message); speakOut(message);
+      });
       return;
     }
     if (/active (la |ta )?(vision|cam[ée]ra)|que vois[- ]tu|qu'?est[- ]ce que tu vois|regarde[- ]?(moi )?(ça|ceci|cela)\b|regarde[- ]moi\b|ouvre (la |ta )?cam[ée]ra/.test(low)) {
@@ -5697,6 +5738,7 @@ function App() {
 
   // Réveil matinal : à l'heure choisie, salut vocal puis briefing (météo incluse) puis lecture des mails
   useEffect(() => {
+    let cancelSequence = () => {};
     const tick = () => {
       let cfg = null;
       try { cfg = JSON.parse(localStorage.getItem("sirius_reveil") || "null"); } catch (e) { /* config illisible */ }
@@ -5707,21 +5749,27 @@ function App() {
       const today = getLocalDateKey(nowLocal);
       if (localStorage.getItem("sirius_reveil_last") === today) return;
       localStorage.setItem("sirius_reveil_last", today);
-      (async () => {
-        const salut = `Réveil ! Il est ${h} heure${h > 1 ? "s" : ""}${m ? ` ${String(m).padStart(2, "0")}` : ""}. Voici ton briefing du matin.`;
-        setStatus("speaking"); setText(salut); speakOut(salut);
-        await new Promise((r) => setTimeout(r, 5000));
-        await runBriefingDisplay(true);
-        // attend la fin de la lecture du briefing avant de passer aux mails
-        const t0 = Date.now();
-        await new Promise((r) => setTimeout(r, 3000));
-        while (speakingRef.current && Date.now() - t0 < 240000) await new Promise((r) => setTimeout(r, 1000));
-        await new Promise((r) => setTimeout(r, 800));
-        readMailAloud();
-      })();
+      cancelSequence = startWakeSequence({
+        announce: () => {
+          const salut = `Réveil ! Il est ${h} heure${h > 1 ? "s" : ""}${m ? ` ${String(m).padStart(2, "0")}` : ""}. Voici ton briefing du matin.`;
+          setStatus("speaking"); setText(salut); speakOut(salut);
+        },
+        briefing: () => runBriefingDisplay(true),
+        readMail: readMailAloud,
+        isSpeaking: () => speakingRef.current,
+        isEnabled: () => {
+          try {
+            const current = JSON.parse(localStorage.getItem("sirius_reveil") || "null");
+            return current?.on && current.time === cfg.time;
+          } catch (error) {
+            console.error("[SIRIUS] Configuration du réveil illisible", error);
+            return false;
+          }
+        },
+      });
     };
     const id = setInterval(tick, 20000);
-    return () => clearInterval(id);
+    return () => { clearInterval(id); cancelSequence(); };
   }, [runBriefingDisplay, readMailAloud, speakOut]);
 
   const jours = undefined, mois = undefined, dateStr = undefined, timeStr = undefined; // → LiveClock/LiveDate (liveStats.js)
@@ -5905,14 +5953,8 @@ function App() {
     await captureSiriusInterface(region);
   };
 
-  const moduleItems = createModuleRegistry({
-    icons: { RotateCcw, Monitor, Clapperboard, FolderOpen, BadgeInfo, Link2, Camera, Workflow, Ruler, Boxes,
-      PantheonLogo, Zap, Orbit, Eye, Landmark, Library, ShieldCheck, Sparkles, Code2, BarChart3, Brain, Database,
-      Radar, History, KeyRound, Calendar, Fingerprint, AlarmClock, HomeIcon, Globe2, Hammer, MythosLogo, Radio,
-      ThemisLogo, TrendingUp, Scale, Flame, BookOpen, Sigma, Newspaper, Package, Wrench, FileCode, Music, Building2 },
-    state: { displayOpen, displayType: display.type, showVision, showProductivity, showMediaHud, spotify },
-    user: authUser,
-    actions: {
+  const moduleActionsRef = useRef(null);
+  moduleActionsRef.current = {
       reload: () => { window.__siriusBootPlayed = false; window.location.reload(); },
       toggleDisplay: () => { pinDisplay(); setDisplayOpen((open) => !open); },
       showMediaModules: () => showOnDisplay({ type: "media", titre: "MODULES MULTIMÉDIA" }),
@@ -5934,10 +5976,23 @@ function App() {
       openProductivity: () => { setProductivityIntent(null); setShowProductivity(true); }, openMedia: () => { setMediaIntent(null); setShowMediaHud(true); },
       openSpotify: () => setShowSpotifyWin(true), openAdmin: () => setShowAdmin(true), openEnterprise: () => setShowEnterprise(true),
       openWorkModule: setActiveWorkModule,
-    },
-  });
+      openWorkDossiers: () => setShowWorkDossiers(true),
+      openSportCoach: () => setShowSportCoach(true),
+  };
+  const moduleItems = useMemo(() => createModuleRegistry({
+    icons: { RotateCcw, Monitor, Clapperboard, FolderOpen, BadgeInfo, Link2, Camera, Workflow, Ruler, Boxes,
+      PantheonLogo, Zap, Orbit, Eye, Landmark, Library, ShieldCheck, Sparkles, Code2, BarChart3, Brain, Database,
+      Radar, History, KeyRound, Calendar, Fingerprint, AlarmClock, HomeIcon, Globe2, Hammer, MythosLogo, Radio,
+      ThemisLogo, TrendingUp, Scale, Flame, BookOpen, Sigma, Newspaper, Package, Wrench, FileCode, Music, Building2, Activity },
+    state: { displayOpen, displayType: display.type, showVision, showProductivity, showMediaHud, spotify },
+    user: authUser,
+    actions: Object.fromEntries(Object.keys(moduleActionsRef.current).map((name) =>
+      [name, (...args) => moduleActionsRef.current[name](...args)])),
+  }), [displayOpen, display.type, showVision, showProductivity, showMediaHud, spotify, authUser]);
   moduleItemsRef.current = moduleItems;
 
+  const closeModulesMenu = useCallback(() => setShowModulesMenu(false), []);
+  const closeCommandPalette = useCallback(() => setShowCmdPalette(false), []);
   const navigateMobile = (destination) => {
     if (destination === "modules") {
       setShowModulesMenu(true);
@@ -6003,8 +6058,6 @@ function App() {
         }
         openers[id] && openers[id](true);
       }} />}
-
-
       {showSetup && (
         <SiriusSetup
           initialProfile={profile}
@@ -6080,8 +6133,9 @@ function App() {
       <ModeBanner
         mode={sysMode}
         cause={sysCause}
-        onExit={() => { setFrugalManual(null); setSystemMode("normal", "manual").then((d) => { if (d) speakRef.current(d.responseText); }); }}
-        onDiagnostic={() => fetch(`${API}/system/diagnostic`, { credentials: "include" }).then((r) => r.json()).then((d) => { setText(d.responseText); speakRef.current(d.responseText); }).catch(() => {})}
+        connection={modeConnection}
+        onExit={() => setSystemMode("normal", "manual").then((d) => speakRef.current(d.responseText))}
+        onDiagnostic={() => getSystemDiagnostic().then((message) => { setText(message); speakRef.current(message); })}
       />
       <FrugalWatcher
         active={sysMode === "frugal"}
@@ -6118,6 +6172,7 @@ function App() {
           "ATLAS#": setShowAtlas, "ΣIRIUS DISPLAY#": setDisplayOpen, "THÉMIS#": setShowThemis,
           "HERMÈS AGORA#": setShowAgora, "SOLON#": setShowSolon, "PROMÉTHÉE#": setShowPromethee,
           "CALLIOPE#": setShowCalliope, "PYTHAGORE#": setShowPythagore,
+          "ASCLÉPIOS#": setShowSportCoach,
         };
         const open = map[mod];
         if (open) open(true);
@@ -6125,7 +6180,7 @@ function App() {
       {showPackager && <PackagerPanel onClose={() => { setShowPackager(false); setPackagerAutoInstall(false); }} autoInstaller={packagerAutoInstall} onSpeak={(m) => speakRef.current(m)} />}
       {showTrailer && <TrailerGallery onClose={() => setShowTrailer(false)} />}
       {showPromo && <PromoPanel onClose={() => setShowPromo(false)} />}
-      {showThemis && <ThemisPanel onClose={() => setShowThemis(false)} />}
+      {showThemis && <ThemisPanel initialSource={themisSource} onClose={() => { setShowThemis(false); setThemisSource(null); }} />}
       {showAgora && <AgoraPipeline onClose={() => setShowAgora(false)} onOpenThemis={() => { setShowAgora(false); setShowThemis(true); }} />}
       {showSolon && <ConsultPanel module="SOLON#" onClose={() => setShowSolon(false)} />}
       {showPromethee && <PrometheePanel onClose={() => setShowPromethee(false)} />}
@@ -6135,6 +6190,10 @@ function App() {
         if (id === "plans") setShowPlans(true);
         setActiveWorkModule(null);
       }} />}
+      {showWorkDossiers && <WorkDossiersPanel onClose={() => setShowWorkDossiers(false)}
+        onOpenThemis={(source) => { setThemisSource(source || null); setShowWorkDossiers(false); setShowThemis(true); }}
+        onOpenHaccp={(source) => { setHaccpSource(source || null); setShowWorkDossiers(false); setHaccp({ sujet: "", auto: false }); }} />}
+      {showSportCoach && <SportCoachPanel key={authUser?.id || authUser?._id || authUser?.email || "local"} user={authUser} onClose={() => setShowSportCoach(false)} />}
       {showCalliope && <CalliopePanel onClose={() => setShowCalliope(false)} />}
       {showCalendar && <CalendarPanel onClose={() => setShowCalendar(false)} />}
       {showConnections && <ConnectionsPanel onClose={() => {
@@ -6216,7 +6275,7 @@ function App() {
 
       {showNexus && <NexusCeleste onClose={() => setShowNexus(false)} mood={computeMood()} status={status} />}
 
-      {haccp && <HaccpModule onClose={() => setHaccp(null)} />}
+      {haccp && <HaccpModule initialSource={haccpSource} onClose={() => { setHaccp(null); setHaccpSource(null); }} />}
 
       {musicChoice && (
         <MusicChoice
@@ -6343,8 +6402,8 @@ function App() {
           )}
         </div>
     </header>
-      <ModulesMenu open={showModulesMenu} onClose={() => setShowModulesMenu(false)} items={moduleItems} />
-      <CommandPalette open={showCmdPalette} onClose={() => setShowCmdPalette(false)} items={moduleItems} />
+      <ModulesMenu open={showModulesMenu} onClose={closeModulesMenu} items={moduleItems} />
+      <CommandPalette open={showCmdPalette} onClose={closeCommandPalette} items={moduleItems} />
 
       {nowPlaying && nowPlaying.title && (
         <div className="now-playing-banner" data-testid="now-playing-banner" onClick={fetchNowPlaying} title="Voir le morceau en cours">

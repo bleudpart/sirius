@@ -1,12 +1,12 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import { Grip, X } from "lucide-react";
 import "./ModulesMenu.css";
 
 // Menu déroulant regroupé par familles (Guidage : groupement logique, max 2 niveaux).
 const GROUPS = ["PANTHÉON", "OUTILS", "MÉDIAS", "SYSTÈME"];
 
-export default function ModulesMenu({ open, onClose, items }) {
+function ModulesMenu({ open, onClose, items }) {
   const ref = useRef(null);
   const compactLayout = typeof window !== "undefined" && window.innerWidth <= 1023;
   const visibleItems = compactLayout ? items.filter((item) => item.mobile !== false) : items;
@@ -55,3 +55,5 @@ export default function ModulesMenu({ open, onClose, items }) {
     </div>
   );
 }
+
+export default memo(ModulesMenu);

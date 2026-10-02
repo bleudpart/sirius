@@ -108,6 +108,7 @@ export default function MythosGallery({ onClose, onOpenModule, initialModule = n
             <div className="mg-detail-info">
               <div className="mg-detail-module">{sel.module}</div>
               <h2 className="mg-detail-name" style={{ color: selColor }}>{sel.character}</h2>
+              <p className="mg-detail-role">Fonction : {sel.role}</p>
               <button className="mg-speak" onClick={() => { cancelSpeech(); speakAsCharacter(sel.voiceIntro, CHAR_VOICES[sel.module] || {}); }} data-testid="mythos-speak-btn">
                 <Volume2 size={13} /> ENTENDRE
               </button>

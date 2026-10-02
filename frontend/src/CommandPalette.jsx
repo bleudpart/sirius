@@ -1,10 +1,10 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Search, CornerDownLeft } from "lucide-react";
 import "./CommandPalette.css";
 
 // Palette de commandes (Ctrl+K) : recherche et lance n'importe quel module par son nom.
-export default function CommandPalette({ open, onClose, items }) {
+function CommandPalette({ open, onClose, items }) {
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
   const inputRef = useRef(null);
@@ -69,3 +69,5 @@ export default function CommandPalette({ open, onClose, items }) {
     </div>
   );
 }
+
+export default memo(CommandPalette);

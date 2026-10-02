@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 import pytest
 
 import server
+import modules_api
 
 
 @pytest.fixture(scope="module")
@@ -15,6 +16,70 @@ def authenticated_client(client):
     assert response.status_code == 200
     client.headers.update({"Authorization": f"Bearer {response.json()['access_token']}"})
     return client
+
+
+def test_system_diagnostic_reports_backend_usage(api_client, monkeypatch):
+    monkeypatch.setattr(modules_api.psutil, "cpu_percent", lambda interval: 17.0)
+    monkeypatch.setattr(modules_api.psutil, "virtual_memory", lambda: type("Memory", (), {"percent": 42.0})())
+    response = authenticated_client(api_client).get("/api/system/diagnostic")
+
+    assert response.status_code == 200
+    assert response.json()["cpu"] == 17.0
+    assert response.json()["ram"] == 42.0
+    assert "serveur" in response.json()["responseText"]
+
+
+@pytest.mark.parametrize("mode", ["normal", "frugal", "safe"])
+def test_system_mode_acknowledges_supported_modes(api_client, mode):
+    response = authenticated_client(api_client).post(
+        "/api/system/mode", json={"mode": mode, "trigger": "manual", "cause": "test"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["mode"] == mode
+    assert response.json()["responseText"]
+
+
+def test_system_routes_reject_invalid_modes_and_anonymous_requests(api_client):
+    client = authenticated_client(api_client)
+    invalid = client.post("/api/system/mode", json={"mode": "unknown"})
+    anonymous_mode = client.post("/api/system/mode", json={"mode": "safe"}, headers={"Authorization": ""})
+    anonymous_diagnostic = client.get("/api/system/diagnostic", headers={"Authorization": ""})
+
+    assert invalid.status_code == 422
+    assert anonymous_mode.status_code == 401
+    assert anonymous_diagnostic.status_code == 401
+
+
+@pytest.mark.parametrize("name", ["ariane", "plutos", "mnemosyne", "nemesis", "thot", "chronos"])
+def test_work_module_portrait_is_available(api_client, name):
+    response = api_client.get(f"/api/mythos/img/{name}.png")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("image/png")
+    assert len(response.content) > 1000
+
+
+def test_work_dossiers_are_exposed_through_authenticated_api(api_client):
+    assert api_client.get("/api/work-dossiers", headers={"Authorization": ""}).status_code == 401
+    response = authenticated_client(api_client).get("/api/work-dossiers/proposals")
+    assert response.status_code == 200
+    assert isinstance(response.json()["proposals"], list)
+
+
+def test_asclepios_presentation_and_portrait_are_available(api_client):
+    response = api_client.get("/api/mythos/characters", headers={"host": "sirius.example"})
+    assert response.status_code == 200
+    character = next(c for c in response.json()["characters"] if c["module"] == "ASCLÉPIOS#")
+    assert character["character"] == "Asclépios"
+    assert character["role"] == "Coach sport & bien-être"
+    assert character["voiceIntro"]
+    assert character["capacites"]
+    assert character["image"] == "http://sirius.example/api/mythos/img/asclepios.png"
+    portrait = api_client.get("/api/mythos/img/asclepios.png")
+    assert portrait.status_code == 200
+    assert portrait.headers["content-type"].startswith("image/png")
+    assert portrait.content.startswith(b"\x89PNG\r\n\x1a\n")
 
 
 def test_omega_skills_registry_exposes_twelve_active_skills(api_client):

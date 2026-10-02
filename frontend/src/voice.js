@@ -320,7 +320,7 @@ export const CHAR_PROFILES = {
   "ARGUS#": "M1", "LOCUS#": "M2", "ORACLE#": "F2", "PANTHÉON#": "M1", "HERACLES#": "M1",
   "ΣIRIUS CORTEX#": "F1", "HÉPHAÏSTOS#": "M1", "ATLAS#": "M1", "ΣIRIUS DISPLAY#": "F1",
   "THÉMIS#": "F1", "SOLON#": "M2", "PROMÉTHÉE#": "M2", "HERMÈS AGORA#": "M2", "CALLIOPE#": "F2",
-  "PYTHAGORE#": "M1",
+  "PYTHAGORE#": "M1", "ASCLÉPIOS#": "M2",
 };
 
 export function loadCharOverrides() {

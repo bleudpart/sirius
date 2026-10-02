@@ -1,0 +1,40 @@
+import { act } from "react";
+import { createRoot } from "react-dom/client";
+import MythosGallery from "./MythosGallery";
+
+jest.mock("./voice", () => ({
+  speakAsCharacter: jest.fn(),
+  cancelSpeech: jest.fn(),
+  CHAR_PROFILES: { "ASCLÉPIOS#": "M2" },
+}));
+
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+
+test("presents Asclépios with role, introduction and access to the coach", async () => {
+  const originalFetch = global.fetch;
+  const openModule = jest.fn();
+  const character = {
+    module: "ASCLÉPIOS#", character: "Asclépios", role: "Coach sport & bien-être",
+    image: "/api/mythos/img/asclepios.png", voiceIntro: "Je suis Asclépios.",
+    details: "Séances guidées et illustrées.", bio: "Figure de la mythologie grecque.",
+    capacites: ["Séances guidées"], style: { color: "doré" }, column: { enabled: true },
+  };
+  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ characters: [character] }) }));
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  try {
+    await act(async () => root.render(<MythosGallery onClose={() => {}} onOpenModule={openModule} />));
+    expect(container.textContent).toContain("Asclépios");
+    expect(container.textContent).toContain("Fonction : Coach sport & bien-être");
+    expect(container.querySelector(".mg-detail-img").getAttribute("src")).toContain("/api/mythos/img/asclepios.png");
+    expect(container.textContent).toContain("Séances guidées et illustrées.");
+    expect(container.textContent).toContain("Je suis Asclépios.");
+    act(() => container.querySelector('[data-testid="mythos-open-module-btn"]').click());
+    expect(openModule).toHaveBeenCalledWith("ASCLÉPIOS#");
+  } finally {
+    act(() => root.unmount());
+    container.remove();
+    global.fetch = originalFetch;
+  }
+});

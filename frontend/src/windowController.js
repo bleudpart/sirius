@@ -38,6 +38,8 @@ export function createWindowController(setters, display) {
     agora: () => setters.setShowAgora(false),
     solon: () => setters.setShowSolon(false),
     promethee: () => setters.setShowPromethee(false),
+    "dossiers-pro": () => setters.setShowWorkDossiers?.(false),
+    "sport-coach": () => setters.setShowSportCoach?.(false),
     ...Object.fromEntries(["workflows", "pricing", "dossiers", "audit", "documents", "planning"].map((id) => [id, () => setters.setActiveWorkModule(null)])),
     calliope: () => setters.setShowCalliope(false),
     pythagore: () => setters.setShowPythagore(false),

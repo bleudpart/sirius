@@ -41,6 +41,7 @@
 
 .mg-detail-module { font-family: "Orbitron", sans-serif; font-size: 12px; letter-spacing: 3px; color: #6fb4c6; }
 .mg-detail-name { font-family: "Cinzel", serif; font-size: 30px; margin: 4px 0 10px; letter-spacing: 1px; }
+.mg-detail-role { margin: 0 0 12px; font-size: 13px; color: #b9d4de; }
 .mg-speak {
   display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
   background: transparent; border: 1px solid var(--c); color: var(--c);

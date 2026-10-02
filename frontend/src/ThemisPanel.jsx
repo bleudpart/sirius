@@ -85,7 +85,7 @@ function Lines({ lines, setLines }) {
   );
 }
 
-export default function ThemisPanel({ onClose }) {
+export default function ThemisPanel({ onClose, initialSource }) {
   const [char, setChar] = useState(null);
   useEffect(() => {
     fetch((process.env.REACT_APP_BACKEND_URL || "") + "/api/mythos/characters")
@@ -96,12 +96,22 @@ export default function ThemisPanel({ onClose }) {
       });
   }, []);
   const [tab, setTab] = useState("dash");
+  useEffect(() => {
+    if (initialSource?.kind === "stock") setTab("stock");
+    else if (initialSource?.kind === "facture") setTab("docs");
+  }, [initialSource]);
   const [stats, setStats] = useState(null);
   const [bilan, setBilan] = useState(null);
   const [docs, setDocs] = useState([]);
   const [orders, setOrders] = useState([]);
   const [clients, setClients] = useState([]);
   const [items, setItems] = useState([]);
+  useEffect(() => {
+    if (!initialSource?.id || !["stock", "facture"].includes(initialSource.kind)) return;
+    const rows = initialSource.kind === "stock" ? items : docs;
+    if (!rows.some((row) => row.id === initialSource.id)) return;
+    document.getElementById(`themis-source-${initialSource.id}`)?.scrollIntoView?.({ block: "center" });
+  }, [initialSource, items, docs, tab]);
   const [payments, setPayments] = useState([]);
   const [pieces, setPieces] = useState([]);
   const [templates, setTemplates] = useState([]);
@@ -416,7 +426,7 @@ export default function ThemisPanel({ onClose }) {
             <div className="th-list">
               <table className="th-table" data-testid="themis-docs-table"><tbody>
                 {docs.map((d) => (
-                  <tr key={d.id}>
+                  <tr key={d.id} id={`themis-source-${d.id}`} className={initialSource?.kind === "facture" && initialSource.id === d.id ? "th-source-focus" : ""}>
                     <td>
                       <b className={d.kind === "facture" ? "th-gold" : "th-cyan"}>{d.number}</b>
                       {lastMail(d) && (
@@ -649,7 +659,7 @@ export default function ThemisPanel({ onClose }) {
             <div className="th-list">
               <table className="th-table" data-testid="themis-items-table"><tbody>
                 {items.map((i) => (
-                  <tr key={i.id} className={i.stock <= i.alert ? "th-low" : ""}>
+                  <tr key={i.id} id={`themis-source-${i.id}`} className={`${i.stock <= i.alert ? "th-low" : ""} ${initialSource?.kind === "stock" && initialSource.id === i.id ? "th-source-focus" : ""}`}>
                     <td><b className="th-gold">{i.name}</b> <small>{i.ref}</small></td><td>{EUR(i.price)}</td>
                     <td className="th-stock-cell">
                       <button className="th-icon-btn" onClick={() => post(`items/${i.id}/stock`, { delta: -1, reason: stockReason }, "PUT")} data-testid={`themis-stock-minus-${i.name}`}><Minus size={11} /></button>

@@ -2053,6 +2053,7 @@ from routes.pantheon_oracle import make_pantheon_oracle_router  # noqa: E402
 from routes.voice_io import make_voice_io_router  # noqa: E402
 from routes.hephaistos import make_hephaistos_router  # noqa: E402
 from routes.feedback import make_feedback_router  # noqa: E402
+from routes.work_dossiers import make_work_dossiers_router  # noqa: E402
 api_router.include_router(
     make_supervision_router(db, omega, require_user, _require_local_control, _admin_token_matches)
 )
@@ -2065,6 +2066,7 @@ api_router.include_router(make_pantheon_oracle_router(db, _rate_ok, require_user
 api_router.include_router(make_voice_io_router())
 api_router.include_router(make_hephaistos_router(db))
 api_router.include_router(make_feedback_router())
+api_router.include_router(make_work_dossiers_router(db, require_user))
 
 # ---- Veille push proactive : Sirius prévient des actus tout seul ----
 async def _push_watch_loop():

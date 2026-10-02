@@ -37,6 +37,7 @@
 }
 .mode-banner-title { font-size: 9.5px; letter-spacing: 3px; }
 .mode-banner-cause { font-family: "Rajdhani", sans-serif; font-size: 11px; opacity: 0.85; }
+.mode-banner-connection { font-family: "Rajdhani", sans-serif; font-size: 11px; white-space: nowrap; }
 .mode-banner-btn {
   display: inline-flex;
   align-items: center;

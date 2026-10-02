@@ -43,10 +43,20 @@ const TABS = [
 ];
 
 const Dot = ({ tone }) => <span className={`hc-dot ${tone}`} />;
+const sourceRowId = (id) => `haccp-source-${id}`;
+
+function useFocusSource(items, focusId) {
+  useEffect(() => {
+    if (focusId && items.some((item) => item.id === focusId)) {
+      document.getElementById(sourceRowId(focusId))?.scrollIntoView?.({ block: "center" });
+    }
+  }, [items, focusId]);
+}
 
 // ---------- 1. Traçabilité & étiquetage ----------
-function SectionTrace() {
+function SectionTrace({ focusId }) {
   const [items, setItems] = useState([]);
+  useFocusSource(items, focusId);
   const [form, setForm] = useState({ produit: "", lot: "", fournisseur: "", dlc: "", temperature_reception: "", quantite: "" });
   const [label, setLabel] = useState(null);
   const load = useCallback(() => api("/trace").then((d) => setItems(d.items)).catch(() => {}), []);
@@ -75,7 +85,7 @@ function SectionTrace() {
       </div>
       <div className="prime-scroll hc-list">
         {items.map((it) => (
-          <div className="hc-row" key={it.id} data-testid={`haccp-trace-row-${it.id}`}>
+          <div className={`hc-row ${focusId === it.id ? "hc-source-focus" : ""}`} id={sourceRowId(it.id)} key={it.id} data-testid={`haccp-trace-row-${it.id}`}>
             <Dot tone={it.statut === "expire" ? "ko" : it.statut === "bientot" ? "warn" : "ok"} />
             <div className="hc-row-main">
               <b>{it.produit}</b>
@@ -218,8 +228,9 @@ function SectionPms() {
 }
 
 // ---------- 4. Non-conformités ----------
-function SectionNc() {
+function SectionNc({ focusId }) {
   const [items, setItems] = useState([]);
+  useFocusSource(items, focusId);
   const [form, setForm] = useState({ type: "température", description: "", action_corrective: "", gravite: "mineure" });
   const load = useCallback(() => api("/nc").then((d) => setItems(d.items)).catch(() => {}), []);
   useEffect(() => { load(); }, [load]);
@@ -248,7 +259,7 @@ function SectionNc() {
       </div>
       <div className="prime-scroll hc-list">
         {items.map((it) => (
-          <div className="hc-row" key={it.id} data-testid={`haccp-nc-row-${it.id}`}>
+          <div className={`hc-row ${focusId === it.id ? "hc-source-focus" : ""}`} id={sourceRowId(it.id)} key={it.id} data-testid={`haccp-nc-row-${it.id}`}>
             <Dot tone={it.statut === "ouverte" ? (it.gravite === "critique" ? "ko" : "warn") : "ok"} />
             <div className="hc-row-main">
               <b>{it.type.toUpperCase()} · {it.gravite}{it.auto ? " · auto (relevé T°)" : ""}</b>
@@ -360,8 +371,9 @@ function SectionAllerg() {
 }
 
 // ---------- 7. Documentation obligatoire ----------
-function SectionDocs() {
+function SectionDocs({ focusId }) {
   const [items, setItems] = useState([]);
+  useFocusSource(items, focusId);
   const [form, setForm] = useState({ nom: "", categorie: "agrément", date_expiration: "" });
   const load = useCallback(() => api("/documents").then((d) => setItems(d.items)).catch(() => {}), []);
   useEffect(() => { load(); }, [load]);
@@ -386,7 +398,7 @@ function SectionDocs() {
       </div>
       <div className="prime-scroll hc-list">
         {items.map((it) => (
-          <div className="hc-row" key={it.id} data-testid={`haccp-doc-row-${it.id}`}>
+          <div className={`hc-row ${focusId === it.id ? "hc-source-focus" : ""}`} id={sourceRowId(it.id)} key={it.id} data-testid={`haccp-doc-row-${it.id}`}>
             <Dot tone={it.statut === "expire" ? "ko" : it.statut === "bientot" ? "warn" : "ok"} />
             <div className="hc-row-main">
               <b>{it.nom}</b>
@@ -498,8 +510,13 @@ function SectionAudit() {
 
 const SECTIONS = { trace: SectionTrace, temp: SectionTemp, pms: SectionPms, nc: SectionNc, clean: SectionClean, allerg: SectionAllerg, docs: SectionDocs, controls: SectionControls, sheets: SectionSheets, audit: SectionAudit };
 
-export default function HaccpModule({ onClose }) {
-  const [tab, setTab] = useState("trace");
+const SOURCE_TABS = { haccp_trace: "trace", haccp_nonconformity: "nc", haccp_document: "docs" };
+
+export default function HaccpModule({ onClose, initialSource }) {
+  const [tab, setTab] = useState(() => SOURCE_TABS[initialSource?.kind] || "trace");
+  useEffect(() => {
+    if (SOURCE_TABS[initialSource?.kind]) setTab(SOURCE_TABS[initialSource.kind]);
+  }, [initialSource]);
   const [ov, setOv] = useState(null);
   const [err, setErr] = useState("");
   useEffect(() => {
@@ -541,7 +558,7 @@ export default function HaccpModule({ onClose }) {
       </div>
       <div className="hc-body prime-card">
         {err && <div className="dev-error" data-testid="haccp-error">{err}</div>}
-        <Section />
+        <Section focusId={SOURCE_TABS[initialSource?.kind] === tab ? initialSource.id : null} />
       </div>
     </div>
   );

@@ -58,6 +58,8 @@ export function createModuleRegistry({ icons, actions, state, user }) {
     openAdmin,
     openEnterprise,
     openWorkModule,
+    openWorkDossiers,
+    openSportCoach,
   } = actions;
 
   return [
@@ -105,6 +107,8 @@ export function createModuleRegistry({ icons, actions, state, user }) {
     { id: "agora", group: "PANTHÉON", label: "HERMÈS AGORA# — pipeline de vente", Icon: icons.TrendingUp, run: openAgora },
     { id: "solon", group: "PANTHÉON", label: "SOLON# — conseil juridique", Icon: icons.Scale, run: openSolon },
     { id: "promethee", group: "PANTHÉON", label: "PROMÉTHÉE# — gestion de projet", Icon: icons.Flame, run: openPromethee },
+    { id: "dossiers-pro", group: "OUTILS", label: "Dossiers intelligents — sources et propositions", Icon: icons.FolderOpen, run: openWorkDossiers },
+    { id: "sport-coach", group: "PANTHÉON", label: "ASCLÉPIOS# — bien-être & santé", Icon: icons.Activity, run: openSportCoach },
     { id: "workflows", group: "PANTHÉON", label: "ARIANE# — orchestration des modules", Icon: icons.Workflow, run: () => openWorkModule("workflows") },
     { id: "pricing", group: "PANTHÉON", label: "PLUTOS# — prix et fournisseurs", Icon: icons.Landmark, run: () => openWorkModule("pricing") },
     { id: "dossiers", group: "PANTHÉON", label: "MNÉMOSYNE# — dossiers et archives", Icon: icons.FolderOpen, run: () => openWorkModule("dossiers") },
