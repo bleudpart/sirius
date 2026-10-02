@@ -2,6 +2,20 @@ apply plugin: 'com.android.application'
 
 def siriusKeystorePath = System.getenv('SIRIUS_ANDROID_KEYSTORE')
 
+gradle.taskGraph.whenReady { graph ->
+    if (graph.allTasks.any { it.project == project && it.name.toLowerCase().contains('release') }) {
+        def required = ['SIRIUS_ANDROID_KEYSTORE', 'SIRIUS_ANDROID_STORE_PASSWORD',
+                        'SIRIUS_ANDROID_KEY_ALIAS', 'SIRIUS_ANDROID_KEY_PASSWORD']
+        def missing = required.findAll { !System.getenv(it)?.trim() }
+        if (missing) {
+            throw new GradleException("Signature Android release absente : ${missing.join(', ')}")
+        }
+        if (!file(siriusKeystorePath).isFile()) {
+            throw new GradleException('Le fichier SIRIUS_ANDROID_KEYSTORE est introuvable.')
+        }
+    }
+}
+
 android {
     namespace = "sh.techenclair.sirius"
     compileSdk = libs.versions.compileSdk.get().toInteger()

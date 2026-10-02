@@ -170,8 +170,25 @@ Liste complète des modules et dates : [MODULES_SIRIUS.txt](./MODULES_SIRIUS.txt
   1. Configure le jeton GitHub : `set GH_TOKEN=ton_token_github`
   2. Lance `RELEASE-SIRIUS-AUTO.bat` à la racine du projet, ou `npm run release:auto` depuis `frontend/`
   3. Le script augmente automatiquement `version`, compile le HUD/backend, puis publie la release.
-     (ou crée la release à la main sur GitHub en y joignant `SIRIUS Setup x.y.z.exe`,
-     `SIRIUS Setup x.y.z.exe.blockmap` et `latest.yml` depuis `frontend\dist`)
+     Pour une publication manuelle, utilise le nom exact de l'installateur indiqué
+     dans `frontend\dist\latest.yml` et son fichier du même nom suivi de `.blockmap`.
+     Vérifie la taille et le SHA-512 de l'installateur, publie les exécutables et
+     le blockmap, puis `latest.yml` en dernier. Ne mélange pas les fichiers de
+     builds différents. Le portable n'est pas utilisé par la mise à jour NSIS.
+     Vérifie la signature avec `Get-AuthenticodeSignature` : un build réussi
+     ne signifie pas qu'un exécutable est signé. La signature de production
+     nécessite un certificat de signature de code reconnu ; conserve sa clé
+     et son mot de passe hors du dépôt.
+- **Android / Google Play** : depuis `frontend`, `npm run mobile:apk` produit
+  un APK **debug**, réservé aux tests et non publiable sur Google Play.
+  `npm run mobile:apk:release` produit un APK release signé et `npm run mobile:play`
+  un Android App Bundle (AAB) signé. Ces deux commandes exigent
+  `SIRIUS_ANDROID_KEYSTORE`, `SIRIUS_ANDROID_STORE_PASSWORD`,
+  `SIRIUS_ANDROID_KEY_ALIAS` et `SIRIUS_ANDROID_KEY_PASSWORD` ; les tâches Gradle
+  release refusent aussi de démarrer sans cette configuration.
+  Ne versionne jamais le keystore ni ses mots de passe. Pour une application
+  déjà publiée, utilise sa clé d'upload existante, pas une nouvelle clé.
+  La signature ne remplace pas les validations et exigences de la Play Console.
 - **Son de démarrage personnalisé** : place un fichier `boot-sound.mp3` (libre de droits) dans `frontend/public/`. Activable dans **Configuration → « Son de démarrage »**.
 - **Sauvegarde de la mémoire locale** (SQLite) avec Sirius Doctor :
   ```
