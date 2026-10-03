@@ -35,6 +35,9 @@ import ModulesMenu from "@/ModulesMenu";
 import MobileNavigation from "@/MobileNavigation";
 import { useAuth } from "@/AuthGate";
 import { App as CapacitorApp } from "@capacitor/app";
+import { Capacitor } from "@capacitor/core";
+import { requestMicrophoneStream, scheduleHandsFreeRetry, stopRecorderAfterSilence, useServerTranscription } from "@/microphoneCapture";
+import PushToTalkButton from "@/components/PushToTalkButton";
 import { speakFr, cancelSpeech, speakSeries, speakAsCharacter } from "@/voice";
 import { loadApiKeys, saveApiKeys } from "@/apiKeyStorage";
 import { loadHud, applyHud } from "@/hudPrefs";
@@ -257,14 +260,19 @@ function App() {
     currentSpokenRef.current = message;
     const t0 = performance.now();
     if (window._siriusTTSTimer) clearTimeout(window._siriusTTSTimer);
-    const safetyTimeoutMs = Math.max(3000, (message.length / 12) * 1000 + 2000);
-    window._siriusTTSTimer = setTimeout(() => {
-      setStatus("idle");
-      speakingRef.current = false;
-    }, safetyTimeoutMs);
+    const finishTimedOutSpeech = () => {
+      cancelSpeech();
+      stopInterruptListenerRef.current();
+      onSpeechEndRef.current();
+    };
+    window._siriusTTSTimer = setTimeout(finishTimedOutSpeech, 30000);
 
     speakFr(message, {
+      onpending: () => { speakingRef.current = true; },
       onstart: () => {
+        clearTimeout(window._siriusTTSTimer);
+        const safetyTimeoutMs = Math.max(10000, (message.length / 8) * 1000 + 5000);
+        window._siriusTTSTimer = setTimeout(finishTimedOutSpeech, safetyTimeoutMs);
         setStatus("speaking");
         setMetrics((m) => ({ ...m, tts: { ...m.tts, latMs: Math.round(performance.now() - t0), count: m.tts.count + 1 } }));
         onSpeechStartRef.current();
@@ -530,8 +538,10 @@ function App() {
   const microphoneRequestCooldownRef = useRef(0);
   const serverRecorderStreamRef = useRef(null);
   const serverRecorderTimerRef = useRef(null);
+  const serverSilenceCleanupRef = useRef(null);
   const discardServerRecordingRef = useRef(false);
-  const preferServerSttRef = useRef(false);
+  const preferServerSttRef = useRef(useServerTranscription(Capacitor.getPlatform()));
+  const microphoneSessionRef = useRef(0);
   const micOnRef = useRef(false);
   // Push-to-talk (talkie-walkie) : maintenir Espace ou le bouton dédié
   const [pttActive, setPttActive] = useState(false);
@@ -874,7 +884,8 @@ function App() {
   const [showAdmin, setShowAdmin] = useState(false);
   const [showEnterprise, setShowEnterprise] = useState(false);
   const [showNummarius, setShowNummarius] = useState(false);
-  const authUser = (useAuth() || {}).user;
+  const auth = useAuth() || {};
+  const authUser = auth.user;
   // Plein écran global du HUD (API Fullscreen du navigateur)
   const [isFullscreen, setIsFullscreen] = useState(false);
   useEffect(() => {
@@ -1340,6 +1351,16 @@ function App() {
   const onSpeechStart = useCallback(() => {
     speakingRef.current = true;
     setStatus("speaking");
+  }, []);
+
+  useEffect(() => {
+    const reportVoiceError = (event) => setText(event.detail);
+    window.addEventListener("sirius-voice-error", reportVoiceError);
+    window.addEventListener("sirius-voice-degraded", reportVoiceError);
+    return () => {
+      window.removeEventListener("sirius-voice-error", reportVoiceError);
+      window.removeEventListener("sirius-voice-degraded", reportVoiceError);
+    };
   }, []);
 
   const onSpeechEnd = useCallback(() => {
@@ -4886,32 +4907,33 @@ function App() {
   }, []);
   
   // ---- Reconnaissance vocale navigateur (Web Speech API) ----
-  const handleTranscript = useCallback((transcript, isFinal) => {
-    if (speakingRef.current) return; // Sirius parle → on ignore (évite l'écho)
+  const handleTranscript = useCallback((transcript, isFinal, pushToTalk = false) => {
+    if (speakingRef.current) return false; // Sirius parle → on ignore (évite l'écho)
     const normalizedTranscript = normalizeVoiceTranscript(transcript).trim();
     setVoiceTranscript(normalizedTranscript);
     const t = normalizedTranscript.toLowerCase().trim();
     if (!isFinal) {
       setStatus("listening");
       setText(normalizedTranscript);
-      return;
+      return false;
     }
     // Réponse vocale « oui / non » à une proposition de lecture à voix haute
     if (window.__siriusReadAloudAnswer && window.__siriusReadAloudAnswer(t)) {
       setStatus("idle");
-      return;
+      return true;
     }
     // En mains libres, seul « Sirius » suivi d'une vraie commande déclenche une action.
     // Le push-to-talk reste direct, car l'appui sur ESPACE est déjà un geste intentionnel.
     const command = extractVoiceCommand(normalizedTranscript, {
-      requireWakeWord: autoMicRef.current && !pttRef.current,
+      requireWakeWord: autoMicRef.current && !pttRef.current && !pushToTalk,
     });
     if (!command) {
-      setStatus("listening");
-      setText("Écoute active.");
-      return;
+      setStatus(micOnRef.current ? "listening" : "idle");
+      setText("En mains libres, dites « Sirius » suivi de votre demande.");
+      return false;
     }
     processCommand(command);
+    return true;
   }, [processCommand]);
 
   // Référence stable vers handleTranscript pour la reconnaissance vocale
@@ -4927,12 +4949,23 @@ function App() {
       return;
     }
     microphoneStartPendingRef.current = true;
+    const session = ++microphoneSessionRef.current;
+    const pushToTalk = pttRef.current;
+    const retryHandsFree = () => {
+      clearTimeout(autoListenTimerRef.current);
+      autoListenTimerRef.current = scheduleHandsFreeRetry(
+        () => autoMicRef.current && session === microphoneSessionRef.current
+          && !speakingRef.current && !micOnRef.current && !pttRef.current
+          && !microphoneStartPendingRef.current && !!startListenRef.current,
+        () => startListenRef.current(),
+      );
+    };
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      if (speakingRef.current) {
-        stream.getTracks().forEach((track) => track.stop());
-        return;
-      }
+      const stream = await requestMicrophoneStream(navigator.mediaDevices, () =>
+        session === microphoneSessionRef.current && !speakingRef.current
+        && (!pushToTalk || pttRef.current));
+      if (!stream) return;
+      serverRecorderStreamRef.current = stream;
       const preferredType = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"]
         .find((type) => MediaRecorder.isTypeSupported(type));
       const recorder = new MediaRecorder(stream, preferredType ? { mimeType: preferredType } : undefined);
@@ -4944,6 +4977,8 @@ function App() {
         if (event.data?.size) chunks.push(event.data);
       };
       recorder.onstop = async () => {
+        serverSilenceCleanupRef.current?.();
+        serverSilenceCleanupRef.current = null;
         clearTimeout(serverRecorderTimerRef.current);
         serverRecorderTimerRef.current = null;
         serverRecorderRef.current = null;
@@ -4960,6 +4995,7 @@ function App() {
         if (blob.size < 800) {
           setText("Je n'ai pas reçu assez de son. Rapprochez-vous du microphone et réessayez.");
           setStatus("idle");
+          retryHandsFree();
           return;
         }
         setStatus("thinking");
@@ -4975,19 +5011,24 @@ function App() {
           if (!transcript) {
             setText("Je n'ai pas distingué de parole. Réessayez plus près du microphone.");
             setStatus("idle");
+            retryHandsFree();
             return;
           }
-          handleTranscriptRef.current(transcript, true);
+          if (!handleTranscriptRef.current(transcript, true, pushToTalk)) retryHandsFree();
         } catch (error) {
           console.error("Erreur transcription ΣIRIUS :", error);
           setText(error.message || "La transcription vocale ΣIRIUS est indisponible.");
           setStatus("idle");
+          setAutoMic(false);
         }
       };
       recorder.onerror = () => {
+        serverSilenceCleanupRef.current?.();
+        serverSilenceCleanupRef.current = null;
         discardServerRecordingRef.current = true;
         setText("L'enregistrement du microphone a été interrompu.");
         setStatus("idle");
+        setAutoMic(false);
         clearTimeout(serverRecorderTimerRef.current);
         serverRecorderTimerRef.current = null;
         micOnRef.current = false;
@@ -4998,12 +5039,22 @@ function App() {
         stream.getTracks().forEach((track) => track.stop());
       };
       recorder.start(250);
+      if (!pushToTalk) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          try {
+            serverSilenceCleanupRef.current = stopRecorderAfterSilence(stream, recorder, AudioContextClass);
+          } catch (error) {
+            console.warn("Détection du silence indisponible ; capture limitée à 15 secondes.", error);
+          }
+        }
+      }
       setVoiceTranscript("");
       micOnRef.current = true;
       window.__siriusMicOn = true;
       setMicOn(true);
       setStatus("listening");
-      setText("Je t'écoute — transcription ΣIRIUS...");
+      setText("Je t'écoute. Cet extrait audio sera envoyé au serveur ΣIRIUS pour transcription.");
       serverRecorderTimerRef.current = setTimeout(() => {
         if (serverRecorderRef.current?.state === "recording") serverRecorderRef.current.stop();
       }, 15000);
@@ -5034,6 +5085,7 @@ function App() {
 
   // Arrête l'écoute en cours
   const stopListening = useCallback(() => {
+    microphoneSessionRef.current += 1;
     const rec = recognitionRef.current;
     recognitionRef.current = null;
     if (phraseSilenceTimerRef.current) {
@@ -5265,6 +5317,7 @@ function App() {
   const pttUp = useCallback(() => {
     if (!pttRef.current) return;
     pttRef.current = false;
+    microphoneSessionRef.current += 1;
     setPttActive(false);
     pttBeep(true);
     // stop() finalise la reconnaissance → le transcript final part vers l'assistant IA
@@ -6023,7 +6076,7 @@ function App() {
 
   return (
     <div
-      className={`sirius-root workspace-mode mobile-section-${mobileDestination} ${ecoMode ? "eco" : ""} ${windowHidden ? "backgrounded" : ""} mode-${sysMode}`}
+      className={`sirius-root workspace-mode mobile-section-${mobileDestination} ${booting ? "is-booting" : ""} ${ecoMode ? "eco" : ""} ${windowHidden ? "backgrounded" : ""} mode-${sysMode}`}
       style={{ ...getHUDStyleVariables(), "--accent": accentColor, "--glow": glowColor, "--hud-scale": hudScale }}
       data-core-active={hudTheme.core.active}
       data-guardian-active={hudTheme.guardian.visible}
@@ -6073,6 +6126,10 @@ function App() {
           initialKeys={keys}
           onComplete={handleSetupComplete}
           onCancel={() => setShowSetup(false)}
+          onOpenAccount={auth.openProfile ? () => {
+            setShowSetup(false);
+            auth.openProfile();
+          } : undefined}
           showAdvanced
         />
       )}
@@ -6606,19 +6663,7 @@ function App() {
             placeholder="Tapez une commande... (ex: allume le salon, quelle heure est-il)"
             data-testid="sirius-cmd-input"
           />
-          <button
-            type="button"
-            className={`ptt-btn ${pttActive ? "on" : ""}`}
-            onPointerDown={(e) => { e.preventDefault(); pttDown(); }}
-            onPointerUp={pttUp}
-            onPointerLeave={() => { if (pttRef.current) pttUp(); }}
-            onContextMenu={(e) => e.preventDefault()}
-            data-testid="sirius-ptt-btn"
-            title="Talkie-walkie : maintenir pour parler, relâcher pour envoyer (ou touche Espace)"
-          >
-            <Radio size={15} />
-            <span>{pttActive ? "À VOUS" : "ESPACE"}</span>
-          </button>
+          <PushToTalkButton active={pttActive} onStart={pttDown} onStop={pttUp} />
           <button type="submit" className="cmd-send" data-testid="sirius-cmd-send" aria-label="Envoyer la commande" title="Envoyer la commande">→</button>
         </form>
 

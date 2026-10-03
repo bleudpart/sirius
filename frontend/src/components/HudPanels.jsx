@@ -8,9 +8,8 @@ import { weatherInfo } from "@/appLogic";
 import { CoreRings, ReactorCore } from "@/components/ReactorVisuals";
 import { LiveClock, LiveDate, useLiveStats } from "@/liveStats";
 import { getLocalDateKey } from "@/dateTime";
-import { speakCinematic, cleanTextForDisplay } from "@/voice";
+import { speakCinematic, cancelSpeech, cleanTextForDisplay } from "@/voice";
 import { WORK_MODULES } from "@/workModules";
-import { Capacitor } from "@capacitor/core";
 
 const BACKEND_BASE = process.env.REACT_APP_BACKEND_URL || "http://127.0.0.1:8001";
 const API = BACKEND_BASE + "/api";
@@ -512,7 +511,18 @@ export function BootScreen({ onDone, userName, onOpenModule, connected }) {
   const [closing, setClosing] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [speechDone, setSpeechDone] = useState(false);
+  const [speechUnavailable, setSpeechUnavailable] = useState(false);
+  const closeTimerRef = useRef(null);
+  const closingRef = useRef(false);
   const speechStartedRef = useRef(false);
+  useEffect(() => {
+    const reportVoiceError = () => {
+      setSpeechUnavailable(true);
+      setSpeechDone(true);
+    };
+    window.addEventListener("sirius-voice-error", reportVoiceError);
+    return () => window.removeEventListener("sirius-voice-error", reportVoiceError);
+  }, []);
   // Le socket met un instant à répondre : annoncer le décompte immédiatement ferait dire
   // « 4 sur 5 » à la voix pendant que l'écran affiche déjà 5 sur 5.
   const [checksSettled, setChecksSettled] = useState(false);
@@ -522,7 +532,6 @@ export function BootScreen({ onDone, userName, onOpenModule, connected }) {
     return () => clearTimeout(t);
   }, [connected]);
   const padRef = useRef(null);
-  const isAndroid = Capacitor.getPlatform() === "android";
   const introSpeech = "Système. Intelligent. Réactif. Interface. Universel. Sécurisé. " +
     "Je suis Sirius... façonné par mon créateur, Daniel Partel. " +
     `Sirius scanne tous ses services... ${okCount} services sur ${total} sont opérationnels... à votre disposition.`;
@@ -551,6 +560,21 @@ export function BootScreen({ onDone, userName, onOpenModule, connected }) {
       setTimeout(() => { try { pad.ctx.close(); } catch (e) {} }, 700);
     } catch (e) { try { pad.ctx.close(); } catch (err) {} }
   };
+  const closeBoot = (moduleId) => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    cancelSpeech();
+    setClosing(true);
+    stopPad();
+    closeTimerRef.current = setTimeout(() => {
+      onDone();
+      if (moduleId && onOpenModule) onOpenModule(moduleId);
+    }, 500);
+  };
+  useEffect(() => () => {
+    clearTimeout(closeTimerRef.current);
+    cancelSpeech();
+  }, []);
 
   useEffect(() => {
     if (!checksSettled) return undefined;
@@ -588,9 +612,7 @@ export function BootScreen({ onDone, userName, onOpenModule, connected }) {
     const hardStop = setTimeout(() => {
       setLoaded(true);
       setSpeechDone(true);
-      setClosing(true);
-      stopPad();
-      setTimeout(onDone, 500);
+      closeBoot();
     }, 30000);
     const step = 520;
     const dur = lines.length * step + 600;
@@ -609,18 +631,20 @@ export function BootScreen({ onDone, userName, onOpenModule, connected }) {
     return () => { clearInterval(lineTimer); clearInterval(progTimer); clearTimeout(safety); clearTimeout(hardStop); stopPad(); };
   }, [lines.length, onDone, checksSettled]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Chargé à 100 % mais voix jamais démarrée (autoplay bloqué / onend muet) → fermeture après 2,5 s
+  // Une voix qui ne démarre pas ne doit pas immobiliser le HUD.
   useEffect(() => {
     if (!loaded || speechDone) return;
-    if (window.Capacitor?.getPlatform?.() === "android") return;
     const t = setTimeout(() => { if (!speechStartedRef.current) setSpeechDone(true); }, 2500);
     return () => clearTimeout(t);
   }, [loaded, speechDone]);
+  useEffect(() => {
+    if (loaded && speechDone) closeBoot();
+  }, [loaded, speechDone]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
 
     <div className={`boot-screen ${closing ? "closing" : ""}`} data-testid="boot-screen" onClick={() => {
       if (!speechStartedRef.current) { playIntroSpeech(); return; }
-      setClosing(true); stopPad(); setTimeout(onDone, 500);
+      closeBoot();
     }}>
       <div className="boot-grid" />
       <div className="boot-scan" />
@@ -654,8 +678,7 @@ export function BootScreen({ onDone, userName, onOpenModule, connected }) {
             data-testid={`boot-module-${id}`}
             onClick={(e) => {
               e.stopPropagation();
-              setClosing(true); stopPad();
-              setTimeout(() => { onDone(); onOpenModule && onOpenModule(id); }, 450);
+              closeBoot(id);
             }}
             onKeyDown={(e) => {
               if (e.key !== "Enter" && e.key !== " ") return;
@@ -689,7 +712,9 @@ export function BootScreen({ onDone, userName, onOpenModule, connected }) {
         <div className="boot-bar">
           <div className="boot-bar-fill" style={{ width: `${progress}%` }} />
         </div>
-        <div className="boot-pct">{progress}%  —  touchez pour activer la voix</div>
+        <div className="boot-pct">{progress}%  —  {speechUnavailable || (speechDone && !speechStartedRef.current)
+          ? "voix indisponible — ouverture du HUD"
+          : "touchez pour activer la voix"}</div>
         <div className="boot-copyright">COPYRIGHT © 2026 ΣIRIUS par Daniel Partel – Tous droits réservés.</div>
       </div>
     </div>

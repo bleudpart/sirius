@@ -3,8 +3,10 @@
 // automatique sur la synthèse du navigateur si la clé est absente ou l'API indisponible.
 import { Capacitor } from "@capacitor/core";
 import { applyFrenchPhonetics } from "./phoneticFr";
+import { speakNative, stopNativeSpeech } from "./nativeVoice";
+import { API_BASE_URL } from "./lib/api";
 
-const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
+const API = API_BASE_URL;
 const TTS_REQUEST_TIMEOUT_MS = 8000;
 const MALE = /(paul|henri|thomas|nicolas|claude|mathieu|guillaume|daniel|jerome|male|homme|man|wavenet-d|wavenet-b|standard-b|standard-d)/i;
 const FEMALE = /(female|femme|amelie|audrey|marie|julie|celine|hortense|denise|eloise|charline|virginie|chantal|neural2-f|neural2-a|neural2-c|neural2-e|wavenet-a|wavenet-c|wavenet-e)/i;
@@ -69,16 +71,35 @@ const isUrgent = (text) => /!|\b(urgent|vite|attention|alerte|imm[ée]diatement|
 
 // ---- Google Cloud TTS (via backend, clé jamais exposée) ----
 let currentAudio = null;
+let finishCurrentAudio = null;
+let currentRequest = null;
 let googleDownUntil = 0; // clé absente / API en panne → on évite de retenter pendant 10 min
+let geminiDownUntil = 0;
 let speakSeq = 0; // n° de la dernière prise de parole — garantit UNE SEULE voix à la fois
 
 // Coupe TOUS les canaux audio (synthèse navigateur + audio Google) avant chaque nouvelle voix
 function stopChannels() {
+  if (currentRequest) {
+    currentRequest.abort();
+    currentRequest = null;
+  }
+  if (Capacitor.getPlatform() === "android") stopNativeSpeech();
   try { window.speechSynthesis.cancel(); } catch (e) {}
   if (currentAudio) {
     try { currentAudio.pause(); currentAudio.src = ""; } catch (e) {}
     currentAudio = null;
   }
+  if (finishCurrentAudio) {
+    finishCurrentAudio(true);
+    finishCurrentAudio = null;
+  }
+}
+
+function reportGeminiFailure(reason) {
+  console.warn("Gemini TTS indisponible :", reason);
+  window.dispatchEvent(new CustomEvent("sirius-voice-degraded", {
+    detail: "Voix Gemini indisponible ; utilisation de la voix Android de secours.",
+  }));
 }
 
 // Préférences de voix (écran Profil) : voix, débit, gravité
@@ -122,58 +143,94 @@ export async function playAudio(base64, { volume = 1, onstart, onend } = {}) {
   }
 }
 
-async function speakGoogle(message, { voice, rate, pitch, volume = 1, onstart, onend }, seq) {
-  if (Date.now() < googleDownUntil) return false;
+async function speakRemote(message, { voice, rate, pitch, volume = 1, onstart, onend, timeoutMs }, seq) {
+  const gemini = Capacitor.getPlatform() === "android";
+  if (Date.now() < (gemini ? geminiDownUntil : googleDownUntil)) return false;
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), TTS_REQUEST_TIMEOUT_MS);
+  currentRequest = controller;
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs ?? (gemini ? 28000 : TTS_REQUEST_TIMEOUT_MS));
   try {
-    const r = await fetch(`${API}/tts/google`, {
+    const r = await fetch(`${API}/tts/${gemini ? "gemini" : "google"}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: phonetic(message), voice, rate, pitch }),
+      body: JSON.stringify(gemini
+        ? { text: message }
+        : { text: phonetic(message), voice, rate, pitch }),
+      credentials: "include",
       signal: controller.signal,
     });
+    if (seq !== speakSeq) return true;
     if (!r.ok) {
-      if (r.status === 503) googleDownUntil = Date.now() + 600000; // clé absente
+      if (r.status === 503) {
+        if (gemini) geminiDownUntil = Date.now() + 60000;
+        else googleDownUntil = Date.now() + 600000;
+      }
+      if (gemini) {
+        reportGeminiFailure(r.status);
+      }
       return false;
     }
     const d = await r.json();
     window.clearTimeout(timeout);
     const audioBase64 = d.audio_base64 || d.audio;
-    if (!audioBase64) return false;
+    if (!audioBase64) {
+      if (gemini) throw new Error("Réponse Gemini sans audio");
+      return false;
+    }
     // Une voix plus récente a pris la parole pendant le chargement → on se tait (pas d'écho)
     if (seq !== undefined && seq !== speakSeq) return true;
+    if (currentRequest === controller) currentRequest = null;
     return await new Promise((resolve) => {
       stopChannels();
-      const audio = new Audio("data:audio/mp3;base64," + audioBase64);
+      const audio = new Audio(`data:${gemini ? "audio/wav" : "audio/mp3"};base64,` + audioBase64);
       audio.volume = Math.max(0.2, Math.min(1, volume));
       currentAudio = audio;
       let started = false;
-      audio.onplay = () => { started = true; if (onstart) onstart(); };
-      audio.onended = () => {
+      let finished = false;
+      const finish = (ok) => {
+        if (finished) return;
+        finished = true;
+        audio.onplay = null;
+        audio.onended = null;
+        audio.onerror = null;
         if (currentAudio === audio) currentAudio = null;
-        if (onend) onend();
-        resolve(true);
+        if (finishCurrentAudio === finish) finishCurrentAudio = null;
+        resolve(ok);
+      };
+      finishCurrentAudio = finish;
+      audio.onplay = () => { started = true; if (seq === speakSeq && onstart) onstart(); };
+      audio.onended = () => {
+        finish(true);
+        if (seq === speakSeq && onend) onend();
       };
       audio.onerror = () => {
-        if (currentAudio === audio) currentAudio = null;
-        if (started) { if (onend) onend(); resolve(true); } // coupé en cours → pas de doublon
-        else resolve(false);
+        if (gemini && seq === speakSeq) reportGeminiFailure("lecture audio");
+        finish(started);
+        if (started && seq === speakSeq && onend) onend();
       };
-      audio.play().catch(() => {
-        if (currentAudio === audio) currentAudio = null;
-        resolve(false); // autoplay bloqué → fallback navigateur
+      audio.play().catch((error) => {
+        if (finished) return;
+        if (gemini && seq === speakSeq) reportGeminiFailure(error.name);
+        finish(false);
       });
     });
   } catch (e) {
+    if (seq !== speakSeq) return true;
+    if (gemini) reportGeminiFailure(e.name);
     return false;
   } finally {
     window.clearTimeout(timeout);
+    if (currentRequest === controller) currentRequest = null;
   }
 }
 
 // ---- Synthèse du navigateur (fallback gratuit) ----
 function speakBrowser(message, { rate = 1.0, pitch = 1.08, volume = 1, gender = "female", onstart, onend } = {}) {
+  if (Capacitor.getPlatform() === "android") {
+    stopChannels();
+    void speakNative(phonetic(message), { rate, pitch, volume, onstart, onend });
+    return;
+  }
   const synth = window.speechSynthesis;
   const end = onend || (() => {});
   if (!synth || !message) { end(); return; }
@@ -210,7 +267,7 @@ function speakBrowser(message, { rate = 1.0, pitch = 1.08, volume = 1, gender = 
 // Voix feutrée nocturne : entre 22 h et 5 h, ΣIRIUS parle plus lentement, plus grave et plus doucement
 const isNight = () => { const h = new Date().getHours(); return h >= 22 || h < 5; };
 
-export function speakFr(message, { onstart, onend } = {}) {
+export function speakFr(message, { onpending, onstart, onend } = {}) {
   if (!message) { (onend || (() => {}))(); return; }
   const urgent = isUrgent(message); // détecté avant nettoyage (les « ! » comptent)
   message = cleanTextForSpeech(message);
@@ -221,10 +278,12 @@ export function speakFr(message, { onstart, onend } = {}) {
   if (night) rate = Math.max(0.5, rate * 0.87);
   const volume = night ? 0.72 : 1;
   const seq = ++speakSeq;
+  stopChannels();
+  if (onpending) onpending();
   const fem = FEMALE.test(cfg.name);
   const bPitch = (fem ? 1.12 : (urgent ? 0.92 : 0.85)) * (night ? 0.95 : 1);
   if (Capacitor.getPlatform() === "android") {
-    speakGoogle(message, {
+    speakRemote(message, {
       voice: "fr-FR-Neural2-G",
       rate,
       pitch: night ? -4.5 : -3,
@@ -233,7 +292,7 @@ export function speakFr(message, { onstart, onend } = {}) {
       onend,
     }, seq).then((ok) => {
       if (!ok && seq === speakSeq) {
-        speakBrowser(message, { rate, pitch: 0.72, volume, gender: "male", onstart, onend });
+        speakBrowser(message, { rate: 1.05, pitch: 1, volume, gender: "male", onstart, onend });
       }
     });
     return;
@@ -242,7 +301,7 @@ export function speakFr(message, { onstart, onend } = {}) {
     speakBrowser(message, { rate, pitch: bPitch, volume, gender: getBrowserGender(cfg.name), onstart, onend });
     return;
   }
-  speakGoogle(message, { voice: cfg.name, rate, pitch: night ? cfg.pitch - 1.5 : cfg.pitch, volume, onstart, onend }, seq).then((ok) => {
+  speakRemote(message, { voice: cfg.name, rate, pitch: night ? cfg.pitch - 1.5 : cfg.pitch, volume, onstart, onend }, seq).then((ok) => {
     if (!ok && seq === speakSeq) speakBrowser(message, { rate, pitch: bPitch, volume, gender: fem ? "female" : "male", onstart, onend });
   });
 }
@@ -266,11 +325,29 @@ export function speakSeries(sentence, opts = {}) {
   seriesChain = seriesChain.then(() => {
     if (id !== seriesId) return undefined; // série interrompue entre-temps
     return new Promise((resolve) => {
-      const guard = setTimeout(resolve, 30000);
+      let ended = false;
+      let seq;
+      const finish = () => {
+        if (ended) return;
+        ended = true;
+        clearTimeout(guard);
+        if (opts.onend) opts.onend();
+        resolve();
+      };
+      const expire = () => {
+        if (seq === speakSeq) cancelSpeech();
+        finish();
+      };
+      let guard = setTimeout(expire, 30000);
       speakFr(phrase, {
-        onstart: opts.onstart,
-        onend: () => { clearTimeout(guard); if (opts.onend) opts.onend(); resolve(); },
+        onstart: () => {
+          clearTimeout(guard);
+          guard = setTimeout(expire, Math.max(10000, (phrase.length / 8) * 1000 + 5000));
+          if (opts.onstart) opts.onstart();
+        },
+        onend: finish,
       });
+      seq = speakSeq;
     });
   });
   return seriesChain;
@@ -283,16 +360,18 @@ export function speakCinematic(message, { onstart, onend } = {}) {
   if (!message) { (onend || (() => {}))(); return; }
   const cfg = loadVoiceConfig();
   const seq = ++speakSeq;
+  stopChannels();
   if (Capacitor.getPlatform() === "android") {
-    speakGoogle(message, {
+    speakRemote(message, {
       voice: "fr-FR-Neural2-G",
       rate: 0.85,
       pitch: -3,
       onstart,
       onend,
+      timeoutMs: 6000,
     }, seq).then((ok) => {
       if (!ok && seq === speakSeq) {
-        speakBrowser(message, { rate: 0.85, pitch: 0.72, gender: "male", onstart, onend });
+        speakBrowser(message, { rate: 1.05, pitch: 1, gender: "male", onstart, onend });
       }
     });
     return;
@@ -301,7 +380,7 @@ export function speakCinematic(message, { onstart, onend } = {}) {
     speakBrowser(message, { rate: 0.85, pitch: 0.95, gender: getBrowserGender(cfg.name), onstart, onend });
     return;
   }
-  speakGoogle(message, { voice: cfg.name, rate: 0.85, pitch: Math.max(-10, cfg.pitch - 3), onstart, onend }, seq).then((ok) => {
+  speakRemote(message, { voice: cfg.name, rate: 0.85, pitch: Math.max(-10, cfg.pitch - 3), onstart, onend }, seq).then((ok) => {
     if (!ok && seq === speakSeq) speakBrowser(message, { rate: 0.85, pitch: 0.62, onstart, onend });
   });
 }
@@ -333,10 +412,20 @@ const _gToB = (g) => Math.max(0.4, Math.min(1.8, 1 + g / 15));
 export function speakAsCharacter(message, { profile, module, pitch = 1, rate = 1, onstart, onend } = {}) {
   if (!message) { (onend || (() => {}))(); return; }
   const safeText = cleanTextForSpeech(message);
+  if (!safeText) { (onend || (() => {}))(); return; }
   const cfg = loadVoiceConfig();
   const prof = profile || (module && CHAR_PROFILES[module]);
   const p = prof && MYTHOS_VOICES[prof];
   const seq = ++speakSeq;
+  stopChannels();
+  if (Capacitor.getPlatform() === "android") {
+    speakRemote(safeText, { rate: 1.05, pitch: 0, onstart, onend }, seq).then((ok) => {
+      if (!ok && seq === speakSeq) {
+        speakBrowser(safeText, { rate: 1.05, pitch: 1, onstart, onend });
+      }
+    });
+    return;
+  }
   if (p) {
     const ov = (module && loadCharOverrides()[module]) || {};
     const gPitch = ov.gPitch ?? p.gPitch;
@@ -346,7 +435,7 @@ export function speakAsCharacter(message, { profile, module, pitch = 1, rate = 1
       speakBrowser(safeText, { rate: vRate, pitch: bPitch, gender: p.gender, onstart, onend });
       return;
     }
-    speakGoogle(safeText, { voice: p.google, rate: vRate, pitch: gPitch, onstart, onend }, seq).then((ok) => {
+    speakRemote(safeText, { voice: p.google, rate: vRate, pitch: gPitch, onstart, onend }, seq).then((ok) => {
       if (!ok && seq === speakSeq) speakBrowser(safeText, { rate: vRate, pitch: bPitch, gender: p.gender, onstart, onend });
     });
     return;
@@ -358,7 +447,7 @@ export function speakAsCharacter(message, { profile, module, pitch = 1, rate = 1
     return;
   }
   const gPitch = Math.max(-14, Math.min(14, Math.round((pitch - 0.9) * 13)));
-  speakGoogle(safeText, { voice: cfg.name, rate: br, pitch: gPitch, onstart, onend }, seq).then((ok) => {
+  speakRemote(safeText, { voice: cfg.name, rate: br, pitch: gPitch, onstart, onend }, seq).then((ok) => {
     if (!ok && seq === speakSeq) speakBrowser(safeText, { rate: br, pitch: bp, onstart, onend });
   });
 }

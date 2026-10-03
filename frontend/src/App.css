@@ -1894,6 +1894,8 @@ body.hud-minimal .medallion-halo { display: none; }
   transition: opacity 0.65s ease;
 }
 .boot-screen.closing { opacity: 0; pointer-events: none; }
+.sirius-root.is-booting > :not(.boot-screen) { visibility: hidden; pointer-events: none; }
+.sirius-root.is-booting > .boot-screen { z-index: 100001; }
 /* Grille alignée sur celle du tableau de bord (.grid-bg, même valeurs) : l'ancienne version
    ici avait une opacité de ligne plus faible (0.07 c'était déjà correct en fait) mais un
    quadrillage plus petit (40px) — remis à 44px/0.06 pour un rendu identique au HUD. */

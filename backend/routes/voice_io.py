@@ -2,23 +2,29 @@
 """Entrées/sorties vocales : Google Cloud TTS, transcription STT (backend dédié ou
 Groq Whisper) et téléchargement des archives source."""
 
+import base64
+import binascii
+import io
 import logging
 import os
+import wave
 from collections import OrderedDict
 from pathlib import Path
 
 import httpx
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from voice_corrections import normalize_voice_transcript
+from auth_api import require_user
 
 logger = logging.getLogger(__name__)
 
 # Cache LRU en mémoire pour les synthèses TTS répétées (ex. "ΣIRIUS est prêt.")
 _TTS_CACHE: OrderedDict[tuple, dict] = OrderedDict()
 _TTS_CACHE_MAX = 64
+_TTS_CACHE_MAX_BYTES = 32 * 1024 * 1024
 
 
 def _cache_get(key: tuple) -> dict | None:
@@ -33,12 +39,13 @@ def _cache_get(key: tuple) -> dict | None:
 
 
 def _cache_set(key: tuple, value: dict) -> None:
-    if key in _TTS_CACHE:
-        _TTS_CACHE.move_to_end(key)
-    else:
-        _TTS_CACHE[key] = value
-        if len(_TTS_CACHE) > _TTS_CACHE_MAX:
-            _TTS_CACHE.popitem(last=False)
+    _TTS_CACHE[key] = value
+    _TTS_CACHE.move_to_end(key)
+    while len(_TTS_CACHE) > _TTS_CACHE_MAX or sum(
+        len(item.get("audio_base64", "")) + len(item.get("audio", ""))
+        for item in _TTS_CACHE.values()
+    ) > _TTS_CACHE_MAX_BYTES:
+        _TTS_CACHE.popitem(last=False)
 
 
 class GoogleTTSRequest(BaseModel):
@@ -48,6 +55,41 @@ class GoogleTTSRequest(BaseModel):
     voice: str = "fr-FR-Neural2-G"
 
 
+class GeminiTTSRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=4500)
+
+
+GEMINI_TTS_STYLE = (
+    "Parle en français de France, avec un ton naturel, chaleureux et "
+    "conversationnel. Débit légèrement dynamique, hauteur naturelle, "
+    "sans grave forcé ni effet de bande-annonce."
+)
+
+
+def _gemini_wave_audio(payload: dict) -> str:
+    steps = payload.get("steps")
+    if not isinstance(steps, list):
+        raise ValueError("Réponse Gemini sans étapes audio")
+    for step in reversed(steps):
+        if not isinstance(step, dict) or step.get("type") != "model_output":
+            continue
+        content = step.get("content")
+        if not isinstance(content, list):
+            continue
+        for block in reversed(content):
+            if not isinstance(block, dict) or block.get("type") != "audio":
+                continue
+            encoded = block.get("data")
+            if not isinstance(encoded, str):
+                raise ValueError("Réponse Gemini sans données audio")
+            decoded = base64.b64decode(encoded, validate=True)
+            with wave.open(io.BytesIO(decoded), "rb") as audio:
+                if audio.getnframes() == 0:
+                    raise ValueError("Audio Gemini vide")
+            return encoded
+    raise ValueError("Réponse Gemini sans audio")
+
+
 ALLOWED_TTS_VOICES = {
     "fr-FR-Neural2-F", "fr-FR-Neural2-G",
     "fr-FR-Wavenet-A", "fr-FR-Wavenet-B", "fr-FR-Wavenet-C", "fr-FR-Wavenet-D", "fr-FR-Wavenet-E",
@@ -55,8 +97,66 @@ ALLOWED_TTS_VOICES = {
 }
 
 
-def make_voice_io_router():
+def make_voice_io_router(db=None):
     router = APIRouter(tags=["voice-io"])
+
+    @router.post("/tts/gemini")
+    async def gemini_tts(req: GeminiTTSRequest, request: Request):
+        await require_user(request, db)
+        key = os.environ.get("GEMINI_TTS_API_KEY")
+        if not key:
+            raise HTTPException(status_code=503, detail="GEMINI_TTS_API_KEY absente")
+        text = req.text.strip()
+        if not text:
+            raise HTTPException(status_code=400, detail="Texte vide")
+        model = os.environ.get("GEMINI_TTS_MODEL", "gemini-3.8-flash-tts")
+        voice = os.environ.get("GEMINI_TTS_VOICE", "Aoede")
+        cache_key = ("gemini", model, voice, GEMINI_TTS_STYLE, text)
+        cached = _cache_get(cache_key)
+        if cached:
+            return cached
+        payload = {
+            "model": model,
+            "input": [{
+                "type": "user_input",
+                "content": [{
+                    "type": "text",
+                    "text": text,
+                    "annotations": [{
+                        "type": "speech_metadata",
+                        "style": GEMINI_TTS_STYLE,
+                    }],
+                }],
+            }],
+            "response_format": {"type": "audio"},
+            "generation_config": {"speech_config": [{"voice": voice}]},
+        }
+        try:
+            async with httpx.AsyncClient(timeout=25) as cx:
+                response = await cx.post(
+                    "https://generativelanguage.googleapis.com/v1beta/interactions",
+                    headers={"x-goog-api-key": key}, json=payload,
+                )
+        except httpx.RequestError as error:
+            logger.warning("[GEMINI TTS] erreur réseau (%s)", type(error).__name__)
+            raise HTTPException(status_code=502, detail="Gemini TTS injoignable") from error
+        if response.status_code != 200:
+            logger.warning("[GEMINI TTS] HTTP %s", response.status_code)
+            raise HTTPException(status_code=502, detail="Erreur Gemini TTS")
+        try:
+            data = response.json()
+            if not isinstance(data, dict):
+                raise ValueError("Réponse Gemini invalide")
+            audio = _gemini_wave_audio(data)
+        except (ValueError, binascii.Error, wave.Error, EOFError) as error:
+            logger.warning("[GEMINI TTS] réponse audio invalide (%s)", type(error).__name__)
+            raise HTTPException(status_code=502, detail="Réponse Gemini sans audio WAV valide") from error
+        result = {
+            "audio_base64": audio, "format": "wav", "mime_type": "audio/wav",
+            "provider": "gemini", "voice": voice,
+        }
+        _cache_set(cache_key, result)
+        return result
 
     @router.get("/tts/google")
     async def google_tts_info():

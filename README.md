@@ -181,6 +181,51 @@ Liste complète des modules et dates : [MODULES_SIRIUS.txt](./MODULES_SIRIUS.txt
      et son mot de passe hors du dépôt.
 - **Android / Google Play** : depuis `frontend`, `npm run mobile:apk` produit
   un APK **debug**, réservé aux tests et non publiable sur Google Play.
+  Sur mobile, **Profil → Mon compte** ouvre la gestion du compte authentifié
+  (déconnexion, export des données et demande de suppression), distincte des
+  préférences de l'assistant. Après une modification de ce parcours, reconstruire
+  l'APK et vérifier la reconnexion sur appareil en portrait et en paysage ;
+  un test du site web ne valide pas l'application Android déjà installée.
+  La voix Android utilise une capture micro (maximum 15 secondes) envoyée à
+  `/api/stt`, plutôt que la reconnaissance Web Speech de la WebView. Maintenir
+  **ESPACE**, puis relâcher pour transcrire ; une annulation pendant la demande
+  de permission ne doit pas démarrer un enregistrement tardif.
+  En mains libres, la capture se termine après environ une seconde de silence
+  suivant la parole (la limite de 15 secondes reste active). Vérifier sur appareil
+  les pauses, le bruit ambiant et le délai serveur ; ce seuil ne garantit pas
+  une transcription immédiate. La présentation se ferme après son chargement
+  et la fin de sa voix ; si la voix ne démarre pas, elle ne bloque pas le HUD.
+  En mains libres, dire **Sirius** suivi de la commande. Une capture vide ou
+  sans commande relance l'écoute ; une erreur de transcription désactive le
+  mode et affiche l'erreur plutôt que de laisser le bouton faussement actif.
+  La synthèse Android utilise **Gemini Aoede** via `/api/tts/gemini`, pour la
+  présentation, les réponses et les personnages, avec un ton français naturel
+  et conversationnel. Le serveur appelle l'API REST Gemini avec `httpx` déjà
+  présent ; aucun SDK supplémentaire ni secret n'est ajouté à l'APK. Configurer
+  `GEMINI_TTS_API_KEY` sur Render, `GEMINI_TTS_MODEL=gemini-3.8-flash-tts`
+  et `GEMINI_TTS_VOICE=Aoede`, puis déployer le backend et reconstruire l'APK.
+  Le modèle doit être accessible au projet Google ; quotas et facturation sont
+  à vérifier. Cette voix n'est pas une copie garantie de Gemini Live.
+  Les réglages Cloud TTS `speakingRate`/`pitch` ne sont pas envoyés à Gemini :
+  les indications de ton sont distinctes du texte lu. La réponse WAV est validée
+  par le serveur et lue comme `audio/wav`, sans modification de hauteur.
+  Cette route exige une session authentifiée ; le cache audio en mémoire est
+  limité à 64 entrées et 32 Mio de données base64. L'annulation coupe aussi
+  la requête en cours et empêche toute lecture tardive. La présentation attend
+  au maximum six secondes la génération distante avant le secours local ;
+  les réponses disposent de 28 secondes. Le micro reste suspendu pendant
+  la génération des réponses, puis reprend à la fin de la lecture.
+  Le texte à lire est transmis à Google, sans audio du micro dans cette requête.
+  L'indisponibilité de Gemini est signalée ; le secours utilise une voix française
+  **locale** du moteur Android via le plugin Capacitor TextToSpeech, en privilégiant
+  `fr-FR` et sans grave forcé. Le web et Windows conservent leur sélection vocale.
+  Une voix
+  française locale doit être installée ; son absence est signalée. Vérifier
+  la narration de démarrage, les réponses et leur interruption sur appareil.
+  Le backend transmet l'audio au moteur `WHISPER_API_URL` / `STT_BACKEND_URL`
+  configuré, sinon à Groq Whisper si une clé Groq est disponible. Vérifier ce
+  flux sur appareil et déclarer la collecte audio dans Google Play ; ne pas
+  conclure à l'absence de conservation par les prestataires depuis le code seul.
   `npm run mobile:apk:release` produit un APK release signé et `npm run mobile:play`
   un Android App Bundle (AAB) signé. Ces deux commandes exigent
   `SIRIUS_ANDROID_KEYSTORE`, `SIRIUS_ANDROID_STORE_PASSWORD`,

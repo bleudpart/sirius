@@ -50,7 +50,7 @@ function KeyField({ k, value, status, onChange, onTest }) {
 }
 
 // Écran de configuration — les réglages techniques restent réservés à l'administrateur.
-export default function SiriusSetup({ initialProfile, initialKeys, onComplete, onCancel, showAdvanced = false }) {
+export default function SiriusSetup({ initialProfile, initialKeys, onComplete, onCancel, onOpenAccount, showAdvanced = false }) {
   const [tab, setTab] = useState("profil");
   const visibleTabs = TABS;
   const [profile, setProfile] = useState({
@@ -243,6 +243,11 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
 
         {tab === "profil" && (
           <section className="setup-section setup-single" data-testid="setup-panel-profil">
+            {onOpenAccount && (
+              <button type="button" className="setup-tab" onClick={onOpenAccount} data-testid="setup-account-btn">
+                <User size={14} /> MON COMPTE
+              </button>
+            )}
             <label className="setup-label">Prénom *</label>
             <input className="setup-input" value={profile.name} onChange={setP("name")} placeholder="Ex : Daniel" data-testid="setup-name" required />
             <div className="setup-row">
