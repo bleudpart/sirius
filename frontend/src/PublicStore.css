@@ -296,5 +296,9 @@
 .public-situations a:focus-visible { outline: 2px solid #d8b875; outline-offset: -2px; }
 .public-situations img { display: block; width: 100%; height: auto; }
 .public-situations figcaption { display: grid; gap: 8px; padding: 16px; color: #b9d4de; }
-.public-situations figcaption strong { font-family: "Cinzel", serif; color: #d8b875; }
 @media (max-width: 700px) { .public-situations-grid { grid-template-columns: 1fr; } }
+
+.public-store :is(h1, h2, h3, .public-plan-name, .public-window-bar, .public-core-preview > span > strong, .public-matrix-actions strong, .public-situations figcaption strong, .public-order-summary > span, .public-subscription-success > strong, .public-slogan) {
+  font-family: "Cinzel", serif;
+  color: var(--store-gold);
+}

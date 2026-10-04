@@ -20,6 +20,8 @@ La galerie « ΣIRIUS en situation » utilise `frontend/public/demo/sirius-dossi
 et `sirius-planning.png` : captures locales avec données fictives et session API
 simulée, identifiées comme données de démonstration. Elles ne prouvent pas
 une connexion IA ou un service externe. Les liens ouvrent les images originales.
+Dans la boutique, les titres et noms des formules utilisent Cinzel doré ;
+les descriptions, prix, boutons et champs de saisie gardent leurs styles de lecture.
 Ne présenter un paiement comme fictif que lorsque le mode test du prestataire
 est effectivement vérifié ; la page ne le déduit pas de sa configuration frontend.
 
