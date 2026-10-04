@@ -45,6 +45,17 @@ test("requires confirmation before deleting and allows cancellation", async () =
   expect(JSON.parse(localStorage.getItem(key)).audit).toHaveLength(1);
 });
 
+test("renders planning dates in French without changing stored ISO dates", async () => {
+  const planning = [{ ...item, due: "2026-10-04", done: false }];
+  localStorage.setItem(key, JSON.stringify({ ...emptyWorkData(), planning }));
+  await act(async () => root.render(
+    <WorkModulesPanel initialModule="planning" user={{ id: "test" }} onClose={() => {}} onOpenExisting={() => {}} />
+  ));
+  expect(host.querySelector(".work-list").textContent).toContain("04/10/2026");
+  expect(host.querySelector(".work-list").textContent).not.toContain("2026-10-04");
+  expect(JSON.parse(localStorage.getItem(key)).planning).toEqual(planning);
+});
+
 test("requires confirmation to merge, keeps existing data and all imported audit entries", async () => {
   localStorage.setItem(key, JSON.stringify({ ...emptyWorkData(), dossiers: [item] }));
   const imported = { ...emptyWorkData(), dossiers: [{ ...item, title: "Autre version" }],

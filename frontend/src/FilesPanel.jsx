@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { FolderOpen, X, Upload, Trash2, Download, FileText, Music, Image as ImageIcon, File as FileIcon, Loader2, Sparkles, ChevronUp, Search, FolderPlus } from "lucide-react";
 import DropZone, { autoAnalyze } from "./DropZone";
 import FileViewer from "./FileViewer";
+import { formatDocumentDate } from "./dateTime";
 
 const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
 const MAX_MB = 20;
@@ -229,7 +230,7 @@ export default function FilesPanel({ onClose }) {
               )}
               <div className="file-meta">
                 <span className="file-name clickable" title={`Ouvrir ${f.original_filename}`} onClick={() => setViewing(f)}>{f.original_filename}</span>
-                <span className="file-info">{f.dossier ? `${f.dossier} · ` : ""}{fmtSize(f.size)} · {(f.created_at || "").slice(0, 10)}</span>
+                <span className="file-info">{f.dossier ? `${f.dossier} · ` : ""}{fmtSize(f.size)} · {formatDocumentDate(f.created_at)}</span>
                 {(f.content_type || "").startsWith("audio/") && (
                   <audio className="file-audio" controls preload="none" src={`${API}/files/${f.id}/download`} />
                 )}

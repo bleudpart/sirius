@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatDocumentDate } from "./dateTime";
 import { CalendarDays, Check, FileText, FolderOpen, Plus, ScrollText, Tags, Trash2, Workflow, X } from "lucide-react";
 import { WORK_MODULES } from "@/workModules";
 import { resolveBackendUrl } from "@/lib/api";
@@ -176,7 +177,7 @@ function WorkModulesWorkspace({ storageKey, initialModule, onClose, onOpenExisti
                 {active === "pricing" && <p>{item.supplier} · {Number(item.price).toLocaleString("fr-FR", { style: "currency", currency: "EUR" })}{item.unit && ` / ${item.unit}`}</p>}
                 {active === "dossiers" && <p>{item.contact}{item.contact && item.details && " · "}{item.details}</p>}
                 {active === "documents" && <><p>{item.dossier && `Dossier : ${item.dossier}`}</p><pre className="work-document">{item.content}</pre></>}
-                {active === "planning" && <button type="button" className={`work-check ${item.done ? "done" : ""}`} onClick={() => toggle(item)}><Check size={15} /> {item.done ? "Terminé" : "À faire"} · {item.due || "sans échéance"}{item.dossier && ` · ${item.dossier}`}</button>}
+                {active === "planning" && <button type="button" className={`work-check ${item.done ? "done" : ""}`} onClick={() => toggle(item)}><Check size={15} /> {item.done ? "Terminé" : "À faire"} · {item.due ? formatDocumentDate(item.due) : "sans échéance"}{item.dossier && ` · ${item.dossier}`}</button>}
                 {active === "workflows" && <>{item.dossier && <p>Dossier : {item.dossier}</p>}<div className="work-steps">{(item.steps || []).map((step, index) => <button type="button" key={`${item.id}-${index}`} className={`work-check ${step.done ? "done" : ""}`} onClick={() => toggle(item, index)}><Check size={15} /> {step.text}</button>)}</div></>}
               </article>)}</div>
             </>

@@ -6,6 +6,7 @@ import { X, LayoutDashboard, FileText, Package, Users, Coins, Boxes, LayoutTempl
 import { ConfirmButton } from "@/ConfirmButton";
 import { speakAsCharacter } from "@/voice";
 import "./Themis.css";
+import { formatDocumentDate as isoToFr } from "./dateTime";
 
 const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api/themis";
 const EUR = (n) => `${Number(n || 0).toFixed(2)} €`;
@@ -14,10 +15,6 @@ const ORDER_STATUSES = ["en_attente", "en_cours", "expédiée", "livrée", "annu
 const frToIso = (s) => {
   const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec((s || "").trim());
   return m ? `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}` : "";
-};
-const isoToFr = (s) => {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || "");
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : (s || "—");
 };
 
 const TABS = [
@@ -549,7 +546,7 @@ export default function ThemisPanel({ onClose, initialSource }) {
                 {payments.map((p) => (
                   <tr key={p.id}><td><b className="th-gold">{EUR(p.amount)}</b></td><td>{p.method}</td>
                     <td>{(factures.find((f) => f.id === p.doc_id) || {}).number || "—"}</td>
-                    <td>{p.created_at.slice(0, 10)}</td>
+                    <td>{isoToFr(p.created_at)}</td>
                     <td><ConfirmButton className="th-icon-btn" onConfirm={() => post(`payments/${p.id}`, null, "DELETE")} testId={`themis-pay-del-${p.id}`}><Trash2 size={12} /></ConfirmButton></td></tr>
                 ))}
               </tbody></table>

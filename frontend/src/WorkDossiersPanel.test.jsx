@@ -397,11 +397,13 @@ test("commitments have an explicit owner and due date, reviewed completion canno
     content: { text: "Vérifier le devis", owner: "Camille", due_date: "2026-10-03" }, sources: [],
   }] });
   try {
+    expect(ui.container.textContent).toContain("03/10/2026");
     await ui.change(ui.field("Type"), "commitment");
     await ui.change(ui.field("Engagement"), "Répondre au fournisseur");
     await ui.change(ui.field("Responsable"), "Camille");
     await ui.change(ui.field("Échéance"), "2026-10-04");
     await ui.submit();
+    expect(ui.container.textContent).toContain("04/10/2026");
     expect(ui.writes).toHaveLength(0);
     await ui.click("Valider l'enregistrement");
     expect(ui.writes[0]).toEqual({ path: "/d1/commitments", method: "POST", body: {

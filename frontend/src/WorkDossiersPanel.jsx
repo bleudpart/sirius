@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FolderOpen, X } from "lucide-react";
 import { API_BASE_URL } from "./lib/api";
+import { formatDocumentDate } from "./dateTime";
 import "./WorkDossiersPanel.css";
 
 const BASE = `${API_BASE_URL}/work-dossiers`;
@@ -124,11 +125,11 @@ function PreparationResult({ mode, result }) {
   if (mode === "client-timeline") return <section className="work-dossiers-entry" aria-label="Carnet client volontaire">
     <h3>Carnet client · événements saisis volontairement</h3>
     {!result.events?.length && <p>Aucun événement client accessible dans ce dossier.</p>}
-    {result.events?.map((entry) => <p key={entry.id}>{CLIENT_EVENTS[entry.content.kind]} · {entry.content.occurred_on} · {entry.content.note} · {STATUSES[entry.status] || entry.status}</p>)}
+    {result.events?.map((entry) => <p key={entry.id}>{CLIENT_EVENTS[entry.content.kind]} · {formatDocumentDate(entry.content.occurred_on)} · {entry.content.note} · {STATUSES[entry.status] || entry.status}</p>)}
     <h4>Suivis datés à vérifier (aucun contact automatique)</h4>
     {!result.followups?.length && <p>Aucun suivi confirmé et échu sur une source inchangée.</p>}
     {result.followups?.map((item) => <div key={item.entry_id}>
-      <p>{CLIENT_EVENTS[item.kind]} · {item.note} · suivi saisi pour le {item.follow_up_on}. Vérifier consentement et dernier échange.</p>
+      <p>{CLIENT_EVENTS[item.kind]} · {item.note} · suivi saisi pour le {formatDocumentDate(item.follow_up_on)}. Vérifier consentement et dernier échange.</p>
       <ProposalEvidence proposal={{ source: item.source, why_suggested: item.why_suggested }} />
     </div>)}
     {result.needs_review?.map((item) => <p key={item.entry_id} role="status">
@@ -151,7 +152,7 @@ function PreparationResult({ mode, result }) {
     <h3>Préparation indicative · aucune exécution</h3>
     {result.sourced_facts && <><h4>Faits sourcés</h4><p className="work-dossiers-preserve">{evidenceText(result.sourced_facts)}</p></>}
     {mode === "accounting-review" && <>
-      <p>Solde : {displayValue(result.remaining)} · échéance : {displayValue(result.due_date)} · retard : {result.overdue == null ? "Non déterminé" : result.overdue ? "Oui" : "Non"}</p>
+      <p>Solde : {displayValue(result.remaining)} · échéance : {result.due_date ? formatDocumentDate(result.due_date) : "Non renseigné"} · retard : {result.overdue == null ? "Non déterminé" : result.overdue ? "Oui" : "Non"}</p>
       <p>Un solde inconnu n'est pas assimilé à zéro ; aucun règlement enregistré.</p>
     </>}
     {mode === "stock-coverage" && <>
@@ -163,7 +164,7 @@ function PreparationResult({ mode, result }) {
       <p>Période : {result.period_start} → {result.period_end} · site : {result.site_id}. Conformité non évaluée.</p>
       {Object.entries(result.evidence || {}).map(([register, rows]) => <div key={register}><h4>{register}</h4>
         {!rows.length && <p>Aucune preuve datée et rattachée à ce site.</p>}
-        {rows.map((row) => <p key={`${row.source.register}:${row.source.id}`} className="work-dossiers-preserve">Source : {row.source.register} · {row.source.id} · {row.date} · {evidenceText(row.facts)} · manquant : {evidenceText(row.missing_info)}</p>)}
+        {rows.map((row) => <p key={`${row.source.register}:${row.source.id}`} className="work-dossiers-preserve">Source : {row.source.register} · {row.source.id} · {formatDocumentDate(row.date)} · {evidenceText(row.facts)} · manquant : {evidenceText(row.missing_info)}</p>)}
       </div>)}
       <p>Preuves manquantes : {evidenceText(result.missing_evidence)}</p>
       <p>Limites des registres : {evidenceText(result.limits)}</p>
@@ -328,8 +329,8 @@ function entrySummary(entry) {
   const content = entry.content;
   if (["decision", "architect_decision"].includes(entry.kind)) return `${OUTCOMES[content.outcome]}\nPourquoi : ${content.rationale}\nQui : ${decisionActor(entry)}\nSuite : ${content.next_step || "À préciser"}${entry.kind === "architect_decision" ? `\nAlternatives : ${evidenceText(content.alternatives)}\nContraintes : ${evidenceText(content.constraints)}\nRéférences déclarées : ${evidenceText(content.document_links)}\nImpacts déclarés, non déduits : ${evidenceText(content.declared_impacts)}` : ""}`;
   if (entry.kind === "writing_revision" || content.type === "customer_followup") return `Faits sourcés : ${evidenceText(content.sourced_facts)}\nSuggestion : ${content.suggested_prose}\nManquant : ${evidenceText(content.missing_facts)}\n${evidenceText(content.checks)}`;
-  if (entry.kind === "client_event") return `${CLIENT_EVENTS[content.kind]} · ${content.occurred_on}\n${content.note}\nSuivi déclaré : ${content.follow_up_on || "Aucune date"}\nContact manuel et consentement à vérifier.`;
-  if (entry.kind === "commitment") return `${content.text}\nResponsable : ${content.owner}\nÉchéance : ${content.due_date || "À préciser"}`;
+  if (entry.kind === "client_event") return `${CLIENT_EVENTS[content.kind]} · ${formatDocumentDate(content.occurred_on)}\n${content.note}\nSuivi déclaré : ${content.follow_up_on ? formatDocumentDate(content.follow_up_on) : "Aucune date"}\nContact manuel et consentement à vérifier.`;
+  if (entry.kind === "commitment") return `${content.text}\nResponsable : ${content.owner}\nÉchéance : ${content.due_date ? formatDocumentDate(content.due_date) : "À préciser"}`;
   if (entry.kind === "meeting") return `${content.title}\n${content.notes}\nTâches proposées :\n${content.tasks.map((task) => `${task.text} — ${task.owner}`).join("\n")}`;
   if (entry.kind === "handoff") return `${content.objective}\nDestination : ${content.target} · transmission manuelle`;
   if (content.type === "invoice_followup") return `Destinataire : ${content.to || "À renseigner"}\nObjet : ${content.subject}\n${content.message}`;
@@ -488,7 +489,7 @@ function WorkThread({ dossier, revision, disabled, queue, onError, onOpenThemis,
       body = { source: ref, ...(source.source.kind === "stock" && form.quantity ? { quantity: Number(form.quantity) } : {}) };
     }
     const summary = mode === "draft" ? `Préparer un brouillon depuis ${sourceLabel(source)}${form.quantity && source.source.kind === "stock" ? ` · quantité ${form.quantity}` : ""}.\nLe contenu sera proposé, jamais envoyé ni exécuté.`
-      : `${form.title || KINDS[mode]}\n${form.text}\n${form.owner ? `Responsable : ${form.owner}\n` : ""}${form.due_date ? `Échéance : ${form.due_date}\n` : ""}${mode === "decision" ? `Décision : ${OUTCOMES[body.outcome]}\nSuite : ${body.next_step || "À préciser"}\n` : ""}${source ? `Source : ${sourceLabel(source)}\n` : ""}${mode === "handoff" ? `Destination : ${body.target}\n` : ""}${tasks.length && mode === "meeting" ? `Tâches proposées :\n${tasks.map((task) => `${task.text} — ${task.owner}`).join("\n")}` : ""}`;
+      : `${form.title || KINDS[mode]}\n${form.text}\n${form.owner ? `Responsable : ${form.owner}\n` : ""}${form.due_date ? `Échéance : ${formatDocumentDate(form.due_date)}\n` : ""}${mode === "decision" ? `Décision : ${OUTCOMES[body.outcome]}\nSuite : ${body.next_step || "À préciser"}\n` : ""}${source ? `Source : ${sourceLabel(source)}\n` : ""}${mode === "handoff" ? `Destination : ${body.target}\n` : ""}${tasks.length && mode === "meeting" ? `Tâches proposées :\n${tasks.map((task) => `${task.text} — ${task.owner}`).join("\n")}` : ""}`;
     queueWrite(path, body, "Enregistrer cette proposition ?", summary, "POST", () => { setForm({}); setTasks([]); });
   };
   const simulate = async (event) => {
@@ -539,7 +540,7 @@ function WorkThread({ dossier, revision, disabled, queue, onError, onOpenThemis,
         {content.type === "customer_followup" && <p>Destinataire : {content.to || "À vérifier"}</p>}
         <p>Vérifications : {evidenceText(content.checks)}. Aucun envoi automatique.</p>
       </>}
-      {entry.kind === "commitment" && <p>Responsable : {content.owner} · Échéance : {content.due_date || "À préciser"}</p>}
+      {entry.kind === "commitment" && <p>Responsable : {content.owner} · Échéance : {content.due_date ? formatDocumentDate(content.due_date) : "À préciser"}</p>}
       {entry.kind === "meeting" && <><p className="work-dossiers-preserve">{content.notes}</p>
         <h4>Tâches proposées · aucune création automatique dans un autre module</h4>
         {!content.tasks?.length && <p>Aucune tâche proposée.</p>}
@@ -629,7 +630,7 @@ function WorkThread({ dossier, revision, disabled, queue, onError, onOpenThemis,
         <li>Suite à clarifier : {decision?.content.next_step || "Responsable et prochaine étape à définir"}</li></ul>
       <h4>Engagements à examiner</h4>
       {entries.filter((entry) => entry.kind === "commitment" && !["completed", "cancelled"].includes(entry.status)).map((entry) =>
-        <p key={entry.id}>{entry.content.text} · {entry.content.owner} · {entry.content.due_date || "Sans échéance"} · {STATUSES[entry.status]}</p>)}
+        <p key={entry.id}>{entry.content.text} · {entry.content.owner} · {entry.content.due_date ? formatDocumentDate(entry.content.due_date) : "Sans échéance"} · {STATUSES[entry.status]}</p>)}
       <h4>Sources à vérifier</h4>{sourceControls(sources.map((item) => item.source))}
       <button type="button" disabled={disabled} onClick={() => { setMode("meeting"); setForm({}); setScenario(null); }}>Saisir le compte rendu et proposer des tâches</button>
     </details>
@@ -873,7 +874,7 @@ export default function WorkDossiersPanel({ onClose, onOpenThemis, onOpenHaccp }
               {dailyCommitments.map((entry) => {
                 const content = entry.content || entry;
                 return <div key={`${entry.dossier_id || selectedId}:${entry.entry_id || entry.id}:${entry.task_id || ""}`}>
-                  <p>{content.text} · {content.owner || "Responsable manquant"} · {content.due_date || "Échéance manquante"} · {STATUSES[entry.status] || entry.status}</p>
+                  <p>{content.text} · {content.owner || "Responsable manquant"} · {content.due_date ? formatDocumentDate(content.due_date) : "Échéance manquante"} · {STATUSES[entry.status] || entry.status}</p>
                   {entry.dossier_id && <button type="button" disabled={busy || !!review} onClick={() => { setSelectedId(entry.dossier_id); setDailyThread(null); setProposalDecision(null); setRationale(""); setNote(""); }}>
                     Ouvrir le dossier : {dossiers.find((item) => item.id === entry.dossier_id)?.title || entry.dossier_id}
                   </button>}

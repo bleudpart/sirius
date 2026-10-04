@@ -3,10 +3,20 @@ import {
   formatLocalTime,
   formatLocalDate,
   getLocalDateKey,
+  formatDocumentDate,
 } from "./dateTime";
 
 describe("dateTime", () => {
   const fixed = new Date(2026, 0, 5, 9, 7, 3); // 5 janvier 2026, 09:07:03 locale
+
+  test("les dates documentaires utilisent JJ/MM/AAAA sans décalage de fuseau", () => {
+    expect(formatDocumentDate("2026-10-04")).toBe("04/10/2026");
+    expect(formatDocumentDate("2026-01-05T23:59:00-12:00")).toBe("05/01/2026");
+    expect(formatDocumentDate("2026-10-04 09:30:00")).toBe("04/10/2026");
+    expect(formatDocumentDate("04/10/2026")).toBe("04/10/2026");
+    expect(formatDocumentDate(null)).toBe("—");
+    expect(formatDocumentDate("À préciser")).toBe("À préciser");
+  });
 
   test("getLocalDateKey complète mois et jour avec des zéros", () => {
     expect(getLocalDateKey(fixed)).toBe("2026-01-05");
