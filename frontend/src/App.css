@@ -984,8 +984,8 @@ body.hud-minimal .antique-jar { display: none; }
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: min(30.6vh, 270px);
-  height: min(30.6vh, 270px);
+  width: min(27.54vh, 243px);
+  height: min(27.54vh, 243px);
   z-index: 2;
 }
 /* Les anneaux/orbite sont cachés par défaut pour .reactor-wrap ailleurs dans ce fichier
@@ -2447,8 +2447,8 @@ body.hud-minimal .medallion-halo { display: none; }
     min-height: 220px;
   }
   .sirius-stage .reactor-wrap {
-    width: min(27vh, 216px);
-    height: min(27vh, 216px);
+    width: min(24.3vh, 194.4px);
+    height: min(24.3vh, 194.4px);
   }
   .hud-panel { padding: 10px 14px 14px; }
   .hud-panel.bottom-left { left: 12px; bottom: 12px; min-width: 200px; }
@@ -2506,8 +2506,8 @@ body.hud-minimal .medallion-halo { display: none; }
     grid-column: 1;
   }
   .sirius-stage .reactor-wrap {
-    width: min(21.6vh, 157.5px);
-    height: min(21.6vh, 157.5px);
+    width: min(19.44vh, 141.75px);
+    height: min(19.44vh, 141.75px);
   }
   .sirius-column {
     max-height: 24vh;
