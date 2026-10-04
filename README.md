@@ -22,6 +22,23 @@ est effectivement vérifié ; la page ne le déduit pas de sa configuration fron
 Validation ciblée depuis `frontend` :
 `npm test -- --watchAll=false --runInBand src/PublicStore.test.jsx`.
 
+## Guide de premier démarrage
+
+Après la présentation et la configuration du profil, un guide propose trois
+entrées : chat écrit, dossiers métier locaux, comptes et connexions facultatifs.
+Il explique les noms des six modules locaux et les prérequis réseau et microphone.
+Dans le menu Modules, la fonction est affichée avant le nom mythologique ;
+les identifiants et commandes existants restent inchangés.
+
+Le guide se retrouve dans **Modules → Guide de démarrage**. Sa fermeture est
+mémorisée localement par compte (`sirius_getting_started_v1:*`) et n'efface
+aucune donnée métier. Un problème de stockage affiche une erreur et permet de
+continuer sans enregistrer. La configuration du profil n'ouvre plus automatiquement
+les connexions : elles sont proposées dans le guide.
+
+Validation ciblée depuis `frontend` :
+`npm test -- --watchAll=false --runInBand src/components/GettingStarted.test.jsx src/SiriusSetup.test.jsx src/App.voice.test.jsx`.
+
 ## 🚀 Installation
 
 ### Option A — Installer SIRIUS comme un logiciel Windows (recommandé)

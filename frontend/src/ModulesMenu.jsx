@@ -2,6 +2,7 @@
 import { memo, useEffect, useRef } from "react";
 import { Grip, X } from "lucide-react";
 import "./ModulesMenu.css";
+import { WORK_MODULES } from "./workModules";
 
 // Menu déroulant regroupé par familles (Guidage : groupement logique, max 2 niveaux).
 const GROUPS = ["PANTHÉON", "OUTILS", "MÉDIAS", "SYSTÈME"];
@@ -35,6 +36,9 @@ function ModulesMenu({ open, onClose, items }) {
             <div className="modmenu-grid">
               {list.map((it) => {
                 const Icon = it.Icon;
+                const workModule = WORK_MODULES.find((module) => module.id === it.id);
+                const [name, purpose] = it.label.split(" — ");
+                const functionLabel = workModule?.description || purpose;
                 return (
                   <button
                     key={it.id}
@@ -44,7 +48,10 @@ function ModulesMenu({ open, onClose, items }) {
                     title={it.label}
                   >
                     <Icon size={16} />
-                    <span className="modmenu-label">{it.label}</span>
+                    <span className="modmenu-label">
+                      {functionLabel || name}
+                      {functionLabel && <small>{workModule?.label || name}</small>}
+                    </span>
                   </button>
                 );
               })}

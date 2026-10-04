@@ -40,6 +40,7 @@ import { requestMicrophoneStream, scheduleHandsFreeRetry, stopRecorderAfterSilen
 import PushToTalkButton from "@/components/PushToTalkButton";
 import VoiceSessionControls from "@/components/VoiceSessionControls";
 import MicrophoneIndicator from "@/components/MicrophoneIndicator";
+import GettingStarted, { gettingStartedKey } from "@/components/GettingStarted";
 import { createVoiceSession, linkAbortSignal } from "@/voiceSession";
 import { speakFr, cancelSpeech, speakSeries, speakAsCharacter as speakCharacterVoice } from "@/voice";
 import { loadApiKeys, saveApiKeys } from "@/apiKeyStorage";
@@ -923,6 +924,7 @@ function App() {
   const [showPythagore, setShowPythagore] = useState(false);
   const [showNews, setShowNews] = useState(false);
   const [showModulesMenu, setShowModulesMenu] = useState(false);
+  const [showGettingStarted, setShowGettingStarted] = useState(false);
   const [showKeysStatus, setShowKeysStatus] = useState(false);
   const [showKeraunos, setShowKeraunos] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
@@ -5034,7 +5036,6 @@ function App() {
 
   // Enregistrement du profil + clés (1er lancement ou modification)
   const handleSetupComplete = useCallback((newProfile, newKeys) => {
-    const offerConnections = !localStorage.getItem("sirius_connections_onboarding_done");
     setProfile(newProfile);
     setKeys(newKeys);
     localStorage.setItem("sirius_profile", JSON.stringify(newProfile));
@@ -5045,8 +5046,8 @@ function App() {
       body: JSON.stringify({ name: newProfile.name }),
     }).catch(() => {});
     setShowSetup(false);
-    if (offerConnections) setShowConnections(true);
-    setText(`${greetByPhase(newProfile.name)} Tous mes systèmes sont en ligne.`);
+    setShowGettingStarted(true);
+    setText(`${greetByPhase(newProfile.name)} Choisissez une fonction pour commencer.`);
   }, []);
   
   // ---- Reconnaissance vocale navigateur (Web Speech API) ----
@@ -5585,7 +5586,7 @@ function App() {
     const isTyping = (e) => {
       const el = e.target;
       return el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable
-        || el.closest?.('[data-testid="sirius-voice-controls"]'));
+        || el.closest?.('[data-testid="sirius-voice-controls"], [data-testid="getting-started"]'));
     };
     const down = (e) => {
       if (e.code !== "Space" || e.repeat || isTyping(e)) return;
@@ -6292,6 +6293,7 @@ function App() {
       openProductivity: () => { setProductivityIntent(null); setShowProductivity(true); }, openMedia: () => { setMediaIntent(null); setShowMediaHud(true); },
       openSpotify: () => setShowSpotifyWin(true), openAdmin: () => setShowAdmin(true), openEnterprise: () => setShowEnterprise(true),
       openWorkModule: setActiveWorkModule,
+      openGettingStarted: () => setShowGettingStarted(true),
       openWorkDossiers: () => setShowWorkDossiers(true),
       openSportCoach: () => setShowSportCoach(true),
   };
@@ -6336,6 +6338,18 @@ function App() {
       data-guardian-active={hudTheme.guardian.visible}
       data-testid="sirius-hud"
     >
+      <GettingStarted
+        key={gettingStartedKey(authUser)}
+        storageKey={gettingStartedKey(authUser)}
+        ready={!booting && !showSetup && !showConnections}
+        requested={showGettingStarted}
+        onClose={() => setShowGettingStarted(false)}
+        onAssistant={() => navigateMobile("assistant")}
+        onModule={(id) => {
+          if (id === "connections") moduleActionsRef.current.openConnections();
+          else moduleActionsRef.current.openWorkModule(id);
+        }}
+      />
       <div className="grid-bg" />
       <div className="city-backdrop" data-testid="sirius-antique-bg" aria-hidden="true">
         <div className="city-glow" />

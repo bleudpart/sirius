@@ -105,6 +105,22 @@ test("Stop cancels a live conversational request and ignores its answer after a 
   expect(host.querySelector('[title="Activer le mode mains libres"]')).not.toBeNull();
 });
 
+test("first-use guide focuses the written chat and can be reopened from the module registry", async () => {
+  await mount();
+  expect(host.querySelector('[data-testid="getting-started"]')).not.toBeNull();
+  const question = [...host.querySelectorAll(".getting-started-actions button")].find((button) => button.textContent.includes("Poser une question"));
+  await act(async () => question.click());
+  await act(async () => jest.advanceTimersByTime(1));
+  expect(host.querySelector('[data-testid="getting-started"]')).toBeNull();
+  expect(host.querySelector(".sirius-root").classList.contains("mobile-section-home")).toBe(true);
+  expect(document.activeElement).toBe(host.querySelector('[data-testid="sirius-cmd-input"]'));
+  expect(localStorage.getItem("sirius_getting_started_v1:voice-test")).toBe("done");
+  await act(async () => host.querySelector('[data-testid="sirius-modules-btn"]').click());
+  await act(async () => host.querySelector('[data-testid="modules-menu-item-getting-started"]').click());
+  expect(host.querySelector('[data-testid="getting-started"]')).not.toBeNull();
+  expect(host.querySelector('[data-testid="modules-menu"]')).toBeNull();
+});
+
 test("pointer Stop discards the buffered phrase before the global push-to-talk release", async () => {
   const previousRecognition = window.SpeechRecognition;
   let recognition;

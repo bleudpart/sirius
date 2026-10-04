@@ -243,6 +243,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
 
         {tab === "profil" && (
           <section className="setup-section setup-single" data-testid="setup-panel-profil">
+            <p className="setup-note">Seul le prénom est demandé pour commencer. Les autres informations sont facultatives. Après l'enregistrement, un guide vous proposera le chat, les dossiers locaux ou la connexion de vos comptes. Le microphone n'est pas nécessaire pour utiliser le chat écrit.</p>
             {onOpenAccount && (
               <button type="button" className="setup-tab" onClick={onOpenAccount} data-testid="setup-account-btn">
                 <User size={14} /> MON COMPTE
