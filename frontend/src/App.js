@@ -41,7 +41,8 @@ import PushToTalkButton from "@/components/PushToTalkButton";
 import VoiceSessionControls from "@/components/VoiceSessionControls";
 import MicrophoneIndicator from "@/components/MicrophoneIndicator";
 import GettingStarted, { gettingStartedKey } from "@/components/GettingStarted";
-import { createVoiceSession, linkAbortSignal } from "@/voiceSession";
+import { createVoiceSession } from "@/voiceSession";
+import { streamConversation, requestConversation, requestAssistantIntent, requestTranscription } from "@/services/assistantApi";
 import { speakFr, cancelSpeech, speakSeries, speakAsCharacter as speakCharacterVoice } from "@/voice";
 import { loadApiKeys, saveApiKeys } from "@/apiKeyStorage";
 import { loadHud, applyHud } from "@/hudPrefs";
@@ -1475,109 +1476,99 @@ function App() {
     // -------------------------------------------------------------
     // NIVEAU 1 : VOIE FLUX STREAM (SSE) avec timeout global de 60 s
     // -------------------------------------------------------------
-    let streamTimeoutId;
-    let unlinkStreamAbort = () => {};
     let streamProducedOutput = false;
     try {
       if (pid && progress?.log) progress.log(pid, "Interrogation du cerveau (voie stream)...", 30);
 
-      const controller = new AbortController();
-      streamTimeoutId = setTimeout(() => controller.abort(), 60000);
-      // Relie l'annulation externe (ex: une action UI a été détectée en parallèle par
-      // resolveIntent) au contrôleur interne, pour couper proprement la requête et le flux.
-      unlinkStreamAbort = linkAbortSignal(externalSignal, controller);
+      const handled = await streamConversation(payload, { signal: externalSignal }, async (resp) => {
+        if (externalSignal.aborted) return true;
 
-      const resp = await fetch(`${API}/chat/stream`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: payload,
-        signal: controller.signal,
-      });
-      if (externalSignal.aborted) return;
+        if (resp.ok && resp.body && (resp.headers.get("content-type") || "").includes("text/event-stream")) {
+          const reader = resp.body.getReader();
+          const dec = new TextDecoder();
+          let buf = "", full = "", pending = "", data = null, spoken = false;
+          let speechFinished = Promise.resolve();
 
-      if (resp.ok && resp.body && (resp.headers.get("content-type") || "").includes("text/event-stream")) {
-        const reader = resp.body.getReader();
-        const dec = new TextDecoder();
-        let buf = "", full = "", pending = "", data = null, spoken = false;
-        let speechFinished = Promise.resolve();
-
-        const speakChunk = (phrase) => {
-          if (externalSignal.aborted) return;
-          const ph = (phrase || "").trim();
-          if (!ph) return;
-          if (!spoken) { spoken = true; setVoicePhase("preparing"); }
-          voiceSeriesPendingRef.current = true;
-          currentSpokenRef.current = ((currentSpokenRef.current || "") + " " + ph).slice(-400);
-          speakingRef.current = true;
-          speechFinished = speakSeries(ph, {
-            onstart: () => {
-              if (externalSignal.aborted) return;
-              setVoicePhase("speaking");
-              onSpeechStartRef.current();
-            },
-          });
-        };
-
-        try {
-          for (;;) {
-            const { done, value } = await reader.read();
+          const speakChunk = (phrase) => {
             if (externalSignal.aborted) return;
-            if (done) break;
-            buf += dec.decode(value, { stream: true });
-            let cut;
-            while ((cut = buf.indexOf("\n\n")) >= 0) {
-              const line = buf.slice(0, cut).trim();
-              buf = buf.slice(cut + 2);
-              if (!line.startsWith("data:")) continue;
-              let ev;
-              try { ev = JSON.parse(line.slice(5)); } catch (e) { continue; }
-              if (ev.type === "delta") {
-                streamProducedOutput = true;
-                full += ev.text; pending += ev.text;
-                setText(full);
-                streamOnDisplay(full);
-                let m;
-                while ((m = /^([\s\S]*?[.!?…])(?:\s+|$)/.exec(pending)) && m[1].trim().length > 1) {
-                  speakChunk(m[1]);
-                  pending = pending.slice(m[0].length);
+            const ph = (phrase || "").trim();
+            if (!ph) return;
+            if (!spoken) { spoken = true; setVoicePhase("preparing"); }
+            voiceSeriesPendingRef.current = true;
+            currentSpokenRef.current = ((currentSpokenRef.current || "") + " " + ph).slice(-400);
+            speakingRef.current = true;
+            speechFinished = speakSeries(ph, {
+              onstart: () => {
+                if (externalSignal.aborted) return;
+                setVoicePhase("speaking");
+                onSpeechStartRef.current();
+              },
+            });
+          };
+
+          try {
+            for (;;) {
+              const { done, value } = await reader.read();
+              if (externalSignal.aborted) return true;
+              if (done) break;
+              buf += dec.decode(value, { stream: true });
+              let cut;
+              while ((cut = buf.indexOf("\n\n")) >= 0) {
+                const line = buf.slice(0, cut).trim();
+                buf = buf.slice(cut + 2);
+                if (!line.startsWith("data:")) continue;
+                let ev;
+                try { ev = JSON.parse(line.slice(5)); } catch (e) { continue; }
+                if (ev.type === "delta") {
+                  streamProducedOutput = true;
+                  full += ev.text; pending += ev.text;
+                  setText(full);
+                  streamOnDisplay(full);
+                  let m;
+                  while ((m = /^([\s\S]*?[.!?…])(?:\s+|$)/.exec(pending)) && m[1].trim().length > 1) {
+                    speakChunk(m[1]);
+                    pending = pending.slice(m[0].length);
+                  }
+                } else if (ev.type === "done") {
+                  data = ev;
                 }
-              } else if (ev.type === "done") {
-                data = ev;
               }
             }
+          } finally {
+            await reader.cancel().catch(() => {});
           }
-        } finally {
-          await reader.cancel().catch(() => {});
-        }
 
-        if (data) {
-          if (externalSignal.aborted) return;
-          if (dispatchAutonomousVideoAction(data.action)) {
-            cancelSpeech();
-            voiceSeriesPendingRef.current = false;
-            speakingRef.current = false;
-            setVoicePhase("idle");
-            streamDisplayIdRef.current = null;
-            if (pid && progress?.done) progress.done(pid, "Action vidéo transmise");
-            return;
-          }
-          if (pending.trim()) speakChunk(pending);
-          const answer = (data.answer || full || "").trim();
-          if (!spoken) { setText(answer); speakOut(answer); } else { setText(answer); }
-          streamOnDisplay(answer, true);
-          if (pid && progress?.done) progress.done(pid, "Réponse délivrée en direct");
-          if (spoken) {
-            void speechFinished.then(() => {
-              if (externalSignal.aborted) return;
+          if (data) {
+            if (externalSignal.aborted) return true;
+            if (dispatchAutonomousVideoAction(data.action)) {
+              cancelSpeech();
               voiceSeriesPendingRef.current = false;
+              speakingRef.current = false;
               setVoicePhase("idle");
-              onSpeechEndRef.current();
-            });
+              streamDisplayIdRef.current = null;
+              if (pid && progress?.done) progress.done(pid, "Action vidéo transmise");
+              return true;
+            }
+            if (pending.trim()) speakChunk(pending);
+            const answer = (data.answer || full || "").trim();
+            if (!spoken) { setText(answer); speakOut(answer); } else { setText(answer); }
+            streamOnDisplay(answer, true);
+            if (pid && progress?.done) progress.done(pid, "Réponse délivrée en direct");
+            if (spoken) {
+              void speechFinished.then(() => {
+                if (externalSignal.aborted) return;
+                voiceSeriesPendingRef.current = false;
+                setVoicePhase("idle");
+                onSpeechEndRef.current();
+              });
+            }
+            return true;
           }
-          return; // ✅ SUCCÈS STREAM : On sort ici
+          if (streamProducedOutput) throw new Error("Flux terminé sans confirmation de fin.");
         }
-        if (streamProducedOutput) throw new Error("Flux terminé sans confirmation de fin.");
-      }
+        return false;
+      });
+      if (handled) return;
     } catch (e) {
       if (!isAbortError(e)) {
         console.warn("⚠️ Stream interrompu ou timeout (60s) -> Passage en voie classique...", e);
@@ -1594,9 +1585,6 @@ function App() {
         if (pid && progress?.error) progress.error(pid, "Réponse interrompue après restitution partielle");
         return;
       }
-    } finally {
-      unlinkStreamAbort();
-      if (streamTimeoutId) clearTimeout(streamTimeoutId);
     }
 
     // Une action UI a été détectée entre-temps par resolveIntent (annulation externe) : on ne
@@ -1607,21 +1595,13 @@ function App() {
     // -------------------------------------------------------------
     // NIVEAU 2 : VOIE CLASSIQUE HTTP (Repli si le Stream échoue/expire)
     // -------------------------------------------------------------
-    const fallbackController = new AbortController();
-    const unlinkFallback = linkAbortSignal(externalSignal, fallbackController);
-    const fallbackTimeout = setTimeout(() => fallbackController.abort(), 30000);
     try {
       if (pid && progress?.log) progress.log(pid, "Passage en voie classique de secours...", 60);
 
-      const resp = await fetch(`${API}/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: payload,
-        signal: fallbackController.signal,
-      });
+      const resp = await requestConversation(payload, { signal: externalSignal });
 
       if (resp.ok) {
-        const data = await resp.json();
+        const data = resp.data;
         if (externalSignal.aborted) return;
         if (dispatchAutonomousVideoAction(data.action)) {
           if (pid && progress?.done) progress.done(pid, "Action vidéo transmise");
@@ -1636,9 +1616,6 @@ function App() {
       }
     } catch (e) {
       if (!externalSignal.aborted) console.warn("⚠️ Échec voie classique -> Passage en réponse locale...", e);
-    } finally {
-      unlinkFallback();
-      clearTimeout(fallbackTimeout);
     }
 
     // Idem : si l'annulation externe a eu lieu pendant NIVEAU 2, pas de repli local non plus.
@@ -3813,23 +3790,8 @@ function App() {
         return;
       }
 
-      const ctrl = new AbortController();
-      const unlink = linkAbortSignal(sessionSignal, ctrl);
-      let intentResponse = null;
-      const to = setTimeout(() => ctrl.abort(), 12000);
-      try {
-        intentResponse = await fetch(`${API}/intent`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: command }),
-          signal: ctrl.signal,
-        });
-      } finally {
-        clearTimeout(to);
-        unlink();
-      }
-
-      const d = await intentResponse.json().catch(() => null);
+      const intentResponse = await requestAssistantIntent(command, { signal: sessionSignal });
+      const d = intentResponse.data;
       if (sessionSignal.aborted) return;
 
       if (intentResponse.ok && d && d.action && d.action !== "none" && executeIntent(d)) {
@@ -5165,15 +5127,12 @@ function App() {
         setStatus("thinking");
         setVoicePhase("transcribing");
         setText("Transcription vocale ΣIRIUS en cours...");
-        const controller = new AbortController();
-        const unlink = linkAbortSignal(voiceSignal, controller);
-        const timeout = setTimeout(() => controller.abort(), 30000);
         try {
           const form = new FormData();
           const extension = blob.type.includes("mp4") ? "m4a" : "webm";
           form.append("file", blob, `sirius-voice.${extension}`);
-          const response = await fetch(`${API}/stt`, { method: "POST", body: form, credentials: "include", signal: controller.signal });
-          const payload = await response.json();
+          const response = await requestTranscription(form, { signal: voiceSignal });
+          const payload = response.data;
           if (voiceSignal.aborted) return;
           if (!response.ok) throw new Error(payload.detail || "Transcription vocale impossible.");
           const transcript = (payload.text || payload.transcript || "").trim();
@@ -5195,9 +5154,6 @@ function App() {
           setVoiceMessage(error.message || "Transcription indisponible — réessayez.");
           autoMicRef.current = false;
           setAutoMic(false);
-        } finally {
-          unlink();
-          clearTimeout(timeout);
         }
       };
       recorder.onerror = () => {

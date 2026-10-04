@@ -39,6 +39,24 @@ les connexions : elles sont proposées dans le guide.
 Validation ciblée depuis `frontend` :
 `npm test -- --watchAll=false --runInBand src/components/GettingStarted.test.jsx src/SiriusSetup.test.jsx src/App.voice.test.jsx`.
 
+## Requêtes de l'assistant
+
+Les appels chat, flux SSE, intention et transcription sont regroupés dans
+`frontend/src/services/assistantApi.js`. Les URL viennent de `lib/api.js` ;
+`lib/backendRequest.js` conserve le `fetch` courant pour rester compatible avec
+les cookies, le bearer et le renouvellement de session appliqués par AuthGate.
+Il ne rejoue pas les requêtes lui-même.
+
+Les délais restent de 60 s pour le flux, 30 s pour le chat et la transcription,
+12 s pour l'intention. Ils couvrent aussi la lecture du corps de réponse.
+L'annulation de la session est propagée et les délais et écouteurs sont nettoyés
+dans tous les cas. Les erreurs remontent aux traitements existants de l'interface ;
+un JSON d'intention invalide est signalé par ce traitement avant le repli.
+La lecture du flux, les actions métier et les règles de repli restent dans App.
+
+Validation ciblée depuis `frontend` :
+`npm test -- --watchAll=false --runInBand src/services/assistantApi.test.js src/voiceSession.test.js src/App.voice.test.jsx`.
+
 ## 🚀 Installation
 
 ### Option A — Installer SIRIUS comme un logiciel Windows (recommandé)
