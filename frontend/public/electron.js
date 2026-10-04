@@ -9,6 +9,7 @@ const {
 } = require("./electron/hud_windows");
 const { startBackend, stopBackend } = require("./electron/backend_process");
 const { setupAutoUpdater } = require("./electron/auto_update");
+const { captureRectangle } = require("./electron/capture_region");
 
 // SIRIUS — Application de bureau Windows (Electron)
 // Charge le HUD React compilé (dossier build) et accorde l'accès au micro.
@@ -234,10 +235,12 @@ app.whenReady().then(async () => {
     const error = await shell.openPath(folderPath);
     return error ? { ok: false, error } : { ok: true };
   });
-  ipcMain.handle("sirius-capture-interface", async () => {
+  ipcMain.handle("sirius-capture-interface", async (_event, region) => {
     if (!mainWindow || mainWindow.isDestroyed()) return { ok: false, error: "Fenêtre SIRIUS indisponible." };
     try {
-      const image = await mainWindow.webContents.capturePage();
+      const rect = captureRectangle(region, mainWindow.getContentBounds());
+      const image = await mainWindow.webContents.capturePage(rect);
+      if (image.isEmpty()) throw new Error("La capture ne contient aucune image.");
       const captureFolder = path.join(app.getPath("pictures"), "SIRIUS Captures");
       await fs.mkdir(captureFolder, { recursive: true });
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-");

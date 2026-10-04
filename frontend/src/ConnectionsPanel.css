@@ -113,6 +113,10 @@
 
 .connection-action { grid-column: 2 / -1; justify-self: stretch; }
 .connection-action.secondary { color: #cceaf4; border-color: rgba(145, 230, 242, 0.34); background: rgba(145, 230, 242, 0.08); }
+.connection-pending-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.connection-pending-actions .connections-wait { width: 100%; margin: 0; display: flex; align-items: center; gap: 7px; text-align: left; }
+.connection-pending-actions button { padding: 0 12px; }
+.connection-pending-actions small { width: 100%; color: #a9cfdd; line-height: 1.5; }
 .connection-action:disabled { opacity: 0.65; cursor: wait; }
 .connections-footer-actions { display:flex; align-items:center; gap:10px; margin-top:16px; }
 .connections-refresh { margin:0; padding: 0 14px; color: #bcdde8; border-color: rgba(145, 230, 242, 0.28); background: rgba(16, 40, 61, 0.7); }

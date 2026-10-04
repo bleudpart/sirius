@@ -20,7 +20,11 @@
   font-family: "Orbitron", sans-serif;
   font-size: 8px;
   letter-spacing: 2px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
 }
+.proactive-stack.dragging .pro-mode-row { cursor: grabbing; }
 .pro-mode-label { display: inline-flex; align-items: center; gap: 4px; margin-right: 4px; opacity: 0.95; color: #f2d99a; text-shadow: 0 0 9px rgba(216, 184, 117, 0.55); }
 .pro-mode-btn {
   background: rgba(0, 20, 34, 0.7);

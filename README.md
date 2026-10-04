@@ -28,7 +28,20 @@ est effectivement vérifié ; la page ne le déduit pas de sa configuration fron
 Validation ciblée depuis `frontend` :
 `npm test -- --watchAll=false --runInBand src/PublicStore.test.jsx`.
 
+Sur Windows, **Capture de l'interface** et **Capture d'une zone (souris)**
+utilisent la capture native Electron et enregistrent les PNG dans le dossier
+Images / SIRIUS Captures. La sélection d'une zone peut être annulée avec Échap.
+Les raccourcis de capture Windows restent indépendants de ces commandes.
+Le panneau **SIRIUS ANTICIPE** se déplace en glissant son en-tête ; sa position
+est mémorisée sur cet appareil, sans modifier les actions des suggestions.
+
 ## Cache mail facultatif
+
+Pendant une connexion Google ou Microsoft, **Vérifier l'état** actualise le statut
+et **Arrêter l'attente** interrompt la demande locale et son suivi. Cette action
+ne révoque pas une autorisation déjà accordée chez le fournisseur ; l'onglet
+externe peut être fermé manuellement. Les requêtes ont un délai de 20 secondes,
+et les erreurs sont affichées avant le bloc du cache mail.
 
 Dans **Centre des connexions**, chaque compte SIRIUS peut activer séparément
 le cache Gmail ou Outlook de cet appareil. Il contient uniquement les identifiants,

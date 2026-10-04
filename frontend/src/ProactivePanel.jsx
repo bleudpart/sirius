@@ -12,6 +12,65 @@ export default function ProactivePanel({ onAction, onSpeak }) {
   const announcedIdsRef = useRef(new Set());
   const onSpeakRef = useRef(onSpeak);
   const lastUserActivityRef = useRef(0);
+  const panelRef = useRef(null);
+  const hasSuggestions = suggestions.length > 0;
+
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) return undefined;
+    const header = panel.querySelector(".pro-mode-row");
+    const key = "sirius_panel_pos";
+    const readPositions = () => JSON.parse(localStorage.getItem(key) || "{}");
+    const position = (x, y) => {
+      panel.style.left = `${Math.min(Math.max(0, x), Math.max(0, window.innerWidth - panel.offsetWidth))}px`;
+      // Keep the handle reachable even when the suggestions exceed the viewport.
+      panel.style.top = `${Math.min(Math.max(0, y), Math.max(0, window.innerHeight - header.offsetHeight))}px`;
+    };
+    try {
+      const saved = readPositions()["proactive-panel"];
+      if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) position(saved.x, saved.y);
+    } catch (cause) { console.error("Restauration de la position SIRIUS ANTICIPE impossible :", cause); }
+    let drag = null;
+    const onDown = (event) => {
+      if (event.button !== 0) return;
+      const rect = panel.getBoundingClientRect();
+      drag = { x: event.clientX - rect.left, y: event.clientY - rect.top, id: event.pointerId };
+      panel.classList.add("dragging");
+      event.preventDefault();
+    };
+    const onMove = (event) => {
+      if (drag && event.pointerId === drag.id) position(event.clientX - drag.x, event.clientY - drag.y);
+    };
+    const onUp = (event) => {
+      if (!drag || (event?.pointerId != null && event.pointerId !== drag.id)) return;
+      drag = null;
+      panel.classList.remove("dragging");
+      try {
+        const saved = readPositions();
+        const rect = panel.getBoundingClientRect();
+        saved["proactive-panel"] = { x: rect.left, y: rect.top };
+        localStorage.setItem(key, JSON.stringify(saved));
+      } catch (cause) { console.error("Sauvegarde de la position SIRIUS ANTICIPE impossible :", cause); }
+    };
+    const onResize = () => {
+      const rect = panel.getBoundingClientRect();
+      position(rect.left, rect.top);
+    };
+    header.addEventListener("pointerdown", onDown);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    window.addEventListener("blur", onUp);
+    window.addEventListener("resize", onResize);
+    return () => {
+      header.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      window.removeEventListener("blur", onUp);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [hasSuggestions]);
 
   useEffect(() => {
     onSpeakRef.current = onSpeak;
@@ -90,8 +149,8 @@ export default function ProactivePanel({ onAction, onSpeak }) {
   if (!suggestions.length) return null;
 
   return (
-    <div className="proactive-stack" data-testid="proactive-panel">
-      <div className="pro-mode-row">
+    <div ref={panelRef} className="proactive-stack" data-testid="proactive-panel">
+      <div className="pro-mode-row" title="Glisser pour déplacer SIRIUS ANTICIPE">
         <Zap size={11} />
         <span className="pro-mode-label"><BrainCircuit size={11} /> SIRIUS ANTICIPE</span>
       </div>

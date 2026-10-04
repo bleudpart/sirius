@@ -6160,9 +6160,16 @@ function App() {
   });
 
   const captureSiriusInterface = async (region = null) => {
-    if (!region && window.siriusDesktop?.captureInterface) {
-      const result = await window.siriusDesktop.captureInterface();
-      showTouchToast(result?.ok ? "CAPTURE ENREGISTRÉE" : (result?.error || "CAPTURE IMPOSSIBLE"));
+    if (window.siriusDesktop?.captureInterface) {
+      try {
+        // Retire visuellement la sélection avant la capture native.
+        if (region) await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const result = await window.siriusDesktop.captureInterface(region || undefined);
+        showTouchToast(result?.ok ? "CAPTURE ENREGISTRÉE" : (result?.error || "CAPTURE IMPOSSIBLE"));
+      } catch (error) {
+        console.error("Capture native SIRIUS impossible :", error);
+        showTouchToast("CAPTURE IMPOSSIBLE");
+      }
       return;
     }
     if (!navigator.mediaDevices?.getDisplayMedia) {
