@@ -1747,6 +1747,10 @@ body.hud-minimal .medallion-halo { display: none; }
 @media (max-width: 900px) { .eu-grid { grid-template-columns: repeat(2, 1fr); } }
 
 /* Barre de commande */
+.cmd-bar,
+.voice-session-controls {
+  width: min(80%, 620px);
+}
 .cmd-bar {
   position: relative;
   /* Fixe explicitement top/bottom à "auto" : une ancienne règle héritée décalait la barre de
@@ -1759,7 +1763,6 @@ body.hud-minimal .medallion-halo { display: none; }
   display: flex;
   align-items: center;
   gap: 10px;
-  width: min(80%, 620px);
   border: 1px solid rgba(145, 230, 242, 0.3);
   border-radius: 4px;
   background: rgba(4, 12, 20, 0.78);
@@ -1770,6 +1773,66 @@ body.hud-minimal .medallion-halo { display: none; }
 .cmd-bar:focus-within {
   border-color: var(--accent);
   box-shadow: 0 0 18px var(--glow);
+}
+.voice-session-controls {
+  position: relative;
+  z-index: 11;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 2px;
+  padding: 0 6px;
+  color: #bad0d6;
+  font: 500 13px/1.4 "Rajdhani", sans-serif;
+}
+.voice-session-controls [role="status"] { min-width: 0; display: grid; gap: 3px; }
+.voice-microphone-dot {
+  display: inline-block;
+  flex: 0 0 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #b94b56;
+  box-shadow: 0 0 0 2px rgba(185, 75, 86, .12);
+}
+.voice-microphone-dot.is-open {
+  background: #39a879;
+  box-shadow: 0 0 0 2px rgba(57, 168, 121, .12);
+}
+.voice-session-controls small { color: #bad0d6; overflow-wrap: anywhere; }
+.voice-session-controls button {
+  position: relative;
+  isolation: isolate;
+  flex-shrink: 0;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 10px;
+  color: #d8c9a7;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.voice-session-controls button::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 6px 0;
+  background: rgba(4, 12, 20, .55);
+  border: 1px solid rgba(216, 184, 117, .25);
+  border-radius: 6px;
+}
+.voice-session-controls button:hover::before,
+.voice-session-controls button:focus-visible::before { border-color: rgba(216, 184, 117, .6); }
+.voice-session-controls button:focus-visible { outline: 2px solid #91e6f2; outline-offset: 3px; }
+@media (min-width: 1024px) {
+  .sirius-command-area > .cmd-bar,
+  .sirius-command-area > .voice-session-controls {
+    translate: 0 -24px;
+  }
 }
 .cmd-prompt {
   font-family: "Orbitron", sans-serif;
@@ -5389,7 +5452,7 @@ body.hud-minimal .medallion-halo { display: none; }
   .reactor-wrap { width: min(36vh, 290px); height: min(36vh, 290px); }
   .sirius-title { font-size: clamp(28px, 5.5vh, 46px); letter-spacing: 6px; }
   .subtitle-box { max-width: 92vw; }
-  .cmd-bar { width: min(94vw, 620px); }
+  .cmd-bar, .voice-session-controls { width: min(94vw, 620px); }
   .hud-panel.bottom-left { left: 10px; bottom: 10px; min-width: 170px; padding: 10px 14px; }
   .hud-panel.stats-mini { left: 10px; right: auto; bottom: 122px; min-width: 170px; max-width: 220px; }
   .hud-panel.bottom-right { right: 10px; bottom: 10px; min-width: 176px; padding: 10px 14px; }
@@ -5422,7 +5485,8 @@ body.hud-minimal .medallion-halo { display: none; }
   .center-stage { gap: 12px; }
   .sirius-dashboard { padding: 4px 6px; gap: 6px; }
   .subtitle-box { max-width: 94vw; font-size: 13px; }
-  .cmd-bar { width: 94vw; gap: 6px; padding: 5px 5px 5px 10px; }
+  .cmd-bar, .voice-session-controls { width: 94vw; }
+  .cmd-bar { gap: 6px; padding: 5px 5px 5px 10px; }
   .cmd-prompt { display: none; }
   .cmd-send { padding: 8px 10px; font-size: 10px; }
   .ptt-btn { padding: 7px 8px; font-size: 9px; }
@@ -7844,7 +7908,8 @@ body[data-phase] .center-stage::before { content: none !important; }
     right: 20px;
   }
 
-  .cmd-bar {
+  .cmd-bar,
+  .voice-session-controls {
     width: min(48vw, 720px);
   }
 }

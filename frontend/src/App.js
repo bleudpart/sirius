@@ -38,7 +38,10 @@ import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { requestMicrophoneStream, scheduleHandsFreeRetry, stopRecorderAfterSilence, useServerTranscription } from "@/microphoneCapture";
 import PushToTalkButton from "@/components/PushToTalkButton";
-import { speakFr, cancelSpeech, speakSeries, speakAsCharacter } from "@/voice";
+import VoiceSessionControls from "@/components/VoiceSessionControls";
+import MicrophoneIndicator from "@/components/MicrophoneIndicator";
+import { createVoiceSession, linkAbortSignal } from "@/voiceSession";
+import { speakFr, cancelSpeech, speakSeries, speakAsCharacter as speakCharacterVoice } from "@/voice";
 import { loadApiKeys, saveApiKeys } from "@/apiKeyStorage";
 import { loadHud, applyHud } from "@/hudPrefs";
 import { initUiSounds } from "@/uiSounds";
@@ -246,6 +249,19 @@ const imageFileToBase64 = (file) => new Promise((resolve, reject) => {
 });
 
 function App() {
+  const [voicePhase, setVoicePhase] = useState("idle");
+  const [voiceMessage, setVoiceMessage] = useState("");
+  const [resumedCommand, setResumedCommand] = useState(null);
+  const [, refreshVoiceSession] = useState(0);
+  const voiceSessionRef = useRef(null);
+  if (!voiceSessionRef.current) voiceSessionRef.current = createVoiceSession();
+  const renderVoiceSignal = voiceSessionRef.current.signal;
+  const voiceSeriesPendingRef = useRef(false);
+  const speakAsCharacter = useCallback((message, options) => {
+    if (voiceSessionRef.current.stopped || renderVoiceSignal.aborted) return;
+    speakCharacterVoice(message, options);
+  }, [renderVoiceSignal]);
+  const stopVoiceRef = useRef(() => {});
   const currentSpokenRef = useRef("");
   const onSpeechStartRef = useRef(() => {});
   const onSpeechEndRef = useRef(() => {});
@@ -253,6 +269,8 @@ function App() {
   const stopInterruptListenerRef = useRef(() => {});
 
   const speakOut = useCallback((message) => {
+    if (voiceSessionRef.current.stopped || renderVoiceSignal.aborted) return;
+    const signal = renderVoiceSignal;
     if (!message) {
       setStatus("idle");
       return;
@@ -261,6 +279,9 @@ function App() {
     const t0 = performance.now();
     if (window._siriusTTSTimer) clearTimeout(window._siriusTTSTimer);
     const finishTimedOutSpeech = () => {
+      if (signal.aborted) return;
+      setVoiceMessage("La réponse vocale a dépassé le délai prévu.");
+      setVoicePhase("idle");
       cancelSpeech();
       stopInterruptListenerRef.current();
       onSpeechEndRef.current();
@@ -268,8 +289,10 @@ function App() {
     window._siriusTTSTimer = setTimeout(finishTimedOutSpeech, 30000);
 
     speakFr(message, {
-      onpending: () => { speakingRef.current = true; },
+      onpending: () => { if (!signal.aborted) { speakingRef.current = true; setVoicePhase("preparing"); } },
       onstart: () => {
+        if (signal.aborted) return;
+        setVoicePhase("speaking");
         clearTimeout(window._siriusTTSTimer);
         const safetyTimeoutMs = Math.max(10000, (message.length / 8) * 1000 + 5000);
         window._siriusTTSTimer = setTimeout(finishTimedOutSpeech, safetyTimeoutMs);
@@ -279,6 +302,8 @@ function App() {
         if (autoMicRef.current && !micOnRef.current) startInterruptListenerRef.current();
       },
       onend: () => {
+        if (signal.aborted) return;
+        setVoicePhase("idle");
         if (window._siriusTTSTimer) clearTimeout(window._siriusTTSTimer);
         setMetrics((m) => ({ ...m, tts: { ...m.tts, durMs: Math.round(performance.now() - t0) } }));
         stopInterruptListenerRef.current();
@@ -286,13 +311,14 @@ function App() {
         setStatus("idle");
       },
       onerror: () => {
+        if (signal.aborted) return;
         if (window._siriusTTSTimer) clearTimeout(window._siriusTTSTimer);
         stopInterruptListenerRef.current();
         onSpeechEndRef.current();
         setStatus("idle");
       }
     });
-  }, []);
+  }, [renderVoiceSignal]);
 
   // ──👉 EXECUTEINTENT (collé automatiquement) — garder au tout début du composant App
   const executeIntentImpl = (d) => {
@@ -415,6 +441,24 @@ function App() {
       requestController?.abort();
       document.removeEventListener("visibilitychange", onVisibility);
     };
+  }, []);
+
+  useEffect(() => {
+    const reportPhase = (event) => {
+      if (voiceSessionRef.current.stopped) return;
+      if (event.detail === "preparing") speakingRef.current = true;
+      if (event.detail === "speaking") onSpeechStartRef.current();
+      if (event.detail === "idle") {
+        if (voiceSeriesPendingRef.current) {
+          setVoicePhase("thinking");
+          return;
+        }
+        onSpeechEndRef.current();
+      }
+      setVoicePhase(event.detail);
+    };
+    window.addEventListener("sirius-voice-phase", reportPhase);
+    return () => window.removeEventListener("sirius-voice-phase", reportPhase);
   }, []);
 
   const [showSetup, setShowSetup] = useState(() => !localStorage.getItem("sirius_profile"));
@@ -551,6 +595,8 @@ function App() {
   // handleCommand est redéfini à chaque rendu : la référence évite que processCommand ne fige une version périmée.
   const handleCommandRef = useRef(null);
   const [micOn, setMicOn] = useState(false);
+  const [captureMicOn, setCaptureMicOn] = useState(false);
+  const [interruptMicOn, setInterruptMicOn] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [ecoMode, setEcoMode] = useState(() => localStorage.getItem("sirius_eco") === "1");
   useEffect(() => { localStorage.setItem("sirius_eco", ecoMode ? "1" : "0"); }, [ecoMode]);
@@ -1354,7 +1400,12 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const reportVoiceError = (event) => setText(event.detail);
+    const reportVoiceError = (event) => {
+      if (voiceSessionRef.current.stopped) return;
+      setText(event.detail);
+      setVoiceMessage(event.detail);
+      if (event.type === "sirius-voice-error") setVoicePhase("idle");
+    };
     window.addEventListener("sirius-voice-error", reportVoiceError);
     window.addEventListener("sirius-voice-degraded", reportVoiceError);
     return () => {
@@ -1383,6 +1434,9 @@ function App() {
   // externalSignal : permet à resolveIntent d'annuler proprement ce flux si une action UI est
   // détectée entre-temps (les deux partent en parallèle pour ne pas s'additionner en latence).
   const cloudAnswer = useCallback(async (command, { signal: externalSignal } = {}) => {
+    externalSignal = externalSignal || renderVoiceSignal;
+    if (externalSignal.aborted) return;
+    setVoicePhase("thinking");
     setStatus("thinking");
 
     if (isLocalTimeQuestion(command)) {
@@ -1420,6 +1474,7 @@ function App() {
     // NIVEAU 1 : VOIE FLUX STREAM (SSE) avec timeout global de 60 s
     // -------------------------------------------------------------
     let streamTimeoutId;
+    let unlinkStreamAbort = () => {};
     let streamProducedOutput = false;
     try {
       if (pid && progress?.log) progress.log(pid, "Interrogation du cerveau (voie stream)...", 30);
@@ -1428,10 +1483,7 @@ function App() {
       streamTimeoutId = setTimeout(() => controller.abort(), 60000);
       // Relie l'annulation externe (ex: une action UI a été détectée en parallèle par
       // resolveIntent) au contrôleur interne, pour couper proprement la requête et le flux.
-      if (externalSignal) {
-        if (externalSignal.aborted) controller.abort();
-        else externalSignal.addEventListener("abort", () => controller.abort(), { once: true });
-      }
+      unlinkStreamAbort = linkAbortSignal(externalSignal, controller);
 
       const resp = await fetch(`${API}/chat/stream`, {
         method: "POST",
@@ -1439,23 +1491,35 @@ function App() {
         body: payload,
         signal: controller.signal,
       });
+      if (externalSignal.aborted) return;
 
       if (resp.ok && resp.body && (resp.headers.get("content-type") || "").includes("text/event-stream")) {
         const reader = resp.body.getReader();
         const dec = new TextDecoder();
         let buf = "", full = "", pending = "", data = null, spoken = false;
+        let speechFinished = Promise.resolve();
 
         const speakChunk = (phrase) => {
+          if (externalSignal.aborted) return;
           const ph = (phrase || "").trim();
           if (!ph) return;
-          if (!spoken) { spoken = true; setStatus("speaking"); }
+          if (!spoken) { spoken = true; setVoicePhase("preparing"); }
+          voiceSeriesPendingRef.current = true;
           currentSpokenRef.current = ((currentSpokenRef.current || "") + " " + ph).slice(-400);
-          speakSeries(ph);
+          speakingRef.current = true;
+          speechFinished = speakSeries(ph, {
+            onstart: () => {
+              if (externalSignal.aborted) return;
+              setVoicePhase("speaking");
+              onSpeechStartRef.current();
+            },
+          });
         };
 
         try {
           for (;;) {
             const { done, value } = await reader.read();
+            if (externalSignal.aborted) return;
             if (done) break;
             buf += dec.decode(value, { stream: true });
             let cut;
@@ -1485,7 +1549,12 @@ function App() {
         }
 
         if (data) {
+          if (externalSignal.aborted) return;
           if (dispatchAutonomousVideoAction(data.action)) {
+            cancelSpeech();
+            voiceSeriesPendingRef.current = false;
+            speakingRef.current = false;
+            setVoicePhase("idle");
             streamDisplayIdRef.current = null;
             if (pid && progress?.done) progress.done(pid, "Action vidéo transmise");
             return;
@@ -1495,19 +1564,36 @@ function App() {
           if (!spoken) { setText(answer); speakOut(answer); } else { setText(answer); }
           streamOnDisplay(answer, true);
           if (pid && progress?.done) progress.done(pid, "Réponse délivrée en direct");
+          if (spoken) {
+            void speechFinished.then(() => {
+              if (externalSignal.aborted) return;
+              voiceSeriesPendingRef.current = false;
+              setVoicePhase("idle");
+              onSpeechEndRef.current();
+            });
+          }
           return; // ✅ SUCCÈS STREAM : On sort ici
         }
+        if (streamProducedOutput) throw new Error("Flux terminé sans confirmation de fin.");
       }
     } catch (e) {
       if (!isAbortError(e)) {
         console.warn("⚠️ Stream interrompu ou timeout (60s) -> Passage en voie classique...", e);
       }
       if (streamProducedOutput || externalSignal?.aborted) {
+        if (!externalSignal.aborted) {
+          cancelSpeech();
+          voiceSeriesPendingRef.current = false;
+          speakingRef.current = false;
+          setVoicePhase("idle");
+          setVoiceMessage("Réponse interrompue avant la fin. Réessayez.");
+        }
         streamDisplayIdRef.current = null; // prochaine réponse : nouvelle fenêtre propre
         if (pid && progress?.error) progress.error(pid, "Réponse interrompue après restitution partielle");
         return;
       }
     } finally {
+      unlinkStreamAbort();
       if (streamTimeoutId) clearTimeout(streamTimeoutId);
     }
 
@@ -1519,6 +1605,9 @@ function App() {
     // -------------------------------------------------------------
     // NIVEAU 2 : VOIE CLASSIQUE HTTP (Repli si le Stream échoue/expire)
     // -------------------------------------------------------------
+    const fallbackController = new AbortController();
+    const unlinkFallback = linkAbortSignal(externalSignal, fallbackController);
+    const fallbackTimeout = setTimeout(() => fallbackController.abort(), 30000);
     try {
       if (pid && progress?.log) progress.log(pid, "Passage en voie classique de secours...", 60);
 
@@ -1526,11 +1615,12 @@ function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: payload,
-        signal: externalSignal,
+        signal: fallbackController.signal,
       });
 
       if (resp.ok) {
         const data = await resp.json();
+        if (externalSignal.aborted) return;
         if (dispatchAutonomousVideoAction(data.action)) {
           if (pid && progress?.done) progress.done(pid, "Action vidéo transmise");
           return;
@@ -1543,7 +1633,10 @@ function App() {
         return; // ✅ SUCCÈS CLASSIQUE : On sort ici
       }
     } catch (e) {
-      console.warn("⚠️ Échec voie classique -> Passage en réponse locale...", e);
+      if (!externalSignal.aborted) console.warn("⚠️ Échec voie classique -> Passage en réponse locale...", e);
+    } finally {
+      unlinkFallback();
+      clearTimeout(fallbackTimeout);
     }
 
     // Idem : si l'annulation externe a eu lieu pendant NIVEAU 2, pas de repli local non plus.
@@ -1553,6 +1646,7 @@ function App() {
     // NIVEAU 3 : RÉPONSE LOCALE (Mode Secours si le serveur est hors-ligne)
     // -------------------------------------------------------------
     if (pid && progress?.error) progress.error(pid, "Serveur cloud indisponible — réponse locale");
+    setVoiceMessage("Connexion au service IA indisponible — réponse locale.");
     const fallback = typeof localAnswer === "function" 
       ? localAnswer(command.toLowerCase()) 
       : "Mode secours : Le serveur Sirius ne répond pas actuellement.";
@@ -1561,26 +1655,38 @@ function App() {
     speakOut(fallback);
     showOnDisplay({ type: "message", titre: "ΣIRIUS — RÉPONSE LOCALE", contenu: fallback });
 
-  }, [speakOut, keys, profile, computeMood, showOnDisplay, streamOnDisplay, sysMode, tasks, displayOpen]);
+  }, [speakOut, keys, profile, computeMood, showOnDisplay, streamOnDisplay, sysMode, tasks, displayOpen, renderVoiceSignal]);
 
   // ---- Interruption naturelle : le micro écoute PENDANT que Sirius parle ----
   const stopInterruptListener = useCallback(() => {
     const rec = interruptRecRef.current;
     interruptRecRef.current = null;
-    try { rec && rec.stop(); } catch (e) {}
+    setInterruptMicOn(false);
+    if (rec) {
+      rec.onstart = null;
+      rec.onend = null;
+      rec.onresult = null;
+      rec.onerror = null;
+      try { rec.abort(); } catch (e) { console.warn("Arrêt du micro d'interruption :", e); }
+    }
   }, []);
   stopInterruptListenerRef.current = stopInterruptListener;
 
   const startInterruptListener = useCallback(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR || interruptRecRef.current) return;
+    if (!SR || interruptRecRef.current || voiceSessionRef.current.stopped) return;
     try {
       const rec = new SR();
+      const signal = voiceSessionRef.current.signal;
+      rec.onstart = () => {
+        if (!signal.aborted && interruptRecRef.current === rec) setInterruptMicOn(true);
+      };
       rec.lang = "fr-FR";
       rec.interimResults = true;
       rec.continuous = true;
       const STOPWORDS = /(^|\s)(stop|arr[êe]te|attends|attend|tais[- ]toi|chut|silence|pause|sirius)(\s|$)/i;
       rec.onresult = (e) => {
+        if (signal.aborted || interruptRecRef.current !== rec) return;
         if (!speakingRef.current) return;
         let final = "";
         let interim = "";
@@ -1605,9 +1711,14 @@ function App() {
         stopInterruptListener();
         const cmd = final.trim().replace(/\b(sirius|syrius|cirius|sirus)\b/gi, " ").replace(/\s+/g, " ").trim();
         const isJustStop = isStop && words.length <= 2;
+        if (isJustStop) {
+          stopVoiceRef.current();
+          return;
+        }
         if (!isJustStop && cmd && cmd.split(/\s+/).length >= 2) {
           setText("Toi : « " + cmd + " »");
           setTimeout(async () => {
+            if (signal.aborted) return;
             try {
               if (processCommandRef.current) {
                 await processCommandRef.current(cmd);
@@ -1622,19 +1733,28 @@ function App() {
         } else {
           setStatus("listening");
           setText("Oui ? Je t'écoute...");
-          setTimeout(() => { if (!micOnRef.current && !speakingRef.current && startListenRef.current) startListenRef.current(); }, 250);
+          setTimeout(() => { if (!signal.aborted && !micOnRef.current && !speakingRef.current && startListenRef.current) startListenRef.current(); }, 250);
         }
       };
       rec.onerror = () => { stopInterruptListener(); };
       rec.onend = () => {
+        if (interruptRecRef.current !== rec) return;
+        setInterruptMicOn(false);
         // Relance tant que Sirius parle encore (Chrome coupe la reco régulièrement)
-        if (speakingRef.current && interruptRecRef.current === rec) {
-          try { rec.start(); } catch (e) { interruptRecRef.current = null; }
+        if (!signal.aborted && speakingRef.current) {
+          try { rec.start(); } catch (e) {
+            interruptRecRef.current = null;
+            console.warn("Relance du micro d'interruption impossible :", e);
+          }
         }
       };
       interruptRecRef.current = rec;
       rec.start();
-    } catch (e) {}
+    } catch (e) {
+      interruptRecRef.current = null;
+      setInterruptMicOn(false);
+      console.warn("Micro d'interruption indisponible :", e);
+    }
   }, [stopInterruptListener, cloudAnswer]);
   startInterruptListenerRef.current = startInterruptListener;
 
@@ -3662,7 +3782,9 @@ function App() {
 // Compréhension naturelle : commandes simples en local, Groq réservé aux intents ambigus.
   const resolveIntent = useCallback(async (command) => {
     if (!command || isBusy.current) return;
-
+    const sessionSignal = renderVoiceSignal;
+    if (sessionSignal.aborted) return;
+    setVoicePhase("thinking");
     setStatus("thinking");
     isBusy.current = true;
     const normalized = command.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -3685,11 +3807,12 @@ function App() {
       }
 
       if (!maybeUiCommand) {
-        await cloudAnswer(command);
+        await cloudAnswer(command, { signal: sessionSignal });
         return;
       }
 
       const ctrl = new AbortController();
+      const unlink = linkAbortSignal(sessionSignal, ctrl);
       let intentResponse = null;
       const to = setTimeout(() => ctrl.abort(), 12000);
       try {
@@ -3701,33 +3824,45 @@ function App() {
         });
       } finally {
         clearTimeout(to);
+        unlink();
       }
 
       const d = await intentResponse.json().catch(() => null);
+      if (sessionSignal.aborted) return;
 
       if (intentResponse.ok && d && d.action && d.action !== "none" && executeIntent(d)) {
         setMetrics((m) => ({ ...m, nlu: { intent: `groq · ${d.action}`, count: m.nlu.count } }));
         return;
       }
 
-      await cloudAnswer(command);
+      await cloudAnswer(command, { signal: sessionSignal });
 
     } catch (e) {
+      if (sessionSignal.aborted) return;
       if (isAbortError(e)) {
-        await cloudAnswer(command);
+        await cloudAnswer(command, { signal: sessionSignal });
         return;
       }
       console.error("[ΣIRIUS NLU] Erreur intent :", e);
-      await cloudAnswer(command);
+      await cloudAnswer(command, { signal: sessionSignal });
     } finally {
       // ⚡ SECURITE ABSOLUE : Débloque le réacteur et ferme le flou visuel dans 100% des cas
-      isBusy.current = false;
-      setStatus("idle");
+      if (sessionSignal === voiceSessionRef.current.signal && !sessionSignal.aborted) {
+        isBusy.current = false;
+        if (!speakingRef.current) { setStatus("idle"); setVoicePhase("idle"); }
+      }
     }
-  }, [executeIntent, cloudAnswer]);
+  }, [executeIntent, cloudAnswer, renderVoiceSignal]);
 
   const processCommand = useCallback((command) => {
     if (!command) return;
+    if (voiceSessionRef.current.stopped) {
+      voiceSessionRef.current.resume();
+      setResumedCommand(command);
+      return;
+    }
+    if (renderVoiceSignal.aborted) return;
+    setVoiceMessage("");
     let enrichedCommand = command;
     const low = command.toLowerCase();
 
@@ -3995,11 +4130,19 @@ function App() {
     pendingEmailSetup, pendingEmailAction, pendingEmailCompose, handlePendingEmailCompose, applyEmailSetupAnswer, fetchEmailBriefing,
     confirmPendingEmailAction, resolveEmailOrdinal, runEmailAction, setEmailSenderRule,
     pendingActionPlan, confirmPendingActionPlan, startGuidedEmailCompose,
+    renderVoiceSignal,
   ]);
+
+  useEffect(() => {
+    if (!resumedCommand) return;
+    setResumedCommand(null);
+    processCommand(resumedCommand);
+  }, [resumedCommand, processCommand]);
 
 // ⚡ PIPELINE DE COMMANDE SÉCURISÉ (Inclus : Archives, Proactivité & Sécurité)
   const handleCommand = async (command, intent = null) => {
     if (!command || (typeof command === "string" && !command.trim())) return;
+    if (renderVoiceSignal.aborted) return;
 
     // 00) Normalisation UNE SEULE FOIS pour tout le pipeline
     const low = (typeof command === "string" ? command : command?.text || "").toLowerCase().trim();
@@ -4929,6 +5072,7 @@ function App() {
     });
     if (!command) {
       setStatus(micOnRef.current ? "listening" : "idle");
+      setVoicePhase(micOnRef.current ? "listening" : "idle");
       setText("En mains libres, dites « Sirius » suivi de votre demande.");
       return false;
     }
@@ -4946,9 +5090,15 @@ function App() {
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
       setText("L'enregistrement vocal n'est pas disponible sur cet appareil.");
       setStatus("idle");
+      setVoicePhase("idle");
+      setVoiceMessage("Enregistrement vocal indisponible sur cet appareil.");
       return;
     }
     microphoneStartPendingRef.current = true;
+    voiceSessionRef.current.resume();
+    setVoiceMessage("");
+    setVoicePhase("requesting");
+    const voiceSignal = voiceSessionRef.current.signal;
     const session = ++microphoneSessionRef.current;
     const pushToTalk = pttRef.current;
     const retryHandsFree = () => {
@@ -4964,7 +5114,10 @@ function App() {
       const stream = await requestMicrophoneStream(navigator.mediaDevices, () =>
         session === microphoneSessionRef.current && !speakingRef.current
         && (!pushToTalk || pttRef.current));
-      if (!stream) return;
+      if (!stream) {
+        if (!voiceSignal.aborted) { setVoicePhase("idle"); setStatus("idle"); }
+        return;
+      }
       serverRecorderStreamRef.current = stream;
       const preferredType = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"]
         .find((type) => MediaRecorder.isTypeSupported(type));
@@ -4977,6 +5130,10 @@ function App() {
         if (event.data?.size) chunks.push(event.data);
       };
       recorder.onstop = async () => {
+        if (serverRecorderRef.current !== recorder) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
         serverSilenceCleanupRef.current?.();
         serverSilenceCleanupRef.current = null;
         clearTimeout(serverRecorderTimerRef.current);
@@ -4984,54 +5141,78 @@ function App() {
         serverRecorderRef.current = null;
         serverRecorderStreamRef.current = null;
         stream.getTracks().forEach((track) => track.stop());
+        setCaptureMicOn(false);
         micOnRef.current = false;
         window.__siriusMicOn = false;
         setMicOn(false);
-        if (discardServerRecordingRef.current) {
-          setStatus((current) => (current === "listening" ? "idle" : current));
+        if (discardServerRecordingRef.current || voiceSignal.aborted) {
+          if (!voiceSignal.aborted) {
+            setStatus((current) => (current === "listening" ? "idle" : current));
+            setVoicePhase("idle");
+          }
           return;
         }
         const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
         if (blob.size < 800) {
           setText("Je n'ai pas reçu assez de son. Rapprochez-vous du microphone et réessayez.");
           setStatus("idle");
+          setVoicePhase("idle");
+          setVoiceMessage("Pas assez de son. Réessayez près du microphone.");
           retryHandsFree();
           return;
         }
         setStatus("thinking");
+        setVoicePhase("transcribing");
         setText("Transcription vocale ΣIRIUS en cours...");
+        const controller = new AbortController();
+        const unlink = linkAbortSignal(voiceSignal, controller);
+        const timeout = setTimeout(() => controller.abort(), 30000);
         try {
           const form = new FormData();
           const extension = blob.type.includes("mp4") ? "m4a" : "webm";
           form.append("file", blob, `sirius-voice.${extension}`);
-          const response = await fetch(`${API}/stt`, { method: "POST", body: form, credentials: "include" });
-          const payload = await response.json().catch(() => ({}));
+          const response = await fetch(`${API}/stt`, { method: "POST", body: form, credentials: "include", signal: controller.signal });
+          const payload = await response.json();
+          if (voiceSignal.aborted) return;
           if (!response.ok) throw new Error(payload.detail || "Transcription vocale impossible.");
           const transcript = (payload.text || payload.transcript || "").trim();
           if (!transcript) {
             setText("Je n'ai pas distingué de parole. Réessayez plus près du microphone.");
             setStatus("idle");
+            setVoicePhase("idle");
+            setVoiceMessage("Aucune parole distinguée. Réessayez près du microphone.");
             retryHandsFree();
             return;
           }
           if (!handleTranscriptRef.current(transcript, true, pushToTalk)) retryHandsFree();
         } catch (error) {
+          if (voiceSignal.aborted) return;
           console.error("Erreur transcription ΣIRIUS :", error);
           setText(error.message || "La transcription vocale ΣIRIUS est indisponible.");
           setStatus("idle");
+          setVoicePhase("idle");
+          setVoiceMessage(error.message || "Transcription indisponible — réessayez.");
+          autoMicRef.current = false;
           setAutoMic(false);
+        } finally {
+          unlink();
+          clearTimeout(timeout);
         }
       };
       recorder.onerror = () => {
+        if (voiceSignal.aborted || serverRecorderRef.current !== recorder) return;
         serverSilenceCleanupRef.current?.();
         serverSilenceCleanupRef.current = null;
         discardServerRecordingRef.current = true;
         setText("L'enregistrement du microphone a été interrompu.");
         setStatus("idle");
+        setVoicePhase("idle");
+        setVoiceMessage("Enregistrement du microphone interrompu.");
         setAutoMic(false);
         clearTimeout(serverRecorderTimerRef.current);
         serverRecorderTimerRef.current = null;
         micOnRef.current = false;
+        setCaptureMicOn(false);
         window.__siriusMicOn = false;
         setMicOn(false);
         serverRecorderRef.current = null;
@@ -5053,18 +5234,22 @@ function App() {
       micOnRef.current = true;
       window.__siriusMicOn = true;
       setMicOn(true);
+      setCaptureMicOn(true);
       setStatus("listening");
+      setVoicePhase("listening");
       setText("Je t'écoute. Cet extrait audio sera envoyé au serveur ΣIRIUS pour transcription.");
       serverRecorderTimerRef.current = setTimeout(() => {
-        if (serverRecorderRef.current?.state === "recording") serverRecorderRef.current.stop();
+        if (serverRecorderRef.current === recorder && recorder.state === "recording") recorder.stop();
       }, 15000);
     } catch (error) {
+      if (voiceSignal.aborted) return;
       console.error("Impossible d'ouvrir le microphone :", error);
       clearTimeout(serverRecorderTimerRef.current);
       serverRecorderTimerRef.current = null;
       micOnRef.current = false;
       window.__siriusMicOn = false;
       setMicOn(false);
+      setCaptureMicOn(false);
       serverRecorderRef.current = null;
       if (serverRecorderStreamRef.current) {
         serverRecorderStreamRef.current.getTracks().forEach((track) => track.stop());
@@ -5074,6 +5259,8 @@ function App() {
         ? "Accès au micro refusé. Autorisez le microphone dans les paramètres de ΣIRIUS."
         : "Impossible d'ouvrir le microphone sur cet appareil.");
       setStatus("idle");
+      setVoicePhase("idle");
+      setVoiceMessage(error?.name === "NotAllowedError" ? "Microphone non autorisé." : "Microphone indisponible.");
       microphoneRequestCooldownRef.current = Date.now() + 5000;
       if (autoMicRef.current) {
         setAutoMic(false);
@@ -5095,24 +5282,68 @@ function App() {
     const serverRecorder = serverRecorderRef.current;
     if (serverRecorder) {
       discardServerRecordingRef.current = true;
+      serverRecorderRef.current = null;
       if (serverRecorder.state !== "inactive") serverRecorder.stop();
     }
+    serverSilenceCleanupRef.current?.();
+    serverSilenceCleanupRef.current = null;
     clearTimeout(serverRecorderTimerRef.current);
     serverRecorderTimerRef.current = null;
-    if (!serverRecorder && serverRecorderStreamRef.current) {
+    if (serverRecorderStreamRef.current) {
       serverRecorderStreamRef.current.getTracks().forEach((track) => track.stop());
       serverRecorderStreamRef.current = null;
     }
     micOnRef.current = false;
     window.__siriusMicOn = false;
     setMicOn(false);
+    setCaptureMicOn(false);
     if (rec) {
       rec.onend = null;
       rec.onerror = null;
-      try { rec.stop(); } catch (e) {}
+      rec.onresult = null;
+      rec.onstart = null;
+      try { rec.abort(); } catch (e) { console.warn("Arrêt de la reconnaissance vocale :", e); }
     }
     setStatus((current) => (current === "listening" ? "idle" : current));
   }, []);
+
+  const stopVoice = useCallback(() => {
+    voiceSessionRef.current.stop();
+    autoMicRef.current = false;
+    setAutoMic(false);
+    clearTimeout(autoListenTimerRef.current);
+    clearTimeout(window._siriusTTSTimer);
+    pttRef.current = false;
+    setPttActive(false);
+    setResumedCommand(null);
+    stopListening();
+    stopInterruptListenerRef.current();
+    cancelSpeech();
+    voiceSeriesPendingRef.current = false;
+    speakingRef.current = false;
+    isBusy.current = false;
+    setVoicePhase("idle");
+    setStatus("idle");
+    setVoiceMessage("Écoute et réponse interrompues. Une action déjà envoyée peut avoir été exécutée ; vérifiez son résultat.");
+  }, [stopListening]);
+  stopVoiceRef.current = stopVoice;
+  useEffect(() => {
+    if (voiceSessionRef.current.stopped) {
+      voiceSessionRef.current.resume();
+      refreshVoiceSession((revision) => revision + 1);
+    }
+    return () => {
+      voiceSessionRef.current.stop();
+      autoMicRef.current = false;
+      clearTimeout(autoListenTimerRef.current);
+      clearTimeout(window._siriusTTSTimer);
+      pttRef.current = false;
+      voiceSeriesPendingRef.current = false;
+      stopListening();
+      stopInterruptListenerRef.current();
+      cancelSpeech();
+    };
+  }, [stopListening]);
 
   const shutdownSirius = useCallback(async () => {
     if (isShuttingDown || !isLocalDevServer) return;
@@ -5155,6 +5386,8 @@ function App() {
   // Démarre l'écoute via la reconnaissance vocale du navigateur (instantanée, gratuite)
   const startListening = useCallback(() => {
     if (micOnRef.current || speakingRef.current) return;
+    voiceSessionRef.current.resume();
+    setVoiceMessage("");
     if (preferServerSttRef.current) {
       startServerListening();
       return;
@@ -5167,6 +5400,13 @@ function App() {
     }
     try {
       const rec = new SR();
+      const sessionSignal = voiceSessionRef.current.signal;
+      rec.onstart = () => {
+        if (!sessionSignal.aborted && recognitionRef.current === rec) {
+          setCaptureMicOn(true);
+          setVoicePhase("listening");
+        }
+      };
       rec.lang = "fr-FR";
       rec.interimResults = true;
       // Mode continu : sans lui, Chrome clôt la session à la première pause et ne capte
@@ -5182,6 +5422,7 @@ function App() {
         phraseSilenceTimerRef.current = null;
       };
       const flushPhrase = () => {
+        if (sessionSignal.aborted) return;
         clearSilenceTimer();
         const spoken = phrase.trim();
         phrase = "";
@@ -5195,6 +5436,7 @@ function App() {
         phraseSilenceTimerRef.current = setTimeout(flushPhrase, PHRASE_SILENCE_MS);
       };
       rec.onresult = (e) => {
+        if (sessionSignal.aborted) return;
         let interim = "";
         let final = "";
         for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -5220,6 +5462,10 @@ function App() {
         }
       };
       rec.onerror = (e) => {
+        if (sessionSignal.aborted) return;
+        setCaptureMicOn(false);
+        setVoicePhase("idle");
+        setVoiceMessage(e.error === "not-allowed" ? "Microphone non autorisé." : e.error === "no-speech" ? "Aucune parole détectée." : "Reconnaissance vocale indisponible.");
         clearSilenceTimer();
         hadError = e.error !== "no-speech";
         micOnRef.current = false;
@@ -5244,7 +5490,9 @@ function App() {
         }
       };
       rec.onend = () => {
+        if (sessionSignal.aborted) return;
         if (recognitionRef.current && recognitionRef.current !== rec) return;
+        setCaptureMicOn(false);
         if (recognitionRef.current === rec) recognitionRef.current = null;
         clearSilenceTimer();
         // Arrêt manuel du micro : la phrase déjà captée ne doit pas être perdue.
@@ -5258,10 +5506,11 @@ function App() {
         window.__siriusMicOn = false;
         setMicOn(false);
         if (useServerFallback && !speakingRef.current) {
-          setTimeout(() => startServerListening(), 150);
+          setTimeout(() => { if (!sessionSignal.aborted) startServerListening(); }, 150);
           return;
         }
         if (!gotFinal && !speakingRef.current) {
+          setVoicePhase("idle");
           setStatus((s) => (s === "listening" ? "idle" : s));
           // Mode conversation : si rien n'a été dit, on relance l'écoute
           if (autoMicRef.current && !hadError) {
@@ -5282,6 +5531,7 @@ function App() {
       window.__siriusMicOn = true;
       setMicOn(true);
       setStatus("listening");
+      setVoicePhase("requesting");
       setText("Je t'écoute...");
     } catch (e) {
       recognitionRef.current = null;
@@ -5290,6 +5540,8 @@ function App() {
       setMicOn(false);
       setText("Impossible de démarrer le micro sur cet appareil.");
       setStatus("idle");
+      setVoicePhase("idle");
+      setVoiceMessage("Impossible de démarrer le microphone.");
     }
   }, [startServerListening]);
 
@@ -5324,6 +5576,7 @@ function App() {
     try {
       if (serverRecorderRef.current?.state === "recording") serverRecorderRef.current.stop();
       else if (recognitionRef.current) recognitionRef.current.stop();
+      else { setVoicePhase("idle"); setStatus("idle"); }
     } catch (e) {}
   }, []);
 
@@ -5331,7 +5584,8 @@ function App() {
     if (booting || showSetup) return;
     const isTyping = (e) => {
       const el = e.target;
-      return el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
+      return el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable
+        || el.closest?.('[data-testid="sirius-voice-controls"]'));
     };
     const down = (e) => {
       if (e.code !== "Space" || e.repeat || isTyping(e)) return;
@@ -6044,7 +6298,7 @@ function App() {
   const moduleItems = useMemo(() => createModuleRegistry({
     icons: { RotateCcw, Monitor, Clapperboard, FolderOpen, BadgeInfo, Link2, Camera, Workflow, Ruler, Boxes,
       PantheonLogo, Zap, Orbit, Eye, Landmark, Library, ShieldCheck, Sparkles, Code2, BarChart3, Brain, Database,
-      Radar, History, KeyRound, Calendar, Fingerprint, AlarmClock, HomeIcon, Globe2, Hammer, MythosLogo, Radio,
+      Radar, History, KeyRound, Calendar, Fingerprint, AlarmClock, HomeIcon, Globe2, Hammer, MythosLogo, Radio, MapPin,
       ThemisLogo, TrendingUp, Scale, Flame, BookOpen, Sigma, Newspaper, Package, Wrench, FileCode, Music, Building2, Activity },
     state: { displayOpen, displayType: display.type, showVision, showProductivity, showMediaHud, spotify },
     user: authUser,
@@ -6359,7 +6613,7 @@ function App() {
       {/* Barre supérieure */}
       <header className="top-bar">
         <div className="brand-tag" data-testid="sirius-brand-tag">
-          <span className="dot" />
+          <MicrophoneIndicator active={captureMicOn || interruptMicOn} />
           Σ I R I U S
         </div>
         <div className="sys-indicators" data-testid="sirius-indicators">
@@ -6666,6 +6920,7 @@ function App() {
           <PushToTalkButton active={pttActive} onStart={pttDown} onStop={pttUp} />
           <button type="submit" className="cmd-send" data-testid="sirius-cmd-send" aria-label="Envoyer la commande" title="Envoyer la commande">→</button>
         </form>
+        <VoiceSessionControls phase={voicePhase} message={voiceMessage} onStop={stopVoice} />
 
         {/* Indicateur talkie-walkie : transmission en cours */}
         {pttActive && (

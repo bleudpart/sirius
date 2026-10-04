@@ -226,6 +226,7 @@ async function speakRemote(message, { voice, rate, pitch, volume = 1, onstart, o
 
 // ---- Synthèse du navigateur (fallback gratuit) ----
 function speakBrowser(message, { rate = 1.0, pitch = 1.08, volume = 1, gender = "female", onstart, onend } = {}) {
+  const seq = speakSeq;
   if (Capacitor.getPlatform() === "android") {
     stopChannels();
     void speakNative(phonetic(message), { rate, pitch, volume, onstart, onend });
@@ -235,6 +236,7 @@ function speakBrowser(message, { rate = 1.0, pitch = 1.08, volume = 1, gender = 
   const end = onend || (() => {});
   if (!synth || !message) { end(); return; }
   const doSpeak = () => {
+    if (seq !== speakSeq) return;
     try {
       stopChannels();
       synth.resume();
@@ -253,11 +255,12 @@ function speakBrowser(message, { rate = 1.0, pitch = 1.08, volume = 1, gender = 
       let keepAlive = null;
       const clearKA = () => { if (keepAlive) { clearInterval(keepAlive); keepAlive = null; } };
       u.onstart = () => {
+        if (seq !== speakSeq) return;
         keepAlive = setInterval(() => { try { synth.resume(); } catch (e) {} }, 10000);
         if (onstart) onstart();
       };
-      u.onend = () => { clearKA(); end(); };
-      u.onerror = () => { clearKA(); end(); };
+      u.onend = () => { clearKA(); if (seq === speakSeq) end(); };
+      u.onerror = () => { clearKA(); if (seq === speakSeq) end(); };
       synth.speak(u);
     } catch (e) { end(); }
   };
@@ -266,6 +269,23 @@ function speakBrowser(message, { rate = 1.0, pitch = 1.08, volume = 1, gender = 
 
 // Voix feutrée nocturne : entre 22 h et 5 h, ΣIRIUS parle plus lentement, plus grave et plus doucement
 const isNight = () => { const h = new Date().getHours(); return h >= 22 || h < 5; };
+
+function speechCallbacks(seq, onstart, onend) {
+  const publish = (phase) => window.dispatchEvent(new CustomEvent("sirius-voice-phase", { detail: phase }));
+  publish("preparing");
+  return {
+    onstart: () => {
+      if (seq !== speakSeq) return;
+      publish("speaking");
+      if (onstart) onstart();
+    },
+    onend: () => {
+      if (seq !== speakSeq) return;
+      publish("idle");
+      if (onend) onend();
+    },
+  };
+}
 
 export function speakFr(message, { onpending, onstart, onend } = {}) {
   if (!message) { (onend || (() => {}))(); return; }
@@ -279,6 +299,7 @@ export function speakFr(message, { onpending, onstart, onend } = {}) {
   const volume = night ? 0.72 : 1;
   const seq = ++speakSeq;
   stopChannels();
+  ({ onstart, onend } = speechCallbacks(seq, onstart, onend));
   if (onpending) onpending();
   const fem = FEMALE.test(cfg.name);
   const bPitch = (fem ? 1.12 : (urgent ? 0.92 : 0.85)) * (night ? 0.95 : 1);
@@ -361,6 +382,7 @@ export function speakCinematic(message, { onstart, onend } = {}) {
   const cfg = loadVoiceConfig();
   const seq = ++speakSeq;
   stopChannels();
+  ({ onstart, onend } = speechCallbacks(seq, onstart, onend));
   if (Capacitor.getPlatform() === "android") {
     speakRemote(message, {
       voice: "fr-FR-Neural2-G",
@@ -418,6 +440,7 @@ export function speakAsCharacter(message, { profile, module, pitch = 1, rate = 1
   const p = prof && MYTHOS_VOICES[prof];
   const seq = ++speakSeq;
   stopChannels();
+  ({ onstart, onend } = speechCallbacks(seq, onstart, onend));
   if (Capacitor.getPlatform() === "android") {
     speakRemote(safeText, { rate: 1.05, pitch: 0, onstart, onend }, seq).then((ok) => {
       if (!ok && seq === speakSeq) {

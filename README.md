@@ -104,6 +104,25 @@ Le journal local n'est plus tronqué aux 500 dernières entrées. En cas de stoc
 inaccessible ou invalide, les modifications sont bloquées pour éviter de l'écraser.
 Toute suppression d'entrée demande confirmation.
 
+### Contrôle de la demande vocale
+
+Sous la barre de commande, un indicateur distingue l'autorisation du microphone,
+l'écoute, la transcription serveur (Android), le traitement, la préparation de
+la voix et la lecture de la réponse. Les erreurs vocales et le recours à la voix
+de secours sont affichés à cet endroit.
+Une petite pastille ronde à côté du nom ΣIRIUS, en haut à gauche, indique le microphone réellement ouvert (vert) ou fermé
+(rouge), y compris l'écoute des commandes d'interruption pendant une réponse.
+
+**Arrêter** abandonne l'écoute sans envoyer la phrase, interrompt la transcription
+et la réponse conversationnelle en cours, et coupe la lecture vocale. Le mode
+mains libres est désactivé : le microphone ne redémarre qu'après un geste explicite.
+Les réponses conversationnelles arrivant après l'arrêt sont ignorées, même si une
+nouvelle demande est lancée. Le texte déjà affiché reste consultable.
+L'arrêt n'annule pas une action métier déjà envoyée (email, domotique, etc.) :
+vérifier le résultat dans le module concerné.
+Ces changements locaux nécessitent une nouvelle compilation Android et ne modifient
+pas le bundle déjà publié en test interne.
+
 ---
 
 ## Sécurité qualité avec SonarQube

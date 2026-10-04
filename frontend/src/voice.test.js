@@ -43,8 +43,13 @@ test("Android narration requests Gemini and falls back explicitly when unconfigu
     speakCinematic("Bonjour", { onstart, onend });
     await fallback;
     expect(speakNative).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
-      onstart, onend, rate: 1.05, pitch: 1,
+      onstart: expect.any(Function), onend: expect.any(Function), rate: 1.05, pitch: 1,
     }));
+    const callbacks = speakNative.mock.calls[0][1];
+    callbacks.onstart();
+    callbacks.onend();
+    expect(onstart).toHaveBeenCalledTimes(1);
+    expect(onend).toHaveBeenCalledTimes(1);
     expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/tts/gemini"), expect.objectContaining({
       body: JSON.stringify({ text: "Bonjour" }), credentials: "include",
     }));
@@ -146,5 +151,55 @@ test("the web keeps its browser synthesis instead of calling the native plugin",
   } finally {
     window.speechSynthesis = previous;
     window.SpeechSynthesisUtterance = previousUtterance;
+  }
+});
+
+test("canceling before browser voices load prevents delayed speech and stale callbacks", () => {
+  jest.useFakeTimers();
+  Capacitor.getPlatform.mockReturnValue("web");
+  const previous = window.speechSynthesis;
+  const previousUtterance = window.SpeechSynthesisUtterance;
+  const synth = { cancel: jest.fn(), resume: jest.fn(), getVoices: () => [], speak: jest.fn() };
+  window.speechSynthesis = synth;
+  window.SpeechSynthesisUtterance = function (text) { this.text = text; };
+  const start = jest.fn();
+  const end = jest.fn();
+  try {
+    speakFr("Ancienne réponse", { onstart: start, onend: end });
+    cancelSpeech();
+    jest.advanceTimersByTime(200);
+    expect(synth.speak).not.toHaveBeenCalled();
+    synth.getVoices = () => [{ lang: "fr-FR", name: "Amelie" }];
+    speakFr("Nouvelle réponse", { onstart: start, onend: end });
+    const utterance = synth.speak.mock.calls[0][0];
+    cancelSpeech();
+    utterance.onstart();
+    utterance.onend();
+    expect(start).not.toHaveBeenCalled();
+    expect(end).not.toHaveBeenCalled();
+  } finally {
+    window.speechSynthesis = previous;
+    window.SpeechSynthesisUtterance = previousUtterance;
+    jest.useRealTimers();
+  }
+});
+
+test("voice phases reflect playback events, not just the response being requested", async () => {
+  const audio = { play: jest.fn().mockResolvedValue(), pause: jest.fn() };
+  global.Audio = jest.fn(() => audio);
+  global.fetch.mockResolvedValue({ ok: true, json: async () => ({ audio_base64: "wav" }) });
+  const phases = [];
+  const listener = (event) => phases.push(event.detail);
+  window.addEventListener("sirius-voice-phase", listener);
+  try {
+    speakFr("Bonjour");
+    await flush();
+    expect(phases).toEqual(["preparing"]);
+    audio.onplay();
+    expect(phases).toEqual(["preparing", "speaking"]);
+    audio.onended();
+    expect(phases).toEqual(["preparing", "speaking", "idle"]);
+  } finally {
+    window.removeEventListener("sirius-voice-phase", listener);
   }
 });
