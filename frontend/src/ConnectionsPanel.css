@@ -64,6 +64,16 @@
 }
 
 .connections-list { display: grid; gap: 12px; }
+.mail-cache { margin-top: 24px; padding: 18px; border: 1px solid rgba(216, 184, 117, .4); border-radius: 8px; }
+.mail-cache h2, .mail-cache h3 { color: #d8b875; font-family: "Cinzel", serif; }
+.mail-cache p { font-size: 14px; line-height: 1.5; }
+.mail-cache label { display: grid; gap: 6px; }
+.mail-cache input { min-width: 0; width: 100%; padding: 10px; background: #061321; color: #d5f6ff; border: 1px solid #91e6f2; }
+.mail-cache-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.mail-cache button { min-height: 44px; padding: 8px 12px; color: #d5f6ff; background: #10283d; border: 1px solid #d8b875; border-radius: 6px; cursor: pointer; }
+.mail-cache button:disabled { opacity: .6; cursor: default; }
+.mail-cache ul { padding: 0; list-style: none; }
+.mail-cache li { display: grid; gap: 6px; margin: 12px 0; padding: 12px; border: 1px solid rgba(145, 230, 242, .25); overflow-wrap: anywhere; }
 
 .connection-item {
   display: grid;

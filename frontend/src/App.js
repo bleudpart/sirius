@@ -34,6 +34,7 @@ import CommandPalette from "@/CommandPalette";
 import ModulesMenu from "@/ModulesMenu";
 import MobileNavigation from "@/MobileNavigation";
 import { useAuth } from "@/AuthGate";
+import useMailCache from "@/hooks/useMailCache";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { requestMicrophoneStream, scheduleHandsFreeRetry, stopRecorderAfterSilence, useServerTranscription } from "@/microphoneCapture";
@@ -935,6 +936,7 @@ function App() {
   const [showNummarius, setShowNummarius] = useState(false);
   const auth = useAuth() || {};
   const authUser = auth.user;
+  const mailCache = useMailCache(authUser);
   // Plein écran global du HUD (API Fullscreen du navigateur)
   const [isFullscreen, setIsFullscreen] = useState(false);
   useEffect(() => {
@@ -6486,7 +6488,7 @@ function App() {
       {showSportCoach && <SportCoachPanel key={authUser?.id || authUser?._id || authUser?.email || "local"} user={authUser} onClose={() => setShowSportCoach(false)} />}
       {showCalliope && <CalliopePanel onClose={() => setShowCalliope(false)} />}
       {showCalendar && <CalendarPanel onClose={() => setShowCalendar(false)} />}
-      {showConnections && <ConnectionsPanel onClose={() => {
+      {showConnections && <ConnectionsPanel mailCache={mailCache} onReadCachedMail={(message) => { setStatus("speaking"); setText(message); speakOut(message); }} onClose={() => {
         localStorage.setItem("sirius_connections_onboarding_done", "1");
         setShowConnections(false);
       }} />}

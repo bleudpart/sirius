@@ -3,6 +3,7 @@ import { Browser } from "@capacitor/browser";
 import { Check, Loader2, RefreshCw, Unplug, X } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api";
 import ProviderLogo from "@/components/ProviderLogo";
+import MailCachePanel from "@/components/MailCachePanel";
 import "./ConnectionsPanel.css";
 
 const PROVIDERS = {
@@ -37,7 +38,7 @@ async function openAuthorization(url) {
   window.open(url, "sirius-account-connection", "width=560,height=760");
 }
 
-export default function ConnectionsPanel({ onClose }) {
+export default function ConnectionsPanel({ onClose, mailCache, onReadCachedMail }) {
   const [status, setStatus] = useState(initialStatus);
   const [pending, setPending] = useState("");
   const [error, setError] = useState("");
@@ -76,6 +77,7 @@ export default function ConnectionsPanel({ onClose }) {
     setError("");
     setPending(key);
     try {
+      if (mailCache?.account && mailCache.clear(key) === false) throw new Error("Effacez le cache mail avant de changer de compte connecté.");
       const provider = PROVIDERS[key];
       const response = await fetch(`${API_BASE_URL}${provider.authorizePath}`, { credentials: "include" });
       const data = await response.json().catch(() => ({}));
@@ -89,17 +91,23 @@ export default function ConnectionsPanel({ onClose }) {
 
   const disconnect = async (key) => {
     setError("");
-    const provider = PROVIDERS[key];
-    const response = await fetch(`${API_BASE_URL}${provider.disconnectPath}`, {
-      method: "POST",
-      credentials: "include",
-    });
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      setError(data.detail || "Déconnexion impossible.");
-      return;
+    try {
+      if (mailCache?.account && mailCache.clear(key) === false) throw new Error("Effacement du cache impossible. Réessayez avant de déconnecter le compte.");
+      const provider = PROVIDERS[key];
+      const response = await fetch(`${API_BASE_URL}${provider.disconnectPath}`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        setError(data.detail || "Déconnexion impossible.");
+        return;
+      }
+      await refresh();
+    } catch (cause) {
+      console.error("Déconnexion du compte mail impossible :", cause);
+      setError(cause.message || "Déconnexion impossible.");
     }
-    await refresh();
   };
 
   return (
@@ -143,6 +151,7 @@ export default function ConnectionsPanel({ onClose }) {
           })}
         </div>
 
+        {mailCache && <MailCachePanel key={mailCache.account} cache={mailCache} onRead={onReadCachedMail} />}
         {pending && <p className="connections-wait">Revenez dans ΣIRIUS après avoir validé l’autorisation.</p>}
         {error && <p className="connections-error" role="alert">{error}</p>}
         <div className="connections-footer-actions">

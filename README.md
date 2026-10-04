@@ -28,6 +28,33 @@ est effectivement vérifié ; la page ne le déduit pas de sa configuration fron
 Validation ciblée depuis `frontend` :
 `npm test -- --watchAll=false --runInBand src/PublicStore.test.jsx`.
 
+## Cache mail facultatif
+
+Dans **Centre des connexions**, chaque compte SIRIUS peut activer séparément
+le cache Gmail ou Outlook de cet appareil. Il contient uniquement les identifiants,
+expéditeurs, objets, aperçus (140 caractères), dates et indicateurs de lecture :
+25 messages Gmail maximum (limite de l'API actuelle), 50 Outlook maximum.
+Aucun corps complet, pièce jointe, jeton OAuth ou envoi différé n'est conservé.
+Les snapshots remplacent les précédents ; il ne s'agit pas d'une archive exhaustive.
+
+Le stockage `localStorage` (`sirius_mail_cache_v1:*`) n'est pas chiffré par SIRIUS.
+Il reste sur le navigateur ou WebView de l'appareil, sans synchronisation entre PC
+et Android. Protégez l'accès à l'appareil. Le cache est séparé par compte SIRIUS
+et lié à l'adresse du compte fournisseur ; un changement de fournisseur connecté,
+un refus d'autorisation ou sa déconnexion efface et désactive le cache concerné.
+Les erreurs de stockage sont affichées, sans effacer silencieusement les données.
+
+Synchronisation explicite à l'activation, puis toutes les cinq minutes lorsque
+SIRIUS est ouvert, visible et en ligne. Aucun service d'arrière-plan Android n'est
+installé. Recherche et consultation des copies dans le Centre des connexions,
+avec horodatage de la dernière synchronisation et effacement/désactivation.
+La lecture vocale utilise le moteur déjà configuré, qui peut nécessiter le réseau ;
+ce cache ne rend pas la reconnaissance vocale ou l'IA locales. Les commandes mail
+existantes restent en ligne et les envois ne sont pas modifiés.
+
+Validation ciblée depuis `frontend` :
+`npm test -- --watchAll=false --runInBand src/services/mailCache.test.js src/components/MailCachePanel.test.jsx src/hooks/useMailCache.test.jsx`.
+
 ## Guide de premier démarrage
 
 Après la présentation et la configuration du profil, un guide propose trois
