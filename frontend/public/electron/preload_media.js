@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld("siriusMedia", {
 
 contextBridge.exposeInMainWorld("siriusUpdates", {
   check: () => ipcRenderer.invoke("sirius-update-check"),
+  status: () => ipcRenderer.invoke("sirius-update-status"),
 });
 
 contextBridge.exposeInMainWorld("siriusFiles", {

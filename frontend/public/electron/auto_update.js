@@ -17,19 +17,33 @@ function setupAutoUpdater({ app, dialog, ipcMain }) {
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true; // installée automatiquement à la fermeture
 
+  // État lisible par l'interface : idle | downloading | ready | error.
+  const state = { phase: "idle", version: null, percent: 0 };
+
   autoUpdater.on("error", (error) => {
     // Hors-ligne ou release absente : silencieux, on réessaiera au prochain cycle.
     console.warn("[UPDATE] vérification impossible :", error == null ? "?" : error.message);
+    if (state.phase === "downloading") state.phase = "error";
   });
 
   autoUpdater.on("update-available", (info) => {
     console.log(`[UPDATE] nouvelle version détectée : ${info.version} (téléchargement en cours)`);
+    if (state.phase !== "ready") Object.assign(state, { phase: "downloading", version: info.version, percent: 0 });
+  });
+
+  autoUpdater.on("download-progress", (progress) => {
+    if (state.phase === "ready") return;
+    state.phase = "downloading";
+    state.percent = Math.max(0, Math.min(100, Math.round(progress?.percent || 0)));
   });
 
   autoUpdater.on("update-downloaded", (info) => {
     // Aucun clic demandé : l'installation se fera à la prochaine fermeture.
     console.log(`[UPDATE] version ${info.version} prête, installation automatique à la fermeture`);
+    Object.assign(state, { phase: "ready", version: info.version, percent: 100 });
   });
+
+  ipcMain.handle("sirius-update-status", () => ({ ...state }));
 
   const check = () => {
     autoUpdater.checkForUpdates().catch(() => {
@@ -38,9 +52,14 @@ function setupAutoUpdater({ app, dialog, ipcMain }) {
   };
 
   ipcMain.handle("sirius-update-check", async () => {
+    if (state.phase === "ready") return { ok: true, available: true, ...state };
     try {
       const result = await autoUpdater.checkForUpdates();
-      return { ok: true, available: Boolean(result?.updateInfo && result.updateInfo.version !== app.getVersion()) };
+      return {
+        ok: true,
+        available: Boolean(result?.updateInfo && result.updateInfo.version !== app.getVersion()),
+        ...state,
+      };
     } catch (error) {
       return { ok: false, message: error?.message || "Vérification impossible." };
     }

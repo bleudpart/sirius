@@ -1,5 +1,5 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { User, KeyRound, Sparkles, ExternalLink, X, Download, Upload, Music, Volume2, Brain, Monitor, RotateCcw, CheckCircle2, XCircle, Loader2, Zap, Layers, Rocket, HardDrive } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { speakFr, speakAsCharacter, CHAR_PROFILES, MYTHOS_VOICES, loadCharOverrides, DEFAULT_VOICE, loadVoiceConfig } from "@/voice";
@@ -160,17 +160,61 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
 
   const [saved, setSaved] = useState(false);
   const [updateStatus, setUpdateStatus] = useState("");
+  const [updateProgress, setUpdateProgress] = useState(null);
+  const updatePollRef = useRef(null);
+
+  const stopUpdatePoll = () => {
+    if (updatePollRef.current) clearInterval(updatePollRef.current);
+    updatePollRef.current = null;
+  };
+  useEffect(() => stopUpdatePoll, []);
+
+  // Retourne true quand il n'y a plus rien à suivre (prête, erreur ou état inconnu).
+  const showUpdateState = (s) => {
+    const v = s?.version ? ` ${s.version}` : "";
+    if (s?.phase === "ready") {
+      setUpdateProgress({ phase: "ready", percent: 100 });
+      setUpdateStatus(`Mise à jour${v} prête — fermez SIRIUS pour l'installer.`);
+      return true;
+    }
+    if (s?.phase === "error") {
+      setUpdateProgress(null);
+      setUpdateStatus("Téléchargement interrompu. Nouvel essai automatique plus tard.");
+      return true;
+    }
+    if (s?.phase === "downloading") {
+      const percent = Math.max(0, Math.min(100, s.percent || 0));
+      setUpdateProgress({ phase: "downloading", percent });
+      setUpdateStatus(`Nouvelle version${v} en téléchargement… ${percent} %`);
+      return false;
+    }
+    setUpdateProgress(null);
+    return true;
+  };
 
   const checkForUpdate = async () => {
+    stopUpdatePoll();
+    setUpdateProgress(null);
     if (!window.siriusUpdates?.check) {
       setUpdateStatus("Mise à jour disponible uniquement dans l'application Windows.");
       return;
     }
     setUpdateStatus("Vérification en cours...");
     const result = await window.siriusUpdates.check();
-    if (!result?.ok) setUpdateStatus("Vérification impossible pour le moment.");
-    else if (result.available) setUpdateStatus("Nouvelle version détectée. Téléchargement en cours...");
-    else setUpdateStatus("SIRIUS est à jour.");
+    if (!result?.ok) { setUpdateStatus("Vérification impossible pour le moment."); return; }
+    if (!result.available) { setUpdateStatus("SIRIUS est à jour."); return; }
+    if (!window.siriusUpdates.status) {
+      setUpdateStatus("Nouvelle version détectée. Téléchargement en cours...");
+      return;
+    }
+    if (showUpdateState(result.phase === "idle" ? { ...result, phase: "downloading" } : result)) return;
+    updatePollRef.current = setInterval(async () => {
+      try {
+        if (showUpdateState(await window.siriusUpdates.status())) stopUpdatePoll();
+      } catch (e) {
+        stopUpdatePoll();
+      }
+    }, 1500);
   };
 
   const exportProfile = () => {
@@ -533,6 +577,19 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
           </button>
           {updateStatus && <span className="setup-note" data-testid="setup-update-status">{updateStatus}</span>}
         </div>
+        {updateProgress && (
+          <div
+            className={`setup-update-progress${updateProgress.phase === "ready" ? " is-ready" : ""}`}
+            role="progressbar"
+            aria-label="Téléchargement de la mise à jour"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={updateProgress.percent}
+            data-testid="setup-update-progress"
+          >
+            <span style={{ width: `${updateProgress.percent}%` }} />
+          </div>
+        )}
 
         <button type="submit" className="setup-submit" data-testid="setup-submit">
           {isEdit ? "ENREGISTRER" : "DÉMARRER ΣIRIUS"}

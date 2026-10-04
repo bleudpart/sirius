@@ -60,6 +60,41 @@ test("settings opens the authenticated account and logout returns to login witho
   }
 });
 
+test("update check follows the download until the installer is ready", async () => {
+  jest.useFakeTimers();
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  const states = [
+    { phase: "downloading", version: "1.0.32", percent: 40 },
+    { phase: "ready", version: "1.0.32", percent: 100 },
+  ];
+  window.siriusUpdates = {
+    check: jest.fn().mockResolvedValue({ ok: true, available: true, phase: "downloading", version: "1.0.32", percent: 5 }),
+    status: jest.fn().mockImplementation(async () => states.shift()),
+  };
+  try {
+    act(() => root.render(<SiriusSetup initialProfile={{ name: "Local" }} onComplete={jest.fn()} onCancel={jest.fn()} />));
+    await act(async () => container.querySelector('[data-testid="setup-check-update"]').click());
+    const status = () => container.querySelector('[data-testid="setup-update-status"]').textContent;
+    expect(status()).toBe("Nouvelle version 1.0.32 en téléchargement… 5 %");
+    await act(async () => { jest.advanceTimersByTime(1500); });
+    expect(status()).toBe("Nouvelle version 1.0.32 en téléchargement… 40 %");
+    const bar = () => container.querySelector('[data-testid="setup-update-progress"]');
+    expect(bar().getAttribute("aria-valuenow")).toBe("40");
+    expect(bar().firstChild.style.width).toBe("40%");
+    await act(async () => { jest.advanceTimersByTime(1500); });
+    expect(status()).toBe("Mise à jour 1.0.32 prête — fermez SIRIUS pour l'installer.");
+    expect(bar().className).toContain("is-ready");
+    expect(bar().firstChild.style.width).toBe("100%");
+    await act(async () => { jest.advanceTimersByTime(3000); });
+    expect(window.siriusUpdates.status).toHaveBeenCalledTimes(2);
+  } finally {
+    act(() => root.unmount());
+    delete window.siriusUpdates;
+    jest.useRealTimers();
+  }
+});
+
 test("settings without account access preserves preferences and does not offer a dead account button", () => {
   const container = document.createElement("div");
   const root = createRoot(container);
