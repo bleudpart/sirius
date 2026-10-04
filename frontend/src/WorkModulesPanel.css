@@ -39,6 +39,15 @@
 .work-audit li { display: flex; gap: 18px; padding: 10px; border-bottom: 1px solid rgba(145, 230, 242, .15); }
 .work-audit time { flex: 0 0 155px; color: #d8b875; }
 .work-error { padding: 10px; color: #ffe0d8; border: 1px solid #c97b70; }
+.work-editable { min-width: 0; margin: 0; padding: 0; border: 0; }
+.work-backup, .work-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid rgba(216, 184, 117, .3); }
+.work-backup p, .work-confirm p { flex-basis: 100%; margin: 0; }
+.work-backup label { display: grid; gap: 6px; min-width: 0; color: #b7d8df; font-size: 14px; }
+.work-backup input { max-width: 100%; }
+.work-backup button, .work-confirm button { min-height: 44px; padding: 8px 14px; color: #f4dfac; background: rgba(216, 184, 117, .12); border: 1px solid rgba(216, 184, 117, .5); border-radius: 3px; cursor: pointer; }
+.work-backup button:focus-visible, .work-confirm button:focus-visible { outline: 2px solid #91e6f2; outline-offset: 2px; }
+.work-modules button:disabled { opacity: .5; cursor: not-allowed; }
+.work-notice { padding: 10px; color: #cde5d4; border: 1px solid #648e76; }
 @media (max-width: 700px) {
   .work-layout, .work-layout.with-portrait { grid-template-columns: 1fr; }
   .work-nav { flex-direction: row; overflow-x: auto; padding: 8px; border-right: 0; border-bottom: 1px solid rgba(145, 230, 242, .18); }

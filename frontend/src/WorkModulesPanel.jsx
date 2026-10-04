@@ -2,10 +2,10 @@ import { useState } from "react";
 import { CalendarDays, Check, FileText, FolderOpen, Plus, ScrollText, Tags, Trash2, Workflow, X } from "lucide-react";
 import { WORK_MODULES } from "@/workModules";
 import { resolveBackendUrl } from "@/lib/api";
+import { downloadWorkJson, emptyWorkData, loadWorkData, mergeWorkBackup, newWorkId, parseWorkBackup, serializeWorkBackup, WORK_BACKUP_MAX_BYTES } from "@/workModuleBackup";
 import "./WorkModulesPanel.css";
 
 const ICONS = { CalendarDays, FileText, FolderOpen, ScrollText, Tags, Workflow };
-const EMPTY = { workflows: [], pricing: [], dossiers: [], documents: [], planning: [], audit: [] };
 const FIELDS = {
   workflows: [{ key: "title", label: "Parcours", required: true }, { key: "dossier", label: "Dossier associé" }, { key: "steps", label: "Étapes (une par ligne)", multiline: true, required: true }],
   pricing: [{ key: "title", label: "Produit ou service", required: true }, { key: "supplier", label: "Fournisseur", required: true }, { key: "price", label: "Prix", type: "number", required: true }, { key: "unit", label: "Unité (kg, pièce, heure...)" }],
@@ -14,34 +14,36 @@ const FIELDS = {
   planning: [{ key: "title", label: "Tâche", required: true }, { key: "due", label: "Échéance", type: "date", required: true }, { key: "dossier", label: "Dossier associé" }],
 };
 
-// crypto.randomUUID n'existe qu'en contexte sécurisé (HTTPS ou localhost).
-const newId = () => (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-  ? crypto.randomUUID()
-  : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
-
-const readWorkData = (key) => {
-  try {
-    const value = JSON.parse(localStorage.getItem(key) || "{}");
-    return Object.fromEntries(Object.keys(EMPTY).map((name) => [name, Array.isArray(value[name]) ? value[name] : []]));
-  } catch (_) { return { ...EMPTY }; }
-};
-
 export default function WorkModulesPanel({ initialModule, user, onClose, onOpenExisting }) {
   const storageKey = `sirius_work_modules_v1_${user?.id || user?._id || user?.email || "local"}`;
-  const [data, setData] = useState(() => readWorkData(storageKey));
-  const [active, setActive] = useState(initialModule);
+  return <WorkModulesWorkspace key={storageKey} storageKey={storageKey} initialModule={initialModule} onClose={onClose} onOpenExisting={onOpenExisting} />;
+}
+
+function WorkModulesWorkspace({ storageKey, initialModule, onClose, onOpenExisting }) {
+  const [loaded] = useState(() => {
+    try { return { data: loadWorkData(storageKey), error: "" }; }
+    catch { return { data: emptyWorkData(), error: "Lecture du stockage local impossible ou données invalides. Vos données ne seront pas écrasées. Fermez ce module et vérifiez le stockage avant de continuer." }; }
+  });
+  const [data, setData] = useState(loaded.data);
+  const [active, setActive] = useState(() => WORK_MODULES.some((entry) => entry.id === initialModule) ? initialModule : WORK_MODULES[0].id);
   const [form, setForm] = useState({});
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [pendingBackup, setPendingBackup] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(null);
   const [portraitAvailable, setPortraitAvailable] = useState(true);
   const module = WORK_MODULES.find((entry) => entry.id === active) || WORK_MODULES[0];
   const Icon = ICONS[module.icon];
 
   const update = (next, activity) => {
-    const withAudit = { ...next, audit: [{ id: newId(), at: new Date().toISOString(), activity }, ...data.audit].slice(0, 500) };
+    if (loaded.error) { setError(loaded.error); return false; }
+    const withAudit = { ...next, audit: [{ id: newWorkId(), at: new Date().toISOString(), activity }, ...next.audit] };
     try {
       localStorage.setItem(storageKey, JSON.stringify(withAudit));
       setData(withAudit);
       setError("");
+      setNotice("");
       return true;
     } catch (_) {
       setError("Enregistrement local impossible : espace insuffisant ou stockage désactivé.");
@@ -53,7 +55,7 @@ export default function WorkModulesPanel({ initialModule, user, onClose, onOpenE
     event.preventDefault();
     const title = String(form.title || "").trim();
     if (!title || (active === "workflows" && !String(form.steps || "").trim())) return;
-    const item = { ...form, title, id: newId(), createdAt: new Date().toISOString() };
+    const item = { ...form, title, id: newWorkId(), createdAt: new Date().toISOString() };
     if (active === "workflows") {
       item.steps = String(form.steps).split("\n").map((text) => ({ text: text.trim(), done: false })).filter((step) => step.text);
     }
@@ -62,7 +64,37 @@ export default function WorkModulesPanel({ initialModule, user, onClose, onOpenE
     if (update({ ...data, [active]: [item, ...data[active]] }, `${module.label} : ajout de « ${title} »`)) setForm({});
   };
 
-  const remove = (item) => update({ ...data, [active]: data[active].filter((entry) => entry.id !== item.id) }, `${module.label} : suppression de « ${item.title} »`);
+  const remove = () => {
+    if (update({ ...data, [active]: data[active].filter((entry) => entry.id !== pendingDelete.id) }, `${module.label} : suppression de « ${pendingDelete.title} »`)) setPendingDelete(null);
+  };
+  const exportBackup = () => {
+    try {
+      downloadWorkJson(serializeWorkBackup(data), `sirius-metier-${new Date().toISOString().slice(0, 10)}.json`);
+      setError("");
+      setNotice("Sauvegarde préparée. Vérifiez que le fichier a bien été téléchargé et conservez-le dans un emplacement privé.");
+    } catch (cause) { setError(cause.message || "Impossible de préparer la sauvegarde."); }
+  };
+  const readBackup = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setPendingBackup(null);
+    setError("");
+    setNotice("");
+    if (file.size > WORK_BACKUP_MAX_BYTES) { setError("Sauvegarde trop volumineuse (5 Mo maximum)."); return; }
+    setImporting(true);
+    try { setPendingBackup(parseWorkBackup(await file.text())); }
+    catch (cause) { setError(cause.message || "Lecture de la sauvegarde impossible."); }
+    finally { setImporting(false); }
+  };
+  const restoreBackup = () => {
+    const merged = mergeWorkBackup(data, pendingBackup);
+    if (!merged.added) { setPendingBackup(null); setNotice("Cette sauvegarde est déjà présente. Aucune donnée modifiée."); return; }
+    if (update(merged.data, `Restauration de sauvegarde : ${merged.added} entrée(s) ajoutée(s), ${merged.conflicts} conflit(s) conservé(s) en copie.`)) {
+      setPendingBackup(null);
+      setNotice(`Restauration enregistrée sur cet appareil : ${merged.added} entrée(s) ajoutée(s). Les données existantes ont été conservées.`);
+    }
+  };
   const toggle = (item, stepIndex = null) => {
     const nextItem = stepIndex === null ? { ...item, done: !item.done } : {
       ...item, steps: (item.steps || []).map((step, index) => index === stepIndex ? { ...step, done: !step.done } : step),
@@ -84,19 +116,36 @@ export default function WorkModulesPanel({ initialModule, user, onClose, onOpenE
         <nav className="work-nav" aria-label="Modules de travail">
           {WORK_MODULES.map((entry) => {
             const EntryIcon = ICONS[entry.icon];
-            return <button type="button" key={entry.id} className={active === entry.id ? "selected" : ""} aria-current={active === entry.id ? "page" : undefined} onClick={() => { setActive(entry.id); setForm({}); setError(""); setPortraitAvailable(true); }}><EntryIcon size={18} /><span>{entry.label}<small>{entry.description}</small></span></button>;
+            return <button type="button" key={entry.id} className={active === entry.id ? "selected" : ""} aria-current={active === entry.id ? "page" : undefined} onClick={() => { setActive(entry.id); setForm({}); setPendingDelete(null); setError(""); setPortraitAvailable(true); }}><EntryIcon size={18} /><span>{entry.label}<small>{entry.description}</small></span></button>;
           })}
         </nav>
         {portraitAvailable && <aside className="work-portrait"><img src={resolveBackendUrl(module.image)} alt={module.label} onError={() => setPortraitAvailable(false)} /></aside>}
         <div className="work-content">
           {error && <p className="work-error" role="alert">{error}</p>}
+          {loaded.error && <p className="work-error" role="alert">{loaded.error}</p>}
+          {notice && <p className="work-notice" role="status">{notice}</p>}
+          <div className="work-backup">
+            <p className="work-hint">{loaded.error ? "Stockage local indisponible" : "Données conservées sur cet appareil uniquement, pour le compte actuel. Aucune synchronisation automatique."}</p>
+            <button type="button" disabled={!!loaded.error} onClick={exportBackup}>Sauvegarder les six modules</button>
+            <label>Restaurer une sauvegarde (5 Mo max.)<input type="file" accept=".json,application/json" disabled={!!loaded.error || importing} onChange={readBackup} /></label>
+            {importing && <p role="status">Lecture de la sauvegarde…</p>}
+            {pendingBackup && <div className="work-confirm" role="group" aria-label="Confirmer la restauration">
+              <p>Cette sauvegarde contient {Object.values(pendingBackup).reduce((sum, items) => sum + items.length, 0)} entrée(s), journal compris. La fusion ne supprime rien. En cas de conflit, la version importée sera ajoutée en copie. Ce fichier peut contenir des données confidentielles.</p>
+              <button type="button" onClick={restoreBackup}>Confirmer la fusion</button>
+              <button type="button" onClick={() => setPendingBackup(null)}>Annuler la restauration</button>
+            </div>}
+          </div>
+          {pendingDelete && <div className="work-confirm" role="group" aria-label="Confirmer la suppression">
+            <p>Supprimer « {pendingDelete.title} » ? Cette suppression ne pourra pas être annulée. Sauvegardez vos données si nécessaire.</p>
+            <button type="button" onClick={remove}>Confirmer la suppression</button>
+            <button type="button" onClick={() => setPendingDelete(null)}>Annuler la suppression</button>
+          </div>}
+          <fieldset className="work-editable" disabled={!!loaded.error}>
           {active === "audit" ? (
             <>
               <div className="work-section-head"><h2>Journal local</h2><button type="button" onClick={() => {
-                const blob = new Blob([JSON.stringify(data.audit, null, 2)], { type: "application/json" });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement("a"); link.href = url; link.download = "sirius-audit.json"; link.click();
-                setTimeout(() => URL.revokeObjectURL(url), 1000);
+                try { downloadWorkJson(JSON.stringify(data.audit, null, 2), "sirius-audit.json"); }
+                catch { setError("Export du journal impossible."); }
               }}>Exporter JSON</button></div>
               <p className="work-hint">Historique des modifications réalisées dans ces six modules sur cet appareil.</p>
               {data.audit.length === 0 && <p className="work-empty">Aucune modification enregistrée.</p>}
@@ -123,7 +172,7 @@ export default function WorkModulesPanel({ initialModule, user, onClose, onOpenE
               <div className="work-section-head"><h2>{module.description}</h2><span>{sortedItems.length} entrée(s)</span></div>
               {sortedItems.length === 0 && <p className="work-empty">Aucune entrée pour le moment.</p>}
               <div className="work-list">{sortedItems.map((item) => <article className="work-item" key={item.id}>
-                <div className="work-item-head"><strong>{item.title}</strong><button type="button" title="Supprimer" aria-label={`Supprimer ${item.title}`} onClick={() => remove(item)}><Trash2 size={15} /></button></div>
+                <div className="work-item-head"><strong>{item.title}</strong><button type="button" title="Supprimer" aria-label={`Supprimer ${item.title}`} onClick={() => setPendingDelete(item)}><Trash2 size={15} /></button></div>
                 {active === "pricing" && <p>{item.supplier} · {Number(item.price).toLocaleString("fr-FR", { style: "currency", currency: "EUR" })}{item.unit && ` / ${item.unit}`}</p>}
                 {active === "dossiers" && <p>{item.contact}{item.contact && item.details && " · "}{item.details}</p>}
                 {active === "documents" && <><p>{item.dossier && `Dossier : ${item.dossier}`}</p><pre className="work-document">{item.content}</pre></>}
@@ -132,6 +181,7 @@ export default function WorkModulesPanel({ initialModule, user, onClose, onOpenE
               </article>)}</div>
             </>
           )}
+          </fieldset>
         </div>
       </div>
     </section>

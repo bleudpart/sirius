@@ -81,6 +81,29 @@ Guide détaillé : [INSTALL-SIRIUS.md](./INSTALL-SIRIUS.md)
 
 Pour le déploiement en petite entreprise : [GUIDE-ENTREPRISE.md](./GUIDE-ENTREPRISE.md)
 
+### Sauvegarde des six modules de travail
+
+Les modules ARIANE, PLUTOS, MNÉMOSYNE, NÉMÉSIS, THOT et CHRONOS conservent
+leurs données dans le stockage local de l'application, séparément pour chaque
+compte et appareil. Ils ne sont pas synchronisés automatiquement avec le serveur.
+Ce stockage peut être perdu en effaçant les données de l'application ou du navigateur.
+
+Dans ces modules, **Sauvegarder les six modules** prépare un fichier JSON versionné
+contenant les parcours, prix, dossiers, documents, planning et le journal local
+(5 Mo maximum pour l'export comme pour l'import ; au-delà, une erreur est affichée
+sans modifier les données).
+Vérifier le téléchargement effectif et conserver le fichier dans un emplacement privé :
+il n'est pas chiffré et peut contenir des informations confidentielles.
+Cette sauvegarde ne couvre pas les autres modules ni les dossiers du fil métier serveur.
+
+**Restaurer une sauvegarde** accepte un fichier de 5 Mo maximum, vérifie son format
+puis demande confirmation avant de fusionner les données dans le compte actuel.
+Les données existantes ne sont pas remplacées ; les doublons identiques sont ignorés
+et les entrées de même identifiant mais différentes sont conservées en copie.
+Le journal local n'est plus tronqué aux 500 dernières entrées. En cas de stockage
+inaccessible ou invalide, les modifications sont bloquées pour éviter de l'écraser.
+Toute suppression d'entrée demande confirmation.
+
 ---
 
 ## Sécurité qualité avec SonarQube
