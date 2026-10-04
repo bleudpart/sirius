@@ -1,4 +1,4 @@
-package sh.techenclair.sirius;
+package fr.sirius_assistant.app;
 
 import android.content.pm.PackageManager;
 import android.os.SystemClock;

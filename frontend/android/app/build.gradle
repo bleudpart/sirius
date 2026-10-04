@@ -17,10 +17,10 @@ gradle.taskGraph.whenReady { graph ->
 }
 
 android {
-    namespace = "sh.techenclair.sirius"
+    namespace = "fr.sirius_assistant.app"
     compileSdk = libs.versions.compileSdk.get().toInteger()
     defaultConfig {
-        applicationId "sh.techenclair.sirius"
+        applicationId "fr.sirius_assistant.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 25

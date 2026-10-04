@@ -2,7 +2,7 @@ const { CapacitorConfig } = require("@capacitor/cli");
 
 /** @type {CapacitorConfig} */
 const config = {
-  appId: "sh.techenclair.sirius",
+  appId: "fr.sirius_assistant.app",
   appName: "ΣIRIUS",
   webDir: "build",
   bundledWebRuntime: false,
