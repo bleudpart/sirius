@@ -61,6 +61,9 @@ Synchronisation explicite à l'activation, puis toutes les cinq minutes lorsque
 SIRIUS est ouvert, visible et en ligne. Aucun service d'arrière-plan Android n'est
 installé. Recherche et consultation des copies dans le Centre des connexions,
 avec horodatage de la dernière synchronisation et effacement/désactivation.
+Gmail et Outlook disposent de consoles distinctes avec leurs icônes, compteurs,
+recherches locales et listes à défilement indépendant : côte à côte sur grand
+écran, empilées sur mobile. Les compteurs décrivent uniquement les copies conservées.
 La lecture vocale utilise le moteur déjà configuré, qui peut nécessiter le réseau ;
 ce cache ne rend pas la reconnaissance vocale ou l'IA locales. Les commandes mail
 existantes restent en ligne et les envois ne sont pas modifiés.

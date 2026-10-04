@@ -1,0 +1,32 @@
+.mail-cache .mail-cache-consoles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 22px; }
+.mail-cache .mail-console { min-width: 0; padding: 16px; border: 1px solid rgba(216, 184, 117, .3); border-top: 2px solid #d8b875; border-radius: 8px; background: linear-gradient(145deg, #0d1b2b, #07111e); box-shadow: 0 12px 28px rgba(0, 0, 0, .25); }
+.mail-console-head { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.mail-console-head > div { flex: 1; min-width: 0; }
+.mail-cache .mail-console-head h3 { margin: 3px 0 0; font: 700 20px "Cinzel", serif; color: #ffe6a3; }
+.mail-console-eyebrow, .mail-console-state { font-size: 10px; letter-spacing: .08em; color: #9bb4c7; }
+.mail-console-state { padding: 5px 7px; border: 1px solid #54707f; border-radius: 4px; }
+.mail-console-state.enabled { color: #9ed7c8; border-color: #6fae9f; }
+.mail-cache .mail-console-account { color: #b6cddc; overflow-wrap: anywhere; font-size: 12px; }
+.mail-console-metrics { display: grid; grid-template-columns: 1fr 1fr 1.4fr; border-block: 1px solid rgba(216, 184, 117, .2); margin: 14px 0; }
+.mail-console-metrics > div { min-width: 0; padding: 10px 5px; }
+.mail-console-metrics span { display: block; font-size: 9px; letter-spacing: .08em; color: #9bb4c7; }
+.mail-console-metrics strong { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-top: 5px; font-size: 17px; color: #ffe6a3; }
+.mail-console-metrics small { font-size: 12px; color: #9bb4c7; }
+.mail-cache .mail-console-sync { font-size: 12px; color: #b6cddc; min-height: 54px; }
+.mail-cache .mail-console .mail-cache-actions { gap: 6px; }
+.mail-cache .mail-console button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; font-size: 12px; }
+.mail-cache .mail-console .mail-cache-actions button { flex: 1 1 150px; }
+.mail-cache .mail-console-search { margin: 16px 0 10px; font-size: 12px; }
+.mail-console-search span { display: flex; align-items: center; gap: 7px; }
+.mail-cache .mail-console-search input { box-sizing: border-box; border-color: #54707f; border-radius: 4px; }
+.mail-console-feed { height: clamp(240px, 42vh, 420px); overflow-y: auto; overscroll-behavior-y: contain; scrollbar-width: thin; scrollbar-color: #54707f #07111e; padding: 0 6px 0 0; }
+.mail-console-feed:focus-visible, .mail-console button:focus-visible, .mail-console input:focus-visible { outline: 2px solid #91e6f2; outline-offset: 3px; }
+.mail-cache .mail-console-feed ul { margin: 0; }
+.mail-cache .mail-console-feed li { margin: 0 0 10px; border-radius: 4px; background: rgba(255, 255, 255, .025); border-color: rgba(127, 178, 212, .2); }
+.mail-cache .mail-console-feed li.mail-preview-unread { border-left: 2px solid #d8b875; }
+.mail-console-feed li > span { font-size: 12px; color: #9bb4c7; }
+.mail-cache .mail-console-feed li p { margin: 4px 0; font-size: 13px; }
+.mail-cache .mail-console-empty { padding: 28px 12px; text-align: center; border: 1px dashed #54707f; color: #b6cddc; }
+@media (max-width: 760px) {
+  .mail-cache .mail-cache-consoles { grid-template-columns: minmax(0, 1fr); }
+}
