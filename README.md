@@ -30,7 +30,9 @@ Validation ciblée depuis `frontend` :
 
 Sur Windows, **Capture de l'interface** et **Capture d'une zone (souris)**
 utilisent la capture native Electron et enregistrent les PNG dans le dossier
-Images / SIRIUS Captures. La sélection d'une zone peut être annulée avec Échap.
+Images / SIRIUS Captures. Dans la barre du haut, l'icône appareil photo capture
+l'interface entière et l'icône de recadrage lance la sélection d'une zone.
+La sélection d'une zone peut être annulée avec Échap.
 Les raccourcis de capture Windows restent indépendants de ces commandes.
 Le panneau **SIRIUS ANTICIPE** se déplace en glissant son en-tête ; sa position
 est mémorisée sur cet appareil, sans modifier les actions des suggestions.
