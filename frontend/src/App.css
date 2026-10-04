@@ -1856,12 +1856,6 @@ body.hud-minimal .medallion-halo { display: none; }
 .voice-session-controls button:hover::before,
 .voice-session-controls button:focus-visible::before { border-color: rgba(216, 184, 117, .6); }
 .voice-session-controls button:focus-visible { outline: 2px solid #91e6f2; outline-offset: 3px; }
-@media (min-width: 1024px) {
-  .sirius-command-area > .cmd-bar,
-  .sirius-command-area > .voice-session-controls {
-    translate: 0 -24px;
-  }
-}
 .cmd-prompt {
   font-family: "Orbitron", sans-serif;
   font-size: 12px;
