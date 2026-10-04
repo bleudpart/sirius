@@ -288,3 +288,13 @@
 @media(prefers-reduced-motion:reduce) {
   .public-store *, .public-store *::before, .public-store *::after { animation:none !important; transition:none !important; }
 }
+.public-situations { max-width: 1180px; margin: 48px auto; }
+.public-situations > p { color: #b9d4de; line-height: 1.5; }
+.public-situations-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.public-situations figure { margin: 0; min-width: 0; border: 1px solid rgba(216, 184, 117, .3); border-radius: 8px; overflow: hidden; background: #071725; }
+.public-situations a { display: block; }
+.public-situations a:focus-visible { outline: 2px solid #d8b875; outline-offset: -2px; }
+.public-situations img { display: block; width: 100%; height: auto; }
+.public-situations figcaption { display: grid; gap: 8px; padding: 16px; color: #b9d4de; }
+.public-situations figcaption strong { font-family: "Cinzel", serif; color: #d8b875; }
+@media (max-width: 700px) { .public-situations-grid { grid-template-columns: 1fr; } }

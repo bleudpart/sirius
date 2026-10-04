@@ -16,6 +16,10 @@ La page `/acheter` est rendue par `frontend/src/PublicStore.jsx`.
 Elle présente une capture statique du HUD et les prérequis des fonctions,
 sans lecteur vidéo vide, compteur d'utilisation ni témoignages non vérifiés.
 L'animation du noyau n'est pas une démonstration fonctionnelle.
+La galerie « ΣIRIUS en situation » utilise `frontend/public/demo/sirius-dossiers.png`
+et `sirius-planning.png` : captures locales avec données fictives et session API
+simulée, identifiées comme données de démonstration. Elles ne prouvent pas
+une connexion IA ou un service externe. Les liens ouvrent les images originales.
 Ne présenter un paiement comme fictif que lorsque le mode test du prestataire
 est effectivement vérifié ; la page ne le déduit pas de sa configuration frontend.
 
@@ -29,6 +33,11 @@ entrées : chat écrit, dossiers métier locaux, comptes et connexions facultati
 Il explique les noms des six modules locaux et les prérequis réseau et microphone.
 Dans le menu Modules, la fonction est affichée avant le nom mythologique ;
 les identifiants et commandes existants restent inchangés.
+Les noms des modules et leurs titres utilisent Cinzel doré ; les descriptions
+gardent leur typographie de lecture, y compris dans le menu, la palette et le guide.
+Les dates documentaires affichées (médiathèque, pièces THÉMIS, échéances des
+dossiers et du planning) sont au format `JJ/MM/AAAA`. Les API, sauvegardes,
+tris et champs natifs de date conservent leurs valeurs ISO.
 
 Le guide se retrouve dans **Modules → Guide de démarrage**. Sa fermeture est
 mémorisée localement par compte (`sirius_getting_started_v1:*`) et n'efface

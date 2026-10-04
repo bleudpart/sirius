@@ -163,6 +163,24 @@ export default function PublicStore() {
         </div>
         <p className="public-function-note">La capture d'écran ci-dessus présente le HUD. L'animation du noyau illustre son apparence, sans exécuter de commande. Les fonctions IA et les services connectés nécessitent une connexion réseau ; leur délai de réponse peut varier.</p>
       </section>
+      <section className="public-situations" aria-labelledby="public-situations-title">
+        <h2 id="public-situations-title" className="public-section-title">ΣIRIUS en situation</h2>
+        <p>Captures de l'application locale avec des données fictives de démonstration. Elles illustrent les dossiers et le planning, pas une réponse IA ni une connexion à un service externe.</p>
+        <div className="public-situations-grid">
+          <figure>
+            <a href="/demo/sirius-dossiers.png" target="_blank" rel="noopener noreferrer" aria-label="Agrandir la capture des dossiers">
+              <img src="/demo/sirius-dossiers.png" alt="MNÉMOSYNE : dossier Atelier Horizon avec un client fictif" width="1440" height="1000" loading="lazy" />
+            </a>
+            <figcaption><strong>MNÉMOSYNE — Dossiers et archives</strong><span>Un dossier, son contact et sa description. Données de démonstration.</span></figcaption>
+          </figure>
+          <figure>
+            <a href="/demo/sirius-planning.png" target="_blank" rel="noopener noreferrer" aria-label="Agrandir la capture du planning">
+              <img src="/demo/sirius-planning.png" alt="CHRONOS : échéance de relecture associée au dossier fictif Atelier Horizon" width="1440" height="1000" loading="lazy" />
+            </a>
+            <figcaption><strong>CHRONOS — Planning et échéances</strong><span>Une tâche datée associée à un dossier. Données de démonstration.</span></figcaption>
+          </figure>
+        </div>
+      </section>
       <section className="public-plans" id="offres" aria-label="Offres ΣIRIUS">
         <h2 className="public-section-title">Choisissez votre formule</h2>
         {PLANS.map((plan) => {

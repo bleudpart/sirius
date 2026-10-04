@@ -17,7 +17,7 @@
 }
 .getting-started header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .getting-started h2 { margin: 0; font-size: 22px; }
-.getting-started h2, .getting-started-actions strong, .getting-started summary {
+.getting-started h2, .getting-started-actions strong, .getting-started summary, .getting-started-module-name {
   font-family: "Cinzel", serif;
   color: var(--sirius-gold, #d8b875);
 }

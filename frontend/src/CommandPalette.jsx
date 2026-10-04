@@ -58,7 +58,7 @@ function CommandPalette({ open, onClose, items }) {
                 data-testid={`command-palette-item-${it.id}`}
               >
                 <Icon size={16} />
-                <span className="cmdp-label">{it.label}</span>
+                <span className="cmdp-label"><span className="cmdp-module-name">{it.label.split(" — ")[0]}</span>{it.label.includes(" — ") && ` — ${it.label.split(" — ").slice(1).join(" — ")}`}</span>
                 {i === sel && <CornerDownLeft size={13} className="cmdp-enter" />}
               </button>
             );

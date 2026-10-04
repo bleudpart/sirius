@@ -1,6 +1,6 @@
 .work-modules { color: #d6eef2; }
 .work-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.work-header .oracle-title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.work-header .oracle-title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-family: "Cinzel", serif; color: #d8b875; }
 .work-header small { color: #94b4bd; font: 500 12px "Rajdhani", sans-serif; }
 .work-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); min-height: calc(100vh - 72px); }
 .work-layout.with-portrait { grid-template-columns: 200px minmax(180px, 28%) minmax(0, 1fr); }
@@ -9,7 +9,7 @@
 .work-nav { display: flex; flex-direction: column; gap: 3px; padding: 20px 9px; border-right: 1px solid rgba(145, 230, 242, .18); }
 .work-nav button { display: flex; align-items: center; gap: 12px; min-height: 54px; padding: 9px 12px; color: #b4cbd0; background: transparent; border: 0; border-left: 2px solid transparent; cursor: pointer; text-align: left; }
 .work-nav button.selected { color: #f2d99a; background: rgba(216, 184, 117, .09); border-left-color: #d8b875; }
-.work-nav span { display: grid; font: 600 12px "Orbitron", sans-serif; }
+.work-nav span { display: grid; color: #d8b875; font: 600 12px "Cinzel", serif; }
 .work-nav small { margin-top: 4px; color: #96aeb7; font: 500 12px "Rajdhani", sans-serif; }
 .work-content { width: min(100%, 960px); padding: 25px clamp(16px, 4vw, 52px) 50px; }
 .work-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding-bottom: 22px; border-bottom: 1px solid rgba(145, 230, 242, .18); }
@@ -21,7 +21,7 @@
 .work-add { align-self: end; }
 .work-shortcuts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 16px 0 0; font-size: 14px; }
 .work-section-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 20px 0 12px; }
-.work-section-head h2 { margin: 0; color: #e4d096; font: 600 17px "Orbitron", sans-serif; }
+.work-section-head h2 { margin: 0; color: #d8b875; font: 600 17px "Cinzel", serif; }
 .work-section-head span, .work-hint, .work-empty { color: #9cbbc4; font-size: 14px; }
 .work-empty { padding: 18px 0; }
 .work-list { display: grid; gap: 10px; }

@@ -65,6 +65,7 @@ test("checkout preserves the selected tier and exposes payment failures", async 
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(email, "client@example.com");
     email.dispatchEvent(new Event("input", { bubbles: true }));
   });
+
   await act(async () => {
     container.querySelector("form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
   });
@@ -73,4 +74,17 @@ test("checkout preserves the selected tier and exposes payment failures", async 
     body: JSON.stringify({ email: "client@example.com", phone: "", tier: "standard", origin_url: window.location.origin }),
   }));
   expect(container.querySelector('[role="alert"]').textContent).toBe("Paiement indisponible pour le test");
+});
+
+test("situation screenshots are labeled as fictional and open the full images", () => {
+  const section = container.querySelector(".public-situations");
+  expect(section.textContent).toContain("données fictives de démonstration");
+  expect(section.querySelectorAll("figure")).toHaveLength(2);
+  for (const name of ["dossiers", "planning"]) {
+    const image = section.querySelector(`img[src="/demo/sirius-${name}.png"]`);
+    expect(image.getAttribute("alt")).toContain("fictif");
+    expect(image.closest("a").getAttribute("href")).toBe(image.getAttribute("src"));
+    expect(image.closest("a").getAttribute("rel")).toBe("noopener noreferrer");
+  }
+  expect(global.fetch).not.toHaveBeenCalled();
 });

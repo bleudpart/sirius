@@ -3841,7 +3841,7 @@ body.hud-minimal .medallion-halo { display: none; }
 .zc-kv { flex: 1; display: flex; flex-direction: column; gap: 2px; font-size: 10px; letter-spacing: 1.5px; color: #6f95a6; }
 .zc-kv b { font-family: "Orbitron", sans-serif; font-size: 15px; color: #eafaff; text-shadow: 0 0 10px var(--glow, rgba(145,230,242,0.6)); }
 .zc-module-row { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; font-size: 12px; }
-.zc-module-name { flex: 1; font-size: 11px !important; letter-spacing: 2px !important; color: #e3c98e; }
+.zc-module-name { flex: 1; font-family: "Cinzel", serif; font-size: 11px !important; letter-spacing: 2px !important; color: #d8b875; }
 .zc-module-row b { font-family: "Orbitron", sans-serif; font-size: 9px; letter-spacing: 1.5px; color: #9fc5d6; }
 .zc-dot { width: 8px; height: 8px; border-radius: 50%; }
 .zc-dot.on { background: #91e6f2; box-shadow: 0 0 9px #91e6f2; animation: blink 2.2s ease-in-out infinite; }
@@ -4053,8 +4053,8 @@ body.hud-minimal .medallion-halo { display: none; }
 }
 .pantheon-tile:hover { border-color: var(--accent); box-shadow: 0 0 14px rgba(145, 230, 242, 0.3); }
 .pantheon-tile .zc-dot { position: absolute; top: 12px; right: 12px; }
-.pantheon-tile-name { font-size: 12px !important; letter-spacing: 2px !important; color: #eafaff; }
-.pantheon-tile-name:not(.font-divine) { font-family: "Orbitron", sans-serif; text-transform: uppercase; }
+.pantheon-tile-name { font-size: 12px !important; letter-spacing: 2px !important; color: #d8b875; }
+.pantheon-tile-name:not(.font-divine) { font-family: "Cinzel", serif; text-transform: uppercase; }
 .pantheon-tile-desc { font-family: "Orbitron", sans-serif; font-size: 7.5px; letter-spacing: 1.5px; color: #6f95a6; }
 .pantheon-open { margin-top: 6px; padding: 4px 14px !important; font-size: 10px !important; }
 .nexus-grid { grid-template-columns: 1.4fr 1fr; }

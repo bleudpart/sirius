@@ -48,7 +48,7 @@ function ModulesMenu({ open, onClose, items }) {
                     title={it.label}
                   >
                     <Icon size={16} />
-                    <span className="modmenu-label">
+                    <span className={`modmenu-label ${functionLabel ? "" : "modmenu-name"}`}>
                       {functionLabel || name}
                       {functionLabel && <small>{workModule?.label || name}</small>}
                     </span>

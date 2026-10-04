@@ -46,9 +46,9 @@ export default function GettingStarted({ storageKey, ready, requested, onClose, 
       </div>
       <details>
         <summary>Comprendre les noms des modules</summary>
-        <ul>{WORK_MODULES.map((module) => <li key={module.id}><strong>{module.description}</strong> — {module.label}</li>)}</ul>
+        <ul>{WORK_MODULES.map((module) => <li key={module.id}><strong>{module.description}</strong> — <span className="getting-started-module-name">{module.label}</span></li>)}</ul>
         <p>Ces six modules gardent leurs données sur cet appareil. Les services connectés et les autres modules ont leur propre stockage.</p>
-        <p>Devis, factures et stocks : <strong>THÉMIS#</strong>. Agenda Google : <strong>AGENDA</strong>. Domotique : <strong>KERAUNOS#</strong>, avec des équipements compatibles configurés.</p>
+        <p>Devis, factures et stocks : <strong className="getting-started-module-name">THÉMIS#</strong>. Agenda Google : <strong className="getting-started-module-name">AGENDA</strong>. Domotique : <strong className="getting-started-module-name">KERAUNOS#</strong>, avec des équipements compatibles configurés.</p>
       </details>
       <p className="getting-started-voice">Pour parler, maintenez ESPACE ou le bouton du microphone, puis relâchez pour envoyer. Autorisez le micro uniquement si vous souhaitez l'utiliser. <strong>Arrêter</strong> abandonne l'écoute et coupe la réponse, sans annuler une action déjà envoyée.</p>
       {error && <p role="alert">{error} <button type="button" onClick={() => { setDismissed(true); onClose(); }}>Continuer sans enregistrer</button></p>}
