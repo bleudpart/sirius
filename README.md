@@ -10,6 +10,18 @@ Frontend **React** + Backend **FastAPI** (Python), packagé en application Windo
 
 ---
 
+## Boutique publique
+
+La page `/acheter` est rendue par `frontend/src/PublicStore.jsx`.
+Elle présente une capture statique du HUD et les prérequis des fonctions,
+sans lecteur vidéo vide, compteur d'utilisation ni témoignages non vérifiés.
+L'animation du noyau n'est pas une démonstration fonctionnelle.
+Ne présenter un paiement comme fictif que lorsque le mode test du prestataire
+est effectivement vérifié ; la page ne le déduit pas de sa configuration frontend.
+
+Validation ciblée depuis `frontend` :
+`npm test -- --watchAll=false --runInBand src/PublicStore.test.jsx`.
+
 ## 🚀 Installation
 
 ### Option A — Installer SIRIUS comme un logiciel Windows (recommandé)

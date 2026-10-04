@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, ShieldCheck, ArrowRight, PlayCircle, Mic, Boxes, Radio, UserRound, Zap, Crown, Home, BrainCircuit, Workflow, ChartNoAxesCombined, Quote } from "lucide-react";
+import { Check, ShieldCheck, ArrowRight, Mic, Boxes, Radio, UserRound, Zap, Crown, Home, BrainCircuit, Workflow, ChartNoAxesCombined } from "lucide-react";
 import PublicLegal from "./PublicLegal";
 import "./PublicStore.css";
 
@@ -12,22 +12,16 @@ const PLANS = [
 ];
 
 const MATRIX_ACTIONS = [
-  { icon: Mic, text: "Envoie le devis à Martin" },
-  { icon: Boxes, text: "Mets à jour le stock" },
-  { icon: Radio, text: "Relance les factures" },
-  { icon: Home, text: "Allume le salon" },
+  { icon: Mic, text: "Dicter une demande", detail: "Le microphone nécessite votre autorisation. La transcription Android envoie un extrait audio au serveur." },
+  { icon: Boxes, text: "Organiser ses dossiers", detail: "Les six modules métier locaux proposent une sauvegarde JSON et une restauration par fusion." },
+  { icon: Radio, text: "Préparer un email", detail: "Les fonctions email nécessitent un compte connecté et les autorisations du fournisseur." },
+  { icon: Home, text: "Piloter des équipements", detail: "La domotique nécessite une connexion configurée et des équipements compatibles." },
 ];
 
 const WHY_DIFFERENT = [
-  { title: "AUTOMATISE", text: "Exécute vos tâches à votre place.", icon: Workflow },
-  { title: "ANALYSE", text: "Comprend votre contexte métier.", icon: BrainCircuit },
-  { title: "AGIT", text: "Pilote outils, applications et domotique.", icon: Zap },
-];
-
-const TESTIMONIALS = [
-  ["L’automatisation vocale change ma manière de travailler.", "Consultant indépendant"],
-  ["L’assistant exécute mes tâches sans intervention.", "Responsable opérationnel"],
-  ["La matrice holographique est intuitive et rapide.", "Gérant de restaurant"],
+  { title: "ORGANISER", text: "Regroupez vos dossiers, documents et activités dans des modules dédiés.", icon: Workflow },
+  { title: "PRÉPARER", text: "L'IA aide à rédiger et analyser. Vérifiez ses réponses avant de les utiliser.", icon: BrainCircuit },
+  { title: "CONNECTER", text: "Les actions sur des services externes dépendent des connexions et autorisations configurées.", icon: Zap },
 ];
 
 export default function PublicStore() {
@@ -39,6 +33,7 @@ export default function PublicStore() {
   const [portalBusy, setPortalBusy] = useState(false);
   const [paypalBusy, setPaypalBusy] = useState(false);
   const [paypalStatus, setPaypalStatus] = useState(null);
+  const selectedPlan = PLANS.find((plan) => plan.id === selected);
   const checkoutSessionId = new URLSearchParams(window.location.search).get("session_id");
   const paymentSucceeded = new URLSearchParams(window.location.search).get("payment") === "success";
 
@@ -126,26 +121,34 @@ export default function PublicStore() {
     <main className="public-store">
       <header className="public-nav">
         <a className="public-brand" href="/"><span className="public-brand-gold">ΣIRIUS</span><span>.</span></a>
+        <nav className="public-nav-links" aria-label="Navigation de la boutique">
+          <a href="#matrice-demo">L'interface</a>
+          <a href="#offres">Les offres</a>
+          <a className="public-nav-cta" href="#commencer">Choisir ma licence <ArrowRight size={15} /></a>
+        </nav>
       </header>
+      <div className="public-showcase">
       <section className="public-hero">
-        <h1>Votre espace de travail<br /><em>prend vie</em></h1>
-        <p className="public-value">L'assistant IA qui exécute réellement vos tâches.</p>
+        <p className="public-eyebrow">ΣIRIUS · Assistant personnel et professionnel</p>
+        <h1>Organisez vos activités.<br /><em>Simplifiez vos tâches.</em></h1>
+        <p className="public-value">Un assistant IA pour préparer vos documents, suivre vos activités et piloter vos outils connectés depuis une seule interface.</p>
         <div className="public-benefits"><span>Emails</span><span>Documents</span><span>Automatisation métier</span><span>Domotique</span></div>
-        <div className="public-hero-actions"><a className="public-primary-cta" href="#commencer">Commencer gratuitement <ArrowRight size={17} /></a><a className="public-secondary-cta" href="#matrice-demo"><PlayCircle size={17} /> Voir la démo</a></div>
+        <div className="public-hero-actions"><a className="public-primary-cta" href="#offres">Découvrir les offres <ArrowRight size={17} /></a><a className="public-secondary-cta" href="#matrice-demo">Explorer l'interface <ArrowRight size={17} /></a></div>
       </section>
       <section className="public-hud-preview public-hud-hero" aria-label="Capture d'écran du HUD ΣIRIUS">
+        <div className="public-window-bar"><span className="public-window-dot" /> ΣIRIUS · L'espace de travail</div>
         <div className="hud-preview"><img src="/hud-preview.png" alt="HUD ΣIRIUS en situation" loading="eager" /></div>
+        <p className="public-preview-caption">Une interface pour vos commandes, vos outils et vos modules.</p>
       </section>
-      <section className="public-metrics" aria-label="Repères ΣIRIUS">
-        <div><strong>+12 000</strong><span>tâches exécutées</span></div><div><strong>24h/24</strong><span>disponible</span></div><div><strong>Windows · Android · iOS</strong><span>sur vos appareils</span></div><div><strong>Instantané</strong><span>temps de réponse</span></div>
-      </section>
+      </div>
       <section className="public-matrix" id="matrice-demo" aria-label="La matrice de ΣIRIUS">
-        <div className="public-section-intro"><span className="public-section-icon"><ChartNoAxesCombined size={21} /></span><div><h2 className="public-section-title">La matrice de ΣIRIUS</h2><p>Une commande, une action réelle.</p></div></div>
+        <div className="public-section-intro"><span className="public-section-icon"><ChartNoAxesCombined size={21} /></span><div><h2 className="public-section-title">Découvrez les fonctions de ΣIRIUS</h2><p>Une présentation des usages et de leurs prérequis, pas une démonstration en direct.</p></div></div>
+        <div className="public-matrix-layout">
         <div className="public-core-preview">
           <div className="public-core-window" aria-label="Noyau ΣIRIUS" role="img">
             <div className="public-core-art">
-              <img src="/holo/sirius-emblem-proposal.svg" alt="" className="public-core-ring public-core-ring-outer" draggable={false} loading="lazy" />
-              <img src="/holo/sirius-emblem-proposal.svg" alt="" className="public-core-ring public-core-ring-inner" draggable={false} loading="lazy" />
+              <img src="/holo/ring-gold.png" alt="" className="public-core-ring public-core-ring-outer" draggable={false} loading="lazy" />
+              <img src="/holo/ring-gold.png" alt="" className="public-core-ring public-core-ring-inner" draggable={false} loading="lazy" />
               <div className="public-core-scan-band" aria-hidden="true" />
               <div className="public-core-heart matrix-circle" />
             </div>
@@ -153,43 +156,47 @@ export default function PublicStore() {
           <span><strong>Le cœur opérationnel de ΣIRIUS.</strong> Vos outils, vos données et vos actions dans un même espace.</span>
         </div>
         <ul className="public-matrix-actions">
-          {MATRIX_ACTIONS.map(({ icon: Icon, text }) => (
-            <li key={text}><Icon size={16} /> <span>{text}</span></li>
+          {MATRIX_ACTIONS.map(({ icon: Icon, text, detail }) => (
+            <li key={text}><Icon size={16} /> <span><strong>{text}</strong><small>{detail}</small></span></li>
           ))}
         </ul>
-        <div className="sirius-video-preview public-matrix-video" aria-label="Aperçu vidéo de l'interface réactive">
-          <video className="public-matrix-video-el" controls muted loop playsInline preload="none" poster="/hud-preview.png">
-          </video>
-          <span className="public-matrix-video-badge"><PlayCircle size={14} /> Aperçu de l'interface réactive (5-7s)</span>
         </div>
+        <p className="public-function-note">La capture d'écran ci-dessus présente le HUD. L'animation du noyau illustre son apparence, sans exécuter de commande. Les fonctions IA et les services connectés nécessitent une connexion réseau ; leur délai de réponse peut varier.</p>
       </section>
-      <section className="public-plans" aria-label="Offres ΣIRIUS">
+      <section className="public-plans" id="offres" aria-label="Offres ΣIRIUS">
         <h2 className="public-section-title">Choisissez votre formule</h2>
         {PLANS.map((plan) => {
           const PlanIcon = plan.icon;
           return (
-            <button key={plan.id} type="button" className={`public-plan public-plan-${plan.id} ${plan.cardClass} ${selected === plan.id ? "selected" : ""} ${plan.featured ? "featured" : ""}`} onClick={() => setSelected(plan.id)}>
+            <button key={plan.id} type="button" aria-pressed={selected === plan.id} className={`public-plan public-plan-${plan.id} ${plan.cardClass} ${selected === plan.id ? "selected" : ""} ${plan.featured ? "featured" : ""}`} onClick={() => setSelected(plan.id)}>
               {plan.badge && <span className={`public-popular ${plan.id === "lifetime" ? "public-popular-alt" : ""}`}>{plan.badge}</span>}
               <span className="public-plan-icon" aria-hidden="true"><PlanIcon size={19} /></span>
               <span className="public-plan-name">{plan.name}</span>
               <span className="public-plan-tagline">{plan.tagline}</span>
               <span className="public-price"><strong>{plan.price} €</strong><small>{plan.suffix}</small></span>
               <span className="public-features">{plan.features.map((feature) => <span key={feature}><Check size={14} /> {feature}</span>)}</span>
+              <span className="public-plan-choice">{selected === plan.id ? <><Check size={16} /> Formule sélectionnée</> : <>Choisir cette formule <ArrowRight size={16} /></>}</span>
             </button>
           );
         })}
       </section>
       <form className="public-checkout" id="commencer" onSubmit={checkout}>
+        <div className="public-checkout-heading">
+        <div>
+        <p className="public-eyebrow">Votre licence</p>
         <h2 className="public-section-title">Commencer avec ΣIRIUS</h2>
+        </div>
+        <p className="public-order-summary" aria-live="polite"><span>{selectedPlan.name}</span><strong>{selectedPlan.price} €</strong><small>Paiement unique</small></p>
+        </div>
         <label htmlFor="public-email">Votre adresse e-mail</label>
         <div className="public-form-row">
           <input id="public-email" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="vous@exemple.fr" />
-          <button type="submit" disabled={busy}>{busy ? "Ouverture..." : "Commencer gratuitement"} <ArrowRight size={17} /></button>
+          <button type="submit" disabled={busy}>{busy ? "Ouverture..." : "Continuer avec Stripe"} <ArrowRight size={17} /></button>
         </div>
         <label htmlFor="public-phone">Téléphone (optionnel)</label>
         <div className="public-form-row">
           <input id="public-phone" type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="06 12 34 56 78" />
-          <a className="public-demo-link" href="#matrice-demo"><PlayCircle size={17} /> Voir une démo</a>
+          <a className="public-demo-link" href="#matrice-demo">Voir les fonctions <ArrowRight size={17} /></a>
         </div>
         {selected !== "monthly" && (
           <button type="button" className="public-paypal-btn" onClick={checkoutPaypal} disabled={paypalBusy}>
@@ -197,9 +204,9 @@ export default function PublicStore() {
           </button>
         )}
         {error && <p className="public-error" role="alert">{error}</p>}
-        <p className="public-legal">Vous serez redirigé vers Stripe. Aucun paiement réel en mode test. Aucun engagement.</p>
+        <p className="public-legal">Le paiement s'ouvre chez Stripe ou PayPal selon votre choix. Vérifiez le montant et les conditions sur la page du prestataire avant de confirmer.</p>
+        <small className="public-checkout-note">Consultez les conditions générales avant l'achat. Cette page ne garantit pas que le prestataire est en mode test.</small>
       </form>
-      <small className="public-checkout-note">Aucun engagement. Mode test Stripe, aucun débit réel.</small>
       {paypalStatus && (
         <p className={paypalStatus.ok ? "public-checkout-note" : "public-error"} role={paypalStatus.ok ? undefined : "alert"}>
           {paypalStatus.ok ? `Paiement PayPal confirmé — licence ${paypalStatus.tier} activée.` : paypalStatus.message}
@@ -210,24 +217,13 @@ export default function PublicStore() {
         <span>Gérez ou résiliez votre abonnement depuis le portail Stripe sécurisé.</span>
         <button type="button" onClick={manageSubscription} disabled={portalBusy}>{portalBusy ? "Ouverture..." : "Gérer mon abonnement"}</button>
       </section>}
-      <section className="public-trust" aria-label="Confiance">
-        <h2>Ils utilisent ΣIRIUS</h2>
-        <div className="public-testimonials">
-          {TESTIMONIALS.map(([quote, author]) => (
-            <blockquote key={quote} className="public-testimonial">
-              <Quote size={18} /><p>« {quote} »</p>
-              <cite>{author}</cite>
-            </blockquote>
-          ))}
-        </div>
-      </section>
       <section className="public-why" aria-label="Pourquoi ΣIRIUS">
         <h2 className="public-section-title">Pourquoi ΣIRIUS</h2>
         <div className="public-why-grid">{WHY_DIFFERENT.map(({ title, text, icon: Icon }) => <article key={title}><Icon size={22} /><h3>{title}</h3><p>{text}</p></article>)}</div>
       </section>
       <footer className="public-footer">
-        <p className="public-slogan">ΣIRIUS. Le travail, automatisé.</p>
-        <p className="public-footer-secure"><ShieldCheck size={13} /> Paiement sécurisé 256 bits</p>
+        <p className="public-slogan">ΣIRIUS. Vos activités, dans un même espace.</p>
+        <p className="public-footer-secure"><ShieldCheck size={13} /> Paiement via Stripe ou PayPal</p>
         © 2026 ΣIRIUS par Daniel Partel · <a href="/mentions-legales">Mentions légales</a> · <a href="/conditions-generales">Conditions générales</a> · <a href="/confidentialite.html">Confidentialité</a> · <a href="/suppression-compte.html">Suppression du compte</a>
       </footer>
     </main>
