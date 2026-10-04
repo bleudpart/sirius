@@ -6592,7 +6592,6 @@ function App() {
       {/* Barre supérieure */}
       <header className="top-bar">
         <div className="brand-tag" data-testid="sirius-brand-tag">
-          <MicrophoneIndicator active={captureMicOn || interruptMicOn} />
           Σ I R I U S
         </div>
         <div className="sys-indicators" data-testid="sirius-indicators">
@@ -6603,6 +6602,7 @@ function App() {
         <div className="conn-status" data-testid="sirius-connection">
           <span className={`conn-led ${connected ? "on" : "off"}`} />
           {"IA CLOUD"}
+          <MicrophoneIndicator active={captureMicOn || interruptMicOn} showLabel />
           {mode === "brainstorm" && <span className="mode-badge" data-testid="brainstorm-badge">BRAINSTORM</span>}
           
           {/* Connection status badge */}
