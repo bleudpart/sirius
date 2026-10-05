@@ -16,13 +16,13 @@
 .dz-inner { display: flex; align-items: center; gap: 14px; }
 .dz-inner > svg { color: var(--gold, #d8b875); flex: 0 0 auto; }
 .dz-text { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.dz-text b { font-size: 13px; color: #eafaff; letter-spacing: 0.03em; }
-.dz-text span { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; color: #88b6c8; }
+.dz-text b { font-size: 13px; color: #ffffff; letter-spacing: 0.03em; }
+.dz-text span { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; color: rgba(255, 255, 255, 0.78); }
 .dz-explore {
   display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
   padding: 8px 13px; border-radius: 8px; cursor: pointer;
   font-family: "Orbitron", sans-serif; font-size: 9px; letter-spacing: 0.08em;
-  color: #91e6f2; background: rgba(0, 50, 70, 0.5);
+  color: #ffffff; background: rgba(0, 50, 70, 0.5);
   border: 1px solid rgba(145, 230, 242, 0.5);
   transition: color 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
@@ -42,12 +42,12 @@
   display: inline-flex; align-items: center; gap: 6px;
   padding: 6px 12px; border-radius: 14px; cursor: pointer;
   font-family: "Orbitron", sans-serif; font-size: 8.5px; letter-spacing: 0.08em;
-  color: #9fd3e8; background: rgba(0, 30, 45, 0.5);
+  color: #ffffff; background: rgba(0, 30, 45, 0.5);
   border: 1px solid rgba(145, 230, 242, 0.3);
   transition: color 0.2s, border-color 0.2s;
 }
 .files-folder i { font-style: normal; font-size: 8px; color: #f2d99a; }
-.files-folder:hover { border-color: var(--gold-soft, rgba(216,184,117,0.55)); color: #eafaff; }
+.files-folder:hover { border-color: var(--gold-soft, rgba(216,184,117,0.55)); color: #ffffff; }
 .files-folder.on {
   color: var(--gold-light, #f2d99a);
   border-color: var(--gold-soft, rgba(216,184,117,0.55));
@@ -81,13 +81,13 @@
 .files-search svg { color: var(--gold, #d8b875); flex: 0 0 auto; }
 .files-search input {
   flex: 1; background: transparent; border: none; outline: none;
-  color: #eafaff; font-family: "Rajdhani", sans-serif; font-size: 13.5px;
+  color: #ffffff; font-family: "Rajdhani", sans-serif; font-size: 13.5px;
 }
 .files-search input::placeholder { color: #4f7385; }
 .files-search-clear {
   display: inline-flex; align-items: center; justify-content: center;
   width: 20px; height: 20px; border-radius: 5px; cursor: pointer;
-  color: #9fd3e8; background: transparent; border: 1px solid transparent;
+  color: #ffffff; background: transparent; border: 1px solid transparent;
 }
 .files-search-clear:hover { color: #f2d99a; border-color: var(--gold-soft, rgba(216,184,117,0.55)); }
 
@@ -106,7 +106,7 @@
   letter-spacing: 0.12em; color: var(--gold, #d8b875); margin: 6px 0 3px; text-transform: uppercase;
 }
 .file-analyse b:first-child { margin-top: 0; }
-.file-analyse p { margin: 0; font-size: 11.5px; line-height: 1.5; color: #cfeefb; white-space: pre-wrap; }
+.file-analyse p { margin: 0; font-size: 11.5px; line-height: 1.5; color: #ffffff; white-space: pre-wrap; }
 
 /* Superposition globale de dépôt (toutes fenêtres) */
 .gdrop-overlay {
@@ -126,7 +126,7 @@
   box-shadow: 0 0 40px rgba(216, 184, 117, 0.25);
 }
 .gdrop-box b { font-family: "Orbitron", sans-serif; font-size: 15px; letter-spacing: 0.1em; }
-.gdrop-box span { font-size: 12px; color: #bfe9f8; }
+.gdrop-box span { font-size: 12px; color: #ffffff; }
 .gdrop-toast {
   position: fixed; right: 18px; bottom: 54px; z-index: 2001;
   max-width: 300px;
@@ -154,7 +154,7 @@
   display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
   padding: 4px 9px; border-radius: 6px; cursor: pointer;
   font-family: "Orbitron", sans-serif; font-size: 9px; letter-spacing: 0.08em;
-  color: #91e6f2; background: rgba(0, 50, 70, 0.5);
+  color: #ffffff; background: rgba(0, 50, 70, 0.5);
   border: 1px solid rgba(145, 230, 242, 0.45);
   transition: color 0.2s, border-color 0.2s;
 }
@@ -166,9 +166,9 @@
 .sd-pasted-text {
   flex: 1; min-height: 0; overflow: auto; margin: 0; padding: 10px 12px;
   font-family: "JetBrains Mono", monospace; font-size: 11.5px; line-height: 1.5;
-  color: #cfeefb; white-space: pre-wrap; word-break: break-word;
+  color: #ffffff; white-space: pre-wrap; word-break: break-word;
 }
-.sd-pasted-other { display: flex; align-items: center; gap: 10px; margin: auto; padding: 20px; color: #9fd3e8; font-size: 12px; }
+.sd-pasted-other { display: flex; align-items: center; gap: 10px; margin: auto; padding: 20px; color: #ffffff; font-size: 12px; }
 
 /* Dépôt direct dans le ΣIRIUS DISPLAY (fichiers glissés sur le display traités sur place) */
 .sirius-display.sd-dragover {
@@ -184,6 +184,6 @@
   color: #d8b875; pointer-events: none;
 }
 .sd-drophint b { font-family: "Orbitron", sans-serif; font-size: 12px; letter-spacing: 0.12em; }
-.sd-drophint span { font-size: 11px; color: #bfe9f8; }
+.sd-drophint span { font-size: 11px; color: #ffffff; }
 body.sirius-dragging .sirius-display iframe,
 body.sirius-dragging .sirius-display video { pointer-events: none; }

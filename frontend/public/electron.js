@@ -222,6 +222,18 @@ app.whenReady().then(async () => {
     return { visible: !!window };
   });
   ipcMain.handle("sirius-media-close-hud", () => ({ closed: closeMediaHudWindow() }));
+  ipcMain.handle("sirius-window-toggle-fullscreen", (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win || win.isDestroyed()) return { fullscreen: false };
+    // La transition est asynchrone sous Windows : on renvoie l'état demandé.
+    const next = !win.isFullScreen();
+    win.setFullScreen(next);
+    return { fullscreen: next };
+  });
+  ipcMain.handle("sirius-window-is-fullscreen", (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    return { fullscreen: !!win && !win.isDestroyed() && win.isFullScreen() };
+  });
   ipcMain.handle("sirius-files-select-folder", async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
       title: "Choisir un dossier Windows",

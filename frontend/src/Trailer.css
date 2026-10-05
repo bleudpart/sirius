@@ -3,7 +3,7 @@
 .tr-toolbar { display: flex; justify-content: center; margin: 4px 0 18px; }
 .tr-download {
   display: inline-flex; align-items: center; gap: 8px; text-decoration: none; cursor: pointer;
-  background: rgba(145,230,242,0.12); color: #7df3ff; border: 1px solid rgba(145,230,242,0.5);
+  background: rgba(145,230,242,0.12); color: #ffffff; border: 1px solid rgba(145,230,242,0.5);
   border-radius: 5px; padding: 9px 20px; font-size: 11px; letter-spacing: 1.6px; font-family: "Orbitron", sans-serif;
   transition: background-color 0.2s, box-shadow 0.2s;
 }
@@ -26,9 +26,9 @@
   display: flex; align-items: center; justify-content: center; font-family: "Orbitron", sans-serif;
   font-size: 12px; color: #01060c; background: #91e6f2; box-shadow: 0 0 12px #91e6f2;
 }
-.tr-zoom { position: absolute; bottom: 8px; right: 8px; color: #7df3ff; opacity: 0.7; }
-.tr-title { margin-top: 8px; font-size: 12.5px; color: #d5f6ff; letter-spacing: 0.5px; font-weight: 600; }
-.tr-desc { margin-top: 3px; font-size: 11px; color: #8fb6c2; line-height: 1.45; }
+.tr-zoom { position: absolute; bottom: 8px; right: 8px; color: #ffffff; opacity: 0.7; }
+.tr-title { margin-top: 8px; font-size: 12.5px; color: #ffffff; letter-spacing: 0.5px; font-weight: 600; }
+.tr-desc { margin-top: 3px; font-size: 11px; color: rgba(255, 255, 255, 0.78); line-height: 1.45; }
 
 .tr-lightbox {
   position: fixed; inset: 0; z-index: 5000; display: flex; flex-direction: column;
@@ -38,4 +38,4 @@
 }
 @keyframes trFade { from { opacity: 0; } to { opacity: 1; } }
 .tr-lightbox img { max-height: 84vh; max-width: 92vw; border-radius: 10px; border: 1px solid rgba(145,230,242,0.4); box-shadow: 0 0 40px rgba(145,230,242,0.3); }
-.tr-lb-caption { font-family: "Orbitron", sans-serif; font-size: 12px; letter-spacing: 2px; color: #7df3ff; }
+.tr-lb-caption { font-family: "Orbitron", sans-serif; font-size: 12px; letter-spacing: 2px; color: #ffffff; }

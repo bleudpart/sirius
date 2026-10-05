@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import {
   Calendar, Target, PieChart, ListChecks, Users, Bell, Settings2,
   Scale, Sparkles, TrendingUp, ChevronRight, Cpu, Activity, Wifi, WifiOff, Clock, RotateCcw, X, Anchor, LayoutGrid,
+  GripHorizontal, Minus,
 } from "lucide-react";
 import HudPanel from "@/hud/HudPanel";
 import {
@@ -22,6 +23,8 @@ function InfoSection({ icon, title, children }) {
 }
 import { LiveClock, useLiveStats } from "@/liveStats";
 import "@/hud/hud.css";
+import "@/ModulesMenu.css";
+import useWheelWindow from "@/useWheelWindow";
 
 const BACKEND_BASE = process.env.REACT_APP_BACKEND_URL || "http://127.0.0.1:8001";
 const API = BACKEND_BASE + "/api";
@@ -548,6 +551,145 @@ export function SiriusInfoHub({ weather, connected, ecoMode, setEcoMode, onOpenT
       <TimePanel inline />
       <QuickSettings ecoMode={ecoMode} setEcoMode={setEcoMode} inline />
     </HudPanel>
+  );
+}
+
+// Centre d'information en roue (même langage que le menu des modules) : les 8 rubriques
+// tournent autour du Σ, le détail de la rubrique active s'affiche à côté, sans défilement.
+const INFO_SECTIONS = [
+  { id: "agenda", label: "AGENDA", Icon: Calendar },
+  { id: "priorites", label: "PRIORITÉS", Icon: Target },
+  { id: "performance", label: "STRATÉGIE", Icon: PieChart },
+  { id: "objectifs", label: "OBJECTIFS", Icon: ListChecks },
+  { id: "ressources", label: "RESSOURCES", Icon: Users },
+  { id: "notifications", label: "ALERTES", Icon: Bell },
+  { id: "heure", label: "HEURE", Icon: Clock },
+  { id: "reglages", label: "RÉGLAGES", Icon: Settings2 },
+];
+const IW = 300;
+const IW_C = IW / 2;
+const IW_OUT = 142;
+const IW_IN = 88;
+const iwPolar = (radius, deg) => {
+  const rad = (deg * Math.PI) / 180;
+  return [IW_C + radius * Math.cos(rad), IW_C + radius * Math.sin(rad)];
+};
+const iwArc = (centerDeg, half) => {
+  const [x0, y0] = iwPolar(IW_OUT, centerDeg - half);
+  const [x1, y1] = iwPolar(IW_OUT, centerDeg + half);
+  const [x2, y2] = iwPolar(IW_IN, centerDeg + half);
+  const [x3, y3] = iwPolar(IW_IN, centerDeg - half);
+  return `M${x0} ${y0} A${IW_OUT} ${IW_OUT} 0 0 1 ${x1} ${y1} L${x2} ${y2} A${IW_IN} ${IW_IN} 0 0 0 ${x3} ${y3}Z`;
+};
+
+export function SiriusInfoWheel({ open, onClose, ...props }) {
+  if (!open) return null;
+  return createPortal(<InfoWheelDialog onClose={onClose} {...props} />, document.body);
+}
+
+function InfoWheelDialog({ onClose, weather, connected, ecoMode, setEcoMode, onOpenThemis }) {
+  const [cal, calErr] = useApi("/calendar/events?max_results=30");
+  const [objectif] = useApi("/agora/objectif");
+  const [bilan] = useApi("/themis/bilan");
+  const [market] = useApi("/nummarius/market");
+  const events = (cal && cal.events) || [];
+  const calConnected = !calErr && !!cal;
+  const [active, setActive] = useState(0);
+  const [rotation, setRotation] = useState(0);
+  const dialogRef = useRef(null);
+  const { minimized, setMinimized, windowProps } = useWheelWindow("info");
+  const n = INFO_SECTIONS.length;
+  const step = 360 / n;
+
+  useEffect(() => { if (!minimized) dialogRef.current?.focus(); }, [minimized]);
+
+  const select = (index) => {
+    const target = ((index % n) + n) % n;
+    const delta = ((target - active + n + Math.floor(n / 2)) % n) - Math.floor(n / 2);
+    setRotation((r) => r - delta * step);
+    setActive(target);
+  };
+  const onKeyDown = (e) => {
+    if (e.key === "Escape") { e.stopPropagation(); onClose(); }
+    if (e.key === "ArrowRight") { e.preventDefault(); select(active + 1); }
+    if (e.key === "ArrowLeft") { e.preventDefault(); select(active - 1); }
+  };
+
+  const section = INFO_SECTIONS[active];
+  const content = {
+    agenda: <ExecutiveCalendar events={events} connected={calConnected} inline />,
+    priorites: <DailyPriorities objectif={objectif} bilan={bilan} inline />,
+    performance: <StrategicPerformance objectif={objectif} market={market} inline />,
+    objectifs: <GoalsTracker objectif={objectif} bilan={bilan} inline />,
+    ressources: <PersonalResources connected={connected} inline />,
+    notifications: <ActiveNotifications bilan={bilan} weather={weather} connected={connected} onOpenThemis={() => { onClose(); onOpenThemis?.(); }} inline />,
+    heure: <TimePanel inline />,
+    reglages: <QuickSettings ecoMode={ecoMode} setEcoMode={setEcoMode} inline />,
+  }[section.id];
+
+  if (minimized) {
+    return (
+      <div className="modwheel-overlay is-minimized" data-testid="info-wheel" onKeyDown={onKeyDown}>
+        <button type="button" className="modwheel-restore" onClick={() => setMinimized(false)} data-testid="info-wheel-restore" title="Rouvrir le centre d'information">
+          <span className="modwheel-sigma">Σ</span> INFOS
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="modwheel-overlay" data-testid="info-wheel" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }} onKeyDown={onKeyDown}>
+      <div ref={dialogRef} tabIndex={-1} className="modwheel infowheel" role="dialog" aria-modal="true" aria-label="Centre d'information ΣIRIUS" {...windowProps}>
+        <span className="modwheel-grip" aria-hidden="true" title="Glisser pour déplacer · double-clic pour recentrer"><GripHorizontal size={16} /></span>
+        <button type="button" className="modwheel-min" onClick={() => setMinimized(true)} data-testid="info-wheel-minimize" aria-label="Réduire le centre d'information" title="Réduire">
+          <Minus size={16} />
+        </button>
+        <button type="button" className="modwheel-close" onClick={onClose} data-testid="info-wheel-close" aria-label="Fermer le centre d'information" title="Fermer (Échap)">
+          <X size={16} />
+        </button>
+        <div className="modwheel-dial">
+          <div className="modwheel-ring" style={{ "--rot": `${rotation}deg` }}>
+            <svg viewBox={`0 0 ${IW} ${IW}`} aria-hidden="true">
+              <circle className="modwheel-orbit" cx={IW_C} cy={IW_C} r={IW_OUT + 8} />
+              <circle className="modwheel-orbit modwheel-orbit-inner" cx={IW_C} cy={IW_C} r={IW_IN - 10} />
+              {INFO_SECTIONS.map((s, i) => (
+                <path key={s.id} className={`modwheel-seg ${i === active ? "active" : ""}`} d={iwArc(-90 + i * step, step / 2 - 2)} />
+              ))}
+            </svg>
+            {INFO_SECTIONS.map((s, i) => {
+              const [x, y] = iwPolar((IW_OUT + IW_IN) / 2, -90 + i * step);
+              const SectionIcon = s.Icon;
+              return (
+                <button
+                  type="button"
+                  key={s.id}
+                  className={`modwheel-cat infowheel-cat ${i === active ? "active" : ""}`}
+                  style={{ left: `${(x / IW) * 100}%`, top: `${(y / IW) * 100}%`, "--counter": `${-rotation}deg` }}
+                  onClick={() => select(i)}
+                  aria-pressed={i === active}
+                  data-testid={`info-wheel-section-${s.id}`}
+                >
+                  <SectionIcon size={16} />
+                  <span>{s.label}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="modwheel-core" aria-live="polite">
+            <span className="modwheel-sigma">Σ</span>
+            <strong>{section.label}</strong>
+            <em>Centre d'information</em>
+          </div>
+        </div>
+        <div className="modwheel-panel infowheel-panel">
+          <div className="modwheel-title">
+            CENTRE D'INFORMATION ΣIRIUS
+            <span>← → pour tourner la roue</span>
+          </div>
+          <div className="infowheel-content" key={section.id}>{content}</div>
+        </div>
+      </div>
+    </div>
   );
 }
 

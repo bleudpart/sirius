@@ -17,7 +17,7 @@
   overflow-y: auto;
   height: 100%;
   padding-bottom: 96px;
-  color: #d3e6f1;
+  color: #ffffff;
   font-family: "Rajdhani", sans-serif;
 }
 
@@ -87,7 +87,7 @@
 .zcx-cell .zcx-h2sub { margin: 0 0 13px; font-size: 11.5px; color: var(--zcx-dim2); letter-spacing: 0.06em; }
 
 .zcx-bar { display: grid; grid-template-columns: 110px 1fr 54px; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 12.5px; }
-.zcx-bar em { font-style: normal; color: #d3e6f1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zcx-bar em { font-style: normal; color: #ffffff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .zcx-track { height: 7px; background: rgba(255, 255, 255, 0.05); overflow: hidden; }
 .zcx-fill { height: 100%; width: 0; transition: width 1.1s cubic-bezier(0.22, 0.8, 0.3, 1); }
 .zcx-bar b { text-align: right; color: var(--zcx-dim); font-weight: 600; font-size: 12px; }
@@ -106,7 +106,7 @@
 }
 .zcx-logline time { color: var(--zcx-dim2); font-size: 11px; }
 .zcx-tag { width: 7px; height: 7px; margin-top: 5px; border-radius: 50%; }
-.zcx-logline p { margin: 0; color: #d3e6f1; }
+.zcx-logline p { margin: 0; color: #ffffff; }
 .zcx-logline p em { font-style: normal; color: #ffe6a3; }
 
 .zcx-prov { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.035); font-size: 12.5px; }
@@ -136,7 +136,7 @@
 
 .nx-flow { display: grid; grid-template-columns: 1fr 96px 34px; align-items: center; gap: 10px; margin-bottom: 7px; font-size: 12px; }
 .nx-flow em {
-  font-style: normal; color: #d3e6f1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-style: normal; color: #ffffff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .nx-flow .nx-arrow { color: var(--zcx-dim2); }
 .nx-flow b { text-align: right; color: var(--zcx-dim); font-weight: 600; font-size: 11.5px; }

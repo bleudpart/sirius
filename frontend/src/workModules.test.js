@@ -1,4 +1,4 @@
-import { WORK_MODULES } from "./workModules";
+import { WORK_MODULES, workModuleName } from "./workModules";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import WorkModulesPanel from "./WorkModulesPanel";
@@ -18,7 +18,7 @@ const buildRegistry = (openWorkModule = jest.fn()) => createModuleRegistry({
 test("declares the six work modules with a portrait", () => {
   expect(WORK_MODULES.map((module) => module.id)).toEqual(WORK_IDS);
   WORK_MODULES.forEach((module) => {
-    expect(module.image).toMatch(/^\/api\/mythos\/img\/[a-z]+\.png$/);
+    expect(module.image).toMatch(/^\/api\/mythos\/img\/[a-z]+\.jpg$/);
   });
 });
 
@@ -68,11 +68,11 @@ test.each(WORK_MODULES)("clicking the $label icon opens its matching panel", (mo
   try {
     act(() => root.render(<WorkModulesPanel initialModule="workflows" user={{ id: "test" }} onClose={onClose} />));
     const button = [...container.querySelectorAll(".work-nav button")]
-      .find((entry) => entry.textContent.includes(module.label));
+      .find((entry) => entry.textContent.includes(workModuleName(module.label)));
     expect(button).toBeDefined();
     act(() => button.click());
     expect(button.classList.contains("selected")).toBe(true);
-    expect(container.querySelector(".oracle-title").textContent).toContain(module.label);
+    expect(container.querySelector(".oracle-title").textContent).toContain(workModuleName(module.label));
     expect(new URL(container.querySelector(".work-portrait img").src).pathname).toBe(module.image);
     act(() => container.querySelector(".setup-close").click());
     expect(onClose).toHaveBeenCalledTimes(1);

@@ -35,16 +35,16 @@
 .pwa-banner-text b {
   font-family: "Cinzel", "Orbitron", serif;
   font-size: 14px; letter-spacing: 0.08em;
-  color: #a5f3fc; text-shadow: 0 0 10px rgba(126, 231, 255, 0.5);
+  color: #ffffff; text-shadow: 0 0 10px rgba(126, 231, 255, 0.5);
 }
-.pwa-banner-text span { font-size: 11.5px; color: #bfe9f8; line-height: 1.4; }
+.pwa-banner-text span { font-size: 11.5px; color: #ffffff; line-height: 1.4; }
 .pwa-ios-hint { display: inline-flex; align-items: center; gap: 5px; }
 .pwa-banner-actions { display: flex; flex-direction: column; gap: 6px; flex: 0 0 auto; }
 .pwa-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   padding: 7px 12px; border-radius: 8px; cursor: pointer;
   font-family: "Orbitron", sans-serif; font-size: 9.5px; letter-spacing: 0.08em;
-  color: #91e6f2; background: rgba(0, 50, 70, 0.5);
+  color: #ffffff; background: rgba(0, 50, 70, 0.5);
   border: 1px solid rgba(145, 230, 242, 0.5);
   transition: box-shadow 0.2s, color 0.2s;
   white-space: nowrap;
@@ -52,17 +52,17 @@
 .pwa-btn.install {
   color: #f2d99a; border-color: rgba(216, 184, 117, 0.6); background: rgba(70, 50, 10, 0.4);
 }
-.pwa-btn:hover:not(:disabled) { color: #eafaff; box-shadow: 0 0 12px rgba(145, 230, 242, 0.4); }
+.pwa-btn:hover:not(:disabled) { color: #ffffff; box-shadow: 0 0 12px rgba(145, 230, 242, 0.4); }
 .pwa-btn.install:hover:not(:disabled) { box-shadow: 0 0 14px rgba(216, 184, 117, 0.45); }
 .pwa-btn:disabled { opacity: 0.5; cursor: wait; }
 .pwa-close {
   position: absolute; top: 8px; right: 8px;
   display: inline-flex; align-items: center; justify-content: center;
   width: 24px; height: 24px; border-radius: 7px; cursor: pointer;
-  color: #9fd3e8; background: transparent; border: 1px solid transparent;
+  color: #ffffff; background: transparent; border: 1px solid transparent;
   transition: color 0.2s, border-color 0.2s;
 }
-.pwa-close:hover { color: #eafaff; border-color: rgba(145, 230, 242, 0.5); }
+.pwa-close:hover { color: #ffffff; border-color: rgba(145, 230, 242, 0.5); }
 
 /* Pastille notifications en mode installé */
 .pwa-bell-pill {

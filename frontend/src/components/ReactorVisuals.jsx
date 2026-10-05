@@ -82,6 +82,10 @@ export function ReactorCore({ status, volume, color, eco }) {
     let lastFrame = 0;
     const draw = (ts) => {
       raf = requestAnimationFrame(draw);
+      // Figé pendant le déplacement d'une fenêtre : libère le GPU pour un glissement fluide.
+      if (document.documentElement.classList.contains("sirius-dragging")) return;
+      // Figé aussi derrière la roue ouverte (HUD flouté, animations CSS en pause).
+      if (document.querySelector(".modwheel-overlay:not(.is-minimized)")) return;
       const s = stateRef.current;
       // Mode économie : on ralentit fortement le rafraîchissement (surtout en veille)
       const minDt = s.eco ? (s.status === "idle" || s.status === "listening" ? 110 : 55) : 33;
@@ -389,7 +393,10 @@ export function Waveform({ status, color }) {
     window.addEventListener("resize", resize);
     let lastWave = 0;
     const draw = (ts) => {
-      if (ts && ts - lastWave < 33) { raf = requestAnimationFrame(draw); return; }
+      if ((ts && ts - lastWave < 33) || document.documentElement.classList.contains("sirius-dragging")) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
       lastWave = ts || 0;
       t += 0.05;
       const w = canvas.width, h = canvas.height, mid = h / 2;

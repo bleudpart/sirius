@@ -1,5 +1,5 @@
 /* © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France). */
-/* Palette de commandes (Ctrl+K) */
+/* Palette de commandes (Ctrl+Maj+K) */
 .cmdp-overlay {
   position: fixed; inset: 0; z-index: 3000;
   display: flex; align-items: flex-start; justify-content: center;
@@ -25,30 +25,30 @@
 @keyframes cmdpIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
 .cmdp-search {
   display: flex; align-items: center; gap: 10px; padding: 14px 16px;
-  border-bottom: 1px solid rgba(145, 230, 242, 0.18); color: #7df3ff;
+  border-bottom: 1px solid rgba(145, 230, 242, 0.18); color: #ffffff;
 }
 .cmdp-search input {
-  flex: 1; background: none; border: none; outline: none; color: #eaf7fb;
+  flex: 1; background: none; border: none; outline: none; color: #ffffff;
   font-family: "Rajdhani", sans-serif; font-size: 16px; letter-spacing: 0.5px;
 }
 .cmdp-search input::placeholder { color: #5a7a86; }
 .cmdp-search kbd {
-  font-family: "Orbitron", sans-serif; font-size: 9px; color: #7df3ff;
+  font-family: "Orbitron", sans-serif; font-size: 9px; color: #ffffff;
   border: 1px solid rgba(145, 230, 242, 0.4); border-radius: 4px; padding: 2px 6px;
 }
 .cmdp-list { overflow-y: auto; padding: 8px; }
 .cmdp-empty { padding: 20px; text-align: center; color: #5a7a86; font-family: "Rajdhani", sans-serif; }
 .cmdp-item {
   display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; cursor: pointer;
-  background: none; border: none; border-radius: 8px; color: #b9d4de;
+  background: none; border: none; border-radius: 8px; color: rgba(255, 255, 255, 0.78);
   font-family: "Rajdhani", sans-serif; font-size: 14.5px; letter-spacing: 0.4px; text-align: left;
   transition: background-color 0.12s;
 }
-.cmdp-item svg { color: #91e6f2; flex: 0 0 auto; }
-.cmdp-item.sel { background: rgba(145, 230, 242, 0.16); color: #eaf7fb; }
+.cmdp-item svg { color: #ffffff; flex: 0 0 auto; }
+.cmdp-item.sel { background: rgba(145, 230, 242, 0.16); color: #ffffff; }
 .cmdp-label { flex: 1; }
 .cmdp-module-name { color: #d8b875; font-family: "Cinzel", serif; font-weight: 600; }
-.cmdp-enter { color: #7df3ff; opacity: 0.8; }
+.cmdp-enter { color: #ffffff; opacity: 0.8; }
 .cmdp-foot {
   display: flex; gap: 18px; justify-content: flex-end; padding: 8px 16px;
   border-top: 1px solid rgba(145, 230, 242, 0.14);

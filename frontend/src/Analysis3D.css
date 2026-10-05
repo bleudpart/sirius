@@ -25,11 +25,11 @@
   border-bottom: 1px solid rgba(216, 184, 117, 0.3);
 }
 .an3d-title { font-family: "Cinzel", serif; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-shadow: 0 0 8px rgba(216, 184, 117, 0.4); }
-.an3d-hint { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; font-size: 10.5px; color: #7fb6cc; font-style: italic; }
+.an3d-hint { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; font-size: 10.5px; color: rgba(255, 255, 255, 0.78); font-style: italic; }
 .an3d-close {
   display: inline-flex; align-items: center; justify-content: center;
   width: 26px; height: 26px; border-radius: 6px; cursor: pointer;
-  color: #9fd3e8; background: transparent; border: 1px solid transparent;
+  color: #ffffff; background: transparent; border: 1px solid transparent;
   transition: color 0.2s, border-color 0.2s;
 }
 .an3d-close:hover { color: #f2d99a; border-color: rgba(216, 184, 117, 0.55); }

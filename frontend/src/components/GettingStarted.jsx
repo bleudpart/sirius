@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { WORK_MODULES } from "../workModules";
+import { WORK_MODULES, workModuleName } from "../workModules";
 import "./GettingStarted.css";
 
 export function gettingStartedKey(user) {
@@ -46,7 +46,7 @@ export default function GettingStarted({ storageKey, ready, requested, onClose, 
       </div>
       <details>
         <summary>Comprendre les noms des modules</summary>
-        <ul>{WORK_MODULES.map((module) => <li key={module.id}><strong>{module.description}</strong> — <span className="getting-started-module-name">{module.label}</span></li>)}</ul>
+        <ul>{WORK_MODULES.map((module) => <li key={module.id}><strong>{module.description}</strong> — <span className="getting-started-module-name">{workModuleName(module.label)}</span></li>)}</ul>
         <p>Ces six modules gardent leurs données sur cet appareil. Les services connectés et les autres modules ont leur propre stockage.</p>
         <p>Devis, factures et stocks : <strong className="getting-started-module-name">THÉMIS#</strong>. Agenda Google : <strong className="getting-started-module-name">AGENDA</strong>. Domotique : <strong className="getting-started-module-name">KERAUNOS#</strong>, avec des équipements compatibles configurés.</p>
       </details>

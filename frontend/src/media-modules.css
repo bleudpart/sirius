@@ -10,7 +10,7 @@
   background:
     radial-gradient(circle at 100% 0, rgba(145, 230, 242, 0.08), transparent 32%),
     linear-gradient(135deg, rgba(4, 18, 30, 0.44), rgba(2, 10, 18, 0.2));
-  color: #d9f6ff;
+  color: #ffffff;
   font-family: "Rajdhani", sans-serif;
 }
 
@@ -33,7 +33,7 @@
 }
 
 .media-module-type {
-  color: var(--media-cyan);
+  color: #ffffff;
   font-family: "Orbitron", sans-serif;
   font-size: 8px;
   font-weight: 700;
@@ -42,7 +42,7 @@
 
 .media-modules h2 {
   margin: 4px 0 6px;
-  color: var(--media-cyan-soft);
+  color: #ffffff;
   font-family: "Orbitron", sans-serif;
   font-size: 17px;
   font-weight: 700;
@@ -54,7 +54,7 @@
 .media-modules-head p {
   max-width: 580px;
   margin: 0;
-  color: rgba(185, 225, 235, 0.8);
+  color: rgba(255, 255, 255, 0.8);
   font-size: 14px;
   font-weight: 600;
   line-height: 1.35;
@@ -69,7 +69,7 @@
   border: 1px solid rgba(145, 230, 242, 0.45);
   border-radius: 6px;
   background: linear-gradient(180deg, rgba(145, 230, 242, 0.16), rgba(4, 37, 53, 0.88));
-  color: var(--media-cyan-soft);
+  color: #ffffff;
   cursor: pointer;
   font-family: "Orbitron", sans-serif;
   font-size: 8px;
@@ -136,7 +136,7 @@
 }
 
 .media-module-icon.is-video {
-  color: var(--media-cyan-soft);
+  color: #ffffff;
   background: rgba(145, 230, 242, 0.1);
 }
 
@@ -151,7 +151,7 @@
 
 .media-module-card h3 {
   margin: 3px 0 4px;
-  color: #e8fbff;
+  color: #ffffff;
   font-family: "Rajdhani", sans-serif;
   font-size: 18px;
   font-weight: 700;
@@ -161,7 +161,7 @@
 
 .media-module-card p {
   margin: 0;
-  color: rgba(191, 222, 231, 0.72);
+  color: rgba(255, 255, 255, 0.72);
   font-size: 13px;
   font-weight: 600;
   line-height: 1.25;
@@ -200,7 +200,7 @@
   border: 1px solid rgba(145, 230, 242, 0.24);
   border-radius: 7px;
   background: rgba(4, 18, 30, 0.76);
-  color: rgba(185, 225, 235, 0.9);
+  color: rgba(255, 255, 255, 0.9);
   font-family: "Rajdhani", sans-serif;
   font-size: 14px;
   font-weight: 600;

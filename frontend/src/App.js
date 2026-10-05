@@ -59,7 +59,7 @@ import { chooseBestVoiceTranscript, extractVoiceCommand, normalizeVoiceTranscrip
 import { initHoloWindows, minimizeAll, resetHoloWindowLayout } from "@/holoWindows";
 import { ConfirmButton } from "@/ConfirmButton";
 import { getHUDStyleVariables, renderHUD } from "@/theme";
-import { SiriusInfoHub, SiriusNextAction } from "@/hud/SiriusHudPanels";
+import { SiriusInfoHub, SiriusInfoWheel, SiriusNextAction } from "@/hud/SiriusHudPanels";
 import { restoreHudPanel } from "@/hud/hudPanelState";
 import { BACKEND_BASE_URL } from "@/lib/api";
 import "@/App.css";
@@ -926,6 +926,7 @@ function App() {
   const [showPythagore, setShowPythagore] = useState(false);
   const [showNews, setShowNews] = useState(false);
   const [showModulesMenu, setShowModulesMenu] = useState(false);
+  const [showInfoWheel, setShowInfoWheel] = useState(false);
   const [showGettingStarted, setShowGettingStarted] = useState(false);
   const [showKeysStatus, setShowKeysStatus] = useState(false);
   const [showKeraunos, setShowKeraunos] = useState(false);
@@ -937,23 +938,60 @@ function App() {
   const auth = useAuth() || {};
   const authUser = auth.user;
   const mailCache = useMailCache(authUser);
-  // Plein écran global du HUD (API Fullscreen du navigateur)
+  // Plein écran global du HUD : fenêtre Electron si disponible, sinon API Fullscreen du navigateur
   const [isFullscreen, setIsFullscreen] = useState(false);
   useEffect(() => {
     const onFs = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", onFs);
-    return () => document.removeEventListener("fullscreenchange", onFs);
+    const desktop = window.siriusDesktop;
+    let stopResizeSync = null;
+    if (desktop?.isFullscreen) {
+      // Échap / F11 côté Windows modifient l'état sans passer par le bouton.
+      const sync = () => desktop.isFullscreen().then((r) => setIsFullscreen(!!r?.fullscreen)).catch(() => {});
+      sync();
+      window.addEventListener("resize", sync);
+      stopResizeSync = () => window.removeEventListener("resize", sync);
+    }
+    return () => {
+      document.removeEventListener("fullscreenchange", onFs);
+      stopResizeSync?.();
+    };
   }, []);
-  const toggleFullscreen = useCallback(() => {
+  const toggleFullscreen = useCallback(async () => {
+    const desktop = window.siriusDesktop;
+    if (desktop?.toggleFullscreen) {
+      try {
+        const r = await desktop.toggleFullscreen();
+        setIsFullscreen(!!r?.fullscreen);
+        return;
+      } catch { /* repli navigateur */ }
+    }
     try {
-      if (document.fullscreenElement) document.exitFullscreen();
-      else document.documentElement.requestFullscreen();
-    } catch (e) { /* non supporté */ }
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen({ navigationUI: "hide" });
+    } catch (e) {
+      console.warn("Plein écran indisponible.", e);
+    }
   }, []);
+  // Application Windows : Échap quitte le plein écran (comme un navigateur) et F11 le bascule.
+  useEffect(() => {
+    const desktop = window.siriusDesktop;
+    if (!desktop?.toggleFullscreen) return undefined;
+    const onKey = (e) => {
+      if (e.key === "F11") {
+        e.preventDefault();
+        toggleFullscreen();
+      } else if (e.key === "Escape" && isFullscreen) {
+        toggleFullscreen();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isFullscreen, toggleFullscreen]);
   const [showCmdPalette, setShowCmdPalette] = useState(false);
   useEffect(() => {
     const onKey = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setShowCmdPalette((o) => !o);
       }
@@ -5697,7 +5735,8 @@ function App() {
     const onKey = (e) => {
       if (e.ctrlKey || e.metaKey) {
         const k = e.key.toLowerCase();
-        if (k === "k") { e.preventDefault(); setShowModulesMenu((o) => !o); }
+        if (k === "k") { if (!e.shiftKey) { e.preventDefault(); setShowModulesMenu((o) => !o); } }
+        else if (k === "i") { e.preventDefault(); setShowInfoWheel((o) => !o); }
         else if (k === "p") { e.preventDefault(); setShowAgora(true); }
         else if (k === "m") { e.preventDefault(); setShowMythosGallery(true); }
         else if (k === "j") { e.preventDefault(); setShowNews(true); }
@@ -6051,7 +6090,7 @@ function App() {
 
   statusPulseRef.current.status = status;
 
-  // Registre centralisé des modules (menu déroulant + palette Ctrl+K) — avec les noms inscrits
+  // Registre centralisé des modules (roue des modules Ctrl+K + palette Ctrl+Maj+K) — avec les noms inscrits
   // Navigation tactile (tablette/mobile) : balayage = module précédent/suivant, pincement = fermer/ouvrir
   const TOUCH_RING = [
     { label: "PANTHEON SYSTEM", get: () => showPantheon, set: setShowPantheon },
@@ -6602,7 +6641,7 @@ function App() {
         <div className="conn-status" data-testid="sirius-connection">
           <span className={`conn-led ${connected ? "on" : "off"}`} />
           {"IA CLOUD"}
-          <MicrophoneIndicator active={captureMicOn || interruptMicOn} showLabel />
+          <MicrophoneIndicator active={autoMic || captureMicOn || interruptMicOn} showLabel />
           {mode === "brainstorm" && <span className="mode-badge" data-testid="brainstorm-badge">BRAINSTORM</span>}
           
           {/* Connection status badge */}
@@ -6643,6 +6682,16 @@ function App() {
             title="Menu des modules (Ctrl+K)"
           >
             <Grip size={15} />
+          </button>
+          <button
+            type="button"
+            className={`profile-btn ${showInfoWheel ? "on" : ""}`}
+            onClick={() => setShowInfoWheel((o) => !o)}
+            data-testid="sirius-info-btn"
+            title="Centre d'information ΣIRIUS (Ctrl+I)"
+            aria-label="Centre d'information"
+          >
+            <BadgeInfo size={15} />
           </button>
           <button
             type="button"
@@ -6688,7 +6737,7 @@ function App() {
             aria-pressed={autoMic}
             data-testid="sirius-top-mic-btn"
           >
-            {autoMic ? <MicOff size={15} /> : <Mic size={15} />}
+            {autoMic ? <Mic size={15} /> : <MicOff size={15} />}
           </button>
           <button
             className="profile-btn profile-btn-pinned"
@@ -6712,6 +6761,15 @@ function App() {
         </div>
     </header>
       <ModulesMenu open={showModulesMenu} onClose={closeModulesMenu} items={moduleItems} />
+      <SiriusInfoWheel
+        open={showInfoWheel}
+        onClose={() => setShowInfoWheel(false)}
+        weather={weather}
+        connected={connected}
+        ecoMode={ecoMode}
+        setEcoMode={setEcoMode}
+        onOpenThemis={() => setShowThemis(true)}
+      />
       <CommandPalette open={showCmdPalette} onClose={closeCommandPalette} items={moduleItems} />
 
       {nowPlaying && nowPlaying.title && (
@@ -6815,15 +6873,17 @@ function App() {
 
       {/* Tableau de bord principal ΣIRIUS — noyau central + fenêtre d'info unique */}
       <main className="sirius-dashboard sirius-dashboard--hub">
-        <aside className="sirius-column sirius-column--left">
-          <SiriusInfoHub
-            weather={weather}
-            connected={connected}
-            ecoMode={ecoMode}
-            setEcoMode={setEcoMode}
-            onOpenThemis={() => setShowThemis(true)}
-          />
-        </aside>
+        {mobileDestination === "info" && (
+          <aside className="sirius-column sirius-column--left">
+            <SiriusInfoHub
+              weather={weather}
+              connected={connected}
+              ecoMode={ecoMode}
+              setEcoMode={setEcoMode}
+              onOpenThemis={() => setShowThemis(true)}
+            />
+          </aside>
+        )}
 
         <section className="sirius-center">
           <div className="sirius-stage">

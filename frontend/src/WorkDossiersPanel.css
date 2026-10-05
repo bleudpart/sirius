@@ -1,4 +1,4 @@
-.work-dossiers { color: #d6eef2; overflow-y: auto; }
+.work-dossiers { color: #ffffff; overflow-y: auto; }
 .work-dossiers-head { display: flex; align-items: center; justify-content: space-between; }
 .work-dossiers-head h1 { display: flex; align-items: center; gap: 10px; font: 600 16px "Orbitron", sans-serif; color: #e4d096; }
 .work-dossiers-body { padding: 22px clamp(16px, 4vw, 46px); }
@@ -8,13 +8,13 @@
 .work-dossiers-grid h3 { font-size: 16px; }
 .work-dossiers-form { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; }
 .work-dossiers-form label { display: grid; gap: 6px; flex: 1 1 180px; }
-.work-dossiers-form input, .work-dossiers-form select, .work-dossiers-form textarea { width: 100%; padding: 9px; background: #091e28; color: #edf6f7; border: 1px solid #58828c; }
+.work-dossiers-form input, .work-dossiers-form select, .work-dossiers-form textarea { width: 100%; padding: 9px; background: #091e28; color: #ffffff; border: 1px solid #58828c; }
 .work-dossiers button:not(.setup-close) { padding: 9px; border: 1px solid #748d89; background: #122c36; color: #f0ddad; cursor: pointer; }
 .work-dossiers button:disabled { opacity: .55; cursor: not-allowed; }
 .work-dossiers-grid > div > button { display: block; width: 100%; text-align: left; margin-bottom: 6px; }
 .work-dossiers-grid button.selected { border-color: #e4d096; }
 .work-dossiers-entry, .work-dossiers-proposal { padding: 12px; border: 1px solid #3c626e; margin: 10px 0; }
-.work-dossiers-proposal small { color: #b9d9e0; }
+.work-dossiers-proposal small { color: #ffffff; }
 .work-dossiers-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .work-dossiers-error { color: #ffe0d8 !important; border: 1px solid #c97b70; padding: 10px; }
 .work-dossiers-integrations { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; margin: 16px 0; }
@@ -28,21 +28,21 @@
 .work-dossiers-capture label { display: grid; gap: 6px; }
 .work-dossiers-capture figure { margin: 0; }
 .work-dossiers-capture img { display: block; max-width: 100%; max-height: 220px; object-fit: contain; }
-.work-dossiers-capture small, .work-dossiers-capture figcaption { color: #b9d9e0; }
+.work-dossiers-capture small, .work-dossiers-capture figcaption { color: #ffffff; }
 .work-dossiers-thread { min-width: 0; }
 .work-dossiers-thread > details { border: 1px solid #3c626e; padding: 12px; margin: 12px 0; }
 .work-dossiers-thread summary { cursor: pointer; color: #e4d096; font-weight: 600; padding: 4px; }
 .work-dossiers-thread h2 { font-size: 18px; color: #e4d096; }
 .work-dossiers-thread .work-dossiers-form { margin-top: 12px; }
 .work-dossiers-thread .work-dossiers-form textarea { min-height: 90px; }
-.work-dossiers-meta { display: flex; flex-wrap: wrap; gap: 10px; color: #b9d9e0; font-size: 13px; }
+.work-dossiers-meta { display: flex; flex-wrap: wrap; gap: 10px; color: #ffffff; font-size: 13px; }
 .work-dossiers-source { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 0; }
 .work-dossiers-source small { overflow-wrap: anywhere; }
 .work-dossiers-day { border: 1px solid #748d89; background: #0d2530; padding: 16px; margin: 18px 0; }
 .work-dossiers-day h2, .work-dossiers-metiers h2 { color: #e4d096; font-size: 18px; }
 .work-dossiers-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 12px; }
 .work-dossiers-card-grid > * { min-width: 0; }
-.work-dossiers-metiers h4 { color: #b9d9e0; margin-bottom: 4px; }
+.work-dossiers-metiers h4 { color: #ffffff; margin-bottom: 4px; }
 .work-dossiers-evidence { margin-top: 12px; padding: 10px; background: #091e28; }
 .work-dossiers-evidence summary { cursor: pointer; color: #e4d096; }
 .work-dossiers-evidence dt { font-weight: 600; margin-top: 10px; color: #e4d096; }

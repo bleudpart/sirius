@@ -8,15 +8,15 @@
 .np-search {
   display: flex; align-items: center; gap: 8px; flex: 1 1 420px;
   background: rgba(0, 14, 24, 0.7); border: 1px solid rgba(145, 230, 242, 0.22);
-  border-radius: 6px; padding: 4px 6px 4px 12px; color: #7fdcee;
+  border-radius: 6px; padding: 4px 6px 4px 12px; color: #ffffff;
 }
 .np-search input {
   flex: 1; background: none; border: none; outline: none;
-  color: #d5f6ff; font-size: 13px; font-family: "Rajdhani", sans-serif;
+  color: #ffffff; font-size: 13px; font-family: "Rajdhani", sans-serif;
 }
 .np-search button, .np-actions button {
   display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
-  background: transparent; border: 1px solid rgba(145, 230, 242, 0.4); color: #7fdcee;
+  background: transparent; border: 1px solid rgba(145, 230, 242, 0.4); color: #ffffff;
   border-radius: 4px; padding: 5px 12px; font-size: 10px; letter-spacing: 1.5px;
   font-family: "Orbitron", sans-serif; transition: background-color 0.2s;
 }
@@ -26,7 +26,7 @@
 .np-actions { display: flex; align-items: center; gap: 8px; }
 .np-updated { font-size: 11px; color: #7c98a2; }
 .np-err { padding: 10px 26px; color: #f43f5e; font-size: 13px; }
-.np-loading { padding: 24px 26px; color: #7fb6cc; font-size: 14px; }
+.np-loading { padding: 24px 26px; color: rgba(255, 255, 255, 0.78); font-size: 14px; }
 .spin { animation: npSpin 1s linear infinite; }
 @keyframes npSpin { to { transform: rotate(360deg); } }
 
@@ -44,15 +44,15 @@
 .np-card-meta { display: flex; justify-content: space-between; gap: 10px; }
 .np-source { font-family: "Orbitron", sans-serif; font-size: 9.5px; letter-spacing: 1.8px; color: #f0be50; }
 .np-date { font-size: 11px; color: #7c98a2; }
-.np-title { margin: 0; font-size: 15.5px; line-height: 1.35; color: #e6f7ff; font-weight: 600; }
-.np-desc { margin: 0; font-size: 12.5px; line-height: 1.5; color: #9fc0cc; }
+.np-title { margin: 0; font-size: 15.5px; line-height: 1.35; color: #ffffff; font-weight: 600; }
+.np-desc { margin: 0; font-size: 12.5px; line-height: 1.5; color: rgba(255, 255, 255, 0.78); }
 .np-link {
   align-self: flex-start; display: inline-flex; align-items: center; gap: 6px;
   margin-top: 4px; font-family: "Orbitron", sans-serif; font-size: 9.5px;
-  letter-spacing: 1.5px; color: #7fdcee; text-decoration: none;
+  letter-spacing: 1.5px; color: #ffffff; text-decoration: none;
   border-bottom: 1px solid rgba(145, 230, 242, 0.35); padding-bottom: 2px;
 }
-.np-link:hover { color: #bdf3ff; }
+.np-link:hover { color: #ffffff; }
 
 /* Or véritable — actualités */
 .np-source {

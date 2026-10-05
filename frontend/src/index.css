@@ -61,7 +61,7 @@ body {
     justify-items: center;
     gap: var(--sirius-space-md);
     padding: var(--sirius-space-xl);
-    color: #e8fbff;
+    color: #ffffff;
     text-align: center;
     background:
         radial-gradient(circle at center, rgba(145, 230, 242, 0.12), transparent 42%),

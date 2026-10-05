@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { formatDocumentDate } from "./dateTime";
 import { CalendarDays, Check, FileText, FolderOpen, Plus, ScrollText, Tags, Trash2, Workflow, X } from "lucide-react";
-import { WORK_MODULES } from "@/workModules";
+import { WORK_MODULES, workModuleName as displayName } from "@/workModules";
 import { resolveBackendUrl } from "@/lib/api";
 import { downloadWorkJson, emptyWorkData, loadWorkData, mergeWorkBackup, newWorkId, parseWorkBackup, serializeWorkBackup, WORK_BACKUP_MAX_BYTES } from "@/workModuleBackup";
 import "./WorkModulesPanel.css";
@@ -62,11 +62,11 @@ function WorkModulesWorkspace({ storageKey, initialModule, onClose, onOpenExisti
     }
     if (active === "planning") item.done = false;
     if (active === "pricing") item.price = Number(form.price);
-    if (update({ ...data, [active]: [item, ...data[active]] }, `${module.label} : ajout de « ${title} »`)) setForm({});
+    if (update({ ...data, [active]: [item, ...data[active]] }, `${displayName(module.label)} : ajout de « ${title} »`)) setForm({});
   };
 
   const remove = () => {
-    if (update({ ...data, [active]: data[active].filter((entry) => entry.id !== pendingDelete.id) }, `${module.label} : suppression de « ${pendingDelete.title} »`)) setPendingDelete(null);
+    if (update({ ...data, [active]: data[active].filter((entry) => entry.id !== pendingDelete.id) }, `${displayName(module.label)} : suppression de « ${pendingDelete.title} »`)) setPendingDelete(null);
   };
   const exportBackup = () => {
     try {
@@ -100,7 +100,7 @@ function WorkModulesWorkspace({ storageKey, initialModule, onClose, onOpenExisti
     const nextItem = stepIndex === null ? { ...item, done: !item.done } : {
       ...item, steps: (item.steps || []).map((step, index) => index === stepIndex ? { ...step, done: !step.done } : step),
     };
-    update({ ...data, [active]: data[active].map((entry) => entry.id === item.id ? nextItem : entry) }, `${module.label} : avancement de « ${item.title} »`);
+    update({ ...data, [active]: data[active].map((entry) => entry.id === item.id ? nextItem : entry) }, `${displayName(module.label)} : avancement de « ${item.title} »`);
   };
 
   const sortedItems = active === "pricing"
@@ -110,17 +110,17 @@ function WorkModulesWorkspace({ storageKey, initialModule, onClose, onOpenExisti
   return (
     <section className="prime-screen work-modules" data-testid="work-modules-panel" onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); onClose(); } }}>
       <header className="zeus-head work-header">
-        <div className="oracle-title font-divine"><Icon size={22} /> {module.label} <small>{module.description}</small></div>
+        <div className="oracle-title font-divine"><Icon size={22} /> {displayName(module.label)} <small>{module.description}</small></div>
         <button className="setup-close zeus-close" type="button" onClick={onClose} title="Fermer" aria-label="Fermer"><X size={18} /></button>
       </header>
       <div className={`work-layout ${portraitAvailable ? "with-portrait" : ""}`}>
         <nav className="work-nav" aria-label="Modules de travail">
           {WORK_MODULES.map((entry) => {
             const EntryIcon = ICONS[entry.icon];
-            return <button type="button" key={entry.id} className={active === entry.id ? "selected" : ""} aria-current={active === entry.id ? "page" : undefined} onClick={() => { setActive(entry.id); setForm({}); setPendingDelete(null); setError(""); setPortraitAvailable(true); }}><EntryIcon size={18} /><span>{entry.label}<small>{entry.description}</small></span></button>;
+            return <button type="button" key={entry.id} className={active === entry.id ? "selected" : ""} aria-current={active === entry.id ? "page" : undefined} onClick={() => { setActive(entry.id); setForm({}); setPendingDelete(null); setError(""); setPortraitAvailable(true); }}><EntryIcon size={18} /><span>{displayName(entry.label)}<small>{entry.description}</small></span></button>;
           })}
         </nav>
-        {portraitAvailable && <aside className="work-portrait"><img src={resolveBackendUrl(module.image)} alt={module.label} onError={() => setPortraitAvailable(false)} /></aside>}
+        {portraitAvailable && <aside className="work-portrait"><img src={resolveBackendUrl(module.image)} alt={displayName(module.label)} onError={() => setPortraitAvailable(false)} /><span>{displayName(module.label)}</span></aside>}
         <div className="work-content">
           {error && <p className="work-error" role="alert">{error}</p>}
           {loaded.error && <p className="work-error" role="alert">{loaded.error}</p>}

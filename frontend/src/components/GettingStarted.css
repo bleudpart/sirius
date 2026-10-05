@@ -11,7 +11,7 @@
   border: 1px solid rgba(216, 184, 117, .5);
   border-radius: 12px;
   background: #071725;
-  color: #d5e7ed;
+  color: #ffffff;
   box-shadow: 0 16px 48px rgba(0, 0, 0, .6);
   font: 400 15px/1.5 "Rajdhani", sans-serif;
 }
@@ -28,7 +28,7 @@
 .getting-started details { margin-top: 18px; }
 .getting-started summary { cursor: pointer; min-height: 44px; display: list-item; align-content: center; }
 .getting-started ul { padding-left: 20px; }
-.getting-started-voice { color: #b5cbd3; }
+.getting-started-voice { color: rgba(255, 255, 255, 0.78); }
 .getting-started-dismiss { min-height: 44px; padding: 8px 14px; background: transparent; border: 1px solid rgba(216, 184, 117, .45); border-radius: 6px; }
 .getting-started button:focus-visible, .getting-started summary:focus-visible { outline: 2px solid #91e6f2; outline-offset: 3px; }
 @media (max-width: 1023px) {

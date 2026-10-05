@@ -173,7 +173,7 @@ export default function PortusNummarius({ onClose }) {
                       <YAxis domain={["auto", "auto"]} tick={{ fill: "#8aa2b5", fontSize: 10 }} tickLine={false} axisLine={false} width={62}
                         tickFormatter={(v) => fmtPrice(v)} />
                       <Tooltip contentStyle={{ background: "rgba(5,14,22,0.95)", border: "1px solid rgba(216,184,117,0.5)", borderRadius: 8, fontSize: 12, color: "#f2d99a" }}
-                        formatter={(v) => [`${fmtPrice(v)} $`, sel.label]} labelStyle={{ color: "#7fd4e8" }} />
+                        formatter={(v) => [`${fmtPrice(v)} $`, sel.label]} labelStyle={{ color: "#ffffff" }} />
                       <Area type="monotone" dataKey="v" stroke={up ? "#91e6f2" : "#c98175"} strokeWidth={2} fill="url(#nummFill)" dot={false} animationDuration={600} />
                     </AreaChart>
                   </ResponsiveContainer>

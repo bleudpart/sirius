@@ -15,11 +15,11 @@
   font-family: "Orbitron", sans-serif;
   font-size: 7.5px;
   letter-spacing: 1.5px;
-  color: #7dd3fc;
+  color: #ffffff;
   border: 1px solid rgba(145, 230, 242, 0.3);
   padding: 3px 8px;
 }
-.mm-chip b { color: #e0fbff; margin-left: 4px; }
+.mm-chip b { color: #ffffff; margin-left: 4px; }
 
 .mm-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
 .mm-search {
@@ -30,7 +30,7 @@
   min-width: 220px;
   background: rgba(0, 18, 30, 0.75);
   border: 1px solid rgba(145, 230, 242, 0.35);
-  color: #91e6f2;
+  color: #ffffff;
   padding: 6px 10px;
 }
 .mm-search input {
@@ -38,14 +38,14 @@
   background: none;
   border: none;
   outline: none;
-  color: #d5f6ff;
+  color: #ffffff;
   font-family: "Rajdhani", sans-serif;
   font-size: 13px;
 }
 .mm-filters select {
   background: rgba(0, 18, 30, 0.85);
   border: 1px solid rgba(145, 230, 242, 0.35);
-  color: #8be9ff;
+  color: #ffffff;
   font-family: "Orbitron", sans-serif;
   font-size: 8px;
   letter-spacing: 1px;
@@ -62,7 +62,7 @@
 }
 .mm-row.muted { opacity: 0.55; }
 .mm-row-main { flex: 1; }
-.mm-content { color: #e6faff; font-size: 13.5px; margin: 0 0 5px; line-height: 1.4; }
+.mm-content { color: #ffffff; font-size: 13.5px; margin: 0 0 5px; line-height: 1.4; }
 .mm-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .mm-badge {
   display: inline-flex;
@@ -73,11 +73,11 @@
   letter-spacing: 1px;
   padding: 2px 6px;
   border: 1px solid rgba(145, 230, 242, 0.4);
-  color: #91e6f2;
+  color: #ffffff;
 }
 .mm-badge.t-prospective { border-color: #ff9500; color: #ffb347; }
 .mm-badge.t-procedural { border-color: #a78bfa; color: #c4b5fd; }
-.mm-badge.t-episodic { border-color: rgba(140, 200, 220, 0.5); color: #a5d8e6; }
+.mm-badge.t-episodic { border-color: rgba(140, 200, 220, 0.5); color: rgba(255, 255, 255, 0.78); }
 .mm-badge.s-inference { border-color: #ffd24d; color: #ffe08a; }
 .mm-badge.s-observation { border-color: #7dd3a0; color: #a0e8c0; }
 .mm-badge.contested { border-color: #c26b60; color: #ff8a8a; }
@@ -85,14 +85,14 @@
   font-family: "Orbitron", sans-serif;
   font-size: 7px;
   letter-spacing: 1px;
-  color: #5fa8bd;
+  color: rgba(255, 255, 255, 0.78);
 }
 
 .mm-row-actions { display: flex; gap: 5px; }
 .mm-icon-btn {
   background: rgba(0, 24, 40, 0.8);
   border: 1px solid rgba(145, 230, 242, 0.35);
-  color: #8be9ff;
+  color: #ffffff;
   padding: 5px 7px;
   cursor: pointer;
   transition: background-color 0.2s, box-shadow 0.2s;
@@ -108,7 +108,7 @@
   min-height: 48px;
   background: rgba(0, 18, 30, 0.9);
   border: 1px solid rgba(145, 230, 242, 0.5);
-  color: #e6faff;
+  color: #ffffff;
   font-family: "Rajdhani", sans-serif;
   font-size: 13px;
   padding: 6px 8px;
@@ -127,9 +127,9 @@
   font-family: "Orbitron", sans-serif;
   font-size: 7px;
   letter-spacing: 1px;
-  color: #91e6f2;
+  color: #ffffff;
   min-width: 150px;
 }
 .mm-audit-kind.k-block_sensitive, .mm-audit-kind.k-contradiction_pending { color: #ffb347; }
 .mm-audit-kind.k-delete { color: #ff8a8a; }
-.mm-audit-detail { flex: 1; color: #bfe9f5; font-size: 12px; }
+.mm-audit-detail { flex: 1; color: #ffffff; font-size: 12px; }

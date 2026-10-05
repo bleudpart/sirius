@@ -40,7 +40,7 @@
   }
 
   .mobile-navigation-item.active {
-    color: #dffbff;
+    color: #ffffff;
   }
 
   .mobile-navigation-item.active::after {
@@ -57,7 +57,7 @@
   }
 
   .mobile-navigation-item.active .mobile-navigation-icon {
-    color: #91e6f2;
+    color: #ffffff;
     background: rgba(145, 230, 242, 0.12);
   }
 

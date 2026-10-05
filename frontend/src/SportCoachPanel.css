@@ -1,4 +1,4 @@
-.sport-coach { color: #dfedf0; overflow-y: auto; }
+.sport-coach { color: #ffffff; overflow-y: auto; }
 .sport-head { display: flex; align-items: center; justify-content: space-between; }
 .sport-head h1 { display: flex; align-items: center; gap: 12px; color: #e4d096; font: 600 17px "Orbitron", sans-serif; }
 .sport-body { padding: 20px clamp(16px, 4vw, 48px) 48px; max-width: 1050px; margin: auto; }
@@ -6,13 +6,13 @@
 .sport-privacy { border-left-color: #83d1df; }
 .sport-form, .sport-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0; align-items: end; }
 .sport-form label, .sport-step label { display: grid; gap: 8px; flex: 1 1 190px; }
-.sport-coach select { background: #091e28; color: #edf6f7; border: 1px solid #769ca4; padding: 10px; width: 100%; }
+.sport-coach select { background: #091e28; color: #ffffff; border: 1px solid #769ca4; padding: 10px; width: 100%; }
 .sport-coach button:not(.setup-close) { display: inline-flex; align-items: center; gap: 7px; min-height: 42px; padding: 9px 12px; background: #142e39; border: 1px solid #91b4b9; color: #f3e1ad; cursor: pointer; }
 .sport-coach button:disabled { opacity: .5; cursor: not-allowed; }
 .sport-coach button:focus-visible, .sport-coach select:focus-visible { outline: 2px solid #d6bc81; outline-offset: 2px; }
 .sport-coach h2 { color: #e4d096; font-size: 18px; }
 .sport-log { border-bottom: 1px solid #47707b; padding: 12px 0; }
-.sport-progress { color: #b0d7de; margin: 18px 0; }
+.sport-progress { color: rgba(255, 255, 255, 0.78); margin: 18px 0; }
 .sport-adaptation { flex: 1 1 100%; min-width: 0; padding: 16px; border: 1px solid #507c86; line-height: 1.5; }
 .sport-adaptation legend { color: #e4d096; }
 .sport-proposal { padding: 12px; background: rgba(4, 25, 35, .85); }
@@ -24,5 +24,5 @@
 .sport-error { color: #ffb8ae; }
 .sport-message { color: #b9eac9; }
 .sport-sources { margin-top: 28px; font-size: 13px; line-height: 1.5; }
-.sport-sources a { color: #b8e8ee; }
+.sport-sources a { color: #ffffff; }
 @media (max-width: 700px) { .sport-step { grid-template-columns: 1fr; } }

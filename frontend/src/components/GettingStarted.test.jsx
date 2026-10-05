@@ -31,7 +31,7 @@ test("waits for boot and setup, then explains optional connections, voice and al
   expect(host.textContent).toContain("Cette étape est facultative");
   expect(host.textContent).toContain("sans annuler une action déjà envoyée");
   WORK_MODULES.forEach((module) => {
-    expect(host.textContent).toContain(module.label);
+    expect(host.textContent).toContain(module.label.replace(/#$/, ""));
     expect(host.textContent).toContain(module.description);
   });
   expect(props.onModule).not.toHaveBeenCalled();
@@ -79,13 +79,45 @@ test("module menu shows purpose first, preserves names and runs the original act
   const onClose = jest.fn();
   const Icon = () => null;
   await act(async () => root.render(<ModulesMenu open onClose={onClose} items={[
-    { id: "dossiers", label: "MNÉMOSYNE# — dossiers et archives", Icon, run, group: "PANTHÉON" },
+    { id: "dossiers", label: "MNÉMOSYNE — dossiers et archives", Icon, run, group: "PANTHÉON" },
     { id: "themis", label: "THÉMIS# — gestion d'entreprise", Icon, run, group: "PANTHÉON" },
   ]} />));
-  const button = host.querySelector('[data-testid="modules-menu-item-dossiers"]');
-  expect(button.textContent).toBe("Dossiers et archivesMNÉMOSYNE#");
-  expect(host.querySelector('[data-testid="modules-menu-item-themis"]').textContent).toBe("gestion d'entrepriseTHÉMIS#");
+  const button = document.querySelector('[data-testid="modules-menu-item-dossiers"]');
+  expect(button.textContent).toBe("Dossiers et archivesMNÉMOSYNE");
+  expect(document.querySelector('[data-testid="modules-menu-item-themis"]').textContent).toBe("gestion d'entrepriseTHÉMIS");
   await act(async () => button.click());
   expect(run).toHaveBeenCalledTimes(1);
+  expect(onClose).toHaveBeenCalledTimes(1);
+});
+
+test("module wheel switches categories and searches every entry", async () => {
+  const run = jest.fn();
+  const onClose = jest.fn();
+  const Icon = () => null;
+  await act(async () => root.render(<ModulesMenu open onClose={onClose} items={[
+    { id: "themis", label: "THÉMIS# — gestion d'entreprise", Icon, run, group: "PANTHÉON" },
+    { id: "capture-region", label: "Capture d'une zone", Icon, run, group: "OUTILS" },
+    { id: "spotify", label: "Spotify — lecteur intégré", Icon, run, group: "MÉDIAS", active: true },
+    { id: "reload", label: "Recharger ΣIRIUS", Icon, run, group: "SYSTÈME" },
+    { id: "future", label: "Nouveau secteur", Icon, run, group: "LABO" },
+  ]} />));
+  const item = (id) => document.querySelector(`[data-testid="modules-menu-item-${id}"]`);
+  expect(item("spotify")).not.toBeNull();
+  expect(item("themis")).toBeNull();
+  expect(document.querySelector('[data-testid="modules-menu-group-LABO"]')).not.toBeNull();
+  await act(async () => document.querySelector('[data-testid="modules-menu-group-SYSTÈME"]').click());
+  expect(item("reload")).not.toBeNull();
+  expect(item("spotify")).toBeNull();
+  const search = document.querySelector('[data-testid="modules-menu-search"]');
+  const setValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+  await act(async () => { setValue.call(search, "capture"); search.dispatchEvent(new Event("input", { bubbles: true })); });
+  expect(item("capture-region")).not.toBeNull();
+  expect(item("reload")).toBeNull();
+  await act(async () => { setValue.call(search, "theMIS"); search.dispatchEvent(new Event("input", { bubbles: true })); });
+  expect(item("themis")).not.toBeNull();
+  await act(async () => search.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+  expect(onClose).not.toHaveBeenCalled();
+  expect(search.value).toBe("");
+  await act(async () => search.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
   expect(onClose).toHaveBeenCalledTimes(1);
 });

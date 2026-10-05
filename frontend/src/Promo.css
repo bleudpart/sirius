@@ -62,7 +62,7 @@
 .promo-time {
   position: absolute; bottom: 10px; left: 10px;
   font-family: "Orbitron", sans-serif; font-size: 10px; letter-spacing: 1px;
-  color: #8be1ff; background: rgba(4, 18, 28, 0.8);
+  color: #ffffff; background: rgba(4, 18, 28, 0.8);
   border: 1px solid rgba(145, 230, 242, 0.45); border-radius: 6px;
   padding: 3px 8px; backdrop-filter: blur(4px);
 }
@@ -83,7 +83,7 @@
 }
 .promo-field {
   font-family: "Rajdhani", sans-serif; font-size: 13px; line-height: 1.45;
-  color: #b9d4e0;
+  color: #ffffff;
 }
 .promo-field b {
   display: block;
@@ -96,7 +96,7 @@
   display: flex; align-items: flex-start; gap: 6px;
   margin-top: 2px; padding: 8px 10px;
   font-family: "Rajdhani", sans-serif; font-size: 13px; font-style: italic;
-  color: #8be1ff; background: rgba(145, 230, 242, 0.06);
+  color: #ffffff; background: rgba(145, 230, 242, 0.06);
   border-left: 2px solid rgba(145, 230, 242, 0.55); border-radius: 0 8px 8px 0;
 }
 .promo-voice svg { flex-shrink: 0; margin-top: 2px; }
@@ -156,7 +156,7 @@
 }
 .promo-show-voice {
   font-family: "Rajdhani", sans-serif; font-size: 18px; font-style: italic;
-  color: #cfeef8; text-shadow: 0 0 10px rgba(145, 230, 242, 0.4);
+  color: #ffffff; text-shadow: 0 0 10px rgba(145, 230, 242, 0.4);
 }
 .promo-show-dots { display: flex; gap: 8px; margin-top: 4px; }
 .promo-show-dots span {

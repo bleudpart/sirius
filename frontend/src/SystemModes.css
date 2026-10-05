@@ -97,9 +97,9 @@
   font-family: "Orbitron", sans-serif;
   font-size: 9px;
   letter-spacing: 2.5px;
-  color: #d3faff;
+  color: #ffffff;
 }
-.vision-icon-btn { background: none; border: 1px solid rgba(145,230,242,0.35); color: #91e6f2; padding: 3px 5px; cursor: pointer; }
+.vision-icon-btn { background: none; border: 1px solid rgba(145,230,242,0.35); color: #ffffff; padding: 3px 5px; cursor: pointer; }
 .vision-video { width: 100%; border: 1px solid rgba(145, 230, 242, 0.3); display: block; }
 .vision-error { color: #d8b875; font-size: 11px; line-height: 1.4; }
 .vision-question {
@@ -107,7 +107,7 @@
   margin-top: 8px;
   background: rgba(6, 19, 33, 0.85);
   border: 1px solid rgba(145, 230, 242, 0.35);
-  color: #edf7f8;
+  color: #ffffff;
   font-family: "Rajdhani", sans-serif;
   font-size: 12px;
   padding: 6px 8px;
@@ -120,7 +120,7 @@
   gap: 5px;
   background: rgba(13, 35, 54, 0.85);
   border: 1px solid rgba(145, 230, 242, 0.5);
-  color: #91e6f2;
+  color: #ffffff;
   font-family: "Orbitron", sans-serif;
   font-size: 8px;
   letter-spacing: 1.5px;
@@ -133,7 +133,7 @@
 .vision-privacy { color: #748b99; font-size: 9px; }
 .vision-desc {
   margin-top: 9px;
-  color: #edf7f8;
+  color: #ffffff;
   font-size: 12px;
   line-height: 1.45;
   border-left: 2px solid rgba(145, 230, 242, 0.5);

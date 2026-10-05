@@ -3,7 +3,7 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Search, CornerDownLeft } from "lucide-react";
 import "./CommandPalette.css";
 
-// Palette de commandes (Ctrl+K) : recherche et lance n'importe quel module par son nom.
+// Palette de commandes (Ctrl+Maj+K) : recherche et lance n'importe quel module par son nom.
 function CommandPalette({ open, onClose, items }) {
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
@@ -64,7 +64,7 @@ function CommandPalette({ open, onClose, items }) {
             );
           })}
         </div>
-        <div className="cmdp-foot"><span>↑↓ naviguer</span><span>↵ ouvrir</span><span>Ctrl+K</span></div>
+        <div className="cmdp-foot"><span>↑↓ naviguer</span><span>↵ ouvrir</span><span>Ctrl+Maj+K</span></div>
       </div>
     </div>
   );

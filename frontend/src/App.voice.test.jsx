@@ -23,7 +23,7 @@ jest.mock("./uiSounds", () => ({ initUiSounds: () => () => {} }));
 jest.mock("./holoFx", () => ({ initHoloFx: () => () => {} }));
 jest.mock("./readAloud", () => ({ initReadAloud: () => () => {} }));
 jest.mock("./useTouchNav", () => () => {});
-jest.mock("./hud/SiriusHudPanels", () => ({ SiriusInfoHub: () => null, SiriusNextAction: () => null }));
+jest.mock("./hud/SiriusHudPanels", () => ({ SiriusInfoHub: () => null, SiriusInfoWheel: () => null, SiriusNextAction: () => null }));
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const originalFetch = global.fetch;
@@ -160,9 +160,10 @@ test("first-use guide focuses the written chat and can be reopened from the modu
   expect(document.activeElement).toBe(host.querySelector('[data-testid="sirius-cmd-input"]'));
   expect(localStorage.getItem("sirius_getting_started_v1:voice-test")).toBe("done");
   await act(async () => host.querySelector('[data-testid="sirius-modules-btn"]').click());
-  await act(async () => host.querySelector('[data-testid="modules-menu-item-getting-started"]').click());
+  await act(async () => document.querySelector('[data-testid="modules-menu-group-OUTILS"]').click());
+  await act(async () => document.querySelector('[data-testid="modules-menu-item-getting-started"]').click());
   expect(host.querySelector('[data-testid="getting-started"]')).not.toBeNull();
-  expect(host.querySelector('[data-testid="modules-menu"]')).toBeNull();
+  expect(document.querySelector('[data-testid="modules-menu"]')).toBeNull();
 });
 
 test("pointer Stop discards the buffered phrase before the global push-to-talk release", async () => {

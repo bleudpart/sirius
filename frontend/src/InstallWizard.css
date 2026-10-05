@@ -27,13 +27,13 @@
   font-family: "Orbitron", sans-serif;
   font-size: 13px;
   letter-spacing: 4px;
-  color: #aef3ff;
+  color: #ffffff;
   text-shadow: 0 0 12px rgba(145, 230, 242, 0.6);
 }
 .iw-icon-btn {
   background: none;
   border: 1px solid rgba(145, 230, 242, 0.35);
-  color: #8be9ff;
+  color: #ffffff;
   padding: 4px 6px;
   cursor: pointer;
   transition: background-color 0.2s;
@@ -60,7 +60,7 @@
   gap: 10px;
   padding: 6px 10px;
   border: 1px solid transparent;
-  color: #6fa9be;
+  color: rgba(255, 255, 255, 0.78);
   transition: border-color 0.25s, background-color 0.25s;
 }
 .iw-step.current { border-color: rgba(145, 230, 242, 0.45); background: rgba(145, 230, 242, 0.06); }
@@ -75,7 +75,7 @@
 }
 .iw-step-status .ok { color: #7dffd4; }
 .iw-step-status .err { color: #ff7a7a; }
-.iw-spin { animation: iwSpin 1s linear infinite; color: #91e6f2; }
+.iw-spin { animation: iwSpin 1s linear infinite; color: #ffffff; }
 @keyframes iwSpin { to { transform: rotate(360deg); } }
 
 .iw-message {
@@ -86,7 +86,7 @@
 }
 .iw-message.error { border-left-color: #ff5a5a; background: rgba(60, 10, 10, 0.35); }
 .iw-message.ok { border-left-color: #33ffbb; }
-.iw-message p { color: #d5f6ff; font-size: 12.5px; line-height: 1.5; margin: 0; }
+.iw-message p { color: #ffffff; font-size: 12.5px; line-height: 1.5; margin: 0; }
 
 .iw-actions { display: flex; gap: 8px; margin-top: 10px; }
 .iw-btn {
@@ -95,7 +95,7 @@
   gap: 5px;
   background: rgba(0, 24, 40, 0.85);
   border: 1px solid rgba(145, 230, 242, 0.45);
-  color: #8be9ff;
+  color: #ffffff;
   font-family: "Orbitron", sans-serif;
   font-size: 8px;
   letter-spacing: 1.5px;
@@ -104,7 +104,7 @@
   transition: background-color 0.2s, box-shadow 0.2s;
 }
 .iw-btn:hover { background: rgba(145, 230, 242, 0.16); box-shadow: 0 0 12px rgba(145, 230, 242, 0.35); }
-.iw-btn.ghost { border-color: rgba(120, 160, 180, 0.4); color: #9fc4d4; }
+.iw-btn.ghost { border-color: rgba(120, 160, 180, 0.4); color: rgba(255, 255, 255, 0.78); }
 .iw-btn.activate {
   border-color: rgba(0, 255, 170, 0.6);
   color: #7dffd4;

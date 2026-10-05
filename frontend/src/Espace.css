@@ -35,7 +35,7 @@
   display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
   padding: 6px 10px; border-radius: 7px; cursor: pointer;
   font-family: "Orbitron", sans-serif; font-size: 8px; letter-spacing: 0.08em;
-  color: #91e6f2; background: rgba(0, 50, 70, 0.5);
+  color: #ffffff; background: rgba(0, 50, 70, 0.5);
   border: 1px solid rgba(145, 230, 242, 0.45);
   transition: color 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
@@ -48,7 +48,7 @@
 .esp-legend {
   position: absolute; left: 12px; bottom: 10px;
   display: flex; align-items: center; gap: 14px;
-  font-size: 10.5px; color: #9fd3e8;
+  font-size: 10.5px; color: #ffffff;
   pointer-events: none;
 }
 .esp-legend span { display: inline-flex; align-items: center; gap: 5px; }
@@ -56,7 +56,7 @@
 .esp-legend .dot.gold { background: #d8b875; box-shadow: 0 0 8px rgba(216, 184, 117, 0.8); }
 .esp-legend .dot.cyan { background: #91e6f2; box-shadow: 0 0 8px rgba(145, 230, 242, 0.8); }
 .esp-legend .dot.grey { background: #b8bcc4; }
-.esp-hint { color: rgba(159, 211, 232, 0.5); margin-left: 6px; }
+.esp-hint { color: rgba(255, 255, 255, 0.5); margin-left: 6px; }
 
 @media (max-width: 640px) {
   .esp-panel { width: calc(100vw - 12px); height: 78vh; }

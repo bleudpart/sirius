@@ -51,7 +51,7 @@
 .heph-kpis span { display: block; color: #54707f; font: 600 9px "Rajdhani", sans-serif; letter-spacing: 0.14em; }
 .heph-kpis b { display: block; margin-top: 4px; color: #ffe6a3; font: 600 25px "Rajdhani", sans-serif; }
 .heph-kpis b small { color: #7b97ac; font-size: 12px; }
-.heph-kpis b.good { color: #6fae9f; }
+.heph-kpis b.good { color: rgba(255, 255, 255, 0.78); }
 .heph-kpis b.risk { color: #b0728a; }
 .heph-kpis i { color: #7b97ac; font: normal 10px "Rajdhani", sans-serif; }
 .heph-health-grid { display: grid; grid-template-columns: 150px 1fr; gap: 22px; align-items: center; }
@@ -60,7 +60,7 @@
 .heph-health-ring circle:nth-child(2) { transition: stroke-dashoffset 1s cubic-bezier(.22,.8,.3,1); }
 .heph-ring-value { fill: #ffe6a3; font: 600 20px "Rajdhani", sans-serif; }
 .heph-group-bars { display: flex; flex-direction: column; gap: 12px; }
-.heph-group-bar { display: grid; grid-template-columns: 145px 1fr 42px; align-items: center; gap: 10px; color: #d3e6f1; font-size: 12px; }
+.heph-group-bar { display: grid; grid-template-columns: 145px 1fr 42px; align-items: center; gap: 10px; color: #ffffff; font-size: 12px; }
 .heph-group-bar > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .heph-bar-track { height: 8px; overflow: hidden; background: rgba(255, 255, 255, 0.06); }
 .heph-bar-track i { display: block; height: 100%; transition: width 1s cubic-bezier(.22,.8,.3,1); }
@@ -89,7 +89,7 @@
   box-shadow: 0 0 12px rgba(216, 184, 117, 0.6);
   transition: width 0.5s ease;
 }
-.heph-phase { font-family: "Rajdhani", sans-serif; font-size: 12.5px; color: #9fd3e8; letter-spacing: 0.04em; }
+.heph-phase { font-family: "Rajdhani", sans-serif; font-size: 12.5px; color: #ffffff; letter-spacing: 0.04em; }
 
 .heph-error {
   display: flex; align-items: center; gap: 7px;
@@ -107,9 +107,9 @@
 .heph-summary.dégradé { border-color: rgba(245, 158, 11, 0.5); }
 .heph-gauge { display: flex; align-items: center; gap: 8px; color: #d8b875; }
 .heph-gauge b { font-family: "Orbitron", sans-serif; font-size: 26px; text-shadow: 0 0 14px rgba(216, 184, 117, 0.6); }
-.heph-summary-txt { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; color: #cfeefb; }
+.heph-summary-txt { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; color: #ffffff; }
 .heph-state { font-family: "Orbitron", sans-serif; font-size: 11px; letter-spacing: 0.12em; font-weight: 700; }
-.heph-state-ok { color: #5eead4; }
+.heph-state-ok { color: #ffffff; }
 .heph-state-dégradé { color: #d8b875; }
 .heph-state-critique { color: #ff9a9a; }
 .heph-dl {
@@ -130,13 +130,13 @@
   border: 1px solid rgba(145, 230, 242, 0.16);
   border-left: 3px solid rgba(145, 230, 242, 0.4);
 }
-.heph-row.ok { border-left-color: #5eead4; color: #bfe9f8; }
+.heph-row.ok { border-left-color: #5eead4; color: #ffffff; }
 .heph-row.fail { border-left-color: #c98175; color: #ffd7d7; background: rgba(50, 10, 10, 0.35); }
-.heph-row.ok svg { color: #5eead4; }
+.heph-row.ok svg { color: #ffffff; }
 .heph-row.fail svg { color: #c98175; }
 .heph-row-name { font-family: "Rajdhani", sans-serif; font-weight: 600; font-size: 14px; letter-spacing: 0.03em; }
 .heph-row-meta { margin-left: auto; display: flex; gap: 10px; }
-.heph-row-meta em { font-style: normal; font-size: 11px; color: #7fb6cc; }
+.heph-row-meta em { font-style: normal; font-size: 11px; color: rgba(255, 255, 255, 0.78); }
 .heph-row-meta em.heph-nc { color: #d8b875; }
 .heph-badge {
   font-family: "Orbitron", sans-serif; font-size: 8.5px; letter-spacing: 0.1em;
@@ -158,13 +158,13 @@
 .heph-dot.ok { fill: #5eead4; }
 .heph-dot.warn { fill: #d8b875; }
 .heph-dot.fail { fill: #c98175; }
-.heph-chart-scale { display: flex; flex-direction: column; justify-content: space-between; font-size: 9px; color: #7fb6cc; padding: 2px 0; }
+.heph-chart-scale { display: flex; flex-direction: column; justify-content: space-between; font-size: 9px; color: rgba(255, 255, 255, 0.78); padding: 2px 0; }
 .heph-hist-list { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
 .heph-hist-row {
   display: flex; align-items: center; gap: 10px;
   padding: 6px 10px; border-radius: 6px; font-size: 12px;
   background: rgba(0, 20, 32, 0.4); border: 1px solid rgba(145, 230, 242, 0.12);
-  color: #bfe9f8;
+  color: #ffffff;
 }
 .heph-dot-inline { width: 8px; height: 8px; border-radius: 50%; flex: none; }
 .heph-dot-inline.ok { background: #5eead4; box-shadow: 0 0 6px #5eead4; }
@@ -173,7 +173,7 @@
 .heph-hist-date { font-family: "Rajdhani", sans-serif; font-weight: 600; }
 .heph-hist-src { font-family: "Orbitron", sans-serif; font-size: 8px; letter-spacing: 0.1em; color: #d8b875; border: 1px solid rgba(216, 184, 117, 0.4); border-radius: 8px; padding: 1px 7px; }
 .heph-hist-rate { font-family: "Orbitron", sans-serif; font-size: 11px; color: #f2d99a; }
-.heph-hist-detail { color: #7fb6cc; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.heph-hist-detail { color: rgba(255, 255, 255, 0.78); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .heph-purge-group { margin-left: auto; display: inline-flex; gap: 6px; }
 .heph-purge {

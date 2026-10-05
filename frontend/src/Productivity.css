@@ -14,7 +14,7 @@
   max-height: min(860px, calc(100vh - 36px));
   display: flex;
   flex-direction: column;
-  color: #e6faff;
+  color: #ffffff;
   background: linear-gradient(145deg, rgba(5, 28, 46, 0.99), rgba(2, 11, 24, 0.99));
   border: 1px solid rgba(77, 238, 255, 0.45);
   box-shadow: 0 0 45px rgba(20, 178, 227, 0.22), inset 0 0 35px rgba(20, 178, 227, 0.06);
@@ -58,7 +58,7 @@
 .productivity-header p,
 .productivity-tool-head p {
   margin: 0;
-  color: #8db2bf;
+  color: rgba(255, 255, 255, 0.78);
   font: 12px "Segoe UI", sans-serif;
 }
 
@@ -69,7 +69,7 @@
   place-items: center;
   width: 31px;
   height: 31px;
-  color: #dffbff;
+  color: #ffffff;
   background: transparent;
   border: 1px solid rgba(77, 238, 255, 0.32);
   cursor: pointer;
@@ -88,7 +88,7 @@
   gap: 7px;
   min-height: 42px;
   padding: 0 15px;
-  color: #8db2bf;
+  color: rgba(255, 255, 255, 0.78);
   background: transparent;
   border: 0;
   border-bottom: 2px solid transparent;
@@ -138,7 +138,7 @@
 .productivity-form label {
   display: grid;
   gap: 5px;
-  color: #86b3c1;
+  color: rgba(255, 255, 255, 0.78);
   font-size: 9px;
   letter-spacing: 0.11em;
 }
@@ -154,7 +154,7 @@
 .productivity-task aside select {
   box-sizing: border-box;
   width: 100%;
-  color: #ecfbff;
+  color: #ffffff;
   background: rgba(0, 7, 16, 0.76);
   border: 1px solid rgba(77, 238, 255, 0.28);
   border-radius: 7px;
@@ -214,7 +214,7 @@
 .productivity-secondary-btn,
 .productivity-copy-btn,
 .productivity-search button {
-  color: #d9faff;
+  color: #ffffff;
   background: rgba(11, 62, 84, 0.45);
   border-color: rgba(77, 238, 255, 0.38);
 }
@@ -253,7 +253,7 @@
 .productivity-summary,
 .productivity-note p,
 .productivity-task p {
-  color: #cbe7ef;
+  color: #ffffff;
   font: 13px/1.5 "Segoe UI", sans-serif;
 }
 
@@ -266,7 +266,7 @@
 
 .productivity-result-grid > div {
   min-height: 82px;
-  color: #93b5c0;
+  color: rgba(255, 255, 255, 0.78);
   background: rgba(10, 50, 69, 0.35);
   padding: 10px;
   font: 12px "Segoe UI", sans-serif;
@@ -292,7 +292,7 @@
 }
 
 .productivity-tags span {
-  color: #c8f9ff;
+  color: #ffffff;
   border: 1px solid rgba(77, 238, 255, 0.27);
   padding: 3px 6px;
   font: 10px "Segoe UI", sans-serif;
@@ -345,7 +345,7 @@
 
 .productivity-diagnostic p {
   margin: 4px 0 0;
-  color: #a9c5cd;
+  color: rgba(255, 255, 255, 0.78);
 }
 
 .productivity-search {
@@ -378,7 +378,7 @@
 .productivity-note h4,
 .productivity-task h4 {
   margin: 0;
-  color: #f4fbff;
+  color: #ffffff;
   font-size: 13px;
 }
 
@@ -473,7 +473,7 @@
   gap: 5px;
   padding: 11px;
   text-align: left;
-  color: #b9d5dd;
+  color: rgba(255, 255, 255, 0.78);
   background: transparent;
   border: 0;
   border-bottom: 1px solid rgba(77, 238, 255, 0.1);
@@ -500,7 +500,7 @@
   margin: 0;
   overflow: auto;
   white-space: pre-wrap;
-  color: #d6f2f7;
+  color: #ffffff;
   font: 12px/1.55 Consolas, monospace;
 }
 

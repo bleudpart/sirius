@@ -28,7 +28,7 @@
 .sp-bar {
   display: flex; align-items: center; gap: 8px;
   padding: 8px 10px;
-  color: #91e6f2;
+  color: #ffffff;
   border-bottom: 1px solid rgba(145, 230, 242, 0.25);
   cursor: grab;
   user-select: none;
@@ -40,17 +40,17 @@
   flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .sp-count {
-  font-size: 9px; letter-spacing: 0.1em; color: #a5f3fc;
+  font-size: 9px; letter-spacing: 0.1em; color: #ffffff;
   border: 1px solid rgba(145, 230, 242, 0.4); border-radius: 9px; padding: 2px 7px;
   white-space: nowrap;
 }
 .sp-close {
   display: inline-flex; align-items: center; justify-content: center;
   width: 22px; height: 22px; border-radius: 6px; cursor: pointer;
-  color: #9fd3e8; background: transparent; border: 1px solid transparent;
+  color: #ffffff; background: transparent; border: 1px solid transparent;
   transition: color 0.2s, border-color 0.2s;
 }
-.sp-close:hover { color: #eafaff; border-color: rgba(145, 230, 242, 0.5); }
+.sp-close:hover { color: #ffffff; border-color: rgba(145, 230, 242, 0.5); }
 .sp-pulse { animation: spPulse 1.4s ease-in-out infinite; }
 @keyframes spPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
@@ -75,7 +75,7 @@
 .sirius-progress.sp-compact { width: 320px; max-height: none; }
 .sirius-progress.sp-compact .sp-bar { border-bottom: none; }
 
-.sp-task { padding: 7px 10px 4px; color: #cfeefb; }
+.sp-task { padding: 7px 10px 4px; color: #ffffff; }
 .sp-task-head { display: flex; align-items: center; gap: 7px; }
 .sp-task.sp-done .sp-task-head { color: #6ee7a0; }
 .sp-task.sp-error .sp-task-head { color: #ff9a9a; }
@@ -116,8 +116,8 @@
   scrollbar-color: rgba(145, 230, 242, 0.4) transparent;
 }
 .sp-line { display: flex; gap: 8px; }
-.sp-time { color: rgba(145, 230, 242, 0.55); font-family: "Orbitron", sans-serif; font-size: 8.5px; padding-top: 2px; white-space: nowrap; }
-.sp-msg { color: #bfe9f8; word-break: break-word; }
+.sp-time { color: rgba(255, 255, 255, 0.55); font-family: "Orbitron", sans-serif; font-size: 8.5px; padding-top: 2px; white-space: nowrap; }
+.sp-msg { color: #ffffff; word-break: break-word; }
 
 /* Journal des tâches passées */
 .sp-journal {
@@ -149,7 +149,7 @@
   scrollbar-width: thin;
   scrollbar-color: rgba(145, 230, 242, 0.4) transparent;
 }
-.sp-journal-empty { color: rgba(159, 211, 232, 0.7); font-size: 12px; padding: 16px 4px; text-align: center; }
+.sp-journal-empty { color: rgba(255, 255, 255, 0.7); font-size: 12px; padding: 16px 4px; text-align: center; }
 .sp-jrow {
   padding: 7px 9px; margin-bottom: 6px;
   background: rgba(4, 22, 34, 0.55);
@@ -159,14 +159,14 @@
 }
 .sp-jrow.sp-j-done { border-left-color: #9fd8c9; }
 .sp-jrow.sp-j-error { border-left-color: #c98175; }
-.sp-jrow-head { display: flex; align-items: center; gap: 7px; color: #cfeefb; }
+.sp-jrow-head { display: flex; align-items: center; gap: 7px; color: #ffffff; }
 .sp-jrow.sp-j-done .sp-jrow-head svg { color: #6ee7a0; }
 .sp-jrow.sp-j-error .sp-jrow-head svg { color: #ff9a9a; }
 .sp-jtask { flex: 1; font-size: 11.5px; letter-spacing: 0.03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sp-jduree { font-family: "Orbitron", sans-serif; font-size: 9px; color: #91e6f2; white-space: nowrap; }
+.sp-jduree { font-family: "Orbitron", sans-serif; font-size: 9px; color: #ffffff; white-space: nowrap; }
 .sp-jrow-sub { display: flex; gap: 10px; margin-top: 3px; font-size: 10px; }
-.sp-jdate { color: rgba(145, 230, 242, 0.55); font-family: "Orbitron", sans-serif; font-size: 8.5px; white-space: nowrap; padding-top: 1px; }
-.sp-jres { color: #9fd3e8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-jdate { color: rgba(255, 255, 255, 0.55); font-family: "Orbitron", sans-serif; font-size: 8.5px; white-space: nowrap; padding-top: 1px; }
+.sp-jres { color: #ffffff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Ancien « thème noir & or » retiré : contredisait le verre cyan défini plus haut,
    aligné sur .shud-panel (voir Atlas.css/Keraunos.css pour le même correctif). */

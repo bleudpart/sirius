@@ -16,7 +16,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #91e6f2;
+  color: #ffffff;
   font-family: "Orbitron", sans-serif;
   font-size: 8px;
   letter-spacing: 2px;
@@ -29,7 +29,7 @@
 .pro-mode-btn {
   background: rgba(0, 20, 34, 0.7);
   border: 1px solid rgba(145, 230, 242, 0.35);
-  color: #7dd3fc;
+  color: #ffffff;
   font-family: "Orbitron", sans-serif;
   font-size: 7px;
   letter-spacing: 1.5px;
@@ -39,7 +39,7 @@
 }
 .pro-mode-btn.on {
   background: rgba(145, 230, 242, 0.22);
-  color: #e0fbff;
+  color: #ffffff;
   box-shadow: 0 0 10px rgba(145, 230, 242, 0.45);
 }
 
@@ -59,7 +59,7 @@
 
 .sugg-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .sugg-title {
-  color: #aef3ff;
+  color: #ffffff;
   font-family: "Orbitron", sans-serif;
   font-size: 10px;
   letter-spacing: 1.5px;
@@ -75,14 +75,14 @@
   letter-spacing: 1px;
   padding: 2px 6px;
   border: 1px solid rgba(145, 230, 242, 0.4);
-  color: #91e6f2;
+  color: #ffffff;
 }
 .sugg-badge.urg-haute { border-color: #ff9500; color: #ffb347; }
 .sugg-badge.risk-eleve { border-color: #c26b60; color: #ff7a7a; }
 .sugg-badge.risk-moyen { border-color: #ffd24d; color: #ffe08a; }
 
 .sugg-desc {
-  color: #d5f6ff;
+  color: #ffffff;
   font-size: 11.5px;
   line-height: 1.45;
   margin: 7px 0 9px;
@@ -96,7 +96,7 @@
 .sugg-confidence { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 7px; margin: 0 0 9px; font-family: "Orbitron", sans-serif; font-size: 6.5px; letter-spacing: 1px; color: #d8b875; }
 .sugg-confidence i { display: block; height: 3px; background: rgba(145, 230, 242, 0.16); overflow: hidden; }
 .sugg-confidence i b { display: block; height: 100%; background: linear-gradient(90deg, #91e6f2, #f2d99a); box-shadow: 0 0 7px rgba(242, 217, 154, 0.65); }
-.sugg-confidence small { color: #7fa6b5; font-size: 6px; white-space: nowrap; }
+.sugg-confidence small { color: rgba(255, 255, 255, 0.78); font-size: 6px; white-space: nowrap; }
 .sugg-confirm {
   color: #ffb347;
   font-size: 10.5px;
@@ -107,8 +107,8 @@
   padding: 4px 8px;
   margin: 0 0 9px;
 }
-.sugg-why p { color: #9fd8e8; font-size: 10px; margin: 2px 0; }
-.sugg-why b { color: #91e6f2; }
+.sugg-why p { color: #ffffff; font-size: 10px; margin: 2px 0; }
+.sugg-why b { color: #ffffff; }
 
 .sugg-actions { display: flex; flex-wrap: wrap; gap: 5px; }
 .sugg-btn {
@@ -117,7 +117,7 @@
   gap: 4px;
   background: rgba(0, 24, 40, 0.8);
   border: 1px solid rgba(145, 230, 242, 0.4);
-  color: #8be9ff;
+  color: #ffffff;
   font-family: "Orbitron", sans-serif;
   font-size: 7.5px;
   letter-spacing: 1px;
@@ -130,7 +130,7 @@
 .sugg-btn.exec:hover { background: rgba(0, 255, 170, 0.14); }
 .sugg-btn.danger { border-color: rgba(255, 90, 90, 0.5); color: #ff9d9d; }
 .sugg-btn.danger:hover { background: rgba(255, 90, 90, 0.12); }
-.sugg-btn.ghost { border-color: rgba(120, 160, 180, 0.4); color: #9fc4d4; }
+.sugg-btn.ghost { border-color: rgba(120, 160, 180, 0.4); color: rgba(255, 255, 255, 0.78); }
 
 @media (max-width: 900px) {
   .proactive-stack { width: 260px; left: 12px; top: 96px; }

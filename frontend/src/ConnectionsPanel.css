@@ -4,7 +4,7 @@
   z-index: 3100;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  color: #d5f6ff;
+  color: #ffffff;
   background:
     linear-gradient(rgba(44, 127, 157, 0.08) 1px, transparent 1px),
     linear-gradient(90deg, rgba(44, 127, 157, 0.08) 1px, transparent 1px),
@@ -51,7 +51,7 @@
   place-items: center;
   border: 1px solid rgba(145, 230, 242, 0.3);
   border-radius: 8px;
-  color: #d5f6ff;
+  color: #ffffff;
   background: rgba(16, 40, 61, 0.72);
   cursor: pointer;
 }
@@ -69,9 +69,9 @@
 .mail-cache h2, .mail-cache h3 { color: #d8b875; font-family: "Cinzel", serif; }
 .mail-cache p { font-size: 14px; line-height: 1.5; }
 .mail-cache label { display: grid; gap: 6px; }
-.mail-cache input { min-width: 0; width: 100%; padding: 10px; background: #061321; color: #d5f6ff; border: 1px solid #91e6f2; }
+.mail-cache input { min-width: 0; width: 100%; padding: 10px; background: #061321; color: #ffffff; border: 1px solid #91e6f2; }
 .mail-cache-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.mail-cache button { min-height: 44px; padding: 8px 12px; color: #d5f6ff; background: #10283d; border: 1px solid #d8b875; border-radius: 6px; cursor: pointer; }
+.mail-cache button { min-height: 44px; padding: 8px 12px; color: #ffffff; background: #10283d; border: 1px solid #d8b875; border-radius: 6px; cursor: pointer; }
 .mail-cache button:disabled { opacity: .6; cursor: default; }
 .mail-cache ul { padding: 0; list-style: none; }
 .mail-cache li { display: grid; gap: 6px; margin: 12px 0; padding: 12px; border: 1px solid rgba(145, 230, 242, .25); overflow-wrap: anywhere; }
@@ -89,11 +89,11 @@
 }
 
 .connection-item.connected { border-color: rgba(216, 184, 117, 0.55); }
-.connection-icon { width: 48px; height: 48px; display: grid; place-items: center; border: 1px solid rgba(145, 230, 242, 0.34); border-radius: 8px; color: #91e6f2; }
+.connection-icon { width: 48px; height: 48px; display: grid; place-items: center; border: 1px solid rgba(145, 230, 242, 0.34); border-radius: 8px; color: #ffffff; }
 .connection-main h2 { margin: 0; color: #ffe6a3; font: 700 17px "Cinzel", serif; letter-spacing: 0.04em; }
-.connection-main p { margin: 4px 0 0; color: #a9cfdd; font-size: 13px; }
+.connection-main p { margin: 4px 0 0; color: rgba(255, 255, 255, 0.78); font-size: 13px; }
 .connection-main small { display: block; margin-top: 4px; color: #f2d99a; font-size: 12px; }
-.connection-state { justify-self: end; display: inline-flex; align-items: center; gap: 5px; color: #9fd3e8; font-size: 12px; }
+.connection-state { justify-self: end; display: inline-flex; align-items: center; gap: 5px; color: #ffffff; font-size: 12px; }
 .connection-item.connected .connection-state { color: #f2d99a; }
 
 .connection-action,
@@ -113,18 +113,18 @@
 }
 
 .connection-action { grid-column: 2 / -1; justify-self: stretch; }
-.connection-action.secondary { color: #cceaf4; border-color: rgba(145, 230, 242, 0.34); background: rgba(145, 230, 242, 0.08); }
+.connection-action.secondary { color: #ffffff; border-color: rgba(145, 230, 242, 0.34); background: rgba(145, 230, 242, 0.08); }
 .connection-pending-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .connection-pending-actions .connections-wait { width: 100%; margin: 0; display: flex; align-items: center; gap: 7px; text-align: left; }
 .connection-pending-actions button { padding: 0 12px; }
-.connection-pending-actions small { width: 100%; color: #a9cfdd; line-height: 1.5; }
+.connection-pending-actions small { width: 100%; color: rgba(255, 255, 255, 0.78); line-height: 1.5; }
 .connection-action:disabled { opacity: 0.65; cursor: wait; }
 .connections-footer-actions { display:flex; align-items:center; gap:10px; margin-top:16px; }
-.connections-refresh { margin:0; padding: 0 14px; color: #bcdde8; border-color: rgba(145, 230, 242, 0.28); background: rgba(16, 40, 61, 0.7); }
-.connections-later { min-height:44px; padding:0 16px; border:0; color:#9fc3d0; background:transparent; font:700 12px "Rajdhani",sans-serif; cursor:pointer; }
+.connections-refresh { margin:0; padding: 0 14px; color: #ffffff; border-color: rgba(145, 230, 242, 0.28); background: rgba(16, 40, 61, 0.7); }
+.connections-later { min-height:44px; padding:0 16px; border:0; color:rgba(255, 255, 255, 0.78); background:transparent; font:700 12px "Rajdhani",sans-serif; cursor:pointer; }
 .connections-later:hover { color:#fff; }
 .connections-wait, .connections-error { margin: 16px 0 0; text-align: center; font-size: 13px; }
-.connections-wait { color: #d5f6ff; }
+.connections-wait { color: #ffffff; }
 .connections-error { color: #ffb4a2; }
 
 @media (max-width: 560px) {

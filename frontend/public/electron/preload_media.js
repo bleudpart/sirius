@@ -27,4 +27,6 @@ contextBridge.exposeInMainWorld("siriusDesktop", {
   captureInterface: (region) => ipcRenderer.invoke("sirius-capture-interface", region),
   captureScreen: () => ipcRenderer.invoke("sirius-capture-screen"),
   openCaptureFolder: () => ipcRenderer.invoke("sirius-open-capture-folder"),
+  toggleFullscreen: () => ipcRenderer.invoke("sirius-window-toggle-fullscreen"),
+  isFullscreen: () => ipcRenderer.invoke("sirius-window-is-fullscreen"),
 });
