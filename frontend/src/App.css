@@ -8271,8 +8271,7 @@ body[data-phase] .center-stage::before { content: none !important; }
   [data-testid="sirius-fullscreen-btn"],
   [data-testid="sirius-modules-btn"],
   [data-testid="sirius-info-btn"],
-  [data-testid="sirius-profile-btn"],
-  .sirius-mobile-exit {
+  [data-testid="sirius-profile-btn"] {
     display: none;
   }
 

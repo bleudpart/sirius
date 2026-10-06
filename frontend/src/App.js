@@ -6678,15 +6678,15 @@ function App() {
           </button>
           
           {window.Capacitor?.getPlatform?.() === "android" && (
-            <button
-              className="profile-btn sirius-mobile-exit"
-              onClick={exitMobileApp}
-              data-testid="sirius-mobile-exit-btn"
-              title="Quitter SIRIUS"
-              aria-label="Quitter SIRIUS"
+            <ConfirmButton
+              className="profile-btn sirius-shutdown-btn sirius-mobile-exit"
+              onConfirm={exitMobileApp}
+              testId="sirius-mobile-exit-btn"
+              title="Quitter ΣIRIUS"
+              label="QUITTER ?"
             >
-              <X size={15} />
-            </button>
+              <Power size={15} />
+            </ConfirmButton>
           )}
           <button
             className={`profile-btn ${isFullscreen ? "on" : ""}`}
