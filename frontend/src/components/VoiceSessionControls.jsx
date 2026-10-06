@@ -1,6 +1,6 @@
 const LABELS = {
   idle: "Prêt",
-  requesting: "Autorisation du microphone…",
+  requesting: "Ouverture du microphone…",
   listening: "J’écoute…",
   transcribing: "Je transcris…",
   thinking: "Je traite votre demande…",

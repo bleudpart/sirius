@@ -331,17 +331,38 @@ Liste complète des modules et dates : [MODULES_SIRIUS.txt](./MODULES_SIRIUS.txt
   préférences de l'assistant. Après une modification de ce parcours, reconstruire
   l'APK et vérifier la reconnexion sur appareil en portrait et en paysage ;
   un test du site web ne valide pas l'application Android déjà installée.
+  La barre supérieure adapte sa hauteur et répartit les boutons sur plusieurs
+  lignes si nécessaire, sans réduire leurs icônes. Vérifier les petits écrans
+  en portrait ainsi que l'onglet Infos après un changement de cette barre.
+  Sous 1024 px, les modules utilisent une page adaptée à l'écran, sans déplacement,
+  réduction ni redimensionnement. Les cartes du Panthéon restent dans le flux :
+  un balayage vertical, y compris depuis leur titre, doit permettre d'atteindre
+  les notifications et l'historique. Les géométries PC sauvegardées restent intactes.
+  Pour un diagnostic USB sans remplacer l'application Play, synchroniser les
+  assets puis lancer `gradlew.bat assembleDebug -PsiriusDiagnostic` dans
+  `frontend/android` : le paquet distinct est `fr.sirius_assistant.app.diagnostic`.
+  Cette variante n'est pas destinée à Google Play et possède ses propres données.
+  Sur mobile, la liste des pastilles du menu Modules reste dans un cadre de hauteur
+  bornée et défile au doigt, sans changer la roue de catégories. Vérifier notamment
+  l'accès à la dernière pastille de la catégorie Outils sur Android.
+  Le centre d'information utilise le même cadre tactile borné, avec un contenu
+  à l'échelle du téléphone et une barre de défilement visible.
+  Les deux fenêtres gardent leurs coins arrondis ; en paysage, la roue est à gauche
+  et le titre ainsi que la liste sont à droite.
   La voix Android utilise une capture micro (maximum 15 secondes) envoyée à
   `/api/stt`, plutôt que la reconnaissance Web Speech de la WebView. Maintenir
   **ESPACE**, puis relâcher pour transcrire ; une annulation pendant la demande
   de permission ne doit pas démarrer un enregistrement tardif.
-  En mains libres, la capture se termine après environ une seconde de silence
+  En mains libres, la capture se termine après environ deux secondes de silence
   suivant la parole (la limite de 15 secondes reste active). Vérifier sur appareil
   les pauses, le bruit ambiant et le délai serveur ; ce seuil ne garantit pas
   une transcription immédiate. La présentation se ferme après son chargement
   et la fin de sa voix ; si la voix ne démarre pas, elle ne bloque pas le HUD.
   En mains libres, dire **Sirius** suivi de la commande. Une capture vide ou
-  sans commande relance l'écoute ; une erreur de transcription désactive le
+  sans commande relance l'écoute en conservant le diagnostic sous la barre de
+  commande. Une phrase reconnue sans mot d'activation y reste affichée avec
+  le rappel « Sirius ». L'ouverture du micro n'indique pas une nouvelle demande
+  d'autorisation à chaque relance. Une erreur de transcription désactive le
   mode et affiche l'erreur plutôt que de laisser le bouton faussement actif.
   La synthèse Android utilise **Gemini Aoede** via `/api/tts/gemini`, pour la
   présentation, les réponses et les personnages, avec un ton français naturel

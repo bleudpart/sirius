@@ -8,7 +8,7 @@ import {
   PantheonSystem, NexusCeleste, SiriusDisplay, EuropeanaViewer, HaccpModule, KeysStatus, KeraunosPanel,
   AboutPanel, EspacePanel, ArchiveGallery, MemoryManager, InstallWizard, ScriptInstaller, LocusPanel,
   AtlasPanel, HeraclesPanel, HephaistosPanel, MythosGallery, ConsultPanel, PrometheePanel, CalliopePanel, CalendarPanel,
-  FaceIdPanel, PythagorePanel, PackagerPanel, TrailerGallery, SiriusSetup, PromoPanel, ThemisPanel,
+  FaceIdPanel, PythagorePanel, PackagerPanel, TrailerGallery, SiriusSetup, FirstRunWizard, PromoPanel, ThemisPanel,
   AdminPanel, EnterprisePanel, PortusNummarius, AgoraPipeline, NewsPanel, ReveilPanel, SpotifyPanel, MediaHUD, ProductivityPanel,
   FloorPlanPanel, Photo3DPanel, ConnectionsPanel, WorkModulesPanel, WorkDossiersPanel, SportCoachPanel,
 } from "@/lazyModules";
@@ -63,6 +63,7 @@ import { SiriusInfoHub, SiriusInfoWheel, SiriusNextAction } from "@/hud/SiriusHu
 import { restoreHudPanel } from "@/hud/hudPanelState";
 import { BACKEND_BASE_URL } from "@/lib/api";
 import "@/App.css";
+import "@/mobileModulePages.css";
 import { AmbientEngine } from "@/ambientAudio";
 import { APP_RELEASE, APP_VERSION } from "@/version";
 import ProviderLogo from "@/components/ProviderLogo";
@@ -465,6 +466,8 @@ function App() {
   }, []);
 
   const [showSetup, setShowSetup] = useState(() => !localStorage.getItem("sirius_profile"));
+  // Premier lancement : assistant guidé ; l'écran complet reste accessible en « mode expert ».
+  const [firstRunWizard, setFirstRunWizard] = useState(() => !localStorage.getItem("sirius_profile"));
   const [showMemory, setShowMemory] = useState(false);
   const [musicChoice, setMusicChoice] = useState(null);
   const [spotify, setSpotify] = useState(() => {
@@ -1318,8 +1321,10 @@ function App() {
 
     const scheduleReconnect = () => {
       if (stopped || retryTimer) return;
-      // En ligne (preview/prod) : max 4 tentatives vers le backend local pour ne pas spammer la console
-      if (attempt >= 4 && window.location.hostname !== "localhost") return;
+      // Preview web : max 4 tentatives pour ne pas spammer la console. L'appli Electron
+      // (127.0.0.1) et l'appli mobile (localhost) réessaient sans fin : le moteur local d'un PC
+      // peut mettre plusieurs dizaines de secondes à démarrer.
+      if (attempt >= 4 && !["localhost", "127.0.0.1"].includes(window.location.hostname)) return;
       const delay = Math.min(15000, 1000 * 2 ** Math.min(attempt, 4));
       attempt += 1;
       retryTimer = setTimeout(() => { retryTimer = null; connect(); }, delay);
@@ -4210,7 +4215,7 @@ function App() {
     fetch(`${API}/prime/log`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: typeof command === "string" ? command : command?.text, intent }),
+      body: JSON.stringify({ text: typeof command === "string" ? command : command?.text, intent: intent || "" }),
     }).catch(() => {});
 
     // 00bis) Action Outlook sensible en attente : « oui » → exécution réelle
@@ -5077,6 +5082,7 @@ function App() {
       setStatus(micOnRef.current ? "listening" : "idle");
       setVoicePhase(micOnRef.current ? "listening" : "idle");
       setText("En mains libres, dites « Sirius » suivi de votre demande.");
+      setVoiceMessage(`Reconnu : « ${normalizedTranscript} ». En mains libres, dites « Sirius » suivi de votre demande.`);
       return false;
     }
     processCommand(command);
@@ -5087,7 +5093,7 @@ function App() {
   const handleTranscriptRef = useRef(null);
   handleTranscriptRef.current = handleTranscript;
 
-  const startServerListening = useCallback(async () => {
+  const startServerListening = useCallback(async (preserveFeedback = false) => {
     if (serverRecorderRef.current || micOnRef.current || microphoneStartPendingRef.current || speakingRef.current) return;
     if (Date.now() < microphoneRequestCooldownRef.current) return;
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
@@ -5099,7 +5105,7 @@ function App() {
     }
     microphoneStartPendingRef.current = true;
     voiceSessionRef.current.resume();
-    setVoiceMessage("");
+    if (!preserveFeedback) setVoiceMessage("");
     setVoicePhase("requesting");
     const voiceSignal = voiceSessionRef.current.signal;
     const session = ++microphoneSessionRef.current;
@@ -5110,7 +5116,7 @@ function App() {
         () => autoMicRef.current && session === microphoneSessionRef.current
           && !speakingRef.current && !micOnRef.current && !pttRef.current
           && !microphoneStartPendingRef.current && !!startListenRef.current,
-        () => startListenRef.current(),
+        () => startListenRef.current(true),
       );
     };
     try {
@@ -5171,6 +5177,9 @@ function App() {
           const form = new FormData();
           const extension = blob.type.includes("mp4") ? "m4a" : "webm";
           form.append("file", blob, `sirius-voice.${extension}`);
+          const savedKeys = loadApiKeys() || {};
+          const userGroqKey = (savedKeys.groq_key || savedKeys.groq || "").trim();
+          if (userGroqKey) form.append("groq_key", userGroqKey);
           const response = await requestTranscription(form, { signal: voiceSignal });
           const payload = response.data;
           if (voiceSignal.aborted) return;
@@ -5381,18 +5390,18 @@ function App() {
   }, [stopListening]);
 
   // Démarre l'écoute via la reconnaissance vocale du navigateur (instantanée, gratuite)
-  const startListening = useCallback(() => {
+  const startListening = useCallback((preserveFeedback = false) => {
     if (micOnRef.current || speakingRef.current) return;
     voiceSessionRef.current.resume();
-    setVoiceMessage("");
+    if (!preserveFeedback) setVoiceMessage("");
     if (preferServerSttRef.current) {
-      startServerListening();
+      startServerListening(preserveFeedback);
       return;
     }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) {
       preferServerSttRef.current = true;
-      startServerListening();
+      startServerListening(preserveFeedback);
       return;
     }
     try {
@@ -6392,7 +6401,19 @@ function App() {
         }
         openers[id] && openers[id](true);
       }} />}
-      {showSetup && (
+      {showSetup && firstRunWizard && !booting && (
+        <FirstRunWizard
+          userName={auth.user?.name || profile?.name || ""}
+          userEmail={auth.user?.email || ""}
+          keys={keys}
+          onComplete={(newProfile, newKeys) => {
+            setFirstRunWizard(false);
+            handleSetupComplete({ ...(profile || {}), ...newProfile }, newKeys);
+          }}
+          onExpert={() => setFirstRunWizard(false)}
+        />
+      )}
+      {showSetup && !firstRunWizard && (
         <SiriusSetup
           initialProfile={profile}
           initialKeys={keys}

@@ -90,3 +90,53 @@ test("opening a module and automatic completion cannot hand off twice", () => {
   expect(onDone).toHaveBeenCalledTimes(1);
   expect(onOpenModule).toHaveBeenCalledWith("argus");
 });
+
+const flush = async (ms) => {
+  await act(async () => {
+    jest.advanceTimersByTime(ms);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+};
+
+test("retries the brain, then explains the failure instead of opening a dead HUD", async () => {
+  const onDone = jest.fn();
+  const probeBrain = jest.fn().mockResolvedValue(false);
+  render(<BootScreen onDone={onDone} probeBrain={probeBrain} />);
+  for (let i = 0; i < 12; i += 1) await flush(2000);
+  expect(probeBrain.mock.calls.length).toBeGreaterThan(5);
+  const alert = container.querySelector('[data-testid="boot-brain-alert"]');
+  expect(alert.textContent).toContain("n'arrive pas à joindre son cerveau");
+  expect(speakCinematic.mock.calls[0][0]).toContain("Je n'arrive pas encore à joindre mon cerveau");
+  act(() => speakCinematic.mock.calls[0][1].onend());
+  await flush(31000);
+  expect(onDone).not.toHaveBeenCalled();
+
+  probeBrain.mockResolvedValue(true);
+  await act(async () => {
+    container.querySelector('[data-testid="boot-brain-retry"]').click();
+    await Promise.resolve();
+  });
+  await flush(10);
+  expect(container.querySelector('[data-testid="boot-brain-alert"]')).toBeNull();
+  await flush(500);
+  expect(onDone).toHaveBeenCalledTimes(1);
+});
+
+test("the user can continue without the brain", async () => {
+  const onDone = jest.fn();
+  render(<BootScreen onDone={onDone} probeBrain={() => Promise.resolve(false)} />);
+  for (let i = 0; i < 12; i += 1) await flush(2000);
+  act(() => container.querySelector('[data-testid="boot-brain-continue"]').click());
+  act(() => jest.advanceTimersByTime(500));
+  expect(onDone).toHaveBeenCalledTimes(1);
+});
+
+test("a brain that answers late is announced as ready", async () => {
+  const probeBrain = jest.fn().mockResolvedValueOnce(false).mockResolvedValue(true);
+  render(<BootScreen onDone={jest.fn()} probeBrain={probeBrain} />);
+  await flush(0);
+  expect(speakCinematic).not.toHaveBeenCalled();
+  await flush(2000);
+  expect(speakCinematic.mock.calls[0][0]).toContain("Tous mes systèmes sont prêts");
+});

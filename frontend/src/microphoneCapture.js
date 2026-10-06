@@ -17,7 +17,7 @@ export function scheduleHandsFreeRetry(isReady, startListening) {
   }, 600);
 }
 
-export function createSilenceDetector({ threshold = 0.02, silenceMs = 1000, minimumSpeechMs = 200 } = {}) {
+export function createSilenceDetector({ threshold = 0.02, silenceMs = 2000, minimumSpeechMs = 200 } = {}) {
   let speechMs = 0;
   let previousTime = null;
   let lastSound = null;

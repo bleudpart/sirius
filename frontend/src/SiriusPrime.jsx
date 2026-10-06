@@ -31,7 +31,8 @@ export default function SiriusPrime({ onClose }) {
   useEffect(() => {
     const c = starsRef.current;
     const x = c.getContext("2d");
-    let raf, running = true, t = 0;
+    // Mobile : fond quasi opaque, étoiles masquées en CSS ; on évite une boucle rAF par fenêtre.
+    let raf, running = !window.matchMedia?.("(max-width: 1023px)")?.matches, t = 0;
     const resize = () => { c.width = window.innerWidth; c.height = window.innerHeight; };
     resize();
     window.addEventListener("resize", resize);

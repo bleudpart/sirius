@@ -640,6 +640,7 @@ function InfoWheelDialog({ onClose, weather, connected, ecoMode, setEcoMode, onO
   return (
     <div className="modwheel-overlay" data-testid="info-wheel" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }} onKeyDown={onKeyDown}>
       <div ref={dialogRef} tabIndex={-1} className="modwheel infowheel" role="dialog" aria-modal="true" aria-label="Centre d'information ΣIRIUS" {...windowProps}>
+        <h2 className="modwheel-heading">Centre d'information</h2>
         <span className="modwheel-grip" aria-hidden="true" title="Glisser pour déplacer · double-clic pour recentrer"><GripHorizontal size={16} /></span>
         <button type="button" className="modwheel-min" onClick={() => setMinimized(true)} data-testid="info-wheel-minimize" aria-label="Réduire le centre d'information" title="Réduire">
           <Minus size={16} />

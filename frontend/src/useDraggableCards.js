@@ -55,6 +55,7 @@ export default function useDraggableCards(deps = []) {
         try { localStorage.setItem(key, JSON.stringify(parseXY())); } catch (e) { /* stockage plein ignoré */ }
       };
       const onDown = (e) => {
+        if (window.matchMedia("(max-width: 1023px)").matches) return;
         // Ne pas démarrer le drag sur un élément interactif
         if (e.target.closest("button, a, input, select, textarea, [role='button']")) return;
         const cur = parseXY();

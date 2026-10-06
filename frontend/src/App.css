@@ -1980,6 +1980,41 @@ body.hud-minimal .medallion-halo { display: none; }
   transition: opacity 0.65s ease;
 }
 .boot-screen.closing { opacity: 0; pointer-events: none; }
+.boot-brain-wait {
+  margin-top: 10px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: rgba(145, 230, 242, 0.8);
+}
+.boot-brain-alert {
+  margin: 14px auto 0;
+  max-width: 440px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: center;
+  cursor: default;
+  border: 1px solid rgba(212, 175, 55, 0.55);
+  border-radius: 12px;
+  background: rgba(6, 19, 33, 0.92);
+  color: #e8dcb5;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.boot-brain-alert strong { font-family: "Cinzel", serif; color: #f2d27a; letter-spacing: 0.04em; }
+.boot-brain-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 4px; }
+.boot-brain-actions button {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(212, 175, 55, 0.7);
+  background: rgba(212, 175, 55, 0.14);
+  color: #f2d27a;
+  font-family: "Cinzel", serif;
+  cursor: pointer;
+}
+.boot-brain-actions button + button { border-color: rgba(145, 230, 242, 0.45); background: transparent; color: #bfeff6; }
 .sirius-root.is-booting > :not(.boot-screen) { visibility: hidden; pointer-events: none; }
 .sirius-root.is-booting > .boot-screen { z-index: 100001; }
 /* Grille alignée sur celle du tableau de bord (.grid-bg, même valeurs) : l'ancienne version
@@ -8195,6 +8230,41 @@ body[data-phase] .center-stage::before { content: none !important; }
 @media (max-width: 1023px) {
   .sirius-root {
     padding-top: env(safe-area-inset-top, 0px);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
+  .top-bar {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 56px;
+    gap: 6px;
+  }
+
+  .top-bar .conn-status {
+    max-width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    margin-left: auto;
+    box-sizing: border-box;
+  }
+
+  .conn-status .profile-btn {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    margin-left: 0;
+    padding: 4px;
+  }
+
+  .conn-status .profile-btn.conn-badge {
+    width: 72px;
+    min-width: 72px;
+  }
+
+  .conn-status .profile-btn > svg {
+    flex-shrink: 0;
+    min-width: 15px;
+    min-height: 15px;
   }
 
   .auth-chip,
@@ -8243,7 +8313,7 @@ body[data-phase] .center-stage::before { content: none !important; }
   }
 
   .sirius-root.mobile-section-info {
-    grid-template-rows: 56px minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
     grid-template-areas: "top" "dashboard";
   }
 
@@ -8488,3 +8558,29 @@ body[data-phase] .center-stage::before { content: none !important; }
   background: linear-gradient(180deg, rgba(22, 58, 44, 0.6), rgba(10, 32, 24, 0.75)) !important;
   box-shadow: inset 0 1px 0 rgba(220, 255, 238, 0.05), 0 0 8px rgba(110, 180, 148, 0.18) !important;
 }
+/* ---- Assistant de premier démarrage (FirstRunWizard) ---- */
+.fw-card { max-width: 520px; padding: 22px 24px; }
+.fw-card .setup-title { text-align: center; font-family: "Cinzel", serif; }
+.fw-steps { display: flex; justify-content: center; gap: 18px; list-style: none; padding: 0; margin: 14px 0 18px; }
+.fw-step { display: flex; align-items: center; gap: 6px; color: rgba(255, 255, 255, 0.5); font: 600 12px "Cinzel", serif; letter-spacing: 1px; }
+.fw-step span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 1px solid currentColor; font-size: 11px; }
+.fw-step.active { color: #f2d99a; text-shadow: 0 0 10px rgba(216, 184, 117, 0.45); }
+.fw-step.done { color: #3ddc97; }
+.fw-body h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; color: #d8b875; font: 700 15px "Cinzel", serif; letter-spacing: 1.5px; }
+.fw-body p { color: rgba(255, 255, 255, 0.82); font-size: 14px; line-height: 1.45; margin: 0 0 10px; }
+.fw-status { display: flex; align-items: center; gap: 6px; }
+.fw-status.ok { color: #3ddc97 !important; }
+.fw-status.ko { color: #ffb4a8 !important; }
+.fw-link { display: grid; gap: 8px; }
+.fw-tabs { display: flex; gap: 6px; }
+.fw-tabs button { flex: 1; padding: 7px; border-radius: 8px; border: 1px solid rgba(216, 184, 117, 0.3); background: transparent; color: rgba(255, 255, 255, 0.7); cursor: pointer; font: 600 13px "Rajdhani", sans-serif; }
+.fw-tabs button.on { border-color: #d8b875; color: #f2d99a; background: rgba(216, 184, 117, 0.1); }
+.fw-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+.fw-primary, .fw-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 8px 18px; border-radius: 8px; cursor: pointer; font: 700 13px "Cinzel", serif; letter-spacing: 1px; }
+.fw-primary { border: 1px solid #d8b875; background: rgba(216, 184, 117, 0.18); color: #f2d99a; }
+.fw-primary:disabled { opacity: 0.6; cursor: wait; }
+.fw-secondary { border: 1px solid rgba(255, 255, 255, 0.25); background: transparent; color: rgba(255, 255, 255, 0.8); }
+.fw-link-btn { margin-right: auto; background: none; border: 0; color: #91e6f2; cursor: pointer; text-decoration: underline; font-size: 12px; }
+.fw-summary { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 6px; font-size: 14px; }
+.fw-summary li.ok { color: #3ddc97; }
+.fw-summary li.ko { color: #fcd34d; }

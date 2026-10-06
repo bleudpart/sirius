@@ -19,8 +19,12 @@ export default function useTouchNav(handlers) {
         ".card-drag-grip, .zc-section-title, .web-window, .task-window, .sirius-display, " +
         ".sirius-progress, .sp-journal, .modmenu, .setup-screen, [data-hud-panel], .float-card"
       );
+    const modulePage = (el) => window.matchMedia("(max-width: 1023px)").matches &&
+      el?.closest?.(".holo-win, .prime-screen, .connections-screen, " +
+        ".atlas-panel, .kr-panel, .p3d-overlay, .esp-panel, .about-panel, .media-hud-window, .productivity-screen");
 
     const onStart = (e) => {
+      if (modulePage(e.target)) { tracking = false; multi = false; return; }
       if (e.touches.length === 2) {
         multi = true;
         pinchFired = false;

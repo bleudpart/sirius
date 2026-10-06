@@ -1,0 +1,427 @@
+/* Mobile only: override desktop geometry, including positions restored inline. */
+@media (max-width: 1023px) {
+  :is(.holo-win.holo-win, .prime-screen, .zeus-screen, .eu-screen, .setup-screen,
+      .atlas-panel, .kr-panel, .p3d-overlay, .esp-panel, .about-panel,
+      .media-hud-window, .productivity-screen, .connections-screen) {
+    /* Même cadre que les roues (ModulesMenu.css) : carte arrondie posée au-dessus
+       de la navigation, liseré or tournant peint dans la bordure. */
+    position: fixed !important;
+    top: max(8px, env(safe-area-inset-top, 0px)) !important;
+    right: 8px !important;
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
+    left: 8px !important;
+    width: auto !important;
+    height: auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+    border: 1.5px solid transparent !important;
+    border-radius: 18px !important;
+    background:
+      linear-gradient(155deg, rgba(16, 48, 68, 0.97), rgba(4, 14, 26, 0.985)) padding-box,
+      conic-gradient(from var(--sir-frame-angle),
+        rgba(240, 190, 80, 0.16), #f0be50 12%, #fff1c2 18%, #f0be50 24%, rgba(240, 190, 80, 0.16) 40%,
+        rgba(240, 190, 80, 0.16) 50%, #f0be50 62%, #fff1c2 68%, #f0be50 74%, rgba(240, 190, 80, 0.16) 90%) border-box !important;
+    box-shadow:
+      0 0 18px rgba(240, 190, 80, 0.16),
+      0 24px 60px rgba(0, 5, 14, 0.7),
+      inset 0 1px 0 rgba(220, 250, 255, 0.12) !important;
+    transform: none !important;
+    translate: none !important;
+    /* Liseré fixe sur mobile : le faire tourner repeignait toute la fenêtre plein écran
+       ~26 fois/s (fond + ombre floue), ce qui figeait la WebView Android. */
+    animation: none !important;
+    box-sizing: border-box;
+    touch-action: auto;
+    overscroll-behavior-y: contain;
+  }
+
+  :is(.holo-win.holo-win, .prime-screen, .eu-screen, .setup-screen, .atlas-panel, .kr-panel,
+      .esp-panel, .about-panel, .productivity-screen, .connections-screen) {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+
+  /* En-têtes : bandeau collant, titre Cinzel or souligné du spectre RGB, fermeture ronde 44 px */
+  :is(.holo-win, .prime-screen, .zeus-screen, .eu-screen, .setup-screen, .productivity-screen, .connections-screen)
+    > :is(.zeus-head, .eu-head, .setup-head, .gcal-head) {
+    position: sticky !important;
+    top: 0;
+    z-index: 25;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 56px;
+    padding: 6px 60px 6px 14px !important;
+    background: rgba(8, 28, 40, 0.96) !important;
+    border-bottom: 1px solid transparent !important;
+    border-image: linear-gradient(90deg, #ff4d9d, #f0be50, #00e5ff, #b04dff) 1 !important;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.3);
+    box-sizing: border-box;
+  }
+
+  :is(.atlas-panel, .kr-panel, .esp-panel, .p3d-overlay) > :is(.atlas-bar, .kr-bar, .esp-bar, .p3d-bar) {
+    position: sticky;
+    top: 0;
+    z-index: 25;
+    min-height: 56px;
+    padding: 6px 10px 6px 14px !important;
+    background: rgba(8, 28, 40, 0.96) !important;
+    border-bottom: 1px solid transparent !important;
+    border-image: linear-gradient(90deg, #ff4d9d, #f0be50, #00e5ff, #b04dff) 1 !important;
+    box-sizing: border-box;
+  }
+
+  :is(.atlas-bar, .kr-bar, .esp-bar, .p3d-bar) :is(.kr-icon-btn, .atlas-icon-btn, .esp-icon-btn, .p3d-close) {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 50% !important;
+    border: 1px solid rgba(145, 230, 242, 0.3) !important;
+    background: rgba(0, 18, 30, 0.6) !important;
+  }
+
+  .kr-panel {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  :is(.holo-win, .prime-screen, .zeus-screen, .eu-screen, .setup-screen, .atlas-panel, .kr-panel, .esp-panel,
+      .p3d-overlay, .productivity-screen, .connections-screen)
+    :is(.oracle-title, .prime-title, .zeus-title, .setup-title, .eu-title, .architect-title, .atlas-title,
+        .kr-title, .fp-title, .p3d-title, .sp-title, .iw-title, .keys-title, .an3d-title, .esp-title) {
+    min-width: 0;
+    margin: 0;
+    font-family: "Cinzel", serif !important;
+    font-size: clamp(16px, 5vw, 21px) !important;
+    font-weight: 700;
+    letter-spacing: 1.5px !important;
+    line-height: 1.15;
+    text-transform: uppercase;
+    color: #f0d590 !important;
+    text-shadow: 0 0 12px rgba(240, 190, 80, 0.35) !important;
+    overflow-wrap: anywhere;
+  }
+
+  :is(.holo-win, .prime-screen, .zeus-screen, .eu-screen, .setup-screen, .productivity-screen, .connections-screen)
+    :is(.zeus-head, .eu-head, .setup-head, .gcal-head) :is(.setup-close, .zeus-close) {
+    position: absolute !important;
+    top: 6px !important;
+    right: 8px !important;
+    display: grid;
+    place-items: center;
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    border: 1px solid rgba(145, 230, 242, 0.3) !important;
+    background: rgba(0, 18, 30, 0.6) !important;
+    color: #ffffff;
+  }
+
+  :is(.prime-screen, .eu-screen, .about-panel) {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding-top: 0;
+    padding-bottom: 20px;
+    touch-action: pan-y pinch-zoom;
+  }
+
+  .prime-screen:has(> .mythos-avatar) {
+    display: block;
+  }
+
+  .prime-screen:has(> img.mythos-avatar) > img.mythos-avatar {
+    display: block;
+    width: 96px !important;
+    max-width: 96px;
+    max-height: 120px;
+    margin: 12px auto;
+  }
+
+  .holo-win :is(.holo-win-bar, .holo-win-resize, .holo-win-min),
+  .media-hud-window .media-window-resize,
+  .prime-card .card-drag-grip {
+    display: none !important;
+  }
+
+  .holo-win .holo-drag,
+  .media-hud-window .media-hud-header,
+  .prime-card :is(.zc-section-title, .prime-card-title, .oracle-card-title, h3, h4) {
+    cursor: auto !important;
+    touch-action: pan-y pinch-zoom !important;
+  }
+
+  .prime-card {
+    min-width: 0;
+    max-width: 100%;
+    transform: none !important;
+    translate: none !important;
+    touch-action: pan-y;
+  }
+
+  .prime-grid {
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+    max-width: 100%;
+    padding: 0 12px;
+    gap: 12px;
+  }
+
+  .prime-screen .zeus-head {
+    position: sticky !important;
+    top: 0;
+    z-index: 30 !important;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .prime-screen .oracle-title {
+    min-width: 0;
+    flex: 1;
+    font-size: clamp(15px, 4vw, 20px);
+    letter-spacing: 1px;
+    overflow-wrap: anywhere;
+  }
+
+  .prime-screen .prime-sub {
+    margin: 16px 0;
+    padding: 0 12px;
+    line-height: 1.6;
+    letter-spacing: 1px;
+  }
+
+  .prime-screen .setup-close {
+    flex: 0 0 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  [data-testid="pantheon-panel"] .pantheon-notif-row {
+    flex-wrap: wrap;
+  }
+
+  [data-testid="pantheon-panel"] .pantheon-notif-input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  [data-testid="pantheon-panel"] .prime-scroll {
+    max-height: none !important;
+    overflow: visible;
+  }
+
+  .prime-screen .dev-action-btn {
+    width: auto;
+    min-width: 44px;
+    min-height: 44px;
+    max-width: 100%;
+    white-space: normal;
+  }
+
+  .work-modules .work-layout,
+  .work-modules .work-layout.with-portrait {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .work-modules .work-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: 0;
+    padding: 8px;
+  }
+
+  .work-modules .work-nav button { flex-shrink: 0; }
+  .work-modules .work-portrait { position: static; padding: 12px; }
+  .work-modules .work-content { min-width: 0; padding: 16px 12px 32px; }
+  .work-modules .work-form { grid-template-columns: minmax(0, 1fr); }
+
+  :is(.atlas-panel, .kr-panel, .p3d-overlay, .esp-panel, .media-hud-window) {
+    background-color: #07141f;
+    z-index: 1000;
+  }
+}
+
+/* Contenu des fenêtres PRIME (Oracle Divin, Pantheon System, Prime…) au dessin de la roue des
+   modules : tuiles arrondies discrètes, intertitres or, champs en pilule. Remplace l'ancien
+   habillage à coins coupés et contours cyan lumineux. */
+@media (max-width: 1023px) {
+  :is(.prime-screen, .holo-win) .prime-card {
+    clip-path: none;
+    border: 1px solid rgba(145, 230, 242, 0.14);
+    border-radius: 14px;
+    background: linear-gradient(140deg, rgba(10, 34, 50, 0.72), rgba(0, 16, 28, 0.62));
+    box-shadow: 0 8px 22px rgba(0, 8, 16, 0.38), inset 0 1px 0 rgba(220, 250, 255, 0.06);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    animation: primeTileIn 0.34s ease-out both;
+    padding: 14px;
+  }
+
+  :is(.prime-screen, .holo-win) .zc-section-title {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    margin: 2px 2px 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(145, 230, 242, 0.12);
+    color: #f0be50;
+    font-family: "Orbitron", sans-serif;
+    font-size: 11px;
+    letter-spacing: 2.2px;
+    text-shadow: none;
+  }
+
+  .prime-screen .prime-sub {
+    color: rgba(255, 255, 255, 0.62);
+    font-family: "Rajdhani", sans-serif;
+    font-size: 12px;
+    letter-spacing: 1.4px;
+  }
+
+  .prime-screen :is(.prime-journal-row, .oracle-market-row, .oracle-news-row, .oracle-astro-row, .pantheon-svc-row, .pantheon-proc-row) {
+    border-bottom-color: rgba(145, 230, 242, 0.08);
+  }
+
+  .prime-screen :is(.prime-sugg, .oracle-day) {
+    border: 1px solid rgba(145, 230, 242, 0.14);
+    border-radius: 12px;
+    background: rgba(0, 18, 30, 0.55);
+  }
+
+  .prime-screen :is(.oracle-day-name, .oracle-news-theme, .prime-time, .prime-sugg-num) {
+    color: #d8b875;
+    text-shadow: none;
+  }
+
+  .prime-screen .memory-empty {
+    border: 1px solid rgba(145, 230, 242, 0.14);
+    border-radius: 12px;
+    background: rgba(0, 18, 30, 0.45);
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  .prime-screen .cmd-input {
+    min-height: 42px;
+    padding: 0 16px;
+    border: 1px solid rgba(145, 230, 242, 0.25);
+    border-radius: 21px;
+    background: rgba(0, 18, 30, 0.65);
+    color: #ffffff;
+    font-family: "Rajdhani", sans-serif;
+    font-size: 15px;
+  }
+  .prime-screen .cmd-input:focus {
+    border-color: rgba(145, 230, 242, 0.7);
+    box-shadow: 0 0 16px rgba(126, 231, 255, 0.2);
+  }
+
+  .prime-screen .zc-bar-track {
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(145, 230, 242, 0.1);
+  }
+  .prime-screen .zc-bar-fill { border-radius: 3px; }
+
+  [data-testid="pantheon-panel"] .pantheon-toggle {
+    width: auto;
+    flex: 1 1 100%;
+    font-family: "Rajdhani", sans-serif;
+    font-size: 14px;
+    letter-spacing: 0.6px;
+  }
+
+  .prime-screen :is(.cmd-send, .dev-action-btn, .oracle-3d-btn) {
+    min-height: 42px;
+    padding: 0 16px;
+    border: 1px solid rgba(240, 190, 80, 0.55);
+    border-radius: 21px;
+    background: linear-gradient(140deg, rgba(64, 48, 18, 0.62), rgba(18, 16, 12, 0.7));
+    color: #ffe6a3;
+    box-shadow: inset 0 0 12px rgba(240, 190, 80, 0.1);
+    font-family: "Rajdhani", sans-serif;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+
+  .prime-screen .memory-icon-btn {
+    width: 36px;
+    height: 36px;
+    border: 1px solid rgba(126, 231, 255, 0.25);
+    border-radius: 50%;
+    background: rgba(126, 231, 255, 0.1);
+  }
+}
+
+@keyframes primeTileIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Performance mobile : pas d'animation infinie qui force un repeint (texte en dégradé,
+   halos, spectre) à l'intérieur des fenêtres, ni sur les cadres du HUD. */
+@media (max-width: 1023px) {
+  .holo-win::before,
+  .sirius-display::after,
+  .web-window::after,
+  .shud-panel::after,
+  .sirius-display .sd-bar,
+  :is(.holo-win, .prime-screen, .zeus-screen, .eu-screen, .setup-screen, .modwheel)
+    :is(.zc-section-title, .hud-panel-title, .panel-title, .fc-head, .modmenu-head,
+        .oracle-title, .prime-title, .zeus-title, .setup-title, .eu-title, .kr-title,
+        .gold-rich, .cmd-send, .brand-tag) {
+    animation: none !important;
+  }
+
+  :is(.holo-win, .prime-screen) :is(.zc-section-title, .hud-panel-title, .panel-title, .fc-head) {
+    filter: none;
+  }
+
+  .prime-stars { display: none !important; }
+
+  /* Halos pulsés par filter: drop-shadow → repeint complet à chaque image. */
+  .cmd-send, .brand-tag, .gold-rich {
+    animation: none !important;
+  }
+}
+
+/* Portraits des modules sur téléphone : un seul gabarit partout (4:5, centré, cadre or),
+   quelle que soit la règle d'origine (mythos-avatar, consultations, WorkModules, Kéraunos). */
+@media (max-width: 1023px) {
+  .prime-screen:has(> img.mythos-avatar) > img.mythos-avatar,
+  .atlas-panel:has(> img.mythos-avatar) > img.mythos-avatar,
+  :is(.prime-screen, .atlas-panel, .holo-win) img.mythos-avatar,
+  .consult-portrait img,
+  .work-modules .work-portrait img,
+  .kr-character img {
+    display: block;
+    position: static !important;
+    width: 120px !important;
+    height: 150px !important;
+    max-width: 120px !important;
+    max-height: 150px !important;
+    margin: 12px auto 4px !important;
+    object-fit: cover;
+    object-position: 50% 18%;
+    border-radius: 14px;
+    border: 1px solid rgba(217, 165, 60, 0.6);
+    box-shadow: 0 0 14px rgba(216, 184, 117, 0.18);
+    filter: none !important;
+    grid-column: 1 / -1;
+  }
+  .consult-portrait,
+  .work-modules .work-portrait,
+  .kr-character {
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center;
+    text-align: center;
+    padding: 0 0 4px !important;
+    gap: 6px;
+  }
+}

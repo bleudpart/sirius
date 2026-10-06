@@ -72,7 +72,7 @@ export const logPrimeCommand = async (command, intent = null) => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include", // 👈 Ajouté par sécurité ici aussi
-      body: JSON.stringify({ text: command, intent }),
+      body: JSON.stringify({ text: command, intent: intent || "" }),
     });
   } catch (err) {
     // Échec silencieux pour ne pas bloquer l'expérience utilisateur

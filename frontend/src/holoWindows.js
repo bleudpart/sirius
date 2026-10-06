@@ -2,6 +2,7 @@
 // Fenêtres holographiques 3D : transforme les écrans plats en panneaux cyan flottants,
 // déplaçables (drag sur l'en-tête), redimensionnables (poignée bas-droite) et fermables.
 const SEL = ".prime-screen, .zeus-screen, .eu-screen, .setup-screen, .iw-panel";
+const mobilePage = () => window.matchMedia("(max-width: 1023px)").matches;
 let zTop = 1000;
 const bumpZ = () => (zTop = Math.min(zTop + 1, 1190));
 let cascade = 0;
@@ -58,6 +59,7 @@ function track(e0, el, k, fn) {
 }
 
 function startDrag(e, el, k) {
+  if (mobilePage()) return;
   if (e.target.closest("button, input, select, textarea, a, [role=button]")) return;
   const g0 = { ...el.__geo };
   track(e, el, k, (dx, dy) => {
@@ -68,6 +70,7 @@ function startDrag(e, el, k) {
 }
 
 function startResize(e, el, k) {
+  if (mobilePage()) return;
   e.stopPropagation();
   const g0 = { ...el.__geo };
   track(e, el, k, (dx, dy) => {
@@ -204,6 +207,7 @@ function titleOf(el) {
 }
 
 function minimize(el) {
+  if (mobilePage()) return;
   if (el.__pill) return;
   el.classList.add("holo-minimized");
   const pill = document.createElement("button");

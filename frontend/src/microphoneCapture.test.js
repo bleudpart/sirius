@@ -28,14 +28,26 @@ test("an active press keeps its stream and permission failures remain explicit",
   await expect(requestMicrophoneStream({ getUserMedia: async () => { throw error; } }, () => true)).rejects.toBe(error);
 });
 
-test("hands-free capture stops after one second of silence, not before speech", () => {
+test("hands-free capture stops after two seconds of silence, not before speech", () => {
   const detect = createSilenceDetector();
   const quiet = new Float32Array([0, 0]);
   const speech = new Float32Array([0.1, -0.1]);
   for (let now = 0; now <= 1000; now += 50) expect(detect(quiet, now)).toBe(false);
   for (let now = 1050; now <= 1300; now += 50) expect(detect(speech, now)).toBe(false);
-  expect(detect(quiet, 2250)).toBe(false);
-  expect(detect(quiet, 2300)).toBe(true);
+  expect(detect(quiet, 3250)).toBe(false);
+  expect(detect(quiet, 3300)).toBe(true);
+});
+
+test("a pause after Sirius keeps the recording open for the rest of the request", () => {
+  const detect = createSilenceDetector();
+  const quiet = new Float32Array([0, 0]);
+  const speech = new Float32Array([0.1, -0.1]);
+  detect(quiet, 0);
+  for (let now = 50; now <= 350; now += 50) expect(detect(speech, now)).toBe(false);
+  for (let now = 400; now <= 1850; now += 50) expect(detect(quiet, now)).toBe(false);
+  for (let now = 1900; now <= 3500; now += 50) expect(detect(speech, now)).toBe(false);
+  expect(detect(quiet, 5450)).toBe(false);
+  expect(detect(quiet, 5500)).toBe(true);
 });
 
 test("a short click or a new spoken segment does not end a sentence", () => {

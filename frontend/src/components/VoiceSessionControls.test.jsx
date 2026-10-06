@@ -12,7 +12,7 @@ test("shows each real phase with an always accessible stop button", async () => 
   const stop = jest.fn();
   try {
     for (const [phase, label] of Object.entries({
-      idle: "Prêt", requesting: "Autorisation du microphone…",
+      idle: "Prêt", requesting: "Ouverture du microphone…",
       listening: "J’écoute…", transcribing: "Je transcris…",
       thinking: "Je traite votre demande…", preparing: "Je prépare la voix…", speaking: "Je réponds…",
     })) {

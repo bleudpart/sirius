@@ -178,7 +178,7 @@ export default function KeraunosPanel({ onClose }) {
       </div>
 
       <aside className="kr-character" aria-label="Kéraunos">
-        <img src="/holo/keraunos-proposal-realistic.svg" alt="Kéraunos, gardien de la foudre domestique" />
+        <img src="/holo/gardien-realiste.jpg" alt="Kéraunos, gardien de la foudre domestique" />
         <strong>KÉRAUNOS#</strong>
         <span>GARDIEN DE LA FOUDRE DOMESTIQUE</span>
       </aside>

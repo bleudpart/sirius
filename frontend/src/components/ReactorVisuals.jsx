@@ -5,6 +5,10 @@ import { useEffect, useRef, useState } from "react";
 
 import { STATES } from "@/appLogic";
 
+const isMobileViewport = () => Boolean(window.matchMedia?.("(max-width: 1023px)")?.matches);
+// Fenêtres plein écran sur mobile : le réacteur est caché dessous.
+const MOBILE_COVER_SELECTOR = ".holo-win, .prime-screen, .zeus-screen, .eu-screen, .setup-screen, .kr-panel, .atlas-panel, .esp-panel, .p3d-overlay, .about-panel, .media-hud-window";
+
 export function CoreRings() {
   return (
     <div className="core-rings" aria-hidden="true">
@@ -79,6 +83,7 @@ export function ReactorCore({ status, volume, color, eco }) {
       return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
     };
 
+    const isMobile = isMobileViewport();
     let lastFrame = 0;
     const draw = (ts) => {
       raf = requestAnimationFrame(draw);
@@ -86,14 +91,17 @@ export function ReactorCore({ status, volume, color, eco }) {
       if (document.documentElement.classList.contains("sirius-dragging")) return;
       // Figé aussi derrière la roue ouverte (HUD flouté, animations CSS en pause).
       if (document.querySelector(".modwheel-overlay:not(.is-minimized)")) return;
+      // Mobile : une fenêtre de module recouvre tout l'écran, inutile de dessiner dessous.
+      if (isMobile && document.querySelector(MOBILE_COVER_SELECTOR)) return;
       const s = stateRef.current;
-      // Mode économie : on ralentit fortement le rafraîchissement (surtout en veille)
-      const minDt = s.eco ? (s.status === "idle" || s.status === "listening" ? 110 : 55) : 33;
+      // Mode économie (et mobile) : rafraîchissement ralenti, surtout en veille
+      const light = s.eco || isMobile;
+      const minDt = light ? (s.status === "idle" || s.status === "listening" ? 110 : 55) : 33;
       if (ts && ts - lastFrame < minDt) return;
       const dt = lastFrame ? Math.min(0.2, (ts - lastFrame) / 1000) : 0.033;
       lastFrame = ts || 0;
       s.t += dt;
-      const blur = s.eco ? 0 : 18; // shadowBlur coûteux → désactivé en éco
+      const blur = light ? 0 : 18; // shadowBlur coûteux → désactivé en éco et sur mobile
       const conf = STATES[s.status] || STATES.idle;
       const [r, g, b] = hexToRgb(s.color || conf.color);
       const W = canvas.width;
@@ -392,8 +400,10 @@ export function Waveform({ status, color }) {
     resize();
     window.addEventListener("resize", resize);
     let lastWave = 0;
+    const isMobile = isMobileViewport();
     const draw = (ts) => {
-      if ((ts && ts - lastWave < 33) || document.documentElement.classList.contains("sirius-dragging")) {
+      if ((ts && ts - lastWave < 33) || document.documentElement.classList.contains("sirius-dragging")
+          || (isMobile && document.querySelector(MOBILE_COVER_SELECTOR))) {
         raf = requestAnimationFrame(draw);
         return;
       }

@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
 import { speakFr, cancelSpeech, speakSeries } from "./voice";
 import { TextDecoder } from "util";
+import { Capacitor } from "@capacitor/core";
 
 jest.mock("./AuthGate", () => ({ useAuth: () => ({ user: { id: "voice-test", name: "Validation" } }) }));
 jest.mock("./voice", () => ({
@@ -186,6 +187,7 @@ test("pointer Stop discards the buffered phrase before the global push-to-talk r
       result.isFinal = true;
       recognition.onresult({ resultIndex: 0, results: [result] });
     });
+
     const button = host.querySelector(".voice-session-controls button");
     await act(async () => {
       button.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
@@ -199,5 +201,59 @@ test("pointer Stop discards the buffered phrase before the global push-to-talk r
     expect(host.querySelector(".voice-session-controls").textContent).toContain("Prêt");
   } finally {
     window.SpeechRecognition = previousRecognition;
+  }
+});
+
+test.each([
+  ["", "Aucune parole distinguée"],
+  ["donne le briefing de la journée", "Reconnu : « donne le briefing de la journée »"],
+])("Android keeps feedback after a hands-free retry for transcript %s", async (transcript, feedback) => {
+  const previousRecorder = window.MediaRecorder;
+  const previousMediaDevices = Object.getOwnPropertyDescriptor(navigator, "mediaDevices");
+  const recorders = [];
+  const stopTrack = jest.fn();
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  Object.defineProperty(navigator, "mediaDevices", {
+    configurable: true,
+    value: { getUserMedia: jest.fn(async () => ({ getTracks: () => [{ stop: stopTrack }] })) },
+  });
+  window.MediaRecorder = class {
+    static isTypeSupported() { return true; }
+    constructor() {
+      this.mimeType = "audio/webm";
+      this.state = "inactive";
+      recorders.push(this);
+    }
+    start() { this.state = "recording"; }
+    stop() {
+      this.state = "inactive";
+      this.ondataavailable?.({ data: new Blob(["a".repeat(1000)], { type: this.mimeType }) });
+      this.onstop?.();
+    }
+  };
+  const fallback = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation((url, options) => String(url).endsWith("/stt")
+    ? Promise.resolve({ ok: true, json: async () => ({ text: transcript }) })
+    : fallback(url, options));
+  try {
+    await mount();
+    await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
+    expect(recorders).toHaveLength(1);
+    await act(async () => recorders[0].stop());
+    expect(host.querySelector('[data-testid="sirius-voice-controls"]').textContent).toContain(feedback);
+    await act(async () => jest.advanceTimersByTime(600));
+    expect(recorders).toHaveLength(2);
+    const controls = host.querySelector('[data-testid="sirius-voice-controls"]');
+    expect(controls.textContent).toContain("J’écoute");
+    expect(controls.textContent).toContain(feedback);
+    expect(stopTrack).toHaveBeenCalledTimes(1);
+    expect(global.fetch.mock.calls.filter(([url]) => /\/chat(?:\/stream)?$/.test(String(url)))).toEqual([]);
+    await act(async () => controls.querySelector("button").click());
+    await act(async () => jest.advanceTimersByTime(16000));
+    expect(recorders).toHaveLength(2);
+  } finally {
+    window.MediaRecorder = previousRecorder;
+    if (previousMediaDevices) Object.defineProperty(navigator, "mediaDevices", previousMediaDevices);
+    else delete navigator.mediaDevices;
   }
 });

@@ -10,6 +10,25 @@ import { LiveClock, LiveDate, useLiveStats } from "@/liveStats";
 import { getLocalDateKey } from "@/dateTime";
 import { speakCinematic, cancelSpeech, cleanTextForDisplay } from "@/voice";
 import { WORK_MODULES } from "@/workModules";
+import { API_BASE_URL } from "@/lib/api";
+
+const BRAIN_RETRY_MS = 2000;
+const BRAIN_DEADLINE_MS = 20000;
+
+// Le serveur local d'un PC met parfois une dizaine de secondes à démarrer, et le serveur
+// public peut être lent à répondre : on réessaie avant de déclarer le cerveau injoignable.
+export async function probeBrainOnce() {
+  const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+  const timer = setTimeout(() => controller?.abort(), 4000);
+  try {
+    const response = await fetch(`${API_BASE_URL}/health`, { signal: controller?.signal, cache: "no-store" });
+    return response.ok;
+  } catch (error) {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 const BACKEND_BASE = process.env.REACT_APP_BACKEND_URL || "http://127.0.0.1:8001";
 const API = BACKEND_BASE + "/api";
@@ -473,26 +492,54 @@ export function CentralCard({ card, weather, onClose }) {
   );
 }
 
-export function BootScreen({ onDone, userName, onOpenModule, connected }) {
+export function BootScreen({ onDone, userName, onOpenModule, connected, probeBrain = probeBrainOnce }) {
+  // État du cerveau (serveur) : null = recherche en cours, true = joint, false = injoignable.
+  const [brain, setBrain] = useState(connected ? true : null);
+  const [brainAttempt, setBrainAttempt] = useState(0);
+  const [brainRun, setBrainRun] = useState(0);
+  const brainRef = useRef(brain);
+  brainRef.current = brain;
+  useEffect(() => {
+    if (connected) setBrain(true);
+  }, [connected]);
+  useEffect(() => {
+    if (brainRef.current === true) return undefined;
+    let cancelled = false;
+    let timer = null;
+    const deadline = Date.now() + BRAIN_DEADLINE_MS;
+    const attempt = async (n) => {
+      if (cancelled) return;
+      setBrainAttempt(n);
+      const ok = await Promise.resolve(probeBrain()).catch(() => false);
+      if (cancelled || brainRef.current === true) return;
+      if (ok) { setBrain(true); return; }
+      if (Date.now() >= deadline) { setBrain(false); return; }
+      timer = setTimeout(() => attempt(n + 1), BRAIN_RETRY_MS);
+    };
+    attempt(1);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [brainRun]); // eslint-disable-line react-hooks/exhaustive-deps
+  const retryBrain = () => {
+    setBrain(null);
+    setBrainRun((n) => n + 1);
+  };
+
   // Chaque ligne annonce l'état réellement constaté : afficher « OK » sans vérifier
   // ferait mentir l'écran de démarrage (la liaison peut échouer pendant qu'il défile).
   const checks = useMemo(() => {
     const speech = typeof window !== "undefined" && "speechSynthesis" in window;
+    // La dictée passe soit par le navigateur, soit par l'enregistrement micro transcrit
+    // par le serveur (/stt) : c'est le cas de la WebView Android, sans SpeechRecognition.
     const recog = typeof window !== "undefined"
-      && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
-    const secure = typeof window !== "undefined" && window.isSecureContext;
+      && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window
+        || (typeof window.MediaRecorder !== "undefined" && !!navigator.mediaDevices?.getUserMedia));
     return [
       { label: "Initialisation du noyau Σ.I.R.I.U.S", state: null },
-      { label: "Chargement des modules cognitifs", state: true },
+      { label: "Connexion au cerveau Σ.I.R.I.U.S", state: brain === null ? null : brain === true },
       { label: "Calibration synthèse vocale", state: speech },
-      { label: "Activation reconnaissance vocale", state: recog },
-      { label: "Établissement liaison WebSocket", state: !!connected },
-      { label: "Protocoles de sécurité", state: !!secure },
+      { label: "Activation du micro", state: recog },
     ];
-  }, [connected]);
-
-  const okCount = checks.filter((c) => c.state === true).length;
-  const total = checks.filter((c) => c.state !== null).length;
+  }, [brain]);
 
   const lines = useMemo(() => {
     const dots = (label) => ".".repeat(Math.max(3, 42 - label.length));
@@ -501,11 +548,10 @@ export function BootScreen({ onDone, userName, onOpenModule, connected }) {
         ? `> ${c.label} ...`
         : `> ${c.label} ${dots(c.label)} ${c.state ? "OK" : "INDISPONIBLE"}`
     ));
-    rows.push(userName
-      ? `> Bienvenue, ${userName}. ${okCount}/${total} services opérationnels.`
-      : `> ${okCount}/${total} services opérationnels.`);
+    const status = brain === false ? "cerveau injoignable." : "prêt.";
+    rows.push(userName ? `> Bienvenue, ${userName}. ΣIRIUS ${status}` : `> ΣIRIUS ${status}`);
     return rows;
-  }, [checks, okCount, total, userName]);
+  }, [checks, brain, userName]);
   const [shown, setShown] = useState(0);
   const [progress, setProgress] = useState(0);
   const [closing, setClosing] = useState(false);
@@ -523,18 +569,18 @@ export function BootScreen({ onDone, userName, onOpenModule, connected }) {
     window.addEventListener("sirius-voice-error", reportVoiceError);
     return () => window.removeEventListener("sirius-voice-error", reportVoiceError);
   }, []);
-  // Le socket met un instant à répondre : annoncer le décompte immédiatement ferait dire
-  // « 4 sur 5 » à la voix pendant que l'écran affiche déjà 5 sur 5.
-  const [checksSettled, setChecksSettled] = useState(false);
+  // On attend le verdict du cerveau avant d'annoncer l'état à voix haute ; un « Réessayer »
+  // ultérieur ne relance pas la présentation.
+  const [narrationReady, setNarrationReady] = useState(false);
   useEffect(() => {
-    if (connected) { setChecksSettled(true); return undefined; }
-    const t = setTimeout(() => setChecksSettled(true), 2500);
-    return () => clearTimeout(t);
-  }, [connected]);
+    if (brain !== null) setNarrationReady(true);
+  }, [brain]);
   const padRef = useRef(null);
   const introSpeech = "Système. Intelligent. Réactif. Interface. Universel. Sécurisé. " +
     "Je suis Sirius... façonné par mon créateur, Daniel Partel. " +
-    `Sirius scanne tous ses services... ${okCount} services sur ${total} sont opérationnels... à votre disposition.`;
+    (brain === false
+      ? "Je n'arrive pas encore à joindre mon cerveau... vérifiez la connexion Internet."
+      : "Tous mes systèmes sont prêts... à votre disposition.");
   const playIntroSpeech = () => {
     try {
       const pad = padRef.current;
@@ -577,7 +623,7 @@ export function BootScreen({ onDone, userName, onOpenModule, connected }) {
   }, []);
 
   useEffect(() => {
-    if (!checksSettled) return undefined;
+    if (!narrationReady) return undefined;
     // Présentation vocale : voix française grave et posée, style bande-annonce
     // (équivalents français des mots de l'acronyme : mêmes initiales S.I.R.I.U.S,
     //  la voix française butait sur les mots anglais comme « Responsive »)
@@ -612,7 +658,7 @@ export function BootScreen({ onDone, userName, onOpenModule, connected }) {
     const hardStop = setTimeout(() => {
       setLoaded(true);
       setSpeechDone(true);
-      closeBoot();
+      if (brainRef.current !== false) closeBoot();
     }, 30000);
     const step = 520;
     const dur = lines.length * step + 600;
@@ -629,7 +675,7 @@ export function BootScreen({ onDone, userName, onOpenModule, connected }) {
       if (p >= 100) { setLoaded(true); clearInterval(progTimer); }
     }, 40);
     return () => { clearInterval(lineTimer); clearInterval(progTimer); clearTimeout(safety); clearTimeout(hardStop); stopPad(); };
-  }, [lines.length, onDone, checksSettled]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [lines.length, onDone, narrationReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Une voix qui ne démarre pas ne doit pas immobiliser le HUD.
   useEffect(() => {
@@ -638,8 +684,8 @@ export function BootScreen({ onDone, userName, onOpenModule, connected }) {
     return () => clearTimeout(t);
   }, [loaded, speechDone]);
   useEffect(() => {
-    if (loaded && speechDone) closeBoot();
-  }, [loaded, speechDone]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (loaded && speechDone && brain !== false) closeBoot();
+  }, [loaded, speechDone, brain]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
 
     <div className={`boot-screen ${closing ? "closing" : ""}`} data-testid="boot-screen" onClick={() => {
@@ -715,6 +761,26 @@ export function BootScreen({ onDone, userName, onOpenModule, connected }) {
         <div className="boot-pct">{progress}%  —  {speechUnavailable || (speechDone && !speechStartedRef.current)
           ? "voix indisponible — ouverture du HUD"
           : "touchez pour activer la voix"}</div>
+        {brain === null && brainAttempt > 1 && (
+          <div className="boot-brain-wait" data-testid="boot-brain-wait" role="status">
+            Connexion au cerveau ΣIRIUS… tentative {brainAttempt}
+          </div>
+        )}
+        {brain === false && (
+          <div className="boot-brain-alert" data-testid="boot-brain-alert" role="alert"
+            onClick={(e) => e.stopPropagation()}>
+            <strong>ΣIRIUS n'arrive pas à joindre son cerveau.</strong>
+            <span>
+              {/127\.0\.0\.1|localhost/.test(API_BASE_URL)
+                ? "Le moteur de ΣIRIUS démarre encore sur cet ordinateur. Patientez quelques secondes puis réessayez ; si le problème continue, fermez et relancez ΣIRIUS."
+                : "Vérifiez que l'appareil est connecté à Internet (Wi-Fi ou données mobiles), puis réessayez."}
+            </span>
+            <div className="boot-brain-actions">
+              <button type="button" data-testid="boot-brain-retry" onClick={retryBrain}>Réessayer</button>
+              <button type="button" data-testid="boot-brain-continue" onClick={() => closeBoot()}>Continuer quand même</button>
+            </div>
+          </div>
+        )}
         <div className="boot-copyright">COPYRIGHT © 2026 ΣIRIUS par Daniel Partel – Tous droits réservés.</div>
       </div>
     </div>

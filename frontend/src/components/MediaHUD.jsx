@@ -196,6 +196,7 @@ export default function MediaHUD({ onClose, onShowOnDisplay, initialIntent, stan
   };
 
   const startDrag = (event) => {
+    if (window.matchMedia("(max-width: 1023px)").matches) return;
     if (standalone || event.button !== 0 || event.target.closest("button, input, select, a")) return;
     const element = windowRef.current;
     gsap.killTweensOf(element);
@@ -226,6 +227,7 @@ export default function MediaHUD({ onClose, onShowOnDisplay, initialIntent, stan
   };
 
   const startResize = (event) => {
+    if (window.matchMedia("(max-width: 1023px)").matches) return;
     if (standalone || event.button !== 0) return;
     const element = windowRef.current;
     gsap.killTweensOf(element);

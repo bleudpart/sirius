@@ -43,6 +43,14 @@ android {
         }
     }
     buildTypes {
+        debug {
+            if (project.hasProperty('siriusDiagnostic')) {
+                applicationIdSuffix ".diagnostic"
+                versionNameSuffix "-diagnostic"
+                resValue "string", "app_name", "SIRIUS Diagnostic"
+                resValue "string", "title_activity_main", "SIRIUS Diagnostic"
+            }
+        }
         release {
             minifyEnabled true
             shrinkResources true

@@ -57,6 +57,7 @@ export const PythagorePanel = wrap(() => import("@/PythagorePanel"));
 export const PackagerPanel = wrap(() => import("@/PackagerPanel"));
 export const TrailerGallery = wrap(() => import("@/TrailerGallery"));
 export const SiriusSetup = wrap(() => import("@/SiriusSetup"));
+export const FirstRunWizard = wrap(() => import("@/FirstRunWizard"));
 export const PromoPanel = wrap(() => import("@/PromoPanel"));
 export const ThemisPanel = wrap(() => import("@/ThemisPanel"));
 export const AdminPanel = wrap(() => import("@/AdminPanel"));

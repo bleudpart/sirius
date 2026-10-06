@@ -74,7 +74,7 @@ test("storage failure is explicit and permits continuing without persistence", a
   expect(props.onClose).toHaveBeenCalledTimes(1);
 });
 
-test("module menu shows purpose first, preserves names and runs the original action", async () => {
+test("module menu shows names first, keeps purpose as subtitle and runs the original action", async () => {
   const run = jest.fn();
   const onClose = jest.fn();
   const Icon = () => null;
@@ -83,8 +83,8 @@ test("module menu shows purpose first, preserves names and runs the original act
     { id: "themis", label: "THÉMIS# — gestion d'entreprise", Icon, run, group: "PANTHÉON" },
   ]} />));
   const button = document.querySelector('[data-testid="modules-menu-item-dossiers"]');
-  expect(button.textContent).toBe("Dossiers et archivesMNÉMOSYNE");
-  expect(document.querySelector('[data-testid="modules-menu-item-themis"]').textContent).toBe("gestion d'entrepriseTHÉMIS");
+  expect(button.textContent).toBe("MNÉMOSYNEDossiers et archives");
+  expect(document.querySelector('[data-testid="modules-menu-item-themis"]').textContent).toBe("THÉMISgestion d'entreprise");
   await act(async () => button.click());
   expect(run).toHaveBeenCalledTimes(1);
   expect(onClose).toHaveBeenCalledTimes(1);

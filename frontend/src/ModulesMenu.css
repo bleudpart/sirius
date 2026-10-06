@@ -79,6 +79,8 @@
 }
 .modwheel-close:hover { background: rgba(145, 230, 242, 0.16); transform: rotate(90deg); }
 
+.modwheel-heading { display: none; }
+
 /* Déplacement et réduction */
 .modwheel { cursor: grab; }
 .modwheel.is-dragging { cursor: grabbing; user-select: none; will-change: translate; }
@@ -258,8 +260,8 @@ html:has(.modwheel-overlay:not(.is-minimized)) .sirius-stage *::after { animatio
 .modmenu-item:hover .modmenu-ico { background: rgba(126, 231, 255, 0.2); color: #ffffff; }
 .modmenu-item.active .modmenu-ico { border-color: rgba(240, 190, 80, 0.7); color: #ffd779; }
 .modmenu-label { min-width: 0; overflow-wrap: anywhere; line-height: 1.2; }
-.modmenu-label small, .modmenu-name { color: #d8b875; font-family: "Cinzel", serif; font-weight: 600; }
-.modmenu-label small { display: block; margin-top: 3px; font-size: 11px; }
+.modmenu-name { display: block; color: #d8b875; font-family: "Cinzel", serif; font-weight: 600; }
+.modmenu-label small { display: block; margin-top: 3px; font-size: 11px; font-weight: 400; color: rgba(200, 225, 235, 0.62); line-height: 1.25; }
 
 /* Tablette : roue plus compacte */
 @media (max-width: 900px) {
@@ -272,24 +274,100 @@ html:has(.modwheel-overlay:not(.is-minimized)) .sirius-stage *::after { animatio
   .modwheel-title span { display: none; }
 }
 
+/* La grille doit rester bornee pour que les pastilles defilent dans leur cadre. */
+@media (max-width: 1023px) {
+  .modwheel-overlay:not(.is-minimized) {
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .modwheel {
+    min-height: 0;
+    max-height: 100%;
+    overflow: hidden;
+  }
+  .modwheel-search { flex-shrink: 0; }
+  .modwheel-grid,
+  .infowheel .infowheel-content {
+    touch-action: pan-y;
+    overscroll-behavior-y: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(145, 230, 242, 0.4) transparent;
+    border: 1px solid rgba(145, 230, 242, 0.25);
+    border-radius: 14px;
+    padding: 8px;
+  }
+  .infowheel .infowheel-content {
+    zoom: 1;
+  }
+  .infowheel .infowheel-content::-webkit-scrollbar {
+    display: block;
+    width: 6px;
+  }
+  .infowheel .infowheel-content::-webkit-scrollbar-thumb {
+    background: rgba(145, 230, 242, 0.4);
+    border-radius: 6px;
+  }
+}
+
 /* Mobile : plein écran au-dessus de la navigation */
 @media (max-width: 640px) {
   .modwheel-overlay {
     padding: 0;
-    top: calc(56px + env(safe-area-inset-top, 0px));
+    top: 0;
     bottom: calc(68px + env(safe-area-inset-bottom, 0px));
     place-items: stretch;
   }
-  .modwheel { width: 100%; height: 100%; border-radius: 0; border-width: 1px 0 0; }
-  .modwheel-dial { width: 210px; }
-  .modwheel-core { width: 96px; height: 96px; padding: 8px; }
+  .modwheel-overlay:not(.is-minimized) { padding: max(8px, env(safe-area-inset-top, 0px)) 8px 10px; }
+  .modwheel { width: 100%; height: 100%; border-radius: 18px; grid-template-rows: auto auto minmax(0, 1fr); padding-top: 10px; }
+  .modwheel-heading {
+    display: block;
+    margin: 0;
+    padding: 4px 112px 10px 4px;
+    min-height: 44px;
+    box-sizing: border-box;
+    font-family: "Cinzel", serif;
+    font-size: clamp(17px, 5.4vw, 22px);
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    line-height: 1.15;
+    text-transform: uppercase;
+    color: #f0d590;
+    text-shadow: 0 0 12px rgba(240, 190, 80, 0.35);
+    border-bottom: 1px solid transparent;
+    border-image: linear-gradient(90deg, #ff4d9d, #f0be50, #00e5ff, #b04dff) 1;
+  }
+  .infowheel .infowheel-panel { padding-right: 0; }
+  .modwheel-grip { display: none; }
+  .modwheel-min, .modwheel-close { top: 10px; }
+  .modwheel-min { right: 62px; width: 44px; height: 44px; }
+  .modwheel-dial { width: 188px; margin: 6px 0; }
+  .modwheel-core { width: 88px; height: 88px; padding: 8px; }
   .modwheel-core strong { font-size: 10.5px; letter-spacing: 0.3px; overflow-wrap: normal; }
   .modwheel-sigma { font-size: 22px; }
   .modwheel-core em { display: none; }
-  .modwheel-cat { width: 66px; }
+  .modwheel-cat { width: 60px; letter-spacing: 1px; }
   .modwheel-close { width: 44px; height: 44px; }
   .modwheel-grid { grid-template-columns: 1fr; }
   .modmenu-item { min-height: 54px; font-size: 14px; }
+}
+
+/* Téléphone en paysage : roue à gauche, titre et contenu à droite. */
+@media (max-width: 1023px) and (orientation: landscape) and (max-height: 600px) {
+  .modwheel-overlay:not(.is-minimized) {
+    padding: max(10px, env(safe-area-inset-top, 0px)) max(14px, env(safe-area-inset-right, 0px)) max(10px, env(safe-area-inset-bottom, 0px)) max(14px, env(safe-area-inset-left, 0px));
+  }
+  .modwheel {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 18px;
+    width: 100%;
+    height: 100%;
+    padding: 12px 14px;
+    border-radius: 18px;
+  }
+  .modwheel-dial { width: min(225px, calc(100vh - 90px)); align-self: center; margin: 0 8px; }
+  .modwheel-panel { padding: 4px 0 0; }
+  .infowheel .modwheel-title { align-items: center; min-height: 34px; margin-top: 4px; padding-right: 92px; }
+  .modwheel-search { margin-right: 92px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

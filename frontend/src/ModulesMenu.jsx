@@ -128,6 +128,7 @@ function ModulesMenu({ open, onClose, items }) {
       onKeyDown={onKeyDown}
     >
       <div className="modwheel" role="dialog" aria-modal="true" aria-label="Menu des modules" {...windowProps}>
+        <h2 className="modwheel-heading">Modules ΣIRIUS</h2>
         <span className="modwheel-grip" aria-hidden="true" title="Glisser pour déplacer · double-clic pour recentrer"><GripHorizontal size={16} /></span>
         <button type="button" className="modwheel-min" onClick={() => setMinimized(true)} data-testid="modules-menu-minimize" aria-label="Réduire le menu des modules" title="Réduire">
           <Minus size={16} />
@@ -218,9 +219,9 @@ function ModulesMenu({ open, onClose, items }) {
                   title={it.label}
                 >
                   <span className="modmenu-ico"><Icon size={18} /></span>
-                  <span className={`modmenu-label ${functionLabel ? "" : "modmenu-name"}`}>
-                    {functionLabel || name}
-                    {functionLabel && <small>{name}</small>}
+                  <span className="modmenu-label">
+                    <span className="modmenu-name">{name}</span>
+                    {functionLabel && <small>{functionLabel}</small>}
                   </span>
                 </button>
               );
