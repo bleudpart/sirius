@@ -31,6 +31,8 @@ def client(monkeypatch):
     monkeypatch.setenv("GEMINI_TTS_API_KEY", "test-key-not-a-secret")
     monkeypatch.delenv("GEMINI_TTS_MODEL", raising=False)
     monkeypatch.delenv("GEMINI_TTS_VOICE", raising=False)
+    monkeypatch.delenv("GOOGLE_TTS_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_TTS_FALLBACK_VOICE", raising=False)
     voice_io._TTS_CACHE.clear()
     app = FastAPI()
     app.include_router(voice_io.make_voice_io_router(), prefix="/api")
@@ -127,6 +129,40 @@ def test_anonymous_request_never_calls_provider(client, monkeypatch):
     mock_upstream(monkeypatch, lambda request: pytest.fail("Anonymous provider call"))
     client.headers.pop("Authorization")
     assert client.post("/api/tts/gemini", json={"text": "Bonjour"}).status_code == 401
+
+
+def test_quota_exhaustion_relays_same_voice_through_chirp(client, monkeypatch):
+    monkeypatch.setenv("GOOGLE_TTS_API_KEY", "cloud-test-key")
+    wav = base64.b64decode(audio_payload()["steps"][0]["content"][0]["data"])
+    calls = []
+
+    def handler(request):
+        import json
+
+        calls.append(request.url.host)
+        if request.url.host == "generativelanguage.googleapis.com":
+            return httpx.Response(429, text="quota")
+        body = json.loads(request.content)
+        assert body["voice"]["name"] == "fr-FR-Chirp3-HD-Aoede"
+        assert body["audioConfig"]["audioEncoding"] == "LINEAR16"
+        return httpx.Response(200, json={"audioContent": base64.b64encode(wav).decode()})
+
+    mock_upstream(monkeypatch, handler)
+    result = client.post("/api/tts/gemini", json={"text": "Bonjour"}).json()
+    assert result["provider"] == "google-chirp"
+    assert result["mime_type"] == "audio/wav"
+    assert base64.b64decode(result["audio_base64"]) == wav
+    client.post("/api/tts/gemini", json={"text": "Bonjour"})
+    assert calls == ["generativelanguage.googleapis.com", "texttospeech.googleapis.com",
+                     "generativelanguage.googleapis.com"]
+
+
+def test_failed_relay_keeps_gemini_error(client, monkeypatch):
+    monkeypatch.setenv("GOOGLE_TTS_API_KEY", "cloud-test-key")
+    mock_upstream(monkeypatch, lambda request: httpx.Response(429, text="quota"))
+    response = client.post("/api/tts/gemini", json={"text": "Bonjour"})
+    assert response.status_code == 502
+    assert response.json()["detail"] == "Erreur Gemini TTS"
 
 
 def test_cache_limits_audio_memory(monkeypatch):

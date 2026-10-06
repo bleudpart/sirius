@@ -10,9 +10,10 @@ import os
 import wave
 from collections import OrderedDict
 from pathlib import Path
+from typing import Optional
 
 import httpx
-from fastapi import APIRouter, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -90,6 +91,68 @@ def _gemini_wave_audio(payload: dict) -> str:
     raise ValueError("Réponse Gemini sans audio")
 
 
+async def _gemini_request(key: str, payload: dict) -> str:
+    try:
+        async with httpx.AsyncClient(timeout=25) as cx:
+            response = await cx.post(
+                "https://generativelanguage.googleapis.com/v1beta/interactions",
+                headers={"x-goog-api-key": key}, json=payload,
+            )
+    except httpx.RequestError as error:
+        logger.warning("[GEMINI TTS] erreur réseau (%s)", type(error).__name__)
+        raise HTTPException(status_code=502, detail="Gemini TTS injoignable") from error
+    if response.status_code != 200:
+        logger.warning("[GEMINI TTS] HTTP %s", response.status_code)
+        raise HTTPException(status_code=502, detail="Erreur Gemini TTS")
+    try:
+        data = response.json()
+        if not isinstance(data, dict):
+            raise ValueError("Réponse Gemini invalide")
+        return _gemini_wave_audio(data)
+    except (ValueError, binascii.Error, wave.Error, EOFError) as error:
+        logger.warning("[GEMINI TTS] réponse audio invalide (%s)", type(error).__name__)
+        raise HTTPException(status_code=502, detail="Réponse Gemini sans audio WAV valide") from error
+
+
+async def _chirp_fallback(text: str, voice: str) -> Optional[dict]:
+    """Synthétise la même voix Gemini via Google Cloud TTS (Chirp3-HD), en WAV."""
+    key = os.environ.get("GOOGLE_TTS_API_KEY")
+    if not key:
+        return None
+    name = os.environ.get("GEMINI_TTS_FALLBACK_VOICE") or f"fr-FR-Chirp3-HD-{voice}"
+    cache_key = ("chirp", name, text)
+    cached = _cache_get(cache_key)
+    if cached:
+        return cached
+    payload = {
+        "input": {"text": text},
+        "voice": {"languageCode": "fr-FR", "name": name},
+        "audioConfig": {"audioEncoding": "LINEAR16", "sampleRateHertz": 24000},
+    }
+    try:
+        async with httpx.AsyncClient(timeout=20) as cx:
+            response = await cx.post(
+                "https://texttospeech.googleapis.com/v1/text:synthesize",
+                params={"key": key}, json=payload,
+            )
+        if response.status_code != 200:
+            logger.warning("[CHIRP TTS] HTTP %s", response.status_code)
+            return None
+        audio = response.json().get("audioContent")
+        with wave.open(io.BytesIO(base64.b64decode(audio, validate=True)), "rb") as wav:
+            if wav.getnframes() == 0:
+                return None
+    except (httpx.RequestError, ValueError, TypeError, binascii.Error, wave.Error, EOFError) as error:
+        logger.warning("[CHIRP TTS] échec (%s)", type(error).__name__)
+        return None
+    result = {
+        "audio_base64": audio, "format": "wav", "mime_type": "audio/wav",
+        "provider": "google-chirp", "voice": voice,
+    }
+    _cache_set(cache_key, result)
+    return result
+
+
 ALLOWED_TTS_VOICES = {
     "fr-FR-Neural2-F", "fr-FR-Neural2-G",
     "fr-FR-Wavenet-A", "fr-FR-Wavenet-B", "fr-FR-Wavenet-C", "fr-FR-Wavenet-D", "fr-FR-Wavenet-E",
@@ -132,25 +195,15 @@ def make_voice_io_router(db=None):
             "generation_config": {"speech_config": [{"voice": voice}]},
         }
         try:
-            async with httpx.AsyncClient(timeout=25) as cx:
-                response = await cx.post(
-                    "https://generativelanguage.googleapis.com/v1beta/interactions",
-                    headers={"x-goog-api-key": key}, json=payload,
-                )
-        except httpx.RequestError as error:
-            logger.warning("[GEMINI TTS] erreur réseau (%s)", type(error).__name__)
-            raise HTTPException(status_code=502, detail="Gemini TTS injoignable") from error
-        if response.status_code != 200:
-            logger.warning("[GEMINI TTS] HTTP %s", response.status_code)
-            raise HTTPException(status_code=502, detail="Erreur Gemini TTS")
-        try:
-            data = response.json()
-            if not isinstance(data, dict):
-                raise ValueError("Réponse Gemini invalide")
-            audio = _gemini_wave_audio(data)
-        except (ValueError, binascii.Error, wave.Error, EOFError) as error:
-            logger.warning("[GEMINI TTS] réponse audio invalide (%s)", type(error).__name__)
-            raise HTTPException(status_code=502, detail="Réponse Gemini sans audio WAV valide") from error
+            audio = await _gemini_request(key, payload)
+        except HTTPException as error:
+            # Quota Gemini vite épuisé (429) : même timbre via Google Cloud TTS
+            # plutôt que la voix système du téléphone.
+            fallback = await _chirp_fallback(text, voice)
+            if fallback is None:
+                raise
+            logger.info("[GEMINI TTS] relais Chirp3-HD après échec (%s)", error.detail)
+            return fallback
         result = {
             "audio_base64": audio, "format": "wav", "mime_type": "audio/wav",
             "provider": "gemini", "voice": voice,
@@ -238,13 +291,18 @@ def make_voice_io_router(db=None):
 
     # Simple STT endpoint (compatibility)
     @router.post("/stt")
-    async def stt(file: UploadFile = File(...)):
-        """Transcrit un fichier audio via le backend configuré ou Groq Whisper."""
+    async def stt(file: UploadFile = File(...), groq_key: str | None = Form(None)):
+        """Transcrit un fichier audio via le backend configuré ou Groq Whisper.
+
+        Sans clé dans l'environnement, la clé Groq saisie dans la page de configuration
+        (envoyée avec l'audio) est utilisée : un PC fraîchement installé n'a pas de `.env`.
+        """
         data = await file.read()
         if not data:
             raise HTTPException(status_code=400, detail="Audio vide")
         stt_url = os.environ.get("WHISPER_API_URL") or os.environ.get("STT_BACKEND_URL")
-        groq_key = (os.environ.get("GROQ_KEY") or os.environ.get("GROQ_API_KEY") or "").strip()
+        user_groq_key = (groq_key or "").strip()
+        groq_key = (os.environ.get("GROQ_KEY") or os.environ.get("GROQ_API_KEY") or user_groq_key).strip()
         fname = getattr(file, "filename", None) or "audio.webm"
         ctype = getattr(file, "content_type", None) or "audio/webm"
         if stt_url:

@@ -26,7 +26,9 @@ class LocalFactUpdate(BaseModel):
 
 class PrimeLog(BaseModel):
     text: str
-    intent: str = ""
+    # Le HUD envoie intent=null pour une commande libre : sans cela, la route
+    # répondait 422 et plus aucune activité n'alimentait ZEUS CORTEX.
+    intent: str | None = ""
 
 
 class WorkLogCreate(BaseModel):
@@ -100,7 +102,7 @@ def make_memory_router(db, require_user, resolve_user_id):
     @router.post("/prime/log")
     async def prime_log(req: PrimeLog, request: Request):
         uid = await resolve_user_id(request, db)
-        log_event(req.text, req.intent, user_id=uid)
+        log_event(req.text, req.intent or "", user_id=uid)
         return {"ok": True}
 
     @router.get("/work-log")

@@ -210,6 +210,13 @@ mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
 db_name = os.environ.get('DB_NAME', 'sirius_db')
 _DB_MODE = (os.getenv("SIRIUS_DB") or "").strip().lower()
 client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=1500)
+
+
+def _redact_mongo_url(url: str) -> str:
+    """Masque les identifiants d'une URL MongoDB avant journalisation."""
+    return re.sub(r"(://)[^@/]+@", r"\1***@", url or "")
+
+
 if _DB_MODE == "local":
     db = DatabaseRouter(LocalDocStore())
 else:
@@ -223,10 +230,10 @@ async def _select_database_backend():
         return
     try:
         await asyncio.wait_for(client.admin.command("ping"), timeout=2.0)
-        logger.info("[DB] MongoDB détecté : %s", mongo_url)
+        logger.info("[DB] MongoDB détecté : %s", _redact_mongo_url(mongo_url))
     except Exception:
         if _DB_MODE == "mongo":
-            logger.error("[DB] SIRIUS_DB=mongo mais MongoDB est injoignable : %s", mongo_url)
+            logger.error("[DB] SIRIUS_DB=mongo mais MongoDB est injoignable : %s", _redact_mongo_url(mongo_url))
             return
         db.use(LocalDocStore())
         logger.info("[DB] MongoDB absent → docstore SQLite local (aucun serveur requis)")
