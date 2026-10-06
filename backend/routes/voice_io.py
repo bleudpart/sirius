@@ -19,6 +19,8 @@ from pydantic import BaseModel, Field
 
 from voice_corrections import normalize_voice_transcript
 from auth_api import require_user
+import cloud_link
+import usage_quota
 
 logger = logging.getLogger(__name__)
 
@@ -165,8 +167,10 @@ def make_voice_io_router(db=None):
 
     @router.post("/tts/gemini")
     async def gemini_tts(req: GeminiTTSRequest, request: Request):
-        await require_user(request, db)
+        user = await require_user(request, db)
         key = os.environ.get("GEMINI_TTS_API_KEY")
+        if not key and cloud_link.should_relay_tts("GEMINI_TTS_API_KEY"):
+            return await cloud_link.relay_json("/api/tts/gemini", req.model_dump())
         if not key:
             raise HTTPException(status_code=503, detail="GEMINI_TTS_API_KEY absente")
         text = req.text.strip()
@@ -178,6 +182,7 @@ def make_voice_io_router(db=None):
         cached = _cache_get(cache_key)
         if cached:
             return cached
+        await usage_quota.consume(db, user, "tts")
         payload = {
             "model": model,
             "input": [{
@@ -221,9 +226,10 @@ def make_voice_io_router(db=None):
             "message": "Utiliser POST /api/tts/google pour synthétiser.",
         }
 
-    @router.post("/tts/google")
-    async def google_tts(req: GoogleTTSRequest):
+    async def _google_tts(req: GoogleTTSRequest, user: dict):
         key = os.environ.get("GOOGLE_TTS_API_KEY")
+        if not key and cloud_link.should_relay_tts("GOOGLE_TTS_API_KEY"):
+            return await cloud_link.relay_json("/api/tts/google", req.model_dump())
         if not key:
             raise HTTPException(status_code=503, detail="GOOGLE_TTS_API_KEY absente")
         text = req.text.strip()[:4500]
@@ -237,6 +243,7 @@ def make_voice_io_router(db=None):
         cached = _cache_get(cache_key)
         if cached:
             return cached
+        await usage_quota.consume(db, user, "tts")
 
         payload = {
             "input": {"text": text},
@@ -265,12 +272,17 @@ def make_voice_io_router(db=None):
         _cache_set(cache_key, result)
         return result
 
+    @router.post("/tts/google")
+    async def google_tts(req: GoogleTTSRequest, request: Request):
+        return await _google_tts(req, await require_user(request, db))
+
     # Generic TTS endpoint wrapper (compatibility)
     @router.post("/tts")
-    async def tts(req: GoogleTTSRequest):
+    async def tts(req: GoogleTTSRequest, request: Request):
         """Compatibility wrapper: POST /api/tts → delegates to a configured TTS backend if present,
         otherwise uses the local Google TTS implementation.
         """
+        user = await require_user(request, db)
         tts_url = os.environ.get("TTS_BACKEND_URL")
         if tts_url:
             try:
@@ -287,24 +299,30 @@ def make_voice_io_router(db=None):
                 raise HTTPException(status_code=502, detail="TTS proxy failed")
 
         # Fallback to built-in Google TTS implementation
-        return await google_tts(req)
+        return await _google_tts(req, user)
 
     # Simple STT endpoint (compatibility)
     @router.post("/stt")
-    async def stt(file: UploadFile = File(...), groq_key: str | None = Form(None)):
+    async def stt(request: Request, file: UploadFile = File(...), groq_key: str | None = Form(None)):
         """Transcrit un fichier audio via le backend configuré ou Groq Whisper.
 
         Sans clé dans l'environnement, la clé Groq saisie dans la page de configuration
-        (envoyée avec l'audio) est utilisée : un PC fraîchement installé n'a pas de `.env`.
+        (envoyée avec l'audio) est utilisée ; à défaut, le compte ΣIRIUS Cloud relié.
         """
+        user = await require_user(request, db)
         data = await file.read()
         if not data:
             raise HTTPException(status_code=400, detail="Audio vide")
         stt_url = os.environ.get("WHISPER_API_URL") or os.environ.get("STT_BACKEND_URL")
         user_groq_key = (groq_key or "").strip()
-        groq_key = (os.environ.get("GROQ_KEY") or os.environ.get("GROQ_API_KEY") or user_groq_key).strip()
+        env_groq_key = (os.environ.get("GROQ_KEY") or os.environ.get("GROQ_API_KEY") or "").strip()
+        groq_key = env_groq_key or user_groq_key
         fname = getattr(file, "filename", None) or "audio.webm"
         ctype = getattr(file, "content_type", None) or "audio/webm"
+        if cloud_link.should_relay_stt(user_groq_key):
+            return await cloud_link.relay_stt(fname, data, ctype)
+        if stt_url or env_groq_key:
+            await usage_quota.consume(db, user, "stt")
         if stt_url:
             try:
                 async with httpx.AsyncClient(timeout=90) as cx:

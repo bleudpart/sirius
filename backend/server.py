@@ -199,6 +199,8 @@ app = FastAPI(title="Sirius Backend API", version="1.0.0", lifespan=_lifespan)
 from storage import put_object, get_object, APP_NAME
 from local_memory import list_facts, add_fact, delete_fact, update_fact, log_event, prime_overview, log_service, list_service_log, recall_facts, learn_fact, recent_episodes
 from auth_api import _decode_token, is_direct_local_request, resolve_user_id, require_user  # noqa: E402
+import cloud_link  # noqa: E402
+import usage_quota  # noqa: E402
 from omega_engine import OmegaEngine  # noqa: E402
 from version_info import APP_NAME, APP_RELEASE, APP_VERSION  # noqa: E402
 
@@ -350,6 +352,11 @@ async def ui_intent(req: IntentRequest, request: Request):
         logger.warning("Intent rate limit exceeded", extra={"client_ip": ip})
         return {"action": "none"}
 
+    if cloud_link.should_relay_chat({}):
+        try:
+            return await cloud_link.relay_json("/api/intent", req.model_dump())
+        except HTTPException:
+            pass
     result = await parse_intent((req.text or "").strip())
     return result
 
@@ -359,14 +366,19 @@ class ResetRequest(BaseModel):
 @api_router.post("/chat")
 async def chat(req: ChatRequest, request: Request):
     """Reçoit une commande, génère une réponse intelligente et garde l'historique."""
-    uid = (await require_user(request, db))["user_id"]
+    user = await require_user(request, db)
+    uid = user["user_id"]
     texte = (req.text or "").strip()
     if not texte:
         raise HTTPException(status_code=400, detail="Texte vide")
     if not _rate_ok(uid):
         raise HTTPException(status_code=429, detail="Trop de requêtes, patientez un instant.")
+    if cloud_link.should_relay_chat(req.keys):
+        return await cloud_link.relay_json("/api/chat", req.model_dump())
     session_id = f"{uid}:{req.session_id or 'default'}"
     autonomous_action = detect_autonomous_action(texte)
+    if not autonomous_action:
+        await usage_quota.consume(db, user, "chat")
 
     # Historique de la session (8 derniers échanges)
     doc = await db.sirius_chats.find_one({"session_id": session_id}, {"_id": 0, "history": 1})
@@ -448,17 +460,26 @@ async def chat(req: ChatRequest, request: Request):
 async def chat_stream(req: ChatRequest, request: Request):
     """Version en flux (SSE) : Sirius répond via ask_sirius."""
     from fastapi.responses import StreamingResponse
-    uid = (await require_user(request, db))["user_id"]
+    user = await require_user(request, db)
+    uid = user["user_id"]
     texte = (req.text or "").strip()
     if not texte:
         raise HTTPException(status_code=400, detail="Texte vide")
     if not _rate_ok(uid):
         raise HTTPException(status_code=429, detail="Trop de requêtes, patientez un instant.")
+    if cloud_link.should_relay_chat(req.keys):
+        return StreamingResponse(
+            cloud_link.relay_stream("/api/chat/stream", req.model_dump()),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+    autonomous_action = detect_autonomous_action(texte)
+    if not autonomous_action:
+        await usage_quota.consume(db, user, "chat")
     session_id = f"{uid}:{req.session_id or 'default'}"
     doc = await db.sirius_chats.find_one({"session_id": session_id}, {"_id": 0, "history": 1})
     history = (doc or {}).get("history", [])
     merged_memory = await _gather_memory_context(texte, uid, req.memory)
-    autonomous_action = detect_autonomous_action(texte)
     requested_ia_mode = (req.ia_mode or "jarvis").lower()
     effective_mode = "turbo" if detect_urgency(texte) else (
         "profond" if requested_ia_mode == "profond" else (req.mode or "normal")
@@ -2071,6 +2092,14 @@ api_router.include_router(make_spotify_router())
 api_router.include_router(make_infos_router())
 api_router.include_router(make_pantheon_oracle_router(db, _rate_ok, require_user))
 api_router.include_router(make_voice_io_router(db))
+api_router.include_router(cloud_link.make_cloud_link_router(require_user, db, is_direct_local_request))
+
+
+@api_router.get("/usage")
+async def usage_today(request: Request):
+    """Consommation du jour sur les clés du serveur (quotas du compte)."""
+    return await usage_quota.usage_summary(db, await require_user(request, db))
+
 api_router.include_router(make_hephaistos_router(db))
 api_router.include_router(make_feedback_router())
 api_router.include_router(make_work_dossiers_router(db, require_user))
