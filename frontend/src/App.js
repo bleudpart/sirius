@@ -10,7 +10,7 @@ import {
   AtlasPanel, HeraclesPanel, HephaistosPanel, MythosGallery, ConsultPanel, PrometheePanel, CalliopePanel, CalendarPanel,
   FaceIdPanel, PythagorePanel, PackagerPanel, TrailerGallery, SiriusSetup, FirstRunWizard, PromoPanel, ThemisPanel,
   AdminPanel, EnterprisePanel, PortusNummarius, AgoraPipeline, NewsPanel, ReveilPanel, SpotifyPanel, MediaHUD, ProductivityPanel,
-  FloorPlanPanel, Photo3DPanel, ConnectionsPanel, WorkModulesPanel, WorkDossiersPanel, SportCoachPanel,
+  FloorPlanPanel, Photo3DPanel, ConnectionsPanel, WorkModulesPanel, WorkDossiersPanel, SportCoachPanel, MediaModulesPanel,
 } from "@/lazyModules";
 import { pushStats, setStatsOffline } from "@/liveStats";
 import { formatLocalDate, formatLocalTime, getLocalDateKey } from "@/dateTime";
@@ -21,7 +21,7 @@ import { MemoryPanel, HoloPopups, AnalyticsPanel, MusicChoice, CentralCard, Boot
 import OverlayApp from "@/OverlayApp";
 import WebWindows from "@/WebWindows";
 import TaskWindows from "@/TaskWindows";
-import { progress } from "@/SiriusProgress";
+import SiriusProgress, { progress } from "@/SiriusProgress";
 import useTouchNav from "@/useTouchNav";
 import PwaPrompt from "@/PwaPrompt";
 import GlobalDrop from "@/GlobalDrop";
@@ -60,7 +60,7 @@ import { chooseBestVoiceTranscript, extractVoiceCommand, hasVoiceWakeWord, norma
 import { initHoloWindows, minimizeAll, resetHoloWindowLayout } from "@/holoWindows";
 import { ConfirmButton } from "@/ConfirmButton";
 import { getHUDStyleVariables, renderHUD } from "@/theme";
-import { SiriusInfoHub, SiriusInfoWheel, SiriusNextAction } from "@/hud/SiriusHudPanels";
+import { SiriusInfoHub, SiriusInfoWheel } from "@/hud/SiriusHudPanels";
 import { restoreHudPanel } from "@/hud/hudPanelState";
 import { BACKEND_BASE_URL } from "@/lib/api";
 import "@/App.css";
@@ -381,7 +381,7 @@ function App() {
         setShowHeracles, setShowHephaistos, setShowMythosGallery, setShowTrailer, setShowPromo, setShowThemis,
         setShowAgora, setShowSolon, setShowPromethee, setShowCalliope, setShowPythagore, setShowNews,
         setShowPackager, setShowInstall, setShowScripts, setShowVision, setShowAdmin, setShowSetup,
-        setShowGallery, setShowSpotifyWin, setShowMediaHud, setShowProductivity,
+        setShowGallery, setShowSpotifyWin, setShowMediaHud, setShowMediaModules, setShowProductivity, setShowInfoWheel,
         setActiveWorkModule, setShowPlans, setShowPhoto3D, setShowConnections, setShowReveil, setShowEnterprise, setShowWorkDossiers, setShowSportCoach,
       });
       if (controller.close(target)) { confirm(d.say || "Fenêtre fermée."); return true; }
@@ -935,6 +935,7 @@ function App() {
   const [showNews, setShowNews] = useState(false);
   const [showModulesMenu, setShowModulesMenu] = useState(false);
   const [showInfoWheel, setShowInfoWheel] = useState(false);
+  const [showMediaModules, setShowMediaModules] = useState(false);
   const [showGettingStarted, setShowGettingStarted] = useState(false);
   const [showKeysStatus, setShowKeysStatus] = useState(false);
   const [showKeraunos, setShowKeraunos] = useState(false);
@@ -6361,7 +6362,10 @@ function App() {
   moduleActionsRef.current = {
       reload: () => { window.__siriusBootPlayed = false; window.location.reload(); },
       toggleDisplay: () => { pinDisplay(); setDisplayOpen((open) => !open); },
-      showMediaModules: () => showOnDisplay({ type: "media", titre: "MODULES MULTIMÉDIA" }),
+      showMediaModules: () => {
+        if (Capacitor.getPlatform() === "android") setShowMediaModules(true);
+        else showOnDisplay({ type: "media", titre: "MODULES MULTIMÉDIA" });
+      },
       openFiles: () => setShowFiles(true), openInfoHub: () => setShowInfoWheel(true), openConnections: () => setShowConnections(true),
       captureInterface: () => captureSiriusInterface(), captureRegion: captureSiriusRegion, openCaptureFolder,
       openArchitect: () => { setArchitectPrompt(""); setShowArchitect(true); }, openPlans: () => { setPlansPrompt(""); setShowPlans(true); },
@@ -6389,11 +6393,12 @@ function App() {
       PantheonLogo, Zap, Orbit, Eye, Landmark, Library, ShieldCheck, Sparkles, Code2, BarChart3, Brain, Database,
       Radar, History, KeyRound, Calendar, Fingerprint, AlarmClock, HomeIcon, Globe2, Hammer, MythosLogo, Radio, MapPin,
       ThemisLogo, TrendingUp, Scale, Flame, BookOpen, Sigma, Newspaper, Package, Wrench, FileCode, Music, Building2, Activity },
-    state: { displayOpen, displayType: display.type, showVision, showProductivity, showMediaHud, spotify },
+    state: { displayOpen, displayType: display.type, showMediaModules, showVision, showProductivity, showMediaHud, spotify },
+    platform: Capacitor.getPlatform(),
     user: authUser,
     actions: Object.fromEntries(Object.keys(moduleActionsRef.current).map((name) =>
       [name, (...args) => moduleActionsRef.current[name](...args)])),
-  }), [displayOpen, display.type, showVision, showProductivity, showMediaHud, spotify, authUser]);
+  }), [displayOpen, display.type, showMediaModules, showVision, showProductivity, showMediaHud, spotify, authUser]);
   moduleItemsRef.current = moduleItems;
 
   const closeModulesMenu = useCallback(() => setShowModulesMenu(false), []);
@@ -6409,7 +6414,7 @@ function App() {
       setMobileDestination(destination);
       return;
     }
-    if (destination === "info") restoreHudPanel("info-hub");
+    if (destination === "info") setShowInfoWheel(true);
     setShowModulesMenu(false);
     setMobileDestination(destination === "assistant" ? "home" : destination);
     if (destination === "assistant") {
@@ -6438,6 +6443,8 @@ function App() {
         }}
       />
       <div className="grid-bg" />
+      <SiriusProgress journalOnly />
+      {showMediaModules && <MediaModulesPanel onClose={() => setShowMediaModules(false)} />}
       <div className="city-backdrop" data-testid="sirius-antique-bg" aria-hidden="true">
         <div className="city-glow" />
         <div className="city-skyline far" />
@@ -7012,7 +7019,6 @@ function App() {
             )}
           </div>
           <div className="sirius-identity">
-            <SiriusNextAction connected={connected} />
             <h1 className="sirius-title" data-testid="sirius-title">
               <button
                 type="button"

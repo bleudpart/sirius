@@ -3,6 +3,12 @@ import { loadApiKeys } from "@/apiKeyStorage";
 import { useEffect, useState } from "react";
 import { X, Volume2, ArrowRight } from "lucide-react";import { speakAsCharacter, cancelSpeech, CHAR_PROFILES } from "@/voice";
 import "./MythosGallery.css";
+import { WORK_MODULES, workModuleName } from "./workModules";
+
+const moduleDisplayName = (name) => {
+  const clean = workModuleName(name);
+  return WORK_MODULES.some(({ label }) => label === clean) ? clean : name;
+};
 
 const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
 
@@ -91,7 +97,7 @@ export default function MythosGallery({ onClose, onOpenModule, initialModule = n
                 <div className="mg-thumb-img" style={{ boxShadow: on ? `0 0 22px ${col}66` : "none" }}>
                   <img src={c.image} alt={c.character} draggable={false} />
                 </div>
-                <span className="mg-thumb-module">{c.module}</span>
+                <span className="mg-thumb-module">{moduleDisplayName(c.module)}</span>
                 <span className="mg-thumb-name">{c.character}</span>
               </button>
             );
@@ -106,7 +112,7 @@ export default function MythosGallery({ onClose, onOpenModule, initialModule = n
                    style={{ filter: `drop-shadow(0 0 34px ${selColor}88)` }} />
             </div>
             <div className="mg-detail-info">
-              <div className="mg-detail-module">{sel.module}</div>
+              <div className="mg-detail-module">{moduleDisplayName(sel.module)}</div>
               <h2 className="mg-detail-name" style={{ color: selColor }}>{sel.character}</h2>
               <p className="mg-detail-role">Fonction : {sel.role}</p>
               <button className="mg-speak" onClick={() => { cancelSpeech(); speakAsCharacter(sel.voiceIntro, CHAR_VOICES[sel.module] || {}); }} data-testid="mythos-speak-btn">
@@ -115,7 +121,7 @@ export default function MythosGallery({ onClose, onOpenModule, initialModule = n
               {onOpenModule && sel.column && sel.column.enabled && (
                 <button className="mg-open" onClick={() => onOpenModule(sel.module)} data-testid="mythos-open-module-btn"
                         style={{ borderColor: selColor, color: selColor }}>
-                  OUVRIR LE MODULE {sel.module} <ArrowRight size={13} />
+                  OUVRIR LE MODULE {moduleDisplayName(sel.module)} <ArrowRight size={13} />
                 </button>
               )}
               <p className="mg-detail-intro">« {sel.voiceIntro} »</p>

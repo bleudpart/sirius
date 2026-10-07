@@ -2,9 +2,13 @@
 // Fenêtres holographiques 3D : transforme les écrans plats en panneaux cyan flottants,
 // déplaçables (drag sur l'en-tête), redimensionnables (poignée bas-droite) et fermables.
 const SEL = ".prime-screen, .zeus-screen, .eu-screen, .setup-screen, .iw-panel";
+const MOBILE_SEL = ".atlas-panel, .kr-panel, .p3d-overlay, .esp-panel, .about-panel, .media-hud-window, .productivity-screen, .connections-screen, .fp-overlay, .vision-card, .keys-panel, .sp-journal, .getting-started";
 const mobilePage = () => window.matchMedia("(max-width: 1023px)").matches;
 let zTop = 1000;
-const bumpZ = () => (zTop = Math.min(zTop + 1, 1190));
+let mobileZTop = 1200;
+const bumpZ = () => mobilePage()
+  ? (mobileZTop = Math.min(mobileZTop + 1, 1490))
+  : (zTop = Math.min(zTop + 1, 1190));
 let cascade = 0;
 let geom = {};
 try { geom = JSON.parse(localStorage.getItem("sirius_holo_geom") || "{}"); } catch (e) { geom = {}; }
@@ -201,20 +205,24 @@ function dock() {
 }
 
 function titleOf(el) {
-  const t = el.querySelector(".zeus-title, .eu-title, .gcal-title, .setup-title, h1, h2");
+  const t = el.querySelector(".zeus-title, .eu-title, .gcal-title, .setup-title, .fp-title, .p3d-title, .keys-title, .vision-title, .sp-title, .atlas-title, .kr-title, .esp-title, h1, h2");
   const txt = (t && t.textContent.trim()) || (el.getAttribute("data-testid") || "fenêtre").replace(/-/g, " ");
   return txt.replace(/\s+/g, " ").slice(0, 30).toUpperCase();
 }
 
 function minimize(el) {
-  if (mobilePage()) return;
   if (el.__pill) return;
   el.classList.add("holo-minimized");
   const pill = document.createElement("button");
   pill.className = "holo-dock-pill";
   pill.setAttribute("data-testid", "holo-dock-pill");
   pill.title = "Restaurer la fenêtre";
-  pill.innerHTML = `<span class="hdp-dot"></span><span class="hdp-label">${titleOf(el)}</span>`;
+  const dot = document.createElement("span");
+  dot.className = "hdp-dot";
+  const label = document.createElement("span");
+  label.className = "hdp-label";
+  label.textContent = titleOf(el);
+  pill.append(dot, label);
   pill.addEventListener("click", () => {
     pill.remove();
     el.__pill = null;
@@ -227,10 +235,38 @@ function minimize(el) {
   el.__pill = pill;
 }
 
+function decorateMobileControls(el) {
+  if (!mobilePage() || el.classList.contains("auth-screen") || el.closest(".boot-screen")) return;
+  const close = [...el.querySelectorAll("button")].find((button) =>
+    button.querySelector(".lucide-x") ||
+    /fermer/i.test(button.getAttribute("aria-label") || "") ||
+    button.matches(".setup-close, .zeus-close, .eu-close, .fp-close, .p3d-close, .keys-close, .media-close-btn")
+  );
+  if (!close || close.closest(`${SEL}, ${MOBILE_SEL}`) !== el) return;
+  close.classList.add("mobile-window-close");
+  if (!close.getAttribute("aria-label")) close.setAttribute("aria-label", "Fermer la fenêtre");
+  const bar = close.closest("header, .zeus-head, .eu-head, .gcal-head, .setup-head, .fp-header, .p3d-bar, .keys-bar, .vision-head, .sp-bar, .atlas-bar, .kr-bar, .esp-bar, .about-bar") || close.parentElement;
+  bar.classList.add("mobile-window-controls");
+  let mn = el.querySelector(".holo-win-min");
+  if (!mn) {
+    mn = document.createElement("button");
+    mn.className = "holo-win-min";
+    mn.type = "button";
+    mn.setAttribute("data-testid", "holo-win-min");
+    mn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></svg>';
+    mn.addEventListener("click", (e) => { e.stopPropagation(); minimize(el); });
+  }
+  mn.classList.add("mobile-window-min");
+  mn.type = "button";
+  mn.setAttribute("aria-label", "Réduire la fenêtre");
+  mn.title = "Réduire en pastille";
+  bar.appendChild(mn);
+}
+
 function decorate(el) {
   if (el.__holoWin || el.classList.contains("auth-screen") || el.closest(".boot-screen")) return;
   // Une seule surface de module reste active : les précédentes sont rangées dans le dock.
-  document.querySelectorAll(".holo-win:not(.holo-minimized)").forEach((openWindow) => {
+  if (!mobilePage()) document.querySelectorAll(".holo-win:not(.holo-minimized)").forEach((openWindow) => {
     if (openWindow !== el) minimize(openWindow);
   });
   el.__holoWin = true;
@@ -280,27 +316,33 @@ function decorate(el) {
   rz.title = "Redimensionner";
   el.appendChild(rz);
   rz.addEventListener("pointerdown", (e) => startResize(e, el, k));
+  decorateMobileControls(el);
 }
 
 export function minimizeAll() {
-  const wins = document.querySelectorAll(".holo-win:not(.holo-minimized)");
-  wins.forEach((el) => minimize(el));
-  return wins.length;
+  const wins = document.querySelectorAll(".holo-win:not(.holo-minimized), .mobile-window-controls");
+  const windows = new Set([...wins].map((el) => el.closest(`${SEL}, ${MOBILE_SEL}`)).filter(Boolean));
+  const openWindows = [...windows].filter((el) => !el.classList.contains("holo-minimized"));
+  openWindows.forEach((el) => minimize(el));
+  return openWindows.length;
 }
 
 export function initHoloWindows() {
   if (window.__holoWinInit) return;
   window.__holoWinInit = true;
   document.querySelectorAll(SEL).forEach(decorate);
+  document.querySelectorAll(MOBILE_SEL).forEach(decorateMobileControls);
   document.querySelectorAll(POP_SEL).forEach(decoratePopup);
   const obs = new MutationObserver((muts) => {
     for (const m of muts) {
       for (const n of m.addedNodes) {
         if (n.nodeType !== 1) continue;
         if (n.matches && n.matches(SEL)) decorate(n);
+        if (n.matches && n.matches(MOBILE_SEL)) decorateMobileControls(n);
         if (n.matches && n.matches(POP_SEL)) decoratePopup(n);
         if (n.querySelectorAll) {
           n.querySelectorAll(SEL).forEach(decorate);
+          n.querySelectorAll(MOBILE_SEL).forEach(decorateMobileControls);
           n.querySelectorAll(POP_SEL).forEach(decoratePopup);
         }
       }

@@ -285,6 +285,19 @@ html:has(.modwheel-overlay:not(.is-minimized)) .sirius-stage *::after { animatio
     overflow: hidden;
   }
   .modwheel-search { flex-shrink: 0; }
+  .modmenu-item { min-width: 0; height: auto; }
+  .modmenu-label { flex: 1 1 0; }
+  .modmenu-name {
+    font-size: clamp(12px, 3.4vw, 14px);
+    line-height: 1.35;
+    letter-spacing: 0.2px;
+    white-space: normal;
+    text-wrap: balance;
+  }
+  @supports (font-size: 1cqi) {
+    .modmenu-label { container-type: inline-size; }
+    .modmenu-name { font-size: clamp(12px, 6cqi, 14px); }
+  }
   .modwheel-grid,
   .infowheel .infowheel-content {
     touch-action: pan-y;

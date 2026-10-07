@@ -48,13 +48,12 @@ test("opens the HUD when loading and narration both finish", () => {
   expect(onDone).toHaveBeenCalledTimes(1);
 });
 
-test("a narration that never starts does not hold the HUD for thirty seconds", () => {
+test("a narration that never starts reports the unavailable voice and releases the HUD", () => {
   const onDone = jest.fn();
   render(<BootScreen connected onDone={onDone} />);
   act(() => jest.advanceTimersByTime(5000));
-  act(() => jest.advanceTimersByTime(2500));
-  expect(container.textContent).toContain("ouverture du HUD…");
-  expect(container.textContent).not.toContain("voix indisponible");
+  act(() => jest.advanceTimersByTime(10000));
+  expect(container.textContent).toContain("voix indisponible");
   act(() => jest.advanceTimersByTime(500));
   expect(onDone).toHaveBeenCalledTimes(1);
 });
@@ -63,6 +62,7 @@ test("repeated taps while closing finish only once", () => {
   const onDone = jest.fn();
   render(<BootScreen connected onDone={onDone} />);
   act(() => speakCinematic.mock.calls[0][1].onstart());
+  act(() => speakCinematic.mock.calls[0][1].onend());
   tap();
   tap();
   act(() => jest.advanceTimersByTime(500));
@@ -73,6 +73,7 @@ test("unmount cancels the pending handoff", () => {
   const onDone = jest.fn();
   render(<BootScreen connected onDone={onDone} />);
   act(() => speakCinematic.mock.calls[0][1].onstart());
+  act(() => speakCinematic.mock.calls[0][1].onend());
   tap();
   act(() => root.unmount());
   root = createRoot(container);
@@ -138,6 +139,43 @@ test("a brain that answers late is announced as ready", async () => {
   render(<BootScreen onDone={jest.fn()} probeBrain={probeBrain} />);
   await flush(0);
   expect(speakCinematic).not.toHaveBeenCalled();
+  tap();
+  expect(speakCinematic).not.toHaveBeenCalled();
   await flush(2000);
-  expect(speakCinematic.mock.calls[0][0]).toContain("Tous mes systèmes sont prêts");
+  expect(speakCinematic.mock.calls[0][0]).toContain("Connexion au cerveau Sirius. OK.");
+});
+
+test("an offline screen does not label completed speech as a stuck reader", async () => {
+  const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    render(<BootScreen onDone={jest.fn()} probeBrain={() => Promise.resolve(false)} />);
+    for (let i = 0; i < 12; i += 1) await flush(2000);
+    act(() => speakCinematic.mock.calls[0][1].onend());
+    await flush(150000);
+    expect(warn).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain("voix indisponible");
+    expect(container.querySelector('[data-testid="boot-brain-alert"]')).not.toBeNull();
+  } finally {
+    warn.mockRestore();
+  }
+});
+
+test("reads every service and ends with the user's welcome without cutting off long speech", () => {
+  const onDone = jest.fn();
+  render(<BootScreen connected userName="Daniel" onDone={onDone} />);
+  const [message, callbacks] = speakCinematic.mock.calls[0];
+  expect(message).toContain("Initialisation du noyau Sirius. OK.");
+  expect(message).toContain("Connexion au cerveau Sirius. OK.");
+  expect(message).toMatch(/Calibration synthèse vocale\. (OK|Indisponible)\./);
+  expect(message).toMatch(/Activation du micro\. (OK|Indisponible)\./);
+  expect(message).toMatch(/Bienvenue, Daniel\.$/);
+  act(() => callbacks.onstart());
+  act(() => jest.advanceTimersByTime(45000));
+  tap();
+  expect(onDone).not.toHaveBeenCalled();
+  expect(cancelSpeech).not.toHaveBeenCalled();
+  expect(container.textContent).toContain("Bienvenue, Daniel.");
+  act(() => callbacks.onend());
+  act(() => jest.advanceTimersByTime(500));
+  expect(onDone).toHaveBeenCalledTimes(1);
 });

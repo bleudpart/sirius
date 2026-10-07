@@ -53,7 +53,7 @@ export default function ProductivityPanel({ onClose, initialTab = "documents" })
     <div className="productivity-screen" data-testid="productivity-panel" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <div className="productivity-card">
         <header className="productivity-header">
-          <div><span>MODULE 4</span><h2>PRODUCTIVITE &amp; TRAVAIL</h2><p>Documents, code, notes, taches et rapports restent sur votre poste.</p></div>
+          <div><span>ΣIRIUS</span><h2>PRODUCTIVITÉ &amp; TRAVAIL</h2><p>Documents, code, notes, tâches et rapports.</p></div>
           <button type="button" onClick={onClose} aria-label="Fermer Productivite"><X size={18} /></button>
         </header>
         <nav className="productivity-tabs" aria-label="Outils Productivite">
@@ -64,4 +64,3 @@ export default function ProductivityPanel({ onClose, initialTab = "documents" })
     </div>
   );
 }
-

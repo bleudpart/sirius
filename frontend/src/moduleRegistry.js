@@ -1,4 +1,4 @@
-export function createModuleRegistry({ icons, actions, state, user }) {
+export function createModuleRegistry({ icons, actions, state, user, platform = "web" }) {
   const { ThemisLogo, PantheonLogo, MythosLogo } = icons;
   const {
     reload,
@@ -67,13 +67,13 @@ export function createModuleRegistry({ icons, actions, state, user }) {
     { id: "getting-started", group: "OUTILS", label: "Guide de démarrage", Icon: icons.BadgeInfo, run: openGettingStarted },
     { id: "reload", group: "SYSTÈME", label: "Recharger ΣIRIUS", Icon: icons.RotateCcw, run: reload },
     { id: "display", group: "MÉDIAS", label: "ΣIRIUS DISPLAY", Icon: icons.Monitor, active: state.displayOpen, run: toggleDisplay },
-    { id: "media-modules", group: "MÉDIAS", label: "Modules multimédia", Icon: icons.Clapperboard, active: state.displayOpen && state.displayType === "media", run: showMediaModules },
+    { id: "media-modules", group: "MÉDIAS", label: "Modules multimédia", Icon: icons.Clapperboard, active: platform === "android" ? state.showMediaModules : state.displayOpen && state.displayType === "media", run: showMediaModules },
     { id: "files", group: "MÉDIAS", label: "Médiathèque", Icon: icons.FolderOpen, run: openFiles },
     { id: "info-hub", group: "OUTILS", label: "Centre d'information ΣIRIUS", Icon: icons.BadgeInfo, run: openInfoHub },
     { id: "connections", group: "OUTILS", label: "Comptes & connexions", Icon: icons.Link2, run: openConnections },
-    { id: "capture-interface", group: "OUTILS", label: "Capture de l'interface", Icon: icons.Camera, run: captureInterface },
-    { id: "capture-region", group: "OUTILS", label: "Capture d'une zone (souris)", Icon: icons.Camera, run: captureRegion },
-    { id: "open-capture-folder", group: "OUTILS", label: "Ouvrir le dossier des captures", Icon: icons.FolderOpen, run: openCaptureFolder },
+    { id: "capture-interface", group: "OUTILS", label: "Capture de l'interface", Icon: icons.Camera, mobile: false, run: captureInterface },
+    { id: "capture-region", group: "OUTILS", label: "Capture d'une zone (souris)", Icon: icons.Camera, mobile: false, run: captureRegion },
+    { id: "open-capture-folder", group: "OUTILS", label: "Ouvrir le dossier des captures", Icon: icons.FolderOpen, mobile: false, run: openCaptureFolder },
     { id: "architect", group: "OUTILS", label: "Architecte visuel", Icon: icons.Workflow, run: openArchitect },
     { id: "plans", group: "OUTILS", label: "Plans 2D (PLANS#)", Icon: icons.Ruler, run: openPlans },
     { id: "photo3d", group: "OUTILS", label: "Photos → Objet 3D (PHOTO3D#)", Icon: icons.Boxes, run: openPhoto3d },
@@ -129,5 +129,5 @@ export function createModuleRegistry({ icons, actions, state, user }) {
     { id: "spotify", group: "MÉDIAS", label: state.spotify ? "Spotify — lecteur intégré" : "Spotify — lecteur (connexion requise)", Icon: icons.Music, active: state.spotify, run: openSpotify },
     ...(user?.role === "admin" ? [{ id: "admin", group: "SYSTÈME", label: "ADMINISTRATION — comptes & activité", Icon: icons.ShieldCheck, run: openAdmin }] : []),
     ...(user ? [{ id: "enterprise", group: "SYSTÈME", label: "ΣIRIUS ENTREPRISE — équipe, audit & sauvegardes", Icon: icons.Building2, run: openEnterprise }] : []),
-  ];
+  ].filter((item) => platform !== "android" || item.mobile !== false);
 }

@@ -537,7 +537,7 @@ export function BootScreen({ onDone, userName, onOpenModule, connected, probeBra
       && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window
         || (typeof window.MediaRecorder !== "undefined" && !!navigator.mediaDevices?.getUserMedia));
     return [
-      { label: "Initialisation du noyau Σ.I.R.I.U.S", state: null },
+      { label: "Initialisation du noyau Σ.I.R.I.U.S", state: true },
       { label: "Connexion au cerveau Σ.I.R.I.U.S", state: brain === null ? null : brain === true },
       { label: "Calibration synthèse vocale", state: speech },
       { label: "Activation du micro", state: recog },
@@ -561,11 +561,15 @@ export function BootScreen({ onDone, userName, onOpenModule, connected, probeBra
   const [loaded, setLoaded] = useState(false);
   const [speechDone, setSpeechDone] = useState(false);
   const [speechUnavailable, setSpeechUnavailable] = useState(false);
+  const [speechPlaying, setSpeechPlaying] = useState(false);
   const closeTimerRef = useRef(null);
   const closingRef = useRef(false);
   const speechStartedRef = useRef(false);
+  const speechFinishedRef = useRef(false);
   useEffect(() => {
     const reportVoiceError = () => {
+      speechFinishedRef.current = true;
+      setSpeechPlaying(false);
       setSpeechUnavailable(true);
       setSpeechDone(true);
     };
@@ -579,12 +583,20 @@ export function BootScreen({ onDone, userName, onOpenModule, connected, probeBra
     if (brain !== null) setNarrationReady(true);
   }, [brain]);
   const padRef = useRef(null);
+  const serviceSpeech = checks.map(({ label, state }) =>
+    `${label.replace(/Σ\.I\.R\.I\.U\.S/g, "Sirius")}. ${state === null ? "En cours." : state ? "OK." : "Indisponible."}`
+  ).join(" ");
   const introSpeech = "Système. Intelligent. Réactif. Interface. Universel. Sécurisé. " +
     "Je suis Sirius... façonné par mon créateur, Daniel Partel. " +
+    serviceSpeech + " " +
     (brain === false
       ? "Je n'arrive pas encore à joindre mon cerveau... vérifiez la connexion Internet."
-      : "Tous mes systèmes sont prêts... à votre disposition.");
+      : "Sirius est prêt... à votre disposition.") +
+    (userName ? ` Bienvenue, ${userName}.` : " Bienvenue.");
   const playIntroSpeech = () => {
+    speechFinishedRef.current = false;
+    setSpeechDone(false);
+    setSpeechUnavailable(false);
     try {
       const pad = padRef.current;
       if (pad) {
@@ -594,8 +606,8 @@ export function BootScreen({ onDone, userName, onOpenModule, connected, probeBra
       }
     } catch (e) {}
     speakCinematic(introSpeech, {
-      onstart: () => { speechStartedRef.current = true; },
-      onend: () => setSpeechDone(true),
+      onstart: () => { speechStartedRef.current = true; setSpeechPlaying(true); },
+      onend: () => { speechFinishedRef.current = true; setSpeechPlaying(false); setSpeechDone(true); },
     });
   };
 
@@ -635,6 +647,7 @@ export function BootScreen({ onDone, userName, onOpenModule, connected, probeBra
       window.__siriusBootSpoken = true;
       playIntroSpeech();
     } else {
+      speechFinishedRef.current = true;
       setSpeechDone(true);
     }
     // Nappe sonore cinématique discrète sous la voix (Web Audio, gratuite)
@@ -656,13 +669,16 @@ export function BootScreen({ onDone, userName, onOpenModule, connected, probeBra
       });
       padRef.current = { ctx, master };
     } catch (e) {}
-    // Sécurité : on laisse la présentation être regardée avant le repli automatique.
-    const safety = setTimeout(() => setSpeechDone(true), 16000);
+    // Un lecteur bloqué doit laisser accès au HUD, sans tronquer une narration normale.
     const hardStop = setTimeout(() => {
+      if (speechFinishedRef.current || closingRef.current) return;
+      console.warn("La narration de démarrage n'a pas terminé dans le délai de sécurité.");
       setLoaded(true);
+      setSpeechUnavailable(true);
+      setSpeechPlaying(false);
       setSpeechDone(true);
       if (brainRef.current !== false) closeBoot();
-    }, 30000);
+    }, Math.max(120000, introSpeech.length * 200));
     const step = 520;
     const dur = lines.length * step + 600;
     let i = 0;
@@ -677,13 +693,19 @@ export function BootScreen({ onDone, userName, onOpenModule, connected, probeBra
       setProgress(p);
       if (p >= 100) { setLoaded(true); clearInterval(progTimer); }
     }, 40);
-    return () => { clearInterval(lineTimer); clearInterval(progTimer); clearTimeout(safety); clearTimeout(hardStop); stopPad(); };
+    return () => { clearInterval(lineTimer); clearInterval(progTimer); clearTimeout(hardStop); stopPad(); };
   }, [lines.length, onDone, narrationReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Une voix qui ne démarre pas ne doit pas immobiliser le HUD.
   useEffect(() => {
     if (!loaded || speechDone) return;
-    const t = setTimeout(() => { if (!speechStartedRef.current) setSpeechDone(true); }, 2500);
+    const t = setTimeout(() => {
+      if (!speechStartedRef.current) {
+        console.warn("La voix de démarrage n'a pas pu démarrer.");
+        setSpeechUnavailable(true);
+        setSpeechDone(true);
+      }
+    }, 10000);
     return () => clearTimeout(t);
   }, [loaded, speechDone]);
   useEffect(() => {
@@ -692,8 +714,9 @@ export function BootScreen({ onDone, userName, onOpenModule, connected, probeBra
   return (
 
     <div className={`boot-screen ${closing ? "closing" : ""}`} data-testid="boot-screen" onClick={() => {
-      if (!speechStartedRef.current) { playIntroSpeech(); return; }
-      closeBoot();
+      if (closingRef.current || !narrationReady) return;
+      if (!speechStartedRef.current && !speechDone) { playIntroSpeech(); return; }
+      if (speechDone) closeBoot();
     }}>
       <div className="boot-grid" />
       <div className="boot-scan" />
@@ -763,6 +786,8 @@ export function BootScreen({ onDone, userName, onOpenModule, connected, probeBra
         </div>
         <div className="boot-pct">{progress}%  —          {speechUnavailable
           ? "voix indisponible — ouverture du HUD"
+          : speechPlaying
+            ? "lecture des services et de l'accueil…"
                   : speechDone && !speechStartedRef.current
                     ? "ouverture du HUD…"
                     : "touchez pour activer la voix"}</div>

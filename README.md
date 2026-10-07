@@ -359,6 +359,29 @@ Liste complète des modules et dates : [MODULES_SIRIUS.txt](./MODULES_SIRIUS.txt
   à l'échelle du téléphone et une barre de défilement visible.
   Les deux fenêtres gardent leurs coins arrondis ; en paysage, la roue est à gauche
   et le titre ainsi que la liste sont à droite.
+  Le menu Android exclut les captures d'interface, la sélection à la souris et
+  l'ouverture du dossier des captures, réservées au PC, y compris en paysage.
+  Le guide, les connexions et le centre d'information restent disponibles.
+  Le HUD principal ne comporte plus la pastille « Prochaines Actions ».
+  Les six modules métier (Ariane, Plutos, Mnémosyne, Némésis, Thot et Chronos)
+  sont affichés sans suffixe « # », y compris dans la galerie MYTHOS.
+  Les titres Cinzel des pastilles s'adaptent à la largeur disponible dans les
+  quatre catégories du menu mobile, sans tronquer les noms longs.
+  Le journal des tâches s'ouvre même sans tâche en cours ; il conserve les
+  événements de progression sur cet appareil. Le catalogue multimédia a sa
+  propre fenêtre sur Android ; Windows garde son ouverture dans ΣIRIUS Display.
+  Le gabarit mobile commun couvre aussi les plans 2D/3D, la caméra, les clés API,
+  le journal, le guide et Productivité : cadre or, bandeau RGB fixe, titres Cinzel
+  et fermeture ronde de 44 px. Les boutons HACCP et Réveil s'ajustent au texte.
+  Les boutons Fermer et Réduire sont ronds et assortis sur mobile. La réduction
+  conserve la fenêtre et son contenu ; sa pastille permet de la restaurer
+  au-dessus de la navigation. Fermer retire aussi sa pastille éventuelle.
+  Sur Android et les éditions Windows (installée ou portable), la narration de
+  démarrage lit les services affichés et leur état, puis termine par l'accueil
+  personnalisé. La page attend la fin réelle de la lecture avant de disparaître ;
+  un lecteur absent ou bloqué est signalé et ne doit pas immobiliser le HUD.
+  Vérifier le centrage des actualités et de la caméra, les défilements et les
+  dimensions en portrait et paysage avant de publier l'APK.
   La voix Android utilise une capture micro (maximum 15 secondes) envoyée à
   `/api/stt`, plutôt que la reconnaissance Web Speech de la WebView. Maintenir
   **ESPACE**, puis relâcher pour transcrire ; une annulation pendant la demande

@@ -10,7 +10,14 @@ jest.mock("./AuthGate", () => ({ useAuth: () => ({ user: { id: "voice-test", nam
 jest.mock("./voice", () => ({
   speakFr: jest.fn(), cancelSpeech: jest.fn(), speakSeries: jest.fn(() => Promise.resolve()), speakAsCharacter: jest.fn(),
 }));
-jest.mock("./lazyModules", () => new Proxy({}, { get: (_, key) => key === "__esModule" ? true : () => null }));
+jest.mock("./lazyModules", () => new Proxy({}, { get: (_, key) => {
+  if (key === "__esModule") return true;
+  if (key === "MediaModulesPanel") return ({ onClose }) => (
+    <div data-testid="media-modules-panel"><button onClick={onClose}>Fermer le catalogue</button></div>
+  );
+  if (key === "SiriusDisplay") return () => <div data-testid="sirius-display" />;
+  return () => null;
+} }));
 jest.mock("./components/ReactorVisuals", () => ({ MedallionRing: () => null, ReactorCore: () => null, Waveform: () => null }));
 jest.mock("./components/HudPanels", () => {
   const React = require("react");
@@ -27,7 +34,7 @@ jest.mock("./useTouchNav", () => () => {});
 jest.mock("./hud/SiriusHudPanels", () => ({
   SiriusInfoHub: () => null,
   SiriusInfoWheel: ({ open }) => open ? <div data-testid="info-wheel">Centre d'information ΣIRIUS</div> : null,
-  SiriusNextAction: () => null,
+  SiriusNextAction: () => <button className="shud-next">Prochaines Actions</button>,
 }));
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -98,6 +105,12 @@ async function send(command) {
   await act(async () => host.querySelector('[data-testid="sirius-cmd-form"]').dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
 }
 
+test("the HUD no longer mounts the next-actions pill", async () => {
+  await mount();
+  expect(host.querySelector('[data-testid="sirius-title"]')).not.toBeNull();
+  expect(host.querySelector(".shud-next")).toBeNull();
+});
+
 test("the information centre entry opens its wheel from the modules menu", async () => {
   await mount();
   expect(host.querySelector('[data-testid="info-wheel"]')).toBeNull();
@@ -107,6 +120,29 @@ test("the information centre entry opens its wheel from the modules menu", async
   expect(entry.textContent).toContain("ΣIRIUS");
   await act(async () => entry.click());
   expect(host.querySelector('[data-testid="info-wheel"]')).not.toBeNull();
+});
+
+test("the tasks journal opens from the module menu even without a running task", async () => {
+  await mount();
+  await act(async () => host.querySelector('[data-testid="sirius-modules-btn"]').click());
+  await act(async () => document.querySelector('[data-testid="modules-menu-group-OUTILS"]').click());
+  await act(async () => document.querySelector('[data-testid="modules-menu-item-journal"]').click());
+  expect(host.querySelector('[data-testid="sirius-journal-panel"]')).not.toBeNull();
+  expect(host.textContent).toContain("Aucune tâche enregistrée");
+});
+
+test("Android opens and closes a dedicated media catalogue without opening Display", async () => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  await mount();
+  const display = host.querySelector('[data-testid="sirius-display"]');
+  expect(display).toBeNull();
+  await act(async () => host.querySelector('[data-testid="sirius-modules-btn"]').click());
+  await act(async () => document.querySelector('[data-testid="modules-menu-group-MÉDIAS"]').click());
+  await act(async () => document.querySelector('[data-testid="modules-menu-item-media-modules"]').click());
+  expect(host.querySelector('[data-testid="media-modules-panel"]')).not.toBeNull();
+  expect(host.querySelector('[data-testid="sirius-display"]')).toBe(display);
+  await act(async () => host.querySelector('[data-testid="media-modules-panel"] button').click());
+  expect(host.querySelector('[data-testid="media-modules-panel"]')).toBeNull();
 });
 
 function mockConversationStream(events) {

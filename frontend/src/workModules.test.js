@@ -18,6 +18,8 @@ const buildRegistry = (openWorkModule = jest.fn()) => createModuleRegistry({
 test("declares the six work modules with a portrait", () => {
   expect(WORK_MODULES.map((module) => module.id)).toEqual(WORK_IDS);
   WORK_MODULES.forEach((module) => {
+    expect(module.label).not.toContain("#");
+    expect(workModuleName(`${module.label}#`)).toBe(module.label);
     expect(module.image).toMatch(/^\/api\/mythos\/img\/[a-z]+\.jpg$/);
   });
 });

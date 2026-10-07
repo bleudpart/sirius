@@ -26,7 +26,7 @@ export const progress = {
 const now = () => new Date().toLocaleTimeString("fr-FR", { hour12: false });
 const POS_KEY = "sirius_progress_pos";
 
-export default function SiriusProgress() {
+export default function SiriusProgress({ journalOnly = false }) {
   const [tasks, setTasks] = useState([]);
   const panelRef = useRef(null);
   const logRef = useRef(null);
@@ -143,7 +143,7 @@ export default function SiriusProgress() {
   const running = tasks.filter((t) => t.status === "running").length;
   return (
     <>
-      <div ref={panelRef} className={`sirius-progress ${tasks.length ? "" : "sp-compact"}`} data-testid="sirius-progress-panel">
+      {!journalOnly && <div ref={panelRef} className={`sirius-progress ${tasks.length ? "" : "sp-compact"}`} data-testid="sirius-progress-panel">
       <div className="sp-bar" onPointerDown={onBarDown} title="Glisser pour déplacer" data-testid="sirius-progress-bar-header">
         <Activity size={13} className={running ? "sp-pulse" : ""} />
         <span className="sp-title">ΣIRIUS — ACTIVITÉ EN COURS</span>
@@ -175,16 +175,16 @@ export default function SiriusProgress() {
           )))}
         </div>
       )}
-      </div>
+      </div>}
 
       {showJournal && (
-        <div className="sp-journal" data-testid="sirius-journal-panel">
+        <div className="sp-journal" role="dialog" aria-label="Journal des tâches ΣIRIUS" data-testid="sirius-journal-panel">
           <div className="sp-bar">
             <History size={13} />
             <span className="sp-title">JOURNAL DES TÂCHES ΣIRIUS</span>
             <span className="sp-count">{journal.length} ENTRÉE{journal.length > 1 ? "S" : ""}</span>
             <button className="sp-close" title="Vider le journal" onClick={() => { writeJournal([]); setJournal([]); }} data-testid="sirius-journal-clear-btn"><Trash2 size={13} /></button>
-            <button className="sp-close" onClick={() => setShowJournal(false)} data-testid="sirius-journal-close-btn"><X size={13} /></button>
+            <button className="sp-close" aria-label="Fermer le journal" onClick={() => setShowJournal(false)} data-testid="sirius-journal-close-btn"><X size={13} /></button>
           </div>
           <div className="sp-journal-list" data-testid="sirius-journal-list">
             {journal.length === 0 && <div className="sp-journal-empty">Aucune tâche enregistrée pour le moment.</div>}

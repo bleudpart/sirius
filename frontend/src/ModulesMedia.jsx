@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { Clapperboard, ExternalLink, Headphones, Loader2, RefreshCw } from "lucide-react";
 import { getHudMediaActionLabel, openHudMediaModule } from "./hud_media";
 import "./media-modules.css";
+import { BACKEND_BASE_URL } from "./lib/api";
 
-const BACKEND_URL = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/$/, "");
-const MEDIA_MODULES_ENDPOINT = `${BACKEND_URL}/modules/media`;
+const MEDIA_MODULES_ENDPOINT = `${BACKEND_BASE_URL}/modules/media`;
 
 function hasExpectedModuleShape(mediaModule) {
   return Boolean(

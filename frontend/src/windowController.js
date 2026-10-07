@@ -53,6 +53,8 @@ export function createWindowController(setters, display) {
     gallery: () => setters.setShowGallery(false),
     spotify: () => setters.setShowSpotifyWin(false),
     media: () => setters.setShowMediaHud(false),
+    "media-modules": () => setters.setShowMediaModules?.(false),
+    "info-hub": () => setters.setShowInfoWheel?.(false),
     productivity: () => setters.setShowProductivity(false),
   };
 
