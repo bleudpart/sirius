@@ -41,6 +41,8 @@ export function cleanTextForDisplay(t) {
 
 function cleanTextForSpeech(t) {
   return String(t || "")
+    // « ΣIRIUS » : la synthèse lit le sigma grec (« sigma irius ») ; le nom se prononce « Sirius ».
+    .replace(/Σ\s?IRIUS/gi, "Sirius")
     .replace(/```[\s\S]*?```/g, " ")            // blocs de code entiers
     .replace(/`([^`]*)`/g, "$1")                 // `code` en ligne → contenu
     .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")  // liens/images Markdown → texte du lien
@@ -317,7 +319,7 @@ export function speakFr(message, { onpending, onstart, onend } = {}) {
       onend,
     }, seq).then((ok) => {
       if (!ok && seq === speakSeq) {
-        speakBrowser(message, { rate: 1.05, pitch: 1, volume, gender: "male", onstart, onend });
+        speakBrowser(message, { rate: 1.05, pitch: 1, volume, gender: "female", onstart, onend });
       }
     });
     return;
@@ -397,7 +399,7 @@ export function speakCinematic(message, { onstart, onend } = {}) {
       timeoutMs: 6000,
     }, seq).then((ok) => {
       if (!ok && seq === speakSeq) {
-        speakBrowser(message, { rate: 1.05, pitch: 1, gender: "male", onstart, onend });
+        speakBrowser(message, { rate: 1.05, pitch: 1, gender: "female", onstart, onend });
       }
     });
     return;

@@ -7,6 +7,7 @@ import binascii
 import io
 import logging
 import os
+import re
 import wave
 from collections import OrderedDict
 from pathlib import Path
@@ -28,6 +29,13 @@ logger = logging.getLogger(__name__)
 _TTS_CACHE: OrderedDict[tuple, dict] = OrderedDict()
 _TTS_CACHE_MAX = 64
 _TTS_CACHE_MAX_BYTES = 32 * 1024 * 1024
+
+_SIGMA_NAME = re.compile(r"Σ\s?IRIUS", re.IGNORECASE)
+
+
+def _speakable(text: str) -> str:
+    """« ΣIRIUS » se prononce « Sirius » : sans cela la synthèse lit « sigma irius »."""
+    return _SIGMA_NAME.sub("Sirius", text or "").strip()
 
 
 def _cache_get(key: tuple) -> dict | None:
@@ -117,7 +125,7 @@ async def _gemini_request(key: str, payload: dict) -> str:
 
 
 async def _chirp_fallback(text: str, voice: str) -> Optional[dict]:
-    """Synthétise la même voix Gemini via Google Cloud TTS (Chirp3-HD), en WAV."""
+    """Synthétise la voix Chirp3-HD via Google Cloud TTS, en WAV."""
     key = os.environ.get("GOOGLE_TTS_API_KEY")
     if not key:
         return None
@@ -173,16 +181,25 @@ def make_voice_io_router(db=None):
             return await cloud_link.relay_json("/api/tts/gemini", req.model_dump())
         if not key:
             raise HTTPException(status_code=503, detail="GEMINI_TTS_API_KEY absente")
-        text = req.text.strip()
+        text = _speakable(req.text)
         if not text:
             raise HTTPException(status_code=400, detail="Texte vide")
         model = os.environ.get("GEMINI_TTS_MODEL", "gemini-3.8-flash-tts")
         voice = os.environ.get("GEMINI_TTS_VOICE", "Aoede")
         cache_key = ("gemini", model, voice, GEMINI_TTS_STYLE, text)
+        chirp_primary = os.environ.get("GEMINI_TTS_PRIMARY", "").strip() != "1"
         cached = _cache_get(cache_key)
-        if cached:
+        if cached and not chirp_primary:
             return cached
         await usage_quota.consume(db, user, "tts")
+        # Chirp3-HD d'abord : timbre identique d'une phrase à l'autre et plus rapide. Gemini
+        # (génératif, vite saturé en 429) alternait avec Chirp et changeait la voix en cours d'usage.
+        if chirp_primary:
+            chirp = await _chirp_fallback(text, voice)
+            if chirp is not None:
+                return chirp
+            if cached:
+                return cached
         payload = {
             "model": model,
             "input": [{
@@ -202,8 +219,7 @@ def make_voice_io_router(db=None):
         try:
             audio = await _gemini_request(key, payload)
         except HTTPException as error:
-            # Quota Gemini vite épuisé (429) : même timbre via Google Cloud TTS
-            # plutôt que la voix système du téléphone.
+            # Essayer Chirp avant le secours local si Gemini échoue.
             fallback = await _chirp_fallback(text, voice)
             if fallback is None:
                 raise
@@ -232,7 +248,7 @@ def make_voice_io_router(db=None):
             return await cloud_link.relay_json("/api/tts/google", req.model_dump())
         if not key:
             raise HTTPException(status_code=503, detail="GOOGLE_TTS_API_KEY absente")
-        text = req.text.strip()[:4500]
+        text = _speakable(req.text)[:4500]
         if not text:
             raise HTTPException(status_code=400, detail="Texte vide")
         voice = req.voice if req.voice in ALLOWED_TTS_VOICES else "fr-FR-Neural2-G"

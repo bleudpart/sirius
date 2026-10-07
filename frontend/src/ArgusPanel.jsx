@@ -29,6 +29,8 @@ export function ArgusWatcher({ onCriticalAlert }) {
   const seen = useRef(new Set());
 
   useEffect(() => {
+    // ARGUS surveille le serveur local du PC : le serveur distant (Android) refuse ces appels.
+    if (window.Capacitor?.isNativePlatform?.()) return undefined;
     const report = (message, stack) => {
       const key = (message || "").slice(0, 80);
       if (!message || seen.current.has(key) || Date.now() - lastSent.current < 10000) return;

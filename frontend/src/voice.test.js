@@ -70,6 +70,14 @@ test("Android answers and character voices share the native fallback", async () 
   expect(speakNative).toHaveBeenCalled();
 });
 
+test("Android reads the assistant name without pronouncing the Greek sigma", async () => {
+  speakFr("ΣIRIUS a ouvert Panthéon.");
+  await flush();
+  expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/tts/gemini"), expect.objectContaining({
+    body: JSON.stringify({ text: "Sirius a ouvert Panthéon." }),
+  }));
+});
+
 test("Gemini WAV plays once and ends once without native fallback", async () => {
   const audio = { play: jest.fn().mockResolvedValue(), pause: jest.fn() };
   global.Audio = jest.fn(() => audio);

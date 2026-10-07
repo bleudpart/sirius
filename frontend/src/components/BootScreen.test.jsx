@@ -53,7 +53,8 @@ test("a narration that never starts does not hold the HUD for thirty seconds", (
   render(<BootScreen connected onDone={onDone} />);
   act(() => jest.advanceTimersByTime(5000));
   act(() => jest.advanceTimersByTime(2500));
-  expect(container.textContent).toContain("voix indisponible");
+  expect(container.textContent).toContain("ouverture du HUD…");
+  expect(container.textContent).not.toContain("voix indisponible");
   act(() => jest.advanceTimersByTime(500));
   expect(onDone).toHaveBeenCalledTimes(1);
 });

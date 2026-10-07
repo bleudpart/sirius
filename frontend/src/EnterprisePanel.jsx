@@ -140,7 +140,7 @@ export default function EnterprisePanel({ onClose }) {
   return (
     <div className="prime-screen" data-testid="enterprise-panel">
       <header className="zeus-head">
-        <div className="zeus-title enterprise-title font-divine"><Building2 size={20} /> SIRIUS ENTREPRISE</div>
+        <div className="zeus-title enterprise-title font-divine"><Building2 size={20} /> ΣIRIUS ENTREPRISE</div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <button className="file-btn" onClick={load} disabled={busy} title="Actualiser"><RefreshCw size={13} /></button>
           <button className="setup-close zeus-close" onClick={onClose} title="Fermer"><X size={15} /></button>

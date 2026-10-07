@@ -69,7 +69,7 @@ export function createModuleRegistry({ icons, actions, state, user }) {
     { id: "display", group: "MÉDIAS", label: "ΣIRIUS DISPLAY", Icon: icons.Monitor, active: state.displayOpen, run: toggleDisplay },
     { id: "media-modules", group: "MÉDIAS", label: "Modules multimédia", Icon: icons.Clapperboard, active: state.displayOpen && state.displayType === "media", run: showMediaModules },
     { id: "files", group: "MÉDIAS", label: "Médiathèque", Icon: icons.FolderOpen, run: openFiles },
-    { id: "info-hub", group: "OUTILS", label: "Centre d'information SIRIUS", Icon: icons.BadgeInfo, run: openInfoHub },
+    { id: "info-hub", group: "OUTILS", label: "Centre d'information ΣIRIUS", Icon: icons.BadgeInfo, run: openInfoHub },
     { id: "connections", group: "OUTILS", label: "Comptes & connexions", Icon: icons.Link2, run: openConnections },
     { id: "capture-interface", group: "OUTILS", label: "Capture de l'interface", Icon: icons.Camera, run: captureInterface },
     { id: "capture-region", group: "OUTILS", label: "Capture d'une zone (souris)", Icon: icons.Camera, run: captureRegion },
@@ -128,6 +128,6 @@ export function createModuleRegistry({ icons, actions, state, user }) {
     { id: "media", group: "MÉDIAS", label: "MEDIA PROXY — lecteurs et controles", Icon: icons.Radio, active: state.showMediaHud, run: openMedia },
     { id: "spotify", group: "MÉDIAS", label: state.spotify ? "Spotify — lecteur intégré" : "Spotify — lecteur (connexion requise)", Icon: icons.Music, active: state.spotify, run: openSpotify },
     ...(user?.role === "admin" ? [{ id: "admin", group: "SYSTÈME", label: "ADMINISTRATION — comptes & activité", Icon: icons.ShieldCheck, run: openAdmin }] : []),
-    ...(user ? [{ id: "enterprise", group: "SYSTÈME", label: "SIRIUS ENTREPRISE — équipe, audit & sauvegardes", Icon: icons.Building2, run: openEnterprise }] : []),
+    ...(user ? [{ id: "enterprise", group: "SYSTÈME", label: "ΣIRIUS ENTREPRISE — équipe, audit & sauvegardes", Icon: icons.Building2, run: openEnterprise }] : []),
   ];
 }

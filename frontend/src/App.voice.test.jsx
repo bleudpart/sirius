@@ -24,7 +24,11 @@ jest.mock("./uiSounds", () => ({ initUiSounds: () => () => {} }));
 jest.mock("./holoFx", () => ({ initHoloFx: () => () => {} }));
 jest.mock("./readAloud", () => ({ initReadAloud: () => () => {}, parseReadPanelCommand: () => null, readPanelAloud: () => false }));
 jest.mock("./useTouchNav", () => () => {});
-jest.mock("./hud/SiriusHudPanels", () => ({ SiriusInfoHub: () => null, SiriusInfoWheel: () => null, SiriusNextAction: () => null }));
+jest.mock("./hud/SiriusHudPanels", () => ({
+  SiriusInfoHub: () => null,
+  SiriusInfoWheel: ({ open }) => open ? <div data-testid="info-wheel">Centre d'information ΣIRIUS</div> : null,
+  SiriusNextAction: () => null,
+}));
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const originalFetch = global.fetch;
@@ -93,6 +97,17 @@ async function send(command) {
   });
   await act(async () => host.querySelector('[data-testid="sirius-cmd-form"]').dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
 }
+
+test("the information centre entry opens its wheel from the modules menu", async () => {
+  await mount();
+  expect(host.querySelector('[data-testid="info-wheel"]')).toBeNull();
+  await act(async () => host.querySelector('[data-testid="sirius-modules-btn"]').click());
+  await act(async () => document.querySelector('[data-testid="modules-menu-group-OUTILS"]').click());
+  const entry = document.querySelector('[data-testid="modules-menu-item-info-hub"]');
+  expect(entry.textContent).toContain("ΣIRIUS");
+  await act(async () => entry.click());
+  expect(host.querySelector('[data-testid="info-wheel"]')).not.toBeNull();
+});
 
 function mockConversationStream(events) {
   const reader = {

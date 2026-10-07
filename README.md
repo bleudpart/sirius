@@ -363,8 +363,11 @@ Liste complète des modules et dates : [MODULES_SIRIUS.txt](./MODULES_SIRIUS.txt
   `/api/stt`, plutôt que la reconnaissance Web Speech de la WebView. Maintenir
   **ESPACE**, puis relâcher pour transcrire ; une annulation pendant la demande
   de permission ne doit pas démarrer un enregistrement tardif.
-  En mains libres, la capture se termine après environ deux secondes de silence
-  suivant la parole (la limite de 15 secondes reste active). Vérifier sur appareil
+  Sur Android, la capture désactive les traitements micro de la WebView qui
+  peuvent produire un flux muet sur certains Samsung. En mains libres, une
+  capture sans parole détectée n'est pas envoyée au serveur et ne consomme donc
+  pas le quota de transcription. La capture se termine après environ 1,2 seconde
+  de silence suivant la parole (la limite de 15 secondes reste active). Vérifier sur appareil
   les pauses, le bruit ambiant et le délai serveur ; ce seuil ne garantit pas
   une transcription immédiate. La présentation se ferme après son chargement
   et la fin de sa voix ; si la voix ne démarre pas, elle ne bloque pas le HUD.
@@ -374,14 +377,17 @@ Liste complète des modules et dates : [MODULES_SIRIUS.txt](./MODULES_SIRIUS.txt
   le rappel « Sirius ». L'ouverture du micro n'indique pas une nouvelle demande
   d'autorisation à chaque relance. Une erreur de transcription désactive le
   mode et affiche l'erreur plutôt que de laisser le bouton faussement actif.
-  La synthèse Android utilise **Gemini Aoede** via `/api/tts/gemini`, pour la
-  présentation, les réponses et les personnages, avec un ton français naturel
-  et conversationnel. Le serveur appelle l'API REST Gemini avec `httpx` déjà
-  présent ; aucun SDK supplémentaire ni secret n'est ajouté à l'APK. Configurer
-  `GEMINI_TTS_API_KEY` sur Render, `GEMINI_TTS_MODEL=gemini-3.8-flash-tts`
-  et `GEMINI_TTS_VOICE=Aoede`, puis déployer le backend et reconstruire l'APK.
-  Le modèle doit être accessible au projet Google ; quotas et facturation sont
-  à vérifier. Cette voix n'est pas une copie garantie de Gemini Live.
+  La synthèse Android utilise **Chirp3-HD Aoede en priorité** via `/api/tts/gemini`,
+  pour la présentation, les réponses et les personnages. Gemini Aoede reste le
+  secours serveur : les deux moteurs ont des timbres différents malgré le nom
+  Aoede commun. Le serveur appelle les API REST avec `httpx` déjà présent ;
+  aucun SDK supplémentaire ni secret n'est ajouté à l'APK. Configurer
+  `GOOGLE_TTS_API_KEY` et `GEMINI_TTS_API_KEY` sur Render,
+  `GEMINI_TTS_MODEL=gemini-3.8-flash-tts` et `GEMINI_TTS_VOICE=Aoede`.
+  `GEMINI_TTS_PRIMARY=1` rétablit explicitement Gemini en premier.
+  Déployer le backend pour changer cette priorité ; reconstruire l'APK pour les
+  correctifs client. Les API doivent être accessibles au projet Google ; quotas
+  et facturation sont à vérifier. Cette voix n'est pas une copie garantie de Gemini Live.
   Les réglages Cloud TTS `speakingRate`/`pitch` ne sont pas envoyés à Gemini :
   les indications de ton sont distinctes du texte lu. La réponse WAV est validée
   par le serveur et lue comme `audio/wav`, sans modification de hauteur.
@@ -392,9 +398,10 @@ Liste complète des modules et dates : [MODULES_SIRIUS.txt](./MODULES_SIRIUS.txt
   les réponses disposent de 28 secondes. Le micro reste suspendu pendant
   la génération des réponses, puis reprend à la fin de la lecture.
   Le texte à lire est transmis à Google, sans audio du micro dans cette requête.
-  L'indisponibilité de Gemini est signalée ; le secours utilise une voix française
+  L'indisponibilité du service vocal est signalée ; le secours utilise une voix française
   **locale** du moteur Android via le plugin Capacitor TextToSpeech, en privilégiant
-  `fr-FR` et sans grave forcé. Le web et Windows conservent leur sélection vocale.
+  `fr-FR` et sans grave forcé. La voix locale dépend du moteur installé ; son
+  timbre n'est pas identique à la voix serveur. Le web et Windows conservent leur sélection vocale.
   Une voix
   française locale doit être installée ; son absence est signalée. Vérifier
   la narration de démarrage, les réponses et leur interruption sur appareil.

@@ -33,6 +33,7 @@ def client(monkeypatch):
     monkeypatch.delenv("GEMINI_TTS_VOICE", raising=False)
     monkeypatch.delenv("GOOGLE_TTS_API_KEY", raising=False)
     monkeypatch.delenv("GEMINI_TTS_FALLBACK_VOICE", raising=False)
+    monkeypatch.delenv("GEMINI_TTS_PRIMARY", raising=False)
     voice_io._TTS_CACHE.clear()
     app = FastAPI()
     app.include_router(voice_io.make_voice_io_router(), prefix="/api")
@@ -131,7 +132,7 @@ def test_anonymous_request_never_calls_provider(client, monkeypatch):
     assert client.post("/api/tts/gemini", json={"text": "Bonjour"}).status_code == 401
 
 
-def test_quota_exhaustion_relays_same_voice_through_chirp(client, monkeypatch):
+def test_chirp_is_primary_so_the_voice_never_changes_between_sentences(client, monkeypatch):
     monkeypatch.setenv("GOOGLE_TTS_API_KEY", "cloud-test-key")
     wav = base64.b64decode(audio_payload()["steps"][0]["content"][0]["data"])
     calls = []
@@ -141,20 +142,59 @@ def test_quota_exhaustion_relays_same_voice_through_chirp(client, monkeypatch):
 
         calls.append(request.url.host)
         if request.url.host == "generativelanguage.googleapis.com":
-            return httpx.Response(429, text="quota")
+            pytest.fail("Gemini must not be called while Chirp answers")
         body = json.loads(request.content)
         assert body["voice"]["name"] == "fr-FR-Chirp3-HD-Aoede"
         assert body["audioConfig"]["audioEncoding"] == "LINEAR16"
+        assert body["input"]["text"] == "Sirius a fermé Panthéon."
         return httpx.Response(200, json={"audioContent": base64.b64encode(wav).decode()})
 
     mock_upstream(monkeypatch, handler)
-    result = client.post("/api/tts/gemini", json={"text": "Bonjour"}).json()
+    result = client.post("/api/tts/gemini", json={"text": "ΣIRIUS a fermé Panthéon."}).json()
     assert result["provider"] == "google-chirp"
     assert result["mime_type"] == "audio/wav"
     assert base64.b64decode(result["audio_base64"]) == wav
-    client.post("/api/tts/gemini", json={"text": "Bonjour"})
-    assert calls == ["generativelanguage.googleapis.com", "texttospeech.googleapis.com",
-                     "generativelanguage.googleapis.com"]
+    client.post("/api/tts/gemini", json={"text": "ΣIRIUS a fermé Panthéon."})
+    assert calls == ["texttospeech.googleapis.com"]
+
+
+def test_gemini_primary_option_relays_through_chirp_on_quota(client, monkeypatch):
+    monkeypatch.setenv("GOOGLE_TTS_API_KEY", "cloud-test-key")
+    monkeypatch.setenv("GEMINI_TTS_PRIMARY", "1")
+    wav = base64.b64decode(audio_payload()["steps"][0]["content"][0]["data"])
+    calls = []
+
+    def handler(request):
+        calls.append(request.url.host)
+        if request.url.host == "generativelanguage.googleapis.com":
+            return httpx.Response(429, text="quota")
+        return httpx.Response(200, json={"audioContent": base64.b64encode(wav).decode()})
+
+    mock_upstream(monkeypatch, handler)
+    assert client.post("/api/tts/gemini", json={"text": "Bonjour"}).json()["provider"] == "google-chirp"
+    assert calls == ["generativelanguage.googleapis.com", "texttospeech.googleapis.com"]
+
+
+def test_chirp_recovery_takes_priority_over_cached_gemini(client, monkeypatch):
+    monkeypatch.setenv("GOOGLE_TTS_API_KEY", "cloud-test-key")
+    wav = audio_payload()["steps"][0]["content"][0]["data"]
+    calls = []
+    chirp_available = False
+
+    def handler(request):
+        calls.append(request.url.host)
+        if request.url.host == "texttospeech.googleapis.com":
+            if not chirp_available:
+                return httpx.Response(503)
+            return httpx.Response(200, json={"audioContent": wav})
+        return httpx.Response(200, json=audio_payload())
+
+    mock_upstream(monkeypatch, handler)
+    assert client.post("/api/tts/gemini", json={"text": "Bonjour"}).json()["provider"] == "gemini"
+    chirp_available = True
+    assert client.post("/api/tts/gemini", json={"text": "Bonjour"}).json()["provider"] == "google-chirp"
+    assert calls == ["texttospeech.googleapis.com", "generativelanguage.googleapis.com",
+                     "texttospeech.googleapis.com"]
 
 
 def test_failed_relay_keeps_gemini_error(client, monkeypatch):

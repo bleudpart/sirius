@@ -2,9 +2,10 @@
 import { useEffect, useRef, useState } from "react";
 import { speakAsCharacter } from "@/voice";
 import { IonicColumn, GreekAmphora } from "@/MythosDecor";
+import { API_BASE_URL, resolveBackendUrl } from "@/lib/api";
 import "./Mythos.css";
 
-const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
+const API = API_BASE_URL;
 
 const COLOR_GLOW = {
   "bleu froid": "rgba(56,189,248,0.55)",
@@ -56,7 +57,7 @@ export default function MythosBackdrop({ module, state = "idle" }) {
         </div>
       )}
       <img
-        src={char.image}
+        src={resolveBackendUrl(char.image)}
         alt=""
         className={`mythos-silhouette ${(char.style.opacity || 0) >= 0.9 ? "solid" : ""}`}
         draggable={false}

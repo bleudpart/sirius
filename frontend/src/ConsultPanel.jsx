@@ -7,8 +7,9 @@ import { X, Scale, Flame, Loader2, ArrowRight, Volume2, History, Trash2, FileDow
 import MythosBackdrop from "@/MythosBackdrop";
 import { ConfirmButton } from "@/ConfirmButton";
 import { speakAsCharacter, cancelSpeech } from "@/voice";
+import { API_BASE_URL, resolveBackendUrl } from "@/lib/api";
 
-const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
+const API = API_BASE_URL;
 const OLD_LOCAL_KEY = "sirius_consult_history";
 
 const smtpConf = () => {
@@ -199,7 +200,7 @@ export default function ConsultPanel({ module, onClose }) {
 
       <div className="consult-layout">
         <div className="consult-portrait">
-          <img src={c.img} alt={c.name} draggable={false} data-testid={`${slug}-portrait`} />
+          <img src={resolveBackendUrl(c.img)} alt={c.name} draggable={false} data-testid={`${slug}-portrait`} />
           <button
             className="mg-speak"
             onClick={() => { cancelSpeech(); speakAsCharacter(c.intro, { module }); }}

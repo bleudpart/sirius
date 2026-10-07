@@ -8306,8 +8306,13 @@ body[data-phase] .center-stage::before { content: none !important; }
   [data-testid="sirius-fullscreen-btn"],
   [data-testid="sirius-modules-btn"],
   [data-testid="sirius-info-btn"],
-  [data-testid="sirius-profile-btn"] {
+  [data-testid="sirius-capture-btn"] {
     display: none;
+  }
+
+  .conn-status .profile-btn-pinned {
+    color: #fcd34d;
+    border-color: rgba(251, 191, 36, 0.55);
   }
 
   .sirius-root.mobile-section-info .sirius-dashboard {

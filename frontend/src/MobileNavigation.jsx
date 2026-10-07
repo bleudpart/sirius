@@ -6,7 +6,7 @@ const destinations = [
   { id: "info", label: "Infos", Icon: Activity },
   { id: "assistant", label: "Assistant", Icon: MessageCircle, primary: true },
   { id: "modules", label: "Modules", Icon: LayoutGrid },
-  { id: "profile", label: "Profil", Icon: SlidersHorizontal },
+  { id: "profile", label: "Réglages", Icon: SlidersHorizontal },
 ];
 
 export default function MobileNavigation({ active, onNavigate }) {

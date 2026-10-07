@@ -37,7 +37,7 @@ import { useAuth } from "@/AuthGate";
 import useMailCache from "@/hooks/useMailCache";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
-import { requestMicrophoneStream, scheduleHandsFreeRetry, stopRecorderAfterSilence, useServerTranscription } from "@/microphoneCapture";
+import { isWhisperHallucination, microphoneConstraints, requestMicrophoneStream, scheduleHandsFreeRetry, stopRecorderAfterSilence, useServerTranscription } from "@/microphoneCapture";
 import PushToTalkButton from "@/components/PushToTalkButton";
 import VoiceSessionControls from "@/components/VoiceSessionControls";
 import MicrophoneIndicator from "@/components/MicrophoneIndicator";
@@ -5188,7 +5188,7 @@ function App() {
     try {
       const stream = await requestMicrophoneStream(navigator.mediaDevices, () =>
         session === microphoneSessionRef.current && !speakingRef.current
-        && (!pushToTalk || pttRef.current));
+        && (!pushToTalk || pttRef.current), microphoneConstraints(window.Capacitor?.getPlatform?.()));
       if (!stream) {
         if (!voiceSignal.aborted) { setVoicePhase("idle"); setStatus("idle"); }
         return;
@@ -5209,7 +5209,8 @@ function App() {
           stream.getTracks().forEach((track) => track.stop());
           return;
         }
-        serverSilenceCleanupRef.current?.();
+        const silenceWatcher = serverSilenceCleanupRef.current;
+        silenceWatcher?.();
         serverSilenceCleanupRef.current = null;
         clearTimeout(serverRecorderTimerRef.current);
         serverRecorderTimerRef.current = null;
@@ -5225,6 +5226,12 @@ function App() {
             setStatus((current) => (current === "listening" ? "idle" : current));
             setVoicePhase("idle");
           }
+          return;
+        }
+        if (!pushToTalk && silenceWatcher?.heardSpeech && !silenceWatcher.heardSpeech()) {
+          setStatus("idle");
+          setVoicePhase("idle");
+          retryHandsFree();
           return;
         }
         const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
@@ -5250,7 +5257,8 @@ function App() {
           const payload = response.data;
           if (voiceSignal.aborted) return;
           if (!response.ok) throw new Error(payload.detail || "Transcription vocale impossible.");
-          const transcript = (payload.text || payload.transcript || "").trim();
+          const rawTranscript = (payload.text || payload.transcript || "").trim();
+          const transcript = isWhisperHallucination(rawTranscript) ? "" : rawTranscript;
           if (!transcript) {
             setText("Je n'ai pas distingué de parole. Réessayez plus près du microphone.");
             setStatus("idle");
@@ -6354,7 +6362,7 @@ function App() {
       reload: () => { window.__siriusBootPlayed = false; window.location.reload(); },
       toggleDisplay: () => { pinDisplay(); setDisplayOpen((open) => !open); },
       showMediaModules: () => showOnDisplay({ type: "media", titre: "MODULES MULTIMÉDIA" }),
-      openFiles: () => setShowFiles(true), openInfoHub: () => restoreHudPanel("info-hub"), openConnections: () => setShowConnections(true),
+      openFiles: () => setShowFiles(true), openInfoHub: () => setShowInfoWheel(true), openConnections: () => setShowConnections(true),
       captureInterface: () => captureSiriusInterface(), captureRegion: captureSiriusRegion, openCaptureFolder,
       openArchitect: () => { setArchitectPrompt(""); setShowArchitect(true); }, openPlans: () => { setPlansPrompt(""); setShowPlans(true); },
       openPhoto3d: () => setShowPhoto3D(true), openPantheon: () => setShowPantheon(true), openCortex: () => setShowCortex(true),
@@ -6830,7 +6838,8 @@ function App() {
             className="profile-btn profile-btn-pinned"
             onClick={() => setShowSetup(true)}
             data-testid="sirius-profile-btn"
-            title="Profil et clés API"
+            title="Réglages : profil et clés API"
+            aria-label="Réglages"
           >
             <UserCog size={15} />
           </button>

@@ -527,7 +527,10 @@ export function BootScreen({ onDone, userName, onOpenModule, connected, probeBra
   // Chaque ligne annonce l'état réellement constaté : afficher « OK » sans vérifier
   // ferait mentir l'écran de démarrage (la liaison peut échouer pendant qu'il défile).
   const checks = useMemo(() => {
-    const speech = typeof window !== "undefined" && "speechSynthesis" in window;
+    // La voix passe par le serveur (/tts lu en Audio) ; la synthèse du navigateur n'est
+    // qu'un secours, absente de la WebView Android.
+    const speech = typeof window !== "undefined"
+      && ("speechSynthesis" in window || typeof window.Audio !== "undefined");
     // La dictée passe soit par le navigateur, soit par l'enregistrement micro transcrit
     // par le serveur (/stt) : c'est le cas de la WebView Android, sans SpeechRecognition.
     const recog = typeof window !== "undefined"
@@ -758,9 +761,11 @@ export function BootScreen({ onDone, userName, onOpenModule, connected, probeBra
         <div className="boot-bar">
           <div className="boot-bar-fill" style={{ width: `${progress}%` }} />
         </div>
-        <div className="boot-pct">{progress}%  —  {speechUnavailable || (speechDone && !speechStartedRef.current)
+        <div className="boot-pct">{progress}%  —          {speechUnavailable
           ? "voix indisponible — ouverture du HUD"
-          : "touchez pour activer la voix"}</div>
+                  : speechDone && !speechStartedRef.current
+                    ? "ouverture du HUD…"
+                    : "touchez pour activer la voix"}</div>
         {brain === null && brainAttempt > 1 && (
           <div className="boot-brain-wait" data-testid="boot-brain-wait" role="status">
             Connexion au cerveau ΣIRIUS… tentative {brainAttempt}
