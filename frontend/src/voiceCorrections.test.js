@@ -1,4 +1,4 @@
-import { chooseBestVoiceTranscript, extractVoiceCommand, normalizeVoiceTranscript } from "./voiceCorrections";
+import { chooseBestVoiceTranscript, extractVoiceCommand, hasVoiceWakeWord, normalizeVoiceTranscript } from "./voiceCorrections";
 
 test("normalizes the creator name when speech recognition hears Pontel", () => {
   expect(normalizeVoiceTranscript("qui est Daniel Pontel")).toBe("qui est Daniel Partel");
@@ -31,4 +31,11 @@ test("requires an actionable command after the Sirius wake word", () => {
 test("allows concise commands through push-to-talk", () => {
   expect(extractVoiceCommand("briefing")).toBe("briefing");
   expect(extractVoiceCommand("heu")).toBe("");
+});
+
+test("detects a wake word spoken alone so the next phrase can be accepted", () => {
+  expect(hasVoiceWakeWord("Sirius.")).toBe(true);
+  expect(hasVoiceWakeWord("Serious")).toBe(true);
+  expect(extractVoiceCommand("Sirius.", { requireWakeWord: true })).toBe("");
+  expect(hasVoiceWakeWord("quelle heure est-il")).toBe(false);
 });

@@ -69,7 +69,7 @@ test("hands-free retries after an ignored capture and rechecks readiness at exec
     let ready = true;
     const start = jest.fn();
     scheduleHandsFreeRetry(() => ready, start);
-    jest.advanceTimersByTime(599);
+    jest.advanceTimersByTime(249);
     expect(start).not.toHaveBeenCalled();
     jest.advanceTimersByTime(1);
     expect(start).toHaveBeenCalledTimes(1);

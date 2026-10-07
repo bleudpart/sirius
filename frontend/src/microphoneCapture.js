@@ -14,7 +14,7 @@ export async function requestMicrophoneStream(mediaDevices, isCurrent) {
 export function scheduleHandsFreeRetry(isReady, startListening) {
   return setTimeout(() => {
     if (isReady()) startListening();
-  }, 600);
+  }, 250);
 }
 
 export function createSilenceDetector({ threshold = 0.02, silenceMs = 2000, minimumSpeechMs = 200 } = {}) {

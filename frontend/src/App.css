@@ -2757,6 +2757,13 @@ body.hud-minimal .medallion-halo { display: none; }
   background: rgba(216, 184, 117, 0.1); border: 1px solid rgba(251,191,36,0.4);
   color: #fcd34d; font-size: 13px; line-height: 1.4;
 }
+.setup-server-keys {
+  display: flex; gap: 9px; align-items: flex-start;
+  margin-bottom: 14px; padding: 11px 14px; border-radius: 8px;
+  background: rgba(52, 211, 153, 0.08); border: 1px solid rgba(52, 211, 153, 0.45);
+  color: #a7f3d0; font-size: 13px; line-height: 1.45;
+}
+.setup-server-keys > svg { flex-shrink: 0; margin-top: 2px; color: #34d399; }
 .setup-submit {
   margin-top: 14px; width: 100%;
   font-family: "Orbitron", sans-serif; font-weight: 700; font-size: 14px;
@@ -8234,37 +8241,65 @@ body[data-phase] .center-stage::before { content: none !important; }
   }
 
   .top-bar {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     height: auto;
-    min-height: 56px;
-    gap: 6px;
+    min-height: 48px;
+    gap: 4px;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .top-bar .sys-indicators,
+  .top-bar .conn-label,
+  .top-bar .mic-status-pill > :not(.voice-microphone-dot),
+  [data-testid="sirius-capture-region-btn"] {
+    display: none;
+  }
+
+  .top-bar .brand-tag {
+    flex-shrink: 0;
+    font-size: 12px;
+    letter-spacing: 2px;
+    white-space: nowrap;
+  }
+
+  .top-bar .mic-status-pill {
+    margin-left: 0;
+    padding: 3px;
+    gap: 0;
   }
 
   .top-bar .conn-status {
+    min-width: 0;
     max-width: 100%;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     justify-content: flex-end;
+    align-items: center;
+    gap: 4px;
     margin-left: auto;
     box-sizing: border-box;
   }
 
   .conn-status .profile-btn {
     flex-shrink: 0;
-    width: 36px;
-    height: 36px;
+    width: 30px;
+    height: 30px;
     margin-left: 0;
-    padding: 4px;
+    padding: 3px;
   }
 
   .conn-status .profile-btn.conn-badge {
-    width: 72px;
-    min-width: 72px;
+    width: 50px;
+    min-width: 50px;
+    gap: 2px;
   }
 
   .conn-status .profile-btn > svg {
     flex-shrink: 0;
-    min-width: 15px;
-    min-height: 15px;
+    width: 14px;
+    height: 14px;
+    min-width: 14px;
+    min-height: 14px;
   }
 
   .auth-chip,

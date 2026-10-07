@@ -108,3 +108,26 @@ test("settings without account access preserves preferences and does not offer a
     act(() => root.unmount());
   }
 });
+
+test("API tab explains that the server provides the brain when it has its own key", async () => {
+  const originalFetch = global.fetch;
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  global.fetch = jest.fn((url) => Promise.resolve({
+    ok: true,
+    json: async () => (String(url).endsWith("/chat/status") ? { groq_env: true } : { linked: false }),
+  }));
+  try {
+    await act(async () => root.render(
+      <SiriusSetup initialProfile={{ name: "Daniel" }} onCancel={jest.fn()} onComplete={jest.fn()} />,
+    ));
+    const apiTab = [...container.querySelectorAll("button")].find((b) => b.textContent.trim() === "API");
+    await act(async () => apiTab.click());
+    expect(container.querySelector('[data-testid="setup-server-keys"]').textContent)
+      .toContain("Aucune clé n'est nécessaire");
+    expect(container.querySelector('[data-testid="setup-warn-nogroq"]')).toBeNull();
+  } finally {
+    act(() => root.unmount());
+    global.fetch = originalFetch;
+  }
+});

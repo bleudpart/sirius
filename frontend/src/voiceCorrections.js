@@ -58,6 +58,10 @@ export function chooseBestVoiceTranscript(alternatives) {
 const WAKE_WORD = /\b(?:sirius|syrius|cirius|sirus|cyrus|serious|s[ée]rieux|cilius|syriusse|sirio)\b/gi;
 const SHORT_COMMANDS = new Set(["stop", "silence", "pause", "briefing", "continue", "annule", "annuler"]);
 
+export function hasVoiceWakeWord(text) {
+  return new RegExp(WAKE_WORD.source, "i").test(normalizeVoiceTranscript(text));
+}
+
 export function extractVoiceCommand(text, { requireWakeWord = false } = {}) {
   const transcript = normalizeVoiceTranscript(text).trim();
   const hasWakeWord = new RegExp(WAKE_WORD.source, "i").test(transcript);
