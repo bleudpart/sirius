@@ -76,6 +76,10 @@ let currentRequest = null;
 let googleDownUntil = 0; // clé absente / API en panne → on évite de retenter pendant 10 min
 let geminiDownUntil = 0;
 let speakSeq = 0; // n° de la dernière prise de parole — garantit UNE SEULE voix à la fois
+let utterances = 0; // nombre de prises de parole lancées (l'annulation ne compte pas)
+let lastUtteranceAt = 0;
+export const spokenCount = () => utterances;
+export const lastSpokenAt = () => lastUtteranceAt;
 
 // Coupe TOUS les canaux audio (synthèse navigateur + audio Google) avant chaque nouvelle voix
 function stopChannels() {
@@ -297,7 +301,7 @@ export function speakFr(message, { onpending, onstart, onend } = {}) {
   let rate = Math.max(0.5, Math.min(2, urgent ? cfg.rate + 0.13 : cfg.rate));
   if (night) rate = Math.max(0.5, rate * 0.87);
   const volume = night ? 0.72 : 1;
-  const seq = ++speakSeq;
+  const seq = ++speakSeq; utterances += 1; lastUtteranceAt = Date.now();
   stopChannels();
   ({ onstart, onend } = speechCallbacks(seq, onstart, onend));
   if (onpending) onpending();
@@ -380,7 +384,7 @@ export function speakCinematic(message, { onstart, onend } = {}) {
   message = cleanTextForSpeech(message);
   if (!message) { (onend || (() => {}))(); return; }
   const cfg = loadVoiceConfig();
-  const seq = ++speakSeq;
+  const seq = ++speakSeq; utterances += 1; lastUtteranceAt = Date.now();
   stopChannels();
   ({ onstart, onend } = speechCallbacks(seq, onstart, onend));
   if (Capacitor.getPlatform() === "android") {
@@ -438,7 +442,7 @@ export function speakAsCharacter(message, { profile, module, pitch = 1, rate = 1
   const cfg = loadVoiceConfig();
   const prof = profile || (module && CHAR_PROFILES[module]);
   const p = prof && MYTHOS_VOICES[prof];
-  const seq = ++speakSeq;
+  const seq = ++speakSeq; utterances += 1; lastUtteranceAt = Date.now();
   stopChannels();
   ({ onstart, onend } = speechCallbacks(seq, onstart, onend));
   if (Capacitor.getPlatform() === "android") {

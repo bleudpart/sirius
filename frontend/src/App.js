@@ -44,7 +44,8 @@ import MicrophoneIndicator from "@/components/MicrophoneIndicator";
 import GettingStarted, { gettingStartedKey } from "@/components/GettingStarted";
 import { createVoiceSession } from "@/voiceSession";
 import { streamConversation, requestConversation, requestAssistantIntent, requestTranscription } from "@/services/assistantApi";
-import { speakFr, cancelSpeech, speakSeries, speakAsCharacter as speakCharacterVoice } from "@/voice";
+import { speakFr, cancelSpeech, speakSeries, speakAsCharacter as speakCharacterVoice, spokenCount, lastSpokenAt } from "@/voice";
+import { isWindowCommand, observeWindowChanges, shortStatusToSpeak, snapshotWindows, windowChangeConfirmation } from "@/voiceConfirmation";
 import { loadApiKeys, saveApiKeys } from "@/apiKeyStorage";
 import { loadHud, applyHud } from "@/hudPrefs";
 import { initUiSounds } from "@/uiSounds";
@@ -53,9 +54,9 @@ import { WORK_MODULES } from "@/workModules";
 import { createWindowController } from "@/windowController";
 import { initHoloFx } from "@/holoFx";
 import { getDisplayAutoCloseDelay } from "@/displayTiming";
-import { initReadAloud } from "@/readAloud";
+import { initReadAloud, parseReadPanelCommand, readPanelAloud } from "@/readAloud";
 import { detectMailProvider, extractContactQuery, extractEmailRecipientQuery, isContactCommand, isSendEmailCommand, isVoiceNo, isVoiceYes, voiceNumberChoice } from "@/emailComposeVoice";
-import { chooseBestVoiceTranscript, extractVoiceCommand, normalizeVoiceTranscript } from "@/voiceCorrections";
+import { chooseBestVoiceTranscript, extractVoiceCommand, hasVoiceWakeWord, normalizeVoiceTranscript } from "@/voiceCorrections";
 import { initHoloWindows, minimizeAll, resetHoloWindowLayout } from "@/holoWindows";
 import { ConfirmButton } from "@/ConfirmButton";
 import { getHUDStyleVariables, renderHUD } from "@/theme";
@@ -564,6 +565,8 @@ function App() {
   const [text, setText] = useState(
     `${greetByPhase(userName)} Tous mes systèmes sont en ligne. ${APP_RELEASE}.`
   );
+  const textRef = useRef(text);
+  textRef.current = text;
   const [connected, setConnected] = useState(false);
   const [isShuttingDown, setIsShuttingDown] = useState(false);
   const isLocalDevServer = typeof window !== "undefined"
@@ -596,6 +599,8 @@ function App() {
   // Push-to-talk (talkie-walkie) : maintenir Espace ou le bouton dédié
   const [pttActive, setPttActive] = useState(false);
   const pttRef = useRef(false);
+  // « Sirius » prononcé seul : la phrase suivante est acceptée sans répéter le mot d'activation.
+  const wakeArmedUntilRef = useRef(0);
   const speakingRef = useRef(false);
   const isBusy = useRef(false); // ⚡ Verrou anti-surchauffe / anti-doublon (partagé entre resolveIntent et handleCommand)
   // handleCommand est redéfini à chaque rendu : la référence évite que processCommand ne fige une version périmée.
@@ -3863,6 +3868,49 @@ function App() {
     }
   }, [executeIntent, cloudAnswer, renderVoiceSignal]);
 
+  // Confirmation vocale générale : après « ouvre / ferme / affiche… », si Sirius n'a rien dit,
+  // il lit le court message de résultat affiché (les fenêtres sont annoncées par l'observateur).
+  const actionWatchRef = useRef(0);
+  const lastActionCommandRef = useRef({ command: "", at: 0 });
+  const watchActionConfirmation = useCallback((command) => {
+    lastActionCommandRef.current = { command, at: Date.now() };
+    if (!isWindowCommand(command) || localStorage.getItem("sirius_action_confirm") === "off") return;
+    const spokenNow = () => (typeof spokenCount === "function" ? spokenCount() : 0);
+    const id = ++actionWatchRef.current;
+    const before = snapshotWindows();
+    const spokenBefore = spokenNow();
+    const textBefore = textRef.current;
+    const check = (attempt) => {
+      if (id !== actionWatchRef.current || voiceSessionRef.current.stopped) return;
+      if (spokenNow() !== spokenBefore) return; // Sirius a déjà répondu : pas de doublon
+      if (isBusy.current) {
+        if (attempt < 12) setTimeout(() => check(attempt + 1), 700);
+        return;
+      }
+      if (windowChangeConfirmation(command, before, snapshotWindows())) return;
+      if (attempt < 2) { setTimeout(() => check(attempt + 1), 700); return; } // modules chargés à la demande
+      const shown = shortStatusToSpeak(textRef.current, textBefore, command);
+      if (shown) speakOut(shown);
+    };
+    setTimeout(() => check(0), 900);
+  }, [speakOut]);
+
+  // Annonce proactive : toute fenêtre ouverte ou fermée (voix, doigt, souris) est confirmée à voix haute,
+  // sauf si Sirius vient de parler (sa propre réponse fait déjà office de confirmation).
+  useEffect(() => {
+    if (booting) return undefined;
+    return observeWindowChanges((previous, next) => {
+      if (localStorage.getItem("sirius_action_confirm") === "off") return;
+      if (voiceSessionRef.current.stopped || speakingRef.current || isBusy.current) return;
+      const spokeAt = typeof lastSpokenAt === "function" ? lastSpokenAt() : 0;
+      if (Date.now() - spokeAt < 3000) return;
+      const recent = lastActionCommandRef.current;
+      const command = Date.now() - recent.at < 6000 ? recent.command : "";
+      const msg = windowChangeConfirmation(command, previous, next);
+      if (msg) speakOut(msg);
+    });
+  }, [booting, speakOut]);
+
   const processCommand = useCallback((command) => {
     if (!command) return;
     if (voiceSessionRef.current.stopped) {
@@ -3871,9 +3919,18 @@ function App() {
       return;
     }
     if (renderVoiceSignal.aborted) return;
+    watchActionConfirmation(command);
     setVoiceMessage("");
     let enrichedCommand = command;
     const low = command.toLowerCase();
+
+    // « Sirius, lis Zeus Cortex » : lecture à voix haute d'une fenêtre ouverte
+    const readTarget = parseReadPanelCommand(command);
+    if (readTarget !== null && readPanelAloud(readTarget)) {
+      setStatus("idle");
+      setText(readTarget ? `Lecture de « ${readTarget} ».` : "Lecture de la fenêtre.");
+      return;
+    }
 
     const asksBriefingDetail = /(?:plus de d[ée]tails|pr[ée]cisions?|d[ée]veloppe|explique|qu'est[- ]ce qui s'est pass[ée]|que sait[- ]on|parle[- ]moi davantage|approfondis)/.test(low)
       && /(?:incident|[ée]v[ée]nement|actualit[ée]|info|cette|ce sujet|ce point|paris|ukraine|guerre|march[ée]|m[ée]t[ée]o)/.test(low);
@@ -4139,7 +4196,7 @@ function App() {
     pendingEmailSetup, pendingEmailAction, pendingEmailCompose, handlePendingEmailCompose, applyEmailSetupAnswer, fetchEmailBriefing,
     confirmPendingEmailAction, resolveEmailOrdinal, runEmailAction, setEmailSenderRule,
     pendingActionPlan, confirmPendingActionPlan, startGuidedEmailCompose,
-    renderVoiceSignal,
+    renderVoiceSignal, watchActionConfirmation,
   ]);
 
   useEffect(() => {
@@ -5075,16 +5132,25 @@ function App() {
     }
     // En mains libres, seul « Sirius » suivi d'une vraie commande déclenche une action.
     // Le push-to-talk reste direct, car l'appui sur ESPACE est déjà un geste intentionnel.
+    const handsFreeWake = autoMicRef.current && !pttRef.current && !pushToTalk;
+    const wakeArmed = handsFreeWake && Date.now() < wakeArmedUntilRef.current;
     const command = extractVoiceCommand(normalizedTranscript, {
-      requireWakeWord: autoMicRef.current && !pttRef.current && !pushToTalk,
+      requireWakeWord: handsFreeWake && !wakeArmed,
     });
     if (!command) {
       setStatus(micOnRef.current ? "listening" : "idle");
       setVoicePhase(micOnRef.current ? "listening" : "idle");
+      if (handsFreeWake && hasVoiceWakeWord(normalizedTranscript)) {
+        wakeArmedUntilRef.current = Date.now() + 12000;
+        setText("Je vous écoute.");
+        setVoiceMessage("Je vous écoute : dites votre demande.");
+        return false;
+      }
       setText("En mains libres, dites « Sirius » suivi de votre demande.");
       setVoiceMessage(`Reconnu : « ${normalizedTranscript} ». En mains libres, dites « Sirius » suivi de votre demande.`);
       return false;
     }
+    wakeArmedUntilRef.current = 0;
     processCommand(command);
     return true;
   }, [processCommand]);
@@ -6661,7 +6727,7 @@ function App() {
         </div>
         <div className="conn-status" data-testid="sirius-connection">
           <span className={`conn-led ${connected ? "on" : "off"}`} />
-          {"IA CLOUD"}
+          <span className="conn-label">IA CLOUD</span>
           <MicrophoneIndicator active={autoMic || captureMicOn || interruptMicOn} showLabel />
           {mode === "brainstorm" && <span className="mode-badge" data-testid="brainstorm-badge">BRAINSTORM</span>}
           

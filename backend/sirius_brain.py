@@ -264,9 +264,9 @@ _INTENT_SYSTEM_PROMPT = """Tu analyses une commande vocale destinée à ΣIRIUS 
 à une ACTION D'INTERFACE précise, ou s'il s'agit d'une simple question/conversation.
 
 Réponds UNIQUEMENT avec un objet JSON valide, sans markdown, correspondant à l'un de ces formats exacts :
-- Ouvrir un module/fenêtre : {"action": "open_module", "target": "<id>", "say": "<confirmation courte>"}
-- Fermer un module/fenêtre : {"action": "close_module", "target": "<id>", "say": "<confirmation courte>"}
-- Réduire un module en pastille : {"action": "minimize_module", "target": "<id>", "say": "<confirmation courte>"}
+- Ouvrir un module/fenêtre : {"action": "open_module", "target": "<id>", "say": "J'ai ouvert <nom du module>."}
+- Fermer un module/fenêtre : {"action": "close_module", "target": "<id>", "say": "J'ai fermé <nom du module>."}
+- Réduire un module en pastille : {"action": "minimize_module", "target": "<id>", "say": "J'ai réduit <nom du module>."}
 - Tout réduire en pastilles : {"action": "minimize_all"}
 - Arrêter la lecture à voix haute en cours : {"action": "stop_reading"}
 - Couper la musique d'ambiance : {"action": "stop_music", "say": "<confirmation courte>"}

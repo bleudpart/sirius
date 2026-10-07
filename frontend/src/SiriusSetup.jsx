@@ -69,6 +69,20 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
   const setK = (k) => (e) => { setKeys((s) => ({ ...s, [k]: e.target.value })); setKeyStatus((st) => ({ ...st, [k]: null })); };
   const fileRef = useRef(null);
 
+  // Le serveur ΣIRIUS fournit-il déjà le cerveau ? (clé du serveur ou PC lié à ΣIRIUS Cloud)
+  const [serverBrain, setServerBrain] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    const readJson = (path) => fetch(`${API}${path}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    Promise.all([readJson("/chat/status"), readJson("/cloud/status")]).then(([chat, cloud]) => {
+      if (!alive) return;
+      if (chat?.groq_env) setServerBrain("server");
+      else if (cloud?.linked) setServerBrain("cloud");
+      else setServerBrain("none");
+    });
+    return () => { alive = false; };
+  }, []);
+
   // Validation des clés API (Gestion des erreurs : valider avant de sauvegarder)
   const [keyStatus, setKeyStatus] = useState({});
   const testKey = async (k) => {
@@ -113,6 +127,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
   // HUD : transparence, taille, mode minimal
   const [hud, setHud] = useState(loadHud);
   const [readAloudOn, setReadAloudOn] = useState(localStorage.getItem("sirius_read_aloud") !== "off");
+  const [actionConfirmOn, setActionConfirmOn] = useState(localStorage.getItem("sirius_action_confirm") !== "off");
   const updateHud = (patch) => setHud((h) => { const nh = { ...h, ...patch }; saveHud(nh); return nh; });
   const [nas, setNas] = useState(() => {
     try { return JSON.parse(localStorage.getItem("sirius_nas")) || { path: "", enabled: false }; } catch (e) { return { path: "", enabled: false }; }
@@ -519,6 +534,20 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
                 <span>Aucune proposition de lecture.</span>
               </button>
             </div>
+            <p className="setup-note">Sur Android, pas de pastille : dites « Sirius, lis Zeus Cortex ».</p>
+            <label className="setup-label"><Volume2 size={13} style={{ marginRight: 6, verticalAlign: "-2px" }} />Confirmations vocales des actions</label>
+            <div className="setup-modes">
+              <button type="button" className={`setup-mode ${actionConfirmOn ? "active" : ""}`}
+                onClick={() => { localStorage.setItem("sirius_action_confirm", "on"); setActionConfirmOn(true); }} data-testid="setup-actionconfirm-on">
+                <b>ACTIVÉES</b>
+                <span>« J'ai ouvert Thémis », « J'ai fermé Atlas »…</span>
+              </button>
+              <button type="button" className={`setup-mode ${!actionConfirmOn ? "active" : ""}`}
+                onClick={() => { localStorage.setItem("sirius_action_confirm", "off"); setActionConfirmOn(false); }} data-testid="setup-actionconfirm-off">
+                <b>COUPÉES</b>
+                <span>Les actions s'exécutent sans annonce.</span>
+              </button>
+            </div>
             <div className="setup-actions">
               <ConfirmButton className="setup-reset" label="CONFIRMER ?" title="Réinitialiser le HUD" testId="setup-reset-hud"
                 onConfirm={() => { saveHud({ ...HUD_DEFAULTS }); setHud({ ...HUD_DEFAULTS }); }}>
@@ -552,7 +581,18 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
 
         {tab === "api" && (
           <section className="setup-section setup-single" data-testid="setup-panel-api">
-            <p className="setup-note">Chaque clé reste privée sur votre PC. Testez chaque clé avant d'enregistrer.</p>
+            {(serverBrain === "server" || serverBrain === "cloud") && (
+              <div className="setup-server-keys" data-testid="setup-server-keys">
+                <CheckCircle2 size={14} />
+                <span>
+                  {serverBrain === "cloud"
+                    ? "Cerveau, voix et micro fournis par votre compte ΣIRIUS Cloud. Aucune clé n'est nécessaire."
+                    : "Cerveau, voix et micro fournis par le serveur ΣIRIUS. Aucune clé n'est nécessaire."}
+                  {" "}Les champs ci-dessous sont facultatifs : une clé personnelle remplace celle du serveur.
+                </span>
+              </div>
+            )}
+            <p className="setup-note">Chaque clé personnelle reste privée sur cet appareil. Testez chaque clé avant d'enregistrer.</p>
             {Object.keys(KEY_META).map((k) => (
               <KeyField key={k} k={k} value={keys[k]} status={keyStatus[k]} onChange={setK(k)} onTest={() => testKey(k)} />
             ))}
@@ -565,7 +605,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
           </section>
         )}
 
-        {!(keys.groq_key || "").trim() && tab === "api" && (
+        {!(keys.groq_key || "").trim() && tab === "api" && serverBrain === "none" && (
           <div className="setup-warn" data-testid="setup-warn-nogroq">
             Sans clé Groq personnelle, Sirius utilise la clé du serveur si elle est configurée — sinon il ne pourra pas répondre.
           </div>

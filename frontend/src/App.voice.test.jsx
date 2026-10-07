@@ -22,7 +22,7 @@ jest.mock("./components/HudPanels", () => {
 });
 jest.mock("./uiSounds", () => ({ initUiSounds: () => () => {} }));
 jest.mock("./holoFx", () => ({ initHoloFx: () => () => {} }));
-jest.mock("./readAloud", () => ({ initReadAloud: () => () => {} }));
+jest.mock("./readAloud", () => ({ initReadAloud: () => () => {}, parseReadPanelCommand: () => null, readPanelAloud: () => false }));
 jest.mock("./useTouchNav", () => () => {});
 jest.mock("./hud/SiriusHudPanels", () => ({ SiriusInfoHub: () => null, SiriusInfoWheel: () => null, SiriusNextAction: () => null }));
 

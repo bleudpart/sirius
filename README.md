@@ -216,6 +216,16 @@ de secours sont affichés à cet endroit.
 Une petite pastille ronde à côté du nom ΣIRIUS, en haut à gauche, indique le microphone réellement ouvert (vert) ou fermé
 (rouge), y compris l'écoute des commandes d'interruption pendant une réponse.
 
+Lecture d'une fenêtre à voix haute : dites « Sirius, lis Zeus Cortex » (ou « lis ça »
+pour la dernière fenêtre ouverte). Sur PC, une pastille propose aussi la lecture ;
+sur Android, elle est masquée pour gagner de la place et seule la commande vocale reste.
+
+Confirmations vocales : quand une fenêtre s'ouvre, se ferme ou que Sirius exécute une
+action (voix, doigt ou souris), il l'annonce brièvement (« J'ai ouvert Zeus Cortex. »,
+« J'ai fermé Panthéon. »). Pas d'annonce s'il vient déjà de parler, s'il est occupé ou si
+la session vocale est arrêtée. Interrupteur dans Configuration → « Confirmations vocales
+des actions » (clé locale `sirius_action_confirm`).
+
 **Arrêter** abandonne l'écoute sans envoyer la phrase, interrompt la transcription
 et la réponse conversationnelle en cours, et coupe la lecture vocale. Le mode
 mains libres est désactivé : le microphone ne redémarre qu'après un geste explicite.

@@ -1,6 +1,7 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // Lecture à voix haute universelle : dès qu'un contenu textuel significatif apparaît
 // dans un panneau (tous modules), Sirius propose « Veux-tu que je te lise ça à voix haute ? ».
+// Sur Android, pas de proposition : on demande « Sirius, lis Zeus Cortex ».
 import { speakFr, cancelSpeech } from "@/voice";
 
 const PANEL_SELECTOR = ".prime-screen, .zeus-screen, .hud-panel, .central-card, .holo-popup";
@@ -11,8 +12,64 @@ const SKIP_TAGS = new Set(["BUTTON", "INPUT", "TEXTAREA", "SELECT", "SCRIPT", "S
 
 const state = new WeakMap(); // panel -> { muted, promptedLen, bar, timer }
 let currentPanel = null; // dernier panneau proposant une lecture
+let lastPanel = null; // dernier panneau dont le contenu a changé
 let miniRec = null;
-const enabled = () => localStorage.getItem("sirius_read_aloud") !== "off";
+// Sur Android, la pastille prend trop de place : la lecture se demande à la voix (« Sirius, lis Zeus Cortex »).
+const isAndroidApp = () => typeof window !== "undefined" && window.Capacitor?.getPlatform?.() === "android";
+const enabled = () => localStorage.getItem("sirius_read_aloud") !== "off" && !isAndroidApp();
+
+const READ_COMMAND = /^(?:lis|lit|lire|relis|lecture)(?:[- ]moi)?\b\s*(.*)$/i;
+const READ_FILLERS = /^(?:(?:à|a) voix haute|le|la|les|l'|de|du|des|d'|ça|ca|cela|ce|cet|cette|contenu|texte|fenêtre|fenetre|module|panneau|page|écran|ecran)\b\s*/i;
+const OTHER_READ_TARGET = /\b(?:e-?mails?|mails?|courriels?|messages?|sms|notifications?|premier|premi[eè]re|deuxi[eè]me|troisi[eè]me|dernier|derni[eè]re|\d+)\b/i;
+
+const normalizeLabel = (value) => String(value || "").toLowerCase()
+  .normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+
+// « lis Zeus Cortex », « lis-moi ça », « lecture de la fenêtre » → cible (éventuellement vide).
+// Renvoie null si ce n'est pas une demande de lecture d'une fenêtre (ex. « lis mes mails »).
+export function parseReadPanelCommand(command) {
+  const match = String(command || "").trim().match(READ_COMMAND);
+  if (!match) return null;
+  let target = match[1].trim().replace(/[.!?]+$/, "");
+  if (OTHER_READ_TARGET.test(target)) return null;
+  let previous;
+  do { previous = target; target = target.replace(READ_FILLERS, "").trim(); } while (target !== previous);
+  return target;
+}
+
+const isVisible = (panel) => document.body.contains(panel) && panel.getClientRects().length > 0;
+
+function findPanel(target) {
+  const panels = [...document.querySelectorAll(PANEL_SELECTOR)].filter(isVisible);
+  if (!panels.length) return null;
+  const wanted = normalizeLabel(target).split(" ").filter((word) => word.length > 1);
+  if (wanted.length) {
+    let best = null;
+    let bestScore = 0;
+    for (const panel of panels) {
+      const heading = normalizeLabel(`${panel.getAttribute("aria-label") || ""} ${panel.getAttribute("data-testid") || ""} ${extractText(panel).slice(0, 160)}`);
+      const score = wanted.filter((word) => heading.includes(word)).length;
+      if (score > bestScore) { best = panel; bestScore = score; }
+    }
+    if (best) return best;
+  }
+  return lastPanel && isVisible(lastPanel) ? lastPanel : panels[panels.length - 1];
+}
+
+// Lit à voix haute la fenêtre demandée (ou la dernière fenêtre active). Renvoie false si rien à lire.
+export function readPanelAloud(target = "") {
+  const panel = findPanel(target);
+  if (!panel) return false;
+  let toRead = extractText(panel);
+  if (toRead.length < 2) return false;
+  if (toRead.length > MAX_SPEECH_CHARS) toRead = toRead.slice(0, MAX_SPEECH_CHARS) + ". La suite est à l'écran.";
+  const heading = (panel.getAttribute("aria-label") || panel.querySelector(".zeus-title, .eu-title, h1, h2, h3")?.textContent || "")
+    .replace(/\s+/g, " ").trim().slice(0, 40);
+  cancelSpeech();
+  if (!heading) speakFr(toRead);
+  else speakFr(toRead.startsWith(heading) ? `Je lis ${toRead}` : `Je lis ${heading}. ${toRead}`);
+  return true;
+}
 
 // Réponse vocale « oui / non » : consommée par le micro principal (App.js) ou la mini-écoute locale
 function answerFromVoice(text) {
@@ -149,6 +206,7 @@ function evaluate(panel) {
 function schedule(panel) {
   let st = state.get(panel);
   if (!st) { st = { muted: false, promptedLen: 0, bar: null, timer: null }; state.set(panel, st); }
+  lastPanel = panel;
   clearTimeout(st.timer);
   st.timer = setTimeout(() => evaluate(panel), 1200);
 }
