@@ -32,10 +32,11 @@ GROQ_LLM_FALLBACK = MODELS[1]
 GROQ_FALLBACK_MODELS = MODELS
 K3_MODEL = "kimi-k2.6"
 GROQ_JSON_OPTIONS = {"reasoning_effort": "low"}
+KIMI_REFLECTION_TIMEOUT = 8.0
 
 # Initialisation du client Groq / OpenAI (réutilisé entre requêtes : connexions HTTP conservées
 # en pool, évite l'aller-retour TLS/handshake d'une création par appel).
-client = AsyncOpenAI(api_key=GROQ_API_KEY, base_url=GROQ_LLM_ENDPOINT) if GROQ_API_KEY else None
+client = AsyncOpenAI(api_key=GROQ_API_KEY, base_url=GROQ_LLM_ENDPOINT, max_retries=0) if GROQ_API_KEY else None
 _k3_clients: dict[str, AsyncOpenAI] = {}
 
 # --- CLIENT K3 (Kimi / Moonshot), fabrique réutilisable pour Thémis (OCR factures) et les
@@ -754,7 +755,7 @@ def _extract_per_kilo_prices_from_text(text: str):
     return _extract_per_kilo_prices(f"- Réponse | source\n  {text}")
 
 
-async def _kimi_reflect(prompt, profile=None, memory=None, mode="normal", mood=None, key=None, environment=None):
+async def _kimi_reflect(prompt, profile=None, memory=None, mode="normal", mood=None, key=None, environment=None, *, history=None):
     """Produit une analyse privée que Groq utilise pour formuler une réponse approfondie."""
     client_k3 = k3_client(key)
     if not client_k3:
@@ -762,24 +763,57 @@ async def _kimi_reflect(prompt, profile=None, memory=None, mode="normal", mood=N
     try:
         reflection_prompt = (
             "Tu es le module de réflexion de ΣIRIUS. Analyse la demande ci-dessous avant que "
-            "l'assistant formule sa réponse. Identifie les faits, les hypothèses, les risques, "
-            "les décisions et les actions utiles. Ne réponds pas à l'utilisateur et ne mentionne "
-            "jamais les modèles IA. Fournis des notes concises, factuelles et exploitables."
+            "l'assistant formule sa réponse. Appuie-toi sur l'historique pour comprendre les "
+            "références et l'objectif réel. Distingue les faits vérifiés, les hypothèses et les "
+            "informations manquantes. Compare les options utiles et leurs conséquences, relève "
+            "les risques qui changent la décision, puis recommande une action concrète avec "
+            "sa justification. Pour une question simple, reste bref. Ne réponds pas à l'utilisateur "
+            "et ne mentionne jamais les modèles IA. Fournis une synthèse décisionnelle concise, "
+            "pas un raisonnement étape par étape."
         )
-        response = await client_k3.chat.completions.create(
+        response = await asyncio.wait_for(client_k3.with_options(max_retries=0).chat.completions.create(
             model=K3_MODEL,
             messages=[
                 {"role": "system", "content": reflection_prompt + "\n\n" + build_system_prompt(profile, memory, mode, mood, environment)},
+                *_conversation_history(history),
                 {"role": "user", "content": prompt},
             ],
             max_tokens=700,
             temperature=1.0,
-            timeout=30.0,
-        )
+            timeout=KIMI_REFLECTION_TIMEOUT,
+        ), timeout=KIMI_REFLECTION_TIMEOUT)
         return (response.choices[0].message.content or "").strip()
     except Exception as error:
         logger.warning("[ΣIRIUS:REFLECTION] Kimi indisponible : %r", error)
         return ""
+
+
+def _conversation_history(history):
+    messages = []
+    for turn in (history or [])[-10:]:
+        role = turn.get("role") if isinstance(turn, dict) else None
+        content = (turn.get("content") or "").strip() if isinstance(turn, dict) else ""
+        if role in ("user", "assistant") and content:
+            messages.append({"role": role, "content": content[:800]})
+    return messages
+
+
+async def _answer_context(prompt, history, profile, memory, mode, mood, k3_key, environment, serp_key):
+    async def reflection():
+        if (mode or "normal").lower() == "profond" and k3_key:
+            return await _kimi_reflect(
+                prompt, profile, memory, mode, mood, k3_key, environment, history=history,
+            )
+        return ""
+
+    return await asyncio.gather(
+        reflection(),
+        _research_briefing_follow_up(prompt, serp_key),
+        _research_current_prices(
+            prompt, serp_key, timeout=4.5 if (mode or "normal").lower() == "turbo" else 7.0,
+        ),
+    )
+
 
 def build_system_prompt(profile=None, memory=None, mode="normal", mood=None, environment=None):
     """Construit le prompt système en tenant compte du profil, de la mémoire, du mode et de l'humeur."""
@@ -793,7 +827,14 @@ def build_system_prompt(profile=None, memory=None, mode="normal", mood=None, env
     if mode == "turbo":
         base += "\n\nMode d'exécution : turbo. Réponds de façon brève et immédiate, sans détour."
     else:
-        base += "\n\nMode d'exécution : normal. Donne une réponse complète, nuancée et bien argumentée."
+        base += (
+            "\n\nMode d'exécution : normal. Donne une réponse complète, nuancée et bien argumentée. "
+            "Commence par une phrase courte donnant la réponse ou la décision utile, puis "
+            "approfondis avec les raisons, les conséquences et la prochaine action pertinentes. "
+            "Distingue les faits des hypothèses ; ne compense pas une information manquante "
+            "par une invention. Compare les options seulement si elles changent la décision. "
+            "La profondeur vient de la précision, pas de la longueur ni des répétitions."
+        )
 
     mood = mood or {}
     humeur = mood.get("label") or mood.get("humeur")
@@ -964,13 +1005,8 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
 
     tag = f"[ΣIRIUS:{'TURBO' if is_turbo else 'NORMAL'}]"
 
-    deep_mode = (mode or "normal").lower() == "profond"
-    reflection = await _kimi_reflect(prompt, profile, memory, mode, mood, k3_key, environment) if deep_mode and k3_key else ""
-    research = await _research_briefing_follow_up(prompt, keys.get("serp") or keys.get("serpapi") or serp_key)
-    targeted_research = await _research_current_prices(
-        prompt,
-        serp_key,
-        timeout=4.5 if is_turbo else 7.0,
+    reflection, research, targeted_research = await _answer_context(
+        prompt, history, profile, memory, mode, mood, k3_key, environment, serp_key,
     )
 
     if not file_snippets and not web_snippets and groq_key:
@@ -998,12 +1034,7 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
 
         # Historique resserré : 10 tours à 800 caractères (au lieu de 20 tours à 2000) — la
         # mémoire épisodique condensée prend déjà le relais pour le contexte plus ancien.
-        history_messages = []
-        for turn in (history or [])[-10:]:
-            role = turn.get("role") if isinstance(turn, dict) else None
-            content = (turn.get("content") or "").strip() if isinstance(turn, dict) else ""
-            if role in ("user", "assistant") and content:
-                history_messages.append({"role": role, "content": content[:800]})
+        history_messages = _conversation_history(history)
 
         json_instruction = (
             '\n\nRéponds UNIQUEMENT avec un objet JSON valide, sans markdown, au format exact : '
@@ -1060,22 +1091,19 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
                 mood=mood,
                 environment=environment,
             )
+            if reflection:
+                sys_prompt += "\n\nNOTES DE RÉFLEXION PRIVÉES :\n" + reflection
             if research:
                 sys_prompt += "\n\nSOURCES WEB RÉCENTES POUR LA QUESTION DE SUIVI :\n" + research
             if is_targeted_factual_question(prompt):
                 sys_prompt += _targeted_answer_guidance(targeted_research, prompt)
-            history_messages = []
-            for turn in (history or [])[-10:]:
-                role = turn.get("role") if isinstance(turn, dict) else None
-                content = (turn.get("content") or "").strip() if isinstance(turn, dict) else ""
-                if role in ("user", "assistant") and content:
-                    history_messages.append({"role": role, "content": content[:800]})
+            history_messages = _conversation_history(history)
             json_instruction = (
                 '\n\nRéponds UNIQUEMENT avec un objet JSON valide, sans markdown, au format exact : '
                 '{"reponse": "...", "memoire": [], "popups": []}'
             )
             client_k3 = k3_client(k3_key)
-            resp = await client_k3.chat.completions.create(
+            resp = await client_k3.with_options(max_retries=0).chat.completions.create(
                 model=K3_MODEL,
                 messages=[
                     {"role": "system", "content": sys_prompt + json_instruction},
@@ -1084,7 +1112,7 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
                 ],
                 max_tokens=1200,
                 temperature=1.0,
-                timeout=30.0,
+                timeout=10.0 if is_turbo else 15.0,
             )
             raw_json = resp.choices[0].message.content.strip()
             answer, memories, popups = _parse_structured(raw_json)
@@ -1143,13 +1171,8 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
         "\n\nRéponds directement en langage naturel, sans JSON, sans habillage, sans listes à puces "
         "sauf si explicitement demandé — uniquement le texte de ta réponse, prêt à être lu à voix haute."
     )
-    deep_mode = (mode or "normal").lower() == "profond"
-    reflection = await _kimi_reflect(prompt, profile, memory, mode, mood, k3_key, environment) if deep_mode and k3_key else ""
-    research = await _research_briefing_follow_up(prompt, serp_key)
-    targeted_research = await _research_current_prices(
-        prompt,
-        serp_key,
-        timeout=4.5 if is_turbo else 7.0,
+    reflection, research, targeted_research = await _answer_context(
+        prompt, history, profile, memory, mode, mood, k3_key, environment, serp_key,
     )
     if not groq_key and not k3_key:
         logger.warning("[ΣIRIUS:STREAM] Aucune clé LLM disponible, retour local.")
@@ -1177,18 +1200,19 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
     # Historique resserré : 10 tours (au lieu de 20) à 800 caractères (au lieu de 2000) — la
     # mémoire épisodique condensée prend déjà le relais pour le contexte plus ancien, inutile
     # de renvoyer un historique brut aussi volumineux à chaque message.
-    history_messages = []
-    for turn in (history or [])[-10:]:
-        role = turn.get("role") if isinstance(turn, dict) else None
-        content = (turn.get("content") or "").strip() if isinstance(turn, dict) else ""
-        if role in ("user", "assistant") and content:
-            history_messages.append({"role": role, "content": content[:800]})
+    history_messages = _conversation_history(history)
+    providers = [(client_groq, name, 0.8) for name in models_to_try] if client_groq else []
+    if k3_key:
+        providers.append((None, K3_MODEL, 1.0))
 
     last_error = None
-    for model_name in models_to_try if client_groq else []:
+    for provider, model_name, temperature in providers:
         buffered_targeted_answer = []
+        output_started = False
         try:
-            stream = await client_groq.chat.completions.create(
+            if provider is None:
+                provider = k3_client(k3_key).with_options(max_retries=0)
+            stream = await provider.chat.completions.create(
                 model=model_name,
                 messages=[
                     {"role": "system", "content": sys_prompt + plain_instruction},
@@ -1196,12 +1220,13 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
                     {"role": "user", "content": prompt},
                 ],
                 max_tokens=max_tokens,
-                temperature=0.8,
-                top_p=0.95,
-                presence_penalty=0.9,
-                frequency_penalty=0.4,
+                temperature=temperature,
                 timeout=timeout,
                 stream=True,
+                **({
+                    "top_p": 0.95, "presence_penalty": 0.9, "frequency_penalty": 0.4,
+                    "extra_body": GROQ_JSON_OPTIONS,
+                } if model_name != K3_MODEL else {}),
             )
             async for chunk in stream:
                 delta = chunk.choices[0].delta.content if chunk.choices else None
@@ -1209,35 +1234,23 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
                     if targeted_research and is_targeted_factual_question(prompt):
                         buffered_targeted_answer.append(delta)
                     else:
+                        output_started = True
                         yield delta
             if buffered_targeted_answer:
                 draft = "".join(buffered_targeted_answer).strip()
                 yield _finalize_targeted_answer(prompt, draft, targeted_research)
+            elif not output_started:
+                raise ValueError("Flux du modèle terminé sans texte.")
             return
         except Exception as e:
+            if output_started:
+                logger.warning("[ΣIRIUS:STREAM] Réponse partielle interrompue : %r", e)
+                raise
             last_error = e
             logger.warning(f"[ΣIRIUS:STREAM] {model_name} refusé : {repr(e)}")
     if last_error:
         logger.warning(f"[ΣIRIUS:STREAM] Repli suite à : {repr(last_error)}")
 
-    if k3_key:
-        try:
-            result = await ask_sirius(
-                prompt=prompt,
-                history=history,
-                profile=profile,
-                memory=memory,
-                mode=mode,
-                keys=keys,
-                mood=mood,
-                environment=environment,
-            )
-            answer = (result.get("reponse") or "").strip()
-            if answer:
-                yield _finalize_targeted_answer(prompt, answer, targeted_research)
-                return
-        except Exception as e:
-            logger.warning(f"[ΣIRIUS:STREAM] Repli Kimi refusé : {repr(e)}")
     if targeted_research:
         yield _answer_from_research(prompt, targeted_research)
     else:

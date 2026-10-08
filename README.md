@@ -400,10 +400,10 @@ Liste complète des modules et dates : [MODULES_SIRIUS.txt](./MODULES_SIRIUS.txt
   les pauses, le bruit ambiant et le délai serveur ; ce seuil ne garantit pas
   une transcription immédiate. La présentation se ferme après son chargement
   et la fin de sa voix ; si la voix ne démarre pas, elle ne bloque pas le HUD.
-  En mains libres, dire **Sirius** suivi de la commande. Une capture vide ou
+  En mains libres, **Sirius** est facultatif devant une demande complète. Une capture vide ou
   sans commande relance l'écoute en conservant le diagnostic sous la barre de
-  commande. Une phrase reconnue sans mot d'activation y reste affichée avec
-  le rappel « Sirius ». L'ouverture du micro n'indique pas une nouvelle demande
+  commande. Une phrase reconnue sans mot d'activation est traitée directement.
+  L'ouverture du micro n'indique pas une nouvelle demande
   d'autorisation à chaque relance. Une erreur de transcription désactive le
   mode et affiche l'erreur plutôt que de laisser le bouton faussement actif.
   La synthèse Android utilise **Chirp3-HD Aoede en priorité** via `/api/tts/gemini`,
@@ -434,6 +434,18 @@ Liste complète des modules et dates : [MODULES_SIRIUS.txt](./MODULES_SIRIUS.txt
   Une voix
   française locale doit être installée ; son absence est signalée. Vérifier
   la narration de démarrage, les réponses et leur interruption sur appareil.
+  Le moteur de réponse ne choisit pas la voix : les réponses de Groq et de Kimi
+  suivent toutes ce même parcours de synthèse vocale. En mode normal, la réponse
+  commence par le résultat utile, puis ses raisons et conséquences, sans appel
+  de réflexion supplémentaire. Le mode profond ajoute une synthèse Kimi tenant
+  compte de l'historique, limitée à huit secondes sans nouvelle tentative automatique.
+  Réflexion et recherches indépendantes sont préparées en parallèle. Le secours
+  Kimi répond en flux sans relancer Groq ni refaire les recherches ; un flux
+  interrompu après du texte est signalé plutôt que mélangé à une seconde réponse.
+  Ces limites réduisent l'attente évitable, sans garantir un délai réel sur le
+  réseau mobile. Vérifier le temps jusqu'au premier texte puis jusqu'à la voix
+  sur appareil après déploiement du backend ; ces changements ne nécessitent pas
+  de nouvel APK.
   Le backend transmet l'audio au moteur `WHISPER_API_URL` / `STT_BACKEND_URL`
   configuré, sinon à Groq Whisper si une clé Groq est disponible. Vérifier ce
   flux sur appareil et déclarer la collecte audio dans Google Play ; ne pas
