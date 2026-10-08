@@ -1,10 +1,12 @@
 import asyncio
 from types import SimpleNamespace
 
+import pytest
 import sirius_brain
 
 
-def test_briefing_intent_bypasses_the_general_or_llm_fallback(monkeypatch):
+@pytest.mark.parametrize("prompt", ["briefing", "briefing du soir", "brieffing du soir"])
+def test_briefing_intent_bypasses_the_general_or_llm_fallback(monkeypatch, prompt):
     class UnexpectedClient:
         @property
         def chat(self):
@@ -12,7 +14,7 @@ def test_briefing_intent_bypasses_the_general_or_llm_fallback(monkeypatch):
 
     monkeypatch.setattr(sirius_brain, "client", UnexpectedClient())
 
-    result = asyncio.run(sirius_brain.parse_intent("briefing"))
+    result = asyncio.run(sirius_brain.parse_intent(prompt))
 
     assert result["action"] == "daily_briefing"
     assert result["say"]

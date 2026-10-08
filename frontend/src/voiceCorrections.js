@@ -3,6 +3,7 @@
 export function normalizeVoiceTranscript(text) {
   if (!text) return "";
   return [
+    [/\bbrieffing\b/gi, "briefing"],
     [/\bdaniel\s*[,;:]?\s*pontel\b/gi, "Daniel Partel"],
     [/\bdaniel\s*[,;:]?\s*parti\b/gi, "Daniel Partel"],
     [/\bdaniel\s*[,;:]?\s*part\s+elle\b/gi, "Daniel Partel"],

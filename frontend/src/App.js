@@ -227,7 +227,7 @@ const signaturePreviewText = (user) => {
 };
 const todayStr = () => getLocalDateKey();
 
-const DAILY_BRIEFING_COMMAND = /^\s*(?:(?:mon|le|les)\s+)?(?:briefing(?:\s+(?:quotidien|du jour|matinal))?|infos\s+du\s+jour|actualit[ée]s?\s+internationales?|br[èe]ves\s+internationales?|r[ée]sum[ée](?:[-\s]+moi)?(?:\s+(?:la|ma|du)\s+)?journ[ée]e?|fais[-\s]+moi\s+le\s+point(?:\s+sur\s+(?:ma\s+)?journ[ée]e?)?|qu'est[-\s]ce\s+qui\s+m'attend(?:\s+aujourd'hui)?|(?:mes\s+)?priorit[ée]s\s+du\s+jour|quoi\s+de\s+neuf\s+aujourd'hui)\s*[?.!]*\s*$/i;
+const DAILY_BRIEFING_COMMAND = /^\s*(?:(?:mon|le|les)\s+)?(?:brieff?ing(?:\s+(?:quotidien|du jour|matinal|du soir|de ce soir|soir))?|infos\s+du\s+jour|actualit[ée]s?\s+internationales?|br[èe]ves\s+internationales?|r[ée]sum[ée](?:[-\s]+moi)?(?:\s+(?:la|ma|du)\s+)?journ[ée]e?|fais[-\s]+moi\s+le\s+point(?:\s+sur\s+(?:ma\s+)?journ[ée]e?)?|qu'est[-\s]ce\s+qui\s+m'attend(?:\s+aujourd'hui)?|(?:mes\s+)?priorit[ée]s\s+du\s+jour|quoi\s+de\s+neuf\s+aujourd'hui)\s*[?.!]*\s*$/i;
 
 // Verbe exprimant une demande de liaison de compte, quelle que soit la tournure employée.
 const CONNECT_VERB = /\b(?:connect\w*|connexion|reconnect\w*|relie|relier|associe|associer|autorise|autoriser|lie|lier|branche|brancher)\b/i;
@@ -1493,7 +1493,7 @@ function App() {
         if (autoMicRef.current && !speakingRef.current && !micOnRef.current && startListenRef.current) {
           startListenRef.current();
         }
-      }, 600);
+      }, Capacitor.getPlatform() === "android" ? 1500 : 600);
     }
   }, []);
   onSpeechStartRef.current = onSpeechStart;
@@ -1719,6 +1719,9 @@ function App() {
   stopInterruptListenerRef.current = stopInterruptListener;
 
   const startInterruptListener = useCallback(() => {
+    // Android Web Speech relance le dialogue système pendant la synthèse et peut
+    // retranscrire la voix de Sirius comme une nouvelle commande.
+    if (Capacitor.getPlatform() === "android") return;
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR || interruptRecRef.current || voiceSessionRef.current.stopped) return;
     try {
@@ -5293,7 +5296,7 @@ function App() {
             retryHandsFree();
             return;
           }
-          if (!handleTranscriptRef.current(transcript, true, pushToTalk)) retryHandsFree();
+          if (!handleTranscriptRef.current(transcript, true)) retryHandsFree();
         } catch (error) {
           if (voiceSignal.aborted) return;
           console.error("Erreur transcription ΣIRIUS :", error);

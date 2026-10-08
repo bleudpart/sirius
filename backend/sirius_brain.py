@@ -222,7 +222,7 @@ BRIEFING_PROMPT = (
 _briefing_cache = {"t": 0.0, "key": "", "txt": ""}
 _BRIEFING_INTENT_PATTERN = re.compile(
     r"^\s*(?:(?:mon|le)\s+)?(?:"
-    r"briefing(?:\s+(?:quotidien|du jour|matinal))?|"
+    r"brieff?ing(?:\s+(?:quotidien|du jour|matinal|du soir|de ce soir|soir))?|"
     r"r[ée]sum[ée](?:[-\s]+moi)?(?:\s+(?:la|ma|du)\s+)?journ[ée]e?|"
     r"fais[-\s]+moi\s+le\s+point(?:\s+sur\s+(?:ma\s+)?journ[ée]e?)?|"
     r"qu'est[-\s]ce\s+qui\s+m'attend(?:\s+aujourd'hui)?|"

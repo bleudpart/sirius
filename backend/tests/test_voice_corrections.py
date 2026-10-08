@@ -14,3 +14,7 @@ def test_does_not_replace_unrelated_parti():
 def test_normalizes_sirius_module_lexicon():
     assert normalize_voice_transcript("serious ouvre argousse") == "SIRIUS ouvre ARGUS"
     assert normalize_voice_transcript("out look envoie un mail") == "Outlook envoie un mail"
+
+
+def test_normalizes_briefing_transcription_typo():
+    assert normalize_voice_transcript("brieffing du soir") == "briefing du soir"

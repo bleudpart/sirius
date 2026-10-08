@@ -15,6 +15,10 @@ test("normalizes common Sirius module names", () => {
   expect(normalizeVoiceTranscript("out look envoie un mail")).toBe("Outlook envoie un mail");
 });
 
+test("corrects the common transcription typo for briefing", () => {
+  expect(normalizeVoiceTranscript("brieffing du soir")).toBe("briefing du soir");
+});
+
 test("chooses the alternative matching Sirius lexicon", () => {
   expect(chooseBestVoiceTranscript([
     { transcript: "daniel parti", confidence: 0.71 },
@@ -26,6 +30,11 @@ test("requires an actionable command after the Sirius wake word", () => {
   expect(extractVoiceCommand("Sirius", { requireWakeWord: true })).toBe("");
   expect(extractVoiceCommand("bruit ambiant", { requireWakeWord: true })).toBe("");
   expect(extractVoiceCommand("Sirius ouvre les actualités", { requireWakeWord: true })).toBe("ouvre les actualités");
+});
+
+test("extracts complete natural commands without requiring a wake word", () => {
+  expect(extractVoiceCommand("explique-moi le mot bal")).toBe("explique-moi le mot bal");
+  expect(extractVoiceCommand("brieffing du soir")).toBe("briefing du soir");
 });
 
 test.each(["Zirius", "zirius", "Ziriusse", "Ziryus"])("accepts the wake-word transcription %s", (wakeWord) => {

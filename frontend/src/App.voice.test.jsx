@@ -50,6 +50,7 @@ let chatSignal;
 let deliverAnswer;
 let native;
 let nativeCalls;
+let originalSpeechRecognition;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -59,6 +60,7 @@ beforeEach(() => {
   chatSignal = null;
   deliverAnswer = null;
   nativeCalls = [];
+  originalSpeechRecognition = window.SpeechRecognition;
   native = {
     active: false,
     cancel: jest.fn(async () => {
@@ -106,6 +108,8 @@ afterEach(async () => {
   sessionStorage.clear();
   global.fetch = originalFetch;
   window.matchMedia = originalMatchMedia;
+  if (originalSpeechRecognition === undefined) delete window.SpeechRecognition;
+  else window.SpeechRecognition = originalSpeechRecognition;
   global.TextDecoder = originalTextDecoder;
   jest.restoreAllMocks();
   jest.clearAllTimers();
@@ -262,6 +266,34 @@ test("Android native test mode replaces a pending answer with a newly spoken que
   expect(speakFr.mock.calls.some(([text]) => text === "Réponse devenue obsolète")).toBe(false);
   expect(speakFr.mock.calls.some(([text]) => text.startsWith("Il est "))).toBe(true);
   expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/stt"))).toBe(false);
+});
+
+test("Android hands-free accepts the full evening-briefing phrase without a wake word", async () => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  localStorage.setItem("sirius_android_stt", "native");
+  const webSpeech = jest.fn();
+  window.SpeechRecognition = webSpeech;
+  await mount();
+
+  await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
+  expect(nativeCalls).toHaveLength(1);
+  await act(async () => nativeCalls[0].resolve("brieffing du soir"));
+  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/oracle/overview"))).toBe(true);
+  expect(global.fetch.mock.calls.some(([url]) => /\/(?:intent|chat)(?:\/stream)?$/.test(String(url)))).toBe(false);
+  expect(webSpeech).not.toHaveBeenCalled();
+});
+
+test("Android does not open a second recognizer during Sirius playback", async () => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  localStorage.setItem("sirius_android_stt", "native");
+  const webSpeech = jest.fn();
+  window.SpeechRecognition = webSpeech;
+  speakFr.mockImplementation((_text, options) => options?.onstart?.());
+  await mount();
+  await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
+  await send("quelle heure est-il");
+  expect(speakFr).toHaveBeenCalled();
+  expect(webSpeech).not.toHaveBeenCalled();
 });
 
 test("Stop cancels a native microphone and a late result cannot send a request", async () => {

@@ -59,6 +59,7 @@ function cleanTextForSpeech(t) {
     .replace(/[—–]/g, ", ")                      // tirets longs → pause naturelle
     .replace(/\s-{2,}\s/g, ", ")                 // -- ou --- entre mots
     .replace(/(\d)\s*-\s*(\d)/g, "$1 à $2")       // plage numérique 10-15 → « 10 à 15 » (pas « moins »)
+    .replace(/\b(qu|[cdjlmnst])\s*['’]\s*(?=[aeiouyàâäéèêëîïôöùûü])/giu, "$1'")
     // Seuls les tirets ISOLÉS deviennent des espaces. Un tiret entre deux lettres soude un mot
     // (« dites-m'en », « peut-être », « e-mail ») : le couper fait lire « m » comme « meu ».
     .replace(/(?<!\p{L})-|-(?!\p{L})/gu, " ")

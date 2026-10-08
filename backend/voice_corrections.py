@@ -11,6 +11,7 @@ def normalize_voice_transcript(text: str) -> str:
         return ""
     corrected = str(text)
     replacements = (
+        (r"\bbrieffing\b", "briefing"),
         (r"\bdaniel\s*[,;:]?\s*pontel\b", "Daniel Partel"),
         (r"\bdaniel\s*[,;:]?\s*parti\b", "Daniel Partel"),
         (r"\bdaniel\s*[,;:]?\s*part\s+elle\b", "Daniel Partel"),

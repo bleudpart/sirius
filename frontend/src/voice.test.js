@@ -78,6 +78,14 @@ test("Android reads the assistant name without pronouncing the Greek sigma", asy
   }));
 });
 
+test("joins French elisions separated by stray spaces before speech synthesis", async () => {
+  speakFr("Je l 'ai déjà fait et c ’ est prêt.");
+  await flush();
+  expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/tts/gemini"), expect.objectContaining({
+    body: JSON.stringify({ text: "Je l'ai déjà fait et c'est prêt." }),
+  }));
+});
+
 test("Gemini WAV plays once and ends once without native fallback", async () => {
   const audio = { play: jest.fn().mockResolvedValue(), pause: jest.fn() };
   global.Audio = jest.fn(() => audio);
