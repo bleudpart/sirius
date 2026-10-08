@@ -446,6 +446,26 @@ Liste complète des modules et dates : [MODULES_SIRIUS.txt](./MODULES_SIRIUS.txt
   réseau mobile. Vérifier le temps jusqu'au premier texte puis jusqu'à la voix
   sur appareil après déploiement du backend ; ces changements ne nécessitent pas
   de nouvel APK.
+  Dans l'APK Android, le sélecteur **Micro Android → Local (test)** active un
+  parcours expérimental via `SpeechRecognizer.createOnDeviceSpeechRecognizer`
+  (Android 12 ou ultérieur). Il ne demande pas une reconnaissance native réseau :
+  le moteur local doit être disponible et prendre en charge le français. Sinon,
+  l'indisponibilité est affichée et la capture serveur reprend ; revenir à
+  **Serveur** reste possible à tout moment. Le changement de moteur arrête
+  l'écoute et la réponse en cours ; réactiver ensuite le micro.
+  Le mode serveur reste le choix initial et le talkie-walkie conserve ce parcours.
+  En mains libres local, une nouvelle phrase peut remplacer une demande encore
+  en cours de génération. Toute nouvelle commande invalide les requêtes et la
+  lecture précédentes : une réponse tardive ne doit plus s'afficher ni parler.
+  Une action externe déjà envoyée n'est pas annulée rétroactivement.
+  L'écoute locale est suspendue dès la préparation de la voix pour éviter
+  l'auto-déclenchement ; pendant la lecture, utiliser **Arrêter** ou le
+  talkie-walkie pour interrompre, puis formuler la nouvelle demande.
+  Ce mode requiert la reconstruction de l'APK. Comparer sur le Samsung les
+  délais fin de phrase → texte reconnu → premier texte de réponse → voix,
+  la compréhension des noms des modules, le changement de sujet pendant
+  l'attente, le secours serveur, les permissions et le passage en arrière-plan.
+  Aucun gain de latence ni qualité hors ligne n'est garanti avant ces essais.
   Le backend transmet l'audio au moteur `WHISPER_API_URL` / `STT_BACKEND_URL`
   configuré, sinon à Groq Whisper si une clé Groq est disponible. Vérifier ce
   flux sur appareil et déclarer la collecte audio dans Google Play ; ne pas

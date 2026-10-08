@@ -8,13 +8,23 @@ const LABELS = {
   speaking: "Je réponds…",
 };
 
-export default function VoiceSessionControls({ phase, message, onStop }) {
+export default function VoiceSessionControls({ phase, message, onStop, androidRecognition, onRecognitionChange }) {
   return (
     <div className="voice-session-controls" data-testid="sirius-voice-controls">
       <div role="status" aria-live="polite" aria-atomic="true">
         <span>{LABELS[phase] || LABELS.idle}</span>
         {message && <small>{message}</small>}
       </div>
+      {androidRecognition && (
+        <label>
+          Micro Android
+          <select aria-label="Moteur de reconnaissance Android" value={androidRecognition}
+            onChange={(event) => onRecognitionChange(event.target.value)}>
+            <option value="server">Serveur</option>
+            <option value="native">Local (test)</option>
+          </select>
+        </label>
+      )}
       <button
         type="button"
         onPointerDown={onStop}

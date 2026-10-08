@@ -50,6 +50,28 @@ test("microphone indicator follows capture rather than the conversational phase"
   }
 });
 
+test("Android exposes an optional local recognition test without changing desktop controls", async () => {
+  const host = document.createElement("div");
+  const root = createRoot(host);
+  const change = jest.fn();
+  try {
+    await act(async () => root.render(<VoiceSessionControls phase="idle" onStop={() => {}} />));
+    expect(host.querySelector("select")).toBeNull();
+    await act(async () => root.render(
+      <VoiceSessionControls phase="idle" onStop={() => {}} androidRecognition="server" onRecognitionChange={change} />
+    ));
+    const select = host.querySelector("select");
+    expect(select.value).toBe("server");
+    await act(async () => {
+      select.value = "native";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(change).toHaveBeenCalledWith("native");
+  } finally {
+    await act(async () => root.unmount());
+  }
+});
+
 test("stops on pointer down before a global pointer-up can send a buffered phrase", async () => {
   const host = document.createElement("div");
   document.body.appendChild(host);

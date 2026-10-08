@@ -1788,6 +1788,18 @@ body.hud-minimal .medallion-halo { display: none; }
   font: 500 13px/1.4 "Rajdhani", sans-serif;
 }
 .voice-session-controls [role="status"] { min-width: 0; display: grid; gap: 3px; }
+.voice-session-controls:has(select) { flex-wrap: wrap; }
+.voice-session-controls label { display: flex; align-items: center; gap: 6px; }
+.voice-session-controls select {
+  min-height: 44px;
+  max-width: 150px;
+  background: #071523;
+  color: #e8d7ae;
+  border: 1px solid rgba(216, 184, 117, .5);
+  border-radius: 12px;
+  padding: 4px 8px;
+}
+.voice-session-controls select:focus-visible { outline: 2px solid #91e6f2; outline-offset: 3px; }
 .voice-microphone-dot {
   display: inline-block;
   flex: 0 0 6px;

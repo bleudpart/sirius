@@ -5,6 +5,9 @@ import App from "./App";
 import { speakFr, cancelSpeech, speakSeries } from "./voice";
 import { TextDecoder } from "util";
 import { Capacitor } from "@capacitor/core";
+import { createNativeRecognition } from "./nativeSpeechRecognition";
+
+jest.mock("./nativeSpeechRecognition", () => ({ createNativeRecognition: jest.fn() }));
 
 jest.mock("./AuthGate", () => ({ useAuth: () => ({ user: { id: "voice-test", name: "Validation" } }) }));
 jest.mock("./voice", () => ({
@@ -45,6 +48,8 @@ let root;
 let host;
 let chatSignal;
 let deliverAnswer;
+let native;
+let nativeCalls;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -53,6 +58,22 @@ beforeEach(() => {
   global.TextDecoder = TextDecoder;
   chatSignal = null;
   deliverAnswer = null;
+  nativeCalls = [];
+  native = {
+    active: false,
+    cancel: jest.fn(async () => {
+      native.active = false;
+      nativeCalls.at(-1)?.reject(Object.assign(new Error("Cancelled"), { code: "CANCELLED" }));
+    }),
+    listen: jest.fn(({ signal, onEvent }) => {
+      native.active = true;
+      onEvent({ phase: "listening", text: "" });
+      return new Promise((resolve, reject) => {
+        nativeCalls.push({ signal, onEvent, reject, resolve: (text) => { native.active = false; resolve(text); } });
+      });
+    }),
+  };
+  createNativeRecognition.mockReturnValue(native);
   jest.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
   jest.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
   window.matchMedia = jest.fn(() => ({
@@ -210,6 +231,124 @@ test("Stop cancels a live conversational request and ignores its answer after a 
   expect(speakFr.mock.calls.some(([text]) => text.startsWith("Il est "))).toBe(true);
   expect(host.textContent).not.toContain("Réponse devenue obsolète");
   expect(host.querySelector('[title="Activer le mode mains libres"]')).not.toBeNull();
+});
+
+test("a new request replaces a busy request without needing Stop first", async () => {
+  await mount();
+  await send("Explique pourquoi le ciel est bleu");
+  const previousSignal = chatSignal;
+  const lateAnswer = deliverAnswer;
+  await send("quelle heure est-il");
+  expect(previousSignal.aborted).toBe(true);
+  await act(async () => lateAnswer());
+  expect(speakFr.mock.calls.some(([text]) => text === "Réponse devenue obsolète")).toBe(false);
+  expect(speakFr.mock.calls.some(([text]) => text.startsWith("Il est "))).toBe(true);
+});
+
+test("Android native test mode replaces a pending answer with a newly spoken question", async () => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  localStorage.setItem("sirius_android_stt", "native");
+  await mount();
+  await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
+  expect(nativeCalls).toHaveLength(1);
+  await act(async () => nativeCalls[0].resolve("Explique pourquoi le ciel est bleu"));
+  const previousSignal = chatSignal;
+  const lateAnswer = deliverAnswer;
+  expect(nativeCalls).toHaveLength(2);
+  expect(host.querySelector(".voice-session-controls").textContent).toContain("Je traite");
+  await act(async () => nativeCalls[1].resolve("quelle heure est-il"));
+  expect(previousSignal.aborted).toBe(true);
+  await act(async () => lateAnswer());
+  expect(speakFr.mock.calls.some(([text]) => text === "Réponse devenue obsolète")).toBe(false);
+  expect(speakFr.mock.calls.some(([text]) => text.startsWith("Il est "))).toBe(true);
+  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/stt"))).toBe(false);
+});
+
+test("Stop cancels a native microphone and a late result cannot send a request", async () => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  localStorage.setItem("sirius_android_stt", "native");
+  await mount();
+  await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
+  const capture = nativeCalls[0];
+  await act(async () => host.querySelector(".voice-session-controls button").click());
+  await act(async () => capture.resolve("Explique le ciel bleu"));
+  expect(native.cancel).toHaveBeenCalled();
+  expect(global.fetch.mock.calls.some(([url]) => /\/chat(?:\/stream)?$/.test(String(url)))).toBe(false);
+});
+
+test("an obsolete streamed response cannot overwrite a newer local answer", async () => {
+  let deliver;
+  let oldSignal;
+  const reader = {
+    read: jest.fn(() => new Promise((resolve) => { deliver = resolve; })),
+    cancel: jest.fn(async () => {}),
+  };
+  const fallback = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation((url, options) => {
+    if (!String(url).endsWith("/chat/stream")) return fallback(url, options);
+    oldSignal = options.signal;
+    return Promise.resolve({ ok: true, headers: { get: () => "text/event-stream" }, body: { getReader: () => reader } });
+  });
+  await mount();
+  await send("Explique le ciel bleu");
+  await send("quelle heure est-il");
+  expect(oldSignal.aborted).toBe(true);
+  await act(async () => deliver({ done: false, value: new Uint8Array(Buffer.from(
+    'data: {"type":"delta","text":"Ancienne réponse."}\n\n'
+  )) }));
+  expect(host.textContent).not.toContain("Ancienne réponse.");
+  expect(speakSeries).not.toHaveBeenCalled();
+  expect(reader.cancel).toHaveBeenCalled();
+});
+
+test("push-to-talk immediately invalidates a pending reply", async () => {
+  await mount();
+  await send("Explique le ciel bleu");
+  const oldSignal = chatSignal;
+  await act(async () => document.dispatchEvent(new KeyboardEvent("keydown", { code: "Space", bubbles: true })));
+  expect(oldSignal.aborted).toBe(true);
+  await act(async () => host.querySelector(".voice-session-controls button").click());
+});
+
+test("native permission refusal is explicit and does not silently upload audio", async () => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  localStorage.setItem("sirius_android_stt", "native");
+  native.listen.mockRejectedValueOnce(Object.assign(new Error("Microphone non autorisé."), { code: "PERMISSION_DENIED" }));
+  await mount();
+  await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
+  expect(host.querySelector(".voice-session-controls").textContent).toContain("Microphone non autorisé.");
+  expect(host.querySelector('[title="Activer le mode mains libres"]')).not.toBeNull();
+  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/stt"))).toBe(false);
+});
+
+test("native unavailability explicitly falls back to server capture", async () => {
+  const previousRecorder = window.MediaRecorder;
+  const previousMediaDevices = Object.getOwnPropertyDescriptor(navigator, "mediaDevices");
+  const recorders = [];
+  window.MediaRecorder = class {
+    static isTypeSupported() { return true; }
+    constructor() { recorders.push(this); this.state = "inactive"; }
+    start() { this.state = "recording"; }
+    stop() { this.state = "inactive"; this.onstop?.(); }
+  };
+  Object.defineProperty(navigator, "mediaDevices", {
+    configurable: true, value: { getUserMedia: jest.fn(async () => ({ getTracks: () => [{ stop: jest.fn() }] })) },
+  });
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  localStorage.setItem("sirius_android_stt", "native");
+  native.listen.mockRejectedValueOnce(Object.assign(new Error("French model missing"), { code: "UNAVAILABLE" }));
+  try {
+    await mount();
+    await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
+    expect(recorders).toHaveLength(1);
+    expect(host.querySelector(".voice-session-controls").textContent).toContain("transcription serveur");
+    await act(async () => host.querySelector(".voice-session-controls button").click());
+    expect(recorders[0].state).toBe("inactive");
+  } finally {
+    window.MediaRecorder = previousRecorder;
+    if (previousMediaDevices) Object.defineProperty(navigator, "mediaDevices", previousMediaDevices);
+    else delete navigator.mediaDevices;
+  }
 });
 
 test("first-use guide focuses the written chat and can be reopened from the module registry", async () => {

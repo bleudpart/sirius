@@ -40,6 +40,7 @@ import { Capacitor } from "@capacitor/core";
 import { isWhisperHallucination, microphoneConstraints, requestMicrophoneStream, scheduleHandsFreeRetry, stopRecorderAfterSilence, useServerTranscription } from "@/microphoneCapture";
 import PushToTalkButton from "@/components/PushToTalkButton";
 import VoiceSessionControls from "@/components/VoiceSessionControls";
+import { createNativeRecognition } from "@/nativeSpeechRecognition";
 import MicrophoneIndicator from "@/components/MicrophoneIndicator";
 import GettingStarted, { gettingStartedKey } from "@/components/GettingStarted";
 import { createVoiceSession } from "@/voiceSession";
@@ -256,6 +257,16 @@ const imageFileToBase64 = (file) => new Promise((resolve, reject) => {
 function App() {
   const [voicePhase, setVoicePhase] = useState("idle");
   const [voiceMessage, setVoiceMessage] = useState("");
+  const [androidRecognition, setAndroidRecognition] = useState(() =>
+    localStorage.getItem("sirius_android_stt") === "native" ? "native" : "server");
+  const androidRecognitionRef = useRef(androidRecognition);
+  androidRecognitionRef.current = androidRecognition;
+  const nativeRecognitionRef = useRef(null);
+  if (!nativeRecognitionRef.current) nativeRecognitionRef.current = createNativeRecognition();
+  const nativeUnavailableRef = useRef(false);
+  const nativeStartingRef = useRef(false);
+  const stopNativeCaptureRef = useRef(() => {});
+  const stopCaptureRef = useRef(() => {});
   const [resumedCommand, setResumedCommand] = useState(null);
   const [, refreshVoiceSession] = useState(0);
   const voiceSessionRef = useRef(null);
@@ -294,7 +305,13 @@ function App() {
     window._siriusTTSTimer = setTimeout(finishTimedOutSpeech, 30000);
 
     speakFr(message, {
-      onpending: () => { if (!signal.aborted) { speakingRef.current = true; setVoicePhase("preparing"); } },
+      onpending: () => {
+        if (!signal.aborted) {
+          speakingRef.current = true;
+          stopCaptureRef.current();
+          setVoicePhase("preparing");
+        }
+      },
       onstart: () => {
         if (signal.aborted) return;
         setVoicePhase("speaking");
@@ -1543,6 +1560,7 @@ function App() {
             const ph = (phrase || "").trim();
             if (!ph) return;
             if (!spoken) { spoken = true; setVoicePhase("preparing"); }
+            stopNativeCaptureRef.current();
             voiceSeriesPendingRef.current = true;
             currentSpokenRef.current = ((currentSpokenRef.current || "") + " " + ph).slice(-400);
             speakingRef.current = true;
@@ -3910,11 +3928,22 @@ function App() {
     });
   }, [booting, speakOut]);
 
-  const processCommand = useCallback((command) => {
+  const processCommand = useCallback((command, sessionReady = false) => {
     if (!command) return;
-    if (voiceSessionRef.current.stopped) {
+    if (!sessionReady) {
+      voiceSessionRef.current.stop();
       voiceSessionRef.current.resume();
+      cancelSpeech();
+      clearTimeout(window._siriusTTSTimer);
+      clearTimeout(autoListenTimerRef.current);
+      stopCaptureRef.current();
+      stopInterruptListenerRef.current();
+      cancelCascadeRef.current();
+      voiceSeriesPendingRef.current = false;
+      speakingRef.current = false;
+      isBusy.current = false;
       setResumedCommand(command);
+      refreshVoiceSession((revision) => revision + 1);
       return;
     }
     if (renderVoiceSignal.aborted) return;
@@ -4211,7 +4240,7 @@ function App() {
   useEffect(() => {
     if (!resumedCommand) return;
     setResumedCommand(null);
-    processCommand(resumedCommand);
+    processCommand(resumedCommand, true);
   }, [resumedCommand, processCommand]);
 
 // ⚡ PIPELINE DE COMMANDE SÉCURISÉ (Inclus : Archives, Proactivité & Sécurité)
@@ -5349,6 +5378,7 @@ function App() {
 
   // Arrête l'écoute en cours
   const stopListening = useCallback(() => {
+    stopNativeCaptureRef.current();
     microphoneSessionRef.current += 1;
     const rec = recognitionRef.current;
     recognitionRef.current = null;
@@ -5383,6 +5413,7 @@ function App() {
     }
     setStatus((current) => (current === "listening" ? "idle" : current));
   }, []);
+  stopCaptureRef.current = stopListening;
 
   const stopVoice = useCallback(() => {
     voiceSessionRef.current.stop();
@@ -5404,6 +5435,15 @@ function App() {
     setVoiceMessage("Écoute et réponse interrompues. Une action déjà envoyée peut avoir été exécutée ; vérifiez son résultat.");
   }, [stopListening]);
   stopVoiceRef.current = stopVoice;
+  const changeAndroidRecognition = useCallback((mode) => {
+    stopVoice();
+    nativeUnavailableRef.current = false;
+    localStorage.setItem("sirius_android_stt", mode);
+    setAndroidRecognition(mode);
+    setVoiceMessage(mode === "native"
+      ? "Test Android local activé. Le serveur prend le relais si le français local est indisponible."
+      : "Transcription serveur activée.");
+  }, [stopVoice]);
   useEffect(() => {
     if (voiceSessionRef.current.stopped) {
       voiceSessionRef.current.resume();
@@ -5460,11 +5500,107 @@ function App() {
     await CapacitorApp.exitApp();
   }, [stopListening]);
 
+  const stopNativeCapture = useCallback(() => {
+    if (!nativeRecognitionRef.current.active && !nativeStartingRef.current) return;
+    microphoneSessionRef.current += 1;
+    nativeStartingRef.current = false;
+    void nativeRecognitionRef.current.cancel().catch((error) => {
+      setVoiceMessage(`Arrêt du microphone Android impossible : ${error.message}`);
+    });
+    micOnRef.current = false;
+    window.__siriusMicOn = false;
+    setMicOn(false);
+    setCaptureMicOn(false);
+  }, []);
+  stopNativeCaptureRef.current = stopNativeCapture;
+
+  const startNativeListening = useCallback(async (preserveFeedback = false) => {
+    if (nativeStartingRef.current || micOnRef.current || speakingRef.current || pttRef.current) return;
+    nativeStartingRef.current = true;
+    const session = ++microphoneSessionRef.current;
+    const signal = voiceSessionRef.current.signal;
+    const started = performance.now();
+    const isCurrent = () => !signal.aborted && session === microphoneSessionRef.current;
+    if (!preserveFeedback) setVoiceMessage("");
+    if (!isBusy.current) setVoicePhase("requesting");
+    const retry = () => {
+      clearTimeout(autoListenTimerRef.current);
+      autoListenTimerRef.current = setTimeout(() => {
+        if (autoMicRef.current && isCurrent() && !speakingRef.current && !micOnRef.current) {
+          startListenRef.current?.(true);
+        }
+      }, 500);
+    };
+    try {
+      const transcript = await nativeRecognitionRef.current.listen({
+        signal,
+        onEvent: ({ phase, text }) => {
+          if (!isCurrent()) return;
+          if (phase === "listening") {
+            micOnRef.current = true;
+            window.__siriusMicOn = true;
+            setMicOn(true);
+            setCaptureMicOn(true);
+          }
+          if (text) setVoiceTranscript(normalizeVoiceTranscript(text));
+          if (!isBusy.current) {
+            if (phase === "listening") { setStatus("listening"); setVoicePhase("listening"); }
+            if (phase === "transcribing") setVoicePhase("transcribing");
+            if (phase === "partial" && text) setText(normalizeVoiceTranscript(text));
+          }
+        },
+      });
+      if (!isCurrent()) return;
+      micOnRef.current = false;
+      window.__siriusMicOn = false;
+      setMicOn(false);
+      setCaptureMicOn(false);
+      nativeStartingRef.current = false;
+      setMetrics((m) => ({ ...m, stt: { ...m.stt, ms: Math.round(performance.now() - started), count: m.stt.count + 1 } }));
+      if (!handleTranscriptRef.current(transcript, true)) retry();
+    } catch (error) {
+      if (!isCurrent()) return;
+      micOnRef.current = false;
+      window.__siriusMicOn = false;
+      setMicOn(false);
+      setCaptureMicOn(false);
+      nativeStartingRef.current = false;
+      if (error.code === "NO_SPEECH") {
+        if (!isBusy.current) { setStatus("idle"); setVoicePhase("idle"); }
+        setVoiceMessage("Aucune parole reconnue par Android. L'écoute reprend.");
+        retry();
+      } else if (error.code === "UNAVAILABLE" || error.code === "BUSY") {
+        console.warn("Reconnaissance locale Android indisponible :", error);
+        nativeUnavailableRef.current = true;
+        setVoiceMessage("Reconnaissance locale indisponible ; transcription serveur au prochain enregistrement.");
+        if (!isBusy.current) startServerListening(true);
+      } else if (error.code !== "CANCELLED" && !isAbortError(error)) {
+        console.error("Reconnaissance locale Android :", error);
+        autoMicRef.current = false;
+        setAutoMic(false);
+        setVoiceMessage(error.message || "Reconnaissance Android interrompue.");
+        if (!isBusy.current) { setStatus("idle"); setVoicePhase("idle"); }
+      } else if (error.code === "CANCELLED") {
+        autoMicRef.current = false;
+        setAutoMic(false);
+        setVoiceMessage("Écoute locale suspendue. Réactivez le microphone pour reprendre.");
+        if (!isBusy.current) { setStatus("idle"); setVoicePhase("idle"); }
+      }
+    } finally {
+      if (session === microphoneSessionRef.current) nativeStartingRef.current = false;
+    }
+  }, [startServerListening]);
+
   // Démarre l'écoute via la reconnaissance vocale du navigateur (instantanée, gratuite)
   const startListening = useCallback((preserveFeedback = false) => {
     if (micOnRef.current || speakingRef.current) return;
     voiceSessionRef.current.resume();
     if (!preserveFeedback) setVoiceMessage("");
+    if (Capacitor.getPlatform() === "android" && androidRecognitionRef.current === "native"
+      && !nativeUnavailableRef.current && !pttRef.current) {
+      void startNativeListening(preserveFeedback);
+      return;
+    }
     if (preferServerSttRef.current) {
       startServerListening(preserveFeedback);
       return;
@@ -5620,7 +5756,13 @@ function App() {
       setVoicePhase("idle");
       setVoiceMessage("Impossible de démarrer le microphone.");
     }
-  }, [startServerListening]);
+  }, [startServerListening, startNativeListening]);
+
+  useEffect(() => {
+    if (voicePhase !== "thinking" || !autoMic || Capacitor.getPlatform() !== "android"
+      || androidRecognition !== "native" || nativeUnavailableRef.current) return;
+    void startNativeListening(true);
+  }, [voicePhase, autoMic, androidRecognition, startNativeListening, renderVoiceSignal]);
 
   // Référence pour relancer l'écoute depuis onSpeechEnd (mode conversation)
   startListenRef.current = startListening;
@@ -5628,8 +5770,18 @@ function App() {
   // ---- Talkie-walkie (push-to-talk) : maintenir = micro actif, relâcher = envoi ----
   const pttDown = useCallback(() => {
     if (pttRef.current) return;
+    stopListening();
     pttRef.current = true;
     setPttActive(true);
+    voiceSessionRef.current.stop();
+    voiceSessionRef.current.resume();
+    refreshVoiceSession((revision) => revision + 1);
+    isBusy.current = false;
+    voiceSeriesPendingRef.current = false;
+    setResumedCommand(null);
+    clearTimeout(window._siriusTTSTimer);
+    clearTimeout(autoListenTimerRef.current);
+    stopNativeCaptureRef.current();
     // Priorité au canal : on coupe la voix de Sirius immédiatement
     cancelSpeech();
     speakingRef.current = false;
@@ -5641,7 +5793,7 @@ function App() {
       setMicOn(false);
     }
     setTimeout(() => { if (pttRef.current) startListening(); }, 130);
-  }, [startListening, stopInterruptListener]);
+  }, [startListening, stopInterruptListener, stopListening]);
 
   const pttUp = useCallback(() => {
     if (!pttRef.current) return;
@@ -7067,7 +7219,9 @@ function App() {
           <PushToTalkButton active={pttActive} onStart={pttDown} onStop={pttUp} />
           <button type="submit" className="cmd-send" data-testid="sirius-cmd-send" aria-label="Envoyer la commande" title="Envoyer la commande">→</button>
         </form>
-        <VoiceSessionControls phase={voicePhase} message={voiceMessage} onStop={stopVoice} />
+        <VoiceSessionControls phase={voicePhase} message={voiceMessage} onStop={stopVoice}
+          androidRecognition={Capacitor.getPlatform() === "android" ? androidRecognition : null}
+          onRecognitionChange={changeAndroidRecognition} />
 
         {/* Indicateur talkie-walkie : transmission en cours */}
         {pttActive && (

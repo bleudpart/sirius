@@ -2,12 +2,19 @@ package fr.sirius_assistant.app;
 
 import android.content.pm.PackageManager;
 import android.os.SystemClock;
+import android.os.Bundle;
 
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
 	private int lastPermissionRequestCode = Integer.MIN_VALUE;
 	private long lastPermissionResultAt;
+
+	@Override
+	public void onCreate(Bundle savedInstanceState) {
+		registerPlugin(SiriusSpeechPlugin.class);
+		super.onCreate(savedInstanceState);
+	}
 
 	@Override
 	public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
