@@ -28,6 +28,11 @@ test("requires an actionable command after the Sirius wake word", () => {
   expect(extractVoiceCommand("Sirius ouvre les actualités", { requireWakeWord: true })).toBe("ouvre les actualités");
 });
 
+test.each(["Zirius", "zirius", "Ziriusse", "Ziryus"])("accepts the wake-word transcription %s", (wakeWord) => {
+  expect(hasVoiceWakeWord(wakeWord)).toBe(true);
+  expect(extractVoiceCommand(`${wakeWord} quelle heure est-il`, { requireWakeWord: true })).toBe("quelle heure est-il");
+});
+
 test("allows concise commands through push-to-talk", () => {
   expect(extractVoiceCommand("briefing")).toBe("briefing");
   expect(extractVoiceCommand("heu")).toBe("");

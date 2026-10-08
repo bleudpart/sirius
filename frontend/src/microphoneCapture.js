@@ -40,13 +40,23 @@ export function createSilenceDetector({ threshold = 0.02, silenceMs = 2000, mini
   let previousTime = null;
   let lastSound = null;
   let noiseFloor = null;
+  let initialLevels = [];
   const detect = (samples, now) => {
     const rms = Math.sqrt(samples.reduce((sum, value) => sum + value * value, 0) / samples.length);
     const elapsed = previousTime === null ? 0 : Math.max(0, Math.min(100, now - previousTime));
     previousTime = now;
     if (noiseFloor === null || rms < noiseFloor) noiseFloor = rms;
     else noiseFloor += (rms - noiseFloor) * 0.005;
-    if (rms >= Math.max(threshold, noiseFloor * noiseRatio)) {
+    const speechThreshold = Math.max(threshold, noiseFloor * noiseRatio);
+    if (speechMs < minimumSpeechMs) {
+      // La première mesure peut être de la parole : la réévaluer quand le bruit baisse.
+      initialLevels.push({ rms, elapsed, now });
+      if (initialLevels.length > 400) initialLevels.shift();
+      const speechLevels = initialLevels.filter((level) => level.rms >= speechThreshold);
+      speechMs = speechLevels.reduce((total, level) => total + level.elapsed, 0);
+      lastSound = speechLevels.length ? speechLevels[speechLevels.length - 1].now : null;
+      if (speechMs >= minimumSpeechMs) initialLevels = [];
+    } else if (rms >= speechThreshold) {
       speechMs += elapsed;
       lastSound = now;
     }

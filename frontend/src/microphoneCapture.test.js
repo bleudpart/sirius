@@ -90,6 +90,17 @@ test("a silent hands-free capture reports no speech so it is not sent to the ser
   expect(detect.heardSpeech()).toBe(true);
 });
 
+test("speech starting immediately is not mistaken for the background noise floor", () => {
+  const detect = createSilenceDetector({ silenceMs: 1200 });
+  const speech = new Float32Array([0.1, -0.1]);
+  const quiet = new Float32Array([0.005, -0.005]);
+  for (let now = 0; now <= 600; now += 50) detect(speech, now);
+  detect(quiet, 650);
+  expect(detect.heardSpeech()).toBe(true);
+  expect(detect(quiet, 1750)).toBe(false);
+  expect(detect(quiet, 1800)).toBe(true);
+});
+
 test("Whisper silence hallucinations are not treated as requests", () => {
   for (const text of ["...", "", "Sous-titrage ST' 501", "Sous-titres réalisés par la communauté d'Amara.org", "Merci d'avoir regardé cette vidéo !"]) {
     expect(isWhisperHallucination(text)).toBe(true);

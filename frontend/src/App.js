@@ -51,12 +51,12 @@ import { loadHud, applyHud } from "@/hudPrefs";
 import { initUiSounds } from "@/uiSounds";
 import { createModuleRegistry } from "@/moduleRegistry";
 import { WORK_MODULES } from "@/workModules";
-import { createWindowController } from "@/windowController";
+import { closeForegroundWindow, createWindowController } from "@/windowController";
 import { initHoloFx } from "@/holoFx";
 import { getDisplayAutoCloseDelay } from "@/displayTiming";
 import { initReadAloud, parseReadPanelCommand, readPanelAloud } from "@/readAloud";
 import { detectMailProvider, extractContactQuery, extractEmailRecipientQuery, isContactCommand, isSendEmailCommand, isVoiceNo, isVoiceYes, voiceNumberChoice } from "@/emailComposeVoice";
-import { chooseBestVoiceTranscript, extractVoiceCommand, hasVoiceWakeWord, normalizeVoiceTranscript } from "@/voiceCorrections";
+import { chooseBestVoiceTranscript, extractVoiceCommand, normalizeVoiceTranscript } from "@/voiceCorrections";
 import { initHoloWindows, minimizeAll, resetHoloWindowLayout } from "@/holoWindows";
 import { ConfirmButton } from "@/ConfirmButton";
 import { getHUDStyleVariables, renderHUD } from "@/theme";
@@ -599,8 +599,6 @@ function App() {
   // Push-to-talk (talkie-walkie) : maintenir Espace ou le bouton dédié
   const [pttActive, setPttActive] = useState(false);
   const pttRef = useRef(false);
-  // « Sirius » prononcé seul : la phrase suivante est acceptée sans répéter le mot d'activation.
-  const wakeArmedUntilRef = useRef(0);
   const speakingRef = useRef(false);
   const isBusy = useRef(false); // ⚡ Verrou anti-surchauffe / anti-doublon (partagé entre resolveIntent et handleCommand)
   // handleCommand est redéfini à chaque rendu : la référence évite que processCommand ne fige une version périmée.
@@ -3924,6 +3922,16 @@ function App() {
     setVoiceMessage("");
     let enrichedCommand = command;
     const low = command.toLowerCase();
+    const closeCommand = low.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    if (/^(?:sirius[, ]*)?(?:ferme|fermer|fermez)(?:[- ]moi)?(?:\s+(?:(?:la|le|cette|ce)\s+)?(?:fenetre|module)(?:\s+(?:ouverte?|actif|active|actuel|actuelle|au premier plan))?)?[.!?]*$/.test(closeCommand)) {
+      cancelCascadeRef.current();
+      const name = closeForegroundWindow();
+      const message = name ? `J'ai fermé ${name}.` : "Aucune fenêtre ouverte à fermer.";
+      setText(message);
+      setStatus("speaking");
+      speakOut(message);
+      return;
+    }
 
     // « Sirius, lis Zeus Cortex » : lecture à voix haute d'une fenêtre ouverte
     const readTarget = parseReadPanelCommand(command);
@@ -5116,7 +5124,7 @@ function App() {
   }, []);
   
   // ---- Reconnaissance vocale navigateur (Web Speech API) ----
-  const handleTranscript = useCallback((transcript, isFinal, pushToTalk = false) => {
+  const handleTranscript = useCallback((transcript, isFinal) => {
     if (speakingRef.current) return false; // Sirius parle → on ignore (évite l'écho)
     const normalizedTranscript = normalizeVoiceTranscript(transcript).trim();
     setVoiceTranscript(normalizedTranscript);
@@ -5131,27 +5139,14 @@ function App() {
       setStatus("idle");
       return true;
     }
-    // En mains libres, seul « Sirius » suivi d'une vraie commande déclenche une action.
-    // Le push-to-talk reste direct, car l'appui sur ESPACE est déjà un geste intentionnel.
-    const handsFreeWake = autoMicRef.current && !pttRef.current && !pushToTalk;
-    const wakeArmed = handsFreeWake && Date.now() < wakeArmedUntilRef.current;
-    const command = extractVoiceCommand(normalizedTranscript, {
-      requireWakeWord: handsFreeWake && !wakeArmed,
-    });
+    const command = extractVoiceCommand(normalizedTranscript);
     if (!command) {
       setStatus(micOnRef.current ? "listening" : "idle");
       setVoicePhase(micOnRef.current ? "listening" : "idle");
-      if (handsFreeWake && hasVoiceWakeWord(normalizedTranscript)) {
-        wakeArmedUntilRef.current = Date.now() + 12000;
-        setText("Je vous écoute.");
-        setVoiceMessage("Je vous écoute : dites votre demande.");
-        return false;
-      }
-      setText("En mains libres, dites « Sirius » suivi de votre demande.");
-      setVoiceMessage(`Reconnu : « ${normalizedTranscript} ». En mains libres, dites « Sirius » suivi de votre demande.`);
+      setText("Je vous écoute : dites votre demande.");
+      setVoiceMessage(`Reconnu : « ${normalizedTranscript} ». Dites votre demande complète.`);
       return false;
     }
-    wakeArmedUntilRef.current = 0;
     processCommand(command);
     return true;
   }, [processCommand]);
@@ -5189,7 +5184,7 @@ function App() {
     try {
       const stream = await requestMicrophoneStream(navigator.mediaDevices, () =>
         session === microphoneSessionRef.current && !speakingRef.current
-        && (!pushToTalk || pttRef.current), microphoneConstraints(window.Capacitor?.getPlatform?.()));
+        && (!pushToTalk || pttRef.current), microphoneConstraints(Capacitor.getPlatform()));
       if (!stream) {
         if (!voiceSignal.aborted) { setVoicePhase("idle"); setStatus("idle"); }
         return;
@@ -5232,6 +5227,7 @@ function App() {
         if (!pushToTalk && silenceWatcher?.heardSpeech && !silenceWatcher.heardSpeech()) {
           setStatus("idle");
           setVoicePhase("idle");
+          setVoiceMessage("Aucune parole détectée dans cet enregistrement. Réessayez près du microphone.");
           retryHandsFree();
           return;
         }

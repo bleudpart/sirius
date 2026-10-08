@@ -10,6 +10,8 @@ export function normalizeVoiceTranscript(text) {
     [/\bpart\s+elle\b/gi, "Partel"],
     [/\bserious\b/gi, "SIRIUS"],
     [/\bsyrius\b/gi, "SIRIUS"],
+    [/\bzirius\b/gi, "SIRIUS"],
+    [/\bzir[iy]us(?:se)?\b/gi, "SIRIUS"],
     [/\bcirius\b/gi, "SIRIUS"],
     [/\bsirus\b/gi, "SIRIUS"],
     [/\bcyrus\b/gi, "SIRIUS"],

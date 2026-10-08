@@ -1,3 +1,32 @@
+const WINDOW_SURFACES = ".prime-screen, .zeus-screen, .eu-screen, .setup-screen, .iw-panel, .atlas-panel, .kr-panel, .p3d-overlay, .esp-panel, .about-panel, .media-hud-window, .productivity-screen, .connections-screen, .fp-overlay, .vision-card, .keys-panel, .sp-journal, .getting-started, .modwheel, .sirius-display";
+
+export function closeForegroundWindow() {
+  const candidates = [...document.querySelectorAll(WINDOW_SURFACES)].filter((el) => {
+    const style = getComputedStyle(el);
+    return !el.closest(".boot-screen, .auth-screen, .holo-minimized, .holo-closing")
+      && style.display !== "none" && style.visibility !== "hidden" && el.getClientRects().length > 0;
+  }).map((el, order) => {
+    let z = 0;
+    for (let parent = el; parent; parent = parent.parentElement) {
+      const value = Number.parseInt(getComputedStyle(parent).zIndex, 10);
+      if (Number.isFinite(value)) z = Math.max(z, value);
+    }
+    const close = [...el.querySelectorAll("button")].find((button) =>
+      button.closest(WINDOW_SURFACES) === el && !button.disabled
+      && (button.matches(".mobile-window-close, .setup-close, .zeus-close, .eu-close, .modwheel-close, .fp-close, .p3d-close, .keys-close, .media-close-btn")
+        || /fermer/i.test(button.getAttribute("aria-label") || "")
+        || button.querySelector(".lucide-x"))
+    );
+    return { el, close, z, order };
+  }).filter(({ close }) => close).sort((a, b) => b.z - a.z || b.order - a.order);
+  const current = candidates[0];
+  if (!current) return null;
+  const title = current.el.querySelector(".zeus-title, .oracle-title, .eu-title, .fp-title, .p3d-title, .keys-title, .vision-title, .sp-title, h1, h2");
+  const name = title?.textContent.trim() || current.el.getAttribute("aria-label") || "la fenêtre";
+  current.close.click();
+  return name;
+}
+
 export function createWindowController(setters, display) {
   const closers = {
     display: () => setters.setDisplayOpen(false),

@@ -131,6 +131,17 @@ test("the tasks journal opens from the module menu even without a running task",
   expect(host.textContent).toContain("Aucune tâche enregistrée");
 });
 
+test("close the window targets the visible journal without asking the assistant", async () => {
+  await mount();
+  await act(async () => window.dispatchEvent(new Event("sirius-journal-open")));
+  const journal = host.querySelector('[data-testid="sirius-journal-panel"]');
+  jest.spyOn(journal, "getClientRects").mockReturnValue([{}]);
+  await send("ferme la fenêtre");
+  expect(host.querySelector('[data-testid="sirius-journal-panel"]')).toBeNull();
+  expect(speakFr).toHaveBeenCalledWith(expect.stringContaining("J'ai fermé"), expect.anything());
+  expect(global.fetch.mock.calls.filter(([url]) => /\/(?:intent|chat)(?:\/stream)?$/.test(String(url)))).toHaveLength(0);
+});
+
 test("Android opens and closes a dedicated media catalogue without opening Display", async () => {
   jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
   await mount();
@@ -257,8 +268,11 @@ test("pointer Stop discards the buffered phrase before the global push-to-talk r
 
 test.each([
   ["", "Aucune parole distinguée"],
-  ["donne le briefing de la journée", "Reconnu : « donne le briefing de la journée »"],
-])("Android keeps feedback after a hands-free retry for transcript %s", async (transcript, feedback) => {
+  ["Sirius", "Dites votre demande complète"],
+  ["Explique pourquoi le ciel est bleu", null],
+  ["Zirius explique pourquoi le ciel est bleu", null],
+  ["quelle heure est-il", "local-answer"],
+])("Android handles the hands-free transcript %s without discarding valid requests", async (transcript, feedback) => {
   const previousRecorder = window.MediaRecorder;
   const previousMediaDevices = Object.getOwnPropertyDescriptor(navigator, "mediaDevices");
   const recorders = [];
@@ -291,6 +305,26 @@ test.each([
     await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
     expect(recorders).toHaveLength(1);
     await act(async () => recorders[0].stop());
+    if (feedback === "local-answer") {
+      const [, callbacks] = speakFr.mock.calls.find(([message]) => message.startsWith("Il est "));
+      await act(async () => callbacks.onstart());
+      await act(async () => jest.advanceTimersByTime(1000));
+      expect(recorders).toHaveLength(1);
+      await act(async () => callbacks.onend());
+      await act(async () => jest.advanceTimersByTime(600));
+      expect(recorders).toHaveLength(2);
+      expect(host.querySelector('[data-testid="sirius-voice-controls"]').textContent).toContain("J’écoute");
+      await act(async () => host.querySelector('[data-testid="sirius-voice-controls"] button').click());
+      return;
+    }
+    if (feedback === null) {
+      expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/chat"))).toHaveLength(1);
+      expect(host.querySelector('[data-testid="sirius-voice-controls"]').textContent).toContain("Je traite");
+      await act(async () => jest.advanceTimersByTime(600));
+      expect(recorders).toHaveLength(1);
+      await act(async () => host.querySelector('[data-testid="sirius-voice-controls"] button').click());
+      return;
+    }
     expect(host.querySelector('[data-testid="sirius-voice-controls"]').textContent).toContain(feedback);
     await act(async () => jest.advanceTimersByTime(600));
     expect(recorders).toHaveLength(2);

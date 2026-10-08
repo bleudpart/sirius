@@ -382,6 +382,12 @@ Liste complète des modules et dates : [MODULES_SIRIUS.txt](./MODULES_SIRIUS.txt
   un lecteur absent ou bloqué est signalé et ne doit pas immobiliser le HUD.
   Vérifier le centrage des actualités et de la caméra, les défilements et les
   dimensions en portrait et paysage avant de publier l'APK.
+  La variante transcrite « Zirius » est aussi reconnue comme mot d'appel.
+  En mains libres, le mot d'appel est facultatif : une demande complète est
+  traitée directement. Coupez le mode mains libres dans une conversation privée
+  ou près d'une télévision ; la parole ambiante peut aussi être transcrite.
+  « Ferme la fenêtre » ferme localement la fenêtre visible au premier plan,
+  sans demander son nom ; les fenêtres réduites ne sont pas ciblées.
   La voix Android utilise une capture micro (maximum 15 secondes) envoyée à
   `/api/stt`, plutôt que la reconnaissance Web Speech de la WebView. Maintenir
   **ESPACE**, puis relâcher pour transcrire ; une annulation pendant la demande
