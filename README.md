@@ -394,6 +394,10 @@ Liste complète des modules et dates : [MODULES_SIRIUS.txt](./MODULES_SIRIUS.txt
   `/api/stt`, plutôt que la reconnaissance Web Speech de la WebView. Maintenir
   **ESPACE**, puis relâcher pour transcrire ; une annulation pendant la demande
   de permission ne doit pas démarrer un enregistrement tardif.
+  Le talkie-walkie ouvre le micro dès l'appui : attendre le signal sonore et
+  **À VOUS** avant de parler. **OUVERTURE…** indique que la capture n'est pas
+  encore prête. Après une réponse, Android relance l'ouverture après 250 ms ;
+  l'autorisation et l'activation matérielle peuvent ajouter un délai.
   Sur Android, la capture désactive les traitements micro de la WebView qui
   peuvent produire un flux muet sur certains Samsung. En mains libres, une
   capture sans parole détectée n'est pas envoyée au serveur et ne consomme donc

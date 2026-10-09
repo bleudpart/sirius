@@ -6,8 +6,12 @@ import { speakFr, cancelSpeech, speakSeries } from "./voice";
 import { TextDecoder } from "util";
 import { Capacitor } from "@capacitor/core";
 import { createNativeRecognition } from "./nativeSpeechRecognition";
+import { connectStreamingStt } from "./services/streamingStt";
+import { pttBeep } from "./appLogic";
 
 jest.mock("./nativeSpeechRecognition", () => ({ createNativeRecognition: jest.fn() }));
+jest.mock("./services/streamingStt", () => ({ connectStreamingStt: jest.fn() }));
+jest.mock("./appLogic", () => ({ ...jest.requireActual("./appLogic"), pttBeep: jest.fn() }));
 
 jest.mock("./AuthGate", () => ({ useAuth: () => ({ user: { id: "voice-test", name: "Validation" } }) }));
 jest.mock("./voice", () => ({
@@ -54,6 +58,7 @@ let originalSpeechRecognition;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  connectStreamingStt.mockResolvedValue(null);
   speakSeries.mockResolvedValue();
   jest.useFakeTimers();
   global.TextDecoder = TextDecoder;
@@ -439,6 +444,67 @@ test("holding Space prevents browser page scrolling from repeated keydown events
   })));
 });
 
+test.each([false, true])("Android waits for microphone readiness and handles early release=%s", async (earlyRelease) => {
+  const previousRecorder = window.MediaRecorder;
+  const previousMediaDevices = Object.getOwnPropertyDescriptor(navigator, "mediaDevices");
+  let resolveMicrophone;
+  const stopTrack = jest.fn();
+  const recorders = [];
+  const connection = {
+    send: jest.fn(() => true),
+    finish: jest.fn(async () => ({ text: "quelle heure est-il" })),
+    close: jest.fn(),
+  };
+  connectStreamingStt.mockResolvedValue(connection);
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  const getUserMedia = jest.fn(() => new Promise((resolve) => { resolveMicrophone = resolve; }));
+  Object.defineProperty(navigator, "mediaDevices", {
+    configurable: true, value: { getUserMedia },
+  });
+  window.MediaRecorder = class {
+    static isTypeSupported() { return true; }
+    constructor() {
+      this.mimeType = "audio/webm";
+      this.state = "inactive";
+      recorders.push(this);
+    }
+    start() { this.state = "recording"; }
+    stop() {
+      this.state = "inactive";
+      this.ondataavailable?.({ data: new Blob(["a".repeat(1000)], { type: this.mimeType }) });
+      this.onstop?.();
+    }
+  };
+  try {
+    await mount();
+    await act(async () => document.dispatchEvent(new KeyboardEvent("keydown", { code: "Space", bubbles: true })));
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+    expect(pttBeep).not.toHaveBeenCalled();
+    expect(host.querySelector('[data-testid="sirius-ptt-btn"]').textContent).toContain("OUVERTURE");
+    if (earlyRelease) {
+      await act(async () => document.dispatchEvent(new KeyboardEvent("keyup", { code: "Space", bubbles: true })));
+    }
+    await act(async () => resolveMicrophone({ getTracks: () => [{ stop: stopTrack }] }));
+    if (earlyRelease) {
+      expect(recorders).toHaveLength(0);
+      expect(stopTrack).toHaveBeenCalledTimes(1);
+      expect(pttBeep).not.toHaveBeenCalled();
+    } else {
+      expect(recorders[0].state).toBe("recording");
+      expect(host.querySelector('[data-testid="sirius-ptt-btn"]').textContent).toContain("À VOUS");
+      expect(pttBeep).toHaveBeenCalledWith(false);
+      await act(async () => document.dispatchEvent(new KeyboardEvent("keyup", { code: "Space", bubbles: true })));
+      expect(connection.finish).toHaveBeenCalledTimes(1);
+      expect(speakFr.mock.calls.some(([text]) => text.startsWith("Il est "))).toBe(true);
+      expect(stopTrack).toHaveBeenCalledTimes(1);
+    }
+  } finally {
+    window.MediaRecorder = previousRecorder;
+    if (previousMediaDevices) Object.defineProperty(navigator, "mediaDevices", previousMediaDevices);
+    else delete navigator.mediaDevices;
+  }
+});
+
 test("native permission refusal is explicit and does not silently upload audio", async () => {
   jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
   localStorage.setItem("sirius_android_stt", "native");
@@ -609,7 +675,7 @@ test.each([
       await act(async () => jest.advanceTimersByTime(1000));
       expect(recorders).toHaveLength(1);
       await act(async () => callbacks.onend());
-      await act(async () => jest.advanceTimersByTime(600));
+      await act(async () => jest.advanceTimersByTime(250));
       expect(recorders).toHaveLength(2);
       expect(host.querySelector('[data-testid="sirius-voice-controls"]').textContent).toContain("J’écoute");
       await act(async () => host.querySelector('[data-testid="sirius-voice-controls"] button').click());

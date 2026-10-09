@@ -1501,7 +1501,7 @@ function App() {
         if (autoMicRef.current && !speakingRef.current && !micOnRef.current && startListenRef.current) {
           startListenRef.current();
         }
-      }, Capacitor.getPlatform() === "android" ? 1500 : 600);
+      }, Capacitor.getPlatform() === "android" ? 250 : 600);
     }
   }, []);
   onSpeechStartRef.current = onSpeechStart;
@@ -5407,6 +5407,7 @@ function App() {
         stream.getTracks().forEach((track) => track.stop());
       };
       recorder.start(250);
+      if (pushToTalk) pttBeep(false);
       if (!pushToTalk) {
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         if (AudioContextClass) {
@@ -5704,6 +5705,7 @@ function App() {
         if (!sessionSignal.aborted && recognitionRef.current === rec) {
           setCaptureMicOn(true);
           setVoicePhase("listening");
+          if (pttRef.current) pttBeep(false);
         }
       };
       rec.lang = "fr-FR";
@@ -5870,21 +5872,20 @@ function App() {
     cancelSpeech();
     speakingRef.current = false;
     stopInterruptListener();
-    pttBeep(false);
     if (micOnRef.current) {
       try { recognitionRef.current && recognitionRef.current.stop(); } catch (e) {}
       micOnRef.current = false;
       setMicOn(false);
     }
-    setTimeout(() => { if (pttRef.current) startListening(); }, 130);
+    startListening();
   }, [startListening, stopInterruptListener, stopListening]);
 
   const pttUp = useCallback(() => {
     if (!pttRef.current) return;
     pttRef.current = false;
-    microphoneSessionRef.current += 1;
+    if (!serverRecorderRef.current) microphoneSessionRef.current += 1;
     setPttActive(false);
-    pttBeep(true);
+    if (micOnRef.current) pttBeep(true);
     // stop() finalise la reconnaissance → le transcript final part vers l'assistant IA
     try {
       if (serverRecorderRef.current?.state === "recording") serverRecorderRef.current.stop();
@@ -7303,7 +7304,7 @@ function App() {
             placeholder="Tapez une commande... (ex: allume le salon, quelle heure est-il)"
             data-testid="sirius-cmd-input"
           />
-          <PushToTalkButton active={pttActive} onStart={pttDown} onStop={pttUp} />
+          <PushToTalkButton active={pttActive} ready={captureMicOn} onStart={pttDown} onStop={pttUp} />
           <button type="submit" className="cmd-send" data-testid="sirius-cmd-send" aria-label="Envoyer la commande" title="Envoyer la commande">→</button>
         </form>
         <VoiceSessionControls phase={voicePhase} message={voiceMessage} onStop={stopVoice}
@@ -7315,7 +7316,9 @@ function App() {
           <>
             <div className="ptt-frame" />
             <div className="ptt-indicator" data-testid="sirius-ptt-indicator">
-              <span className="ptt-pulse" /> TRANSMISSION — RELÂCHEZ POUR ENVOYER
+              <span className="ptt-pulse" /> {captureMicOn
+                ? "TRANSMISSION — RELÂCHEZ POUR ENVOYER"
+                : "OUVERTURE DU MICRO — ATTENDEZ LE SIGNAL"}
             </div>
           </>
         )}

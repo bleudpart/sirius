@@ -1,6 +1,6 @@
 import { Radio } from "lucide-react";
 
-export default function PushToTalkButton({ active, onStart, onStop }) {
+export default function PushToTalkButton({ active, ready, onStart, onStop }) {
   return (
     <button
       type="button"
@@ -19,7 +19,7 @@ export default function PushToTalkButton({ active, onStart, onStop }) {
       aria-pressed={active}
     >
       <Radio size={15} />
-      <span>{active ? "À VOUS" : "ESPACE"}</span>
+      <span>{active ? (ready ? "À VOUS" : "OUVERTURE…") : "ESPACE"}</span>
     </button>
   );
 }
