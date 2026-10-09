@@ -9,7 +9,7 @@ test("Android excludes PC-only actions at every screen size but retains usable m
   for (const id of ["capture-interface", "capture-region", "open-capture-folder", "install", "scripts", "packager", "hephaistos"]) {
     expect(ids).not.toContain(id);
   }
-  for (const id of ["getting-started", "info-hub", "connections", "journal", "media-modules", "plans"]) {
+  for (const id of ["getting-started", "info-hub", "connections", "journal", "media-modules", "plans", "odysseia"]) {
     expect(ids).toContain(id);
   }
 });

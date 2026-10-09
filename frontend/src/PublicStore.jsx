@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, ShieldCheck, ArrowRight, Mic, Boxes, Radio, UserRound, Zap, Crown, Home, BrainCircuit, Workflow, ChartNoAxesCombined } from "lucide-react";
 import PublicLegal from "./PublicLegal";
 import "./PublicStore.css";
@@ -25,6 +25,10 @@ const WHY_DIFFERENT = [
 ];
 
 export default function PublicStore() {
+  const [mythWindowOpen, setMythWindowOpen] = useState(false);
+  const mythDialogRef = useRef(null);
+  const mythCloseButtonRef = useRef(null);
+  const mythOpenerRef = useRef(null);
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [selected, setSelected] = useState("pro");
@@ -36,6 +40,39 @@ export default function PublicStore() {
   const selectedPlan = PLANS.find((plan) => plan.id === selected);
   const checkoutSessionId = new URLSearchParams(window.location.search).get("session_id");
   const paymentSucceeded = new URLSearchParams(window.location.search).get("payment") === "success";
+
+  useEffect(() => {
+    if (!mythWindowOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    mythCloseButtonRef.current?.focus();
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setMythWindowOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const dialog = event.currentTarget;
+      const focusable = dialog.querySelectorAll('button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])');
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    const dialog = mythDialogRef.current;
+    dialog?.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      dialog?.removeEventListener("keydown", onKeyDown);
+      mythOpenerRef.current?.focus();
+    };
+  }, [mythWindowOpen]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -181,6 +218,24 @@ export default function PublicStore() {
           </figure>
         </div>
       </section>
+      <section className="public-odysseia-card" aria-labelledby="public-odysseia-card-title">
+        <img src="/Designer%20(16).png" alt="Athéna, illustration de la bibliothèque ODYSSEIA" loading="lazy" />
+        <div>
+          <p className="public-eyebrow">ODYSSEIA · Mythes et histoire</p>
+          <h2 id="public-odysseia-card-title" className="public-section-title">L’ère mythologique grecque</h2>
+          <p>Des récits du Cosmos aux héros de Troie : découvrez ce que racontent les mythes et ce que l’histoire peut réellement établir.</p>
+          <button
+            type="button"
+            className="public-secondary-cta"
+            onClick={(event) => {
+              mythOpenerRef.current = event.currentTarget;
+              setMythWindowOpen(true);
+            }}
+          >
+            Lire la synthèse <ArrowRight size={17} />
+          </button>
+        </div>
+      </section>
       <section className="public-plans" id="offres" aria-label="Offres ΣIRIUS">
         <h2 className="public-section-title">Choisissez votre formule</h2>
         {PLANS.map((plan) => {
@@ -244,6 +299,49 @@ export default function PublicStore() {
         <p className="public-footer-secure"><ShieldCheck size={13} /> Paiement via Stripe ou PayPal</p>
         © 2026 ΣIRIUS par Daniel Partel · <a href="/mentions-legales">Mentions légales</a> · <a href="/conditions-generales">Conditions générales</a> · <a href="/confidentialite.html">Confidentialité</a> · <a href="/suppression-compte.html">Suppression du compte</a>
       </footer>
+      {mythWindowOpen && (
+        <div
+          className="public-odysseia-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setMythWindowOpen(false);
+          }}
+        >
+          <section
+            ref={mythDialogRef}
+            className="public-odysseia-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="public-odysseia-title"
+            aria-describedby="public-odysseia-summary"
+          >
+            <header className="public-odysseia-heading">
+              <div>
+                <p className="public-eyebrow">ODYSSEIA · Bibliothèque des mythes anciens</p>
+                <h2 id="public-odysseia-title">L’ère mythologique grecque</h2>
+              </div>
+              <button ref={mythCloseButtonRef} className="public-odysseia-close" type="button" onClick={() => setMythWindowOpen(false)} aria-label="Fermer la synthèse">
+                ×
+              </button>
+            </header>
+            <div className="public-odysseia-content" id="public-odysseia-summary">
+              <img src="/Designer%20(16).png" alt="Athéna, détail de l’illustration ODYSSEIA" />
+              <div>
+                <p>« L’ère mythologique » n’est pas une période officielle de l’histoire grecque : c’est un temps légendaire où les récits expliquent les origines du monde, des dieux, des humains et des héros.</p>
+                <p>Dans la <cite>Théogonie</cite>, Hésiode raconte l’apparition du Cosmos, les générations divines, le conflit des Titans et l’installation de Zeus. D’autres récits évoquent Prométhée, Pandore et les âges de l’humanité. Les dieux olympiens — parmi lesquels Athéna, Apollon et Poséidon — incarnent des puissances et des aspects multiples du monde grec.</p>
+                <p>Les traditions héroïques prolongent ce temps fabuleux avec Persée, Héraclès, Thésée, Jason et les récits liés à Troie. L’<cite>Iliade</cite> met en scène une partie de la guerre légendaire ; l’<cite>Odyssée</cite> suit le retour d’Ulysse. Ces poèmes, transmis et façonnés par la tradition orale avant leur mise par écrit, ne sont pas des chroniques contemporaines des événements racontés.</p>
+                <p>L’histoire apporte toutefois des repères : la civilisation mycénienne et la cité de Troie à Hisarlık ont bien existé et sont étudiées par l’archéologie. Cela ne prouve pas que les épisodes homériques se sont déroulés tels quels. Il faut donc distinguer le temps du mythe, les sociétés historiques de l’Âge du Bronze et l’époque où les récits ont été composés.</p>
+                <h3>Repères de lecture</h3>
+                <ul>
+                  <li>Hésiode, <cite>Théogonie</cite> et <cite>Les Travaux et les Jours</cite>.</li>
+                  <li>Homère, <cite>Iliade</cite> et <cite>Odyssée</cite>.</li>
+                  <li>Archéologie égéenne : sites mycéniens et site de Troie/Hisarlık.</li>
+                </ul>
+                <p className="public-odysseia-note">Cette présentation résume la tradition mythologique et distingue explicitement les récits légendaires des faits historiques documentés.</p>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }

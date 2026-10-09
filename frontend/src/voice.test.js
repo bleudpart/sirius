@@ -74,7 +74,15 @@ test("Android reads the assistant name without pronouncing the Greek sigma", asy
   speakFr("ΣIRIUS a ouvert Panthéon.");
   await flush();
   expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/tts/gemini"), expect.objectContaining({
-    body: JSON.stringify({ text: "Sirius a ouvert Panthéon." }),
+    body: JSON.stringify({ text: "Siriusse a ouvert Panthéon." }),
+  }));
+});
+
+test("Android Gemini TTS receives French letter names for HUD", async () => {
+  speakFr("Le HUD est prêt.");
+  await flush();
+  expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/tts/gemini"), expect.objectContaining({
+    body: JSON.stringify({ text: "Le ache u dé est prêt." }),
   }));
 });
 

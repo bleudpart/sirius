@@ -740,6 +740,7 @@ export function BootScreen({ onDone, userName, onOpenModule, connected, probeBra
           ["locus", "LOCUS", "Géolocalisation"],
           ["pantheon", "PANTHÉON", "Cœur du système"],
           ["cortex", "CORTEX", "Intelligence centrale"],
+          ["odysseia", "ODYSSEIA", "Accéder à la bibliothèque des mythes anciens"],
         ].map(([id, name, role], i) => (
           <div
             className="boot-module"

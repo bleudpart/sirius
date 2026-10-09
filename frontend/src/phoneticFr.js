@@ -15,6 +15,7 @@ export const FR_ACRONYMS = {
   RGPD: "èrre gé pé dé",
   PDF: "pé dé èf",
   API: "a pé i",
+  HUD: "ache u dé",
   URL: "u èrre èl",
   CRM: "cé èrre èm",
   ERP: "eu èrre pé",
@@ -60,6 +61,9 @@ export const FR_NAMES = {
   Atlas: "Atlass",
   Solon: "Solone",
   Themis: "Témisse",
+  "Face ID": "feïss aï di",
+  FaceID: "feïss aï di",
+  "Face-ID": "feïss aï di",
 };
 
 // Règles contextuelles qui ne se réduisent pas à un mot isolé.

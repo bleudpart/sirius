@@ -216,8 +216,10 @@ de secours sont affichés à cet endroit.
 Une petite pastille ronde à côté du nom ΣIRIUS, en haut à gauche, indique le microphone réellement ouvert (vert) ou fermé
 (rouge), y compris l'écoute des commandes d'interruption pendant une réponse.
 
-Lecture d'une fenêtre à voix haute : dites « Sirius, lis Zeus Cortex » (ou « lis ça »
-pour la dernière fenêtre ouverte). Sur PC, une pastille propose aussi la lecture ;
+Lecture d'un module ou d'une fenêtre à voix haute : dites « Sirius, lis ODYSSEIA »,
+« Sirius, lis le contenu de Zeus Cortex » ou « lis ça » pour la dernière fenêtre ouverte.
+SIRIUS peut lire le contenu actuellement affiché dans les fenêtres accessibles, dont
+ODYSSEIA et son texte historique. Sur PC, une pastille propose aussi la lecture ;
 sur Android, elle est masquée pour gagner de la place et seule la commande vocale reste.
 
 Confirmations vocales : quand une fenêtre s'ouvre, se ferme ou que Sirius exécute une

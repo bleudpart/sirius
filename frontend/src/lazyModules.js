@@ -48,6 +48,7 @@ export const AtlasPanel = wrap(() => import("@/AtlasPanel"));
 export const HeraclesPanel = wrap(() => import("@/HeraclesPanel"));
 export const HephaistosPanel = wrap(() => import("@/HephaistosPanel"));
 export const MythosGallery = wrap(() => import("@/MythosGallery"));
+export const Odysseia = wrap(() => import("@/Odysseia"));
 export const ConsultPanel = wrap(() => import("@/ConsultPanel"));
 export const PrometheePanel = wrap(() => import("@/PrometheePanel"));
 export const CalliopePanel = wrap(() => import("@/CalliopePanel"));

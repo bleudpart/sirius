@@ -88,3 +88,32 @@ test("situation screenshots are labeled as fictional and open the full images", 
   }
   expect(global.fetch).not.toHaveBeenCalled();
 });
+
+test("the ODYSSEIA summary opens as an accessible window and closes with Escape", () => {
+  const opener = container.querySelector(".public-odysseia-card button");
+  expect(opener.textContent).toContain("Lire la synthèse");
+  act(() => opener.click());
+
+  const dialog = container.querySelector('[role="dialog"][aria-modal="true"]');
+  expect(dialog).not.toBeNull();
+  expect(dialog.getAttribute("aria-labelledby")).toBe("public-odysseia-title");
+  expect(dialog.textContent).toContain("L’ère mythologique grecque");
+  expect(dialog.textContent).toContain("n’est pas une période officielle");
+  expect(dialog.textContent).toContain("Hésiode");
+  expect(dialog.textContent).toContain("Hisarlık");
+  expect(dialog.querySelector('img[src="/Designer%20(16).png"]')).not.toBeNull();
+  expect(document.activeElement).toBe(dialog.querySelector("button"));
+  expect(document.body.style.overflow).toBe("hidden");
+
+  act(() => dialog.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+  expect(container.querySelector('[role="dialog"]')).toBeNull();
+  expect(document.activeElement).toBe(opener);
+  expect(document.body.style.overflow).toBe("");
+});
+
+test("the ODYSSEIA summary closes when the backdrop is clicked", () => {
+  act(() => container.querySelector(".public-odysseia-card button").click());
+  const backdrop = container.querySelector(".public-odysseia-backdrop");
+  act(() => backdrop.dispatchEvent(new MouseEvent("mousedown", { bubbles: true })));
+  expect(container.querySelector('[role="dialog"]')).toBeNull();
+});

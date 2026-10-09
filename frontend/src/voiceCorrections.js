@@ -65,10 +65,20 @@ export function hasVoiceWakeWord(text) {
   return new RegExp(WAKE_WORD.source, "i").test(normalizeVoiceTranscript(text));
 }
 
+export function startsWithVoiceWakeWord(text) {
+  return new RegExp(`^\\s*${WAKE_WORD.source}`, "i").test(normalizeVoiceTranscript(text));
+}
+
+export function removeVoiceWakeWord(text) {
+  return normalizeVoiceTranscript(text)
+    .replace(new RegExp(`^\\s*${WAKE_WORD.source}[\\s,.:;!?-]*`, "i"), "")
+    .trim();
+}
+
 export function extractVoiceCommand(text, { requireWakeWord = false } = {}) {
   const transcript = normalizeVoiceTranscript(text).trim();
   const hasWakeWord = new RegExp(WAKE_WORD.source, "i").test(transcript);
-  if (requireWakeWord && !hasWakeWord) return "";
+  if (requireWakeWord && (!hasWakeWord || !startsWithVoiceWakeWord(transcript))) return "";
 
   const command = transcript.replace(WAKE_WORD, " ").replace(/\s+/g, " ").trim().replace(/^[,.\s]+/, "");
   const words = command.match(/[\p{L}\p{N}]+/gu) || [];

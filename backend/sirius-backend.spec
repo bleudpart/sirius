@@ -13,7 +13,12 @@ hiddenimports.extend(collect_submodules("fal_client"))
 # Embeddings locaux : fastembed est importé paresseusement (fonction), on force sa collecte.
 hiddenimports.extend(collect_submodules("fastembed"))
 # PLANS# : export DXF (import paresseux dans floorplan.py).
-hiddenimports.extend(collect_submodules("ezdxf"))
+hiddenimports.extend(
+    collect_submodules(
+        "ezdxf",
+        filter=lambda module: not module.startswith("ezdxf.addons.browser"),
+    )
+)
 
 datas = [
     (str(project_dir / "frontend" / "build"), "frontend/build"),
@@ -53,6 +58,9 @@ analysis = Analysis(
         "pandas",
         "pygame",
         "pytest",
+        # cffi references these in a never-called static-analysis workaround.
+        "pycparser.lextab",
+        "pycparser.yacctab",
         "scipy",
         "sympy",
         "torch",

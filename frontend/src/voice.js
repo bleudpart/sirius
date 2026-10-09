@@ -161,7 +161,7 @@ async function speakRemote(message, { voice, rate, pitch, volume = 1, onstart, o
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(gemini
-        ? { text: message }
+        ? { text: phonetic(message) }
         : { text: phonetic(message), voice, rate, pitch }),
       credentials: "include",
       signal: controller.signal,

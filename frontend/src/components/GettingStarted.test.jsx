@@ -30,6 +30,7 @@ test("waits for boot and setup, then explains optional connections, voice and al
   expect(host.textContent).toContain("Par où commencer");
   expect(host.textContent).toContain("Cette étape est facultative");
   expect(host.textContent).toContain("sans annuler une action déjà envoyée");
+  expect(host.textContent).toContain("Découvrir ODYSSEIA");
   WORK_MODULES.forEach((module) => {
     expect(host.textContent).toContain(module.label.replace(/#$/, ""));
     expect(host.textContent).toContain(module.description);
@@ -42,6 +43,7 @@ test.each([
   ["Poser une question", null],
   ["Organiser mon travail", "dossiers"],
   ["Connecter mes comptes", "connections"],
+  ["Découvrir ODYSSEIA", "odysseia"],
 ])("shortcut %s uses the existing action and persists dismissal", async (label, id) => {
   await render();
   const button = [...host.querySelectorAll(".getting-started-actions button")].find((el) => el.textContent.includes(label));

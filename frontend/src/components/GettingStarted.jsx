@@ -43,6 +43,9 @@ export default function GettingStarted({ storageKey, ready, requested, onClose, 
         <button type="button" onClick={() => choose(() => onModule("connections"))}>
           <strong>Connecter mes comptes</strong><span>Les emails et agendas nécessitent un compte connecté et ses autorisations. Cette étape est facultative.</span>
         </button>
+        <button type="button" onClick={() => choose(() => onModule("odysseia"))}>
+          <strong>Découvrir ODYSSEIA</strong><span>Accédez à la bibliothèque des mythes anciens : citations, récits historiques et sources pour comprendre l'univers mythologique de SIRIUS.</span>
+        </button>
       </div>
       <details>
         <summary>Comprendre les noms des modules</summary>

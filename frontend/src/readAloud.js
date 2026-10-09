@@ -4,7 +4,7 @@
 // Sur Android, pas de proposition : on demande « Sirius, lis Zeus Cortex ».
 import { speakFr, cancelSpeech } from "@/voice";
 
-const PANEL_SELECTOR = ".prime-screen, .zeus-screen, .hud-panel, .central-card, .holo-popup";
+const PANEL_SELECTOR = ".prime-screen, .zeus-screen, .hud-panel, .central-card, .holo-popup, [role='dialog'][aria-label], [data-hud-panel]";
 const MIN_CHARS = 110;
 const MAX_SPEECH_CHARS = 2500;
 const RESHOW_DELTA = 80; // nouveau contenu significatif = variation de longueur > 80 caractères
@@ -19,7 +19,7 @@ const isAndroidApp = () => typeof window !== "undefined" && window.Capacitor?.ge
 const enabled = () => localStorage.getItem("sirius_read_aloud") !== "off" && !isAndroidApp();
 
 const READ_COMMAND = /^(?:lis|lit|lire|relis|lecture)(?:[- ]moi)?\b\s*(.*)$/i;
-const READ_FILLERS = /^(?:(?:à|a) voix haute|le|la|les|l'|de|du|des|d'|ça|ca|cela|ce|cet|cette|contenu|texte|fenêtre|fenetre|module|panneau|page|écran|ecran)\b\s*/i;
+const READ_FILLERS = /^(?:(?:tout\s+)?ce\s+qu['’]?\s*il\s+y\s+a\s+dans|ce\s+qui\s+est\s+affich[ée]\s+dans|(?:à|a)\s+voix\s+haute|le\s+contenu\s+(?:de|du|des|de\s+la)|le|la|les|l'|de|du|des|d'|ça|ca|cela|ce|cet|cette|contenu|texte|fenêtre|fenetre|module|panneau|page|écran|ecran)\b\s*/i;
 const OTHER_READ_TARGET = /\b(?:e-?mails?|mails?|courriels?|messages?|sms|notifications?|premier|premi[eè]re|deuxi[eè]me|troisi[eè]me|dernier|derni[eè]re|\d+)\b/i;
 
 const normalizeLabel = (value) => String(value || "").toLowerCase()

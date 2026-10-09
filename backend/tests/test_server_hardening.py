@@ -51,6 +51,14 @@ def test_system_routes_reject_invalid_modes_and_anonymous_requests(api_client):
     assert anonymous_diagnostic.status_code == 401
 
 
+def test_chat_get_explains_post_only_without_redirect_loop(api_client):
+    response = api_client.get("/api/chat", follow_redirects=False)
+
+    assert response.status_code == 405
+    assert response.headers["allow"] == "POST"
+    assert response.json()["detail"] == "Use POST /api/chat to send a message."
+
+
 @pytest.mark.parametrize("name", ["ariane", "plutos", "mnemosyne", "nemesis", "thot", "chronos"])
 def test_work_module_portrait_is_available(api_client, name):
     response = api_client.get(f"/api/mythos/img/{name}.png")

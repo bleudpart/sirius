@@ -1,0 +1,91 @@
+.odysseia-window {
+  grid-template-columns: 344px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 26px;
+  padding: 30px 30px 30px 28px;
+}
+.odysseia-window .modwheel-dial { width: 320px; }
+.odysseia-window .infowheel-cat { width: 86px; font-size: 8px; letter-spacing: 1px; }
+.odysseia-window .modwheel-cat small { font-size: 9px; }
+.odysseia-wheel-core { gap: 2px; }
+.odysseia-wheel-core img { width: 66px; height: 66px; object-fit: cover; object-position: 25% 30%; border: 2px solid rgba(240, 190, 80, .72); border-radius: 50%; box-shadow: 0 0 14px rgba(240, 190, 80, .3); }
+.odysseia-wheel-core strong { color: #f3d58c; font-family: "Cinzel", serif; font-size: 13px; letter-spacing: 1.2px; text-shadow: 0 0 12px rgba(240, 190, 80, .6); }
+.odysseia-wheel-core em { font-size: 9px; }
+.odysseia-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; cursor: auto; }
+.odysseia-panel { padding-right: 30px; }
+.odysseia-panel > .modwheel-title { color: #f3d58c; font: 600 13px/1.3 "Cinzel", serif; letter-spacing: 1.1px; }
+.odysseia-panel > .modwheel-title span { color: rgba(235, 247, 255, .68); font: 11px "Rajdhani", sans-serif; letter-spacing: .4px; }
+.odysseia-content { display: flex; flex-direction: column; zoom: 1; padding: 14px 16px; }
+.odysseia-title { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin: 18px 4px 12px; }
+.odysseia-title span, .odysseia-featured > span { color: #91e6f2; font: 600 10px "Orbitron", sans-serif; letter-spacing: 1.5px; }
+.odysseia-title h2 { margin: 5px 0 0; color: #f6d991; font: 500 20px/1.25 "Cinzel", serif; }
+.odysseia-title label { display: grid; gap: 4px; color: rgba(235, 247, 255, .7); font: 12px "Rajdhani", sans-serif; }
+.odysseia-title select { min-width: 145px; min-height: 36px; padding: 4px 8px; border: 1px solid rgba(145, 230, 242, .28); border-radius: 5px; color: #eaf6ff; background: #0a1b29; font: inherit; }
+.odysseia-citation-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; min-height: 0; overflow-y: auto; padding: 4px; }
+.odysseia-citation { display: grid; align-content: space-between; gap: 12px; min-height: 94px; padding: 12px; border: 1px solid rgba(145, 230, 242, .15); border-radius: 8px; background: rgba(0, 14, 24, .7); color: #f4f1e8; text-align: left; cursor: pointer; }
+.odysseia-citation.active { border-color: rgba(240, 190, 80, .75); background: rgba(75, 55, 22, .28); }
+.odysseia-citation q { font: italic 15px/1.4 "Cinzel", serif; }
+.odysseia-citation span { color: rgba(145, 230, 242, .8); font: 11px "Rajdhani", sans-serif; }
+.odysseia-featured { margin: 12px 4px 0; padding: 12px 15px; border-left: 2px solid #f0be50; background: rgba(0, 12, 21, .5); }
+.odysseia-featured blockquote { margin: 6px 0; color: #ffe5a8; font: 500 16px/1.45 "Cinzel", serif; }
+.odysseia-featured p, .odysseia-history p { color: rgba(235, 247, 255, .82); font: 13px/1.6 "Rajdhani", sans-serif; }
+.odysseia-quote-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.odysseia-quote-nav span { color: rgba(235, 247, 255, .65); font: 12px "Rajdhani", sans-serif; }
+.odysseia-quote-nav button { display: inline-flex; align-items: center; gap: 5px; min-height: 38px; padding: 5px 10px; border: 1px solid rgba(145, 230, 242, .35); border-radius: 6px; color: #a8e9f3; background: rgba(0, 18, 30, .65); font: 12px "Rajdhani", sans-serif; cursor: pointer; }
+.odysseia-quote-nav button:hover { border-color: rgba(240, 190, 80, .75); color: #ffe09a; }
+.odysseia-history { display: flex; flex: 1; flex-direction: column; min-height: 0; overflow: hidden; padding: 0 5px 12px; }
+.odysseia-article-layout { display: flex; flex: 1; flex-direction: column; gap: 8px; min-height: 0; overflow: hidden; }
+.odysseia-chapters { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; min-height: 38px; overflow: hidden; padding: 0 0 8px; border-bottom: 1px solid rgba(145, 230, 242, .15); cursor: auto; }
+.odysseia-chapters label { flex: 0 0 auto; color: #f0be50; font: 600 9px "Orbitron", sans-serif; letter-spacing: .7px; }
+.odysseia-chapters select { flex: 1; min-width: 0; min-height: 34px; padding: 4px 8px; border: 1px solid rgba(145, 230, 242, .28); border-radius: 5px; color: #eaf6ff; background: #0a1b29; font: 12px "Rajdhani", sans-serif; }
+.odysseia-article { min-width: 0; min-height: 0; flex: 1; overflow-y: auto; padding: 6px 12px 18px 4px; color: rgba(235, 247, 255, .86); font: 14px/1.7 "Rajdhani", sans-serif; scroll-behavior: smooth; }
+.odysseia-article h1, .odysseia-article h2, .odysseia-article h3, .odysseia-article h4 { scroll-margin-top: 12px; color: #f3d58c; font-family: "Cinzel", serif; line-height: 1.35; }
+.odysseia-article h1 { margin: 8px 0 12px; font-size: 24px; }
+.odysseia-article h2 { margin: 22px 0 10px; font-size: 19px; }
+.odysseia-article h3 { margin: 18px 0 8px; font-size: 16px; }
+.odysseia-article h4 { margin: 14px 0 6px; font-size: 14px; }
+.odysseia-article p { margin: 8px 0 14px; white-space: normal; }
+.odysseia-article strong { color: #ffe3a2; }
+.odysseia-article em { color: #a8e9f3; }
+.odysseia-article ul, .odysseia-article ol { margin: 7px 0 14px; padding-left: 24px; }
+.odysseia-article li { padding: 2px 0; }
+.odysseia-article hr { height: 1px; margin: 18px 0; border: 0; background: linear-gradient(90deg, transparent, rgba(240, 190, 80, .55), transparent); }
+.odysseia-lead { margin: 0 0 20px; padding: 14px 16px; border: 1px solid rgba(145, 230, 242, .16); border-left: 2px solid #f0be50; border-radius: 8px; background: rgba(0, 14, 24, .5); }
+.odysseia-lead h2 { margin: 0 0 8px; color: #f3d58c; font: 500 18px/1.35 "Cinzel", serif; }
+.odysseia-lead h3 { margin: 12px 0 4px; color: #91e6f2; font: 500 14px "Cinzel", serif; }
+.odysseia-lead p { margin: 3px 0 8px; color: rgba(235, 247, 255, .82); font: 13px/1.55 "Rajdhani", sans-serif; }
+.odysseia-history-list { display: grid; gap: 10px; }
+.odysseia-history-list article { padding: 12px 14px; border: 1px solid rgba(145, 230, 242, .14); border-radius: 8px; background: rgba(0, 14, 24, .55); }
+.odysseia-history-list h3 { margin: 0; color: #f4cc73; font: 500 15px "Cinzel", serif; }
+.odysseia-history-list p { margin: 6px 0 0; }
+.odysseia-editorial { margin-top: 14px; padding: 10px 12px; border-left: 2px solid rgba(145, 230, 242, .6); background: rgba(0, 12, 21, .45); }
+.odysseia-sources { display: grid; gap: 12px; padding-left: 20px; }
+.odysseia-sources a { color: #9de9f2; font: 13px/1.5 "Rajdhani", sans-serif; }
+.odysseia-window button:focus-visible, .odysseia-window select:focus-visible, .odysseia-window a:focus-visible { outline: 2px solid #91e6f2; outline-offset: 3px; }
+@media (max-width: 900px) {
+  .odysseia-window { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: 10px; padding: 16px; }
+  .odysseia-window .modwheel-dial { width: 250px; }
+  .odysseia-window .odysseia-panel { padding-right: 0; }
+  .odysseia-title { margin-top: 6px; }
+  .odysseia-article { padding-right: 6px; }
+}
+@media (max-width: 640px) {
+  .odysseia-window { grid-template-rows: auto auto minmax(0, 1fr); padding: 14px 12px; }
+  .odysseia-window .modwheel-dial { width: min(188px, calc(100vw - 42px)); }
+  .odysseia-window .modwheel-core { width: 88px; height: 88px; padding: 6px; }
+  .odysseia-wheel-core img { width: 36px; height: 36px; }
+  .odysseia-wheel-core strong { font-size: 10px; letter-spacing: .6px; }
+  .odysseia-window .infowheel-cat { width: 62px; font-size: 7px; }
+  .odysseia-window .modwheel-cat small { display: none; }
+  .odysseia-title { align-items: start; flex-direction: column; gap: 8px; }
+  .odysseia-title h2 { font-size: 17px; }
+  .odysseia-title label { width: 100%; }
+  .odysseia-title select { width: 100%; }
+  .odysseia-citation-list { grid-template-columns: 1fr; }
+  .odysseia-citation { min-height: 62px; }
+  .odysseia-chapters { align-items: start; flex-direction: column; }
+  .odysseia-chapters select { width: 100%; flex: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .odysseia-window, .odysseia-window::before { animation: none; }
+}

@@ -1,4 +1,4 @@
-import { chooseBestVoiceTranscript, extractVoiceCommand, hasVoiceWakeWord, normalizeVoiceTranscript } from "./voiceCorrections";
+import { chooseBestVoiceTranscript, extractVoiceCommand, hasVoiceWakeWord, normalizeVoiceTranscript, removeVoiceWakeWord, startsWithVoiceWakeWord } from "./voiceCorrections";
 
 test("normalizes the creator name when speech recognition hears Pontel", () => {
   expect(normalizeVoiceTranscript("qui est Daniel Pontel")).toBe("qui est Daniel Partel");
@@ -30,6 +30,7 @@ test("requires an actionable command after the Sirius wake word", () => {
   expect(extractVoiceCommand("Sirius", { requireWakeWord: true })).toBe("");
   expect(extractVoiceCommand("bruit ambiant", { requireWakeWord: true })).toBe("");
   expect(extractVoiceCommand("Sirius ouvre les actualités", { requireWakeWord: true })).toBe("ouvre les actualités");
+  expect(extractVoiceCommand("ouvre les actualités, Sirius", { requireWakeWord: true })).toBe("");
 });
 
 test("extracts complete natural commands without requiring a wake word", () => {
@@ -52,4 +53,10 @@ test("detects a wake word spoken alone so the next phrase can be accepted", () =
   expect(hasVoiceWakeWord("Serious")).toBe(true);
   expect(extractVoiceCommand("Sirius.", { requireWakeWord: true })).toBe("");
   expect(hasVoiceWakeWord("quelle heure est-il")).toBe(false);
+});
+
+test("recognizes and removes a leading wake word for short voice confirmations", () => {
+  expect(startsWithVoiceWakeWord("Sirius, oui")).toBe(true);
+  expect(startsWithVoiceWakeWord("oui, Sirius")).toBe(false);
+  expect(removeVoiceWakeWord("Sirius, oui")).toBe("oui");
 });

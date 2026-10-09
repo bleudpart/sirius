@@ -15,6 +15,8 @@ def test_system_prompt_matches_the_current_sirius_production_contract():
 
     assert prompt.startswith(SIRIUS_CORE_PROMPT)
     assert "assistant vocal intelligent" in SIRIUS_CORE_PROMPT
+    assert "Tutoie toujours l'utilisateur" in SIRIUS_CORE_PROMPT
+    assert "Ne vouvoie jamais l'utilisateur" in SIRIUS_CORE_PROMPT
     assert "STYLE DE COMMUNICATION" in SIRIUS_CORE_PROMPT
     assert "Tu connais ton environnement de travail" in SIRIUS_CORE_PROMPT
     assert "les tâches en cours" in SIRIUS_CORE_PROMPT

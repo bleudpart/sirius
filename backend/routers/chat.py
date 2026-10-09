@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse
 
 router = APIRouter()
 
@@ -10,4 +10,8 @@ def setup(db):
 
 @router.get("/api/chat")
 async def chat_root():
-    return RedirectResponse(url="/api/chat")
+    return JSONResponse(
+        status_code=405,
+        content={"detail": "Use POST /api/chat to send a message."},
+        headers={"Allow": "POST"},
+    )

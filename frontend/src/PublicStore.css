@@ -95,7 +95,7 @@
 @keyframes publicHeartPulse { 0%,100% { transform:scale(.96); opacity:.88; } 50% { transform:scale(1.08); opacity:1; } }
 @media(max-width:800px){.public-core-heart{width:38px;height:38px}}
 
-/* Bright gold framing for the storefront windows and plan cards. */
+/* The storefront panels share a subtle animated RGB edge; gold remains the title accent. */
 .public-core-window{border-color:rgba(243,197,87,.72);box-shadow:inset 0 0 22px rgba(97,214,255,.1),0 0 18px rgba(243,197,87,.18)}
 .public-core-window{border:0;background:transparent;box-shadow:none}
 .public-core-window::before,.public-core-window::after{content:none}
@@ -234,23 +234,23 @@
 .public-store [id] { scroll-margin-top:24px; }
 @property --store-border-angle { syntax:"<angle>"; inherits:false; initial-value:0deg; }
 @keyframes storeBorderOrbit { to { --store-border-angle:360deg; } }
-.public-store :is(.public-hud-hero,.public-metrics,.public-core-preview,.public-matrix-actions li,.public-plan,.public-checkout,.public-testimonial,.public-why-grid article,.public-subscription-success) {
+.public-store :is(.public-hud-hero,.public-metrics,.public-core-preview,.public-matrix-actions li,.public-plan,.public-checkout,.public-testimonial,.public-why-grid article,.public-subscription-success,.public-situations figure,.public-odysseia-card,.public-odysseia-dialog) {
   position:relative;
   isolation:isolate;
-  border-color:rgba(216,184,117,.42);
+  border-color:rgba(100,210,255,.42);
 }
-.public-store :is(.public-hud-hero,.public-metrics,.public-core-preview,.public-matrix-actions li,.public-plan,.public-checkout,.public-testimonial,.public-why-grid article,.public-subscription-success)::before {
+.public-store :is(.public-hud-hero,.public-metrics,.public-core-preview,.public-matrix-actions li,.public-plan,.public-checkout,.public-testimonial,.public-why-grid article,.public-subscription-success,.public-situations figure,.public-odysseia-card,.public-odysseia-dialog)::before {
   content:"";
   position:absolute;
   inset:0;
   z-index:1;
   padding:1px;
   border-radius:inherit;
-  background:conic-gradient(from var(--store-border-angle),transparent 0 76%,rgba(216,184,117,.16) 82%,#f2d99a 88%,rgba(216,184,117,.28) 93%,transparent 100%);
+  background:conic-gradient(from var(--store-border-angle),transparent 0 54%,#ff3b5c 58%,#ffca3a 63%,#65ed75 68%,#36dfff 73%,#776bff 78%,#ff4fc8 83%,transparent 89% 100%);
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
   -webkit-mask-composite:xor;
   mask-composite:exclude;
-  filter:drop-shadow(0 0 5px rgba(216,184,117,.45));
+  filter:drop-shadow(0 0 5px rgba(96,205,255,.42));
   animation:storeBorderOrbit 7s linear infinite;
   pointer-events:none;
 }
@@ -297,6 +297,70 @@
 .public-situations img { display: block; width: 100%; height: auto; }
 .public-situations figcaption { display: grid; gap: 8px; padding: 16px; color: rgba(255, 255, 255, 0.78); }
 @media (max-width: 700px) { .public-situations-grid { grid-template-columns: 1fr; } }
+
+.public-odysseia-card {
+  max-width:var(--store-content,1180px);
+  display:grid;
+  grid-template-columns:minmax(150px,240px) 1fr;
+  align-items:center;
+  gap:30px;
+  margin:0 auto 80px;
+  padding:28px;
+  border:1px solid rgba(100,210,255,.3);
+  border-radius:14px;
+  background:linear-gradient(130deg,rgba(12,37,54,.95),rgba(5,20,33,.92));
+}
+.public-odysseia-card img { display:block;width:100%;aspect-ratio:1;object-fit:cover;object-position:center 36%;border-radius:10px; }
+.public-odysseia-card .public-eyebrow { margin-bottom:8px; }
+.public-odysseia-card .public-section-title { margin:0 0 12px; }
+.public-odysseia-card p:not(.public-eyebrow) { max-width:650px;color:rgba(255,255,255,.82);font:400 14px/1.65 "Inter",sans-serif; }
+.public-odysseia-card button { cursor:pointer; }
+.public-odysseia-backdrop {
+  position:fixed;
+  inset:0;
+  z-index:10000;
+  display:grid;
+  place-items:center;
+  padding:24px;
+  background:rgba(1,8,14,.82);
+  backdrop-filter:blur(8px);
+}
+.public-odysseia-dialog {
+  width:min(900px,100%);
+  max-height:min(88vh,900px);
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  padding:28px;
+  border:1px solid rgba(100,210,255,.35);
+  border-radius:14px;
+  background:linear-gradient(145deg,#0b2232,#06131f 72%);
+  box-shadow:0 28px 90px rgba(0,0,0,.65);
+  color:#fff;
+}
+.public-odysseia-heading { display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding-bottom:18px;border-bottom:1px solid rgba(145,230,242,.2); }
+.public-odysseia-heading .public-eyebrow { margin:0 0 8px; }
+.public-odysseia-heading h2 { margin:0;font:600 clamp(22px,3vw,32px)/1.25 "Cinzel",serif;color:var(--store-gold); }
+.public-odysseia-close { flex:0 0 40px;width:40px;height:40px;border:1px solid rgba(145,230,242,.3);border-radius:8px;background:rgba(7,27,43,.8);color:#fff;font:300 28px/1 "Inter",sans-serif;cursor:pointer; }
+.public-odysseia-content { overflow:auto;padding:22px 6px 8px 0;color:rgba(255,255,255,.88);font:400 14px/1.7 "Inter",sans-serif; }
+.public-odysseia-content>img { float:right;width:min(28%,190px);max-height:220px;margin:0 0 18px 24px;object-fit:cover;object-position:center 36%;border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.35); }
+.public-odysseia-content p { margin:0 0 14px; }
+.public-odysseia-content h3 { clear:both;margin:22px 0 8px;font:600 17px/1.4 "Cinzel",serif;color:var(--store-gold); }
+.public-odysseia-content ul { margin:0 0 18px;padding-left:22px; }
+.public-odysseia-note { padding:12px 14px;border-left:2px solid #42d7ff;background:rgba(28,95,122,.13);font-size:12px; }
+@media(max-width:700px) {
+  .public-odysseia-card { grid-template-columns:100px 1fr;gap:18px;padding:18px;margin-bottom:64px; }
+  .public-odysseia-card img { align-self:start; }
+  .public-odysseia-card .public-section-title { font-size:21px; }
+}
+@media(max-width:520px) {
+  .public-odysseia-backdrop { padding:10px; }
+  .public-odysseia-dialog { max-height:94vh;padding:18px;border-radius:10px; }
+  .public-odysseia-content { font-size:13px;line-height:1.65; }
+  .public-odysseia-content>img { float:none;display:block;width:100%;height:150px;margin:0 0 16px;object-position:center 32%; }
+  .public-odysseia-card { grid-template-columns:1fr; }
+  .public-odysseia-card img { width:100px; }
+}
 
 .public-store :is(h1, h2, h3, .public-plan-name, .public-window-bar, .public-core-preview > span > strong, .public-matrix-actions strong, .public-situations figcaption strong, .public-order-summary > span, .public-subscription-success > strong, .public-slogan) {
   font-family: "Cinzel", serif;

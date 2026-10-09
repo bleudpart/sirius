@@ -7,7 +7,7 @@ import {
   ArchitectPanel, SpectatorView, FilesPanel, DevCompanion, ZeusCortex, SiriusPrime, OracleDivin,
   PantheonSystem, NexusCeleste, SiriusDisplay, EuropeanaViewer, HaccpModule, KeysStatus, KeraunosPanel,
   AboutPanel, EspacePanel, ArchiveGallery, MemoryManager, InstallWizard, ScriptInstaller, LocusPanel,
-  AtlasPanel, HeraclesPanel, HephaistosPanel, MythosGallery, ConsultPanel, PrometheePanel, CalliopePanel, CalendarPanel,
+  AtlasPanel, HeraclesPanel, HephaistosPanel, MythosGallery, Odysseia, ConsultPanel, PrometheePanel, CalliopePanel, CalendarPanel,
   FaceIdPanel, PythagorePanel, PackagerPanel, TrailerGallery, SiriusSetup, FirstRunWizard, PromoPanel, ThemisPanel,
   AdminPanel, EnterprisePanel, PortusNummarius, AgoraPipeline, NewsPanel, ReveilPanel, SpotifyPanel, MediaHUD, ProductivityPanel,
   FloorPlanPanel, Photo3DPanel, ConnectionsPanel, WorkModulesPanel, WorkDossiersPanel, SportCoachPanel, MediaModulesPanel,
@@ -57,7 +57,7 @@ import { initHoloFx } from "@/holoFx";
 import { getDisplayAutoCloseDelay } from "@/displayTiming";
 import { initReadAloud, parseReadPanelCommand, readPanelAloud } from "@/readAloud";
 import { detectMailProvider, extractContactQuery, extractEmailRecipientQuery, isContactCommand, isSendEmailCommand, isVoiceNo, isVoiceYes, voiceNumberChoice } from "@/emailComposeVoice";
-import { chooseBestVoiceTranscript, extractVoiceCommand, normalizeVoiceTranscript } from "@/voiceCorrections";
+import { chooseBestVoiceTranscript, extractVoiceCommand, normalizeVoiceTranscript, removeVoiceWakeWord, startsWithVoiceWakeWord } from "@/voiceCorrections";
 import { initHoloWindows, minimizeAll, resetHoloWindowLayout } from "@/holoWindows";
 import { ConfirmButton } from "@/ConfirmButton";
 import { getHUDStyleVariables, renderHUD } from "@/theme";
@@ -281,6 +281,7 @@ function App() {
   const currentSpokenRef = useRef("");
   const onSpeechStartRef = useRef(() => {});
   const onSpeechEndRef = useRef(() => {});
+  const suppressAutoMicResumeRef = useRef(false);
   const startInterruptListenerRef = useRef(() => {});
   const stopInterruptListenerRef = useRef(() => {});
 
@@ -922,6 +923,7 @@ function App() {
   const [showHephaistos, setShowHephaistos] = useState(false);
   const [heraclesInput, setHeraclesInput] = useState("");
   const [showMythosGallery, setShowMythosGallery] = useState(false);
+  const [showOdysseia, setShowOdysseia] = useState(false);
   const [mythosFocus, setMythosFocus] = useState(null);
   const [showPackager, setShowPackager] = useState(false);
   const [packagerAutoInstall, setPackagerAutoInstall] = useState(false);
@@ -1426,7 +1428,7 @@ function App() {
   const triggerState = useCallback((s) => {
     setStatus(s);
     const msgs = {
-      idle: "En veille. Dites « Sirius » pour m'activer.",
+      idle: "En veille. Dis « Sirius » pour m'activer.",
       listening: userName ? `Je t'écoute, ${userName}...` : "Je t'écoute...",
       thinking: "Réflexion en cours...",
       speaking: userName ? `Bien sûr ${userName}, voici ma réponse.` : "Bien sûr, voici ma réponse.",
@@ -1486,6 +1488,10 @@ function App() {
   const onSpeechEnd = useCallback(() => {
     speakingRef.current = false;
     setStatus("idle");
+    if (suppressAutoMicResumeRef.current) {
+      suppressAutoMicResumeRef.current = false;
+      return;
+    }
     // Mode conversation : on rouvre le micro automatiquement après que Sirius a parlé
     if (autoMicRef.current && !micOnRef.current) {
       if (autoListenTimerRef.current) clearTimeout(autoListenTimerRef.current);
@@ -1831,6 +1837,7 @@ function App() {
     if (!god && lastGodRef.current && Date.now() - lastGodRef.current.t < 180000) god = lastGodRef.current.god;
     const pool = (god && GOD_QUOTES[god]) || PHILO_QUOTES;
     const q = pool[Math.floor(Math.random() * pool.length)];
+    suppressAutoMicResumeRef.current = true;
     setStatus("speaking");
     setText(`« ${q.t} » — ${q.a}`);
     speakOut(`${q.t} ${q.a}.`);
@@ -2070,7 +2077,7 @@ function App() {
           contenu: d.rapport,
         });
         setStatus("speaking");
-        const m = `J'affiche ${d.titre || d.url} sur votre écran. ${d.resume || ""}`.slice(0, 250);
+        const m = `J'affiche ${d.titre || d.url} sur ton écran. ${d.resume || ""}`.slice(0, 250);
         setText(m); speakOut(m);
         return;
       }
@@ -2096,7 +2103,7 @@ function App() {
       if (r.ok && d.dossier) {
         lastArchiveRef.current = { id: d.id, dossier: d.dossier, original_filename: d.fichier, nom, content_type: payload.url ? "video/mp4" : (payload.mime || "image/png") };
         patchTask(taskId, (t) => ({ ...t, archive: `${d.dossier} / ${d.fichier}` }));
-        const m = `Création terminée — je l'affiche sur votre écran. Archivée dans : ${d.dossier} / ${d.fichier}`;
+        const m = `Création terminée — je l'affiche sur ton écran. Archivée dans : ${d.dossier} / ${d.fichier}`;
         setText(m); speakOut(m);
         return;
       }
@@ -2170,7 +2177,7 @@ function App() {
     const next = { file, name: file.name, url: URL.createObjectURL(file) };
     imageReferenceRef.current = next;
     setImageReference(next);
-    setText(`Image de référence prête : ${file.name}. Décrivez maintenant la transformation souhaitée.`);
+    setText(`Image de référence prête : ${file.name}. Décris maintenant la transformation souhaitée.`);
   }, []);
 
   const clearImageReference = useCallback(() => {
@@ -2189,7 +2196,7 @@ function App() {
     if ((file.content_type || "") === "text/x-sirius-link" && file.url) {
       openWebWindow(file.url, file.nom || file.original_filename, false);
       setStatus("speaking");
-      const m = "J'affiche l'archive sur votre écran.";
+      const m = "J'affiche l'archive sur ton écran.";
       setText(m); speakOut(m);
       return;
     }
@@ -2207,7 +2214,7 @@ function App() {
       legende: file.nom || file.original_filename,
     });
     setStatus("speaking");
-    const m = `J'affiche ${isVideo ? "la vidéo" : "l'image"} sur votre écran.`;
+    const m = `J'affiche ${isVideo ? "la vidéo" : "l'image"} sur ton écran.`;
     setText(m); speakOut(m);
   }, [openTask, pushStep, finishTask, openWebWindow, speakOut, showOnDisplay]);
 
@@ -2231,7 +2238,7 @@ function App() {
         pushStep(id, d.file ? "Capture sauvegardée dans la Médiathèque" : "Affichage du résultat");
         finishTask(id, { kind: "image", src: `data:image/jpeg;base64,${d.image_b64}`, legende: d.titre || query });
         const ext = (d.extraits || []).slice(0, 2).join(". ");
-        const msg = `Recherche effectuée${d.moteur ? ` sur ${d.moteur}` : ""}.${ext ? ` Premiers résultats : ${ext}.` : ""} La capture est dans votre Médiathèque.`;
+        const msg = `Recherche effectuée${d.moteur ? ` sur ${d.moteur}` : ""}.${ext ? ` Premiers résultats : ${ext}.` : ""} La capture est dans ta Médiathèque.`;
         setStatus("speaking"); setText(msg); speakOut(msg);
         return;
       }
@@ -2370,7 +2377,7 @@ function App() {
       if (r.ok && d.archive) {
         setArchiveChoice({ file: d.archive, action: "delete" });
         lastArchiveRef.current = d.archive;
-        const m = `Archive trouvée : ${d.archive.dossier || "Médiathèque"} / ${d.archive.original_filename}. Confirmez-vous la suppression ?`;
+        const m = `Archive trouvée : ${d.archive.dossier || "Médiathèque"} / ${d.archive.original_filename}. Tu confirmes la suppression ?`;
         setText(m); speakOut(m);
         return;
       }
@@ -2437,11 +2444,11 @@ function App() {
     openWebWindow(url, query ? `${p.nom} — ${query}` : p.nom, false);
     setStatus("speaking");
     if (!query) {
-      const m = `J'affiche ${p.nom} sur votre écran.`;
+      const m = `J'affiche ${p.nom} sur ton écran.`;
       setText(m); speakOut(m);
       return;
     }
-    let m = `J'affiche ${p.nom} — ${query} sur votre écran.`;
+    let m = `J'affiche ${p.nom} — ${query} sur ton écran.`;
     try {
       const r = await fetch(`${API}/archive/link`, {
         method: "POST",
@@ -2524,7 +2531,7 @@ function App() {
       if (r.status === 401) {
         failTask(id, "Compte Google non connecté");
         setShowConnections(true);
-        const m = "Votre compte Google n'est pas connecté. Le Centre des connexions est ouvert.";
+        const m = "Ton compte Google n'est pas connecté. Le Centre des connexions est ouvert.";
         setText(m); speakOut(m);
         return;
       }
@@ -2775,7 +2782,7 @@ function App() {
         setStatus("speaking");
         if (r.status === 401 || r.status === 409) setShowConnections(true);
         const m = r.status === 401 || r.status === 409
-          ? "Votre compte Outlook n'est pas connecté. Le Centre des connexions est ouvert."
+          ? "Ton compte Outlook n'est pas connecté. Le Centre des connexions est ouvert."
           : (d.detail || "Je n'arrive pas à lire Outlook pour le moment.");
         setText(m); speakOut(m);
         return;
@@ -2793,7 +2800,7 @@ function App() {
       if (urgents.length > 0) {
         m = `Attention, ${urgents.length} email${urgents.length > 1 ? "s" : ""} urgent${urgents.length > 1 ? "s" : ""} dans Outlook. Le plus récent : ${urgents[0].sujet}, de ${urgents[0].de}.`;
       } else {
-        m = nonLus > 0 ? `Vous avez ${nonLus} email${nonLus > 1 ? "s" : ""} non lu${nonLus > 1 ? "s" : ""}. Cases affichées sur le display.` : "Aucun email non lu. Boîte affichée sur le display.";
+        m = nonLus > 0 ? `Tu as ${nonLus} email${nonLus > 1 ? "s" : ""} non lu${nonLus > 1 ? "s" : ""}. Cases affichées sur le display.` : "Aucun email non lu. Boîte affichée sur le display.";
       }
       setText(m); speakOut(m);
     } catch (e) { failTask(id, "Microsoft Graph injoignable"); }
@@ -3066,7 +3073,7 @@ function App() {
       line += `\n   Action : ${m.action_attendue}`;
       if (m.echeance) line += ` — Échéance : ${m.echeance}`;
       line += `\n   Pourquoi : ${m.raison}`;
-      if (sensible) line += "\n   ⚠ Contenu sensible — dites « lis le message " + n + " » pour l'entendre.";
+      if (sensible) line += "\n   ⚠ Contenu sensible — dis « lis le message " + n + " » pour l'entendre.";
       else if (m.apercu) line += `\n   Aperçu : ${m.apercu}`;
       return line;
     };
@@ -3531,7 +3538,7 @@ function App() {
         }
         setStatus("speaking");
         if (d.error === "no_device") {
-          const m = "Aucun appareil Spotify disponible. Reconnectez votre compte Spotify pour activer mon lecteur intégré, ou ouvrez l'application Spotify.";
+          const m = "Aucun appareil Spotify disponible. Reconnecte ton compte Spotify pour activer mon lecteur intégré, ou ouvre l'application Spotify.";
           setText(m); speakOut(m);
           return;
         }
@@ -3542,7 +3549,7 @@ function App() {
           return;
         }
         if (r.status === 401 || d.error === "scope") {
-          const m = "Reconnectez votre compte Spotify (bouton en haut à droite) pour m'autoriser à lancer la lecture.";
+          const m = "Reconnecte ton compte Spotify (bouton en haut à droite) pour m'autoriser à lancer la lecture.";
           setText(m); speakOut(m);
           return;
         }
@@ -3661,7 +3668,7 @@ function App() {
     const tok = spotifyRef.current;
     if (!tok || !tok.access_token) {
       setStatus("speaking");
-      const m = "Connectez d'abord votre compte Spotify avec le bouton en haut à droite.";
+      const m = "Connecte d'abord ton compte Spotify avec le bouton en haut à droite.";
       setText(m); speakOut(m);
       return;
     }
@@ -3676,7 +3683,7 @@ function App() {
       if (resp.status === 401) {
         saveSpotify(null);
         setStatus("speaking");
-        const m = "Votre session Spotify a expiré. Reconnectez-vous.";
+        const m = "Ta session Spotify a expiré. Reconnecte-toi.";
         setText(m); speakOut(m);
         return;
       }
@@ -4367,7 +4374,7 @@ function App() {
       const auto = /que vois[- ]tu|qu'?est[- ]ce que tu vois|regarde[- ]?(moi )?(ça|ceci|cela)\b/.test(low);
       setVisionAuto(auto);
       setShowVision(true);
-      const m = auto ? "Un instant, j'observe ce que vous me montrez." : "Module vision activé. J'observe via la caméra dès que vous l'autorisez.";
+      const m = auto ? "Un instant, j'observe ce que tu me montres." : "Module vision activé. J'observe via la caméra dès que tu l'autorises.";
       setStatus("speaking"); setText(m); speakOut(m);
       return;
     }
@@ -4385,11 +4392,11 @@ function App() {
       [/nexus/, () => setShowNexus(true), () => setShowNexus(false), "Nexus céleste ouvert. Connexions inter-modules affichées."],
       [/oracle/, () => setShowOracle(true), () => setShowOracle(false), "Oracle divin ouvert. Consultation des prédictions."],
       [/\bprime\b|apprentissage/, () => setShowPrime(true), () => setShowPrime(false), "Sirius Prime ouvert. Mémoire et apprentissage."],
-      [/compagnon|mode dev\b/, () => setShowDev(true), () => setShowDev(false), "Compagnon dev ouvert. Collez votre code."],
-      [/gestion.*m[ée]moire|m[ée]moire longue|gestionnaire.*m[ée]moire/, () => setShowMemoryMgr(true), () => setShowMemoryMgr(false), "Gestionnaire de mémoire ouvert. Vos souvenirs sont sous votre contrôle."],
+      [/compagnon|mode dev\b/, () => setShowDev(true), () => setShowDev(false), "Compagnon dev ouvert. Colle ton code."],
+      [/gestion.*m[ée]moire|m[ée]moire longue|gestionnaire.*m[ée]moire/, () => setShowMemoryMgr(true), () => setShowMemoryMgr(false), "Gestionnaire de mémoire ouvert. Tes souvenirs sont sous ton contrôle."],
       [/(lance|d[ée]marre|ouvre|relance).{0,14}installation|assistant d'installation|diagnostic d'installation|v[ée]rifie (ton |l')installation/, () => setShowInstall(true), () => setShowInstall(false), "Assistant d'installation lancé. Vérification de tous les systèmes."],
       [/argus|surveillance (du )?syst[èe]me|r[ée]paration automatique|analyse (le|les) (syst[èe]me|erreurs)/, () => setShowArgus(true), () => setShowArgus(false), "ARGUS activé. Analyse des systèmes en cours."],
-      [/installe (ce |un |mon )?script|installateur de scripts?|analyse (ce |mon )?script/, () => setShowScripts(true), () => setShowScripts(false), "Installateur de scripts ouvert. Collez votre script pour analyse de sécurité."],
+      [/installe (ce |un |mon )?script|installateur de scripts?|analyse (ce |mon )?script/, () => setShowScripts(true), () => setShowScripts(false), "Installateur de scripts ouvert. Colle ton script pour analyse de sécurité."],
       [/keraunos|domotique|maison connect[ée]e/, () => setShowKeraunos(true), () => setShowKeraunos(false), "KERAUNOS ouvert. Contrôle domotique en ligne."],
       [/\batlas\b|module carte/, () => { setAtlasQuery(""); setAtlasRoute(null); setShowAtlas(true); }, () => setShowAtlas(false), "ATLAS ouvert. Carte et navigation en ligne."],
       [/h[ée]pha[iï]stos|auto.?maintenance|diagnostic (complet|syst[èe]me)|forge/, () => setShowHephaistos(true), () => setShowHephaistos(false), "HÉPHAÏSTOS activé. Forge de diagnostic en ligne."],
@@ -4884,7 +4891,7 @@ function App() {
       mark("atlas · navigation");
       setAtlasRoute({ from: "", to: atlasNavM[1].replace(/[?!.]+$/, "").trim() });
       setAtlasQuery(""); setShowAtlas(true);
-      const am = "Module ATLAS activé — calcul du trajet depuis votre position.";
+      const am = "Module ATLAS activé — calcul du trajet depuis ta position.";
       setText(am); speakOut(am);
       return;
     }
@@ -5015,7 +5022,7 @@ function App() {
       mark("médiathèque");
       setShowFiles(true);
       setStatus("speaking");
-      const m = "Voici votre médiathèque.";
+      const m = "Voici ta médiathèque.";
       setText(m); speakOut(m);
       return;
     }
@@ -5027,7 +5034,7 @@ function App() {
       setPlansPrompt(sujet ? command : "");
       setShowPlans(true);
       setStatus("speaking");
-      const m = sujet ? "Très bien, je trace ce plan coté sous vos yeux." : "J'ouvre le module plans. Décrivez-moi les pièces et leurs dimensions.";
+      const m = sujet ? "Très bien, je trace ce plan coté sous tes yeux." : "J'ouvre le module plans. Décris-moi les pièces et leurs dimensions.";
       setText(m); speakOut(m);
       return;
     }
@@ -5039,7 +5046,7 @@ function App() {
       setArchitectPrompt(sujet ? command : "");
       setShowArchitect(true);
       setStatus("speaking");
-      const m = sujet ? "Très bien, je dessine cette architecture sous vos yeux." : "J'ouvre l'architecte visuel. Décrivez-moi ce que vous voulez construire.";
+      const m = sujet ? "Très bien, je dessine cette architecture sous tes yeux." : "J'ouvre l'architecte visuel. Décris-moi les pièces et dis-moi ce que tu veux construire.";
       setText(m); speakOut(m);
       return;
     }
@@ -5056,7 +5063,7 @@ function App() {
       mark("brainstorming");
       switchMode("brainstorm");
       setStatus("speaking");
-      const m = "Mode brainstorming activé. Balancez votre idée, je vais la challenger comme un associé.";
+      const m = "Mode brainstorming activé. Balance ton idée, je vais la challenger comme un associé.";
       setText(m); speakOut(m);
       return;
     }
@@ -5066,7 +5073,7 @@ function App() {
       setShowSetup(true);
       setStatus("idle");
       setText("J'ouvre tes réglages. Tu peux modifier ton profil et tes clés.");
-      speakOut("J'ouvre vos réglages.");
+      speakOut("J'ouvre tes réglages.");
       return;
     }
     // 2) Mémoire : effacer
@@ -5081,7 +5088,7 @@ function App() {
       }).catch(() => {});
       sessionId.current = "sirius-" + Math.random().toString(36).slice(2) + Date.now().toString(36);
       setStatus("speaking");
-      const m = "C'est fait, j'ai tout effacé. Je ne sais plus rien sur vous.";
+      const m = "C'est fait, j'ai tout effacé. Je ne sais plus rien sur toi.";
       setText(m); speakOut(m);
       return;
     }
@@ -5090,8 +5097,8 @@ function App() {
       mark("mémoire · rappel");
       setStatus("speaking");
       const m = memoryRef.current.length
-        ? `Voici ce que je sais sur vous : ${memoryRef.current.map((f) => f.t).join(". ")}.`
-        : "Je ne retiens encore rien sur vous. Dites « souviens-toi que… » pour m'apprendre quelque chose.";
+        ? `Voici ce que je sais sur toi : ${memoryRef.current.map((f) => f.t).join(". ")}.`
+        : "Je ne retiens encore rien sur toi. Dis « souviens-toi que… » pour m'apprendre quelque chose.";
       setText(m); speakOut(m);
       return;
     }
@@ -5156,7 +5163,7 @@ function App() {
   }, []);
   
   // ---- Reconnaissance vocale navigateur (Web Speech API) ----
-  const handleTranscript = useCallback((transcript, isFinal) => {
+  const handleTranscript = useCallback((transcript, isFinal, { requireWakeWord = false } = {}) => {
     if (speakingRef.current) return false; // Sirius parle → on ignore (évite l'écho)
     const normalizedTranscript = normalizeVoiceTranscript(transcript).trim();
     setVoiceTranscript(normalizedTranscript);
@@ -5167,16 +5174,24 @@ function App() {
       return false;
     }
     // Réponse vocale « oui / non » à une proposition de lecture à voix haute
-    if (window.__siriusReadAloudAnswer && window.__siriusReadAloudAnswer(t)) {
+    const hasRequiredWakeWord = !requireWakeWord || startsWithVoiceWakeWord(normalizedTranscript);
+    const readAloudAnswer = requireWakeWord ? removeVoiceWakeWord(normalizedTranscript).toLowerCase() : t;
+    if (hasRequiredWakeWord && window.__siriusReadAloudAnswer && window.__siriusReadAloudAnswer(readAloudAnswer)) {
       setStatus("idle");
       return true;
     }
-    const command = extractVoiceCommand(normalizedTranscript);
+    const command = extractVoiceCommand(normalizedTranscript, { requireWakeWord });
     if (!command) {
       setStatus(micOnRef.current ? "listening" : "idle");
       setVoicePhase(micOnRef.current ? "listening" : "idle");
-      setText("Je vous écoute : dites votre demande.");
-      setVoiceMessage(`Reconnu : « ${normalizedTranscript} ». Dites votre demande complète.`);
+      const missingWakeWord = requireWakeWord && !startsWithVoiceWakeWord(normalizedTranscript);
+      const feedback = missingWakeWord
+        ? "En mode mains-libres, dis « Sirius » puis ta demande."
+        : "Je t'écoute : dis ta demande.";
+      setText(feedback);
+      setVoiceMessage(missingWakeWord
+        ? `Reconnu : « ${normalizedTranscript} ». Dis « Sirius » puis ta demande.`
+        : `Reconnu : « ${normalizedTranscript} ». Dis ta demande complète.`);
       return false;
     }
     processCommand(command);
@@ -5265,7 +5280,7 @@ function App() {
         }
         const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
         if (blob.size < 800) {
-          setText("Je n'ai pas reçu assez de son. Rapprochez-vous du microphone et réessayez.");
+          setText("Je n'ai pas reçu assez de son. Rapproche-toi du microphone et réessaie.");
           setStatus("idle");
           setVoicePhase("idle");
           setVoiceMessage("Pas assez de son. Réessayez près du microphone.");
@@ -5296,7 +5311,7 @@ function App() {
             retryHandsFree();
             return;
           }
-          if (!handleTranscriptRef.current(transcript, true)) retryHandsFree();
+          if (!handleTranscriptRef.current(transcript, true, { requireWakeWord: !pushToTalk })) retryHandsFree();
         } catch (error) {
           if (voiceSignal.aborted) return;
           console.error("Erreur transcription ΣIRIUS :", error);
@@ -5486,7 +5501,7 @@ function App() {
       if (!response.ok) {
         throw new Error(`Le contrôleur d'arrêt a répondu ${response.status}.`);
       }
-      setText("ΣIRIUS s'éteint. Vous pourrez le relancer depuis l'icône du Bureau.");
+      setText("ΣIRIUS s'éteint. Tu pourras le relancer depuis l'icône du Bureau.");
     } catch (error) {
       console.error("Impossible d'éteindre ΣIRIUS.", error);
       setIsShuttingDown(false);
@@ -5560,7 +5575,7 @@ function App() {
       setCaptureMicOn(false);
       nativeStartingRef.current = false;
       setMetrics((m) => ({ ...m, stt: { ...m.stt, ms: Math.round(performance.now() - started), count: m.stt.count + 1 } }));
-      if (!handleTranscriptRef.current(transcript, true)) retry();
+      if (!handleTranscriptRef.current(transcript, true, { requireWakeWord: !pttRef.current })) retry();
     } catch (error) {
       if (!isCurrent()) return;
       micOnRef.current = false;
@@ -5617,6 +5632,7 @@ function App() {
     try {
       const rec = new SR();
       const sessionSignal = voiceSessionRef.current.signal;
+      const requireWakeWord = !pttRef.current;
       rec.onstart = () => {
         if (!sessionSignal.aborted && recognitionRef.current === rec) {
           setCaptureMicOn(true);
@@ -5643,8 +5659,7 @@ function App() {
         const spoken = phrase.trim();
         phrase = "";
         if (!spoken) return;
-        gotFinal = true;
-        handleTranscriptRef.current(spoken, true);
+        gotFinal = handleTranscriptRef.current(spoken, true, { requireWakeWord });
         try { rec.stop(); } catch (e) { /* session déjà close */ }
       };
       const restartSilenceTimer = () => {
@@ -5715,8 +5730,7 @@ function App() {
         if (phrase.trim() && !gotFinal) {
           const spoken = phrase.trim();
           phrase = "";
-          gotFinal = true;
-          handleTranscriptRef.current(spoken, true);
+          gotFinal = handleTranscriptRef.current(spoken, true, { requireWakeWord });
         }
         micOnRef.current = false;
         window.__siriusMicOn = false;
@@ -5820,9 +5834,9 @@ function App() {
         || el.closest?.('[data-testid="sirius-voice-controls"], [data-testid="getting-started"]'));
     };
     const down = (e) => {
-      if (e.code !== "Space" || e.repeat || isTyping(e)) return;
+      if (e.code !== "Space" || isTyping(e)) return;
       e.preventDefault();
-      pttDown();
+      if (!e.repeat) pttDown();
     };
     const up = (e) => {
       if (e.code !== "Space" || !pttRef.current) return;
@@ -6032,7 +6046,7 @@ function App() {
           speakRef.current(`Paiement de ${(d.amount / 100).toLocaleString("fr-FR")} euros confirmé. Hermès salue ton encaissement.`);
           return;
         }
-        if (["failed", "expired"].includes(d.payment_status)) { setText("Le paiement n'a pas abouti — vous pouvez générer un nouveau lien."); return; }
+        if (["failed", "expired"].includes(d.payment_status)) { setText("Le paiement n'a pas abouti — tu peux générer un nouveau lien."); return; }
       } catch (e) { /* attente */ }
       if (tries < 8) setTimeout(poll, 2500);
       else setText("Paiement en cours de confirmation — consultez le pipeline Hermès dans un instant.");
@@ -6169,9 +6183,9 @@ function App() {
                     const h = dt.getHours(), mn = dt.getMinutes();
                     return `${e.title} à ${h} heure${h > 1 ? "s" : ""}${mn ? ` ${mn}` : ""}`;
                   };
-                  agendaTxt = ` À votre agenda aujourd'hui : ${evts.slice(0, 4).map(fmt).join(", puis ")}.`;
+                  agendaTxt = ` À ton agenda aujourd'hui : ${evts.slice(0, 4).map(fmt).join(", puis ")}.`;
                 } else {
-                  agendaTxt = " Aucun rendez-vous à votre agenda aujourd'hui.";
+                  agendaTxt = " Aucun rendez-vous à ton agenda aujourd'hui.";
                 }
               } catch (e) { /* agenda non connecté — briefing sans agenda */ }
             })(),
@@ -6235,7 +6249,7 @@ function App() {
                 const pp = await rp.json();
                 const plans = pp.plans || [];
                 if (plans.length) {
-                  planTxt = ` Anticipation : ${plans.length} plan${plans.length > 1 ? "s" : ""} d'action préparé${plans.length > 1 ? "s" : ""} pour vos e-mails les plus importants.`;
+                  planTxt = ` Anticipation : ${plans.length} plan${plans.length > 1 ? "s" : ""} d'action préparé${plans.length > 1 ? "s" : ""} pour tes e-mails les plus importants.`;
                   planCards = plans.map((p) => (
                     `• ${p.sujet} (de ${p.de || "expéditeur inconnu"})\n  Plan : ${p.plan}` +
                     (p.brouillon_reponse ? `\n  Brouillon de réponse : ${p.brouillon_reponse}` : "")
@@ -6529,6 +6543,7 @@ function App() {
       openKeraunos: () => setShowKeraunos(true), openEspace: () => setShowEspace(true), openAbout: () => setShowAbout(true), openLocus: () => setShowLocus(true),
       openAtlas: () => { setAtlasQuery(""); setAtlasRoute(null); setShowAtlas(true); }, openHeracles: () => setShowHeracles(true), openHephaistos: () => setShowHephaistos(true),
       openMythos: () => setShowMythosGallery(true), openTrailer: () => setShowTrailer(true), openPromo: () => setShowPromo(true), openThemis: () => setShowThemis(true),
+      openOdysseia: () => setShowOdysseia(true),
       openAgora: () => setShowAgora(true), openSolon: () => setShowSolon(true), openPromethee: () => setShowPromethee(true), openCalliope: () => setShowCalliope(true),
       openPythagore: () => setShowPythagore(true), openNews: () => setShowNews(true), openPackager: () => setShowPackager(true), openInstall: () => setShowInstall(true),
       openScripts: () => setShowScripts(true), toggleVision: () => setShowVision((open) => !open),
@@ -6590,6 +6605,7 @@ function App() {
         onAssistant={() => navigateMobile("assistant")}
         onModule={(id) => {
           if (id === "connections") moduleActionsRef.current.openConnections();
+          else if (id === "odysseia") moduleActionsRef.current.openOdysseia();
           else moduleActionsRef.current.openWorkModule(id);
         }}
       />
@@ -6621,7 +6637,7 @@ function App() {
 
       {booting && <BootScreen userName={userName} connected={connected} onDone={finishBoot} onOpenModule={(id) => {
         if (WORK_MODULES.some((module) => module.id === id)) { setActiveWorkModule(id); return; }
-        const openers = { argus: setShowArgus, atlas: setShowAtlas, oracle: setShowOracle, heracles: setShowHeracles, hephaistos: setShowHephaistos, keraunos: setShowKeraunos, locus: setShowLocus, pantheon: setShowPantheon, cortex: setShowCortex, themis: setShowThemis, nummarius: setShowNummarius };
+        const openers = { argus: setShowArgus, atlas: setShowAtlas, oracle: setShowOracle, heracles: setShowHeracles, hephaistos: setShowHephaistos, keraunos: setShowKeraunos, locus: setShowLocus, pantheon: setShowPantheon, cortex: setShowCortex, themis: setShowThemis, nummarius: setShowNummarius, odysseia: setShowOdysseia };
         if (id === "solon") { setShowSolon(true); return; }
         if (id === "calliope") { setShowCalliope(true); return; }
         if (id === "pythagore") { setShowPythagore(true); return; }
@@ -6768,6 +6784,7 @@ function App() {
         const open = map[mod];
         if (open) open(true);
       }} />}
+      <Odysseia open={showOdysseia} onClose={() => setShowOdysseia(false)} />
       {showPackager && <PackagerPanel onClose={() => { setShowPackager(false); setPackagerAutoInstall(false); }} autoInstaller={packagerAutoInstall} onSpeak={(m) => speakRef.current(m)} />}
       {showTrailer && <TrailerGallery onClose={() => setShowTrailer(false)} />}
       {showPromo && <PromoPanel onClose={() => setShowPromo(false)} />}
@@ -7179,7 +7196,7 @@ function App() {
                 title="Cliquez sur ΣIRIUS pour écouter une citation philosophique"
               >
                 <span className="sirius-wordmark">ΣIRIUS</span>
-                <span className="sirius-tagline">VOTRE ASSISTANT PRIVILÉGIÉ</span>
+                <span className="sirius-tagline">TON ASSISTANT PRIVILÉGIÉ</span>
               </button>
             </h1>
           </div>
