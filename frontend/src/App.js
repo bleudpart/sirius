@@ -45,6 +45,7 @@ import MicrophoneIndicator from "@/components/MicrophoneIndicator";
 import GettingStarted, { gettingStartedKey } from "@/components/GettingStarted";
 import { createVoiceSession } from "@/voiceSession";
 import { streamConversation, requestConversation, requestAssistantIntent, requestTranscription } from "@/services/assistantApi";
+import { connectStreamingStt } from "@/services/streamingStt";
 import { speakFr, cancelSpeech, speakSeries, speakAsCharacter as speakCharacterVoice, spokenCount, lastSpokenAt } from "@/voice";
 import { isWindowCommand, observeWindowChanges, shortStatusToSpeak, snapshotWindows, windowChangeConfirmation } from "@/voiceConfirmation";
 import { loadApiKeys, saveApiKeys } from "@/apiKeyStorage";
@@ -605,6 +606,7 @@ function App() {
   const recognitionRef = useRef(null);
   const phraseSilenceTimerRef = useRef(null);
   const serverRecorderRef = useRef(null);
+  const serverStreamSttRef = useRef(null);
   const microphoneStartPendingRef = useRef(false);
   const microphoneRequestCooldownRef = useRef(0);
   const serverRecorderStreamRef = useRef(null);
@@ -5241,11 +5243,47 @@ function App() {
         .find((type) => MediaRecorder.isTypeSupported(type));
       const recorder = new MediaRecorder(stream, preferredType ? { mimeType: preferredType } : undefined);
       const chunks = [];
+      const savedKeys = loadApiKeys() || {};
+      const userGroqKey = (savedKeys.groq_key || savedKeys.groq || "").trim();
+      let streamStt = null;
+      let streamSttFailed = false;
+      const streamSttPromise = connectStreamingStt({
+        contentType: recorder.mimeType || "audio/webm",
+        groqKey: userGroqKey,
+        signal: voiceSignal,
+      }).then((connection) => {
+        if (!connection) {
+          streamSttFailed = true;
+          return null;
+        }
+        if (discardServerRecordingRef.current || voiceSignal.aborted || session !== microphoneSessionRef.current) {
+          connection.close();
+          return null;
+        }
+        streamStt = connection;
+        serverStreamSttRef.current = connection;
+        for (const chunk of chunks) {
+          if (!connection.send(chunk)) {
+            streamSttFailed = true;
+            break;
+          }
+        }
+        return connection;
+      }).catch((error) => {
+        streamSttFailed = true;
+        if (!voiceSignal.aborted) {
+          console.warn("Flux STT indisponible ; repli sur l'envoi audio classique.", error);
+        }
+        return null;
+      });
       discardServerRecordingRef.current = false;
       serverRecorderRef.current = recorder;
       serverRecorderStreamRef.current = stream;
       recorder.ondataavailable = (event) => {
-        if (event.data?.size) chunks.push(event.data);
+        if (event.data?.size) {
+          chunks.push(event.data);
+          if (streamStt && !streamStt.send(event.data)) streamSttFailed = true;
+        }
       };
       recorder.onstop = async () => {
         if (serverRecorderRef.current !== recorder) {
@@ -5265,6 +5303,8 @@ function App() {
         window.__siriusMicOn = false;
         setMicOn(false);
         if (discardServerRecordingRef.current || voiceSignal.aborted) {
+          streamStt?.close();
+          serverStreamSttRef.current = null;
           if (!voiceSignal.aborted) {
             setStatus((current) => (current === "listening" ? "idle" : current));
             setVoicePhase("idle");
@@ -5272,6 +5312,9 @@ function App() {
           return;
         }
         if (!pushToTalk && silenceWatcher?.heardSpeech && !silenceWatcher.heardSpeech()) {
+          discardServerRecordingRef.current = true;
+          streamStt?.close();
+          serverStreamSttRef.current = null;
           setStatus("idle");
           setVoicePhase("idle");
           setVoiceMessage("Aucune parole détectée dans cet enregistrement. Réessayez près du microphone.");
@@ -5280,6 +5323,9 @@ function App() {
         }
         const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
         if (blob.size < 800) {
+          discardServerRecordingRef.current = true;
+          streamStt?.close();
+          serverStreamSttRef.current = null;
           setText("Je n'ai pas reçu assez de son. Rapproche-toi du microphone et réessaie.");
           setStatus("idle");
           setVoicePhase("idle");
@@ -5291,16 +5337,29 @@ function App() {
         setVoicePhase("transcribing");
         setText("Transcription vocale ΣIRIUS en cours...");
         try {
-          const form = new FormData();
-          const extension = blob.type.includes("mp4") ? "m4a" : "webm";
-          form.append("file", blob, `sirius-voice.${extension}`);
-          const savedKeys = loadApiKeys() || {};
-          const userGroqKey = (savedKeys.groq_key || savedKeys.groq || "").trim();
-          if (userGroqKey) form.append("groq_key", userGroqKey);
-          const response = await requestTranscription(form, { signal: voiceSignal });
-          const payload = response.data;
-          if (voiceSignal.aborted) return;
-          if (!response.ok) throw new Error(payload.detail || "Transcription vocale impossible.");
+          await streamSttPromise;
+          if (voiceSignal.aborted || session !== microphoneSessionRef.current) return;
+          let payload = null;
+          if (streamStt && !streamSttFailed) {
+            try {
+              payload = await streamStt.finish();
+            } catch (error) {
+              if (error.fromServer) throw error;
+              console.warn("Flux STT interrompu ; repli sur l'envoi audio classique.", error);
+            }
+          }
+          if (!payload) {
+            streamStt?.close();
+            const form = new FormData();
+            const extension = blob.type.includes("mp4") ? "m4a" : "webm";
+            form.append("file", blob, `sirius-voice.${extension}`);
+            if (userGroqKey) form.append("groq_key", userGroqKey);
+            const response = await requestTranscription(form, { signal: voiceSignal });
+            payload = response.data;
+            if (!response.ok) throw new Error(payload.detail || "Transcription vocale impossible.");
+          }
+          if (serverStreamSttRef.current === streamStt) serverStreamSttRef.current = null;
+          if (voiceSignal.aborted || session !== microphoneSessionRef.current) return;
           const rawTranscript = (payload.text || payload.transcript || "").trim();
           const transcript = isWhisperHallucination(rawTranscript) ? "" : rawTranscript;
           if (!transcript) {
@@ -5313,6 +5372,8 @@ function App() {
           }
           if (!handleTranscriptRef.current(transcript, true, { requireWakeWord: !pushToTalk })) retryHandsFree();
         } catch (error) {
+          if (serverStreamSttRef.current === streamStt) serverStreamSttRef.current = null;
+          streamStt?.close();
           if (voiceSignal.aborted) return;
           console.error("Erreur transcription ΣIRIUS :", error);
           setText(error.message || "La transcription vocale ΣIRIUS est indisponible.");
@@ -5325,6 +5386,8 @@ function App() {
       };
       recorder.onerror = () => {
         if (voiceSignal.aborted || serverRecorderRef.current !== recorder) return;
+        streamStt?.close();
+        serverStreamSttRef.current = null;
         serverSilenceCleanupRef.current?.();
         serverSilenceCleanupRef.current = null;
         discardServerRecordingRef.current = true;
@@ -5375,6 +5438,8 @@ function App() {
       setMicOn(false);
       setCaptureMicOn(false);
       serverRecorderRef.current = null;
+      serverStreamSttRef.current?.close();
+      serverStreamSttRef.current = null;
       if (serverRecorderStreamRef.current) {
         serverRecorderStreamRef.current.getTracks().forEach((track) => track.stop());
         serverRecorderStreamRef.current = null;
@@ -5410,6 +5475,8 @@ function App() {
       serverRecorderRef.current = null;
       if (serverRecorder.state !== "inactive") serverRecorder.stop();
     }
+    serverStreamSttRef.current?.close();
+    serverStreamSttRef.current = null;
     serverSilenceCleanupRef.current?.();
     serverSilenceCleanupRef.current = null;
     clearTimeout(serverRecorderTimerRef.current);

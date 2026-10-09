@@ -5,6 +5,7 @@ Groq Whisper) et téléchargement des archives source."""
 import base64
 import binascii
 import io
+import json
 import logging
 import os
 import re
@@ -14,9 +15,10 @@ from pathlib import Path
 from typing import Optional
 
 import httpx
-from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
+from starlette.datastructures import Headers
 
 from voice_corrections import normalize_voice_transcript
 from auth_api import require_user
@@ -24,6 +26,7 @@ import cloud_link
 import usage_quota
 
 logger = logging.getLogger(__name__)
+_MAX_STREAM_AUDIO_BYTES = 8 * 1024 * 1024
 
 # Cache LRU en mémoire pour les synthèses TTS répétées (ex. "ΣIRIUS est prêt.")
 _TTS_CACHE: OrderedDict[tuple, dict] = OrderedDict()
@@ -390,6 +393,71 @@ def make_voice_io_router(db=None):
             raise HTTPException(status_code=502, detail="La transcription ΣIRIUS a refusé l'audio.")
 
         raise HTTPException(status_code=503, detail="Aucun moteur de reconnaissance vocale serveur n'est configuré.")
+
+    @router.websocket("/stt/stream")
+    async def stt_stream(websocket: WebSocket):
+        try:
+            await require_user(websocket, db)
+        except HTTPException:
+            await websocket.close(code=1008, reason="Authentification requise")
+            return
+        await websocket.accept()
+        try:
+            setup = await websocket.receive_json()
+            if not isinstance(setup, dict) or setup.get("action") != "start":
+                await websocket.send_json({"type": "error", "detail": "Initialisation du flux audio invalide."})
+                await websocket.close(code=1008)
+                return
+            content_type = (setup.get("content_type") or "audio/webm").strip().lower()
+            if content_type not in {"audio/webm", "audio/webm;codecs=opus", "audio/mp4"}:
+                await websocket.send_json({"type": "error", "detail": "Format audio non pris en charge."})
+                await websocket.close(code=1003)
+                return
+            filename = "sirius-voice.m4a" if content_type == "audio/mp4" else "sirius-voice.webm"
+            groq_key = str(setup.get("groq_key") or "").strip()
+            audio = bytearray()
+            await websocket.send_json({"type": "ready"})
+
+            while True:
+                message = await websocket.receive()
+                if message.get("bytes") is not None:
+                    chunk = message["bytes"]
+                    if len(audio) + len(chunk) > _MAX_STREAM_AUDIO_BYTES:
+                        await websocket.send_json({"type": "error", "detail": "Enregistrement trop volumineux."})
+                        await websocket.close(code=1009)
+                        return
+                    audio.extend(chunk)
+                    continue
+                if message.get("text") is None:
+                    continue
+                try:
+                    event = json.loads(message["text"])
+                except (TypeError, ValueError):
+                    await websocket.send_json({"type": "error", "detail": "Événement audio invalide."})
+                    await websocket.close(code=1003)
+                    return
+                if not isinstance(event, dict) or event.get("action") != "finish":
+                    await websocket.send_json({"type": "error", "detail": "Événement audio non pris en charge."})
+                    await websocket.close(code=1003)
+                    return
+                audio_file = UploadFile(
+                    filename=filename,
+                    file=io.BytesIO(bytes(audio)),
+                    headers=Headers({"content-type": content_type}),
+                )
+                payload = await stt(websocket, audio_file, groq_key)
+                await websocket.send_json({"type": "transcript", "data": payload})
+                await websocket.close(code=1000)
+                return
+        except WebSocketDisconnect:
+            return
+        except HTTPException as error:
+            await websocket.send_json({"type": "error", "detail": error.detail})
+            await websocket.close(code=1011)
+        except Exception:
+            logger.exception("[STT] Erreur inattendue du flux WebSocket")
+            await websocket.send_json({"type": "error", "detail": "Échec de la transcription vocale."})
+            await websocket.close(code=1011)
 
     @router.get("/download/{filename}")
     async def download_zip(filename: str):

@@ -209,6 +209,36 @@ test("stream transport preserves incremental speech and does not send a duplicat
   expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/chat"))).toHaveLength(0);
 });
 
+test("speaks the first complete sentence before the model stream finishes", async () => {
+  let releaseTail;
+  const reader = {
+    read: jest.fn()
+      .mockResolvedValueOnce({
+        done: false,
+        value: new Uint8Array(Buffer.from('data: {"type":"delta","text":"Bonjour. "}\n\n')),
+      })
+      .mockImplementationOnce(() => new Promise((resolve) => { releaseTail = resolve; }))
+      .mockResolvedValueOnce({ done: true }),
+    cancel: jest.fn(async () => {}),
+  };
+  const fallback = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation((url, options) => String(url).endsWith("/chat/stream")
+    ? Promise.resolve({ ok: true, headers: { get: () => "text/event-stream" }, body: { getReader: () => reader } })
+    : fallback(url, options));
+
+  await mount();
+  await send("Explique le ciel bleu");
+  await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+  expect(speakSeries).toHaveBeenCalledWith("Bonjour.", expect.objectContaining({ onstart: expect.any(Function) }));
+  expect(releaseTail).toBeInstanceOf(Function);
+
+  await act(async () => releaseTail({
+    done: false,
+    value: new Uint8Array(Buffer.from('data: {"type":"done","answer":"Bonjour."}\n\n')),
+  }));
+});
+
 test("an incomplete stream keeps its interruption warning and never replays a partial response", async () => {
   const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
   mockConversationStream([{ type: "delta", text: "Réponse partielle. " }]);
