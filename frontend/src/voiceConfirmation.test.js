@@ -29,28 +29,44 @@ describe("confirmations vocales des actions", () => {
     addWindow("Atlas");
     await new Promise((r) => setTimeout(r, 40));
     stop();
-    expect(changes).toEqual(["J'ai ouvert Atlas."]);
+    expect(changes).toEqual(["J'ouvre Atlas."]);
   });
 
   test("formule la confirmation selon le verbe", () => {
-    expect(moduleActionConfirmation("ouvre thémis", "THÉMIS — Gestion")).toBe("J'ai ouvert THÉMIS.");
+    expect(moduleActionConfirmation("ouvre thémis", "THÉMIS — Gestion")).toBe("J'ouvre THÉMIS — Gestion.");
     expect(moduleActionConfirmation("affiche la bourse", "Bourse")).toBe("J'affiche Bourse.");
-    expect(moduleActionConfirmation("lance atlas", "Atlas")).toBe("J'ai lancé Atlas.");
-    expect(moduleActionConfirmation("ferme atlas", "Atlas", "close")).toBe("J'ai fermé Atlas.");
-    expect(moduleActionConfirmation("masque atlas", "Atlas", "close")).toBe("J'ai masqué Atlas.");
+    expect(moduleActionConfirmation("lance atlas", "Atlas")).toBe("Je lance Atlas.");
+    expect(moduleActionConfirmation("ferme atlas", "Atlas", "close")).toBe("Je ferme Atlas.");
+    expect(moduleActionConfirmation("masque atlas", "Atlas", "close")).toBe("Je masque Atlas.");
   });
 
   test("annonce la fenêtre ouverte", () => {
     const before = snapshotWindows();
     addWindow("ZEUS CORTEX");
-    expect(windowChangeConfirmation("ouvre le cortex", before, snapshotWindows())).toBe("J'ai ouvert Zeus Cortex.");
+    expect(windowChangeConfirmation("ouvre le cortex", before, snapshotWindows())).toBe("J'ouvre Zeus Cortex.");
+  });
+
+  test("lit le titre doré complet plutôt que le nom technique du panneau", () => {
+    const before = snapshotWindows();
+    const panel = addWindow("Sous-section", "prime-screen");
+    panel.setAttribute("data-testid", "pantheon-panel");
+    panel.setAttribute("aria-label", "Pantheon panel");
+    panel.insertAdjacentHTML("afterbegin", '<div class="oracle-title font-divine">PANTHEON SYSTEM</div>');
+    expect(windowChangeConfirmation("ouvre panthéon", before, snapshotWindows())).toBe("J'ouvre Pantheon System.");
+  });
+
+  test("ne tronque ni le sous-titre ni les titres longs", () => {
+    const before = snapshotWindows();
+    addWindow("HÉPHAÏSTOS — AUTO-MAINTENANCE ET DIAGNOSTIC DU SYSTÈME");
+    expect(windowChangeConfirmation("ouvre héphaïstos", before, snapshotWindows()))
+      .toBe("J'ouvre Héphaïstos — Auto-Maintenance Et Diagnostic Du Système.");
   });
 
   test("annonce la fenêtre fermée, pas celle rangée en pastille", () => {
     const atlas = addWindow("Atlas");
     const before = snapshotWindows();
     atlas.remove();
-    expect(windowChangeConfirmation("ferme atlas", before, snapshotWindows())).toBe("J'ai fermé Atlas.");
+    expect(windowChangeConfirmation("ferme atlas", before, snapshotWindows())).toBe("Je ferme Atlas.");
 
     const themis = addWindow("Thémis");
     const before2 = snapshotWindows();

@@ -3967,7 +3967,7 @@ function App() {
     if (/^(?:sirius[, ]*)?(?:ferme|fermer|fermez)(?:[- ]moi)?(?:\s+(?:(?:la|le|cette|ce)\s+)?(?:fenetre|module)(?:\s+(?:ouverte?|actif|active|actuel|actuelle|au premier plan))?)?[.!?]*$/.test(closeCommand)) {
       cancelCascadeRef.current();
       const name = closeForegroundWindow();
-      const message = name ? `J'ai fermé ${name}.` : "Aucune fenêtre ouverte à fermer.";
+      const message = name ? `Je ferme ${name}.` : "Aucune fenêtre ouverte à fermer.";
       setText(message);
       setStatus("speaking");
       speakOut(message);

@@ -1,3 +1,5 @@
+import { windowLabel } from "./voiceConfirmation";
+
 const WINDOW_SURFACES = ".prime-screen, .zeus-screen, .eu-screen, .setup-screen, .iw-panel, .atlas-panel, .kr-panel, .p3d-overlay, .esp-panel, .about-panel, .media-hud-window, .productivity-screen, .connections-screen, .fp-overlay, .vision-card, .keys-panel, .sp-journal, .getting-started, .modwheel, .sirius-display";
 
 export function closeForegroundWindow() {
@@ -21,8 +23,7 @@ export function closeForegroundWindow() {
   }).filter(({ close }) => close).sort((a, b) => b.z - a.z || b.order - a.order);
   const current = candidates[0];
   if (!current) return null;
-  const title = current.el.querySelector(".zeus-title, .oracle-title, .eu-title, .fp-title, .p3d-title, .keys-title, .vision-title, .sp-title, h1, h2");
-  const name = title?.textContent.trim() || current.el.getAttribute("aria-label") || "la fenêtre";
+  const name = windowLabel(current.el) || "la fenêtre";
   current.close.click();
   return name;
 }

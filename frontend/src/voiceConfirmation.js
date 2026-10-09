@@ -1,27 +1,27 @@
-// Confirmation vocale d'une action sur une fenêtre : « Sirius, ouvre Thémis » → « J'ai ouvert Thémis. »
+// Les confirmations reprennent le titre visible de la fenêtre.
 const norm = (value) => String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
 export function cleanModuleLabel(label) {
-  return String(label || "").split(/\s+[—–-]\s+/)[0].replace(/[.!?:]+$/, "").trim();
+  return String(label || "").replace(/\s+/g, " ").replace(/[.!?:]+$/, "").trim();
 }
 
 export function moduleActionConfirmation(command, label, action = "open") {
   const name = cleanModuleLabel(label);
   const low = norm(command);
   if (action === "close") {
-    if (!name) return "J'ai fermé la fenêtre.";
-    return /\b(?:masque|cache)/.test(low) ? `J'ai masqué ${name}.` : `J'ai fermé ${name}.`;
+    if (!name) return "Je ferme la fenêtre.";
+    return /\b(?:masque|cache)/.test(low) ? `Je masque ${name}.` : `Je ferme ${name}.`;
   }
-  if (action === "minimize") return name ? `J'ai réduit ${name}.` : "J'ai réduit la fenêtre.";
-  if (!name) return "C'est ouvert.";
+  if (action === "minimize") return name ? `Je réduis ${name}.` : "Je réduis la fenêtre.";
+  if (!name) return "J'ouvre la fenêtre.";
   if (/\b(?:affiche|montre|presente)/.test(low)) return `J'affiche ${name}.`;
-  if (/\b(?:lance|demarre|active)/.test(low)) return `J'ai lancé ${name}.`;
-  return `J'ai ouvert ${name}.`;
+  if (/\b(?:lance|demarre|active)/.test(low)) return `Je lance ${name}.`;
+  return `J'ouvre ${name}.`;
 }
 
 // Fenêtres de module réellement affichées (mêmes surfaces que celles qui couvrent l'écran mobile).
 const WINDOW_SELECTOR = ".holo-win, .prime-screen, .zeus-screen, .eu-screen, .setup-screen, .kr-panel, .atlas-panel, .esp-panel, .p3d-overlay, .about-panel, .media-hud-window";
-const TITLE_SELECTOR = ".zeus-title, .eu-title, .gcal-title, .setup-title, .kr-title, .atlas-title, h1, h2, h3";
+const TITLE_SELECTOR = ".oracle-title, .zeus-title, .eu-title, .gcal-title, .setup-title, .kr-title, .atlas-title, .fp-title, .p3d-title, .keys-title, .vision-title, .sp-title, .about-title, [class*='-title'].font-divine";
 export const WINDOW_COMMAND = /\b(?:ouvr\w*|affich\w*|montr\w*|lanc\w*|demarr\w*|activ\w*|desactiv\w*|present\w*|deplo\w*|ferm\w*|quitt\w*|masqu\w*|cach\w*|lis|lire|relis|joue\w*|mets?|allum\w*|etein\w*|coup\w*|arret\w*|envo\w*|cherch\w*|recherch\w*|connect\w*|deconnect\w*|enregistr\w*|supprim\w*|ajout\w*|cre\w*|regl\w*|program\w*|rappel\w*|synchronis\w*|actualis\w*|rafraich\w*|telecharg\w*|import\w*|export\w*|imprim\w*|partag\w*)\b/;
 export const isWindowCommand = (command) => WINDOW_COMMAND.test(norm(command));
 
@@ -38,9 +38,10 @@ const spokenCase = (text) => (text === text.toUpperCase() && /[A-Z]{3}/.test(tex
   : text);
 
 export function windowLabel(el) {
-  const title = el.getAttribute("aria-label") || el.querySelector(TITLE_SELECTOR)?.textContent
+  const title = el.querySelector(TITLE_SELECTOR)?.textContent || el.querySelector("h1, h2, h3")?.textContent
+    || el.getAttribute("aria-label")
     || (el.getAttribute("data-testid") || "").replace(/[-_]/g, " ");
-  return spokenCase(cleanModuleLabel(String(title).replace(/\s+/g, " ").trim()).slice(0, 40));
+  return spokenCase(cleanModuleLabel(title));
 }
 
 export function snapshotWindows(root = document) {
@@ -55,7 +56,7 @@ export function windowChangeConfirmation(command, before, after, root = document
   const opened = [...after.keys()].filter((el) => !before.has(el)).map((el) => after.get(el)).filter(Boolean);
   if (opened.length) return moduleActionConfirmation(command, opened[opened.length - 1], "open");
   const closed = [...before.keys()].filter((el) => !root.contains(el)).map((el) => before.get(el));
-  if (closed.length > 1) return `J'ai fermé ${closed.length} fenêtres.`;
+  if (closed.length > 1) return `Je ferme ${closed.length} fenêtres.`;
   if (closed.length) return moduleActionConfirmation(command, closed[0], "close");
   return null;
 }

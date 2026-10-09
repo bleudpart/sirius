@@ -39,3 +39,10 @@ test("ignores minimized and hidden windows", () => {
 test("returns no target when no window is open", () => {
   expect(closeForegroundWindow()).toBeNull();
 });
+
+test("returns the full visible module title when closing a panel", () => {
+  const { panel } = windowPanel("Sous-section", "1200");
+  panel.setAttribute("aria-label", "Pantheon panel");
+  panel.insertAdjacentHTML("afterbegin", '<div class="oracle-title font-divine">PANTHEON SYSTEM — MODULE CENTRAL</div>');
+  expect(closeForegroundWindow()).toBe("Pantheon System — Module Central");
+});

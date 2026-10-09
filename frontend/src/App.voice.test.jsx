@@ -168,7 +168,7 @@ test("close the window targets the visible journal without asking the assistant"
   jest.spyOn(journal, "getClientRects").mockReturnValue([{}]);
   await send("ferme la fenêtre");
   expect(host.querySelector('[data-testid="sirius-journal-panel"]')).toBeNull();
-  expect(speakFr).toHaveBeenCalledWith(expect.stringContaining("J'ai fermé"), expect.anything());
+  expect(speakFr).toHaveBeenCalledWith(expect.stringContaining("Je ferme"), expect.anything());
   expect(global.fetch.mock.calls.filter(([url]) => /\/(?:intent|chat)(?:\/stream)?$/.test(String(url)))).toHaveLength(0);
 });
 

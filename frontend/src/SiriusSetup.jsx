@@ -540,7 +540,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
               <button type="button" className={`setup-mode ${actionConfirmOn ? "active" : ""}`}
                 onClick={() => { localStorage.setItem("sirius_action_confirm", "on"); setActionConfirmOn(true); }} data-testid="setup-actionconfirm-on">
                 <b>ACTIVÉES</b>
-                <span>« J'ai ouvert Thémis », « J'ai fermé Atlas »…</span>
+                <span>« J'ouvre Thémis », « Je ferme Atlas »…</span>
               </button>
               <button type="button" className={`setup-mode ${!actionConfirmOn ? "active" : ""}`}
                 onClick={() => { localStorage.setItem("sirius_action_confirm", "off"); setActionConfirmOn(false); }} data-testid="setup-actionconfirm-off">

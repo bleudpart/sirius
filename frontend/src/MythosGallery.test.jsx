@@ -2,6 +2,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import MythosGallery from "./MythosGallery";
 import { WORK_MODULES } from "./workModules";
+import { windowLabel } from "./voiceConfirmation";
 
 jest.mock("./voice", () => ({
   speakAsCharacter: jest.fn(),
@@ -26,6 +27,7 @@ test.each(WORK_MODULES)("displays $label without a hash while preserving its mod
   const root = createRoot(container);
   try {
     await act(async () => root.render(<MythosGallery onClose={() => {}} onOpenModule={openModule} />));
+    expect(windowLabel(container.querySelector(".mythos-gallery"))).toBe("Panthéon Σirius — Galerie Mythos");
     expect(container.querySelector(".mg-thumb-module").textContent).toBe(label);
     expect(container.querySelector(".mg-detail-module").textContent).toBe(label);
     expect(container.querySelector(".mg-open").textContent).not.toContain("#");
@@ -41,6 +43,7 @@ test.each(WORK_MODULES)("displays $label without a hash while preserving its mod
 test("presents Asclépios with role, introduction and access to the coach", async () => {
   const originalFetch = global.fetch;
   const openModule = jest.fn();
+  const onClose = jest.fn();
   const character = {
     module: "ASCLÉPIOS#", character: "Asclépios", role: "Coach sport & bien-être",
     image: "/api/mythos/img/asclepios.png", voiceIntro: "Je suis Asclépios.",
@@ -52,14 +55,21 @@ test("presents Asclépios with role, introduction and access to the coach", asyn
   document.body.appendChild(container);
   const root = createRoot(container);
   try {
-    await act(async () => root.render(<MythosGallery onClose={() => {}} onOpenModule={openModule} />));
+    await act(async () => root.render(<MythosGallery onClose={onClose} onOpenModule={openModule} />));
     expect(container.textContent).toContain("Asclépios");
     expect(container.textContent).toContain("Fonction : Coach sport & bien-être");
     expect(container.querySelector(".mg-detail-img").getAttribute("src")).toContain("/api/mythos/img/asclepios.png");
     expect(container.textContent).toContain("Séances guidées et illustrées.");
     expect(container.textContent).toContain("Je suis Asclépios.");
+    expect(container.querySelector(".mg-actions .mg-open")).not.toBeNull();
+    act(() => container.querySelector('[data-testid="mythos-tab-biographie"]').click());
+    expect(container.querySelector('[data-testid="mythos-detail-bio"]').textContent).toBe(character.bio);
+    act(() => container.querySelector('[data-testid="mythos-tab-capacites"]').click());
+    expect(container.querySelector(".mg-cap").textContent).toBe("Séances guidées");
     act(() => container.querySelector('[data-testid="mythos-open-module-btn"]').click());
     expect(openModule).toHaveBeenCalledWith("ASCLÉPIOS#");
+    act(() => container.querySelector('[aria-label="Fermer la galerie Mythos"]').click());
+    expect(onClose).toHaveBeenCalledTimes(1);
   } finally {
     act(() => root.unmount());
     container.remove();

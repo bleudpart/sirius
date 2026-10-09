@@ -75,8 +75,13 @@ export default function MythosGallery({ onClose, onOpenModule, initialModule = n
   return (
     <div className="prime-screen mythos-gallery" data-testid="mythos-gallery">
       <header className="zeus-head">
-        <div className="oracle-title font-divine"><img src="/holo/logo-mythos.png" alt="" className="th-logo" data-testid="mythos-logo" /> PANTHÉON ΣIRIUS — GALERIE MYTHOS</div>
-        <button className="setup-close zeus-close" onClick={onClose} data-testid="mythos-gallery-close-btn"><X size={18} /></button>
+        <div className="oracle-title font-divine">
+          <img src="/holo/logo-mythos.png" alt="" className="th-logo" data-testid="mythos-logo" />
+          <span className="mg-title-copy">
+            <span>PANTHÉON ΣIRIUS</span><span className="mg-title-divider"> — </span><span>GALERIE MYTHOS</span>
+          </span>
+        </div>
+        <button className="setup-close zeus-close" onClick={onClose} aria-label="Fermer la galerie Mythos" data-testid="mythos-gallery-close-btn"><X size={18} /></button>
       </header>
       <div className="prime-sub">LES IDENTITÉS MYTHOLOGIQUES DES MODULES ΣIRIUS#</div>
 
@@ -115,15 +120,17 @@ export default function MythosGallery({ onClose, onOpenModule, initialModule = n
               <div className="mg-detail-module">{moduleDisplayName(sel.module)}</div>
               <h2 className="mg-detail-name" style={{ color: selColor }}>{sel.character}</h2>
               <p className="mg-detail-role">Fonction : {sel.role}</p>
-              <button className="mg-speak" onClick={() => { cancelSpeech(); speakAsCharacter(sel.voiceIntro, CHAR_VOICES[sel.module] || {}); }} data-testid="mythos-speak-btn">
-                <Volume2 size={13} /> ENTENDRE
-              </button>
-              {onOpenModule && sel.column && sel.column.enabled && (
-                <button className="mg-open" onClick={() => onOpenModule(sel.module)} data-testid="mythos-open-module-btn"
-                        style={{ borderColor: selColor, color: selColor }}>
-                  OUVRIR LE MODULE {moduleDisplayName(sel.module)} <ArrowRight size={13} />
+              <div className="mg-actions">
+                <button className="mg-speak" onClick={() => { cancelSpeech(); speakAsCharacter(sel.voiceIntro, CHAR_VOICES[sel.module] || {}); }} data-testid="mythos-speak-btn">
+                  <Volume2 size={13} /> ENTENDRE
                 </button>
-              )}
+                {onOpenModule && sel.column && sel.column.enabled && (
+                  <button className="mg-open" onClick={() => onOpenModule(sel.module)} data-testid="mythos-open-module-btn"
+                          style={{ borderColor: selColor, color: selColor }}>
+                    OUVRIR LE MODULE {moduleDisplayName(sel.module)} <ArrowRight size={13} />
+                  </button>
+                )}
+              </div>
               <p className="mg-detail-intro">« {sel.voiceIntro} »</p>
               <div className="mg-tabs" data-testid="mythos-tabs">
                 {DETAIL_TABS.map((t) => (
