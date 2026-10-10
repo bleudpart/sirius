@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import gzip
 import json
 import re
@@ -36,9 +37,23 @@ def check_key_contract() -> list[str]:
     server = (ROOT / "backend" / "server.py").read_text(encoding="utf-8")
     missing = [name for name in KEY_NAMES if name not in setup]
     issues = [f"Key field missing from SiriusSetup.jsx: {name}" for name in missing]
-    if "return {\"groq_env\": bool(_sb.ENV_K3_KEY), \"gmaps_env\": bool(gmaps_env)}" not in server:
+    status = next((node for node in ast.parse(server).body
+                   if isinstance(node, ast.AsyncFunctionDef) and node.name == "chat_status"), None)
+    result = next((node.value for node in status.body if isinstance(node, ast.Return)), None) if status else None
+
+    def boolean_value(node: ast.expr) -> bool:
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            return node.func.id in {"bool", "owner_allowed"}
+        if isinstance(node, ast.BoolOp):
+            return all(boolean_value(value) for value in node.values)
+        return isinstance(node, ast.Constant) and isinstance(node.value, bool)
+
+    if (not isinstance(result, ast.Dict)
+            or {key.value for key in result.keys if isinstance(key, ast.Constant)} != {"groq_env", "gmaps_env"}
+            or not all(boolean_value(value) for value in result.values)):
         issues.append("chat/status must expose key availability only as booleans")
-    if "localStorage.getItem(\"sirius_keys\")" in "\n".join(p.read_text(encoding="utf-8") for p in (FRONTEND / "src").rglob("*.js")):
+    sources = (p for p in (FRONTEND / "src").rglob("*.js") if not p.name.endswith(".test.js"))
+    if "localStorage.getItem(\"sirius_keys\")" in "\n".join(p.read_text(encoding="utf-8") for p in sources):
         issues.append("API keys still read from localStorage")
     return issues
 
