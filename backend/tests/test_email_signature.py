@@ -32,7 +32,7 @@ def test_append_signature_text_does_not_duplicate_copyright():
     assert message.count(COPYRIGHT_LINE) == 1
 
 
-def test_email_signature_embeds_compact_inline_logo_and_text_fallback():
+def test_email_signature_embeds_readable_inline_logo_and_text_fallback():
     message = add_signature_to_message(EmailMessage(), "Bonjour,\nVoici votre document.")
     parts = list(message.walk())
     html = next(part.get_content() for part in parts if part.get_content_type() == "text/html")
@@ -41,7 +41,9 @@ def test_email_signature_embeds_compact_inline_logo_and_text_fallback():
 
     assert SIGNATURE_LINE in plain and COPYRIGHT_LINE in plain
     assert f"cid:{SIGNATURE_CID}" in html
-    assert 'width="64" height="64"' in html
+    assert 'width="96" height="96"' in html
+    assert "width:96px;height:96px;" in html
+    assert f'font-size:14px;font-weight:700;line-height:1.5;color:#a67b2e;">{SIGNATURE_LINE}</div>' in html
     assert image["Content-ID"] == f"<{SIGNATURE_CID}>"
     assert image.get_filename() == EMAIL_LOGO
 
@@ -60,6 +62,9 @@ def test_graph_signature_uses_inline_logo_attachment():
 
     assert body["contentType"] == "HTML"
     assert f"cid:{SIGNATURE_CID}" in body["content"]
+    assert 'width="96" height="96"' in body["content"]
+    assert "width:96px;height:96px;" in body["content"]
+    assert f'font-size:14px;font-weight:700;line-height:1.5;color:#a67b2e;">{SIGNATURE_LINE}</div>' in body["content"]
     assert len(attachments) == 1
     assert attachments[0]["isInline"] is True
     assert attachments[0]["contentId"] == SIGNATURE_CID

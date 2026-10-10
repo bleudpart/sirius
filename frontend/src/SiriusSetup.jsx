@@ -16,7 +16,7 @@ const TABS = [
   { id: "ia", label: "IA", Icon: Brain },
   { id: "hud", label: "HUD", Icon: Monitor },
   { id: "stockage", label: "STOCKAGE", Icon: HardDrive },
-  { id: "api", label: "SERVICES ET COFFRE", Icon: KeyRound },
+  { id: "api", label: "CLÉS API ET SERVICES", Icon: KeyRound },
 ];
 const KEY_META = {
   groq_key: { service: "groq_real", label: "Clé Groq (réponses IA — principale)", tag: "cerveau principal · recommandée", url: "https://console.groq.com/keys", ph: "gsk_...", note: "Créez une clé dans votre compte Groq. Consultez les quotas et tarifs du fournisseur ; les autres services sont facultatifs." },
@@ -317,6 +317,9 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
         {tab === "profil" && (
           <section className="setup-section setup-single" data-testid="setup-panel-profil">
             <p className="setup-note">Seul le prénom est demandé pour commencer. Les autres informations sont facultatives. Après l'enregistrement, un guide vous proposera le chat, les dossiers locaux ou la connexion de vos comptes. Le microphone n'est pas nécessaire pour utiliser le chat écrit.</p>
+            <button type="button" className="setup-tab" onClick={() => setTab("api")} data-testid="setup-api-btn">
+              <KeyRound size={14} /> GÉRER MES CLÉS API
+            </button>
             {onOpenAccount && (
               <button type="button" className="setup-tab" onClick={onOpenAccount} data-testid="setup-account-btn">
                 <User size={14} /> MON COMPTE

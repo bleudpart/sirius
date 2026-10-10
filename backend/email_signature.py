@@ -1,5 +1,5 @@
 # © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
-"""Signatures SIRIUS intégrées aux e-mails envoyés (Outlook, Gmail)."""
+"""Signatures e-mail Outlook/Gmail : logo de 96 px et titre doré soutenu en gras."""
 
 import base64
 import re
@@ -61,8 +61,8 @@ def _signature_markup(*, include_image=True, signature_name=None, signature_emai
     signature_line, _, copyright_line, email = signature_lines(signature_name, signature_email)
     image = (
         f'<td style="padding:0 14px 0 0;vertical-align:middle;"><img src="cid:{SIGNATURE_CID}" '
-        'width="64" height="64" alt="ΣIRIUS — Votre assistant privilégié" '
-        'style="display:block;width:64px;height:64px;border:0;outline:none;text-decoration:none;"></td>'
+        'width="96" height="96" alt="ΣIRIUS — Votre assistant privilégié" '
+        'style="display:block;width:96px;height:96px;border:0;outline:none;text-decoration:none;"></td>'
         if include_image else ""
     )
     separator = "border-left:2px solid #a67b2e;" if include_image else ""
@@ -74,7 +74,7 @@ def _signature_markup(*, include_image=True, signature_name=None, signature_emai
   <tr>
     {image}
     <td style="padding:0 0 0 {padding};vertical-align:middle;{separator}">
-      <div style="font-size:13px;font-weight:600;line-height:1.5;color:#07141f;">{escape(signature_line)}</div>
+      <div style="font-size:14px;font-weight:700;line-height:1.5;color:#a67b2e;">{escape(signature_line)}</div>
       <div style="padding-top:3px;font-size:11px;line-height:1.5;overflow-wrap:anywhere;">
         <a href="mailto:{safe_email}" style="color:#07141f;text-decoration:none;">{safe_email}</a>
       </div>

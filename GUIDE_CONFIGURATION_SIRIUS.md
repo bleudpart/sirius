@@ -9,7 +9,7 @@ vous n'avez pas à les connaître, les copier ou les demander.
 
 La disponibilité dépend des services effectivement configurés. Une fonction
 facultative absente n'empêche pas d'utiliser les autres fonctions.
-Les limites quotidiennes sont visibles dans **Configuration → Services et coffre**.
+Les limites quotidiennes sont visibles dans **Configuration → Clés API et services**.
 Se déconnecter ou réinstaller l'application ne recommence pas l'essai.
 
 > **Important : après ces 7 jours, les services en ligne qui utilisent les
@@ -25,9 +25,9 @@ Se déconnecter ou réinstaller l'application ne recommence pas l'essai.
 
 Vous pouvez préparer vos clés avant la fin de l'essai.
 La **page de configuration** s'ouvre avec le bouton **Réglages**
-(icône de réglages du profil) dans le HUD, puis l'onglet **SERVICES ET COFFRE**.
+(icône de réglages du profil) dans le HUD, puis l'onglet **CLÉS API ET SERVICES**, ou le bouton **GÉRER MES CLÉS API** dans **PROFIL**.
 
-1. Ouvrez **Configuration → Services et coffre**.
+1. Ouvrez **Configuration → Clés API et services**.
 2. Choisissez les services dont vous avez besoin. Pour discuter, commencez
    par la clé **Groq** ; les autres services sont facultatifs.
 3. Cliquez sur **obtenir** à côté du service. Sur le site du fournisseur,
@@ -51,7 +51,7 @@ Les champs de clés ne sont pas sauvegardés par le simple bouton général
 Si vous possédez un fichier **sirius.vault**, vous n'avez pas à recopier les
 clés une par une :
 
-1. Ouvrez **Services et coffre** et sélectionnez **Importer un coffre chiffré**.
+1. Ouvrez **Clés API et services** et sélectionnez **Importer un coffre chiffré**.
 2. Choisissez votre fichier, puis saisissez le mot de passe de ce coffre.
 3. Cliquez sur **Déverrouiller et confirmer l'import**. Relisez la liste des
    services avant de confirmer le remplacement du coffre de votre compte
@@ -63,7 +63,7 @@ Après import, testez les services : une clé peut avoir expiré depuis l'export
 
 ## À la prochaine ouverture
 
-Les clés restent chiffrées sur l'appareil. Dans **Services et coffre**,
+Les clés restent chiffrées sur l'appareil. Dans **Clés API et services**,
 saisissez le mot de passe du coffre et cliquez sur **Déverrouiller**.
 Vous n'avez pas à saisir à nouveau toutes vos clés.
 
@@ -186,7 +186,7 @@ dans votre propre compte.
 1. Ouvrez [console.groq.com/keys](https://console.groq.com/keys).
 2. Créez votre compte ou connectez-vous, puis ouvrez **API Keys**.
 3. Créez une nouvelle clé et donnez-lui un nom, par exemple « Mon SIRIUS ».
-4. Copiez la clé complète dans **Clé Groq** sur la page **Services et coffre**.
+4. Copiez la clé complète dans **Clé Groq** sur la page **Clés API et services**.
 5. Cliquez sur **TESTER**, puis protégez et enregistrez le coffre.
 
 Ne confondez pas cette clé avec celle de Kimi. Pour commencer, il n'est

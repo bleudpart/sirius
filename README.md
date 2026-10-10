@@ -122,7 +122,7 @@ l'essai. La période est enregistrée côté serveur lors de la première
 activation du compte, pas dans une préférence de l'appareil. Les droits
 administrateur sont distincts du coffre et restent ceux du compte authentifié.
 
-Dans **Configuration → Services et coffre**, choisissez les services utiles,
+Dans **Configuration → Clés API et services** (ou **Profil → Gérer mes clés API**), choisissez les services utiles,
 créez leurs clés via les liens des fournisseurs, testez-les puis utilisez
 **Protéger et enregistrer**. Le coffre personnel est chiffré par
 AES-256-GCM avec un mot de passe d'au moins 12 caractères et
@@ -157,7 +157,7 @@ IA, transcription du micro et lecture effectivement entendue, confirmée
 par la personne. La disponibilité d'un endpoint ne vaut pas test audio.
 
 **Note utilisateur : [Configurer SIRIUS simplement](./GUIDE_CONFIGURATION_SIRIUS.md).**
-Un guide rapide est également intégré à la page **Services et coffre**.
+Un guide rapide est également intégré à la page **Clés API et services**.
 
 Après la présentation et la configuration du profil, un guide propose trois
 entrées : chat écrit, dossiers métier locaux, comptes et connexions facultatifs.

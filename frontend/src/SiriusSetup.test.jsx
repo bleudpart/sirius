@@ -128,11 +128,19 @@ test("services tab distinguishes the trial from a personal encrypted vault", asy
       <SiriusSetup initialProfile={{ name: "Daniel" }} onCancel={jest.fn()} onComplete={jest.fn()} />,
     ));
     const apiTab = container.querySelector('[data-testid="setup-tab-api"]');
-    await act(async () => apiTab.click());
+    expect(apiTab.textContent).toContain("CLÉS API ET SERVICES");
+    const apiButton = container.querySelector('[data-testid="setup-api-btn"]');
+    expect(apiButton.type).toBe("button");
+    expect(apiButton.textContent).toContain("GÉRER MES CLÉS API");
+    await act(async () => apiButton.click());
+    expect(apiTab.className).toContain("active");
     expect(container.querySelector('[data-testid="setup-trial"]').textContent).toContain("Essai actif");
     expect(container.querySelector('[data-testid="vault-controls"]').textContent).toContain("Mes clés personnelles");
     expect(container.querySelector('[data-testid="setup-account-quotas"]').textContent).toContain("2 / 150");
     expect(container.textContent).not.toContain("Voix : opérationnelle");
+    await act(async () => container.querySelector('[data-testid="setup-tab-profil"]').click());
+    await act(async () => apiTab.click());
+    expect(container.querySelector('[data-testid="vault-controls"]')).not.toBeNull();
   } finally {
     act(() => root.unmount());
     global.fetch = originalFetch;
