@@ -42,12 +42,20 @@ async def _stock_yahoo(sym: str) -> list:
     return points
 
 
-async def _stock_daily(sym: str) -> list:
+def personal_av_keys(request: Request, av_key: str = ""):
+    """Clé Alpha Vantage personnelle : en-tête X-Sirius-Alphavantage-Key (préféré, absent des logs d'accès)."""
+    key = (request.headers.get("x-sirius-alphavantage-key") or av_key or "").strip()[:256]
+    return {"alphavantage": key} if key else None
+
+
+async def _stock_daily(sym: str, keys: dict | None = None) -> list:
     c = _stock_hist.get(sym)
     if c and time.time() - c["ts"] < STOCK_TTL:
         return c["points"]
     points = []
-    key = os.environ.get("ALPHA_VANTAGE_API_KEY", "").strip()
+    from provider_access import provider_env
+    # Sans clé (essai expiré, aucune clé personnelle), repli Yahoo gratuit : jamais la clé du serveur.
+    key = provider_env("alphavantage", "ALPHA_VANTAGE_API_KEY", keys=keys)
     if key:
         try:
             async with httpx.AsyncClient(timeout=25) as cx:
@@ -98,13 +106,14 @@ def make_nummarius_router(db):
         return (await require_user(request, db))["user_id"]
 
     @r.get("/market")
-    async def market(request: Request):
+    async def market(request: Request, av_key: str = ""):
         """Vue d'ensemble : prix, variation et sparkline (30 derniers points) par actif."""
         await _uid(request)
+        keys = personal_av_keys(request, av_key)
         assets, errors = [], []
         for sym, label in STOCKS:
             try:
-                pts = await _stock_daily(sym)
+                pts = await _stock_daily(sym, keys)
                 closes = [p[1] for p in pts]
                 ch = round((closes[-1] - closes[-2]) / closes[-2] * 100, 2) if len(closes) > 1 else 0.0
                 assets.append({"id": sym, "label": label, "type": "stock", "currency": "$",
@@ -129,13 +138,13 @@ def make_nummarius_router(db):
         return {"assets": assets, "errors": errors}
 
     @r.get("/history/{asset_id}")
-    async def history(asset_id: str, request: Request, range: str = "1m"):
+    async def history(asset_id: str, request: Request, range: str = "1m", av_key: str = ""):
         """Courbe d'évolution : range = 1s | 1m | 3m | max."""
         await _uid(request)
         stock = next((s for s in STOCKS if s[0] == asset_id), None)
         crypto = next((c for c in CRYPTOS if c[0] == asset_id), None)
         if stock:
-            pts = await _stock_daily(asset_id)
+            pts = await _stock_daily(asset_id, personal_av_keys(request, av_key))
             n = {"1s": 6, "1m": 22, "3m": 66, "max": len(pts)}.get(range, 22)
             return {"label": stock[1], "type": "stock", "currency": "$",
                     "points": [{"t": d, "v": v} for d, v in pts[-n:]]}
@@ -162,7 +171,7 @@ def make_nummarius_router(db):
     @r.get("/alerts")
     async def list_alerts(request: Request):
         uid = await _uid(request)
-        market_data = await market(request)
+        market_data = await market(request, "")
         current = {asset["id"]: asset for asset in market_data["assets"]}
         alerts = await db.nummarius_alerts.find({"user_id": uid, "active": True}, {"_id": 0}).sort("created_at", -1).to_list(100)
         for alert in alerts:

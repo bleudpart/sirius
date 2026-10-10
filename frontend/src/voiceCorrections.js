@@ -59,7 +59,8 @@ export function chooseBestVoiceTranscript(alternatives) {
 }
 
 const WAKE_WORD = /\b(?:sirius|syrius|cirius|sirus|cyrus|serious|s[ée]rieux|cilius|syriusse|sirio)\b/gi;
-const SHORT_COMMANDS = new Set(["stop", "silence", "pause", "briefing", "continue", "annule", "annuler"]);
+const SHORT_COMMANDS = new Set(["stop", "silence", "pause", "briefing", "continue", "annule", "annuler", "bonjour", "bonsoir", "salut"]);
+const GREETING_WITH_NAME = new RegExp(`^\\s*(?:bonjour|bonsoir|salut)[\\s,]+${WAKE_WORD.source}[\\s,.!?]*$`, "i");
 
 export function hasVoiceWakeWord(text) {
   return new RegExp(WAKE_WORD.source, "i").test(normalizeVoiceTranscript(text));
@@ -78,7 +79,7 @@ export function removeVoiceWakeWord(text) {
 export function extractVoiceCommand(text, { requireWakeWord = false } = {}) {
   const transcript = normalizeVoiceTranscript(text).trim();
   const hasWakeWord = new RegExp(WAKE_WORD.source, "i").test(transcript);
-  if (requireWakeWord && (!hasWakeWord || !startsWithVoiceWakeWord(transcript))) return "";
+  if (requireWakeWord && (!hasWakeWord || (!startsWithVoiceWakeWord(transcript) && !GREETING_WITH_NAME.test(transcript)))) return "";
 
   const command = transcript.replace(WAKE_WORD, " ").replace(/\s+/g, " ").trim().replace(/^[,.\s]+/, "");
   const words = command.match(/[\p{L}\p{N}]+/gu) || [];

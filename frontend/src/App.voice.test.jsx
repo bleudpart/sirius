@@ -8,8 +8,10 @@ import { Capacitor } from "@capacitor/core";
 import { createNativeRecognition } from "./nativeSpeechRecognition";
 import { connectStreamingStt } from "./services/streamingStt";
 import { pttBeep } from "./appLogic";
+import { createNativeHandsFree } from "./nativeHandsFree";
 
 jest.mock("./nativeSpeechRecognition", () => ({ createNativeRecognition: jest.fn() }));
+jest.mock("./nativeHandsFree", () => ({ createNativeHandsFree: jest.fn() }));
 jest.mock("./services/streamingStt", () => ({ connectStreamingStt: jest.fn() }));
 jest.mock("./appLogic", () => ({ ...jest.requireActual("./appLogic"), pttBeep: jest.fn() }));
 
@@ -22,7 +24,10 @@ jest.mock("./lazyModules", () => new Proxy({}, { get: (_, key) => {
   if (key === "MediaModulesPanel") return ({ onClose }) => (
     <div data-testid="media-modules-panel"><button onClick={onClose}>Fermer le catalogue</button></div>
   );
-  if (key === "SiriusDisplay") return () => <div data-testid="sirius-display" />;
+  if (key === "SiriusDisplay") return ({ item, onRead }) => <div data-testid="sirius-display">
+    <button data-testid="sirius-display-read" onClick={onRead}>Lire</button>
+    <div data-testid="sirius-display-body">{item.contenu}</div>
+  </div>;
   return () => null;
 } }));
 jest.mock("./components/ReactorVisuals", () => ({ MedallionRing: () => null, ReactorCore: () => null, Waveform: () => null }));
@@ -54,6 +59,8 @@ let chatSignal;
 let deliverAnswer;
 let native;
 let nativeCalls;
+let handsFree;
+let handsFreeOptions;
 let originalSpeechRecognition;
 
 beforeEach(() => {
@@ -65,6 +72,12 @@ beforeEach(() => {
   chatSignal = null;
   deliverAnswer = null;
   nativeCalls = [];
+  handsFree = {
+    active: false, available: jest.fn(async () => ({ available: false })),
+    setBlocked: jest.fn(async () => {}), stop: jest.fn(async () => { handsFree.active = false; }),
+    start: jest.fn(async () => { handsFree.active = true; handsFreeOptions.onState({ phase: "ready" }); }),
+  };
+  createNativeHandsFree.mockImplementation((options) => { handsFreeOptions = options; return handsFree; });
   originalSpeechRecognition = window.SpeechRecognition;
   native = {
     active: false,
@@ -141,6 +154,53 @@ test("the HUD no longer mounts the next-actions pill", async () => {
   expect(host.querySelector(".shud-next")).toBeNull();
 });
 
+test("native hands-free is diagnostic-only, explicitly started, and stopped before manual capture", async () => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  handsFree.available.mockResolvedValue({ available: true });
+  localStorage.setItem("sirius_android_stt", "native");
+  localStorage.setItem("sirius_auto_mic", "1");
+  await mount();
+  expect(handsFree.start).not.toHaveBeenCalled();
+  const button = host.querySelector('[data-testid="sirius-native-capture-btn"]');
+  expect(button).not.toBeNull();
+  await act(async () => button.click());
+  expect(handsFree.start).toHaveBeenCalledTimes(1);
+  expect(button.textContent).toContain("Arrêter la capture native");
+  await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
+  expect(handsFree.active).toBe(false);
+  expect(nativeCalls).toHaveLength(1);
+});
+
+test("normal Android builds do not offer experimental native hands-free", async () => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  await mount();
+  expect(host.querySelector('[data-testid="sirius-native-capture-btn"]')).toBeNull();
+});
+
+test.each(["Bonjour Zirius", "Zirius bonjour"])(
+  "native continuous capture processes the greeting %s", async (greeting) => {
+    jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+    handsFree.available.mockResolvedValue({ available: true });
+    await mount();
+    await act(async () => host.querySelector('[data-testid="sirius-native-capture-btn"]').click());
+    await act(async () => handsFreeOptions.onTranscript(greeting));
+    const call = global.fetch.mock.calls.find(([url]) => String(url).endsWith("/chat/stream"));
+    expect(JSON.parse(call[1].body).text.toLowerCase()).toBe("bonjour");
+  },
+);
+
+test.each(["Bonjour Zirius", "Zirius bonjour"])(
+  "the ordinary Android microphone processes the greeting %s", async (greeting) => {
+    jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+    localStorage.setItem("sirius_android_stt", "native");
+    await mount();
+    await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
+    await act(async () => nativeCalls[0].resolve(greeting));
+    const call = global.fetch.mock.calls.find(([url]) => String(url).endsWith("/chat/stream"));
+    expect(JSON.parse(call[1].body).text.toLowerCase()).toBe("bonjour");
+  },
+);
+
 test("the information centre entry opens its wheel from the modules menu", async () => {
   await mount();
   expect(host.querySelector('[data-testid="info-wheel"]')).toBeNull();
@@ -214,6 +274,19 @@ test("stream transport preserves incremental speech and does not send a duplicat
   expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/chat"))).toHaveLength(0);
 });
 
+test("an expired trial is shown explicitly without retrying chat or inventing a local answer", async () => {
+  const fallback = global.fetch.getMockImplementation();
+  const message = "Essai de 7 jours terminé : configurez vos clés personnelles.";
+  global.fetch.mockImplementation((url, options) => String(url).endsWith("/chat/stream")
+    ? Promise.resolve({ ok: false, status: 403, json: async () => ({ detail: message, trial: "expired" }) })
+    : fallback(url, options));
+  await mount();
+  await send("Explique le ciel bleu");
+  expect(host.textContent).toContain(message);
+  expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/chat"))).toHaveLength(0);
+  expect(speakSeries).not.toHaveBeenCalled();
+});
+
 test("speaks the first complete sentence before the model stream finishes", async () => {
   let releaseTail;
   const reader = {
@@ -269,7 +342,7 @@ test("Stop cancels a live conversational request and ignores its answer after a 
   expect(speakFr.mock.calls.some(([text]) => text === "Réponse devenue obsolète")).toBe(false);
   expect(speakFr.mock.calls.some(([text]) => text.startsWith("Il est "))).toBe(true);
   expect(host.textContent).not.toContain("Réponse devenue obsolète");
-  expect(host.querySelector('[title="Activer le mode mains libres"]')).not.toBeNull();
+  expect(host.querySelector('[title="Démarrer la conversation vocale"]')).not.toBeNull();
 });
 
 test("a new request replaces a busy request without needing Stop first", async () => {
@@ -293,8 +366,13 @@ test("Android native test mode replaces a pending answer with a newly spoken que
   await act(async () => nativeCalls[0].resolve("Sirius, explique pourquoi le ciel est bleu"));
   const previousSignal = chatSignal;
   const lateAnswer = deliverAnswer;
-  expect(nativeCalls).toHaveLength(2);
+  expect(nativeCalls).toHaveLength(1);
   expect(host.querySelector(".voice-session-controls").textContent).toContain("Je traite");
+  await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
+  expect(previousSignal.aborted).toBe(true);
+  expect(nativeCalls).toHaveLength(1);
+  await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
+  expect(nativeCalls).toHaveLength(2);
   await act(async () => nativeCalls[1].resolve("Sirius, quelle heure est-il"));
   expect(previousSignal.aborted).toBe(true);
   await act(async () => lateAnswer());
@@ -303,7 +381,7 @@ test("Android native test mode replaces a pending answer with a newly spoken que
   expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/stt"))).toBe(false);
 });
 
-test("Android hands-free routes the evening briefing when preceded by the wake word", async () => {
+test("Android manual dictation routes the evening briefing when preceded by the wake word", async () => {
   jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
   localStorage.setItem("sirius_android_stt", "native");
   const webSpeech = jest.fn();
@@ -318,17 +396,85 @@ test("Android hands-free routes the evening briefing when preceded by the wake w
   expect(webSpeech).not.toHaveBeenCalled();
 });
 
-test("Android hands-free ignores ambient-speech-like text without the wake word", async () => {
+test.each([
+  "afficher et lire le briefing",
+  "affiche et lis le brieffing du soir",
+  "lis le briefing",
+  "lire et afficher mon briefing du jour",
+])("%s displays and speaks the briefing rather than only opening a panel", async (command) => {
+  const fallback = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation((url, options) => String(url).endsWith("/oracle/overview")
+    ? Promise.resolve({ ok: true, json: async () => ({ briefing: "Voici les nouvelles de votre journée." }) })
+    : fallback(url, options));
+  await mount();
+  await send(command);
+  expect(host.querySelector('[data-testid="sirius-display"]')).not.toBeNull();
+  expect(speakFr.mock.calls.some(([message]) => message.includes("Voici les nouvelles de votre journée."))).toBe(true);
+  expect(global.fetch.mock.calls.some(([url]) => /\/(?:intent|chat)(?:\/stream)?$/.test(String(url)))).toBe(false);
+});
+
+test("Display reads the complete briefing before visual typing finishes", async () => {
+  const longBriefing = `${"Une nouvelle importante pour cette journée. ".repeat(100)}Fin du briefing.`;
+  const fallback = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation((url, options) => String(url).endsWith("/oracle/overview")
+    ? Promise.resolve({ ok: true, json: async () => ({ briefing: longBriefing }) })
+    : fallback(url, options));
+  await mount();
+  await send("afficher et lire le briefing");
+  speakSeries.mockClear();
+  await send("lis mon Sirius Display");
+  expect(speakSeries.mock.calls.length).toBeGreaterThan(3);
+  expect(speakSeries.mock.calls.map(([text]) => text).join(" ")).toContain("Fin du briefing.");
+  expect(speakSeries.mock.calls.every(([text]) => text.length <= 800)).toBe(true);
+});
+
+test("Display reserves the actual microphone controls and updates on viewport resize", async () => {
+  const fallback = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation((url, options) => String(url).endsWith("/oracle/overview")
+    ? Promise.resolve({ ok: true, json: async () => ({ briefing: "Les informations du jour." }) })
+    : fallback(url, options));
+  await mount();
+  const area = host.querySelector(".sirius-command-area");
+  const header = host.querySelector(".top-bar");
+  jest.spyOn(area, "getBoundingClientRect").mockReturnValue({ top: window.innerHeight - 210 });
+  jest.spyOn(header, "getBoundingClientRect").mockReturnValue({ bottom: 80 });
+  await send("afficher et lire le briefing");
+  const hud = area.closest(".sirius-root");
+  expect(hud.style.getPropertyValue("--display-command-space")).toBe("218px");
+  expect(hud.style.getPropertyValue("--display-header-space")).toBe("88px");
+  area.getBoundingClientRect.mockReturnValue({ top: window.innerHeight - 260 });
+  await act(async () => window.dispatchEvent(new Event("resize")));
+  expect(hud.style.getPropertyValue("--display-command-space")).toBe("268px");
+});
+
+test("Android conversation resumes after each answer without requiring the wake word", async () => {
   jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
   localStorage.setItem("sirius_android_stt", "native");
   await mount();
   await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
-  await act(async () => nativeCalls[0].resolve("ouvrez les actualités"));
-  expect(host.querySelector(".voice-session-controls").textContent).toContain("Dis « Sirius » puis ta demande");
+  await act(async () => nativeCalls[0].resolve("quelle heure est-il"));
+  expect(speakFr.mock.calls.some(([text]) => text.startsWith("Il est "))).toBe(true);
+  const [, options] = speakFr.mock.calls.at(-1);
+  await act(async () => options.onstart?.());
+  await act(async () => jest.advanceTimersByTime(1000));
+  expect(nativeCalls).toHaveLength(1);
+  expect(host.querySelector('[data-testid="sirius-top-mic-btn"]').getAttribute("aria-pressed")).toBe("true");
+  await act(async () => options.onend?.());
+  await act(async () => jest.advanceTimersByTime(500));
+  expect(nativeCalls).toHaveLength(2);
+  await act(async () => nativeCalls[1].resolve("quelle heure est-il"));
+  const [, nextOptions] = speakFr.mock.calls.at(-1);
+  await act(async () => nextOptions.onend?.());
+  await act(async () => jest.advanceTimersByTime(500));
+  expect(nativeCalls).toHaveLength(3);
+  await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
+  await act(async () => jest.advanceTimersByTime(5000));
+  expect(nativeCalls).toHaveLength(3);
+  expect(host.querySelector('[data-testid="sirius-top-mic-btn"]').getAttribute("aria-pressed")).toBe("false");
   expect(global.fetch.mock.calls.some(([url]) => /\/(?:intent|chat)(?:\/stream)?$/.test(String(url)))).toBe(false);
 });
 
-test("Android hands-free requires the leading wake word for read-aloud confirmations", async () => {
+test("Android conversation accepts read-aloud confirmation without the wake word", async () => {
   jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
   localStorage.setItem("sirius_android_stt", "native");
   const readAnswer = jest.fn(() => true);
@@ -337,31 +483,35 @@ test("Android hands-free requires the leading wake word for read-aloud confirmat
     await mount();
     await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
     await act(async () => nativeCalls[0].resolve("oui"));
-    expect(readAnswer).not.toHaveBeenCalled();
-    await act(async () => jest.advanceTimersByTime(500));
-    await act(async () => nativeCalls[1].resolve("Sirius, oui"));
     expect(readAnswer).toHaveBeenCalledWith("oui");
+    await act(async () => jest.advanceTimersByTime(5000));
+    expect(nativeCalls).toHaveLength(2);
   } finally {
     delete window.__siriusReadAloudAnswer;
   }
 });
 
-test("touching the quote button does not reopen hands-free microphone after the quote", async () => {
+test("saved hands-free preference stays disabled and touching the HUD never speaks a quotation", async () => {
   jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
   localStorage.setItem("sirius_android_stt", "native");
   localStorage.setItem("sirius_auto_mic", "1");
   await mount();
   await act(async () => jest.advanceTimersByTime(1200));
-  expect(nativeCalls).toHaveLength(1);
+  expect(nativeCalls).toHaveLength(0);
+  expect(localStorage.getItem("sirius_auto_mic")).toBe("0");
+  expect(host.querySelector('[title="Activer le mode mains libres"]')).toBeNull();
 
-  await act(async () => host.querySelector('[data-testid="core-quote-btn"]').click());
-  const [, speechOptions] = speakFr.mock.calls.at(-1);
-  await act(async () => speechOptions.onpending());
-  await act(async () => speechOptions.onstart());
-  await act(async () => speechOptions.onend());
+  expect(host.querySelector('[data-testid="core-quote-btn"]')).toBeNull();
+  expect(host.querySelector('[aria-label="Écouter une citation philosophique"]')).toBeNull();
+  speakFr.mockClear();
+  await act(async () => {
+    host.querySelector(".core-rings").dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    host.querySelector(".core-rings").click();
+    host.querySelector('[data-testid="sirius-title"]').click();
+  });
   await act(async () => jest.advanceTimersByTime(2000));
-
-  expect(nativeCalls).toHaveLength(1);
+  expect(speakFr).not.toHaveBeenCalled();
+  expect(nativeCalls).toHaveLength(0);
 });
 
 test("Android does not open a second recognizer during Sirius playback", async () => {
@@ -491,6 +641,9 @@ test.each([false, true])("Android waits for microphone readiness and handles ear
       expect(pttBeep).not.toHaveBeenCalled();
     } else {
       expect(recorders[0].state).toBe("recording");
+      expect(host.querySelector('[data-testid="sirius-ptt-btn"]').textContent).toContain("OUVERTURE");
+      expect(pttBeep).not.toHaveBeenCalled();
+      await act(async () => recorders[0].onstart());
       expect(host.querySelector('[data-testid="sirius-ptt-btn"]').textContent).toContain("À VOUS");
       expect(pttBeep).toHaveBeenCalledWith(false);
       await act(async () => document.dispatchEvent(new KeyboardEvent("keyup", { code: "Space", bubbles: true })));
@@ -512,7 +665,7 @@ test("native permission refusal is explicit and does not silently upload audio",
   await mount();
   await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
   expect(host.querySelector(".voice-session-controls").textContent).toContain("Microphone non autorisé.");
-  expect(host.querySelector('[title="Activer le mode mains libres"]')).not.toBeNull();
+  expect(host.querySelector('[title="Démarrer la conversation vocale"]')).not.toBeNull();
   expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/stt"))).toBe(false);
 });
 
@@ -523,7 +676,7 @@ test("native unavailability explicitly falls back to server capture", async () =
   window.MediaRecorder = class {
     static isTypeSupported() { return true; }
     constructor() { recorders.push(this); this.state = "inactive"; }
-    start() { this.state = "recording"; }
+    start() { this.state = "recording"; this.onstart?.(); }
     stop() { this.state = "inactive"; this.onstop?.(); }
   };
   Object.defineProperty(navigator, "mediaDevices", {
@@ -600,7 +753,7 @@ test("pointer Stop discards the buffered phrase before the global push-to-talk r
   }
 });
 
-test("web hands-free resumes listening after rejecting a transcript without the wake word", async () => {
+test("web conversation waits for the end of the answer before reopening", async () => {
   const previousRecognition = window.SpeechRecognition;
   const recognitions = [];
   window.SpeechRecognition = class {
@@ -615,13 +768,18 @@ test("web hands-free resumes listening after rejecting a transcript without the 
     expect(recognitions).toHaveLength(1);
 
     await act(async () => {
-      const result = [{ transcript: "ouvrez les actualités", confidence: 0.9 }];
+      const result = [{ transcript: "quelle heure est-il", confidence: 0.9 }];
       result.isFinal = true;
       recognitions[0].onresult({ resultIndex: 0, results: [result] });
       jest.advanceTimersByTime(1200);
       jest.advanceTimersByTime(500);
     });
 
+    expect(recognitions).toHaveLength(1);
+    expect(speakFr.mock.calls.some(([message]) => message.startsWith("Il est "))).toBe(true);
+    const [, options] = speakFr.mock.calls.at(-1);
+    await act(async () => options.onend?.());
+    await act(async () => jest.advanceTimersByTime(600));
     expect(recognitions).toHaveLength(2);
     expect(global.fetch.mock.calls.filter(([url]) => /\/(?:intent|chat)(?:\/stream)?$/.test(String(url)))).toEqual([]);
   } finally {
@@ -632,11 +790,11 @@ test("web hands-free resumes listening after rejecting a transcript without the 
 test.each([
   ["", "Aucune parole distinguée"],
   ["Sirius", "Dis ta demande complète"],
-  ["Explique pourquoi le ciel est bleu", "Dis « Sirius » puis ta demande"],
+  ["Explique pourquoi le ciel est bleu", null],
   ["Zirius explique pourquoi le ciel est bleu", null],
-  ["quelle heure est-il", "Dis « Sirius » puis ta demande"],
+  ["quelle heure est-il", "local-answer"],
   ["Sirius, quelle heure est-il", "local-answer"],
-])("Android handles the hands-free transcript %s without discarding valid requests", async (transcript, feedback) => {
+])("Android conversation handles transcript %s and resumes when available", async (transcript, feedback) => {
   const previousRecorder = window.MediaRecorder;
   const previousMediaDevices = Object.getOwnPropertyDescriptor(navigator, "mediaDevices");
   const recorders = [];
@@ -646,6 +804,7 @@ test.each([
     configurable: true,
     value: { getUserMedia: jest.fn(async () => ({ getTracks: () => [{ stop: stopTrack }] })) },
   });
+
   window.MediaRecorder = class {
     static isTypeSupported() { return true; }
     constructor() {
@@ -653,7 +812,7 @@ test.each([
       this.state = "inactive";
       recorders.push(this);
     }
-    start() { this.state = "recording"; }
+    start() { this.state = "recording"; this.onstart?.(); }
     stop() {
       this.state = "inactive";
       this.ondataavailable?.({ data: new Blob(["a".repeat(1000)], { type: this.mimeType }) });
@@ -677,7 +836,6 @@ test.each([
       await act(async () => callbacks.onend());
       await act(async () => jest.advanceTimersByTime(250));
       expect(recorders).toHaveLength(2);
-      expect(host.querySelector('[data-testid="sirius-voice-controls"]').textContent).toContain("J’écoute");
       await act(async () => host.querySelector('[data-testid="sirius-voice-controls"] button').click());
       return;
     }
@@ -694,12 +852,58 @@ test.each([
     expect(recorders).toHaveLength(2);
     const controls = host.querySelector('[data-testid="sirius-voice-controls"]');
     expect(controls.textContent).toContain("J’écoute");
-    expect(controls.textContent).toContain(feedback);
     expect(stopTrack).toHaveBeenCalledTimes(1);
     expect(global.fetch.mock.calls.filter(([url]) => /\/chat(?:\/stream)?$/.test(String(url)))).toEqual([]);
     await act(async () => controls.querySelector("button").click());
     await act(async () => jest.advanceTimersByTime(16000));
     expect(recorders).toHaveLength(2);
+  } finally {
+    window.MediaRecorder = previousRecorder;
+    if (previousMediaDevices) Object.defineProperty(navigator, "mediaDevices", previousMediaDevices);
+    else delete navigator.mediaDevices;
+  }
+});
+
+test("Test micro uses the server capture and resumes after answering, not the experimental segmenter", async () => {
+  const previousRecorder = window.MediaRecorder;
+  const previousMediaDevices = Object.getOwnPropertyDescriptor(navigator, "mediaDevices");
+  const recorders = [];
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  handsFree.available.mockResolvedValue({ available: true });
+  localStorage.setItem("sirius_android_stt", "native");
+  Object.defineProperty(navigator, "mediaDevices", {
+    configurable: true, value: { getUserMedia: jest.fn(async () => ({ getTracks: () => [{ stop: jest.fn() }] })) },
+  });
+  window.MediaRecorder = class {
+    static isTypeSupported() { return true; }
+    constructor() { this.mimeType = "audio/webm"; this.state = "inactive"; recorders.push(this); }
+    start() { this.state = "recording"; this.onstart?.(); }
+    stop() {
+      this.state = "inactive";
+      this.ondataavailable?.({ data: new Blob(["a".repeat(1000)], { type: this.mimeType }) });
+      this.onstop?.();
+    }
+  };
+  const fallback = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation((url, options) => String(url).endsWith("/stt")
+    ? Promise.resolve({ ok: true, json: async () => ({ text: "quelle heure est-il" }) })
+    : fallback(url, options));
+  try {
+    await mount();
+    await act(async () => host.querySelector('[data-testid="sirius-test-mic-btn"]').click());
+    expect(recorders).toHaveLength(1);
+    expect(native.listen).not.toHaveBeenCalled();
+    expect(handsFree.start).not.toHaveBeenCalled();
+    expect(localStorage.getItem("sirius_android_stt")).toBe("server");
+    await act(async () => recorders[0].stop());
+    const [, callbacks] = speakFr.mock.calls.find(([text]) => text.startsWith("Il est "));
+    await act(async () => callbacks.onend());
+    await act(async () => jest.advanceTimersByTime(500));
+    expect(recorders).toHaveLength(2);
+    await act(async () => host.querySelector('[data-testid="sirius-test-mic-btn"]').click());
+    await act(async () => jest.advanceTimersByTime(16000));
+    expect(recorders).toHaveLength(2);
+    expect(host.querySelector('[data-testid="sirius-top-mic-btn"]').getAttribute("aria-pressed")).toBe("false");
   } finally {
     window.MediaRecorder = previousRecorder;
     if (previousMediaDevices) Object.defineProperty(navigator, "mediaDevices", previousMediaDevices);

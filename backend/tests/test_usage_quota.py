@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timezone
 
 import pytest
 from fastapi import HTTPException
@@ -15,7 +16,7 @@ def db(tmp_path, monkeypatch):
     return LocalDocStore(str(tmp_path / "quota.db"))
 
 
-USER = {"user_id": "user_quota", "role": "user"}
+USER = {"user_id": "user_quota", "role": "user", "trial_started_at": datetime.now(timezone.utc)}
 
 
 def test_quota_blocks_after_daily_limit_with_french_message(db):

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, ShieldCheck, ArrowRight, Mic, Boxes, Radio, UserRound, Zap, Crown, Home, BrainCircuit, Workflow, ChartNoAxesCombined } from "lucide-react";
+import { Check, ShieldCheck, ArrowRight, Mic, Boxes, Radio, UserRound, Zap, Crown, Home, BrainCircuit, ChartNoAxesCombined, FileText } from "lucide-react";
 import PublicLegal from "./PublicLegal";
 import "./PublicStore.css";
 
@@ -16,12 +16,8 @@ const MATRIX_ACTIONS = [
   { icon: Boxes, text: "Organiser ses dossiers", detail: "Les six modules métier locaux proposent une sauvegarde JSON et une restauration par fusion." },
   { icon: Radio, text: "Préparer un email", detail: "Les fonctions email nécessitent un compte connecté et les autorisations du fournisseur." },
   { icon: Home, text: "Piloter des équipements", detail: "La domotique nécessite une connexion configurée et des équipements compatibles." },
-];
-
-const WHY_DIFFERENT = [
-  { title: "ORGANISER", text: "Regroupez vos dossiers, documents et activités dans des modules dédiés.", icon: Workflow },
-  { title: "PRÉPARER", text: "L'IA aide à rédiger et analyser. Vérifiez ses réponses avant de les utiliser.", icon: BrainCircuit },
-  { title: "CONNECTER", text: "Les actions sur des services externes dépendent des connexions et autorisations configurées.", icon: Zap },
+  { icon: FileText, text: "Rédaction de documents", detail: "L'IA vous aide à préparer des textes et des brouillons. Relisez et validez le contenu avant de l'utiliser." },
+  { icon: BrainCircuit, text: "Analyse assistée par IA", detail: "Obtenez une synthèse ou une explication des informations fournies. Vérifiez les conclusions ; un service IA configuré et une connexion réseau sont nécessaires." },
 ];
 
 export default function PublicStore() {
@@ -167,8 +163,9 @@ export default function PublicStore() {
       <div className="public-showcase">
       <section className="public-hero">
         <p className="public-eyebrow">ΣIRIUS · Assistant personnel et professionnel</p>
-        <h1>Organisez vos activités.<br /><em>Simplifiez vos tâches.</em></h1>
-        <p className="public-value">Un assistant IA pour préparer vos documents, suivre vos activités et piloter vos outils connectés depuis une seule interface.</p>
+        <h1>ZIRIUS <em>travaille pour vous.</em></h1>
+        <p className="public-value">Il organise vos tâches, simplifie votre travail et vous libère du temps.</p>
+        <p className="public-trial-highlight">7 jours d'essai gratuit des services IA dès votre première connexion.</p>
         <div className="public-benefits"><span>Emails</span><span>Documents</span><span>Automatisation métier</span><span>Domotique</span></div>
         <div className="public-hero-actions"><a className="public-primary-cta" href="#offres">Découvrir les offres <ArrowRight size={17} /></a><a className="public-secondary-cta" href="#matrice-demo">Explorer l'interface <ArrowRight size={17} /></a></div>
       </section>
@@ -178,8 +175,15 @@ export default function PublicStore() {
         <p className="public-preview-caption">Une interface pour vos commandes, vos outils et vos modules.</p>
       </section>
       </div>
+      <section className="public-trial" aria-labelledby="public-trial-title">
+        <h2 id="public-trial-title" className="public-section-title">7 jours pour découvrir les services IA</h2>
+        <p>L'essai commence à votre première connexion activant votre compte. Pendant 7 jours, les services IA autorisés utilisent les clés de SIRIUS, dans la limite des quotas quotidiens.</p>
+        <p><strong>Sans engagement ni paiement automatique à la fin de l'essai.</strong> Vous pouvez arrêter d'utiliser l'essai à tout moment : aucun abonnement à annuler.</p>
+        <p>Ensuite, l'assistant de configuration vous guide pour ajouter vos propres clés API dans votre coffre personnel chiffré. Les outils et dossiers locaux restent accessibles ; les fournisseurs peuvent facturer l'utilisation de vos clés.</p>
+        <small>L'essai des services IA est distinct de l'achat d'une licence présenté ci-dessous. Une déconnexion ou une réinstallation ne relance pas les 7 jours.</small>
+      </section>
       <section className="public-matrix" id="matrice-demo" aria-label="La matrice de ΣIRIUS">
-        <div className="public-section-intro"><span className="public-section-icon"><ChartNoAxesCombined size={21} /></span><div><h2 className="public-section-title">Découvrez les fonctions de ΣIRIUS</h2><p>Une présentation des usages et de leurs prérequis, pas une démonstration en direct.</p></div></div>
+        <div className="public-section-intro"><span className="public-section-icon"><ChartNoAxesCombined size={21} /></span><div><h2 className="public-section-title">Découvrez les fonctionnalités de ΣIRIUS</h2><p>Une présentation des usages et de leurs prérequis, pas une démonstration en direct.</p></div></div>
         <div className="public-matrix-layout">
         <div className="public-core-preview">
           <div className="public-core-window" aria-label="Noyau ΣIRIUS" role="img">
@@ -290,12 +294,12 @@ export default function PublicStore() {
         <span>Gérez ou résiliez votre abonnement depuis le portail Stripe sécurisé.</span>
         <button type="button" onClick={manageSubscription} disabled={portalBusy}>{portalBusy ? "Ouverture..." : "Gérer mon abonnement"}</button>
       </section>}
-      <section className="public-why" aria-label="Pourquoi ΣIRIUS">
-        <h2 className="public-section-title">Pourquoi ΣIRIUS</h2>
-        <div className="public-why-grid">{WHY_DIFFERENT.map(({ title, text, icon: Icon }) => <article key={title}><Icon size={22} /><h3>{title}</h3><p>{text}</p></article>)}</div>
+      <section className="public-why" aria-labelledby="public-why-title">
+        <h2 id="public-why-title" className="public-section-title">Pourquoi ΣIRIUS a-t-il été conçu ?</h2>
+        <p>ΣIRIUS a été conçu pour aider les particuliers, les commerçants, les artisans, les indépendants et les entreprises à mieux organiser leur activité au quotidien. Il permet de centraliser les documents, notes, factures, informations comptables, tâches, rendez-vous et projets dans un espace unique. Grâce à ses capacités de classement, de recherche et de synthèse, ΣIRIUS facilite le suivi administratif, l'organisation du travail et la prise de décision.</p>
       </section>
       <footer className="public-footer">
-        <p className="public-slogan">ΣIRIUS. Vos activités, dans un même espace.</p>
+        <p className="public-slogan">ZIRIUS travaille pour vous.</p>
         <p className="public-footer-secure"><ShieldCheck size={13} /> Paiement via Stripe ou PayPal</p>
         © 2026 ΣIRIUS par Daniel Partel · <a href="/mentions-legales">Mentions légales</a> · <a href="/conditions-generales">Conditions générales</a> · <a href="/confidentialite.html">Confidentialité</a> · <a href="/suppression-compte.html">Suppression du compte</a>
       </footer>

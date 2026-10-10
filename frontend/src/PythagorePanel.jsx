@@ -208,7 +208,7 @@ export default function PythagorePanel({ onClose }) {
     <div className="prime-screen" data-testid="pythagore-panel">
       <MythosBackdrop module="PYTHAGORE#" state={busy ? "busy" : "idle"} />
       <header className="zeus-head">
-        <div className="oracle-title font-divine"><Sigma size={20} /> PYTHAGORE# — MATHÉMATIQUES & GÉOMÉTRIE</div>
+        <div className="oracle-title font-divine" data-module-name="PYTHAGORE"><Sigma size={20} /> PYTHAGORE <span className="module-function">— MATHÉMATIQUES & GÉOMÉTRIE</span></div>
         <button className="setup-close zeus-close" onClick={onClose} data-testid="pythagore-close-btn"><X size={18} /></button>
       </header>
       {char && (

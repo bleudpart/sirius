@@ -225,7 +225,7 @@ export default function FloorPlanPanel({ keys, initialPrompt, onClose, onSpeak }
     <div className="fp-overlay" role="dialog" aria-label="PLANS — plans 2D ΣIRIUS" data-hud-panel>
       <div className="fp-panel">
         <header className="fp-header">
-          <div className="fp-title"><Ruler size={16} /> PLANS# — PLANS 2D/3D &amp; GÉOMÉTRIE</div>
+          <div className="fp-title" data-module-name="PLANS"><Ruler size={16} /> PLANS <span className="module-function">— PLANS 2D/3D &amp; GÉOMÉTRIE</span></div>
           <div className="fp-view-toggle" data-testid="floorplan-view-toggle">
             <button className={view === "2d" ? "active" : ""} onClick={() => switchView("2d")}>COULEUR</button>
             <button className={view === "pro" ? "active" : ""} onClick={() => switchView("pro")}>PRO</button>

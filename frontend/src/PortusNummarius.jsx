@@ -3,8 +3,10 @@ import { useEffect, useRef, useState } from "react";
 import { TrendingUp, TrendingDown, RefreshCw, Landmark, Bell, Trash2, Plus } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { speakAsCharacter } from "@/voice";
+import { API_BASE_URL } from "@/lib/api";
+import { personalMarketHeaders } from "@/apiKeyStorage";
 
-const API = process.env.REACT_APP_BACKEND_URL;
+const API = API_BASE_URL;
 const RANGES = [["1s", "1 SEM"], ["1m", "1 MOIS"], ["3m", "3 MOIS"], ["max", "MAX"]];
 
 const fmtPrice = (v) => (v >= 1000 ? v.toLocaleString("fr-FR", { maximumFractionDigits: 0 }) : v);
@@ -40,7 +42,7 @@ export default function PortusNummarius({ onClose }) {
   const loadMarket = async () => {
     setErr("");
     try {
-      const r = await fetch(`${API}/api/nummarius/market`);
+      const r = await fetch(`${API}/nummarius/market`, { credentials: "include", headers: personalMarketHeaders() });
       const data = await r.json();
       if (!r.ok) throw new Error(data.detail || "Marché indisponible");
       setAssets(data.assets);
@@ -52,7 +54,7 @@ export default function PortusNummarius({ onClose }) {
 
   const loadAlerts = async () => {
     try {
-      const response = await fetch(`${API}/api/nummarius/alerts`, { credentials: "include" });
+      const response = await fetch(`${API}/nummarius/alerts`, { credentials: "include", headers: personalMarketHeaders() });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || "Alertes indisponibles");
       setAlerts(data.alerts || []);
@@ -67,7 +69,7 @@ export default function PortusNummarius({ onClose }) {
   const addAlert = async () => {
     if (!sel || !alertThreshold) return;
     try {
-      const response = await fetch(`${API}/api/nummarius/alerts`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ asset_id: sel.id, alert_type: alertType, threshold: Number(alertThreshold) }) });
+      const response = await fetch(`${API}/nummarius/alerts`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ asset_id: sel.id, alert_type: alertType, threshold: Number(alertThreshold) }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || "Création impossible");
       setAlertThreshold("");
@@ -77,7 +79,7 @@ export default function PortusNummarius({ onClose }) {
 
   const deleteAlert = async (id) => {
     try {
-      const response = await fetch(`${API}/api/nummarius/alerts/${id}`, { method: "DELETE", credentials: "include" });
+      const response = await fetch(`${API}/nummarius/alerts/${id}`, { method: "DELETE", credentials: "include" });
       if (!response.ok) throw new Error("Suppression impossible");
       setAlerts((items) => items.filter((item) => item.id !== id));
     } catch (e) { setErr(e.message); }
@@ -89,7 +91,7 @@ export default function PortusNummarius({ onClose }) {
     if (!sel) return;
     let dead = false;
     setLoadingHist(true);
-    fetch(`${API}/api/nummarius/history/${sel.id}?range=${range}`)
+    fetch(`${API}/nummarius/history/${sel.id}?range=${range}`, { credentials: "include", headers: personalMarketHeaders() })
       .then(async (r) => { const d = await r.json(); if (!r.ok) throw new Error(d.detail); return d; })
       .then((d) => { if (!dead) setHist(d); })
       .catch((e) => { if (!dead) { setHist(null); setErr(e.message); } })

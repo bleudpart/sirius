@@ -4,10 +4,23 @@ import {
   formatLocalDate,
   getLocalDateKey,
   formatDocumentDate,
+  formatSpeechDate,
 } from "./dateTime";
 
 describe("dateTime", () => {
   const fixed = new Date(2026, 0, 5, 9, 7, 3); // 5 janvier 2026, 09:07:03 locale
+
+  test("les dates vocales utilisent le mois français sans décalage de fuseau", () => {
+    expect(formatSpeechDate("2026-11-14")).toBe("14 novembre 2026");
+    expect(formatSpeechDate("2026-11-01")).toBe("premier novembre 2026");
+    expect(formatSpeechDate("2028-02-29")).toBe("29 février 2028");
+  });
+
+  test.each(["2026-02-29", "2100-02-29", "2026-13-14", "2026-11-31", "2026-11-00", "texte"])(
+    "ne transforme pas une date invalide : %s", (value) => {
+      expect(formatSpeechDate(value)).toBe(value);
+    },
+  );
 
   test("les dates documentaires utilisent JJ/MM/AAAA sans décalage de fuseau", () => {
     expect(formatDocumentDate("2026-10-04")).toBe("04/10/2026");

@@ -1,7 +1,7 @@
 import { API_BASE_URL } from "./api";
 import { linkAbortSignal } from "./abortSignal";
 
-export async function withBackendResponse(path, options, consume, { signal, timeoutMs }) {
+export async function withBackendResponse(path, options, consume, { signal, timeoutMs, fetchImpl = fetch }) {
   const controller = new AbortController();
   const unlink = linkAbortSignal(signal, controller);
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -11,7 +11,7 @@ export async function withBackendResponse(path, options, consume, { signal, time
   try {
     checkCancelled();
     // Use the current fetch so AuthGate can apply cookies, bearer and session refresh.
-    const response = await fetch(`${API_BASE_URL}${path}`, {
+    const response = await fetchImpl(`${API_BASE_URL}${path}`, {
       ...options,
       credentials: "include",
       signal: controller.signal,

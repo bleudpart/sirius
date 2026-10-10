@@ -1,5 +1,6 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useEffect, useRef } from "react";
+import { trackWindowGesture, isPrimaryGesture } from "./windowGesture";
 
 // Rend déplaçables (drag & drop souris) les fenêtres .prime-card d'un module personnage.
 // Position mémorisée par module + data-testid dans localStorage. À appeler avec le ref du conteneur racine.
@@ -36,6 +37,7 @@ export default function useDraggableCards(deps = []) {
       }
 
       let sx = 0, sy = 0, ox = 0, oy = 0, dragging = false;
+      let disposeGesture = null;
 
       const parseXY = () => {
         const m = /translate\(([-\d.]+)px,\s*([-\d.]+)px\)/.exec(card.style.transform || "");
@@ -50,21 +52,18 @@ export default function useDraggableCards(deps = []) {
         if (!dragging) return;
         dragging = false;
         card.classList.remove("dragging");
-        window.removeEventListener("pointermove", onMove);
-        window.removeEventListener("pointerup", onUp);
         try { localStorage.setItem(key, JSON.stringify(parseXY())); } catch (e) { /* stockage plein ignoré */ }
       };
       const onDown = (e) => {
-        if (window.matchMedia("(max-width: 1023px)").matches) return;
+        if (window.matchMedia("(max-width: 1023px)").matches || !isPrimaryGesture(e)) return;
         // Ne pas démarrer le drag sur un élément interactif
         if (e.target.closest("button, a, input, select, textarea, [role='button']")) return;
         const cur = parseXY();
+        disposeGesture?.();
         ox = cur.x; oy = cur.y; sx = e.clientX; sy = e.clientY;
         dragging = true;
         card.classList.add("dragging");
-        window.addEventListener("pointermove", onMove);
-        window.addEventListener("pointerup", onUp);
-        e.preventDefault();
+        disposeGesture = trackWindowGesture(e, { element: card, onMove, onEnd: onUp });
       };
 
       // Le drag démarre depuis la poignée OU n'importe quel en-tête de la carte
@@ -75,8 +74,7 @@ export default function useDraggableCards(deps = []) {
       cleanups.push(() => {
         grip.removeEventListener("pointerdown", onDown);
         headings.forEach((h) => h.removeEventListener("pointerdown", onDown));
-        window.removeEventListener("pointermove", onMove);
-        window.removeEventListener("pointerup", onUp);
+        disposeGesture?.();
       });
     });
 

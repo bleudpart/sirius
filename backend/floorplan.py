@@ -351,7 +351,8 @@ async def generate_floorplan(description: str, keys: dict = None) -> dict:
     from openai import AsyncOpenAI
     from sirius_brain import ENV_GROQ_LLM_KEY, GROQ_LLM_ENDPOINT, GROQ_LLM_PRIMARY
 
-    api_key = ENV_GROQ_LLM_KEY or (keys or {}).get("groq") or ""
+    from provider_access import require_key
+    api_key = require_key("groq", ENV_GROQ_LLM_KEY, keys)
     if not api_key:
         raise ValueError("Clé GROQ absente : impossible de générer le plan.")
     client = AsyncOpenAI(api_key=api_key, base_url=GROQ_LLM_ENDPOINT, max_retries=0, timeout=40.0)
@@ -501,6 +502,8 @@ def make_floorplan_router(rate_ok) -> APIRouter:
             raise HTTPException(status_code=429, detail="Trop de requêtes, patientez un instant.")
         try:
             return await generate_floorplan(desc, keys=req.keys or {})
+        except HTTPException:
+            raise
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error))
         except Exception as error:

@@ -87,7 +87,7 @@ export default function HeraclesPanel({ onClose, onSpeak, initialInput }) {
     <div className="prime-screen" data-testid="heracles-panel" ref={dragRef}>
       <MythosBackdrop module="HERACLES#" state={busy ? "busy" : error ? "alert" : "idle"} />
       <header className="zeus-head">
-        <div className="oracle-title font-divine"><Fingerprint size={20} /> HERACLES# — INVESTIGATION OSINT</div>
+        <div className="oracle-title font-divine" data-module-name="HERACLES"><Fingerprint size={20} /> HERACLES <span className="module-function">— INVESTIGATION OSINT</span></div>
         <button className="setup-close zeus-close" onClick={onClose} data-testid="heracles-close-btn"><X size={18} /></button>
       </header>
       {char && (

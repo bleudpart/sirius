@@ -24,7 +24,7 @@ const smtpConf = () => {
 };
 
 const CONF = {
-  title: "PROMÉTHÉE# — GESTION DE PROJET",
+  title: "PROMÉTHÉE — GESTION DE PROJET",
   sub: "OBJECTIF · JALONS · RISQUES · ACTIONS · MÉTHODES PMP & AGILE",
   img: `${API}/mythos/img/promethee.jpg`,
   name: "Prométhée",
@@ -174,7 +174,7 @@ export default function PrometheePanel({ onClose }) {
     <div className="prime-screen" data-testid="promethee-panel">
       <MythosBackdrop module={MODULE} state={busy ? "busy" : "idle"} />
       <header className="zeus-head">
-        <div className="oracle-title font-divine"><Flame size={20} /> {CONF.title}</div>
+        <div className="oracle-title font-divine" data-module-name="PROMÉTHÉE"><Flame size={20} /> PROMÉTHÉE <span className="module-function">— GESTION DE PROJET</span></div>
         <button className="setup-close zeus-close" onClick={onClose} data-testid="promethee-close-btn"><X size={18} /></button>
       </header>
       <div className="prime-sub">{CONF.sub}</div>

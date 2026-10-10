@@ -83,7 +83,7 @@ export default function MythosGallery({ onClose, onOpenModule, initialModule = n
         </div>
         <button className="setup-close zeus-close" onClick={onClose} aria-label="Fermer la galerie Mythos" data-testid="mythos-gallery-close-btn"><X size={18} /></button>
       </header>
-      <div className="prime-sub">LES IDENTITÉS MYTHOLOGIQUES DES MODULES ΣIRIUS#</div>
+      <div className="prime-sub">LES IDENTITÉS MYTHOLOGIQUES DES MODULES ΣIRIUS</div>
 
       <div className="mg-body">
         {/* Rangée de vignettes */}

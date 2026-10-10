@@ -320,7 +320,7 @@ export default function ThemisPanel({ onClose, initialSource }) {
   return (
     <div className="prime-screen themis-screen" data-testid="themis-panel">
       <header className="zeus-head">
-        <div className="oracle-title font-divine"><img src="/holo/logo-themis.png" alt="" className="th-logo" data-testid="themis-logo" /> THÉMIS# — GESTION D’ENTREPRISE</div>
+        <div className="oracle-title font-divine" data-module-name="THÉMIS"><img src="/holo/logo-themis.png" alt="" className="th-logo" data-testid="themis-logo" /> THÉMIS <span className="module-function">— GESTION D’ENTREPRISE</span></div>
         <button className="setup-close zeus-close" onClick={onClose} data-testid="themis-close-btn"><X size={18} /></button>
       </header>
       {char && (

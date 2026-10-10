@@ -11,6 +11,7 @@ import { getLocalDateKey } from "@/dateTime";
 import { speakCinematic, cancelSpeech, cleanTextForDisplay } from "@/voice";
 import { WORK_MODULES } from "@/workModules";
 import { API_BASE_URL } from "@/lib/api";
+import { generateBootPresentation } from "@/bootPresentation";
 
 const BRAIN_RETRY_MS = 2000;
 const BRAIN_DEADLINE_MS = 20000;
@@ -537,10 +538,10 @@ export function BootScreen({ onDone, userName, onOpenModule, connected, probeBra
       && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window
         || (typeof window.MediaRecorder !== "undefined" && !!navigator.mediaDevices?.getUserMedia));
     return [
-      { label: "Initialisation du noyau Σ.I.R.I.U.S", state: true },
-      { label: "Connexion au cerveau Σ.I.R.I.U.S", state: brain === null ? null : brain === true },
-      { label: "Calibration synthèse vocale", state: speech },
-      { label: "Activation du micro", state: recog },
+      { label: "Interface ΣIRIUS", state: true, success: "Initialisée", scope: "Initialisation de l'interface." },
+      { label: "Serveur ΣIRIUS", state: brain === null ? null : brain === true, success: "Joignable", scope: "Joignabilité du serveur ; modèle et services externes non testés." },
+      { label: "API de lecture audio", state: speech, success: "Présente", scope: "API présente ; synthèse et sortie audible non vérifiées par ce contrôle." },
+      { label: "API de capture micro", state: recog, success: "Présente", scope: "API présente ; permission, capture et qualité audio non vérifiées par ce contrôle." },
     ];
   }, [brain]);
 
@@ -549,9 +550,9 @@ export function BootScreen({ onDone, userName, onOpenModule, connected, probeBra
     const rows = checks.map((c) => (
       c.state === null
         ? `> ${c.label} ...`
-        : `> ${c.label} ${dots(c.label)} ${c.state ? "OK" : "INDISPONIBLE"}`
+        : `> ${c.label} ${dots(c.label)} ${c.state ? c.success.toUpperCase() : "INDISPONIBLE"}`
     ));
-    const status = brain === false ? "cerveau injoignable." : "prêt.";
+    const status = brain === false ? "serveur injoignable." : "interface prête.";
     rows.push(userName ? `> Bienvenue, ${userName}. ΣIRIUS ${status}` : `> ΣIRIUS ${status}`);
     return rows;
   }, [checks, brain, userName]);
@@ -579,19 +580,52 @@ export function BootScreen({ onDone, userName, onOpenModule, connected, probeBra
   // On attend le verdict du cerveau avant d'annoncer l'état à voix haute ; un « Réessayer »
   // ultérieur ne relance pas la présentation.
   const [narrationReady, setNarrationReady] = useState(false);
+  const [presentation, setPresentation] = useState("");
+  const [presentationError, setPresentationError] = useState("");
   useEffect(() => {
-    if (brain !== null) setNarrationReady(true);
+    if (brain === null) return;
+    window.__siriusStartupDiagnostic = {
+      measuredAt: new Date().toISOString(),
+      checks: checks.map(({ label, state, success, scope }) => ({ label, state, success, scope })),
+      presentationError,
+    };
+  }, [brain, checks, presentationError]);
+  const presentationAttemptedRef = useRef(false);
+  useEffect(() => {
+    if (brain === null || presentationAttemptedRef.current) return;
+    presentationAttemptedRef.current = true;
+    if (!brain) { setNarrationReady(true); return; }
+    const controller = new AbortController();
+    let disposed = false;
+    const timeout = setTimeout(() => controller.abort(), 6000);
+    generateBootPresentation({ checks, signal: controller.signal }).then((text) => {
+      if (!disposed) setPresentation(text);
+    }).catch((error) => {
+      if (!disposed) {
+        console.warn("Présentation générée :", error);
+        setPresentationError("Présentation personnalisée indisponible ; état des services uniquement.");
+      }
+    }).finally(() => {
+      clearTimeout(timeout);
+      if (!disposed) setNarrationReady(true);
+    });
+    return () => {
+      disposed = true;
+      clearTimeout(timeout);
+      controller.abort();
+      if (!narrationReady) presentationAttemptedRef.current = false;
+    };
+    // Les faits sont figés au premier verdict de connexion.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [brain]);
   const padRef = useRef(null);
-  const serviceSpeech = checks.map(({ label, state }) =>
-    `${label.replace(/Σ\.I\.R\.I\.U\.S/g, "Sirius")}. ${state === null ? "En cours." : state ? "OK." : "Indisponible."}`
+  const serviceSpeech = checks.map(({ label, state, success }) =>
+    `${label.replace(/ΣIRIUS/g, "Sirius")}. ${state === null ? "En cours." : state ? `${success}.` : "Indisponible."}`
   ).join(" ");
-  const introSpeech = "Système. Intelligent. Réactif. Interface. Universel. Sécurisé. " +
-    "Je suis Sirius... façonné par mon créateur, Daniel Partel. " +
-    serviceSpeech + " " +
+  const introSpeech = (presentation ? `${presentation} ` : "") + serviceSpeech + " " +
     (brain === false
       ? "Je n'arrive pas encore à joindre mon cerveau... vérifiez la connexion Internet."
-      : "Sirius est prêt... à votre disposition.") +
+      : "Mon interface est prête. La qualité du microphone reste à vérifier lors de votre première demande.") +
     (userName ? ` Bienvenue, ${userName}.` : " Bienvenue.");
   const playIntroSpeech = () => {
     speechFinishedRef.current = false;
@@ -725,9 +759,9 @@ export function BootScreen({ onDone, userName, onOpenModule, connected, probeBra
         {[
           ["argus", "ARGUS", "Surveillance & réparation"],
           ["atlas", "ATLAS", "Carte & navigation"],
-          ["oracle", "ORACLE", "Divination des données"],
+          ["oracle", "ORACLE", "Informations & synthèses"],
           ["heracles", "HERACLES", "Investigation"],
-          ["hephaistos", "HÉPHAÏSTOS", "Forge & maintenance"],
+          ["hephaistos", "HÉPHAÏSTOS", "Outils & maintenance"],
           ["themis", "THÉMIS", "Gestion d'entreprise"],
           ["solon", "SOLON", "Conseil juridique"],
           ["promethee", "PROMÉTHÉE", "Gestion de projet"],
@@ -736,7 +770,7 @@ export function BootScreen({ onDone, userName, onOpenModule, connected, probeBra
           ["pythagore", "PYTHAGORE", "Mathématiques & géométrie"],
           ["agora", "HERMÈS AGORA", "Expert en vente"],
           ["nummarius", "PORTUS NUMMARIUS", "Bourse & marchés"],
-          ["keraunos", "KERAUNOS", "Foudre domotique"],
+          ["keraunos", "KERAUNOS", "Commandes domotiques"],
           ["locus", "LOCUS", "Géolocalisation"],
           ["pantheon", "PANTHÉON", "Cœur du système"],
           ["cortex", "CORTEX", "Intelligence centrale"],
@@ -778,6 +812,8 @@ export function BootScreen({ onDone, userName, onOpenModule, connected, probeBra
           ))}
         </div>
         <div className="boot-log">
+          {presentation && <p data-testid="boot-presentation">{cleanTextForDisplay(presentation)}</p>}
+          {presentationError && <p role="status">{presentationError}</p>}
           {lines.slice(0, shown).map((l, idx) => (
             <div key={idx} className="boot-line">{l}</div>
           ))}

@@ -25,7 +25,7 @@ def _user_id_from_session(session_id: str) -> str:
     return (session_id or "").rsplit(":", 1)[0] or "legacy"
 
 
-async def condense_idle_sessions(db, summarize, now=None) -> int:
+async def condense_idle_sessions(db, summarize, now=None, *, enforce_accounts=False) -> int:
     """Condense les sessions inactives. Retourne le nombre d'épisodes créés.
 
     `summarize` est injecté (généralement sirius_brain.summarize_episode) pour
@@ -47,11 +47,21 @@ async def condense_idle_sessions(db, summarize, now=None) -> int:
         if len(fresh) < MIN_NEW_TURNS:
             continue
 
-        episode = await summarize(fresh)
+        user_id = _user_id_from_session(session_id)
+        if enforce_accounts:
+            from provider_access import metered_scope, owner_allowed
+            user = await db.users.find_one({"user_id": user_id}) or {}
+            if user.get("disabled") or not owner_allowed(user):
+                continue
+            async with metered_scope(db, user) as state:
+                if state["blocked"]:
+                    continue
+                episode = await summarize(fresh)
+        else:
+            episode = await summarize(fresh)
         if not episode:
             continue
 
-        user_id = _user_id_from_session(session_id)
         add_episode(user_id, episode["resume"], session_id=session_id)
         for fact in episode.get("faits") or []:
             try:
@@ -70,11 +80,11 @@ async def condense_idle_sessions(db, summarize, now=None) -> int:
     return created
 
 
-async def episodic_loop(db, summarize):
+async def episodic_loop(db, summarize, *, enforce_accounts=False):
     """Boucle de fond : condensation périodique pendant les temps morts."""
     while True:
         try:
-            await condense_idle_sessions(db, summarize)
+            await condense_idle_sessions(db, summarize, enforce_accounts=enforce_accounts)
         except asyncio.CancelledError:
             raise
         except Exception:

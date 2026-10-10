@@ -8,6 +8,7 @@ import os
 import httpx
 
 from resilience import CircuitOpenError, resilient_call
+from provider_access import provider_key
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ ENV_SERP_KEY = os.environ.get("SERP_API_KEY")
 
 async def serp_results(query, serp_key=None):
     """Meilleurs résultats Google via SerpAPI → [{title, link, snippet}]."""
-    key = serp_key or ENV_SERP_KEY
+    key = provider_key("serp", ENV_SERP_KEY, {"serp": serp_key} if serp_key else None)
     if not key:
         return []
 

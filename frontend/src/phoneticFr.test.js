@@ -1,4 +1,4 @@
-import { applyFrenchPhonetics } from "./phoneticFr";
+import { applyFrenchPhonetics, normalizeFrenchElisions } from "./phoneticFr";
 
 beforeEach(() => localStorage.clear());
 
@@ -12,12 +12,23 @@ test("francise les anglicismes sous toutes leurs formes", () => {
   expect(applyFrenchPhonetics("Lance un scan")).toBe("Lance un skane");
   expect(applyFrenchPhonetics("Je scanne le document")).toBe("Je skane le document");
   expect(applyFrenchPhonetics("deux scans")).toBe("deux skane");
+  expect(applyFrenchPhonetics("PLANNING et planning")).toBe("planingue et planingue");
 });
 
 test("corrige les noms propres mal prononcés", () => {
   expect(applyFrenchPhonetics("Roger Partel")).toBe("Rojé Partel");
   expect(applyFrenchPhonetics("Sirius est prêt")).toBe("Siriusse est prêt");
 });
+
+test.each(["PLUTOS", "Plutos", "plutos"])("prononce le nom %s comme un mot, pas un sigle", (name) => {
+  expect(applyFrenchPhonetics(`J'ouvre ${name}.`)).toBe("J'ouvre Ploutoss.");
+});
+
+test.each(["l\u200b’\u200beffet", "l＇ effet", "l\u2060'\u2060effet", "l ’\nhistoire"])(
+  "normalise les élisions avec séparateurs invisibles : %s", (text) => {
+    expect(normalizeFrenchElisions(text)).toMatch(/^l'(?:effet|histoire)$/);
+  },
+);
 
 test.each(["Face ID", "FaceID", "Face-ID"])("prononce %s comme les lettres anglaises attendues", (name) => {
   expect(applyFrenchPhonetics(`Déverrouillage ${name}`)).toBe("Déverrouillage feïss aï di");

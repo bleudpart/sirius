@@ -46,6 +46,20 @@ describe("confirmations vocales des actions", () => {
     expect(windowChangeConfirmation("ouvre le cortex", before, snapshotWindows())).toBe("J'ouvre Zeus Cortex.");
   });
 
+  test.each(["THÉMIS", "HERMÈS AGORA", "ASCLÉPIOS", "HÉPHAÏSTOS"])(
+    "annonce le nom %s plutôt que la fonction d'un ancien module", (name) => {
+      const before = snapshotWindows();
+      const panel = addWindow("Gestion et diagnostic", "prime-screen");
+      panel.insertAdjacentHTML("beforeend", `<div class="oracle-title" data-module-name="${name}">${name} — Fonction du module</div>`);
+      const spokenName = name.toLowerCase().replace(/(^|\s)(\p{L})/gu, (_, sep, letter) => sep + letter.toUpperCase());
+      expect(windowChangeConfirmation("ouvre le module", before, snapshotWindows())).toBe(`J'ouvre ${spokenName}.`);
+    }
+  );
+
+  test("les anciens suffixes de marque ne sont pas prononcés", () => {
+    expect(moduleActionConfirmation("ouvre", "THÉMIS#")).toBe("J'ouvre THÉMIS.");
+  });
+
   test("lit le titre doré complet plutôt que le nom technique du panneau", () => {
     const before = snapshotWindows();
     const panel = addWindow("Sous-section", "prime-screen");

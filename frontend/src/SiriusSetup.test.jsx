@@ -2,6 +2,7 @@ import React, { act, useState } from "react";
 import { createRoot } from "react-dom/client";
 import AuthGate, { useAuth } from "./AuthGate";
 import SiriusSetup from "./SiriusSetup";
+import { loadApiKeys, setKeyAccount } from "./apiKeyStorage";
 
 jest.mock("./components/ReactorVisuals", () => ({
   CoreRings: () => null,
@@ -109,25 +110,69 @@ test("settings without account access preserves preferences and does not offer a
   }
 });
 
-test("API tab explains that the server provides the brain when it has its own key", async () => {
+test("services tab distinguishes the trial from a personal encrypted vault", async () => {
   const originalFetch = global.fetch;
   const container = document.createElement("div");
   const root = createRoot(container);
   global.fetch = jest.fn((url) => Promise.resolve({
     ok: true,
-    json: async () => (String(url).endsWith("/chat/status") ? { groq_env: true } : { linked: false }),
+    json: async () => ({
+      mode: "trial_then_personal", role: "user",
+      trial: { state: "active", expires_at: "2026-10-17T00:00:00Z" },
+      services: [{ id: "chat", label: "Réponses IA", state: "configured", scope: "Présence, pas test du modèle." }],
+      quotas: { enabled: true, limits: { chat: 150 }, usage: { chat: 2 } },
+    }),
   }));
   try {
     await act(async () => root.render(
       <SiriusSetup initialProfile={{ name: "Daniel" }} onCancel={jest.fn()} onComplete={jest.fn()} />,
     ));
-    const apiTab = [...container.querySelectorAll("button")].find((b) => b.textContent.trim() === "API");
+    const apiTab = container.querySelector('[data-testid="setup-tab-api"]');
     await act(async () => apiTab.click());
-    expect(container.querySelector('[data-testid="setup-server-keys"]').textContent)
-      .toContain("Aucune clé n'est nécessaire");
-    expect(container.querySelector('[data-testid="setup-warn-nogroq"]')).toBeNull();
+    expect(container.querySelector('[data-testid="setup-trial"]').textContent).toContain("Essai actif");
+    expect(container.querySelector('[data-testid="vault-controls"]').textContent).toContain("Mes clés personnelles");
+    expect(container.querySelector('[data-testid="setup-account-quotas"]').textContent).toContain("2 / 150");
+    expect(container.textContent).not.toContain("Voix : opérationnelle");
   } finally {
     act(() => root.unmount());
     global.fetch = originalFetch;
+  }
+});
+
+test.each(["unverifiable", "refused"])("saving a %s fal key never declares it validated", async (status) => {
+  const originalFetch = global.fetch;
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  setKeyAccount("fal-check");
+  const confirm = jest.spyOn(window, "confirm").mockReturnValue(false);
+  global.fetch = jest.fn((url) => Promise.resolve({
+    ok: true,
+    json: async () => String(url).endsWith("/keys/validate")
+      ? { ok: false, status, message: status === "unverifiable" ? "Clé fal.ai non vérifiable." : "Clé refusée." }
+      : { mode: "trial_then_personal", services: [], trial: { state: "expired" }, quotas: { enabled: false } },
+  }));
+  try {
+    await act(async () => root.render(
+      <SiriusSetup initialProfile={{ name: "Test" }} initialKeys={{ fal: "personal-fal-test" }}
+        initialTab="api" onComplete={jest.fn()} onCancel={jest.fn()} />,
+    ));
+    for (const id of ["vault-password", "vault-confirm"]) {
+      const field = container.querySelector(`[data-testid="${id}"]`);
+      act(() => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(field, "a-long-test-password");
+        field.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    }
+    await act(async () => container.querySelector('[data-testid="vault-save"]').click());
+    expect(loadApiKeys()).toEqual({});
+    if (status === "unverifiable") {
+      expect(confirm).toHaveBeenCalledWith(expect.stringContaining("Clé fal.ai"));
+      expect(container.textContent).toContain("Enregistrement annulé");
+    } else {
+      expect(confirm).not.toHaveBeenCalled();
+      expect(container.querySelector('[role="alert"]').textContent).toContain("vérification non réussie");
+    }
+  } finally {
+    act(() => root.unmount()); setKeyAccount(""); confirm.mockRestore(); global.fetch = originalFetch;
   }
 });

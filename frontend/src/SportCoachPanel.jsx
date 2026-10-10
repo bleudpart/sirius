@@ -130,7 +130,7 @@ function SportCoachContent({ user, onClose }) {
 
   return <section className="prime-screen sport-coach" role="dialog" aria-label="Coach Sport et Bien-être" data-testid="sport-coach">
     <header className="zeus-head sport-head">
-      <h1><Activity size={22} /> ASCLÉPIOS# · BIEN-ÊTRE &amp; SANTÉ</h1>
+      <h1 data-module-name="ASCLÉPIOS"><Activity size={22} /> ASCLÉPIOS <span className="module-function">· BIEN-ÊTRE &amp; SANTÉ</span></h1>
       <button type="button" className="setup-close zeus-close" aria-label="Fermer" onClick={onClose}><X size={18} /></button>
     </header>
     <img className="mythos-avatar" src={`${API_BASE_URL}/mythos/img/asclepios.png`} alt="Portrait d'Asclépios" draggable={false} data-testid="asclepios-portrait" />

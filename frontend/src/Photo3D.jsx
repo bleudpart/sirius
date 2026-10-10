@@ -217,7 +217,7 @@ export default function Photo3D({ onClose, onSpeak }) {
       <div className="p3d-panel">
         <header className="p3d-bar">
           <Boxes size={16} />
-          <span className="p3d-title">PHOTO3D# — PHOTOS → OBJET 3D (LOCAL)</span>
+          <span className="p3d-title" data-module-name="PHOTO3D">PHOTO3D <span className="module-function">— PHOTOS → OBJET 3D (LOCAL)</span></span>
           <button className="p3d-close" onClick={onClose} data-testid="photo3d-close-btn"><X size={16} /></button>
         </header>
 

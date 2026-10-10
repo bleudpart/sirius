@@ -32,7 +32,7 @@ export default function GoldSparkles() {
       if (now - last < 55) return;
       last = now;
       const { clientX: x, clientY: y } = e;
-      const core = document.querySelector(".core-quote-zone");
+      const core = document.querySelector(".core-rings");
       const guardian = document.querySelector(".antique-guardian");
       if (inRect(core && core.getBoundingClientRect(), x, y) ||
           inRect(guardian && guardian.getBoundingClientRect(), x, y)) {

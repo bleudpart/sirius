@@ -53,6 +53,11 @@ export const normalizeModuleText = (value) => String(value || "")
   .replace(/[^a-z0-9]+/g, " ")
   .trim();
 
+export function moduleDisplayName(item) {
+  const names = { plans: "PLANS", photo3d: "PHOTO3D" };
+  return names[item.id] || String(item.label || item.id).split("—")[0].replace(/#/g, "").trim();
+}
+
 export function parseModuleOpenCommand(raw) {
   let query = normalizeModuleText(raw)
     .replace(/^(?:(?:ouvre|ouvrir|affiche|afficher|montre|montrer|lance|lancer|deploie|presenter|presente)(?:\s+moi)?\s+)+/, "")

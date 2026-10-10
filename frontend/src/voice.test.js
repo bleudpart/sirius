@@ -51,7 +51,7 @@ test("Android narration requests Gemini and falls back explicitly when unconfigu
     expect(onstart).toHaveBeenCalledTimes(1);
     expect(onend).toHaveBeenCalledTimes(1);
     expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/tts/gemini"), expect.objectContaining({
-      body: JSON.stringify({ text: "Bonjour" }), credentials: "include",
+      body: JSON.stringify({ text: "Bonjour", keys: {} }), credentials: "include",
     }));
     cancelSpeech();
     expect(stopNativeSpeech).toHaveBeenCalled();
@@ -74,15 +74,28 @@ test("Android reads the assistant name without pronouncing the Greek sigma", asy
   speakFr("ΣIRIUS a ouvert Panthéon.");
   await flush();
   expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/tts/gemini"), expect.objectContaining({
-    body: JSON.stringify({ text: "Siriusse a ouvert Panthéon." }),
+    body: JSON.stringify({ text: "Siriusse a ouvert Panthéon.", keys: {} }),
   }));
 });
+
+test.each(["ton ΣIRIUS Display", "ton Sirius Display", "ton Zirius Display", "le ΣIRIUS DISPLAY", "le Sirius Display", "le Zirius Display"])(
+  "Sirius refers to %s as its own screen without changing other possessives",
+  async (screen) => {
+    speakFr(`J'affiche ton briefing dans ${screen}.`);
+    await flush();
+    const request = global.fetch.mock.calls.find(([url]) => String(url).includes("/tts/gemini"));
+    const text = JSON.parse(request[1].body).text;
+    expect(text).toContain("ton briefing");
+    expect(text).toContain("dans mon Ziriusse displé");
+    expect(text).not.toMatch(/dans ton /);
+  }
+);
 
 test("Android Gemini TTS receives French letter names for HUD", async () => {
   speakFr("Le HUD est prêt.");
   await flush();
   expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/tts/gemini"), expect.objectContaining({
-    body: JSON.stringify({ text: "Le ache u dé est prêt." }),
+    body: JSON.stringify({ text: "Le ache u dé est prêt.", keys: {} }),
   }));
 });
 
@@ -90,8 +103,58 @@ test("joins French elisions separated by stray spaces before speech synthesis", 
   speakFr("Je l 'ai déjà fait et c ’ est prêt.");
   await flush();
   expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/tts/gemini"), expect.objectContaining({
-    body: JSON.stringify({ text: "Je l'ai déjà fait et c'est prêt." }),
+    body: JSON.stringify({ text: "Je l'ai déjà fait et c'est prêt.", keys: {} }),
   }));
+});
+
+test.each(["l 'effet", "l ’ effet", "l ‘effet", "l ʼ effet", "l\u00a0’\u00a0effet", "l' effet"])(
+  "keeps %s as one elision in the text sent to TTS",
+  async (elision) => {
+    speakFr(`Voici ${elision} attendu.`);
+    await flush();
+    const request = global.fetch.mock.calls.find(([url]) => String(url).includes("/tts/gemini"));
+    expect(JSON.parse(request[1].body).text).toBe("Voici l'effet attendu.");
+  }
+);
+
+test("joins an elision before a silent h without changing a named letter", async () => {
+  speakFr("L ’ histoire de la lettre L.");
+  await flush();
+  const request = global.fetch.mock.calls.find(([url]) => String(url).includes("/tts/gemini"));
+  expect(JSON.parse(request[1].body).text).toBe("l'histoire de la lettre L.");
+});
+
+test("planning and an uppercase elision remain words on remote and native speech paths", async () => {
+  speakFr("Voici le PLANNING. L ’ effet est visible dans le ΣIRIUS DISPLAY.");
+  await flush();
+  const request = global.fetch.mock.calls.find(([url]) => String(url).includes("/tts/gemini"));
+  const expected = "Voici le planingue. l'effet est visible dans mon Ziriusse displé.";
+  expect(JSON.parse(request[1].body).text).toBe(expected);
+  expect(speakNative.mock.calls[0][0]).toBe(expected);
+});
+
+test.each([
+  ["2026-11-14", "14 novembre 2026"],
+  ["2026-11-01", "premier novembre 2026"],
+  ["2028-02-29", "29 février 2028"],
+])("reads %s as a French date, preserving numeric ranges", async (date, spoken) => {
+  speakFr(`Le ${date}, prévoir 10-15 minutes.`);
+  await flush();
+  const request = global.fetch.mock.calls.find(([url]) => String(url).includes("/tts/gemini"));
+  const expected = `Le ${spoken}, prévoir 10 à 15 minutes.`;
+  expect(JSON.parse(request[1].body).text).toBe(expected);
+  expect(speakNative.mock.calls[0][0]).toBe(expected);
+});
+
+test.each(["answer", "character", "presentation"])("%s speech keeps Plutos and invisible elisions pronounceable", async (kind) => {
+  const text = "PLUTOS explique l\u200b’\u200beffet et l＇ histoire.";
+  if (kind === "character") speakAsCharacter(text, { module: "PLUTOS" });
+  else if (kind === "presentation") speakCinematic(text);
+  else speakFr(text);
+  await flush();
+  const request = global.fetch.mock.calls.find(([url]) => String(url).includes("/tts/gemini"));
+  expect(JSON.parse(request[1].body).text).toBe("Ploutoss explique l'effet et l'histoire.");
+  expect(speakNative.mock.calls[0][0]).toBe("Ploutoss explique l'effet et l'histoire.");
 });
 
 test("Gemini WAV plays once and ends once without native fallback", async () => {

@@ -16,7 +16,7 @@ export default function useTouchNav(handlers) {
       el && el.closest &&
       el.closest(
         "input, textarea, select, button, a, video, " +
-        ".card-drag-grip, .zc-section-title, .web-window, .task-window, .sirius-display, " +
+        ".card-drag-grip, .zc-section-title, .shud-head, .shud-next-wrap, .holo-pop-bar, .pro-mode-row, .web-window, .task-window, .sirius-display, " +
         ".sirius-progress, .sp-journal, .modmenu, .setup-screen, [data-hud-panel], .float-card"
       );
     const modulePage = (el) => window.matchMedia("(max-width: 1023px)").matches &&
@@ -25,6 +25,9 @@ export default function useTouchNav(handlers) {
 
     const onStart = (e) => {
       if (modulePage(e.target)) { tracking = false; multi = false; return; }
+      if (e.target.closest?.(".shud-head, .shud-next-wrap, .holo-pop-bar, .pro-mode-row")) {
+        tracking = false; multi = false; return;
+      }
       if (e.touches.length === 2) {
         multi = true;
         pinchFired = false;

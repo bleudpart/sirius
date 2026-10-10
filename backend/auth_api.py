@@ -209,6 +209,7 @@ def _public_user(document: dict) -> dict:
         "preferences": document.get("preferences") if isinstance(document.get("preferences"), dict) else {},
         "disabled": bool(document.get("disabled")),
         "mfa_enabled": bool(document.get("mfa_enabled")),
+        "trial_started_at": document.get("trial_started_at"),
     }
 
 
@@ -241,7 +242,9 @@ def _set_cookies(response: Response, access_token: str, refresh_token: Optional[
         response.set_cookie("refresh_token", refresh_token, max_age=_REFRESH_TTL_SECONDS, **options)
 
 
-def _issue_session(response: Response, user: dict) -> dict:
+async def _issue_session(response: Response, user: dict, db) -> dict:
+    from provider_access import activate_trial
+    user = await activate_trial(db, user)
     access = create_access_token(user)
     refresh = create_refresh_token(user)
     _set_cookies(response, access, refresh)
@@ -290,16 +293,22 @@ async def require_user(request: Request, db=None) -> dict:
         stored = await db.users.find_one({"user_id": user["user_id"]})
         if not stored or stored.get("disabled"):
             raise HTTPException(status_code=401, detail="Compte indisponible.")
+        from provider_access import activate_trial, bind_user
+        seen_activity = stored.get("last_activity")
+        tracking_started = stored.get("inactivity_tracking_started_at")
+        stored = await activate_trial(db, stored)
         now = datetime.now(timezone.utc)
         updates = {"last_activity": now}
-        if stored.get("inactivity_tracking_started_at") is None:
+        if tracking_started is None:
             updates["inactivity_tracking_started_at"] = now
-        # Compare-and-set prevents an older concurrent request overwriting newer activity.
+        # Compare-and-set against the first read: activate_trial may re-read newer concurrent activity.
         await db.users.update_one(
-            {"user_id": user["user_id"], "last_activity": stored.get("last_activity")},
+            {"user_id": user["user_id"], "last_activity": seen_activity},
             {"$set": updates},
         )
-        return _public_user(stored)
+        public = _public_user(stored)
+        bind_user(public)
+        return public
     return _public_user(user)
 
 
@@ -402,7 +411,7 @@ def make_auth_router(db):
             raise HTTPException(status_code=503, detail="Compte administrateur non configuré.")
         if user.get("mfa_enabled"):
             raise HTTPException(status_code=401, detail="Code MFA requis.")
-        return _issue_session(response, user)
+        return await _issue_session(response, user, db)
 
     @router.post("/local-login")
     async def local_login(data: LocalLoginRequest, request: Request, response: Response):
@@ -414,7 +423,7 @@ def make_auth_router(db):
             raise HTTPException(status_code=401, detail="Mot de passe local incorrect.")
         if not _mfa_valid(user, data.code):
             raise HTTPException(status_code=401, detail="Code MFA requis ou invalide.")
-        return _issue_session(response, user)
+        return await _issue_session(response, user, db)
 
     @router.post("/register")
     async def register(data: RegisterRequest, response: Response):
@@ -436,7 +445,7 @@ def make_auth_router(db):
             "updated_at": now,
         }
         await db.users.insert_one(user)
-        return _issue_session(response, user)
+        return await _issue_session(response, user, db)
 
     @router.post("/login")
     async def login(data: LoginRequest, response: Response):
@@ -459,7 +468,7 @@ def make_auth_router(db):
             raise HTTPException(status_code=401, detail="Code MFA requis ou invalide.")
         await db.login_attempts.delete_one({"identifier": identifier})
         await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"last_activity": now}})
-        return _issue_session(response, user)
+        return await _issue_session(response, user, db)
 
     @router.post("/refresh")
     async def refresh_session(request: Request, response: Response):
@@ -470,7 +479,7 @@ def make_auth_router(db):
         user = await db.users.find_one({"user_id": payload.get("sub"), "disabled": {"$ne": True}})
         if not user:
             raise HTTPException(status_code=401, detail="Compte indisponible.")
-        return _issue_session(response, user)
+        return await _issue_session(response, user, db)
 
     @router.post("/password-reset/request")
     async def password_reset_request(data: PasswordResetRequest):

@@ -70,7 +70,7 @@ def linked() -> bool:
 
 def should_relay_chat(keys: dict | None) -> bool:
     keys = keys or {}
-    user_key = str(keys.get("groq_key") or keys.get("groq") or "").strip()
+    user_key = str(keys.get("groq_key") or keys.get("groq_real") or keys.get("k3") or keys.get("groq") or "").strip()
     return relay_allowed() and not user_key and not _env_has(*_LOCAL_BRAIN_ENV) and linked()
 
 
@@ -157,6 +157,19 @@ async def relay_json(path: str, payload: dict) -> dict:
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code, detail=_detail(response, "ΣIRIUS Cloud a refusé la requête."))
     return response.json()
+
+
+async def relay_get_json(path: str) -> dict:
+    response = await _send("GET", path)
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code, detail=_detail(response, "ΣIRIUS Cloud a refusé la requête."))
+    try:
+        data = response.json()
+    except ValueError as error:
+        raise HTTPException(status_code=502, detail="Réponse ΣIRIUS Cloud illisible.") from error
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=502, detail="Réponse ΣIRIUS Cloud illisible.")
+    return data
 
 
 async def relay_stt(filename: str, data: bytes, content_type: str) -> dict:

@@ -48,7 +48,7 @@ export default function PackagerPanel({ onClose, onSpeak, autoInstaller = false 
   return (
     <div className="prime-screen" data-testid="packager-panel">
       <header className="zeus-head">
-        <div className="oracle-title font-divine"><Package size={20} /> PACKAGER# — LIVRABLE MULTI-PLATEFORME</div>
+        <div className="oracle-title font-divine" data-module-name="PACKAGER"><Package size={20} /> PACKAGER <span className="module-function">— LIVRABLE MULTI-PLATEFORME</span></div>
         <button className="setup-close zeus-close" onClick={onClose} data-testid="packager-close-btn"><X size={18} /></button>
       </header>
       <div className="prime-sub">ZIP AUTO-EXTRACTIBLE · WINDOWS / ANDROID / IPHONE · ICÔNE OFFICIELLE INTÉGRÉE</div>
@@ -57,7 +57,7 @@ export default function PackagerPanel({ onClose, onSpeak, autoInstaller = false 
         <section className="prime-card argus-wide">
           {!out && (
             <div className="pkg-intro">
-              <p>Génère la structure complète du package d'installation ΣIRIUS# (3 plateformes, scripts d'auto-extraction, docs et icône officielle).</p>
+              <p>Génère la structure complète du package d'installation ΣIRIUS (3 plateformes, scripts d'auto-extraction, docs et icône officielle).</p>
               <button className="pkg-build" onClick={build} disabled={busy} data-testid="packager-build-btn">
                 {busy ? <Loader2 size={15} className="spin" /> : <Package size={15} />} GÉNÉRER LE PACKAGE
               </button>

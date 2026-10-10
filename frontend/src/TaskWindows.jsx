@@ -1,10 +1,12 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useEffect, useRef, useState } from "react";
 import { X, CheckCircle2, AlertTriangle, Loader2, FolderCheck, ListTodo } from "lucide-react";
+import useWindowGesture, { isPrimaryGesture } from "./windowGesture";
 
 export default function TaskWindows({ tasks, onClose }) {
   const visibleTasks = [...tasks].reverse().slice(0, 12);
   const panelRef = useRef(null);
+  const gesture = useWindowGesture();
   const hideTimerRef = useRef(null);
   const [isVisible, setIsVisible] = useState(false);
 
@@ -33,7 +35,7 @@ export default function TaskWindows({ tasks, onClose }) {
   }, [tasks]);
 
   const startDrag = (event) => {
-    if (event.target.closest("button")) return;
+    if (!isPrimaryGesture(event) || event.target.closest("button")) return;
     const panel = panelRef.current;
     if (!panel) return;
     const rect = panel.getBoundingClientRect();
@@ -41,21 +43,18 @@ export default function TaskWindows({ tasks, onClose }) {
     const offsetY = event.clientY - rect.top;
     panel.classList.add("dragging");
     const move = (pointerEvent) => {
-      panel.style.left = `${Math.min(Math.max(8, pointerEvent.clientX - offsetX), window.innerWidth - rect.width - 8)}px`;
-      panel.style.top = `${Math.min(Math.max(58, pointerEvent.clientY - offsetY), window.innerHeight - rect.height - 8)}px`;
+      panel.style.left = `${Math.min(Math.max(8, pointerEvent.clientX - offsetX), Math.max(8, window.innerWidth - rect.width - 8))}px`;
+      panel.style.top = `${Math.min(Math.max(58, pointerEvent.clientY - offsetY), Math.max(58, window.innerHeight - 60))}px`;
       panel.style.transform = "none";
     };
     const stop = () => {
       panel.classList.remove("dragging");
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", stop);
     };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", stop);
-    event.preventDefault();
+    gesture(event, { element: panel, onMove: move, onEnd: stop });
   };
 
   const startResize = (event) => {
+    if (!isPrimaryGesture(event)) return;
     const panel = panelRef.current;
     if (!panel) return;
     const rect = panel.getBoundingClientRect();
@@ -75,12 +74,8 @@ export default function TaskWindows({ tasks, onClose }) {
     };
     const stop = () => {
       panel.classList.remove("dragging");
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", stop);
     };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", stop);
-    event.preventDefault();
+    gesture(event, { element: panel, onMove: move, onEnd: stop });
     event.stopPropagation();
   };
 

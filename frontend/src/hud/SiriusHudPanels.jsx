@@ -6,6 +6,7 @@ import {
   GripHorizontal, Minus,
 } from "lucide-react";
 import HudPanel from "@/hud/HudPanel";
+import useWindowGesture, { isPrimaryGesture, fixedWindowFrame } from "../windowGesture";
 import {
   useHudHiddenKeys, restoreHudPanel, hideHudPanel,
   readFloatPos, writeFloatPos, clearFloatPos,
@@ -381,6 +382,7 @@ const NEXT_ACTIONS_KEY = "prochaines-actions";
 // glisser pour déplacer (position mémorisée), bouton de fermeture (masque la pilule, avec
 // une petite puce de restauration), et le popover garde son bouton de fermeture propre.
 function NextActionsButton({ events, bilan, connected }) {
+  const gesture = useWindowGesture();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
   const draggedRef = useRef(false);
@@ -396,11 +398,12 @@ function NextActionsButton({ events, bilan, connected }) {
     // prioritaire) — mais PAS le bouton principal .shud-next : toute la pilule visible EST
     // ce bouton, donc le glisser doit pouvoir démarrer dessus (le seuil de distance ci-dessous
     // distingue ensuite un simple clic d'un vrai glisser).
-    if (e.target.closest(".shud-next-pop, .shud-next-close, .shud-next-redock")) return;
+    if (!isPrimaryGesture(e) || e.target.closest(".shud-next-pop, .shud-next-close, .shud-next-redock")) return;
     const el = wrapRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
     const startLeft = r.left, startTop = r.top;
+    const frame = fixedWindowFrame(el);
     const sx = e.clientX, sy = e.clientY;
     draggedRef.current = false;
     const onMove = (ev) => {
@@ -413,14 +416,12 @@ function NextActionsButton({ events, bilan, connected }) {
       const nl = Math.min(Math.max(0, startLeft + dx), window.innerWidth - 40);
       const nt = Math.min(Math.max(0, startTop + dy), window.innerHeight - 40);
       el.style.position = "fixed";
-      el.style.left = `${nl}px`;
-      el.style.top = `${nt}px`;
+      el.style.left = `${(nl - frame.left) / frame.scaleX}px`;
+      el.style.top = `${(nt - frame.top) / frame.scaleY}px`;
       el.style.margin = "0";
       el.style.zIndex = "500";
     };
     const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
       el.classList.remove("shud-dragging");
       if (draggedRef.current) {
         const rect = el.getBoundingClientRect();
@@ -429,8 +430,7 @@ function NextActionsButton({ events, bilan, connected }) {
         writeFloatPos(NEXT_ACTIONS_KEY, pos);
       }
     };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
+    gesture(e, { element: el, onMove, onEnd: onUp });
   };
 
   const handleToggle = () => {

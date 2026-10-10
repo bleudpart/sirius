@@ -29,6 +29,16 @@ static_dir = backend_dir / "static"
 if static_dir.exists():
     datas.append((str(static_dir), "static"))
 
+# Never ship owner credentials: refuse to build if any project data entry contains a .env file.
+for source, _target in datas:
+    source_path = Path(source)
+    if project_dir not in source_path.parents:
+        continue
+    leaked = [source_path] if source_path.is_file() else list(source_path.rglob(".env*"))
+    leaked = [path for path in leaked if path.name.startswith(".env")]
+    if leaked:
+        raise SystemExit("Fichier .env interdit dans le paquet : " + ", ".join(str(path) for path in leaked))
+
 # Le webagent (recherche invisible via Playwright) a besoin d'un vrai Chromium
 # sur le poste client, sans dépendre d'un téléchargement réseau au premier lancement.
 # On embarque uniquement le dossier "chromium-*" (pas ffmpeg/headless-shell/winldd,

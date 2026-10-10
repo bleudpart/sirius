@@ -10,6 +10,7 @@ import ModulesMedia from "./ModulesMedia";
 import { cleanTextForDisplay } from "./voice";
 import MediaPlayer from "@/components/MediaPlayer";
 import ProviderLogo from "@/components/ProviderLogo";
+import useWindowGesture, { isPrimaryGesture } from "./windowGesture";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const GEO_KEY = "sirius_display_geo_v2";
@@ -212,7 +213,7 @@ const readGeo = () => {
 };
 
 // Panneau d'affichage ΣIRIUS : ouvert par Sirius quand il a du contenu à montrer (messages, web, vidéos, images)
-export default function SiriusDisplay({ item, history, onSelect, onClose, onInteract, onSpeak }) {
+export default function SiriusDisplay({ item, history, onSelect, onClose, onInteract, onSpeak, onRead }) {
   const ref = useRef(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [minimized, setMinimized] = useState(() => !!readGeo().min);
@@ -412,8 +413,9 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
     try { localStorage.setItem(GEO_KEY, JSON.stringify({ ...readGeo(), ...patch })); } catch (e) {}
   };
 
+  const gesture = useWindowGesture();
   const onBarDown = (e) => {
-    if (e.target.closest("button") || full) return;
+    if (!isPrimaryGesture(e) || e.target.closest("button") || full || window.matchMedia("(max-width: 1023px)").matches) return;
     const el = ref.current;
     gsap.killTweensOf(el);
     const r = el.getBoundingClientRect();
@@ -427,16 +429,12 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
     const up = () => {
       el.classList.remove("dragging");
       saveGeo({ x: parseFloat(el.style.left) || 0, y: parseFloat(el.style.top) || 0 });
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
     };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    e.preventDefault();
+    gesture(e, { element: el, onMove: move, onEnd: up });
   };
 
   const onResizeDown = (e) => {
-    if (full) return;
+    if (!isPrimaryGesture(e) || full || window.matchMedia("(max-width: 1023px)").matches) return;
     const el = ref.current;
     gsap.killTweensOf(el);
     const r = el.getBoundingClientRect();
@@ -450,12 +448,8 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
       el.classList.remove("dragging");
       saveGeo({ w: parseFloat(el.style.width) || 440, h: parseFloat(el.style.height) || 460 });
       animateResizeSettle(el);
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
     };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    e.preventDefault();
+    gesture(e, { element: el, onMove: move, onEnd: up });
     e.stopPropagation();
   };
 
@@ -490,6 +484,7 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
       <div className="sd-bar" onPointerDown={onBarDown} onDoubleClick={() => { setMinimized(false); setFull((f) => !f); }} title={full ? "Double-clic : quitter le plein écran" : "Glisser pour déplacer — double-clic : plein écran"} data-testid="sirius-display-bar">
         <Monitor size={13} className="sd-logo" />
         <span className="sd-name">ΣIRIUS DISPLAY</span>
+        {onRead && <button onClick={onRead} title="Lire tout le contenu du Display" aria-label="Lire tout le contenu du Display" data-testid="sirius-display-read">Lire</button>}
         <span className={`sd-badge sd-badge-${type}`} data-testid="sirius-display-badge">
           <Icon size={10} /> {label}
         </span>

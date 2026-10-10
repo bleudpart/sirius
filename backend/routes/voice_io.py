@@ -10,6 +10,7 @@ import logging
 import os
 import re
 import wave
+import hashlib
 from collections import OrderedDict
 from pathlib import Path
 from typing import Optional
@@ -24,6 +25,7 @@ from voice_corrections import normalize_voice_transcript
 from auth_api import require_user
 import cloud_link
 import usage_quota
+from provider_access import PERSONAL_REQUIRED, bind_keys, owner_allowed, personal_key, provider_env, require_personal
 
 logger = logging.getLogger(__name__)
 _MAX_STREAM_AUDIO_BYTES = 8 * 1024 * 1024
@@ -67,10 +69,12 @@ class GoogleTTSRequest(BaseModel):
     rate: float = 1.05
     pitch: float = -2.0
     voice: str = "fr-FR-Neural2-G"
+    keys: dict[str, str] = Field(default_factory=dict)
 
 
 class GeminiTTSRequest(BaseModel):
     text: str = Field(min_length=1, max_length=4500)
+    keys: dict[str, str] = Field(default_factory=dict)
 
 
 GEMINI_TTS_STYLE = (
@@ -129,11 +133,11 @@ async def _gemini_request(key: str, payload: dict) -> str:
 
 async def _chirp_fallback(text: str, voice: str) -> Optional[dict]:
     """Synthétise la voix Chirp3-HD via Google Cloud TTS, en WAV."""
-    key = os.environ.get("GOOGLE_TTS_API_KEY")
+    key = provider_env("google_tts", "GOOGLE_TTS_API_KEY", "GOOGLE_CLOUD_TTS_API_KEY")
     if not key:
         return None
     name = os.environ.get("GEMINI_TTS_FALLBACK_VOICE") or f"fr-FR-Chirp3-HD-{voice}"
-    cache_key = ("chirp", name, text)
+    cache_key = ("chirp", hashlib.sha256(key.encode()).hexdigest(), name, text)
     cached = _cache_get(cache_key)
     if cached:
         return cached
@@ -179,7 +183,9 @@ def make_voice_io_router(db=None):
     @router.post("/tts/gemini")
     async def gemini_tts(req: GeminiTTSRequest, request: Request):
         user = await require_user(request, db)
-        key = os.environ.get("GEMINI_TTS_API_KEY")
+        bind_keys(req.keys)
+        require_personal("gemini_tts", req.keys)
+        key = provider_env("gemini_tts", "GEMINI_TTS_API_KEY", keys=req.keys)
         if not key and cloud_link.should_relay_tts("GEMINI_TTS_API_KEY"):
             return await cloud_link.relay_json("/api/tts/gemini", req.model_dump())
         if not key:
@@ -189,12 +195,13 @@ def make_voice_io_router(db=None):
             raise HTTPException(status_code=400, detail="Texte vide")
         model = os.environ.get("GEMINI_TTS_MODEL", "gemini-3.8-flash-tts")
         voice = os.environ.get("GEMINI_TTS_VOICE", "Aoede")
-        cache_key = ("gemini", model, voice, GEMINI_TTS_STYLE, text)
-        chirp_primary = os.environ.get("GEMINI_TTS_PRIMARY", "").strip() != "1"
+        cache_key = ("gemini", hashlib.sha256(key.encode()).hexdigest(), model, voice, GEMINI_TTS_STYLE, text)
+        chirp_primary = not personal_key("gemini_tts", req.keys) and os.environ.get("GEMINI_TTS_PRIMARY", "").strip() != "1"
         cached = _cache_get(cache_key)
         if cached and not chirp_primary:
             return cached
-        await usage_quota.consume(db, user, "tts")
+        if not personal_key("gemini_tts", req.keys):
+            await usage_quota.consume(db, user, "tts")
         # Chirp3-HD d'abord : timbre identique d'une phrase à l'autre et plus rapide. Gemini
         # (génératif, vite saturé en 429) alternait avec Chirp et changeait la voix en cours d'usage.
         if chirp_primary:
@@ -246,7 +253,9 @@ def make_voice_io_router(db=None):
         }
 
     async def _google_tts(req: GoogleTTSRequest, user: dict):
-        key = os.environ.get("GOOGLE_TTS_API_KEY")
+        bind_keys(req.keys)
+        require_personal("google_tts", req.keys)
+        key = provider_env("google_tts", "GOOGLE_TTS_API_KEY", "GOOGLE_CLOUD_TTS_API_KEY", keys=req.keys)
         if not key and cloud_link.should_relay_tts("GOOGLE_TTS_API_KEY"):
             return await cloud_link.relay_json("/api/tts/google", req.model_dump())
         if not key:
@@ -258,11 +267,12 @@ def make_voice_io_router(db=None):
         rate = max(0.5, min(2.0, req.rate))
         pitch = max(-10.0, min(10.0, req.pitch))
 
-        cache_key = (text, voice, round(rate, 2), round(pitch, 2))
+        cache_key = (hashlib.sha256(key.encode()).hexdigest(), text, voice, round(rate, 2), round(pitch, 2))
         cached = _cache_get(cache_key)
         if cached:
             return cached
-        await usage_quota.consume(db, user, "tts")
+        if not personal_key("google_tts", req.keys):
+            await usage_quota.consume(db, user, "tts")
 
         payload = {
             "input": {"text": text},
@@ -278,11 +288,11 @@ def make_voice_io_router(db=None):
                 r = await cx.post(
                     "https://texttospeech.googleapis.com/v1/text:synthesize",
                     params={"key": key}, json=payload)
-        except Exception as e:
-            logger.error(f"[GOOGLE TTS] réseau: {e}")
+        except Exception:
+            logger.error("[GOOGLE TTS] erreur réseau")
             raise HTTPException(status_code=502, detail="Google TTS injoignable")
         if r.status_code != 200:
-            logger.error(f"[GOOGLE TTS] {r.status_code} {r.text[:200]}")
+            logger.error("[GOOGLE TTS] HTTP %s", r.status_code)
             raise HTTPException(status_code=502, detail="Erreur Google TTS")
         audio = r.json().get("audioContent")
         if not audio:
@@ -302,8 +312,11 @@ def make_voice_io_router(db=None):
         otherwise uses the local Google TTS implementation.
         """
         user = await require_user(request, db)
-        tts_url = os.environ.get("TTS_BACKEND_URL")
+        bind_keys(req.keys)
+        require_personal("google_tts", req.keys)
+        tts_url = os.environ.get("TTS_BACKEND_URL") if owner_allowed(user) and not req.keys else None
         if tts_url:
+            await usage_quota.consume(db, user, "tts")
             try:
                 payload = {"text": req.text, "rate": req.rate, "pitch": req.pitch, "voice": req.voice}
                 async with httpx.AsyncClient(timeout=30) as cx:
@@ -329,18 +342,19 @@ def make_voice_io_router(db=None):
         (envoyée avec l'audio) est utilisée ; à défaut, le compte ΣIRIUS Cloud relié.
         """
         user = await require_user(request, db)
+        bind_keys({"groq_key": groq_key} if groq_key else {})
+        require_personal("groq")
         data = await file.read()
         if not data:
             raise HTTPException(status_code=400, detail="Audio vide")
-        stt_url = os.environ.get("WHISPER_API_URL") or os.environ.get("STT_BACKEND_URL")
         user_groq_key = (groq_key or "").strip()
-        env_groq_key = (os.environ.get("GROQ_KEY") or os.environ.get("GROQ_API_KEY") or "").strip()
-        groq_key = env_groq_key or user_groq_key
+        stt_url = (os.environ.get("WHISPER_API_URL") or os.environ.get("STT_BACKEND_URL")) if owner_allowed(user) and not user_groq_key else None
+        groq_key = provider_env("groq", "GROQ_KEY", "GROQ_API_KEY")
         fname = getattr(file, "filename", None) or "audio.webm"
         ctype = getattr(file, "content_type", None) or "audio/webm"
         if cloud_link.should_relay_stt(user_groq_key):
             return await cloud_link.relay_stt(fname, data, ctype)
-        if stt_url or env_groq_key:
+        if (stt_url or groq_key) and not user_groq_key:
             await usage_quota.consume(db, user, "stt")
         if stt_url:
             try:
@@ -379,7 +393,7 @@ def make_voice_io_router(db=None):
                         },
                     )
             except httpx.HTTPError as error:
-                logger.error("[STT] Groq Whisper inaccessible: %s", error)
+                logger.error("[STT] Groq Whisper inaccessible (%s)", type(error).__name__)
                 raise HTTPException(status_code=502, detail="Transcription ΣIRIUS temporairement injoignable.") from error
             if r.status_code == 200:
                 payload = r.json()
@@ -389,7 +403,7 @@ def make_voice_io_router(db=None):
                     "raw_text": raw_text,
                     "provider": "groq-whisper",
                 }
-            logger.error("[STT] Groq Whisper returned %s: %s", r.status_code, r.text[:200])
+            logger.error("[STT] Groq Whisper HTTP %s", r.status_code)
             raise HTTPException(status_code=502, detail="La transcription ΣIRIUS a refusé l'audio.")
 
         raise HTTPException(status_code=503, detail="Aucun moteur de reconnaissance vocale serveur n'est configuré.")
@@ -415,6 +429,11 @@ def make_voice_io_router(db=None):
                 return
             filename = "sirius-voice.m4a" if content_type == "audio/mp4" else "sirius-voice.webm"
             groq_key = str(setup.get("groq_key") or "").strip()
+            # Refuse before recording: after the trial, only a personal Groq key may transcribe.
+            if not groq_key and not owner_allowed():
+                await websocket.send_json({"type": "error", "detail": PERSONAL_REQUIRED, "trial": "expired"})
+                await websocket.close(code=1008)
+                return
             audio = bytearray()
             await websocket.send_json({"type": "ready"})
 
@@ -453,7 +472,7 @@ def make_voice_io_router(db=None):
             return
         except HTTPException as error:
             await websocket.send_json({"type": "error", "detail": error.detail})
-            await websocket.close(code=1011)
+            await websocket.close(code=1008 if error.status_code in {401, 403} else 1011)
         except Exception:
             logger.exception("[STT] Erreur inattendue du flux WebSocket")
             await websocket.send_json({"type": "error", "detail": "Échec de la transcription vocale."})

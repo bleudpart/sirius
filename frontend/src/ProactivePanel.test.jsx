@@ -9,6 +9,7 @@ let host;
 const suggestion = { id: "test", title: "Suggestion", description: "Test", urgency: "faible", risk_level: "faible" };
 
 beforeEach(() => {
+  jest.useFakeTimers();
   localStorage.removeItem("sirius_panel_pos");
   host = document.createElement("div");
   document.body.appendChild(host);
@@ -21,6 +22,7 @@ afterEach(async () => {
   host.remove();
   global.fetch = originalFetch;
   localStorage.removeItem("sirius_panel_pos");
+  jest.useRealTimers();
 });
 
 function pointer(target, type, x, y, button = 0) {
@@ -38,6 +40,7 @@ test("anticipation header moves the panel and persists its position", async () =
   });
   pointer(host.querySelector(".pro-mode-row"), "pointerdown", 30, 125);
   pointer(window, "pointermove", 104, 205);
+  act(() => jest.advanceTimersByTime(20));
   expect(panel.style.left).toBe("100px");
   expect(panel.style.top).toBe("200px");
   pointer(window, "pointerup", 104, 205);

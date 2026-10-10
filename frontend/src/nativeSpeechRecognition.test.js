@@ -12,7 +12,7 @@ function provider() {
     cancel: jest.fn(async () => { reject?.(Object.assign(new Error("Cancelled"), { code: "CANCELLED" })); }),
     finish: jest.fn(async () => {}),
   };
-  return { plugin, remove, event: (value) => event(value), resolve: (text) => resolve({ text }) };
+  return { plugin, remove, event: (value) => event(value), resolve: (text, alternatives) => resolve({ text, alternatives }) };
 }
 
 const tick = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
@@ -46,6 +46,27 @@ test("aborting a capture cancels the plugin and removes its listener", async () 
   expect(fake.plugin.cancel).toHaveBeenCalledTimes(1);
   expect(fake.remove).toHaveBeenCalledTimes(1);
   expect(native.active).toBe(false);
+});
+
+test("uses the actual Android alternative containing Zirius rather than discarding all but its first guess", async () => {
+  const fake = provider();
+  const native = createNativeRecognition(fake.plugin);
+  const result = native.listen({ signal: new AbortController().signal, onEvent: jest.fn() });
+  await tick();
+  fake.resolve("bonjour jus", [
+    { text: "bonjour jus", confidence: 0.71 },
+    { text: "bonjour Zirius", confidence: 0.68 },
+  ]);
+  expect(await result).toBe("bonjour SIRIUS");
+});
+
+test("never invents Zirius when Android offers no matching alternative", async () => {
+  const fake = provider();
+  const native = createNativeRecognition(fake.plugin);
+  const result = native.listen({ signal: new AbortController().signal, onEvent: jest.fn() });
+  await tick();
+  fake.resolve("bonjour jus", [{ text: "bonjour jus", confidence: 0.71 }]);
+  expect(await result).toBe("bonjour jus");
 });
 
 test("unsupported on-device recognition fails explicitly without starting network recognition", async () => {

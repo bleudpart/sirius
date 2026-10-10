@@ -1,4 +1,4 @@
-import { loadApiKeys } from "@/apiKeyStorage";
+import { personalMarketHeaders } from "@/apiKeyStorage";
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useEffect, useRef, useState } from "react";
 import {
@@ -158,15 +158,14 @@ export default function OracleDivin({ onClose }) {
   const starsRef = useRef(null);
 
   useEffect(() => {
-    let avKey = "", waPhone = "", waKey = "";
-    avKey = loadApiKeys().alphavantage || "";
+    let waPhone = "", waKey = "";
     try {
       const n = JSON.parse(localStorage.getItem("sirius_notif")) || {};
       if (n.whatsapp && n.waNum && n.waKey) { waPhone = n.waNum; waKey = n.waKey; }
     } catch { waPhone = ""; }
-    const extra = `${avKey ? `&av_key=${encodeURIComponent(avKey)}` : ""}${waPhone ? `&wa_phone=${encodeURIComponent(waPhone)}&wa_key=${encodeURIComponent(waKey)}` : ""}`;
+    const extra = waPhone ? `&wa_phone=${encodeURIComponent(waPhone)}&wa_key=${encodeURIComponent(waKey)}` : "";
     const go = (lat, lon) =>
-      fetch(`${API}/oracle/overview?lat=${lat}&lon=${lon}${extra}`).then((r) => r.json()).then(setData).catch(() => {});
+      fetch(`${API}/oracle/overview?lat=${lat}&lon=${lon}${extra}`, { credentials: "include", headers: personalMarketHeaders() }).then((r) => r.json()).then(setData).catch(() => {});
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (p) => go(p.coords.latitude, p.coords.longitude),

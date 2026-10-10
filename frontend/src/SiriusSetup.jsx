@@ -5,23 +5,28 @@ import { QRCodeSVG } from "qrcode.react";
 import { speakFr, speakAsCharacter, CHAR_PROFILES, MYTHOS_VOICES, loadCharOverrides, DEFAULT_VOICE, loadVoiceConfig } from "@/voice";
 import { HUD_DEFAULTS, loadHud, saveHud } from "@/hudPrefs";
 import { ConfirmButton } from "@/ConfirmButton";
+import { exportAccountProfile, importAccountProfile, validatePersonalService } from "@/accountSetup";
+import { assertSecureKeyTransport, loadApiKeys } from "@/apiKeyStorage";
+import AccountServices from "@/AccountServices";
+import VaultControls from "@/VaultControls";
 
-const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
 const TABS = [
   { id: "profil", label: "PROFIL", Icon: User },
   { id: "voix", label: "VOIX", Icon: Volume2 },
   { id: "ia", label: "IA", Icon: Brain },
   { id: "hud", label: "HUD", Icon: Monitor },
   { id: "stockage", label: "STOCKAGE", Icon: HardDrive },
-  { id: "api", label: "API", Icon: KeyRound },
+  { id: "api", label: "SERVICES ET COFFRE", Icon: KeyRound },
 ];
 const KEY_META = {
-  groq_key: { service: "groq_real", label: "Clé Groq (réponses IA — principale)", tag: "cerveau principal · recommandée", url: "https://console.groq.com/keys", ph: "gsk_...", note: "Gratuite, obtenue en 30 secondes sur console.groq.com. C'est la clé la plus importante pour que ΣIRIUS réponde immédiatement." },
+  groq_key: { service: "groq_real", label: "Clé Groq (réponses IA — principale)", tag: "cerveau principal · recommandée", url: "https://console.groq.com/keys", ph: "gsk_...", note: "Créez une clé dans votre compte Groq. Consultez les quotas et tarifs du fournisseur ; les autres services sont facultatifs." },
   groq: { service: "k3", label: "Clé Kimi K3 (Moonshot)", tag: "réflexion approfondie · optionnelle", url: "https://platform.moonshot.cn/console/api-keys", ph: "sk-...", note: "Facultative : n'ajoute que le mode réflexion approfondie. Sans clé, ΣIRIUS répond déjà normalement si la clé Groq est renseignée." },
   serp: { service: "serp", label: "Clé SerpAPI", tag: "recherche web", url: "https://serpapi.com/manage-api-key", ph: "...", note: "Infos du web en temps réel (météo, actualités)." },
   fal: { service: "fal", label: "Clé fal.ai", tag: "clips vidéo", url: "https://fal.ai/dashboard/keys", ph: "...", note: "Génération de clips vidéo uniquement." },
-  gmaps: { service: "gmaps", label: "Clé Google Maps", tag: "géocodage LOCUS#", url: "https://console.cloud.google.com/apis/credentials", ph: "AIza...", note: "Sans clé : Nominatim/OpenStreetMap (gratuit)." },
-  alphavantage: { service: "alphavantage", label: "Clé Alpha Vantage", tag: "bourse ORACLE#", url: "https://www.alphavantage.co/support/#api-key", ph: "...", note: "Cotations boursières réelles (25 req/jour)." },
+  gmaps: { service: "gmaps", label: "Clé Google Maps", tag: "carte Google LOCUS", url: "https://console.cloud.google.com/apis/credentials", ph: "AIza...", note: "Clé Maps JavaScript API utilisée dans le navigateur. Restreignez-la aux origines autorisées. Le test côté serveur ne confirme pas la carte ; la recherche d'adresses n'est pas disponible actuellement." },
+  alphavantage: { service: "alphavantage", label: "Clé Alpha Vantage", tag: "bourse ORACLE", url: "https://www.alphavantage.co/support/#api-key", ph: "...", note: "Cotations boursières réelles (25 req/jour)." },
+  google_tts: { service: "google_tts", label: "Clé Google TTS", tag: "lecture vocale cloud · optionnelle", url: "https://console.cloud.google.com/apis/credentials", ph: "...", note: "La lecture locale de l'appareil reste possible sans cette clé." },
+  gemini_tts: { service: "gemini_tts", label: "Clé Gemini TTS", tag: "lecture vocale Gemini · optionnelle", url: "https://aistudio.google.com/api-keys", ph: "...", note: "Service facultatif, soumis à la tarification de votre fournisseur." },
 };
 
 // Composant stable (hors du parent) : préserve le DOM et le focus à chaque frappe
@@ -34,7 +39,7 @@ function KeyField({ k, value, status, onChange, onTest }) {
         <a className="setup-link" href={meta.url} target="_blank" rel="noreferrer">obtenir <ExternalLink size={11} /></a>
       </label>
       <div className="setup-keyrow">
-        <input className="setup-input" type="password" value={value} onChange={onChange} placeholder={meta.ph} data-testid={`setup-key-${k}`} />
+        <input className="setup-input" type="password" value={value} onChange={onChange} placeholder={meta.ph} maxLength={4096} autoComplete="off" data-testid={`setup-key-${k}`} />
         <button type="button" className="setup-keytest" onClick={onTest} disabled={status?.loading} data-testid={`setup-keytest-${k}`}>
           {status?.loading ? <Loader2 size={13} className="spin" /> : "TESTER"}
         </button>
@@ -50,8 +55,11 @@ function KeyField({ k, value, status, onChange, onTest }) {
 }
 
 // Écran de configuration — les réglages techniques restent réservés à l'administrateur.
-export default function SiriusSetup({ initialProfile, initialKeys, onComplete, onCancel, onOpenAccount, showAdvanced = false }) {
-  const [tab, setTab] = useState("profil");
+export default function SiriusSetup({ initialProfile, initialKeys, initialTab = "profil", onComplete, onCancel, onOpenAccount, showAdvanced = false }) {
+  const [tab, setTab] = useState(initialTab);
+  const [selectedServices, setSelectedServices] = useState(() => [...new Set([
+    "groq_key", ...Object.keys(KEY_META).filter((name) => initialKeys?.[name]),
+  ])]);
   const visibleTabs = TABS;
   const [profile, setProfile] = useState({
     name: "", age: "", profession: "", city: "", gender: "", interests: "", style: "",
@@ -64,24 +72,12 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
     fal: (initialKeys && initialKeys.fal) || "",
     gmaps: (initialKeys && initialKeys.gmaps) || "",
     alphavantage: (initialKeys && initialKeys.alphavantage) || "",
+    google_tts: (initialKeys && initialKeys.google_tts) || "",
+    gemini_tts: (initialKeys && initialKeys.gemini_tts) || "",
   });
   const setP = (k) => (e) => setProfile((p) => ({ ...p, [k]: e.target.value }));
   const setK = (k) => (e) => { setKeys((s) => ({ ...s, [k]: e.target.value })); setKeyStatus((st) => ({ ...st, [k]: null })); };
   const fileRef = useRef(null);
-
-  // Le serveur ΣIRIUS fournit-il déjà le cerveau ? (clé du serveur ou PC lié à ΣIRIUS Cloud)
-  const [serverBrain, setServerBrain] = useState(null);
-  useEffect(() => {
-    let alive = true;
-    const readJson = (path) => fetch(`${API}${path}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-    Promise.all([readJson("/chat/status"), readJson("/cloud/status")]).then(([chat, cloud]) => {
-      if (!alive) return;
-      if (chat?.groq_env) setServerBrain("server");
-      else if (cloud?.linked) setServerBrain("cloud");
-      else setServerBrain("none");
-    });
-    return () => { alive = false; };
-  }, []);
 
   // Validation des clés API (Gestion des erreurs : valider avant de sauvegarder)
   const [keyStatus, setKeyStatus] = useState({});
@@ -91,15 +87,27 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
     if (!val) { setKeyStatus((s) => ({ ...s, [k]: { ok: false, message: "Clé vide." } })); return; }
     setKeyStatus((s) => ({ ...s, [k]: { loading: true } }));
     try {
-      const r = await fetch(`${API}/keys/validate`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ service: meta.service, key: val }),
-      });
-      const d = await r.json();
+      assertSecureKeyTransport();
+      const d = await validatePersonalService(meta.service, val);
       setKeyStatus((s) => ({ ...s, [k]: { ok: !!d.ok, message: d.message || "" } }));
     } catch (e) {
-      setKeyStatus((s) => ({ ...s, [k]: { ok: false, message: "Vérification impossible — backend injoignable." } }));
+      setKeyStatus((s) => ({ ...s, [k]: { ok: false, message: "Vérification impossible — utilisez un backend HTTPS ou local et vérifiez sa connexion." } }));
     }
+  };
+  const validateKeys = async (nextKeys) => {
+    assertSecureKeyTransport();
+    const unverified = [];
+    for (const [name, value] of Object.entries(nextKeys)) {
+      if (!value) continue;
+      const meta = KEY_META[name];
+      if (!meta) throw new Error("Le coffre contient un service non pris en charge.");
+      const result = await validatePersonalService(meta.service, value);
+      const ok = result.ok === true;
+      setKeyStatus((current) => ({ ...current, [name]: { ok, message: result.message || (ok ? "Test réussi." : "Service non validé.") } }));
+      if (!ok && result.status === "unverifiable") unverified.push(meta.label);
+      else if (!ok) throw new Error(`${meta.label} : vérification non réussie. Corrigez la clé ou réessayez avant l'enregistrement.`);
+    }
+    return unverified;
   };
 
   // Musique
@@ -174,6 +182,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
   };
 
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [updateStatus, setUpdateStatus] = useState("");
   const [updateProgress, setUpdateProgress] = useState(null);
   const updatePollRef = useRef(null);
@@ -233,7 +242,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
   };
 
   const exportProfile = () => {
-    const data = JSON.stringify({ profile, keys, _app: "ΣIRIUS", _version: 1 }, null, 2);
+    const data = JSON.stringify(exportAccountProfile(profile), null, 2);
     const blob = new Blob([data], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -250,10 +259,9 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const data = JSON.parse(reader.result);
-        if (data.profile) setProfile((p) => ({ ...p, ...data.profile }));
-        if (data.keys) setKeys((k) => ({ ...k, ...data.keys }));
-        if (!data.profile && !data.keys) alert("Ce fichier .json ne contient pas de profil ni de clés Sirius.");
+        const data = importAccountProfile(JSON.parse(reader.result));
+        setProfile((p) => ({ ...p, ...data.profile }));
+        if (data.ignoredKeys) alert("Profil importé. Les anciennes clés JSON ne sont pas importées : utilisez le coffre chiffré ou la migration.");
       } catch (err) {
         alert("Fichier .json invalide. Vérifiez son contenu et réessayez.");
       }
@@ -264,13 +272,19 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
 
   const submit = (e) => {
     e.preventDefault();
+    setSaveError("");
     if (!profile.name.trim()) { setTab("profil"); return; }
+    const activeKeys = loadApiKeys();
+    if (Object.entries(keys).some(([name, value]) => (value || "").trim() !== (activeKeys[name] || ""))) {
+      setTab("api");
+      setSaveError("Vos clés ont été modifiées mais pas protégées. Utilisez « Protéger et enregistrer » dans le coffre avant d'enregistrer le profil.");
+      return;
+    }
     if (musicSource === "ask") localStorage.removeItem("sirius_music_source");
     else localStorage.setItem("sirius_music_source", musicSource);
     localStorage.setItem("sirius_ambient_track", ambientTrack);
-    const cleanKeys = Object.fromEntries(Object.entries(keys).map(([k, v]) => [k, (v || "").trim()]));
     setSaved(true);
-    setTimeout(() => onComplete({ ...profile, name: profile.name.trim() }, cleanKeys), 850);
+    setTimeout(() => onComplete({ ...profile, name: profile.name.trim() }, loadApiKeys()), 850);
   };
 
   const isEdit = !!(initialProfile && (initialProfile.name || initialProfile.prenom));
@@ -581,34 +595,29 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
 
         {tab === "api" && (
           <section className="setup-section setup-single" data-testid="setup-panel-api">
-            {(serverBrain === "server" || serverBrain === "cloud") && (
-              <div className="setup-server-keys" data-testid="setup-server-keys">
-                <CheckCircle2 size={14} />
-                <span>
-                  {serverBrain === "cloud"
-                    ? "Cerveau, voix et micro fournis par votre compte ΣIRIUS Cloud. Aucune clé n'est nécessaire."
-                    : "Cerveau, voix et micro fournis par le serveur ΣIRIUS. Aucune clé n'est nécessaire."}
-                  {" "}Les champs ci-dessous sont facultatifs : une clé personnelle remplace celle du serveur.
-                </span>
-              </div>
-            )}
-            <p className="setup-note">Chaque clé personnelle reste privée sur cet appareil. Testez chaque clé avant d'enregistrer.</p>
-            {Object.keys(KEY_META).map((k) => (
-              <KeyField key={k} k={k} value={keys[k]} status={keyStatus[k]} onChange={setK(k)} onTest={() => testKey(k)} />
-            ))}
-            <div className="setup-actions">
-              <ConfirmButton className="setup-reset danger" label="CONFIRMER ?" title="Effacer toutes les clés" testId="setup-reset-keys"
-                onConfirm={() => { setKeys({ groq_key: "", groq: "", serp: "", fal: "", gmaps: "", alphavantage: "" }); setKeyStatus({}); }}>
-                <RotateCcw size={13} /> EFFACER LES CLÉS
-              </ConfirmButton>
-            </div>
+            <AccountServices />
+            <VaultControls keys={keys} validateKeys={validateKeys} onKeys={(next) => {
+              setKeys(next); setKeyStatus({});
+              setSelectedServices([...new Set(["groq_key", ...Object.keys(next).filter((name) => KEY_META[name])])]);
+            }}>
+              <fieldset className="vault-services">
+                <legend>Quels services souhaitez-vous configurer ?</legend>
+                <p className="setup-note">Commencez par les réponses IA. Ajoutez seulement les fonctions utiles.</p>
+                <p className="setup-note">Décocher un service masque son champ sans effacer une clé déjà renseignée. Pour la retirer du coffre, videz le champ puis protégez à nouveau le coffre.</p>
+                {Object.entries(KEY_META).map(([name, meta]) => (
+                  <label key={name}>
+                    <input type="checkbox" checked={selectedServices.includes(name)}
+                      onChange={(event) => setSelectedServices((current) => event.target.checked
+                        ? [...current, name] : current.filter((value) => value !== name))} />
+                    {meta.tag}
+                  </label>
+                ))}
+              </fieldset>
+              {selectedServices.filter((name) => KEY_META[name]).map((k) => (
+                <KeyField key={k} k={k} value={keys[k] || ""} status={keyStatus[k]} onChange={setK(k)} onTest={() => testKey(k)} />
+              ))}
+            </VaultControls>
           </section>
-        )}
-
-        {!(keys.groq_key || "").trim() && tab === "api" && serverBrain === "none" && (
-          <div className="setup-warn" data-testid="setup-warn-nogroq">
-            Sans clé Groq personnelle, Sirius utilise la clé du serveur si elle est configurée — sinon il ne pourra pas répondre.
-          </div>
         )}
 
         <div className="setup-actions" style={{ alignItems: "center", justifyContent: "center" }}>
@@ -634,6 +643,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
         <button type="submit" className="setup-submit" data-testid="setup-submit">
           {isEdit ? "ENREGISTRER" : "DÉMARRER ΣIRIUS"}
         </button>
+        {saveError && <p className="fw-status ko" role="alert">{saveError}</p>}
 
         {saved && (
           <div className="setup-saved" data-testid="setup-saved">
@@ -651,7 +661,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, onComplete, o
           <input ref={fileRef} type="file" accept="application/json,.json" onChange={importProfile} style={{ display: "none" }} data-testid="setup-import-input" />
         </div>
         <p className="setup-note" style={{ textAlign: "center", marginTop: "8px" }}>
-          La sauvegarde contient vos clés API : conservez ce fichier en lieu sûr.
+          Le fichier de profil ne contient aucune clé. Exportez vos clés séparément avec le coffre chiffré.
         </p>
       </form>
     </div>

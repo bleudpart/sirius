@@ -282,7 +282,7 @@ function OdysseiaWindow({ onClose }) {
             {section.id === "citations" && (
               <section className="odysseia-main" aria-label="Citations mythologiques">
                 <div className="odysseia-title">
-                  <div><span>ODYSSEIA</span><h2>Paroles inspirées des mythes</h2></div>
+                  <div><span>ODYSSEIA</span><h2>Paroles et citations conservées</h2></div>
                   <label>Figure
                     <select value={filter} onChange={(event) => { setFilter(event.target.value); setActiveQuote(0); }} aria-label="Filtrer par figure">
                       {voices.map((voice) => <option key={voice} value={voice}>{voice}</option>)}
@@ -299,14 +299,16 @@ function OdysseiaWindow({ onClose }) {
                       ref={index === activeQuote ? activeQuoteRef : null}
                       data-testid={`odysseia-quote-${index}`}
                     >
-                      <q>{quote.text}</q><span>Inspirée par {quote.voice}</span>
+                      <q>{quote.text}</q><span>{quote.attributionUnverified ? "Attribution à vérifier : " : "Inspirée par "}{quote.voice}</span>
                     </button>
                   ))}
                 </div>
                 {selected && <article className="odysseia-featured" aria-live="polite">
-                  <span>INSPIRATION — {selected.voice.toUpperCase()}</span>
+                  <span>{selected.attributionUnverified ? "ATTRIBUTION À VÉRIFIER" : "INSPIRATION"} — {selected.voice.toUpperCase()}</span>
                   <blockquote>« {selected.text} »</blockquote>
-                  <p>Une création contemporaine qui reprend un thème associé à cette figure mythologique. Ce texte n'est pas présenté comme une citation historique.</p>
+                  <p>{selected.attributionUnverified
+                    ? "Ancienne citation du HUD conservée sans modification. L'attribution et la formulation historique n'ont pas été vérifiées."
+                    : "Une création contemporaine qui reprend un thème associé à cette figure mythologique. Ce texte n'est pas présenté comme une citation historique."}</p>
                   <div className="odysseia-quote-nav">
                     <button type="button" onClick={() => moveQuote(-1)} aria-label="Citation précédente" data-testid="odysseia-quote-prev"><ArrowUp size={15} /> Précédente</button>
                     <span>{activeQuote + 1} / {quotes.length}</span>

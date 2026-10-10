@@ -18,7 +18,7 @@ if not BASE_URL:
                 BASE_URL = line.split("=", 1)[1].strip().rstrip("/")
                 break
 
-GROQ_KEY = "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"
+GROQ_KEY = os.environ.get("SIRIUS_TEST_GROQ_KEY", "")
 
 
 @pytest.fixture

@@ -41,13 +41,15 @@ export const FR_ANGLICISMS = {
   template: "tempss-plète",
   templates: "tempss-plète",
   login: "logg-ine",
-  planning: "plani-ngue",
+  planning: "planingue",
   meeting: "mi-tingue",
   reporting: "ripor-tingue",
 };
 
 // Noms propres et vocabulaire ΣIRIUS.
 export const FR_NAMES = {
+  "Sirius Display": "Ziriusse displé",
+  "Zirius Display": "Ziriusse displé",
   Roger: "Rojé",
   Sirius: "Siriusse",
   cortex: "cortèxe",
@@ -61,6 +63,7 @@ export const FR_NAMES = {
   Atlas: "Atlass",
   Solon: "Solone",
   Themis: "Témisse",
+  Plutos: "Ploutoss",
   "Face ID": "feïss aï di",
   FaceID: "feïss aï di",
   "Face-ID": "feïss aï di",
@@ -103,3 +106,6 @@ export const applyFrenchPhonetics = (input) => {
   FR_RULES.forEach(([re, dit]) => { out = out.replace(re, dit); });
   return out;
 };
+
+export const normalizeFrenchElisions = (input) => String(input ?? "")
+  .replace(/\b(qu|[cdjlmnst])[\s\u200b\u200c\u200d\u2060\ufeff]*['’‘ʼ＇][\s\u200b\u200c\u200d\u2060\ufeff]*(?=\p{L})/giu, "$1'");

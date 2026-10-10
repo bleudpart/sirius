@@ -5,11 +5,11 @@ import { Download, LogIn, LogOut, Trash2, User, Save } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { BACKEND_BASE_URL, resolveBackendUrl } from "@/lib/api";
 import { CoreRings, ReactorCore } from "@/components/ReactorVisuals";
+import { lockApiKeys, setKeyAccount } from "@/apiKeyStorage";
 
 const API = BACKEND_BASE_URL;
 const BACKEND_URL_PREFIX = `${BACKEND_BASE_URL.replace(/\/$/, "")}/`;
 const LOCAL_BACKEND = /^(https?:\/\/)?(?:127\.0\.0\.1|localhost)(?::\d+)?$/i.test(BACKEND_BASE_URL);
-const TEMPORARY_AUTH_BYPASS = process.env.NODE_ENV !== "production";
 export const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 
@@ -379,20 +379,15 @@ export default function AuthGate({ children }) {
           rememberAccessToken(authenticatedUser);
         }
         if (!cancelled) {
+          setKeyAccount(authenticatedUser.user_id || authenticatedUser.email);
           syncLocalProfile(authenticatedUser);
           setUser(authenticatedUser);
         }
       } catch (error) {
         console.warn("Authentification ΣIRIUS interrompue.", error);
         if (!cancelled) {
-          setUser(TEMPORARY_AUTH_BYPASS ? {
-            email: "danielpartel@hotmail.com",
-            user_id: "danielpartel@hotmail.com",
-            name: "Daniel",
-            role: "admin",
-            provider: "local",
-            preferences: {},
-          } : null);
+          setKeyAccount("");
+          setUser(null);
         }
       } finally {
         if (!cancelled) setChecking(false);
@@ -403,8 +398,20 @@ export default function AuthGate({ children }) {
   }, []);
 
   const logout = async () => {
-    await fetch(`${API}/api/auth/logout`, { method: "POST" });
+    lockApiKeys();
+    let response;
+    try {
+      response = await fetch(`${API}/api/auth/logout`, { method: "POST" });
+    } catch {
+      window.alert("Serveur injoignable : déconnexion non confirmée. Les clés personnelles ont été verrouillées ; réessayez.");
+      return;
+    }
+    if (!response.ok) {
+      window.alert("Déconnexion non confirmée par le serveur. Les clés personnelles ont été verrouillées ; réessayez.");
+      return;
+    }
     siriusAccessToken = null;
+    setKeyAccount("");
     setShowProfile(false);
     setUser(null);
   };
@@ -412,7 +419,10 @@ export default function AuthGate({ children }) {
   if (checking) {
     return <div className="auth-screen"><div className="auth-checking" data-testid="auth-checking">Vérification de la session…</div></div>;
   }
-  if (!user) return <AuthScreen onAuth={setUser} />;
+  if (!user) return <AuthScreen onAuth={(next) => {
+    setKeyAccount(next.user_id || next.email);
+    setUser(next);
+  }} />;
 
   return (
     <AuthContext.Provider value={{ user, setUser, logout, openProfile: () => setShowProfile(true) }}>

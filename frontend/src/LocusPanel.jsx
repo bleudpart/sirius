@@ -104,7 +104,7 @@ export default function LocusPanel({ onClose, onSpeak, keys, initialAddress, ini
     <div className="prime-screen" data-testid="locus-panel" ref={dragRef}>
       <MythosBackdrop module="LOCUS#" state={busy ? "busy" : error ? "alert" : "idle"} />
       <header className="zeus-head">
-        <div className="oracle-title font-divine"><MapPin size={20} /> LOCUS# — GÉOLOCALISATION</div>
+        <div className="oracle-title font-divine" data-module-name="LOCUS"><MapPin size={20} /> LOCUS <span className="module-function">— GÉOLOCALISATION</span></div>
         <button className="setup-close zeus-close" onClick={onClose} data-testid="locus-close-btn"><X size={18} /></button>
       </header>
       {char && (

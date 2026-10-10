@@ -181,9 +181,13 @@ async def _embed_batch(texts):
     if model is not None:
         return await asyncio.to_thread(_local_encode, model, texts)
 
+    from provider_access import provider_key
+    key = provider_key("gemini", _EMBED_API_KEY)
+    if not key:
+        return []
     from google import genai
 
-    client = genai.Client(api_key=_EMBED_API_KEY)
+    client = genai.Client(api_key=key)
 
     async def _call():
         response = await client.aio.models.embed_content(model=EMBED_MODEL, contents=list(texts))

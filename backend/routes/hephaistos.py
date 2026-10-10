@@ -90,9 +90,11 @@ def make_hephaistos_router(db):
             sysroot.append({"name": "MONGODB", "status": "FAIL", "detail": f"{type(e).__name__}: {e}"[:80]})
         report["groups"]["system"] = sysroot
 
+        from provider_access import provider_env
+        kimi_key = provider_env("k3", "K3_API_KEY", "DANIEL_DEV_K3")
         ext = []
         integ = [
-            ("KIMI K3 (LLM)", "https://api.moonshot.cn/v1/models", bool(os.environ.get("DANIEL_DEV_K3"))),
+            ("KIMI K3 (LLM)", "https://api.moonshot.cn/v1/models", bool(kimi_key)),
             ("ALPHA VANTAGE", "https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=AAPL&apikey=demo", bool(os.environ.get("ALPHA_VANTAGE_API_KEY"))),
             ("OPENSTREETMAP", "https://nominatim.openstreetmap.org/search?q=Paris&format=json&limit=1", True),
             ("OSRM (routes)", "https://router.project-osrm.org/route/v1/driving/2.35,48.85;4.83,45.76?overview=false", True),
@@ -107,8 +109,8 @@ def make_hephaistos_router(db):
                 t0 = time.perf_counter()
                 try:
                     req_headers = {}
-                    if name.startswith("KIMI") or name.startswith("GROQ"):
-                        req_headers["Authorization"] = f"Bearer {os.environ.get('DANIEL_DEV_K3','')}"
+                    if name.startswith("KIMI") and kimi_key:
+                        req_headers["Authorization"] = "Bearer " + kimi_key
 
                     r = await cx.get(url, headers=req_headers)
                     reachable = r.status_code < 500

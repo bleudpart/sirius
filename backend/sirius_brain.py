@@ -8,6 +8,7 @@ import time
 from openai import AsyncOpenAI, BadRequestError, RateLimitError
 from media_intent import parse_media_intent
 from productivite.intent_productivite import parse_productivity_intent
+from provider_access import provider_key, personal_key
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,7 @@ _k3_clients: dict[str, AsyncOpenAI] = {}
 # --- CLIENT K3 (Kimi / Moonshot), fabrique réutilisable pour Thémis (OCR factures) et les
 # modules internes : chaque appelant peut fournir sa propre clé (BYOK) ou utiliser la clé serveur.
 def k3_client(key: str | None = None):
-    api_key = (key or ENV_K3_KEY or "").strip()
+    api_key = provider_key("k3", ENV_K3_KEY, {"k3": key} if key else None).strip()
     if not api_key:
         return None
     cache_key = hashlib.sha256(f"{K3_ENDPOINT}|{api_key}".encode("utf-8")).hexdigest()
@@ -317,14 +318,17 @@ async def parse_intent(prompt: str):
     if any(k in prompt_lower for k in ["spotify", "musique", "chanson", "morceau"]):
         return {"action": "spotify", "query": prompt}
 
-    if not client:
+    intent_key = provider_key("groq", ENV_GROQ_LLM_KEY)
+    intent_client = (client if intent_key == ENV_GROQ_LLM_KEY else
+                     AsyncOpenAI(api_key=intent_key, base_url=GROQ_LLM_ENDPOINT, max_retries=0)) if intent_key else None
+    if not intent_client:
         logging.warning("parse_intent: GROQ_API_KEY absente, fallback local.")
         return {"action": "general", "query": prompt}
 
     last_error = None
     for model in MODELS:
         try:
-            response = await client.chat.completions.create(
+            response = await intent_client.chat.completions.create(
                 model=model,
                 messages=[
                     {"role": "system", "content": _INTENT_SYSTEM_PROMPT},
@@ -408,8 +412,8 @@ async def enrich_briefing(data, keys=None):
     if not data:
         return ""
     keys = keys or {}
-    groq_key = ENV_GROQ_LLM_KEY
-    k3_key = (keys.get("k3") or keys.get("groq")) or ENV_K3_KEY
+    groq_key = provider_key("groq", ENV_GROQ_LLM_KEY, keys)
+    k3_key = provider_key("k3", ENV_K3_KEY, keys)
     if not groq_key and not k3_key:
         return ""
 
@@ -477,7 +481,7 @@ async def _research_briefing_follow_up(prompt: str, serp_key: str = "") -> str:
     try:
         from webagent import serp_results
 
-        results = await serp_results(question, serp_key or ENV_SERP_KEY)
+        results = await serp_results(question, provider_key("serp", ENV_SERP_KEY, {"serp": serp_key} if serp_key else None))
     except Exception as error:
         logger.warning("[ΣIRIUS:BRIEFING] recherche de suivi indisponible : %r", error)
         return ""
@@ -622,7 +626,7 @@ async def _research_current_prices(prompt: str, serp_key: str = "", *, timeout: 
             else " ".join(str(prompt or "").split())
         )
         results = await asyncio.wait_for(
-            serp_results(search_query, serp_key or ENV_SERP_KEY),
+            serp_results(search_query, provider_key("serp", ENV_SERP_KEY, {"serp": serp_key} if serp_key else None)),
             timeout=timeout,
         )
     except Exception as error:
@@ -887,7 +891,7 @@ HN_BULLETIN_PROMPT = (
 
 async def hn_bulletin(stories, keys=None):
     keys = keys or {}
-    k3_key = (keys.get("k3") or keys.get("groq")) or ENV_K3_KEY
+    k3_key = provider_key("k3", ENV_K3_KEY, keys)
     fallback = "\n".join(
         f"{i+1}. {s.get('title')} — score {s.get('score')} ({s.get('by')})"
         for i, s in enumerate(stories[:6])
@@ -937,11 +941,12 @@ async def summarize_episode(history):
         for t in (history or [])
         if isinstance(t, dict) and (t.get("content") or "").strip()
     ]
-    if len(turns) < 2 or not ENV_GROQ_LLM_KEY:
+    key = provider_key("groq", ENV_GROQ_LLM_KEY)
+    if len(turns) < 2 or not key:
         return None
     transcript = "\n".join(turns[-24:])[:5000]
     episode_client = AsyncOpenAI(
-        api_key=ENV_GROQ_LLM_KEY, base_url=GROQ_LLM_ENDPOINT, max_retries=0, timeout=20.0
+        api_key=key, base_url=GROQ_LLM_ENDPOINT, max_retries=0, timeout=20.0
     )
     for attempt in range(3):
         try:
@@ -989,10 +994,10 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
     Groq formule la réponse utilisateur ; Kimi 2.6 apporte une réflexion en mode profond.
     """
     keys = keys or {}
-    k3_key = (keys.get("k3") or keys.get("groq")) or ENV_K3_KEY
-    user_groq_key = (keys.get("groq_key") or "").strip()
-    groq_key = ENV_GROQ_LLM_KEY or user_groq_key
-    serp_key = keys.get("serp") or keys.get("serpapi") or ENV_SERP_KEY
+    k3_key = provider_key("k3", ENV_K3_KEY, keys)
+    user_groq_key = personal_key("groq", keys)
+    groq_key = provider_key("groq", ENV_GROQ_LLM_KEY, keys)
+    serp_key = provider_key("serp", ENV_SERP_KEY, keys)
     is_turbo = (mode or "normal").lower() == "turbo"
 
     # ⚡ APPRENTISSAGE INSTANTANÉ : mémorisation/correction sans aller-retour LLM.
@@ -1156,10 +1161,10 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
     pour ne jamais retarder la réponse parlée.
     """
     is_turbo = (mode or "normal").lower() == "turbo"
-    k3_key = (keys or {}).get("k3") or (keys or {}).get("groq") or ENV_K3_KEY
-    user_groq_key = ((keys or {}).get("groq_key") or "").strip()
-    groq_key = ENV_GROQ_LLM_KEY or user_groq_key
-    serp_key = (keys or {}).get("serp") or (keys or {}).get("serpapi") or ENV_SERP_KEY
+    k3_key = provider_key("k3", ENV_K3_KEY, keys)
+    user_groq_key = personal_key("groq", keys)
+    groq_key = provider_key("groq", ENV_GROQ_LLM_KEY, keys)
+    serp_key = provider_key("serp", ENV_SERP_KEY, keys)
 
     # ⚡ APPRENTISSAGE INSTANTANÉ : mémorisation/correction sans aller-retour LLM.
     memorize = detect_memorize_request(prompt)
@@ -1268,10 +1273,11 @@ async def extract_memory_background(prompt, answer):
     Appelée en tâche de fond APRÈS que la réponse a déjà été restituée (voix + affichage) :
     n'ajoute donc aucune latence perçue. Best-effort — toute erreur est avalée silencieusement.
     """
-    if not ENV_GROQ_LLM_KEY or not prompt or not answer:
+    key = provider_key("groq", ENV_GROQ_LLM_KEY)
+    if not key or not prompt or not answer:
         return []
     try:
-        client_groq = client or AsyncOpenAI(api_key=ENV_GROQ_LLM_KEY, base_url=GROQ_LLM_ENDPOINT, max_retries=0)
+        client_groq = client if key == ENV_GROQ_LLM_KEY and client else AsyncOpenAI(api_key=key, base_url=GROQ_LLM_ENDPOINT, max_retries=0)
         resp = await client_groq.chat.completions.create(
             model=GROQ_LLM_PRIMARY,
             messages=[

@@ -155,7 +155,7 @@ export default function HephaistosPanel({ onClose, onSpeak }) {
       <header className="zeus-head">
         {char && <img className="heph-avatar" src={char.image} alt={char.character} draggable={false} />}
         <div className="heph-head-copy">
-          <div className="oracle-title font-divine"><Hammer size={20} /> HÉPHAÏSTOS — AUTO-MAINTENANCE</div>
+          <div className="oracle-title font-divine" data-module-name="HÉPHAÏSTOS"><Hammer size={20} /> HÉPHAÏSTOS <span className="module-function">— AUTO-MAINTENANCE</span></div>
           <span className="heph-head-sub">DIAGNOSTIC RÉEL · FORGE SYSTÈME</span>
         </div>
         {s && <div className="heph-head-metrics"><span><b>{s.rate}%</b> SANTÉ</span><span><b>{s.total}</b> TESTS</span><span><b>{s.duration_ms}</b> ms</span></div>}

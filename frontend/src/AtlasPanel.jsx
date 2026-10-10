@@ -253,7 +253,7 @@ export default function AtlasPanel({ onClose, onSpeak, keys, onSaveKeys, initial
     <div className="atlas-panel" data-testid="atlas-panel">
       <div className="atlas-bar">
         <MapIcon size={14} />
-        <span className="atlas-title">ATLAS# — CARTE &amp; NAVIGATION</span>
+        <span className="atlas-title" data-module-name="ATLAS">ATLAS <span className="module-function">— CARTE &amp; NAVIGATION</span></span>
         {route && !showKey && (
           <span className="atlas-chip" data-testid="atlas-route-stats">
             {String(route.distance_km).replace(".", ",")} km · {route.duration_text}

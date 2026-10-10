@@ -8,6 +8,7 @@ import re
 import time
 
 import httpx
+from provider_access import provider_env, require_env_key, require_key
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -23,13 +24,14 @@ _news_cache = {"t": 0.0, "key": "", "data": None}
 
 async def _fetch_headlines(q: str = "", limit: int = 6):
     """Titres FR récents via /v2/everything (top-headlines country=fr est vide sur le plan gratuit)."""
-    if not NEWS_API_KEY:
+    key = require_key("newsapi", NEWS_API_KEY)
+    if not key:
         raise HTTPException(status_code=503, detail="NEWS_API_KEY absente")
     limit = max(1, min(10, limit))
     cache_key = f"{q.strip().lower()}|{limit}"
     if _news_cache["data"] and _news_cache["key"] == cache_key and time.time() - _news_cache["t"] < 300:
         return _news_cache["data"]
-    params = {"language": "fr", "sortBy": "publishedAt", "pageSize": limit, "apiKey": NEWS_API_KEY}
+    params = {"language": "fr", "sortBy": "publishedAt", "pageSize": limit, "apiKey": key}
     if q.strip():
         params["q"] = q.strip()
     else:
@@ -143,7 +145,7 @@ async def _gather_documentary_data(sujet: str):
                 if titres:
                     data["gallica_archives"] = titres
         async def europeana():
-            key = os.environ.get("EUROPEANA_API_KEY")
+            key = provider_env("europeana", "EUROPEANA_API_KEY")
             if not key:
                 return
             r = await cx.get("https://api.europeana.eu/record/v2/search.json",
@@ -159,7 +161,7 @@ async def _gather_documentary_data(sujet: str):
                 if items:
                     data["europeana_collections"] = items
         async def europeana_images():
-            key = os.environ.get("EUROPEANA_API_KEY")
+            key = provider_env("europeana", "EUROPEANA_API_KEY")
             if not key:
                 return
             r = await cx.get("https://api.europeana.eu/record/v2/search.json",
@@ -194,13 +196,14 @@ def make_infos_router():
 
     @router.get("/weather/current")
     async def weather_current(city: str = "Paris"):
-        if not OPENWEATHER_API_KEY:
+        key = require_key("openweather", OPENWEATHER_API_KEY)
+        if not key:
             raise HTTPException(status_code=503, detail="OPENWEATHER_API_KEY absente")
         try:
             async with httpx.AsyncClient(timeout=10) as cx:
                 r = await cx.get("https://api.openweathermap.org/data/2.5/weather",
                                  params={"q": city, "units": "metric", "lang": "fr",
-                                         "appid": OPENWEATHER_API_KEY})
+                                         "appid": key})
         except Exception:
             raise HTTPException(status_code=502, detail="OpenWeatherMap injoignable")
         if r.status_code == 404:
@@ -223,13 +226,14 @@ def make_infos_router():
 
     @router.get("/country")
     async def country_info(name: str):
-        if not RESTCOUNTRIES_API_KEY:
+        key = require_key("countries", RESTCOUNTRIES_API_KEY)
+        if not key:
             raise HTTPException(status_code=503, detail="RESTCOUNTRIES_API_KEY absente")
         try:
             async with httpx.AsyncClient(timeout=10) as cx:
                 r = await cx.get("https://api.restcountries.com/countries/v5",
                                  params={"q": name, "limit": 1},
-                                 headers={"Authorization": f"Bearer {RESTCOUNTRIES_API_KEY}"})
+                                 headers={"Authorization": f"Bearer {key}"})
         except Exception:
             raise HTTPException(status_code=502, detail="REST Countries injoignable")
         if r.status_code != 200:
@@ -283,7 +287,7 @@ def make_infos_router():
     @router.get("/europeana/search")
     async def europeana_search(q: str, rows: int = 12):
         """Visionneuse Europeana : recherche d'images d'archives."""
-        key = os.environ.get("EUROPEANA_API_KEY")
+        key = require_env_key("europeana", "EUROPEANA_API_KEY")
         if not key:
             raise HTTPException(status_code=503, detail="EUROPEANA_API_KEY absente")
         if not q.strip():

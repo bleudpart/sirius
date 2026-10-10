@@ -6,6 +6,7 @@ import { Clapperboard, Loader2, Music2, Radio, X } from "lucide-react";
 import MediaPlayer from "./MediaPlayer";
 import { MEDIA_PROVIDERS, useMediaControl } from "@/ws/media_control";
 import "./media.css";
+import useWindowGesture from "../windowGesture";
 
 const MEDIA_WINDOW_GEOMETRY = "sirius_media_window_geometry_v1";
 const SPOTIFY_TOKENS_KEY = "sirius_spotify";
@@ -195,9 +196,10 @@ export default function MediaHUD({ onClose, onShowOnDisplay, initialIntent, stan
     onShowOnDisplay(state, controlMedia);
   };
 
+  const gesture = useWindowGesture();
   const startDrag = (event) => {
     if (window.matchMedia("(max-width: 1023px)").matches) return;
-    if (standalone || event.button !== 0 || event.target.closest("button, input, select, a")) return;
+    if (standalone || event.button !== 0 || event.isPrimary === false || event.target.closest("button, input, select, a")) return;
     const element = windowRef.current;
     gsap.killTweensOf(element);
     const bounds = element.getBoundingClientRect();
@@ -215,20 +217,14 @@ export default function MediaHUD({ onClose, onShowOnDisplay, initialIntent, stan
     const stop = () => {
       element.classList.remove("is-moving");
       saveGeometry({ left: parseFloat(element.style.left) || 0, top: parseFloat(element.style.top) || 0 });
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", stop);
-      window.removeEventListener("pointercancel", stop);
     };
 
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", stop);
-    window.addEventListener("pointercancel", stop);
-    event.preventDefault();
+    gesture(event, { element, onMove: move, onEnd: stop });
   };
 
   const startResize = (event) => {
     if (window.matchMedia("(max-width: 1023px)").matches) return;
-    if (standalone || event.button !== 0) return;
+    if (standalone || event.button !== 0 || event.isPrimary === false) return;
     const element = windowRef.current;
     gsap.killTweensOf(element);
     const bounds = element.getBoundingClientRect();
@@ -250,15 +246,9 @@ export default function MediaHUD({ onClose, onShowOnDisplay, initialIntent, stan
         height: parseFloat(element.style.height) || bounds.height,
       });
       animateResizeSettle(element);
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", stop);
-      window.removeEventListener("pointercancel", stop);
     };
 
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", stop);
-    window.addEventListener("pointercancel", stop);
-    event.preventDefault();
+    gesture(event, { element, onMove: move, onEnd: stop });
     event.stopPropagation();
   };
 

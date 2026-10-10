@@ -1,6 +1,7 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useEffect, useRef, useState } from "react";
 import { X, Folder, FolderOpen, ArrowLeft, Film, RotateCw, Library, Link2 } from "lucide-react";
+import useWindowGesture, { isPrimaryGesture } from "./windowGesture";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -10,6 +11,7 @@ const fold = (s) => (s || "").toLowerCase().normalize("NFKD").replace(/[\u0300-\
 // Galerie de la médiathèque ΣIRIUS : dossiers navigables (souris + voix), fenêtre HUD dédiée
 export default function ArchiveGallery({ nav, onClose, onOpen, onSpeak }) {
   const ref = useRef(null);
+  const gesture = useWindowGesture();
   const [z, setZ] = useState(() => ++zCounter);
   const [files, setFiles] = useState([]);
   const [folder, setFolder] = useState(null);
@@ -52,7 +54,7 @@ export default function ArchiveGallery({ nav, onClose, onOpen, onSpeak }) {
   }, [nav && nav.seq]);
 
   const onBarDown = (e) => {
-    if (e.target.closest("button")) return;
+    if (!isPrimaryGesture(e) || e.target.closest("button")) return;
     const el = ref.current;
     const r = el.getBoundingClientRect();
     const dx = e.clientX - r.left;
@@ -65,15 +67,12 @@ export default function ArchiveGallery({ nav, onClose, onOpen, onSpeak }) {
     };
     const up = () => {
       el.classList.remove("dragging");
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
     };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    e.preventDefault();
+    gesture(e, { element: el, onMove: move, onEnd: up });
   };
 
   const onResizeDown = (e) => {
+    if (!isPrimaryGesture(e)) return;
     const el = ref.current;
     const r = el.getBoundingClientRect();
     const sx = e.clientX, sy = e.clientY;
@@ -86,12 +85,8 @@ export default function ArchiveGallery({ nav, onClose, onOpen, onSpeak }) {
     };
     const up = () => {
       el.classList.remove("dragging");
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
     };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    e.preventDefault();
+    gesture(e, { element: el, onMove: move, onEnd: up });
     e.stopPropagation();
   };
 

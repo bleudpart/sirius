@@ -19,7 +19,9 @@ export default function PushToTalkButton({ active, ready, onStart, onStop }) {
       aria-pressed={active}
     >
       <Radio size={15} />
-      <span>{active ? (ready ? "À VOUS" : "OUVERTURE…") : "ESPACE"}</span>
+      <span className="ptt-label">
+        <span>{active ? (ready ? "À VOUS" : "OUVERTURE…") : "ESPACE"}</span>
+      </span>
     </button>
   );
 }

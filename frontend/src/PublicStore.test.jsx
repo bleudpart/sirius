@@ -34,6 +34,33 @@ test("offer selection updates the accessible state and checkout summary", () => 
   expect(container.querySelector(".public-order-summary").textContent).toContain("Lifetime299 €");
 });
 
+test("store displays the requested slogan in the hero and footer", () => {
+  expect(container.querySelector(".public-hero h1").textContent).toBe("ZIRIUS travaille pour vous.");
+  expect(container.querySelector(".public-value").textContent).toBe("Il organise vos tâches, simplifie votre travail et vous libère du temps.");
+  expect(container.querySelector(".public-slogan").textContent).toBe("ZIRIUS travaille pour vous.");
+});
+
+test("store explains why Sirius was designed with the requested text", () => {
+  const section = container.querySelector(".public-why");
+  expect(section.getAttribute("aria-labelledby")).toBe("public-why-title");
+  expect(section.querySelector(".public-why-grid")).toBeNull();
+  expect(section.querySelectorAll("article")).toHaveLength(0);
+  expect(section.querySelector("h2").textContent).toBe("Pourquoi ΣIRIUS a-t-il été conçu ?");
+  expect(section.querySelector(":scope > p").textContent).toBe("ΣIRIUS a été conçu pour aider les particuliers, les commerçants, les artisans, les indépendants et les entreprises à mieux organiser leur activité au quotidien. Il permet de centraliser les documents, notes, factures, informations comptables, tâches, rendez-vous et projets dans un espace unique. Grâce à ses capacités de classement, de recherche et de synthèse, ΣIRIUS facilite le suivi administratif, l'organisation du travail et la prise de décision.");
+});
+
+test("trial explains activation, limits and personal keys without automatic payment", () => {
+  expect(container.querySelector(".public-trial-highlight").textContent).toContain("7 jours d'essai gratuit");
+  const trial = container.querySelector(".public-trial");
+  expect(trial.textContent).toContain("première connexion activant votre compte");
+  expect(trial.textContent).toContain("quotas quotidiens");
+  expect(trial.textContent).toContain("Sans engagement ni paiement automatique");
+  expect(trial.textContent).toContain("aucun abonnement à annuler");
+  expect(trial.textContent).toContain("vos propres clés API");
+  expect(trial.textContent).toContain("distinct de l'achat d'une licence");
+  expect(trial.textContent).toContain("ne relance pas les 7 jours");
+});
+
 test("the core rotates transparent rings rather than the square emblem", () => {
   const rings = container.querySelectorAll(".public-core-ring");
   expect(rings).toHaveLength(2);
@@ -50,7 +77,10 @@ test("store describes real prerequisites without fabricated evidence or empty vi
     expect(container.textContent).not.toContain(claim);
   }
   expect(container.querySelector(".hud-preview img").getAttribute("src")).toBe("/hud-preview.png");
-  expect(container.querySelectorAll(".public-matrix-actions li")).toHaveLength(4);
+  expect(container.querySelectorAll(".public-matrix-actions li")).toHaveLength(6);
+  expect(container.querySelector(".public-matrix h2").textContent).toBe("Découvrez les fonctionnalités de ΣIRIUS");
+  expect(container.querySelector(".public-matrix-actions").textContent).toContain("Rédaction de documents");
+  expect(container.querySelector(".public-matrix-actions").textContent).toContain("Analyse assistée par IA");
   expect(container.textContent).toContain("pas une démonstration en direct");
   expect(container.textContent).toContain("équipements compatibles");
   expect(container.textContent).toContain("leur délai de réponse peut varier");

@@ -1,4 +1,54 @@
+export const ODYSSEIA_HUD_QUOTES = [
+  ["Connais-toi toi-même.", "Socrate"],
+  ["Je ne sais qu'une chose, c'est que je ne sais rien.", "Socrate"],
+  ["Le commencement est la moitié de tout.", "Pythagore"],
+  ["On ne se baigne jamais deux fois dans le même fleuve.", "Héraclite"],
+  ["L'excellence n'est pas un acte, mais une habitude.", "Aristote"],
+  ["Le doute est le commencement de la sagesse.", "Aristote"],
+  ["La patience est amère, mais son fruit est doux.", "Aristote"],
+  ["Nul n'est méchant volontairement.", "Platon"],
+  ["La musique donne une âme à nos cœurs et des ailes à la pensée.", "Platon"],
+  ["Il n'y a qu'un chemin vers le bonheur : cesser de s'inquiéter des choses qui ne dépendent pas de notre volonté.", "Épictète"],
+  ["Ce qui trouble les hommes, ce ne sont pas les choses, mais les jugements qu'ils portent sur elles.", "Épictète"],
+  ["Hâte-toi de bien vivre et songe que chaque jour est à lui seul une vie.", "Sénèque"],
+  ["La fortune sourit aux audacieux.", "Virgile"],
+  ["Tout ce que nous entendons est une opinion, non un fait. Tout ce que nous voyons est une perspective, non la vérité.", "Marc Aurèle"],
+  ["Le bonheur de ta vie dépend de la qualité de tes pensées.", "Marc Aurèle"],
+].map(([text, voice]) => ({ text, voice, origin: "hud", attributionUnverified: true }));
+
+export const ODYSSEIA_HUD_INSPIRATIONS = [
+  ["Les douze travaux commencent tous par le premier geste.", "HERACLES"],
+  ["La rigueur d'aujourd'hui est le bouclier de demain.", "HERACLES"],
+  ["Nul exploit sans discipline : la propreté est ma treizième épreuve.", "HERACLES"],
+  ["La force ne sert à rien sans la constance qui la guide.", "HERACLES"],
+  ["Dans ma forge, chaque panne est un métal qui attend d'être redressé.", "HÉPHAÏSTOS"],
+  ["Ce qui est cassé peut renaître plus fort, si la main qui répare est patiente.", "HÉPHAÏSTOS"],
+  ["Le feu ne détruit que ce qu'on refuse de façonner.", "HÉPHAÏSTOS"],
+  ["Un outil bien entretenu vaut mieux que cent promesses.", "HÉPHAÏSTOS"],
+  ["La justice sans rigueur n'est qu'une opinion ; la rigueur sans justice, une tyrannie.", "THÉMIS"],
+  ["Un compte exact est une parole tenue.", "THÉMIS"],
+  ["L'équilibre de la balance se gagne chiffre après chiffre.", "THÉMIS"],
+  ["Ce qui est écrit et signé protège celui qui a donné sa parole.", "THÉMIS"],
+  ["Vendre, c'est d'abord écouter ce que l'autre n'ose pas dire.", "HERMÈS"],
+  ["Une objection n'est pas un mur : c'est une porte qui demande la bonne clé.", "HERMÈS"],
+  ["Le meilleur messager livre la vérité avec le sourire du marchand.", "HERMÈS"],
+  ["L'affaire conclue trop vite se dénoue de même ; prends le temps de la confiance.", "HERMÈS"],
+  ["Cent yeux ne suffisent pas si aucun ne sait ce qu'il cherche.", "ARGUS"],
+  ["La vigilance est un art silencieux : on ne la remarque que lorsqu'elle manque.", "ARGUS"],
+  ["Ce que tu surveilles avec constance ne te trahira jamais par surprise.", "ARGUS"],
+  ["La foudre ne frappe pas au hasard : elle choisit le point le plus haut.", "KERAUNOS"],
+  ["La puissance sans maîtrise n'est qu'un orage perdu.", "KERAUNOS"],
+  ["Un seul éclair suffit à révéler tout un paysage.", "KERAUNOS"],
+  ["Régner, c'est décider quand tous hésitent encore.", "ZEUS"],
+  ["Du sommet de l'Olympe, les grands problèmes redeviennent petits.", "ZEUS"],
+  ["L'ordre du monde tient à ceux qui veillent quand les autres dorment.", "ZEUS"],
+  ["Chaque lieu garde la mémoire de ceux qui l'ont traversé.", "LOCUS"],
+  ["Savoir où l'on est, c'est déjà savoir qui l'on est.", "LOCUS"],
+  ["Le chemin le plus court n'est pas toujours celui qui t'apprend le plus.", "LOCUS"],
+].map(([text, voice]) => ({ text, voice, origin: "hud" }));
+
 export const ODYSSEIA_QUOTES = [
+  ...[
   ["La sagesse est l'arme que nul bouclier ne peut arrêter.", "Athéna"],
   ["Celui qui connaît son destin n'en est pas l'esclave.", "Apollon"],
   ["La vérité éclaire ceux qui osent la regarder.", "Athéna"],
@@ -58,7 +108,10 @@ export const ODYSSEIA_QUOTES = [
   ["Les civilisations passent, les mythes traversent les âges.", "ODYSSEIA"],
   ["Cherche la sagesse plutôt que la puissance, et la puissance te suivra.", "ODYSSEIA"],
   ["Les récits anciens sont la mémoire éternelle de l'humanité.", "ODYSSEIA"],
-].map(([text, voice]) => ({ text, voice }));
+  ].map(([text, voice]) => ({ text, voice })),
+  ...ODYSSEIA_HUD_QUOTES,
+  ...ODYSSEIA_HUD_INSPIRATIONS,
+];
 
 export const ODYSSEIA_HISTORY = [
   {

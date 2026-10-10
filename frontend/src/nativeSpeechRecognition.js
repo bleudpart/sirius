@@ -1,4 +1,5 @@
 import { registerPlugin } from "@capacitor/core";
+import { chooseBestVoiceTranscript } from "./voiceCorrections";
 
 const speech = registerPlugin("SiriusSpeech");
 
@@ -53,7 +54,8 @@ export function createNativeRecognition(plugin = speech) {
         if (signal.aborted || request.controller.signal.aborted) {
           throw new DOMException("Reconnaissance annulée.", "AbortError");
         }
-        return result.text || "";
+        return result.alternatives?.length
+          ? chooseBestVoiceTranscript(result.alternatives) : result.text || "";
       } finally {
         signal.removeEventListener("abort", abort);
         if (current === request) current = null;

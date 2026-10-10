@@ -1,6 +1,8 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // Fenêtres holographiques 3D : transforme les écrans plats en panneaux cyan flottants,
 // déplaçables (drag sur l'en-tête), redimensionnables (poignée bas-droite) et fermables.
+import { trackWindowGesture, isPrimaryGesture } from "./windowGesture";
+
 const SEL = ".prime-screen, .zeus-screen, .eu-screen, .setup-screen, .iw-panel";
 const MOBILE_SEL = ".atlas-panel, .kr-panel, .p3d-overlay, .esp-panel, .about-panel, .media-hud-window, .productivity-screen, .connections-screen, .fp-overlay, .vision-card, .keys-panel, .sp-journal, .getting-started";
 const mobilePage = () => window.matchMedia("(max-width: 1023px)").matches;
@@ -46,24 +48,21 @@ function apply(el, g) {
 }
 
 function track(e0, el, k, fn) {
-  e0.preventDefault();
+  el.__gestureDispose?.();
   el.classList.add("holo-manip");
   el.__cur = { ...el.__geo };
   const move = (e) => fn(e.clientX - e0.clientX, e.clientY - e0.clientY);
   const up = () => {
-    window.removeEventListener("pointermove", move);
-    window.removeEventListener("pointerup", up);
     el.classList.remove("holo-manip");
     el.__geo = { ...el.__cur };
     geom[k] = { ...el.__cur };
     save();
   };
-  window.addEventListener("pointermove", move);
-  window.addEventListener("pointerup", up);
+  el.__gestureDispose = trackWindowGesture(e0, { element: el, onMove: move, onEnd: up });
 }
 
 function startDrag(e, el, k) {
-  if (mobilePage()) return;
+  if (mobilePage() || !isPrimaryGesture(e)) return;
   if (e.target.closest("button, input, select, textarea, a, [role=button]")) return;
   const g0 = { ...el.__geo };
   track(e, el, k, (dx, dy) => {
@@ -74,7 +73,7 @@ function startDrag(e, el, k) {
 }
 
 function startResize(e, el, k) {
-  if (mobilePage()) return;
+  if (mobilePage() || !isPrimaryGesture(e)) return;
   e.stopPropagation();
   const g0 = { ...el.__geo };
   track(e, el, k, (dx, dy) => {
@@ -122,7 +121,7 @@ function freeEl(el) {
 }
 
 function popTrack(e0, el, fn) {
-  e0.preventDefault();
+  el.__gestureDispose?.();
   el.classList.add("holo-manip");
   el.__cur = { ...el.__geo };
   let moved = false;
@@ -132,13 +131,10 @@ function popTrack(e0, el, fn) {
     fn(dx, dy);
   };
   const up = () => {
-    window.removeEventListener("pointermove", move);
-    window.removeEventListener("pointerup", up);
     el.classList.remove("holo-manip");
     el.__geo = { ...el.__cur };
   };
-  window.addEventListener("pointermove", move);
-  window.addEventListener("pointerup", up);
+  el.__gestureDispose = trackWindowGesture(e0, { element: el, onMove: move, onEnd: up });
   // supprime le clic (fermeture) qui suivrait un vrai déplacement
   el.addEventListener("click", (e) => { if (moved) { e.stopPropagation(); e.preventDefault(); } }, { capture: true, once: true });
 }
@@ -155,7 +151,7 @@ function decoratePopup(el) {
   bar.innerHTML = "<span></span><span></span><span></span>";
   el.prepend(bar);
   bar.addEventListener("pointerdown", (e) => {
-    if (e.target.closest("button, input, select, textarea, a")) return;
+    if (!isPrimaryGesture(e) || e.target.closest("button, input, select, textarea, a")) return;
     freeEl(el);
     const g0 = { ...el.__geo };
     popTrack(e, el, (dx, dy) => {
@@ -169,6 +165,7 @@ function decoratePopup(el) {
   rz.setAttribute("data-testid", "holo-pop-resize");
   el.appendChild(rz);
   rz.addEventListener("pointerdown", (e) => {
+    if (!isPrimaryGesture(e)) return;
     e.stopPropagation();
     freeEl(el);
     const g0 = { ...el.__geo };

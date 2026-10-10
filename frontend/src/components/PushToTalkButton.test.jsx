@@ -4,6 +4,27 @@ import PushToTalkButton from "./PushToTalkButton";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
+test("keeps the same label container and exposes only the current status", () => {
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  try {
+    for (const [active, ready, label] of [
+      [false, false, "ESPACE"],
+      [true, false, "OUVERTURE…"],
+      [true, true, "À VOUS"],
+      [false, false, "ESPACE"],
+    ]) {
+      act(() => root.render(<PushToTalkButton active={active} ready={ready} onStart={() => {}} onStop={() => {}} />));
+      const button = container.querySelector("button");
+      expect(button.querySelector(".ptt-label > span").textContent).toBe(label);
+      expect(button.textContent).toBe(label);
+      expect(button.getAttribute("aria-pressed")).toBe(String(active));
+    }
+  } finally {
+    act(() => root.unmount());
+  }
+});
+
 test("press captures the pointer, survives leaving the button and stops on release or cancellation", () => {
   const container = document.createElement("div");
   const root = createRoot(container);

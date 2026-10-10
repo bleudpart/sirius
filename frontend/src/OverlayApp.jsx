@@ -3,12 +3,13 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { speakFr } from "@/voice";
 import "@/App.css";
+import { API_BASE_URL } from "@/lib/api";
+import { loadApiKeys } from "@/apiKeyStorage";
 
-const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
+const API = API_BASE_URL;
 const load = (k, d) => {
   try {
-    const storage = k === "sirius_keys" ? sessionStorage : localStorage;
-    return JSON.parse(storage.getItem(k)) || d;
+    return JSON.parse(localStorage.getItem(k)) || d;
   } catch {
     return d;
   }
@@ -46,13 +47,14 @@ export default function OverlayApp() {
         body: JSON.stringify({
           text,
           session_id: "overlay",
-          keys: load("sirius_keys", {}),
+          keys: loadApiKeys(),
           profile: load("sirius_profile", {}),
           memory: load("sirius_memory", []),
           mode: localStorage.getItem("sirius_mode") || "normal",
         }),
       });
       const data = await resp.json();
+      if (!resp.ok) throw new Error(typeof data.detail === "string" ? data.detail : "La requête SIRIUS a échoué.");
       const a = data.answer || "Je n'ai pas de réponse.";
       setAnswer(a);
       speakFr(a);

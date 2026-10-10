@@ -4,6 +4,13 @@ const registry = (platform) => createModuleRegistry({
   platform, icons: {}, actions: {}, state: {}, user: { id: "test" },
 });
 
+test.each(["android", "web"])("les libellés et catégories %s ne contiennent plus de dièse", (platform) => {
+  for (const item of registry(platform)) {
+    expect(item.label).not.toContain("#");
+    expect(item.group).not.toContain("#");
+  }
+});
+
 test("Android excludes PC-only actions at every screen size but retains usable modules", () => {
   const ids = registry("android").map((item) => item.id);
   for (const id of ["capture-interface", "capture-region", "open-capture-folder", "install", "scripts", "packager", "hephaistos"]) {

@@ -1194,13 +1194,11 @@ body.hud-minimal .antique-jar { display: none; }
   user-select: none;
   pointer-events: none;
 }
-.sirius-title-button {
+.sirius-title-label {
   display: block;
   padding: 0;
   border: 0;
   background: transparent;
-  cursor: pointer;
-  pointer-events: auto;
 }
 .sirius-wordmark {
   display: block;
@@ -1219,10 +1217,6 @@ body.hud-minimal .antique-jar { display: none; }
   line-height: 1.2;
   text-align: center;
   opacity: 0.9;
-}
-.sirius-title-button:focus-visible {
-  outline: 1px solid rgba(216, 184, 117, 0.75);
-  outline-offset: 6px;
 }
 @media (max-width: 900px) {
   .sirius-wordmark { font-size: clamp(30px, 9vw, 48px); }
@@ -4016,7 +4010,7 @@ body.hud-minimal .medallion-halo { display: none; }
   font-family: "Orbitron", sans-serif;
   font-size: 9px;
   letter-spacing: 3px;
-  color: #6f95a6;
+  color: #ffffff;
   margin: 62px 0 18px;
 }
 .prime-grid {
@@ -4238,6 +4232,17 @@ body.hud-minimal .medallion-halo { display: none; }
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 .web-window.dragging { transition: none; opacity: 0.94; }
+.window-gesture-active {
+  transition: none !important;
+  animation-play-state: paused !important;
+  user-select: none;
+}
+.window-gesture-active iframe { pointer-events: none; }
+.ww-bar, .ww-resize, .sd-bar, .sd-resize,
+.shud-head, .shud-resize, .shud-next-wrap,
+.sp-bar, .pro-mode-row, .holo-pop-bar, .holo-pop-resize {
+  touch-action: none;
+}
 .ww-bar {
   display: flex;
   align-items: center;
@@ -5225,7 +5230,9 @@ body.hud-minimal .medallion-halo { display: none; }
 /* ===== Talkie-walkie (push-to-talk) ===== */
 .ptt-btn {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   padding: 0 12px;
   height: 34px;
@@ -5242,6 +5249,13 @@ body.hud-minimal .medallion-halo { display: none; }
   touch-action: none;
   transition: color 0.15s, background-color 0.15s, box-shadow 0.15s;
 }
+.ptt-btn > svg { flex: 0 0 auto; }
+.ptt-label { display: grid; white-space: nowrap; }
+.ptt-label > span,
+.ptt-label::after { grid-area: 1 / 1; }
+/* Reserve the longest status without adding it to the accessible button name. */
+.ptt-label::after { content: "OUVERTURE…"; visibility: hidden; }
+.ptt-label > span { text-align: center; }
 .ptt-btn:hover { box-shadow: 0 0 12px rgba(216, 184, 117, 0.4); }
 .ptt-btn.on {
   color: #1a0505;
@@ -5596,8 +5610,20 @@ body.hud-minimal .medallion-halo { display: none; }
   .cmd-bar, .voice-session-controls { width: 94vw; }
   .cmd-bar { gap: 6px; padding: 5px 5px 5px 10px; }
   .cmd-prompt { display: none; }
-  .cmd-send { padding: 8px 10px; font-size: 10px; }
-  .ptt-btn { padding: 7px 8px; font-size: 9px; }
+  .cmd-bar > .cmd-send {
+    flex: 0 0 44px;
+    width: 44px;
+    min-height: 36px;
+    height: 36px;
+    padding: 0;
+    font-size: 16px;
+  }
+  .cmd-bar > .ptt-btn {
+    min-height: 36px;
+    height: 36px;
+    padding: 0 8px;
+    font-size: 9px;
+  }
   .cmd-bar > .mic-btn { flex-basis: 64px; width: 64px; min-width: 64px; font-size: 8px; }
   .hud-panel.bottom-right { display: none; } /* NOYAU masqué sur téléphone */
   .hud-panel.bottom-left { min-width: 148px; bottom: 8px; left: 8px; }
@@ -6503,24 +6529,7 @@ body.hud-minimal .guardian-halo { display: none; }
 }
 .boot-module:hover .boot-module-name { filter: drop-shadow(0 0 14px rgba(232, 206, 150, 0.9)); color: transparent; }
 
-/* ===== Citation philosophique : zone de clic sur le noyau ===== */
 .reactor-text { pointer-events: none; }
-.core-quote-zone {
-  position: absolute;
-  left: 50%; top: 50%;
-  width: 42%; height: 42%;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  z-index: 3;
-  padding: 0;
-  transition: box-shadow 0.35s ease;
-}
-.core-quote-zone:hover { box-shadow: 0 0 40px rgba(226, 197, 138, 0.28), inset 0 0 46px rgba(226, 197, 138, 0.14); }
-.core-quote-zone:active { box-shadow: 0 0 60px rgba(232, 206, 150, 0.45), inset 0 0 60px rgba(232, 206, 150, 0.2); }
-.core-quote-zone:focus-visible { outline: 1px solid rgba(216, 184, 117, 0.6); outline-offset: 4px; }
 
 /* ===== Thème par heure : le sanctuaire vit avec la journée ===== */
 body[data-phase] .sanctuary-ambience { transition: filter 3s ease; }
@@ -6982,12 +6991,44 @@ body.hud-minimal .guardian-rig { display: none; }
 }
 
 /* Contraste commun des fenêtres HUD : les contenus restent lisibles sur le verre sombre. */
-.holo-win .prime-sub,
+.holo-win .prime-sub { color: #ffffff; }
 .holo-win .setup-note,
 .holo-win .argus-hist-date { color: rgba(255, 255, 255, 0.78); }
 .holo-win .argus-msg,
 .holo-win .argus-fix,
 .holo-win .argus-hist-label { color: #ffffff; }
+.module-function {
+  color: #ffffff;
+  -webkit-text-fill-color: #ffffff;
+  text-shadow: none;
+}
+.vault-services {
+  margin: 18px 0;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  color: #ffffff;
+}
+.vault-key-fields {
+  padding: 0;
+  margin: 0;
+  border: 0;
+  min-width: 0;
+}
+.vault-services label {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-height: 44px;
+}
+[data-testid="vault-controls"] details {
+  margin: 14px 0;
+  color: #ffffff;
+}
+[data-testid="vault-controls"] summary {
+  padding: 12px 0;
+  cursor: pointer;
+}
 .holo-win .haccp-tab { border-color: rgba(159, 221, 235, 0.48); color: #ffffff; }
 .holo-win .haccp-tab.active { color: #fff3cf; border-color: #e7c978; box-shadow: 0 0 14px rgba(231, 201, 120, 0.28); }
 

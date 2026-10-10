@@ -131,7 +131,7 @@ export default function PromoPanel({ onClose }) {
   return (
     <div className="prime-screen promo-screen" data-testid="promo-panel">
       <header className="zeus-head">
-        <div className="oracle-title font-divine"><Megaphone size={20} /> PROMO# — STORYBOARD VIDÉO</div>
+        <div className="oracle-title font-divine" data-module-name="PROMO"><Megaphone size={20} /> PROMO <span className="module-function">— STORYBOARD VIDÉO</span></div>
         <button className="setup-close zeus-close" onClick={onClose} data-testid="promo-close-btn"><X size={18} /></button>
       </header>
       <div className="prime-sub">{data ? data.shots.length : "…"} PLANS · ~2 MIN · 9:16 RÉSEAUX SOCIAUX · SCÈNE / AMBIANCE / VISUELS / MESSAGE / VOIX OFF</div>

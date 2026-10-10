@@ -261,7 +261,7 @@ html:has(.modwheel-overlay:not(.is-minimized)) .sirius-stage *::after { animatio
 .modmenu-item.active .modmenu-ico { border-color: rgba(240, 190, 80, 0.7); color: #ffd779; }
 .modmenu-label { min-width: 0; overflow-wrap: anywhere; line-height: 1.2; }
 .modmenu-name { display: block; color: #d8b875; font-family: "Cinzel", serif; font-weight: 600; }
-.modmenu-label small { display: block; margin-top: 3px; font-size: 11px; font-weight: 400; color: rgba(200, 225, 235, 0.62); line-height: 1.25; }
+.modmenu-label small { display: block; margin-top: 3px; font-size: 11px; font-weight: 400; color: #ffffff; line-height: 1.25; }
 
 /* Tablette : roue plus compacte */
 @media (max-width: 900px) {

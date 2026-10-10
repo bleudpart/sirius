@@ -51,7 +51,7 @@ def test_chat_accepts_keys_and_profile_shape():
         "text": "Bonjour, comment dois-tu m'appeler ?",
         "session_id": sid,
         "profile": {"name": "Sophie"},
-        "keys": {"groq": "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"},
+        "keys": {"groq": os.environ.get("SIRIUS_TEST_GROQ_KEY", "")},
     }
     r = requests.post(CHAT, json=payload, timeout=30)
     assert r.status_code == 200, r.text

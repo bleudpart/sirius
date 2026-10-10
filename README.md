@@ -4,6 +4,29 @@
 Assistant vocal personnel avec HUD futuriste style « Iron Man ».
 Frontend **React** + Backend **FastAPI** (Python), packagé en application Windows autonome via **Electron**.
 
+La synthèse vocale traite **PLUTOS** comme un nom propre (« Ploutoss »), et non
+comme un sigle à épeler. Les élisions françaises sont réunies avant la lecture
+et son découpage, y compris avec une apostrophe pleine largeur ou des séparateurs
+invisibles. Ce traitement est commun aux requêtes vocales distantes et au repli
+Android ; la prononciation effective reste à vérifier avec la voix de l'appareil.
+Le lexique prononce « planning » sans tiret artificiel. À l'oral, « le/ton
+Sirius Display » devient « mon Zirius Display » ; les élisions « L'… » sont
+envoyées avec un « l » minuscule sans modifier les lettres isolées.
+L'indication d'écoute et le signal vocal du micro serveur attendent l'événement
+de démarrage du MediaRecorder. En capture native continue, la parole commencée
+pendant la calibration initiale est conservée dans le pré-roll et n'est pas
+utilisée comme bruit de fond ; la suppression pendant la réponse reste inchangée.
+Le bouton micro rouge/vert démarre désormais une conversation : un seul appui,
+écoute suspendue pendant le traitement et la réponse, puis reprise automatique
+sans imposer de répéter « Sirius » à chaque échange. Un second appui ou
+« Arrêter » ferme la session. Le maintien pour parler reste un mode manuel séparé ;
+la conversation ne démarre pas automatiquement au lancement de l'application.
+Dans Diagnostic, « Test micro » utilise cette conversation avec la capture serveur.
+L'ancienne capture continue native reste séparée dans les essais audio avancés,
+explicitement expérimentale ; elle n'est plus le bouton de test principal.
+Les dates ISO isolées sont converties pour la voix avant les plages numériques :
+« 2026-11-14 » se lit « 14 novembre 2026 », sans changer le texte affiché.
+
 © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Voir [LICENSE](./LICENSE) et [CONTRAT_LICENCE.txt](./CONTRAT_LICENCE.txt).
 
 ![Logo SIRIUS](./frontend/public/icon-source.png)
@@ -13,6 +36,16 @@ Frontend **React** + Backend **FastAPI** (Python), packagé en application Windo
 ## Boutique publique
 
 La page `/acheter` est rendue par `frontend/src/PublicStore.jsx`.
+Son slogan est « ZIRIUS travaille pour vous. » avec le sous-titre
+« Il organise vos tâches, simplifie votre travail et vous libère du temps. ».
+La section « Découvrez les fonctionnalités de ΣIRIUS » présente six cadres,
+dont la rédaction de documents et l'analyse assistée par IA, avec leurs limites.
+La section « Pourquoi ΣIRIUS a-t-il été conçu ? » présente le texte explicatif
+sans les trois anciens cadres Organiser / Préparer / Connecter.
+La boutique explique l'essai gratuit des services IA pendant 7 jours dès la
+première connexion activant le compte : quotas quotidiens, aucun paiement
+automatique à expiration, puis configuration des clés personnelles. Cet essai
+est distinct de l'achat de la licence ; les coûts des fournisseurs restent séparés.
 Elle présente une capture statique du HUD et les prérequis des fonctions,
 sans lecteur vidéo vide, compteur d'utilisation ni témoignages non vérifiés.
 L'animation du noyau n'est pas une démonstration fonctionnelle.
@@ -74,6 +107,57 @@ Validation ciblée depuis `frontend` :
 `npm test -- --watchAll=false --runInBand src/services/mailCache.test.js src/components/MailCachePanel.test.jsx src/hooks/useMailCache.test.jsx`.
 
 ## Guide de premier démarrage
+
+Les touches sur le noyau et le titre du HUD ne déclenchent plus de citation
+ni de lecture vocale. Les 43 anciennes phrases du HUD sont conservées dans
+**ODYSSEIA → Citations**, consultables et filtrables par figure. Les anciennes
+attributions philosophiques sont signalées comme non vérifiées, distinctes
+des créations contemporaines inspirées des figures mythologiques.
+
+### Essai de 7 jours, puis configuration personnelle
+
+Le parcours prévu distingue un essai avec les services autorisés du serveur,
+soumis aux quotas quotidiens, et l'utilisation des clés personnelles après
+l'essai. La période est enregistrée côté serveur lors de la première
+activation du compte, pas dans une préférence de l'appareil. Les droits
+administrateur sont distincts du coffre et restent ceux du compte authentifié.
+
+Dans **Configuration → Services et coffre**, choisissez les services utiles,
+créez leurs clés via les liens des fournisseurs, testez-les puis utilisez
+**Protéger et enregistrer**. Le coffre personnel est chiffré par
+AES-256-GCM avec un mot de passe d'au moins 12 caractères et
+PBKDF2-SHA256 (600 000 itérations, sel aléatoire). Le fichier `sirius.vault`
+peut être exporté et importé avec confirmation. Il ne contient ni rôle
+administrateur ni configuration globale du serveur.
+
+Le stockage chiffré est isolé par compte sur l'appareil. Les clés
+déverrouillées restent en mémoire pour la session ; elles sont verrouillées
+à la déconnexion et au changement de compte. Ce mécanisme n'utilise pas
+encore le trousseau Windows ou Android Keystore. Après déverrouillage,
+les clés nécessaires sont transmises au backend de confiance pour les
+appels fournisseurs. Le mot de passe du coffre n'est pas récupérable.
+La clé personnelle Google Maps est également utilisée par la carte côté
+navigateur : ses restrictions doivent correspondre à cet usage.
+
+Une clé personnelle est prioritaire pour son fournisseur, sans repli vers
+la clé serveur si elle est refusée. Les autres fournisseurs restent utilisables
+pendant l'essai selon leurs quotas. Une vérification fal.ai non concluante
+reste signalée comme telle ; son stockage chiffré demande une confirmation.
+Les connecteurs sans prise en charge de clés personnelles ne sont pas
+automatiquement rendus disponibles après l'essai par l'import du coffre.
+
+Les anciens caches de clés ne sont plus chargés pour les appels API.
+La migration volontaire conserve l'ancienne copie jusqu'à la protection
+du coffre, puis la retire. Les exports de profil JSON excluent désormais
+les clés. Les anciennes sauvegardes JSON sur disque doivent être protégées
+ou supprimées par leur propriétaire.
+
+Le bilan de démarrage distingue service configuré, test réel d'une réponse
+IA, transcription du micro et lecture effectivement entendue, confirmée
+par la personne. La disponibilité d'un endpoint ne vaut pas test audio.
+
+**Note utilisateur : [Configurer SIRIUS simplement](./GUIDE_CONFIGURATION_SIRIUS.md).**
+Un guide rapide est également intégré à la page **Services et coffre**.
 
 Après la présentation et la configuration du profil, un guide propose trois
 entrées : chat écrit, dossiers métier locaux, comptes et connexions facultatifs.
@@ -388,36 +472,99 @@ Liste complète des modules et dates : [MODULES_SIRIUS.txt](./MODULES_SIRIUS.txt
   Vérifier le centrage des actualités et de la caméra, les défilements et les
   dimensions en portrait et paysage avant de publier l'APK.
   La variante transcrite « Zirius » est aussi reconnue comme mot d'appel.
-  En mains libres, le mot d'appel est facultatif : une demande complète est
-  traitée directement. Coupez le mode mains libres dans une conversation privée
-  ou près d'une télévision ; la parole ambiante peut aussi être transcrite.
+  Le mode mains libres est temporairement désactivé, même s'il avait été
+  enregistré comme actif. Le bouton **Dicter une demande** ouvre une seule
+  écoute ; un nouvel appui pendant l'ouverture ou l'écoute l'annule.
+  Le micro ne s'ouvre ni au démarrage ni automatiquement après une réponse.
+  Le mot d'appel est facultatif pour cette dictée déclenchée manuellement.
   « Ferme la fenêtre » ferme localement la fenêtre visible au premier plan,
   sans demander son nom ; les fenêtres réduites ne sont pas ciblées.
   Les confirmations disent « J'ouvre » ou « Je ferme » et reprennent le titre
   complet affiché en en-tête (par exemple « Pantheon System »), sans lire le nom
   technique du panneau ni tronquer le sous-titre.
+  « Afficher et lire le briefing » déclenche directement son affichage et sa
+  narration, comme « Lis le briefing ». La voix désigne son écran par
+  « mon Sirius Display », sans modifier les autres possessifs.
+  ΣIRIUS Display est l'espace de présentation de l'assistante : elle y montre
+  ses réponses, briefings, explications et contenus (web, images, vidéos,
+  e-mails ou contacts). Les modules métier gardent leurs fenêtres dédiées.
+  L'affichage et la lecture vocale sont deux opérations distinctes : montrer
+  un contenu ne prouve pas que sa narration a été lancée.
+  Le bouton **Lire** du Display et « Lis mon Sirius Display » lisent le texte
+  disponible par morceaux, sans tronquer les longs contenus. Les boutons de
+  l'interface sont exclus ; les e-mails, contacts et valeurs du brouillon
+  édité sont inclus. Une page web/PDF intégrée sans texte accessible ne peut
+  pas être lue comme un document : cette limite est signalée, sans inventer
+  son contenu. Les images/vidéos permettent de lire leur légende ou analyse,
+  pas d'extraire automatiquement des mots de leurs pixels ou de leur audio.
+  Sur téléphone, le Display réserve la place réelle de la barre de commande
+  et des contrôles vocaux, même en plein écran. Son contenu défile dans la
+  fenêtre ; répondre au micro ne nécessite pas de réduire chaque réponse.
+  Le bouton talkie-walkie réserve la largeur de son état « OUVERTURE… »
+  au repos : maintenir puis relâcher ne redimensionne pas la barre de commande.
+  Sur téléphone (jusqu'à 560 px), les boutons talkie-walkie et Envoyer
+  ont une hauteur de 36 px ; Envoyer garde une largeur compacte de 44 px.
+  Les fenêtres flottantes utilisent un suivi de pointeur commun : capture du
+  doigt, une mise à jour par image, arrêt sur annulation/perte de capture et
+  nettoyage à la fermeture. Seules les poignées interceptent le défilement ;
+  les pages mobiles plein écran et le Display restent fixes.
+  Les cartes détachées du HUD conservent leur position sans relancer l'animation
+  d'ouverture ni l'oscillation décorative au relâchement.
+  Les noms des modules restent dorés, leurs descriptions de fonctions sont
+  blanches. Les suffixes « # » ne sont plus affichés dans le catalogue et les
+  titres ; les identifiants historiques utilisés par les API sont conservés.
+  Les confirmations vocales utilisent le nom explicite du module, y compris
+  pour les anciennes fenêtres dont un sous-titre décrit la fonction.
+  Au démarrage, la présentation professionnelle est générée à partir du rôle
+  et des modules déclarés, sans envoyer le nom de l'utilisateur dans cette
+  demande. La génération est bornée à six secondes ; si elle échoue, l'écran
+  le signale et lit uniquement les contrôles, sans fabriquer de présentation.
+  Les contrôles distinguent interface initialisée, serveur joignable et API
+  audio présentes : ils ne prouvent ni le fonctionnement du modèle ni une
+  capture ou une sortie audio de qualité. « Explique les problèmes du démarrage »
+  restitue les résultats de cette session et leurs limites, sans inventer
+  une cause.
   La voix Android utilise une capture micro (maximum 15 secondes) envoyée à
   `/api/stt`, plutôt que la reconnaissance Web Speech de la WebView. Maintenir
   **ESPACE**, puis relâcher pour transcrire ; une annulation pendant la demande
   de permission ne doit pas démarrer un enregistrement tardif.
   Le talkie-walkie ouvre le micro dès l'appui : attendre le signal sonore et
   **À VOUS** avant de parler. **OUVERTURE…** indique que la capture n'est pas
-  encore prête. Après une réponse, Android relance l'ouverture après 250 ms ;
-  l'autorisation et l'activation matérielle peuvent ajouter un délai.
+  encore prête. L'autorisation et l'activation matérielle peuvent ajouter un délai.
   Sur Android, la capture désactive les traitements micro de la WebView qui
-  peuvent produire un flux muet sur certains Samsung. En mains libres, une
-  capture sans parole détectée n'est pas envoyée au serveur et ne consomme donc
-  pas le quota de transcription. La capture se termine après environ 1,2 seconde
+  peuvent produire un flux muet sur certains Samsung. La dictée manuelle
+  se termine après environ 1,2 seconde
   de silence suivant la parole (la limite de 15 secondes reste active). Vérifier sur appareil
   les pauses, le bruit ambiant et le délai serveur ; ce seuil ne garantit pas
   une transcription immédiate. La présentation se ferme après son chargement
   et la fin de sa voix ; si la voix ne démarre pas, elle ne bloque pas le HUD.
-  En mains libres, **Sirius** est facultatif devant une demande complète. Une capture vide ou
-  sans commande relance l'écoute en conservant le diagnostic sous la barre de
-  commande. Une phrase reconnue sans mot d'activation est traitée directement.
-  L'ouverture du micro n'indique pas une nouvelle demande
-  d'autorisation à chaque relance. Une erreur de transcription désactive le
-  mode et affiche l'erreur plutôt que de laisser le bouton faussement actif.
+  Une capture vide ou sans commande ne relance pas l'écoute. Une erreur de
+  transcription est affichée sous la barre de commande.
+  Les salutations courtes « Bonjour Zirius » et « Zirius bonjour » sont
+  acceptées même après retrait du nom de l'assistant. La reconnaissance locale
+  Android conserve les alternatives du moteur pour choisir un nom réellement
+  proposé ; Android 13+ reçoit aussi les variantes Sirius/Zirius comme lexique
+  indicatif. Cela ne garantit pas une transcription exacte et ne remplace pas
+  arbitrairement « jus » par « Sirius ».
+  **Essai Android Diagnostic :** le bouton **Test natif** active explicitement
+  une session `AudioRecord` continue (PCM mono 16 kHz), sans restaurer une
+  activation au démarrage. Un VAD énergétique adaptatif segmente la parole
+  avec environ 500 ms de pré-enregistrement, 1,2 seconde de silence et une
+  limite de 15 secondes. Ce VAD n'est pas neuronal. Les phrases sont envoyées
+  en WAV au serveur existant : il ne s'agit pas de transcription progressive.
+  La capture reste ouverte pendant le traitement et la synthèse, mais ces
+  périodes ne produisent pas de nouvelles demandes ; les buffers sont vidés
+  avant reprise. Il n'y a pas d'interruption vocale pendant la réponse.
+  **Stop**, le passage en arrière-plan et la fermeture libèrent le micro.
+  La disponibilité est limitée nativement au paquet `.diagnostic` ; aucune
+  permission ni écoute n'est déclenchée par la simple présence du bouton.
+  La précision du VAD, le premier mot et la reprise après TTS doivent être
+  validés sur le Samsung avant toute généralisation.
+  Les essais audio locaux sont désactivés par défaut et activables seulement
+  pour une session consentie dans Diagnostic. Les échantillons bruts et découpés
+  restent dans le cache privé du téléphone pour comparaison ; le bouton
+  **Supprimer les essais audio** les efface après analyse. Cela ne remplace pas
+  la transcription serveur habituelle des phrases détectées.
   La synthèse Android utilise **Chirp3-HD Aoede en priorité** via `/api/tts/gemini`,
   pour la présentation, les réponses et les personnages. Gemini Aoede reste le
   secours serveur : les deux moteurs ont des timbres différents malgré le nom

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Anchor } from "lucide-react";
+import useWindowGesture, { isPrimaryGesture, fixedWindowFrame } from "../windowGesture";
 import {
   useHudHiddenKeys, hideHudPanel,
   readFloatPos, writeFloatPos, clearFloatPos,
@@ -19,6 +20,7 @@ export default function HudPanel({
   children,
 }) {
   const ref = useRef(null);
+  const gesture = useWindowGesture();
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const key = panelKey || `${side}-${delay}`;
   const hiddenKeys = useHudHiddenKeys();
@@ -29,6 +31,7 @@ export default function HudPanel({
     const el = ref.current;
     if (!el || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return undefined;
     const onMove = (e) => {
+      if (e.pointerType !== "mouse" || el.classList.contains("window-gesture-active") || el.classList.contains("shud-floating")) return;
       const r = el.getBoundingClientRect();
       const px = (e.clientX - r.left) / r.width - 0.5;
       const py = (e.clientY - r.top) / r.height - 0.5;
@@ -47,40 +50,43 @@ export default function HudPanel({
   // suivre le pointeur — comme une vraie fenêtre HUD flottante plutôt qu'une carte figée
   // dans la liste. Position mémorisée par fenêtre (panelKey) pour survivre au rechargement.
   const onHeaderPointerDown = (e) => {
-    if (e.target.closest("button")) return;
+    if (!isPrimaryGesture(e) || e.target.closest("button")) return;
     const el = ref.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
+    const frame = fixedWindowFrame(el);
     const startLeft = r.left, startTop = r.top;
-    el.style.position = "fixed";
-    el.style.left = `${startLeft}px`;
-    el.style.top = `${startTop}px`;
-    el.style.width = `${r.width}px`;
-    el.style.margin = "0";
-    el.style.zIndex = "500";
-    el.classList.add("shud-dragging");
+    let moved = false;
     const sx = e.clientX, sy = e.clientY;
     const onMove = (ev) => {
+      if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 5) return;
+      if (!moved) {
+        moved = true;
+        el.style.position = "fixed";
+        el.style.width = `${r.width / frame.scaleX}px`;
+        el.style.margin = "0";
+        el.style.zIndex = "500";
+        el.classList.add("shud-dragging");
+      }
       const nl = Math.min(Math.max(0, startLeft + (ev.clientX - sx)), window.innerWidth - 40);
       const nt = Math.min(Math.max(0, startTop + (ev.clientY - sy)), window.innerHeight - 40);
-      el.style.left = `${nl}px`;
-      el.style.top = `${nt}px`;
+      el.style.left = `${(nl - frame.left) / frame.scaleX}px`;
+      el.style.top = `${(nt - frame.top) / frame.scaleY}px`;
     };
     const onUp = () => {
+      if (!moved) return;
+      el.classList.add("shud-floating");
       el.classList.remove("shud-dragging");
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
       const rect = el.getBoundingClientRect();
       const pos = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
       setFloatPos(pos);
       writeFloatPos(key, pos);
     };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    e.preventDefault();
+    gesture(e, { element: el, onMove, onEnd: onUp });
   };
 
   const onResizePointerDown = (e) => {
+    if (!isPrimaryGesture(e)) return;
     const el = ref.current;
     if (!el || !floatPos) return;
     const rect = el.getBoundingClientRect();
@@ -95,15 +101,11 @@ export default function HudPanel({
     };
     const onUp = () => {
       el.classList.remove("shud-dragging");
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
       const next = { left: rect.left, top: rect.top, width: el.getBoundingClientRect().width, height: el.getBoundingClientRect().height };
       setFloatPos(next);
       writeFloatPos(key, next);
     };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    e.preventDefault();
+    gesture(e, { element: el, onMove, onEnd: onUp });
     e.stopPropagation();
   };
 
@@ -126,7 +128,7 @@ export default function HudPanel({
   const panel = (
     <section
       ref={ref}
-      className={`shud-panel ${link ? `shud-link-${side}` : ""} ${className}`}
+      className={`shud-panel ${floatPos ? "shud-floating" : ""} ${link ? `shud-link-${side}` : ""} ${className}`}
       style={{
         "--shud-delay": `${delay}ms`,
         "--shud-tilt-x": `${tilt.x}deg`,

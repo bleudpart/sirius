@@ -110,7 +110,7 @@ function WorkModulesWorkspace({ storageKey, initialModule, onClose, onOpenExisti
   return (
     <section className="prime-screen work-modules" data-testid="work-modules-panel" onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); onClose(); } }}>
       <header className="zeus-head work-header">
-        <div className="oracle-title font-divine"><Icon size={22} /> {displayName(module.label)} <small>{module.description}</small></div>
+        <div className="oracle-title font-divine" data-module-name={displayName(module.label)}><Icon size={22} /> {displayName(module.label)} <small>{module.description}</small></div>
         <button className="setup-close zeus-close" type="button" onClick={onClose} title="Fermer" aria-label="Fermer"><X size={18} /></button>
       </header>
       <div className={`work-layout ${portraitAvailable ? "with-portrait" : ""}`}>
@@ -169,7 +169,7 @@ function WorkModulesWorkspace({ storageKey, initialModule, onClose, onOpenExisti
                 }} /></label>}
                 <button className="work-add" type="submit"><Plus size={16} /> Ajouter</button>
               </form>
-              {active === "workflows" && <div className="work-shortcuts"><span>Ouvrir un outil existant :</span><button type="button" onClick={() => onOpenExisting("promethee")}>PROMÉTHÉE#</button><button type="button" onClick={() => onOpenExisting("themis")}>THÉMIS#</button><button type="button" onClick={() => onOpenExisting("plans")}>PLANS#</button></div>}
+              {active === "workflows" && <div className="work-shortcuts"><span>Ouvrir un outil existant :</span><button type="button" onClick={() => onOpenExisting("promethee")}>PROMÉTHÉE</button><button type="button" onClick={() => onOpenExisting("themis")}>THÉMIS</button><button type="button" onClick={() => onOpenExisting("plans")}>PLANS</button></div>}
               <div className="work-section-head"><h2>{module.description}</h2><span>{sortedItems.length} entrée(s)</span></div>
               {sortedItems.length === 0 && <p className="work-empty">Aucune entrée pour le moment.</p>}
               <div className="work-list">{sortedItems.map((item) => <article className="work-item" key={item.id}>

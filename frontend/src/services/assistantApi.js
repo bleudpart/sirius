@@ -1,4 +1,5 @@
 import { withBackendResponse } from "../lib/backendRequest";
+import { loadApiKeys } from "../apiKeyStorage";
 
 export const ASSISTANT_TIMEOUTS = Object.freeze({
   stream: 60000,
@@ -28,12 +29,12 @@ export function requestConversation(payload, { signal }) {
   return withBackendResponse("/chat", jsonPost(payload), async (response) => ({
     ok: response.ok,
     status: response.status,
-    data: response.ok ? await response.json() : null,
+    data: response.ok || [401, 403, 429].includes(response.status) ? await response.json() : null,
   }), { signal, timeoutMs: ASSISTANT_TIMEOUTS.conversation });
 }
 
 export function requestAssistantIntent(command, { signal }) {
-  return withBackendResponse("/intent", jsonPost(JSON.stringify({ text: command })), readJson, {
+  return withBackendResponse("/intent", jsonPost(JSON.stringify({ text: command, keys: loadApiKeys() })), readJson, {
     signal, timeoutMs: ASSISTANT_TIMEOUTS.intent,
   });
 }

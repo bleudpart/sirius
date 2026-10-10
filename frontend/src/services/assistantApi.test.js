@@ -1,8 +1,10 @@
 import { API_BASE_URL } from "../lib/api";
 import { ASSISTANT_TIMEOUTS, streamConversation, requestConversation, requestAssistantIntent, requestTranscription } from "./assistantApi";
+import { lockApiKeys, saveApiKeys } from "../apiKeyStorage";
 
 const originalFetch = global.fetch;
 beforeEach(() => {
+  lockApiKeys();
   jest.useFakeTimers();
   global.fetch = jest.fn();
 });
@@ -41,14 +43,28 @@ test("HTTP chat failure is returned for the existing local fallback without pars
   expect(failed.json).not.toHaveBeenCalled();
 });
 
+test("trial and quota refusals preserve the server explanation instead of masquerading as downtime", async () => {
+  const data = { detail: "Essai terminé : configurez vos clés personnelles.", trial: "expired" };
+  global.fetch.mockResolvedValue({ ok: false, status: 403, json: async () => data });
+  expect(await requestConversation("{}", {})).toEqual({ ok: false, status: 403, data });
+});
+
 test("intent serializes text and exposes invalid JSON rather than a success-shaped default", async () => {
   global.fetch.mockResolvedValue(response({ action: "open" }));
   await expect(requestAssistantIntent("ouvre le module", {})).resolves.toMatchObject({ data: { action: "open" } });
   expect(global.fetch.mock.calls[0][0]).toBe(`${API_BASE_URL}/intent`);
-  expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual({ text: "ouvre le module" });
+  expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual({ text: "ouvre le module", keys: {} });
   const parseError = new SyntaxError("Invalid JSON");
   global.fetch.mockResolvedValue({ ok: true, json: () => Promise.reject(parseError) });
   await expect(requestAssistantIntent("ouvre", {})).rejects.toBe(parseError);
+});
+
+test("intent uses the personal session credentials after the vault is unlocked", async () => {
+  saveApiKeys({ groq_key: "personal-intent-test-key" });
+  global.fetch.mockResolvedValue(response({ action: "open" }));
+  await requestAssistantIntent("ouvre le module", {});
+  expect(JSON.parse(global.fetch.mock.calls[0][1].body).keys).toEqual({ groq_key: "personal-intent-test-key" });
+  lockApiKeys();
 });
 
 test("transcription keeps FormData and leaves multipart headers to the browser", async () => {

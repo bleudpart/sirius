@@ -1,4 +1,12 @@
-import { dockTitleMatchesModule, executeModuleOpen, findModuleForCommand, MODULE_ALIASES, parseModuleOpenCommand } from "./moduleCommandRouting";
+import { dockTitleMatchesModule, executeModuleOpen, findModuleForCommand, MODULE_ALIASES, parseModuleOpenCommand, moduleDisplayName } from "./moduleCommandRouting";
+
+test.each([
+  ["plans", "Plans 2D (PLANS)", "PLANS"],
+  ["photo3d", "Photos → Objet 3D (PHOTO3D)", "PHOTO3D"],
+  ["themis", "THÉMIS# — gestion d'entreprise", "THÉMIS"],
+])("le nom prononcé de %s n'est pas sa fonction", (id, label, expected) => {
+  expect(moduleDisplayName({ id, label })).toBe(expected);
+});
 
 const modules = [
   { id: "faceid", label: "FACE ID — reconnaissance faciale locale" },

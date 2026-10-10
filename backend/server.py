@@ -148,12 +148,15 @@ async def _delayed_background_loop(delay_seconds: float, factory):
 async def _run_episodic_loop_delayed():
     from episodic import episodic_loop
     from sirius_brain import summarize_episode
-    await episodic_loop(db, summarize_episode)
+    await episodic_loop(db, summarize_episode, enforce_accounts=True)
 
 
 async def _run_vector_warmup_loop_delayed():
     from semantic_vectors import vector_warmup_loop
-    await vector_warmup_loop()
+    # Shared warmup has no account identity: local embeddings only on the public server.
+    user = {"role": "admin"} if os.getenv("SIRIUS_PACKAGED", "").strip() == "1" else {}
+    with provider_scope(user):
+        await vector_warmup_loop()
 
 
 @asynccontextmanager
@@ -199,6 +202,10 @@ app = FastAPI(title="Sirius Backend API", version="1.0.0", lifespan=_lifespan)
 from storage import put_object, get_object, APP_NAME
 from local_memory import list_facts, add_fact, delete_fact, update_fact, log_event, prime_overview, log_service, list_service_log, recall_facts, learn_fact, recent_episodes
 from auth_api import _decode_token, is_direct_local_request, resolve_user_id, require_user  # noqa: E402
+from provider_access import (
+    PERSONAL_REQUIRED, ProviderAccessMiddleware, bind_keys, owner_allowed, personal_key,
+    metered_scope, provider_env, provider_key, provider_scope, require_env_key, require_personal, trial_status,
+)
 import cloud_link  # noqa: E402
 import usage_quota  # noqa: E402
 from omega_engine import OmegaEngine  # noqa: E402
@@ -341,22 +348,28 @@ def _rate_ok(ip: str, limit: int = 30, window: int = 60) -> bool:
 
 class IntentRequest(BaseModel):
     text: str
+    keys: dict = Field(default_factory=dict)
 
 @api_router.post("/intent")
 async def ui_intent(req: IntentRequest, request: Request):
     """Compréhension naturelle d'une commande vocale → intention UI structurée (Groq)."""
-    await require_user(request, db)
+    user = await require_user(request, db)
+    bind_keys(req.keys)
 
     ip = request.client.host if request.client else "?"
     if not _rate_ok(ip, limit=60, window=60):
         logger.warning("Intent rate limit exceeded", extra={"client_ip": ip})
         return {"action": "none"}
 
-    if cloud_link.should_relay_chat({}):
+    if cloud_link.should_relay_chat(req.keys):
         try:
             return await cloud_link.relay_json("/api/intent", req.model_dump())
         except HTTPException:
-            pass
+            raise
+    # After the trial without a personal key, parse_intent uses its local parser only.
+    # Per-provider precedence: only a personal Groq key replaces the owner key for intent parsing.
+    if owner_allowed(user) and not personal_key("groq", req.keys):
+        await usage_quota.consume(db, user, "chat")
     result = await parse_intent((req.text or "").strip())
     return result
 
@@ -367,6 +380,7 @@ class ResetRequest(BaseModel):
 async def chat(req: ChatRequest, request: Request):
     """Reçoit une commande, génère une réponse intelligente et garde l'historique."""
     user = await require_user(request, db)
+    bind_keys(req.keys)
     uid = user["user_id"]
     texte = (req.text or "").strip()
     if not texte:
@@ -377,7 +391,9 @@ async def chat(req: ChatRequest, request: Request):
         return await cloud_link.relay_json("/api/chat", req.model_dump())
     session_id = f"{uid}:{req.session_id or 'default'}"
     autonomous_action = detect_autonomous_action(texte)
-    if not autonomous_action:
+    if not autonomous_action and not personal_key("k3", req.keys):
+        require_personal("groq", req.keys)
+    if not autonomous_action and not (personal_key("groq", req.keys) or personal_key("k3", req.keys)):
         await usage_quota.consume(db, user, "chat")
 
     # Historique de la session (8 derniers échanges)
@@ -422,8 +438,8 @@ async def chat(req: ChatRequest, request: Request):
         brain_ms = int((time.perf_counter() - t0) * 1000)
         logger.info(f"[CHAT] Réponse générée en {brain_ms} ms")
     except Exception as e:
-        logger.error(f"[CHAT] Erreur lors de ask_sirius: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur cerveau: {e}")
+        logger.error("[CHAT] Erreur cerveau (%s)", type(e).__name__)
+        raise HTTPException(status_code=502, detail="Le fournisseur de conversation a refusé la requête.")
 
     # Persistance des nouveaux souvenirs dans la base locale (entre les sessions),
     # avec classement automatique en preference / projet / souvenir.
@@ -461,6 +477,7 @@ async def chat_stream(req: ChatRequest, request: Request):
     """Version en flux (SSE) : Sirius répond via ask_sirius."""
     from fastapi.responses import StreamingResponse
     user = await require_user(request, db)
+    bind_keys(req.keys)
     uid = user["user_id"]
     texte = (req.text or "").strip()
     if not texte:
@@ -474,7 +491,9 @@ async def chat_stream(req: ChatRequest, request: Request):
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
     autonomous_action = detect_autonomous_action(texte)
-    if not autonomous_action:
+    if not autonomous_action and not personal_key("k3", req.keys):
+        require_personal("groq", req.keys)
+    if not autonomous_action and not (personal_key("groq", req.keys) or personal_key("k3", req.keys)):
         await usage_quota.consume(db, user, "chat")
     session_id = f"{uid}:{req.session_id or 'default'}"
     doc = await db.sirius_chats.find_one({"session_id": session_id}, {"_id": 0, "history": 1})
@@ -527,8 +546,16 @@ async def chat_stream(req: ChatRequest, request: Request):
             if not autonomous_action and should_extract_memory(texte, answer):
                 async def _learn_later():
                     try:
+                        account = await db.users.find_one({"user_id": uid}) or {}
+                        if account.get("disabled"):
+                            return
                         from sirius_brain import extract_memory_background
-                        for m in await extract_memory_background(texte, answer):
+                        # After the response: owner use still counts against the daily trial quota.
+                        async with metered_scope(db, account, req.keys) as state:
+                            if state["blocked"] and not personal_key("groq", req.keys):
+                                return
+                            memories = await extract_memory_background(texte, answer)
+                        for m in memories:
                             try:
                                 learn_fact(m, user_id=uid)
                             except Exception as e:
@@ -619,11 +646,13 @@ async def patch_code(request: Request):
 
 # ---- Validation des clés API avant sauvegarde (ergonomie : gestion des erreurs) ----
 class KeyValidateIn(BaseModel):
-    service: str
-    key: str
+    service: str = Field(max_length=64)
+    key: str = Field(max_length=4096)
 
 
 def _env_key(*names: str) -> str:
+    if not owner_allowed():
+        return ""
     for name in names:
         value = os.environ.get(name)
         if value and str(value).strip():
@@ -745,19 +774,28 @@ async def read_file(file_path: str, request: Request):
 
 
 @api_router.post("/keys/validate")
-async def keys_validate(body: KeyValidateIn):
+async def keys_validate(body: KeyValidateIn, request: Request):
+    user = await require_user(request, db)
+    ip = request.client.host if request.client else "?"
+    if not _rate_ok("validate:" + user["user_id"], limit=10, window=60) or not _rate_ok("validate-ip:" + ip, limit=40, window=60):
+        raise HTTPException(status_code=429, detail="Trop de vérifications de clés. Réessayez dans une minute.")
     s = (body.service or "").strip().lower()
     k = (body.key or "").strip()
     if not k:
         return {"ok": False, "message": "Clé vide."}
+    if s in ("gmaps", "google-maps", "google_maps", "maps"):
+        return {"ok": False, "status": "unverifiable",
+                "message": "Clé de carte utilisée dans le navigateur : testez l’ouverture de la carte. "
+                           "La vérification côté serveur ne confirme pas les restrictions de votre clé."}
+    bind_keys({s: k})
     try:
         async with httpx.AsyncClient(timeout=12) as cx:
-            if s in ("k3", "kimi", "groq"):
+            if s in ("k3", "kimi"):
                 from sirius_brain import K3_ENDPOINT
                 r = await cx.get(f"{K3_ENDPOINT}/models", headers={"Authorization": f"Bearer {k}"})
                 return {"ok": r.status_code == 200,
                         "message": "Clé Kimi K3 valide." if r.status_code == 200 else f"Clé refusée par Moonshot ({r.status_code})."}
-            if s in ("groq_real", "groq-real", "groqreal"):
+            if s in ("groq", "groq_key", "groq_real", "groq-real", "groqreal"):
                 r = await cx.get("https://api.groq.com/openai/v1/models", headers={"Authorization": f"Bearer {k}"})
                 return {"ok": r.status_code == 200,
                         "message": "Clé Groq valide." if r.status_code == 200 else f"Clé refusée par Groq ({r.status_code})."}
@@ -765,14 +803,13 @@ async def keys_validate(body: KeyValidateIn):
                 r = await cx.get("https://serpapi.com/account.json", params={"api_key": k})
                 return {"ok": r.status_code == 200,
                         "message": "Clé SerpAPI valide." if r.status_code == 200 else "Clé SerpAPI refusée."}
-            if s in ("gmaps", "google-maps", "google_maps", "maps"):
-                r = await cx.get("https://maps.googleapis.com/maps/api/geocode/json", params={"address": "Paris", "key": k})
-                st = (r.json() or {}).get("status", "")
-                ok = st in ("OK", "ZERO_RESULTS")
-                return {"ok": ok, "message": "Clé Google Maps valide." if ok else f"Clé Google Maps refusée ({st})."}
             if s in ("google-tts", "google_tts", "tts", "gtts"):
-                ok = len(k) >= 20
+                r = await cx.get("https://texttospeech.googleapis.com/v1/voices", headers={"x-goog-api-key": k})
+                ok = r.status_code == 200 and bool(r.json().get("voices"))
                 return {"ok": ok, "message": "Clé Google TTS valide." if ok else "Clé Google TTS absente ou invalide."}
+            if s in ("gemini_tts", "gemini"):
+                r = await cx.get("https://generativelanguage.googleapis.com/v1beta/models", headers={"x-goog-api-key": k})
+                return {"ok": r.status_code == 200, "message": "Clé Gemini vérifiée." if r.status_code == 200 else "Clé Gemini refusée."}
             if s in ("openweather", "weather", "owm"):
                 r = await cx.get("https://api.openweathermap.org/data/2.5/weather", params={"q": "Paris", "appid": k})
                 payload = r.json() if r.status_code == 200 else {}
@@ -788,12 +825,20 @@ async def keys_validate(body: KeyValidateIn):
                 d = r.json() if r.status_code == 200 else {}
                 if "Error Message" in d or "Invalid" in str(d.get("Information", "")):
                     return {"ok": False, "message": "Clé Alpha Vantage refusée."}
-                return {"ok": True, "message": "Clé Alpha Vantage valide." + (" (quota du jour peut-être atteint)" if "Information" in d or "Note" in d else "")}
-            if s == "fal":
-                ok = ":" in k and len(k) >= 15
-                return {"ok": ok, "message": "Format de clé fal.ai valide." if ok else "Format attendu : key_id:key_secret."}
-    except Exception as e:
-        return {"ok": False, "message": f"Vérification impossible : {e}"}
+                ok = bool(d.get("Global Quote")) and not ("Information" in d or "Note" in d)
+                return {"ok": ok, "message": "Clé Alpha Vantage vérifiée." if ok else "Vérification Alpha Vantage refusée ou quota indisponible."}
+            if s in ("fal", "fal_key"):
+                # Platform API read-only call: authenticates the key without running (or billing) a model.
+                r = await cx.get("https://api.fal.ai/v1/models/pricing", params={"endpoint_id": FAL_VIDEO_MODEL},
+                                 headers={"Authorization": "Key " + k})
+                if r.status_code == 200:
+                    return {"ok": True, "message": "Clé fal.ai vérifiée."}
+                if r.status_code in (401, 403):
+                    return {"ok": False, "message": f"Clé refusée par fal.ai ({r.status_code})."}
+                return {"ok": False, "status": "unverifiable",
+                        "message": f"Clé fal.ai non vérifiable pour le moment ({r.status_code})."}
+    except Exception:
+        return {"ok": False, "message": "Vérification momentanément impossible."}
     return {"ok": False, "message": "Service inconnu."}
 
 
@@ -1488,7 +1533,7 @@ class WebOpenRequest(BaseModel):
     keys: dict = {}
 
 async def _first_search_result(query: str, keys: dict):
-    serp_key = (keys or {}).get("serpapi") or os.environ.get("SERP_API_KEY")
+    serp_key = provider_env("serp", "SERP_API_KEY", keys=keys)
     async with httpx.AsyncClient(timeout=10, follow_redirects=True, headers=_BROWSER_UA) as cx:
         if serp_key:
             try:
@@ -1705,6 +1750,7 @@ class TaskImageRequest(BaseModel):
     prompt: str
     reference_image: Optional[str] = Field(default=None, max_length=14_000_000)
     reference_mime: Optional[str] = Field(default=None, max_length=64)
+    keys: dict = Field(default_factory=dict)
 
 class TaskVideoRequest(BaseModel):
     prompt: str
@@ -1764,12 +1810,17 @@ async def _ensure_fal_client():
 
 
 async def _fal_setup(keys: dict):
-    fal_key = (keys or {}).get("fal") or os.environ.get("FAL_KEY")
+    fal_key = require_env_key("fal", "FAL_KEY", "FAL_API_KEY", keys=keys)
     if not fal_key:
         raise HTTPException(status_code=400, detail="Clé fal.ai manquante")
-    os.environ["FAL_KEY"] = fal_key
     try:
-        return await _ensure_fal_client()
+        from types import SimpleNamespace
+        module, installed = await _ensure_fal_client()
+        client = module.AsyncClient(key=fal_key)
+        return SimpleNamespace(
+            submit_async=client.submit, status_async=client.status, result_async=client.result,
+            Completed=module.Completed, InProgress=module.InProgress,
+        ), installed
     except RuntimeError as error:
         logger.error("[TASK VIDEO] activation fal.ai impossible: %s", error)
         raise HTTPException(status_code=503, detail="Client fal.ai indisponible") from error
@@ -1883,7 +1934,7 @@ async def task_image(req: TaskImageRequest):
             "data": req.reference_image,
         })
 
-    api_key = os.environ.get("GEMINI_API_KEY")
+    api_key = require_env_key("gemini", "GEMINI_API_KEY", keys=req.keys)
     if not api_key:
         raise HTTPException(status_code=500, detail="Clé Gemini absente")
     from google import genai
@@ -2021,7 +2072,8 @@ from outlook_graph import make_outlook_router
 async def chat_status():
     import sirius_brain as _sb
     gmaps_env = (os.environ.get("GOOGLE_MAPS_API_KEY") or os.environ.get("MAPS_PLATFORM_API_Key") or "").strip()
-    return {"groq_env": bool(_sb.ENV_K3_KEY), "gmaps_env": bool(gmaps_env)}
+    return {"groq_env": owner_allowed() and bool(_sb.ENV_GROQ_LLM_KEY or _sb.ENV_K3_KEY),
+            "gmaps_env": owner_allowed() and bool(gmaps_env)}
 
 api_router.include_router(make_outlook_router(db))
 
@@ -2100,12 +2152,231 @@ async def usage_today(request: Request):
     """Consommation du jour sur les clés du serveur (quotas du compte)."""
     return await usage_quota.usage_summary(db, await require_user(request, db))
 
+
+_SETUP_STATES = {"configured", "available", "not_configured", "restricted"}
+_SETUP_DESCRIPTIONS = {
+    "owner": "Fourni par le serveur SIRIUS pendant l'essai, dans la limite des quotas du jour.",
+    "owner_admin": "Clé configurée sur ce serveur pour le compte administrateur, sans limite d'essai.",
+    "personal": "Utilise votre clé personnelle, déverrouillée depuis votre coffre chiffré.",
+    "none": "Service en ligne indisponible avec votre compte ; vos outils et dossiers locaux restent accessibles.",
+    "cloud": "Relayé par votre compte SIRIUS Cloud associé, selon son essai et ses quotas.",
+    "local": "Voix locale du navigateur ; une clé Google ou Gemini active la voix premium.",
+}
+
+
+def _cloud_setup_error(error: HTTPException) -> HTTPException:
+    # A cloud 401 must not look like an expired local session to the HUD.
+    if error.status_code == 401:
+        return HTTPException(status_code=503, detail="Session ΣIRIUS Cloud expirée : reconnectez votre compte.")
+    if error.status_code in (403, 429):
+        return error
+    return HTTPException(status_code=503, detail=error.detail if isinstance(error.detail, str) else
+                         "ΣIRIUS Cloud est injoignable. Vérifiez la connexion Internet.")
+
+
+def _cloud_service(remote: dict, fallback: dict) -> dict:
+    state = remote.get("state") if remote.get("state") in _SETUP_STATES else "restricted"
+    scope = remote.get("scope")
+    scope = "cloud" if state == "configured" or scope in ("owner", "cloud") else (scope if scope in ("personal", "none", "local") else "none")
+    item = {"id": fallback["id"], "label": fallback["label"], "state": state, "scope": scope,
+            "description": _SETUP_DESCRIPTIONS[scope], "personal_keys": fallback["personal_keys"], "relayed": True}
+    if "providers" in fallback:
+        item["providers"] = fallback["providers"]
+    return item
+
+
+@api_router.get("/setup/status")
+async def setup_status(request: Request):
+    user = await require_user(request, db)
+    trial = trial_status(user)
+    allowed = owner_allowed(user)
+    services = []
+    specs = {
+        "groq": ("Conversation et transcription", ("GROQ_KEY", "GROQ_API_KEY")),
+        "k3": ("Kimi", ("K3_API_KEY", "DANIEL_DEV_K3")),
+        "serp": ("Recherche web", ("SERP_API_KEY",)),
+        "google_tts": ("Voix Google", ("GOOGLE_TTS_API_KEY", "GOOGLE_CLOUD_TTS_API_KEY")),
+        "gemini_tts": ("Voix Gemini", ("GEMINI_TTS_API_KEY",)),
+        "fal": ("Création vidéo", ("FAL_KEY", "FAL_API_KEY")),
+        "gmaps": ("Google Maps", ("GOOGLE_MAPS_API_KEY", "MAPS_PLATFORM_API_Key")),
+        "alphavantage": ("Marchés", ("ALPHA_VANTAGE_API_KEY",)),
+    }
+    # Maps runs in the browser with the user key; Alpha Vantage via Oracle av_key; fal via req.keys.fal.
+    personal_capable = {"groq", "k3", "serp", "google_tts", "gemini_tts", "fal", "gmaps", "alphavantage"}
+
+    def owner_has(names):
+        return allowed and any(os.getenv(name, "").strip() for name in names)
+
+    def entry(service_id, label, state, scope, supports_personal, providers=None):
+        description = _SETUP_DESCRIPTIONS["owner_admin" if scope == "owner" and trial["state"] == "admin" else scope]
+        item = {"id": service_id, "label": label, "state": state, "scope": scope,
+                "description": description, "personal_keys": supports_personal}
+        if providers is not None:
+            item["providers"] = providers
+        return item
+
+    # Aggregate capabilities first: the client wizard reads ids "chat", "stt" and "tts".
+    if owner_has(specs["groq"][1] + specs["k3"][1]):
+        services.append(entry("chat", "Conversation IA", "configured", "owner", True, ["groq", "k3"]))
+    else:
+        services.append(entry("chat", "Conversation IA", "not_configured",
+                              "owner" if allowed else "personal", True, ["groq", "k3"]))
+    if owner_has(specs["groq"][1]):
+        services.append(entry("stt", "Transcription vocale", "configured", "owner", True, ["groq"]))
+    else:
+        services.append(entry("stt", "Transcription vocale", "not_configured",
+                              "owner" if allowed else "personal", True, ["groq"]))
+    if owner_has(specs["google_tts"][1] + specs["gemini_tts"][1]):
+        services.append(entry("tts", "Lecture vocale", "configured", "owner", True, ["google_tts", "gemini_tts"]))
+    else:
+        services.append(entry("tts", "Lecture vocale", "available", "local", True, ["google_tts", "gemini_tts"]))
+
+    for service, (label, names) in specs.items():
+        supports_personal = service in personal_capable
+        if allowed:
+            state = "configured" if owner_has(names) else "not_configured"
+            scope = "owner"
+        else:
+            # The server never sees the encrypted vault: personal keys arrive per request only.
+            state = "not_configured" if supports_personal else "restricted"
+            scope = "personal" if supports_personal else "none"
+        services.append(entry(service, label, state, scope, supports_personal))
+
+    # Desktop linked to the public cloud: relayed services follow the cloud account, never the local admin.
+    relay_chat = cloud_link.should_relay_chat({})
+    relayed = set()
+    if relay_chat:
+        relayed |= {"chat", "groq", "k3"}
+    if cloud_link.should_relay_stt(""):
+        relayed |= {"stt", "groq"}
+    if cloud_link.should_relay_tts("GOOGLE_TTS_API_KEY"):
+        relayed.add("google_tts")
+    if cloud_link.should_relay_tts("GEMINI_TTS_API_KEY"):
+        relayed.add("gemini_tts")
+    if relayed & {"google_tts", "gemini_tts"} and not owner_has(specs["google_tts"][1] + specs["gemini_tts"][1]):
+        relayed.add("tts")
+    payload = {
+        "mode": "trial_then_personal", "source": "local", "role": user["role"], "trial": trial,
+        "services": services, "quotas": await usage_quota.usage_summary(db, user),
+    }
+    cloud_state = cloud_link.load_state() if cloud_link.relay_allowed() else {}
+    cloud = {"available": cloud_link.relay_allowed(), "linked": bool(cloud_state.get("access_token")),
+             "email": cloud_state.get("email") if cloud_state else None, "account": None, "error": None}
+    if relayed:
+        try:
+            remote = await cloud_link.relay_get_json("/api/setup/status")
+            remote_trial = remote.get("trial")
+            if not isinstance(remote_trial, dict) or remote_trial.get("state") not in ("active", "expired", "admin"):
+                raise HTTPException(status_code=502, detail="ΣIRIUS Cloud ne fournit pas l'état de l'essai.")
+            account = {"role": remote.get("role") if remote.get("role") in ("user", "admin") else "user",
+                       "trial": {k: remote_trial.get(k) for k in ("state", "started_at", "expires_at", "remaining_seconds")},
+                       "quotas": remote.get("quotas") if isinstance(remote.get("quotas"), dict) else {"enabled": False}}
+            remote_services = {item.get("id"): item for item in remote.get("services") or [] if isinstance(item, dict)}
+        except HTTPException as error:
+            if relay_chat:
+                raise _cloud_setup_error(error) from error
+            account, remote_services = None, {}
+            cloud["error"] = _cloud_setup_error(error).detail
+        cloud["account"] = account
+        merged = []
+        for item in services:
+            if item["id"] not in relayed:
+                merged.append(item)
+            elif account is None:
+                merged.append({**item, "state": "restricted", "scope": "cloud", "relayed": True,
+                               "description": "ΣIRIUS Cloud indisponible : " + cloud["error"]})
+            else:
+                merged.append(_cloud_service(remote_services.get(item["id"]) or {}, item))
+        payload["services"] = merged
+        if relay_chat:
+            payload.update(source="cloud", role=account["role"], trial=account["trial"], quotas=account["quotas"])
+            payload["local_role"] = user["role"]
+    payload["cloud"] = cloud
+    return payload
+
+class SetupTestChatIn(BaseModel):
+    keys: dict[str, str] = Field(default_factory=dict, max_length=24)
+
+
+def _setup_chat_target(keys: dict[str, str]):
+    from sirius_brain import GROQ_LLM_ENDPOINT, GROQ_LLM_PRIMARY, K3_ENDPOINT, K3_MODEL
+    groq = personal_key("groq", keys)
+    kimi = personal_key("k3", keys)
+    if groq:
+        return "groq", groq, GROQ_LLM_ENDPOINT, GROQ_LLM_PRIMARY, True
+    if kimi:
+        return "kimi", kimi, K3_ENDPOINT, K3_MODEL, True
+    # Keys for other services (Maps, Serp...) do not disable trial chat; after expiry they never unlock it.
+    if not owner_allowed():
+        raise HTTPException(status_code=403, detail=PERSONAL_REQUIRED)
+    owner_groq = (os.getenv("GROQ_KEY") or os.getenv("GROQ_API_KEY") or "").strip()
+    owner_kimi = (os.getenv("K3_API_KEY") or os.getenv("DANIEL_DEV_K3") or "").strip()
+    if owner_groq:
+        return "groq", owner_groq, GROQ_LLM_ENDPOINT, GROQ_LLM_PRIMARY, False
+    if owner_kimi:
+        return "kimi", owner_kimi, K3_ENDPOINT, K3_MODEL, False
+    raise HTTPException(status_code=503, detail="Aucun fournisseur de conversation n'est configuré sur ce serveur.")
+
+
+@api_router.post("/setup/test-chat")
+async def setup_test_chat(body: SetupTestChatIn, request: Request):
+    """One tiny real completion: success only when the upstream provider answers."""
+    user = await require_user(request, db)
+    ip = request.client.host if request.client else "?"
+    if not _rate_ok("setup-chat:" + user["user_id"], limit=6, window=60) or not _rate_ok("setup-chat-ip:" + ip, limit=30, window=60):
+        raise HTTPException(status_code=429, detail="Trop de tests de connexion. Réessayez dans une minute.")
+    keys = {str(k)[:64]: str(v)[:4096] for k, v in (body.keys or {}).items()}
+    bind_keys(keys)
+    if cloud_link.should_relay_chat(keys):
+        # Linked desktop without local brain keys: the cloud account's trial and quotas decide.
+        try:
+            remote = await cloud_link.relay_json("/api/setup/test-chat", {"keys": {}})
+        except HTTPException as error:
+            raise _cloud_setup_error(error) from error
+        ok = remote.get("ok") is True
+        message = remote.get("message") if isinstance(remote.get("message"), str) else ""
+        return {"ok": ok, "provider": remote.get("provider") if remote.get("provider") in ("groq", "kimi") else "cloud",
+                "source": "cloud", "message": message or ("Connexion ΣIRIUS Cloud réussie." if ok else "ΣIRIUS Cloud n'a pas confirmé la connexion.")}
+    provider, key, endpoint, model, personal = _setup_chat_target(keys)
+    # Registers the credential for log redaction without changing which key is used.
+    provider_key("groq" if provider == "groq" else "k3", "" if personal else key)
+    if not personal:
+        await usage_quota.consume(db, user, "chat")
+    label = "Groq" if provider == "groq" else "Kimi"
+    payload = {"model": model, "messages": [{"role": "user", "content": "Réponds uniquement : OK"}], "max_tokens": 64}
+    if provider == "groq":
+        payload["reasoning_effort"] = "low"
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(15.0, connect=5.0)) as cx:
+            response = await cx.post(f"{endpoint.rstrip('/')}/chat/completions", json=payload,
+                                     headers={"Authorization": f"Bearer {key}"})
+        data = response.json() if response.status_code == 200 else {}
+    except (httpx.HTTPError, ValueError):
+        return {"ok": False, "provider": provider, "message": f"{label} ne répond pas. Réessayez plus tard."}
+    if response.status_code in (401, 403):
+        return {"ok": False, "provider": provider, "message": f"Clé refusée par {label}."}
+    if response.status_code == 429:
+        return {"ok": False, "provider": provider, "message": f"{label} limite temporairement cette clé."}
+    choices = data.get("choices") if isinstance(data, dict) else None
+    first = choices[0] if isinstance(choices, list) and choices and isinstance(choices[0], dict) else {}
+    message = first.get("message") if isinstance(first.get("message"), dict) else {}
+    content = message.get("content")
+    if response.status_code != 200 or not isinstance(content, str) or not content.strip():
+        return {"ok": False, "provider": provider, "message": f"{label} a renvoyé une réponse inattendue ({response.status_code})."}
+    source = "votre clé personnelle" if personal else "l'essai SIRIUS"
+    return {"ok": True, "provider": provider, "source": "personal" if personal else "local",
+            "message": f"Connexion {label} réussie avec {source}."}
+
+
 api_router.include_router(make_hephaistos_router(db))
 api_router.include_router(make_feedback_router())
 api_router.include_router(make_work_dossiers_router(db, require_user))
 
 # ---- Veille push proactive : Sirius prévient des actus tout seul ----
 async def _push_watch_loop():
+    # The legacy global watch has no per-subscriber account or quota attribution.
+    if os.getenv("SIRIUS_PACKAGED", "").strip() != "1":
+        return
     from push_notifications import load_watch, save_watch, subscriber_count, send_push_to_all
     await asyncio.sleep(20)
     while True:
@@ -2502,6 +2773,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(ProviderAccessMiddleware, db=db)
 
 # Rattachement final du routeur /api à l'application (une seule fois, après les middlewares)
 app.include_router(api_router)

@@ -38,8 +38,7 @@ class TestKeyValidation:
     @pytest.mark.parametrize(
         "service,key,expected_ok,message_fragment",
         [
-            ("gmaps", "AIzaFAKE", False, "REQUEST_DENIED"),
-            ("fal", "abc123456789:secret", True, "Format de clé fal.ai valide"),
+            ("gmaps", "AIzaFAKE", False, "testez l’ouverture de la carte"),
             ("serp", "fake", False, "refusée"),
             ("k3", "sk-fake", False, "refusée"),
             ("gmaps", "", False, "Clé vide."),
@@ -55,6 +54,23 @@ class TestKeyValidation:
         data = response.json()
         assert data.get("ok") is expected_ok
         assert isinstance(data.get("message"), str) and message_fragment in data["message"]
+
+    def test_validate_fake_fal_key_is_never_accepted(self, api):
+        # Real authentication against fal.ai: a fake key is refused, or unverifiable if fal.ai/network is unavailable.
+        response = api.post(
+            f"{BASE_URL}/api/keys/validate",
+            json={"service": "fal", "key": "abc123456789:secret"},
+            timeout=30,
+        )
+        assert response.status_code == 200, response.text
+        data = response.json()
+        assert data.get("ok") is False
+        assert data.get("status") in (None, "unverifiable")
+        message = data.get("message")
+        assert isinstance(message, str) and message
+        assert any(fragment in message for fragment in (
+            "Clé refusée par fal.ai", "Clé fal.ai non vérifiable", "Vérification momentanément impossible"))
+        assert "abc123456789:secret" not in response.text
 
 
 # Chat supports direct Groq fast mode, default deep mode, and rapid-mode SSE stages/deltas.

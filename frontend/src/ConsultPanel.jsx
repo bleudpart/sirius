@@ -26,7 +26,7 @@ const smtpConf = () => {
 const CONF = {
   "SOLON#": {
     Icon: Scale,
-    title: "SOLON# — CONSEIL JURIDIQUE",
+    title: "SOLON — CONSEIL JURIDIQUE",
     sub: "AVIS STRUCTURÉS · FAITS / DROIT / ANALYSE / OPTIONS · DROIT FRANÇAIS EXCLUSIVEMENT",
     img: "/api/mythos/img/solon.jpg",
     name: "Solon",
@@ -38,7 +38,7 @@ const CONF = {
   },
   "PROMÉTHÉE#": {
     Icon: Flame,
-    title: "PROMÉTHÉE# — GESTION DE PROJET",
+    title: "PROMÉTHÉE — GESTION DE PROJET",
     sub: "OBJECTIF · JALONS · RISQUES · ACTIONS · MÉTHODES PMP & AGILE",
     img: "/api/mythos/img/promethee.jpg",
     name: "Prométhée",
@@ -191,7 +191,7 @@ export default function ConsultPanel({ module, onClose }) {
     <div className="prime-screen" data-testid={`${slug}-panel`}>
       <MythosBackdrop module={module} state={busy ? "busy" : "idle"} />
       <header className="zeus-head">
-        <div className="oracle-title font-divine"><c.Icon size={20} /> {c.title}</div>
+        <div className="oracle-title font-divine" data-module-name={c.title.split(" — ")[0]}><c.Icon size={20} /> {c.title.split(" — ")[0]} <span className="module-function">— {c.title.split(" — ")[1]}</span></div>
         <button className="setup-close zeus-close" onClick={onClose} data-testid={`${slug}-close-btn`}><X size={18} /></button>
       </header>
       <div className="prime-sub">{c.sub}</div>

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Activity, CheckCircle2, AlertTriangle, Loader2, X, History, Trash2 } from "lucide-react";
 import "./SiriusProgress.css";
+import useWindowGesture, { isPrimaryGesture } from "./windowGesture";
 
 // Journal des tâches passées (localStorage, 200 entrées max)
 const JOURNAL_KEY = "sirius_task_journal";
@@ -118,8 +119,9 @@ export default function SiriusProgress({ journalOnly = false }) {
   }, [tasks.length]);
 
 
+  const gesture = useWindowGesture();
   const onBarDown = (e) => {
-    if (e.target.closest("button")) return;
+    if (!isPrimaryGesture(e) || e.target.closest("button")) return;
     const el = panelRef.current;
     const r = el.getBoundingClientRect();
     const dx = e.clientX - r.left, dy = e.clientY - r.top;
@@ -130,14 +132,10 @@ export default function SiriusProgress({ journalOnly = false }) {
       el.style.right = "auto"; el.style.bottom = "auto";
     };
     const up = () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
       const rr = el.getBoundingClientRect();
       try { localStorage.setItem(POS_KEY, JSON.stringify({ x: rr.left, y: rr.top })); } catch (e) { /* ignoré */ }
     };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    e.preventDefault();
+    gesture(e, { element: el, onMove: move, onEnd: up });
   };
 
   const running = tasks.filter((t) => t.status === "running").length;

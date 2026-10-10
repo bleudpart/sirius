@@ -383,7 +383,7 @@ export default function AgoraPipeline({ onClose, onOpenThemis }) {
   return (
     <div className="prime-screen agora-screen" data-testid="agora-pipeline">
       <header className="zeus-head">
-        <div className="oracle-title font-divine"><TrendingUp size={20} /> HERMÈS AGORA# — {view === "pipeline" ? "PIPELINE DE VENTE" : view === "coach" ? "COACHING OBJECTIONS" : "ENCAISSEMENTS"}</div>
+        <div className="oracle-title font-divine" data-module-name="HERMÈS AGORA"><TrendingUp size={20} /> HERMÈS AGORA <span className="module-function">— {view === "pipeline" ? "PIPELINE DE VENTE" : view === "coach" ? "COACHING OBJECTIONS" : "ENCAISSEMENTS"}</span></div>
         <button className="setup-close zeus-close" onClick={onClose} data-testid="agora-close-btn"><X size={18} /></button>
       </header>
 

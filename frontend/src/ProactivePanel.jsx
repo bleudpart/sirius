@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Zap, Play, Wrench, Clock3, XCircle, HelpCircle, ShieldAlert, BrainCircuit } from "lucide-react";
 import "./Proactive.css";
+import { trackWindowGesture, isPrimaryGesture } from "./windowGesture";
 
 const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
 
@@ -31,12 +32,14 @@ export default function ProactivePanel({ onAction, onSpeak }) {
       if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) position(saved.x, saved.y);
     } catch (cause) { console.error("Restauration de la position SIRIUS ANTICIPE impossible :", cause); }
     let drag = null;
+    let disposeGesture = null;
     const onDown = (event) => {
-      if (event.button !== 0) return;
+      if (!isPrimaryGesture(event)) return;
+      disposeGesture?.();
       const rect = panel.getBoundingClientRect();
       drag = { x: event.clientX - rect.left, y: event.clientY - rect.top, id: event.pointerId };
       panel.classList.add("dragging");
-      event.preventDefault();
+      disposeGesture = trackWindowGesture(event, { element: panel, onMove, onEnd: onUp });
     };
     const onMove = (event) => {
       if (drag && event.pointerId === drag.id) position(event.clientX - drag.x, event.clientY - drag.y);
@@ -57,17 +60,10 @@ export default function ProactivePanel({ onAction, onSpeak }) {
       position(rect.left, rect.top);
     };
     header.addEventListener("pointerdown", onDown);
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onUp);
-    window.addEventListener("blur", onUp);
     window.addEventListener("resize", onResize);
     return () => {
       header.removeEventListener("pointerdown", onDown);
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
-      window.removeEventListener("blur", onUp);
+      disposeGesture?.();
       window.removeEventListener("resize", onResize);
     };
   }, [hasSuggestions]);

@@ -2,7 +2,7 @@
 const norm = (value) => String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
 export function cleanModuleLabel(label) {
-  return String(label || "").replace(/\s+/g, " ").replace(/[.!?:]+$/, "").trim();
+  return String(label || "").replace(/#/g, "").replace(/\s+/g, " ").replace(/[.!?:]+$/, "").trim();
 }
 
 export function moduleActionConfirmation(command, label, action = "open") {
@@ -38,7 +38,8 @@ const spokenCase = (text) => (text === text.toUpperCase() && /[A-Z]{3}/.test(tex
   : text);
 
 export function windowLabel(el) {
-  const title = el.querySelector(TITLE_SELECTOR)?.textContent || el.querySelector("h1, h2, h3")?.textContent
+  const title = el.querySelector("[data-module-name]")?.getAttribute("data-module-name")
+    || el.querySelector(TITLE_SELECTOR)?.textContent || el.querySelector("h1, h2, h3")?.textContent
     || el.getAttribute("aria-label")
     || (el.getAttribute("data-testid") || "").replace(/[-_]/g, " ");
   return spokenCase(cleanModuleLabel(title));

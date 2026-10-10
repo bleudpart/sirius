@@ -190,7 +190,7 @@ export default function CalliopePanel({ onClose }) {
     <div className="prime-screen" data-testid="calliope-panel">
       <MythosBackdrop module="CALLIOPE#" state={busy ? "busy" : "idle"} />
       <header className="zeus-head">
-        <div className="oracle-title font-divine"><BookOpen size={20} /> CALLIOPE# — BIBLIOTHÈQUE AUDIO</div>
+        <div className="oracle-title font-divine" data-module-name="CALLIOPE"><BookOpen size={20} /> CALLIOPE <span className="module-function">— BIBLIOTHÈQUE AUDIO</span></div>
         <button className="setup-close zeus-close" onClick={onClose} data-testid="calliope-close-btn"><X size={18} /></button>
       </header>
       {char && (

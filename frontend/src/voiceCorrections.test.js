@@ -48,6 +48,19 @@ test("allows concise commands through push-to-talk", () => {
   expect(extractVoiceCommand("heu")).toBe("");
 });
 
+test.each(["bonjour Zirius", "Bonjour Sirius", "salut Zirius", "bonsoir Zirius"])(
+  "accepts the short greeting %s instead of discarding it after removing the name", (text) => {
+    expect(extractVoiceCommand(text)).toBe(text.split(" ")[0]);
+  },
+);
+
+test("short greetings do not bypass the leading wake word requirement", () => {
+  expect(extractVoiceCommand("Zirius bonjour", { requireWakeWord: true })).toBe("bonjour");
+  expect(extractVoiceCommand("Bonjour Zirius", { requireWakeWord: true })).toBe("Bonjour");
+  expect(extractVoiceCommand("bonjour", { requireWakeWord: true })).toBe("");
+  expect(extractVoiceCommand("ouvre la porte Zirius", { requireWakeWord: true })).toBe("");
+});
+
 test("detects a wake word spoken alone so the next phrase can be accepted", () => {
   expect(hasVoiceWakeWord("Sirius.")).toBe(true);
   expect(hasVoiceWakeWord("Serious")).toBe(true);

@@ -17,7 +17,7 @@ export default function TrailerGallery({ onClose }) {
   return (
     <div className="prime-screen trailer-screen" data-testid="trailer-gallery">
       <header className="zeus-head">
-        <div className="oracle-title font-divine"><Clapperboard size={20} /> TRAILER# — CLICHÉS CINÉMATIQUES</div>
+        <div className="oracle-title font-divine" data-module-name="TRAILER"><Clapperboard size={20} /> TRAILER <span className="module-function">— CLICHÉS CINÉMATIQUES</span></div>
         <button className="setup-close zeus-close" onClick={onClose} data-testid="trailer-close-btn"><X size={18} /></button>
       </header>
       <div className="prime-sub">STYLE BLOCKBUSTER · 9:16 RÉSEAUX SOCIAUX · TIKTOK / INSTAGRAM / YOUTUBE SHORTS</div>

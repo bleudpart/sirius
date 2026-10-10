@@ -5,6 +5,7 @@ import asyncio
 import csv
 import io
 import json
+import logging
 import os
 import re
 import secrets
@@ -19,6 +20,9 @@ import httpx
 import psutil
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse, Response
+from provider_access import bind_keys
+
+logger = logging.getLogger(__name__)
 from pydantic import BaseModel
 from typing import Optional, List, Literal
 
@@ -41,7 +45,8 @@ def now_iso():
     return datetime.now(timezone.utc).isoformat()
 
 async def _llm(prompt: str, system: str = "Tu es ΣIRIUS, entité suprême, technique et concise. Réponds en français. Tutoie toujours l'utilisateur (jamais « vous », jamais « Monsieur »).") -> str:
-    from sirius_brain import ENV_K3_KEY, k3_client, K3_MODEL
+    from sirius_brain import k3_client, K3_MODEL, ENV_K3_KEY
+    from provider_access import denial_error
     
     enhanced_system = (
         f"{system}\n\n"
@@ -52,7 +57,9 @@ async def _llm(prompt: str, system: str = "Tu es ΣIRIUS, entité suprême, tech
         "N'inclus aucune phrase introductive, aucun texte en dehors du JSON."
     )
 
-    client = k3_client(ENV_K3_KEY)
+    client = k3_client()
+    if client is None:
+        raise denial_error("k3", ENV_K3_KEY) or HTTPException(status_code=503, detail="Service IA non configuré sur ce serveur.")
     r = await client.chat.completions.create(
         model=K3_MODEL,
         messages=[{"role": "system", "content": enhanced_system}, {"role": "user", "content": prompt}],
@@ -711,10 +718,13 @@ def make_modules_router(db):
             for item in data.history if isinstance(item, dict)
         )
         prompt = f"Scénario commercial : {data.scenario}\nMode : {data.mode}\nHistorique :\n{history_text}"
+        bind_keys(data.keys)
         try:
             raw = await _llm(prompt, "Tu es le coach commercial Hermès Agora. Réponds en français, brièvement et concrètement.")
             parsed = json.loads(raw)
             response_text = str(parsed.get("reponse") or parsed.get("plan") or raw).strip()
+        except HTTPException:
+            raise
         except Exception as error:
             logger.warning("[AGORA] coach LLM indisponible: %s", error)
             response_text = "Le coach IA est momentanément indisponible. Reprends ton objection et formule un bénéfice concret."

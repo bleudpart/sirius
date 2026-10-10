@@ -11,6 +11,7 @@ import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 
 import com.getcapacitor.JSObject;
+import com.getcapacitor.JSArray;
 import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -20,6 +21,7 @@ import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 
 @CapacitorPlugin(name = "SiriusSpeech", permissions = {
     @Permission(alias = "microphone", strings = { Manifest.permission.RECORD_AUDIO })
@@ -102,6 +104,19 @@ public class SiriusSpeechPlugin extends Plugin {
                         ArrayList<String> texts = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
                         JSObject result = new JSObject();
                         result.put("text", texts != null && !texts.isEmpty() ? texts.get(0) : "");
+                        JSArray alternatives = new JSArray();
+                        float[] scores = results.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES);
+                        if (texts != null) {
+                            for (int i = 0; i < texts.size(); i++) {
+                                JSObject alternative = new JSObject();
+                                alternative.put("text", texts.get(i));
+                                if (scores != null && i < scores.length && scores[i] >= 0) {
+                                    alternative.put("confidence", scores[i]);
+                                }
+                                alternatives.put(alternative);
+                            }
+                        }
+                        result.put("alternatives", alternatives);
                         pending = null;
                         release();
                         call.resolve(result);
@@ -123,6 +138,11 @@ public class SiriusSpeechPlugin extends Plugin {
                 intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
                 intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
                 intent.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    intent.putStringArrayListExtra(RecognizerIntent.EXTRA_BIASING_STRINGS,
+                        new ArrayList<>(Arrays.asList("Sirius", "Zirius", "Bonjour Sirius",
+                            "Sirius bonjour", "Bonjour Zirius", "Zirius bonjour")));
+                }
                 deadline = () -> {
                     if (current != generation || pending != call) return;
                     pending = null;

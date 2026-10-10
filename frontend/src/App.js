@@ -15,7 +15,7 @@ import {
 import { pushStats, setStatsOffline } from "@/liveStats";
 import { formatLocalDate, formatLocalTime, getLocalDateKey } from "@/dateTime";
 import { STATES, isLocalTimeQuestion, localAnswer, weatherInfo, pttBeep } from "@/appLogic";
-import { executeModuleOpen, MODULE_ALIASES } from "@/moduleCommandRouting";
+import { executeModuleOpen, MODULE_ALIASES, moduleDisplayName } from "@/moduleCommandRouting";
 import { MedallionRing, ReactorCore, Waveform } from "@/components/ReactorVisuals";
 import { MemoryPanel, HoloPopups, AnalyticsPanel, MusicChoice, CentralCard, BootScreen } from "@/components/HudPanels";
 import OverlayApp from "@/OverlayApp";
@@ -23,6 +23,7 @@ import WebWindows from "@/WebWindows";
 import TaskWindows from "@/TaskWindows";
 import SiriusProgress, { progress } from "@/SiriusProgress";
 import useTouchNav from "@/useTouchNav";
+import { trackWindowGesture, isPrimaryGesture } from "./windowGesture";
 import PwaPrompt from "@/PwaPrompt";
 import GlobalDrop from "@/GlobalDrop";
 import ProactivePanel from "@/ProactivePanel";
@@ -41,6 +42,9 @@ import { isWhisperHallucination, microphoneConstraints, requestMicrophoneStream,
 import PushToTalkButton from "@/components/PushToTalkButton";
 import VoiceSessionControls from "@/components/VoiceSessionControls";
 import { createNativeRecognition } from "@/nativeSpeechRecognition";
+import { createNativeHandsFree } from "@/nativeHandsFree";
+import { displayReadingText, splitDisplayReading, isDisplayReadCommand } from "@/displayReading";
+import { explainStartupDiagnostic } from "@/startupDiagnostic";
 import MicrophoneIndicator from "@/components/MicrophoneIndicator";
 import GettingStarted, { gettingStartedKey } from "@/components/GettingStarted";
 import { createVoiceSession } from "@/voiceSession";
@@ -48,7 +52,7 @@ import { streamConversation, requestConversation, requestAssistantIntent, reques
 import { connectStreamingStt } from "@/services/streamingStt";
 import { speakFr, cancelSpeech, speakSeries, speakAsCharacter as speakCharacterVoice, spokenCount, lastSpokenAt } from "@/voice";
 import { isWindowCommand, observeWindowChanges, shortStatusToSpeak, snapshotWindows, windowChangeConfirmation } from "@/voiceConfirmation";
-import { loadApiKeys, saveApiKeys } from "@/apiKeyStorage";
+import { KEY_STORAGE_EVENT, loadApiKeys, saveApiKeys } from "@/apiKeyStorage";
 import { loadHud, applyHud } from "@/hudPrefs";
 import { initUiSounds } from "@/uiSounds";
 import { createModuleRegistry } from "@/moduleRegistry";
@@ -140,71 +144,6 @@ const PHASE_GREETINGS = {
 };
 const greetByPhase = (name) => PHASE_GREETINGS[phaseOfDay()](name ? " " + name : "");
 
-// Sagesse antique : un clic sur le noyau déclame une citation philosophique
-const PHILO_QUOTES = [
-  { t: "Connais-toi toi-même.", a: "Socrate" },
-  { t: "Je ne sais qu'une chose, c'est que je ne sais rien.", a: "Socrate" },
-  { t: "Le commencement est la moitié de tout.", a: "Pythagore" },
-  { t: "On ne se baigne jamais deux fois dans le même fleuve.", a: "Héraclite" },
-  { t: "L'excellence n'est pas un acte, mais une habitude.", a: "Aristote" },
-  { t: "Le doute est le commencement de la sagesse.", a: "Aristote" },
-  { t: "La patience est amère, mais son fruit est doux.", a: "Aristote" },
-  { t: "Nul n'est méchant volontairement.", a: "Platon" },
-  { t: "La musique donne une âme à nos cœurs et des ailes à la pensée.", a: "Platon" },
-  { t: "Il n'y a qu'un chemin vers le bonheur : cesser de s'inquiéter des choses qui ne dépendent pas de notre volonté.", a: "Épictète" },
-  { t: "Ce qui trouble les hommes, ce ne sont pas les choses, mais les jugements qu'ils portent sur elles.", a: "Épictète" },
-  { t: "Hâte-toi de bien vivre et songe que chaque jour est à lui seul une vie.", a: "Sénèque" },
-  { t: "La fortune sourit aux audacieux.", a: "Virgile" },
-  { t: "Tout ce que nous entendons est une opinion, non un fait. Tout ce que nous voyons est une perspective, non la vérité.", a: "Marc Aurèle" },
-  { t: "Le bonheur de ta vie dépend de la qualité de tes pensées.", a: "Marc Aurèle" },
-];
-
-const GOD_QUOTES = {
-  HERACLES: [
-    { t: "Les douze travaux commencent tous par le premier geste.", a: "HERACLES" },
-    { t: "La rigueur d'aujourd'hui est le bouclier de demain.", a: "HERACLES" },
-    { t: "Nul exploit sans discipline : la propreté est ma treizième épreuve.", a: "HERACLES" },
-    { t: "La force ne sert à rien sans la constance qui la guide.", a: "HERACLES" },
-  ],
-  HEPHAISTOS: [
-    { t: "Dans ma forge, chaque panne est un métal qui attend d'être redressé.", a: "HÉPHAÏSTOS" },
-    { t: "Ce qui est cassé peut renaître plus fort, si la main qui répare est patiente.", a: "HÉPHAÏSTOS" },
-    { t: "Le feu ne détruit que ce qu'on refuse de façonner.", a: "HÉPHAÏSTOS" },
-    { t: "Un outil bien entretenu vaut mieux que cent promesses.", a: "HÉPHAÏSTOS" },
-  ],
-  THEMIS: [
-    { t: "La justice sans rigueur n'est qu'une opinion ; la rigueur sans justice, une tyrannie.", a: "THÉMIS" },
-    { t: "Un compte exact est une parole tenue.", a: "THÉMIS" },
-    { t: "L'équilibre de la balance se gagne chiffre après chiffre.", a: "THÉMIS" },
-    { t: "Ce qui est écrit et signé protège celui qui a donné sa parole.", a: "THÉMIS" },
-  ],
-  HERMES: [
-    { t: "Vendre, c'est d'abord écouter ce que l'autre n'ose pas dire.", a: "HERMÈS" },
-    { t: "Une objection n'est pas un mur : c'est une porte qui demande la bonne clé.", a: "HERMÈS" },
-    { t: "Le meilleur messager livre la vérité avec le sourire du marchand.", a: "HERMÈS" },
-    { t: "L'affaire conclue trop vite se dénoue de même ; prends le temps de la confiance.", a: "HERMÈS" },
-  ],
-  ARGUS: [
-    { t: "Cent yeux ne suffisent pas si aucun ne sait ce qu'il cherche.", a: "ARGUS" },
-    { t: "La vigilance est un art silencieux : on ne la remarque que lorsqu'elle manque.", a: "ARGUS" },
-    { t: "Ce que tu surveilles avec constance ne te trahira jamais par surprise.", a: "ARGUS" },
-  ],
-  KERAUNOS: [
-    { t: "La foudre ne frappe pas au hasard : elle choisit le point le plus haut.", a: "KERAUNOS" },
-    { t: "La puissance sans maîtrise n'est qu'un orage perdu.", a: "KERAUNOS" },
-    { t: "Un seul éclair suffit à révéler tout un paysage.", a: "KERAUNOS" },
-  ],
-  ZEUS: [
-    { t: "Régner, c'est décider quand tous hésitent encore.", a: "ZEUS" },
-    { t: "Du sommet de l'Olympe, les grands problèmes redeviennent petits.", a: "ZEUS" },
-    { t: "L'ordre du monde tient à ceux qui veillent quand les autres dorment.", a: "ZEUS" },
-  ],
-  LOCUS: [
-    { t: "Chaque lieu garde la mémoire de ceux qui l'ont traversé.", a: "LOCUS" },
-    { t: "Savoir où l'on est, c'est déjà savoir qui l'on est.", a: "LOCUS" },
-    { t: "Le chemin le plus court n'est pas toujours celui qui t'apprend le plus.", a: "LOCUS" },
-  ],
-};
 // Profil + clés API stockés localement sur le PC de chaque utilisateur
 const loadProfile = () => {
   try { return JSON.parse(localStorage.getItem("sirius_profile")) || null; } catch { return null; }
@@ -228,7 +167,7 @@ const signaturePreviewText = (user) => {
 };
 const todayStr = () => getLocalDateKey();
 
-const DAILY_BRIEFING_COMMAND = /^\s*(?:(?:mon|le|les)\s+)?(?:brieff?ing(?:\s+(?:quotidien|du jour|matinal|du soir|de ce soir|soir))?|infos\s+du\s+jour|actualit[ée]s?\s+internationales?|br[èe]ves\s+internationales?|r[ée]sum[ée](?:[-\s]+moi)?(?:\s+(?:la|ma|du)\s+)?journ[ée]e?|fais[-\s]+moi\s+le\s+point(?:\s+sur\s+(?:ma\s+)?journ[ée]e?)?|qu'est[-\s]ce\s+qui\s+m'attend(?:\s+aujourd'hui)?|(?:mes\s+)?priorit[ée]s\s+du\s+jour|quoi\s+de\s+neuf\s+aujourd'hui)\s*[?.!]*\s*$/i;
+const DAILY_BRIEFING_COMMAND = /^\s*(?:(?:affiche(?:r)?|montre(?:r)?|lis|lire|lit|relis)(?:[-\s]+moi)?(?:\s+et\s+(?:affiche(?:r)?|montre(?:r)?|lis|lire|lit|relis)(?:[-\s]+moi)?)?\s+)?(?:(?:mon|le|les)\s+)?(?:brieff?ing(?:\s+(?:quotidien|du jour|matinal|du soir|de ce soir|soir))?|infos\s+du\s+jour|actualit[ée]s?\s+internationales?|br[èe]ves\s+internationales?|r[ée]sum[ée](?:[-\s]+moi)?(?:\s+(?:la|ma|du)\s+)?journ[ée]e?|fais[-\s]+moi\s+le\s+point(?:\s+sur\s+(?:ma\s+)?journ[ée]e?)?|qu'est[-\s]ce\s+qui\s+m'attend(?:\s+aujourd'hui)?|(?:mes\s+)?priorit[ée]s\s+du\s+jour|quoi\s+de\s+neuf\s+aujourd'hui)\s*[?.!]*\s*$/i;
 
 // Verbe exprimant une demande de liaison de compte, quelle que soit la tournure employée.
 const CONNECT_VERB = /\b(?:connect\w*|connexion|reconnect\w*|relie|relier|associe|associer|autorise|autoriser|lie|lier|branche|brancher)\b/i;
@@ -266,6 +205,10 @@ function App() {
   if (!nativeRecognitionRef.current) nativeRecognitionRef.current = createNativeRecognition();
   const nativeUnavailableRef = useRef(false);
   const nativeStartingRef = useRef(false);
+  const handsFreeRef = useRef(null);
+  const [handsFreeAvailable, setHandsFreeAvailable] = useState(false);
+  const [handsFreePhase, setHandsFreePhase] = useState("stopped");
+  const [saveVoiceDiagnostic, setSaveVoiceDiagnostic] = useState(false);
   const stopNativeCaptureRef = useRef(() => {});
   const stopCaptureRef = useRef(() => {});
   const [resumedCommand, setResumedCommand] = useState(null);
@@ -276,13 +219,13 @@ function App() {
   const voiceSeriesPendingRef = useRef(false);
   const speakAsCharacter = useCallback((message, options) => {
     if (voiceSessionRef.current.stopped || renderVoiceSignal.aborted) return;
+    void handsFreeRef.current?.setBlocked(true);
     speakCharacterVoice(message, options);
   }, [renderVoiceSignal]);
   const stopVoiceRef = useRef(() => {});
   const currentSpokenRef = useRef("");
   const onSpeechStartRef = useRef(() => {});
   const onSpeechEndRef = useRef(() => {});
-  const suppressAutoMicResumeRef = useRef(false);
   const startInterruptListenerRef = useRef(() => {});
   const stopInterruptListenerRef = useRef(() => {});
 
@@ -294,6 +237,7 @@ function App() {
       return;
     }
     currentSpokenRef.current = message;
+    void handsFreeRef.current?.setBlocked(true);
     const t0 = performance.now();
     if (window._siriusTTSTimer) clearTimeout(window._siriusTTSTimer);
     const finishTimedOutSpeech = () => {
@@ -385,7 +329,7 @@ function App() {
     }
     if (act === "open_module" && target) {
       const it = moduleItemsRef.current.find((m) => m.id === target);
-      if (it) { it.run(); confirm(d.say || `J'ouvre ${it.label.split("—")[0].trim()}.`); return true; }
+      if (it) { it.run(); confirm(`J'ouvre ${moduleDisplayName(it)}.`); return true; }
       const extra = { setup: () => setShowSetup(true), gallery: () => setShowGallery(true), outlook: () => launchOutlookMail(), outlook_agenda: () => launchOutlookAgenda(), outlook_read: () => readMailAloud() }[target];
       if (extra) { extra(); confirm(d.say || "C'est ouvert."); return true; }
       return openModuleByName(target);
@@ -470,7 +414,10 @@ function App() {
   useEffect(() => {
     const reportPhase = (event) => {
       if (voiceSessionRef.current.stopped) return;
-      if (event.detail === "preparing") speakingRef.current = true;
+      if (event.detail === "preparing") {
+        speakingRef.current = true;
+        void handsFreeRef.current?.setBlocked(true);
+      }
       if (event.detail === "speaking") onSpeechStartRef.current();
       if (event.detail === "idle") {
         if (voiceSeriesPendingRef.current) {
@@ -486,6 +433,7 @@ function App() {
   }, []);
 
   const [showSetup, setShowSetup] = useState(() => !localStorage.getItem("sirius_profile"));
+  const [setupInitialTab, setSetupInitialTab] = useState("profil");
   // Premier lancement : assistant guidé ; l'écran complet reste accessible en « mode expert ».
   const [firstRunWizard, setFirstRunWizard] = useState(() => !localStorage.getItem("sirius_profile"));
   const [showMemory, setShowMemory] = useState(false);
@@ -635,9 +583,11 @@ function App() {
     document.addEventListener("visibilitychange", syncVisibility);
     return () => document.removeEventListener("visibilitychange", syncVisibility);
   }, []);
-  const [autoMic, setAutoMic] = useState(() => localStorage.getItem("sirius_auto_mic") === "1");
+  // Mains libres suspendu : ne pas restaurer une ancienne activation.
+  const [autoMic, setAutoMic] = useState(false);
   const autoMicRef = useRef(autoMic);
   autoMicRef.current = autoMic;
+  const conversationMicRef = useRef(false);
   useEffect(() => { localStorage.setItem("sirius_auto_mic", autoMic ? "1" : "0"); }, [autoMic]);
   const startListenRef = useRef(null);
   const autoListenTimerRef = useRef(null);
@@ -670,6 +620,30 @@ function App() {
   const [displayOpen, setDisplayOpen] = useState(false);
   const displayCloseTimer = useRef(null);
   const pinDisplay = useCallback(() => { clearTimeout(displayCloseTimer.current); }, []);
+  useEffect(() => {
+    if (!displayOpen) return;
+    const commandArea = document.querySelector(".sirius-command-area");
+    const root = commandArea?.closest(".sirius-root");
+    const header = document.querySelector(".sirius-root > header");
+    if (!root || !commandArea) return;
+    const update = () => {
+      const commandTop = commandArea.getBoundingClientRect().top;
+      const headerBottom = header?.getBoundingClientRect().bottom || 64;
+      root.style.setProperty("--display-command-space", `${Math.max(84, window.innerHeight - commandTop + 8)}px`);
+      root.style.setProperty("--display-header-space", `${Math.max(8, headerBottom + 8)}px`);
+    };
+    update();
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
+    observer?.observe(commandArea);
+    if (header) observer?.observe(header);
+    window.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("resize", update);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("resize", update);
+    };
+  }, [displayOpen]);
   useEffect(() => () => clearTimeout(displayCloseTimer.current), []);
   const showOnDisplay = useCallback((item) => {
     const entry = { ...item, id: Date.now() + Math.random() };
@@ -732,6 +706,45 @@ function App() {
   const closeWebWindow = useCallback((id) => {
     setWebWindows((ws) => ws.filter((w) => w.id !== id));
   }, []);
+
+  const readOwnDisplay = useCallback(async () => {
+    const signal = voiceSessionRef.current.signal;
+    pinDisplay();
+    const body = document.querySelector('[data-testid="sirius-display-body"]');
+    const fullMessage = display.type === "message" && !body?.querySelector('[data-testid="sirius-display-pasted"]')
+      ? (streamDisplayIdRef.current === display.id ? streamTypingRef.current.target : display.contenu || "") : "";
+    const content = fullMessage || displayReadingText(body, display.legende || "");
+    if (!content) {
+      setVoiceMessage(display.type === "web"
+        ? "Le texte de cette page intégrée n'est pas accessible à la lecture. Fournissez son texte pour que je le lise."
+        : "Aucun texte accessible à lire dans mon Sirius Display.");
+      return;
+    }
+    cancelSpeech();
+    void handsFreeRef.current?.setBlocked(true);
+    voiceSeriesPendingRef.current = true;
+    speakingRef.current = true;
+    setVoicePhase("preparing");
+    try {
+      for (const phrase of splitDisplayReading(content)) {
+        if (signal.aborted) return;
+        await speakSeries(phrase, { onstart: () => {
+          if (!signal.aborted) { setVoicePhase("speaking"); onSpeechStartRef.current(); }
+        } });
+      }
+    } catch (error) {
+      if (!signal.aborted) {
+        console.error("Lecture du Display :", error);
+        setVoiceMessage(error.message || "Lecture du Display interrompue.");
+      }
+    } finally {
+      if (!signal.aborted) {
+        voiceSeriesPendingRef.current = false;
+        setVoicePhase("idle");
+        onSpeechEndRef.current();
+      }
+    }
+  }, [display, pinDisplay]);
 
   // Fenêtres de tâches ΣIRIUS : ouvertes et pilotées par Sirius (créations, rendus, analyses)
   // Moteur émotionnel : humeur & énergie de Sirius (module le ton du LLM et des interventions)
@@ -965,6 +978,11 @@ function App() {
   const [showNummarius, setShowNummarius] = useState(false);
   const auth = useAuth() || {};
   const authUser = auth.user;
+  useEffect(() => {
+    const syncKeys = () => setKeys(loadApiKeys());
+    window.addEventListener(KEY_STORAGE_EVENT, syncKeys);
+    return () => window.removeEventListener(KEY_STORAGE_EVENT, syncKeys);
+  }, []);
   const mailCache = useMailCache(authUser);
   // Plein écran global du HUD : fenêtre Electron si disponible, sinon API Fullscreen du navigateur
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -1468,6 +1486,7 @@ function App() {
   }, []);
 
   const onSpeechStart = useCallback(() => {
+    void handsFreeRef.current?.setBlocked(true);
     speakingRef.current = true;
     setStatus("speaking");
   }, []);
@@ -1490,12 +1509,9 @@ function App() {
   const onSpeechEnd = useCallback(() => {
     speakingRef.current = false;
     setStatus("idle");
-    if (suppressAutoMicResumeRef.current) {
-      suppressAutoMicResumeRef.current = false;
-      return;
-    }
+    if (!voiceSeriesPendingRef.current) setVoicePhase("idle");
     // Mode conversation : on rouvre le micro automatiquement après que Sirius a parlé
-    if (autoMicRef.current && !micOnRef.current) {
+    if (autoMicRef.current && !micOnRef.current && !handsFreeRef.current?.active) {
       if (autoListenTimerRef.current) clearTimeout(autoListenTimerRef.current);
       autoListenTimerRef.current = setTimeout(() => {
         if (autoMicRef.current && !speakingRef.current && !micOnRef.current && startListenRef.current) {
@@ -1546,6 +1562,17 @@ function App() {
         activity: cmdTimesRef.current?.length >= 3 ? "intense" : "exploration",
       },
     });
+    const showServiceDenial = (status, data) => {
+      const message = typeof data?.detail === "string" ? data.detail : status === 401
+        ? "Connectez-vous à votre compte SIRIUS."
+        : status === 429 ? "La limite d'utilisation est atteinte. Réessayez après sa remise à zéro."
+          : "Accès au service refusé. Vérifiez votre essai et vos clés dans Réglages → Services et coffre.";
+      setText(message);
+      setVoiceMessage(message);
+      showOnDisplay({ type: "message", titre: "ΣIRIUS — ACCÈS AU SERVICE", contenu: message });
+      if (pid && progress?.error) progress.error(pid, message);
+      return true;
+    };
 
     // -------------------------------------------------------------
     // NIVEAU 1 : VOIE FLUX STREAM (SSE) avec timeout global de 60 s
@@ -1556,6 +1583,9 @@ function App() {
 
       const handled = await streamConversation(payload, { signal: externalSignal }, async (resp) => {
         if (externalSignal.aborted) return true;
+        if ([401, 403, 429].includes(resp.status)) {
+          return showServiceDenial(resp.status, await resp.json());
+        }
 
         if (resp.ok && resp.body && (resp.headers.get("content-type") || "").includes("text/event-stream")) {
           const reader = resp.body.getReader();
@@ -1674,6 +1704,10 @@ function App() {
       if (pid && progress?.log) progress.log(pid, "Passage en voie classique de secours...", 60);
 
       const resp = await requestConversation(payload, { signal: externalSignal });
+      if ([401, 403, 429].includes(resp.status)) {
+        showServiceDenial(resp.status, resp.data);
+        return;
+      }
 
       if (resp.ok) {
         const data = resp.data;
@@ -1814,36 +1848,6 @@ function App() {
     }
   }, [stopInterruptListener, cloudAnswer]);
   startInterruptListenerRef.current = startInterruptListener;
-
-  // Citation philosophique : un clic sur le noyau fait parler la sagesse antique.
-  // Si le panneau d'un dieu est ouvert (ou l'a été il y a moins de 3 min), c'est lui qui déclame.
-  const openGod =
-    showAgora ? "HERMES" :
-    showThemis ? "THEMIS" :
-    showHephaistos ? "HEPHAISTOS" :
-    showHeracles ? "HERACLES" :
-    showAtlas ? "ATLAS" :
-    showOracle ? "ORACLE" :
-    showArgus ? "ARGUS" :
-    showKeraunos ? "KERAUNOS" :
-    showCortex ? "ZEUS" :
-    showLocus ? "LOCUS" : null;
-  const lastGodRef = useRef(null);
-  useEffect(() => {
-    if (openGod) lastGodRef.current = { god: openGod, t: Date.now() };
-    else if (lastGodRef.current) lastGodRef.current.t = Date.now();
-  }, [openGod]);
-
-  const speakQuote = useCallback(() => {
-    let god = openGod;
-    if (!god && lastGodRef.current && Date.now() - lastGodRef.current.t < 180000) god = lastGodRef.current.god;
-    const pool = (god && GOD_QUOTES[god]) || PHILO_QUOTES;
-    const q = pool[Math.floor(Math.random() * pool.length)];
-    suppressAutoMicResumeRef.current = true;
-    setStatus("speaking");
-    setText(`« ${q.t} » — ${q.a}`);
-    speakOut(`${q.t} ${q.a}.`);
-  }, [speakOut, openGod]);
 
   // Progression vocale : Sirius annonce à voix haute le début et la fin de chaque tâche suivie
   const progNamesRef = useRef({});
@@ -3807,7 +3811,7 @@ function App() {
     if (!item) return false;
 
     const surface = item.id === "display" ? "ΣIRIUS Display" : "le HUD";
-    const msg = `J'ouvre ${item.label.split("—")[0].trim()} dans ${surface}.`;
+    const msg = `J'ouvre ${moduleDisplayName(item)} dans ${surface}.`;
     setText(msg);
     speakOut(msg);
     return true;
@@ -3964,6 +3968,12 @@ function App() {
     let enrichedCommand = command;
     const low = command.toLowerCase();
     const closeCommand = low.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    if (/(?:qu.est.ce qui ne va pas|qu.est.ce qui va pas|pourquoi|explique|erreurs?|problemes?).*(?:presentation|demarrage)|(?:presentation|demarrage).*(?:erreurs?|problemes?|ne va pas)|^qu.est.ce qui ne va pas[ ?.!]*$/.test(closeCommand)) {
+      const message = explainStartupDiagnostic(window.__siriusStartupDiagnostic);
+      showOnDisplay({ type: "message", titre: "CONTRÔLES DU DÉMARRAGE", contenu: message });
+      speakOut(message);
+      return;
+    }
     if (/^(?:sirius[, ]*)?(?:ferme|fermer|fermez)(?:[- ]moi)?(?:\s+(?:(?:la|le|cette|ce)\s+)?(?:fenetre|module)(?:\s+(?:ouverte?|actif|active|actuel|actuelle|au premier plan))?)?[.!?]*$/.test(closeCommand)) {
       cancelCascadeRef.current();
       const name = closeForegroundWindow();
@@ -3971,6 +3981,21 @@ function App() {
       setText(message);
       setStatus("speaking");
       speakOut(message);
+      return;
+    }
+
+    if (DAILY_BRIEFING_COMMAND.test(low) && runBriefingRef.current) {
+      setMetrics((m) => ({
+        ...m,
+        nlu: { intent: "briefing · demande", count: m.nlu.count + 1 },
+        ctx: { exchanges: m.ctx.exchanges + 1 },
+      }));
+      runBriefingRef.current(true);
+      return;
+    }
+
+    if (isDisplayReadCommand(command)) {
+      void readOwnDisplay();
       return;
     }
 
@@ -4009,12 +4034,6 @@ function App() {
         ctx: { exchanges: m.ctx.exchanges + 1 },
       }));
     };
-
-    if (DAILY_BRIEFING_COMMAND.test(low) && runBriefingRef.current) {
-      mark("briefing · demande");
-      runBriefingRef.current(true);
-      return;
-    }
 
     if (pendingEmailCompose && handlePendingEmailCompose(command)) {
       mark("email · composition guidée");
@@ -4246,7 +4265,7 @@ function App() {
     pendingEmailSetup, pendingEmailAction, pendingEmailCompose, handlePendingEmailCompose, applyEmailSetupAnswer, fetchEmailBriefing,
     confirmPendingEmailAction, resolveEmailOrdinal, runEmailAction, setEmailSenderRule,
     pendingActionPlan, confirmPendingActionPlan, startGuidedEmailCompose,
-    renderVoiceSignal, watchActionConfirmation,
+    renderVoiceSignal, watchActionConfirmation, readOwnDisplay, showOnDisplay,
   ]);
 
   useEffect(() => {
@@ -5204,6 +5223,74 @@ function App() {
   const handleTranscriptRef = useRef(null);
   handleTranscriptRef.current = handleTranscript;
 
+  useEffect(() => {
+    if (Capacitor.getPlatform() !== "android") return;
+    let disposed = false;
+    const controller = createNativeHandsFree({
+      onState: ({ phase, message }) => {
+        if (disposed) return;
+        if (phase === "diagnostic-error") {
+          setVoiceMessage(message || "Conservation audio locale interrompue.");
+          return;
+        }
+        setHandsFreePhase(phase);
+        if (phase === "ready") {
+          setVoicePhase("listening");
+          setVoiceMessage("Micro natif prêt. Dites votre demande ; Stop ferme la session.");
+        } else if (phase === "opening") {
+          setVoiceMessage("Ouverture du microphone natif — attendez « Prêt ».");
+        } else if (phase === "speech") {
+          setVoicePhase("listening");
+        } else if (phase === "transcribing") {
+          setVoicePhase("transcribing");
+          setVoiceMessage("Transcription de votre phrase en cours.");
+        } else if (phase === "error" || phase === "stopped") {
+          setVoicePhase((current) => current === "listening" || current === "transcribing" ? "idle" : current);
+        } else if (phase === "paused") {
+          setVoicePhase((current) => current === "transcribing" ? "idle" : current);
+        }
+        if (message) setVoiceMessage(message);
+      },
+      onTranscript: (transcript) => {
+        if (!disposed) {
+          setVoicePhase("idle");
+          handleTranscriptRef.current(transcript, true);
+        }
+      },
+      groqKey: () => {
+        const keys = loadApiKeys() || {};
+        return (keys.groq_key || keys.groq || "").trim();
+      },
+    });
+    handsFreeRef.current = controller;
+    controller.available().then(({ available }) => {
+      if (!disposed) setHandsFreeAvailable(available);
+    }).catch((error) => {
+      console.warn("Disponibilité du microphone natif :", error);
+      if (!disposed) setVoiceMessage(`Micro natif indisponible : ${error.message}`);
+    });
+    const stopOnBackground = () => {
+      if (document.hidden) void controller.stop().catch((error) => {
+        if (!disposed) setVoiceMessage(`Arrêt du micro natif impossible : ${error.message}`);
+      });
+    };
+    document.addEventListener("visibilitychange", stopOnBackground);
+    return () => {
+      disposed = true;
+      handsFreeRef.current = null;
+      document.removeEventListener("visibilitychange", stopOnBackground);
+      void controller.stop().catch((error) => console.error("Arrêt du micro natif :", error));
+    };
+  }, []);
+
+  useEffect(() => {
+    void handsFreeRef.current?.setBlocked(
+      booting || showSetup || windowHidden || pttActive || speakingRef.current || isBusy.current
+      || ["thinking", "preparing", "speaking", "transcribing", "requesting"].includes(voicePhase)
+      || status === "thinking" || status === "speaking"
+    );
+  });
+
   const startServerListening = useCallback(async (preserveFeedback = false) => {
     if (serverRecorderRef.current || micOnRef.current || microphoneStartPendingRef.current || speakingRef.current) return;
     if (Date.now() < microphoneRequestCooldownRef.current) return;
@@ -5370,7 +5457,7 @@ function App() {
             retryHandsFree();
             return;
           }
-          if (!handleTranscriptRef.current(transcript, true, { requireWakeWord: !pushToTalk })) retryHandsFree();
+          if (!handleTranscriptRef.current(transcript, true, { requireWakeWord: autoMicRef.current && !conversationMicRef.current && !pushToTalk })) retryHandsFree();
         } catch (error) {
           if (serverStreamSttRef.current === streamStt) serverStreamSttRef.current = null;
           streamStt?.close();
@@ -5381,6 +5468,7 @@ function App() {
           setVoicePhase("idle");
           setVoiceMessage(error.message || "Transcription indisponible — réessayez.");
           autoMicRef.current = false;
+          conversationMicRef.current = false;
           setAutoMic(false);
         }
       };
@@ -5406,8 +5494,20 @@ function App() {
         serverRecorderStreamRef.current = null;
         stream.getTracks().forEach((track) => track.stop());
       };
+      recorder.onstart = () => {
+        if (voiceSignal.aborted || session !== microphoneSessionRef.current
+          || serverRecorderRef.current !== recorder || recorder.state !== "recording") return;
+        if (pushToTalk) pttBeep(false);
+        setVoiceTranscript("");
+        micOnRef.current = true;
+        window.__siriusMicOn = true;
+        setMicOn(true);
+        setCaptureMicOn(true);
+        setStatus("listening");
+        setVoicePhase("listening");
+        setText("Je t'écoute. Cet extrait audio sera envoyé au serveur ΣIRIUS pour transcription.");
+      };
       recorder.start(250);
-      if (pushToTalk) pttBeep(false);
       if (!pushToTalk) {
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         if (AudioContextClass) {
@@ -5418,14 +5518,6 @@ function App() {
           }
         }
       }
-      setVoiceTranscript("");
-      micOnRef.current = true;
-      window.__siriusMicOn = true;
-      setMicOn(true);
-      setCaptureMicOn(true);
-      setStatus("listening");
-      setVoicePhase("listening");
-      setText("Je t'écoute. Cet extrait audio sera envoyé au serveur ΣIRIUS pour transcription.");
       serverRecorderTimerRef.current = setTimeout(() => {
         if (serverRecorderRef.current === recorder && recorder.state === "recording") recorder.stop();
       }, 15000);
@@ -5502,6 +5594,7 @@ function App() {
   stopCaptureRef.current = stopListening;
 
   const stopVoice = useCallback(() => {
+    void handsFreeRef.current?.stop().catch((error) => setVoiceMessage(`Arrêt du micro natif impossible : ${error.message}`));
     voiceSessionRef.current.stop();
     autoMicRef.current = false;
     setAutoMic(false);
@@ -5643,7 +5736,7 @@ function App() {
       setCaptureMicOn(false);
       nativeStartingRef.current = false;
       setMetrics((m) => ({ ...m, stt: { ...m.stt, ms: Math.round(performance.now() - started), count: m.stt.count + 1 } }));
-      if (!handleTranscriptRef.current(transcript, true, { requireWakeWord: !pttRef.current })) retry();
+      if (!handleTranscriptRef.current(transcript, true, { requireWakeWord: autoMicRef.current && !conversationMicRef.current && !pttRef.current })) retry();
     } catch (error) {
       if (!isCurrent()) return;
       micOnRef.current = false;
@@ -5679,7 +5772,8 @@ function App() {
 
   // Démarre l'écoute via la reconnaissance vocale du navigateur (instantanée, gratuite)
   const startListening = useCallback((preserveFeedback = false) => {
-    if (micOnRef.current || speakingRef.current) return;
+    if (micOnRef.current || speakingRef.current || isBusy.current || voiceSeriesPendingRef.current
+      || handsFreeRef.current?.active) return;
     voiceSessionRef.current.resume();
     if (!preserveFeedback) setVoiceMessage("");
     if (Capacitor.getPlatform() === "android" && androidRecognitionRef.current === "native"
@@ -5700,7 +5794,7 @@ function App() {
     try {
       const rec = new SR();
       const sessionSignal = voiceSessionRef.current.signal;
-      const requireWakeWord = !pttRef.current;
+      const requireWakeWord = autoMicRef.current && !conversationMicRef.current && !pttRef.current;
       rec.onstart = () => {
         if (!sessionSignal.aborted && recognitionRef.current === rec) {
           setCaptureMicOn(true);
@@ -5845,18 +5939,54 @@ function App() {
   }, [startServerListening, startNativeListening]);
 
   useEffect(() => {
-    if (voicePhase !== "thinking" || !autoMic || Capacitor.getPlatform() !== "android"
-      || androidRecognition !== "native" || nativeUnavailableRef.current) return;
-    void startNativeListening(true);
-  }, [voicePhase, autoMic, androidRecognition, startNativeListening, renderVoiceSignal]);
+    if (voicePhase !== "idle" || !autoMic || booting || showSetup || windowHidden
+      || speakingRef.current || isBusy.current || voiceSeriesPendingRef.current
+      || micOnRef.current || handsFreeRef.current?.active) return;
+    clearTimeout(autoListenTimerRef.current);
+    autoListenTimerRef.current = scheduleHandsFreeRetry(
+      () => autoMicRef.current && !speakingRef.current && !isBusy.current
+        && !micOnRef.current && !handsFreeRef.current?.active && !voiceSessionRef.current.stopped,
+      () => startListening(true),
+    );
+    return () => clearTimeout(autoListenTimerRef.current);
+  }, [voicePhase, autoMic, booting, showSetup, windowHidden, startListening, renderVoiceSignal]);
 
   // Référence pour relancer l'écoute depuis onSpeechEnd (mode conversation)
   startListenRef.current = startListening;
 
+  const toggleConversation = useCallback(async (serverTest = false) => {
+    if (autoMicRef.current || micOnRef.current || voicePhase === "requesting") {
+      stopVoice();
+      return;
+    }
+    stopVoice();
+    try {
+      await handsFreeRef.current?.stop();
+      if (serverTest) {
+        androidRecognitionRef.current = "server";
+        nativeUnavailableRef.current = false;
+        localStorage.setItem("sirius_android_stt", "server");
+        setAndroidRecognition("server");
+      }
+      conversationMicRef.current = true;
+      autoMicRef.current = true;
+      setAutoMic(true);
+      startListening();
+    } catch (error) {
+      stopVoice();
+      setVoiceMessage(`Ouverture de la conversation impossible : ${error.message}`);
+    }
+  }, [voicePhase, stopVoice, startListening]);
+
   // ---- Talkie-walkie (push-to-talk) : maintenir = micro actif, relâcher = envoi ----
   const pttDown = useCallback(() => {
     if (pttRef.current) return;
+    const nativeHandsFreeWasActive = handsFreeRef.current?.active;
+    const nativeStop = handsFreeRef.current?.stop();
     stopListening();
+    autoMicRef.current = false;
+    conversationMicRef.current = false;
+    setAutoMic(false);
     pttRef.current = true;
     setPttActive(true);
     voiceSessionRef.current.stop();
@@ -5877,7 +6007,18 @@ function App() {
       micOnRef.current = false;
       setMicOn(false);
     }
-    startListening();
+    if (nativeHandsFreeWasActive) {
+      void nativeStop.then(() => {
+        if (pttRef.current) startListening();
+      }).catch((error) => {
+        pttRef.current = false;
+        setPttActive(false);
+        setVoiceMessage(`Arrêt du micro natif impossible : ${error.message}`);
+      });
+    } else {
+      void nativeStop?.catch((error) => setVoiceMessage(`Arrêt du micro natif impossible : ${error.message}`));
+      startListening();
+    }
   }, [startListening, stopInterruptListener, stopListening]);
 
   const pttUp = useCallback(() => {
@@ -6008,17 +6149,19 @@ function App() {
       }
       el.classList.add("draggable-panel");
       let drag = null;
+      let disposeGesture = null;
       const onDown = (e) => {
-        if (e.button !== 0 || e.target.closest("button, input, a, select")) return;
+        if (!isPrimaryGesture(e) || e.target.closest("button, input, a, select")) return;
+        disposeGesture?.();
         const r = el.getBoundingClientRect();
         drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
         el.classList.add("dragging");
-        e.preventDefault();
+        disposeGesture = trackWindowGesture(e, { element: el, onMove, onEnd: onUp });
       };
       const onMove = (e) => {
         if (!drag) return;
-        const x = Math.min(Math.max(0, e.clientX - drag.dx), window.innerWidth - el.offsetWidth);
-        const y = Math.min(Math.max(0, e.clientY - drag.dy), window.innerHeight - el.offsetHeight);
+        const x = Math.min(Math.max(0, e.clientX - drag.dx), Math.max(0, window.innerWidth - el.offsetWidth));
+        const y = Math.min(Math.max(0, e.clientY - drag.dy), Math.max(0, window.innerHeight - 60));
         el.style.left = x + "px";
         el.style.top = y + "px";
         el.style.right = "auto";
@@ -6035,12 +6178,9 @@ function App() {
         } catch (e) {}
       };
       el.addEventListener("pointerdown", onDown);
-      window.addEventListener("pointermove", onMove);
-      window.addEventListener("pointerup", onUp);
       cleanups.push(() => {
         el.removeEventListener("pointerdown", onDown);
-        window.removeEventListener("pointermove", onMove);
-        window.removeEventListener("pointerup", onUp);
+        disposeGesture?.();
         el.classList.remove("draggable-panel", "dragging");
       });
     });
@@ -6184,10 +6324,13 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [booting, showSetup]);
 
+  const briefingSpeakRef = useRef(speakOut);
+  briefingSpeakRef.current = speakOut;
   // Briefing matinal parlé et affiché dans ΣIRIUS Display.
   const briefingDoneRef = useRef(false);
   const runBriefingDisplay = useCallback(async (force = false) => {
     if (briefingInFlightRef.current) return;
+    const signal = voiceSessionRef.current.signal;
     briefingInFlightRef.current = true;
     const pid = progress.start("Infos du jour", { silent: true });
     progress.log(pid, "Collecte des actualités et de la veille…", 25);
@@ -6201,13 +6344,15 @@ function App() {
           streamOnDisplay(cached.displayMsg || cached.msg, true, "INFOS DU JOUR");
           setStatus("speaking");
           setText(cached.msg);
-          speakOut(cached.msg);
+          if (!signal.aborted) briefingSpeakRef.current(cached.msg);
           progress.done(pid, "Briefing délivré depuis le cache");
           return;
         }
       } catch (e) { /* cache briefing illisible — recalcul normal */ }
-      const r = await fetch(`${API}/oracle/overview`, { credentials: "include" });
+      const r = await fetch(`${API}/oracle/overview`, { credentials: "include", signal });
+      if (!r.ok) throw new Error("Briefing indisponible.");
       const d = await r.json();
+      if (signal.aborted) return;
       if (d.briefing) {
         progress.log(pid, "Briefing synthétisé, lecture vocale…", 80);
         localStorage.setItem("sirius_last_briefing", todayStr());
@@ -6339,11 +6484,12 @@ function App() {
           const savedAt = Date.now();
           localStorage.setItem("sirius_last_briefing_context", JSON.stringify({ saved_at: savedAt, text: msg.slice(-12000) }));
           localStorage.setItem("sirius_daily_briefing_cache", JSON.stringify({ date: todayStr(), saved_at: savedAt, msg, displayMsg }));
+          if (signal.aborted) return;
           streamDisplayIdRef.current = null; // nouvelle fenêtre dédiée au briefing, révélée progressivement
           streamOnDisplay(displayMsg, true, "INFOS DU JOUR");
           setStatus("speaking");
           setText(msg);
-          speakOut(msg);
+          briefingSpeakRef.current(msg);
           progress.done(pid, "Briefing délivré");
           // Anticipation cognitive : propose ensuite, un par un et à voix haute, les brouillons
           // de réponse — rien n'est jamais envoyé sans un « vas-y, envoie » explicite.
@@ -6353,9 +6499,15 @@ function App() {
         } else {
           progress.done(pid, "Aucun briefing disponible");
         }
-      } catch (e) { progress.error(pid, "Briefing indisponible"); }
+      } catch (e) {
+        if (signal.aborted) return;
+        console.error("Lecture du briefing :", e);
+        setVoiceMessage(e.message || "Briefing indisponible.");
+        setStatus("idle");
+        progress.error(pid, "Briefing indisponible");
+      }
       finally { briefingInFlightRef.current = false; }
-  }, [streamOnDisplay, speakOut, userName, profile, msFetch, presentNextActionPlan]);
+  }, [streamOnDisplay, userName, profile, msFetch, presentNextActionPlan]);
   useEffect(() => { runBriefingRef.current = runBriefingDisplay; }, [runBriefingDisplay]);
   useEffect(() => {
     // Briefing uniquement sur demande : activable via sirius_briefing_auto = "1".
@@ -6616,7 +6768,10 @@ function App() {
       openPythagore: () => setShowPythagore(true), openNews: () => setShowNews(true), openPackager: () => setShowPackager(true), openInstall: () => setShowInstall(true),
       openScripts: () => setShowScripts(true), toggleVision: () => setShowVision((open) => !open),
       openProductivity: () => { setProductivityIntent(null); setShowProductivity(true); }, openMedia: () => { setMediaIntent(null); setShowMediaHud(true); },
-      openSpotify: () => setShowSpotifyWin(true), openAdmin: () => setShowAdmin(true), openEnterprise: () => setShowEnterprise(true),
+      openSpotify: () => setShowSpotifyWin(true), openAdmin: () => {
+        if (authUser?.role === "admin") setShowAdmin(true);
+        else setText("L'administration est réservée au compte administrateur. Connectez-vous avec ce compte.");
+      }, openEnterprise: () => setShowEnterprise(true),
       openWorkModule: setActiveWorkModule,
       openGettingStarted: () => setShowGettingStarted(true),
       openWorkDossiers: () => setShowWorkDossiers(true),
@@ -6726,20 +6881,21 @@ function App() {
             setFirstRunWizard(false);
             handleSetupComplete({ ...(profile || {}), ...newProfile }, newKeys);
           }}
-          onExpert={() => setFirstRunWizard(false)}
+          onExpert={() => { setSetupInitialTab("api"); setFirstRunWizard(false); }}
         />
       )}
       {showSetup && !firstRunWizard && (
         <SiriusSetup
           initialProfile={profile}
           initialKeys={keys}
+          initialTab={setupInitialTab}
           onComplete={handleSetupComplete}
           onCancel={() => setShowSetup(false)}
           onOpenAccount={auth.openProfile ? () => {
             setShowSetup(false);
             auth.openProfile();
           } : undefined}
-          showAdvanced
+          showAdvanced={authUser?.role === "admin"}
         />
       )}
 
@@ -6919,7 +7075,7 @@ function App() {
         />
       )}
       {showPythagore && <PythagorePanel onClose={() => setShowPythagore(false)} />}
-      {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
+      {showAdmin && authUser?.role === "admin" && <AdminPanel onClose={() => setShowAdmin(false)} />}
       {showEnterprise && <EnterprisePanel onClose={() => setShowEnterprise(false)} />}
       {showNummarius && <PortusNummarius onClose={() => setShowNummarius(false)} />}
       {showNews && <NewsPanel onClose={() => setShowNews(false)} />}
@@ -6979,7 +7135,7 @@ function App() {
         <div className="conn-status" data-testid="sirius-connection">
           <span className={`conn-led ${connected ? "on" : "off"}`} />
           <span className="conn-label">IA CLOUD</span>
-          <MicrophoneIndicator active={autoMic || captureMicOn || interruptMicOn} showLabel />
+          <MicrophoneIndicator active={autoMic || captureMicOn || interruptMicOn || ["ready", "speech", "paused", "transcribing", "processing"].includes(handsFreePhase)} showLabel />
           {mode === "brainstorm" && <span className="mode-badge" data-testid="brainstorm-badge">BRAINSTORM</span>}
           
           {/* Connection status badge */}
@@ -7063,20 +7219,23 @@ function App() {
           </button>
           <button
             type="button"
-            className={`profile-btn top-tool-btn top-mic-btn ${autoMic ? "on" : ""}`}
-            onClick={() => {
-              const next = !autoMicRef.current;
-              setAutoMic(next);
-              if (next) startListening();
-              else stopListening();
-            }}
-            title={autoMic ? "Désactiver le mode mains libres" : "Activer le mode mains libres"}
-            aria-label={autoMic ? "Désactiver le mode mains libres" : "Activer le mode mains libres"}
-            aria-pressed={autoMic}
+            className={`profile-btn top-tool-btn top-mic-btn ${autoMic || micOn || voicePhase === "requesting" ? "on" : ""}`}
+            onClick={() => { void toggleConversation(); }}
+            title={autoMic || micOn || voicePhase === "requesting" ? "Arrêter la conversation vocale" : "Démarrer la conversation vocale"}
+            aria-label={autoMic || micOn || voicePhase === "requesting" ? "Arrêter la conversation vocale" : "Démarrer la conversation vocale"}
+            aria-pressed={autoMic || micOn || voicePhase === "requesting"}
             data-testid="sirius-top-mic-btn"
           >
-            {autoMic ? <Mic size={15} /> : <MicOff size={15} />}
+            {micOn || voicePhase === "requesting" ? <Mic size={15} /> : <MicOff size={15} />}
           </button>
+          {handsFreeAvailable && (
+            <button type="button" className={`profile-btn top-tool-btn ${autoMic ? "on" : ""}`}
+              data-testid="sirius-test-mic-btn" aria-pressed={autoMic}
+              title="Test micro : conversation continue avec transcription serveur"
+              onClick={() => { void toggleConversation(true); }}>
+              <Radio size={15} /> Test micro
+            </button>
+          )}
           <button
             className="profile-btn profile-btn-pinned"
             onClick={() => setShowSetup(true)}
@@ -7162,6 +7321,7 @@ function App() {
           onClose={() => setDisplayOpen(false)}
           onInteract={pinDisplay}
           onSpeak={(m) => { setStatus("speaking"); setText(m); speakOut(m); }}
+          onRead={() => { voiceSessionRef.current.resume(); void readOwnDisplay(); }}
         />
       )}
 
@@ -7241,13 +7401,6 @@ function App() {
                 </div>
               </div>
               <ReactorCore status={status} volume={0.35} color="#91e6f2" eco={ecoMode} />
-              <button
-                className="core-quote-zone"
-                data-testid="core-quote-btn"
-                aria-label="Écouter une citation philosophique"
-                title="Citation philosophique"
-                onClick={speakQuote}
-              />
             </div>
             <Waveform status={status} color={accentColor} />
             {activeCard && (
@@ -7256,16 +7409,10 @@ function App() {
           </div>
           <div className="sirius-identity">
             <h1 className="sirius-title" data-testid="sirius-title">
-              <button
-                type="button"
-                className="sirius-title-button"
-                onClick={speakQuote}
-                aria-label="Écouter une citation philosophique"
-                title="Cliquez sur ΣIRIUS pour écouter une citation philosophique"
-              >
+              <span className="sirius-title-label">
                 <span className="sirius-wordmark">ΣIRIUS</span>
                 <span className="sirius-tagline">TON ASSISTANT PRIVILÉGIÉ</span>
-              </button>
+              </span>
             </h1>
           </div>
         </section>
@@ -7310,6 +7457,48 @@ function App() {
         <VoiceSessionControls phase={voicePhase} message={voiceMessage} onStop={stopVoice}
           androidRecognition={Capacitor.getPlatform() === "android" ? androidRecognition : null}
           onRecognitionChange={changeAndroidRecognition} />
+        {handsFreeAvailable && (
+          <details data-testid="native-audio-diagnostics">
+            <summary>Capture native expérimentale et essais audio (Diagnostic)</summary>
+            <button type="button" data-testid="sirius-native-capture-btn"
+              onClick={async () => {
+                if (handsFreeRef.current?.active) { stopVoice(); return; }
+                stopVoice();
+                try {
+                  await handsFreeRef.current?.stop();
+                  await nativeRecognitionRef.current.cancel();
+                  voiceSessionRef.current.resume();
+                  refreshVoiceSession((revision) => revision + 1);
+                  await handsFreeRef.current?.start({ diagnosticCapture: saveVoiceDiagnostic });
+                } catch (error) {
+                  setVoiceMessage(`Ouverture du micro natif impossible : ${error.message}`);
+                }
+              }}>
+              {!["stopped", "error"].includes(handsFreePhase) ? "Arrêter la capture native" : "Essayer la capture native expérimentale"}
+            </button>
+            <label>
+              <input
+                type="checkbox"
+                checked={saveVoiceDiagnostic}
+                disabled={!["stopped", "error"].includes(handsFreePhase)}
+                onChange={(event) => setSaveVoiceDiagnostic(event.target.checked)}
+              /> Conserver de courts échantillons sur ce téléphone pour cet essai
+            </label>
+            <button
+              type="button"
+              disabled={!["stopped", "error"].includes(handsFreePhase)}
+              onClick={async () => {
+                try {
+                  await handsFreeRef.current?.deleteDiagnostics();
+                  setSaveVoiceDiagnostic(false);
+                  setVoiceMessage("Échantillons audio locaux supprimés.");
+                } catch (error) {
+                  setVoiceMessage(`Suppression audio impossible : ${error.message}`);
+                }
+              }}
+            >Supprimer les essais audio</button>
+          </details>
+        )}
 
         {/* Indicateur talkie-walkie : transmission en cours */}
         {pttActive && (

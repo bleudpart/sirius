@@ -101,6 +101,12 @@
     inset 0 0 22px rgba(126, 231, 255, 0.16);
   cursor: grabbing;
 }
+.shud-panel.shud-floating,
+.shud-panel.shud-dragging {
+  animation: none;
+  transform: none;
+  translate: none;
+}
 @keyframes shudIn {
   from { opacity: 0; transform: perspective(700px) translateY(16px); }
   to { opacity: 1; transform: perspective(700px) translateY(0); }

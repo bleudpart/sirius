@@ -158,11 +158,7 @@
 .public-testimonial cite { font:600 12px "Inter",sans-serif; }
 .public-why { margin:0 auto 100px; }
 .public-why>.public-section-title { text-align:center; margin-bottom:28px; }
-.public-why-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; }
-.public-why-grid article { min-height:210px; padding:26px; border:1px solid rgba(145,230,242,.22); border-radius:8px; background:linear-gradient(145deg,rgba(15,47,68,.76),rgba(5,20,33,.9)); }
-.public-why-grid article>svg { color:var(--store-gold-strong); }
-.public-why-grid h3 { margin:22px 0 10px; color:#ffffff; font:600 18px "Cinzel",serif; }
-.public-why-grid p { margin:0; color:rgba(255, 255, 255, 0.78); font:400 14px/1.55 "Inter",sans-serif; }
+.public-why > p { max-width:900px; margin:0 auto; color:rgba(255,255,255,.85); font:400 16px/1.8 "Inter",sans-serif; }
 .public-footer { font-family:"Inter",sans-serif; }
 @media(max-width:800px){.public-hero{margin:66px auto 34px}.public-hero h1{font-size:46px}.public-hud-hero{margin-bottom:35px}.public-metrics{grid-template-columns:1fr 1fr;margin-bottom:72px}.public-matrix{margin-bottom:72px}.public-core-preview{flex-direction:column}.public-matrix-actions{grid-template-columns:1fr 1fr}.public-plans{grid-template-columns:1fr;margin-bottom:72px}.public-plan.featured,.public-plan-pro{transform:none}.public-checkout{margin-bottom:72px;padding:24px 18px}.public-why-grid{grid-template-columns:1fr}.public-trust,.public-why{margin-bottom:72px}}
 @media(max-width:480px){.public-hero-actions{flex-direction:column}.public-primary-cta,.public-secondary-cta{width:100%}.public-metrics{grid-template-columns:1fr}.public-matrix-actions{grid-template-columns:1fr}}
@@ -366,3 +362,7 @@
   font-family: "Cinzel", serif;
   color: var(--store-gold);
 }
+.public-trial-highlight { color:var(--store-gold-strong); font-weight:600; line-height:1.6; }
+.public-trial { max-width:1180px; margin:40px auto; padding:24px; border:1px solid var(--store-line); border-radius:12px; background:rgba(8,29,45,.7); }
+.public-trial p,.public-trial small { line-height:1.7; }
+.public-trial small { display:block; }

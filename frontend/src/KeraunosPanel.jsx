@@ -169,7 +169,7 @@ export default function KeraunosPanel({ onClose }) {
     <div className="kr-panel kr-panel-with-hero" data-testid="keraunos-panel">
       <div className="kr-bar">
         <Home size={14} />
-        <span className="kr-title">KERAUNOS# — DOMOTIQUE</span>
+        <span className="kr-title" data-module-name="KERAUNOS">KERAUNOS <span className="module-function">— DOMOTIQUE</span></span>
         {config?.configured && !showConfig && <span className="kr-count" data-testid="keraunos-count">{nbOn} actif{nbOn > 1 ? "s" : ""} / {entities.length}</span>}
         {config?.configured && (
           <button className="kr-icon-btn" onClick={() => setShowConfig((s) => !s)} title="Configuration" data-testid="keraunos-settings-btn"><Settings2 size={13} /></button>
@@ -179,7 +179,7 @@ export default function KeraunosPanel({ onClose }) {
 
       <aside className="kr-character" aria-label="Kéraunos">
         <img src="/holo/gardien-realiste.jpg" alt="Kéraunos, gardien de la foudre domestique" />
-        <strong>KÉRAUNOS#</strong>
+        <strong>KÉRAUNOS</strong>
         <span>GARDIEN DE LA FOUDRE DOMESTIQUE</span>
       </aside>
 

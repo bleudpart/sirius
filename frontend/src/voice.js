@@ -2,9 +2,11 @@
 // Voix de Sirius — synthèse locale ou Google Cloud TTS avec basculement
 // automatique sur la synthèse du navigateur si la clé est absente ou l'API indisponible.
 import { Capacitor } from "@capacitor/core";
-import { applyFrenchPhonetics } from "./phoneticFr";
+import { applyFrenchPhonetics, normalizeFrenchElisions } from "./phoneticFr";
 import { speakNative, stopNativeSpeech } from "./nativeVoice";
 import { API_BASE_URL } from "./lib/api";
+import { KEY_STORAGE_EVENT, loadApiKeys } from "./apiKeyStorage";
+import { formatSpeechDate } from "./dateTime";
 
 const API = API_BASE_URL;
 const TTS_REQUEST_TIMEOUT_MS = 8000;
@@ -40,7 +42,7 @@ export function cleanTextForDisplay(t) {
 }
 
 function cleanTextForSpeech(t) {
-  return String(t || "")
+  return normalizeFrenchElisions(String(t || "")
     // « ΣIRIUS » : la synthèse lit le sigma grec (« sigma irius ») ; le nom se prononce « Sirius ».
     .replace(/Σ\s?IRIUS/gi, "Sirius")
     .replace(/```[\s\S]*?```/g, " ")            // blocs de code entiers
@@ -53,20 +55,21 @@ function cleanTextForSpeech(t) {
     .replace(/(\*\*|__)(.*?)\1/g, "$2")          // **gras** __gras__
     .replace(/(\*|_)(.*?)\1/g, "$2")             // *italique* _italique_
     .replace(/[*_#`~|]/g, " ")                   // symboles Markdown restants
+    .replace(/\b(?:ton|le)\s+((?:sirius|zirius)\s+display)\b/gi, "mon $1")
     .replace(/[\u2010\u2011\u2012]/g, "-")       // tirets Unicode (insécables) → tiret simple
     // Élision mal orthographiée par le LLM : « dites-m-en » → « dites-m'en » (sinon « m » se lit « meu »).
     .replace(/-([mtl])-(en|y)\b/gi, "-$1'$2")
     .replace(/[—–]/g, ", ")                      // tirets longs → pause naturelle
     .replace(/\s-{2,}\s/g, ", ")                 // -- ou --- entre mots
+    .replace(/(?<![\p{L}\p{N}_-])\d{4}-\d{2}-\d{2}(?![\p{L}\p{N}_-])/gu, (date) => formatSpeechDate(date))
     .replace(/(\d)\s*-\s*(\d)/g, "$1 à $2")       // plage numérique 10-15 → « 10 à 15 » (pas « moins »)
-    .replace(/\b(qu|[cdjlmnst])\s*['’]\s*(?=[aeiouyàâäéèêëîïôöùûü])/giu, "$1'")
     // Seuls les tirets ISOLÉS deviennent des espaces. Un tiret entre deux lettres soude un mot
     // (« dites-m'en », « peut-être », « e-mail ») : le couper fait lire « m » comme « meu ».
     .replace(/(?<!\p{L})-|-(?!\p{L})/gu, " ")
     .replace(/[()\[\]{}<>]/g, "")    // supprime parenthèses / crochets / accolades / chevrons
     .replace(/\/+/g, " ")            // supprime barres
     .replace(/[ \t]+/g, " ")         // normalise espaces (garde les fins de phrase)
-    .trim();
+    .trim()).replace(/\bL'(?=\p{L})/gu, "l'");
 }
 
 // Ton adapté à l'urgence : plus rapide et tendu si le message est urgent
@@ -78,6 +81,10 @@ let finishCurrentAudio = null;
 let currentRequest = null;
 let googleDownUntil = 0; // clé absente / API en panne → on évite de retenter pendant 10 min
 let geminiDownUntil = 0;
+window.addEventListener(KEY_STORAGE_EVENT, () => {
+  googleDownUntil = 0;
+  geminiDownUntil = 0;
+});
 let speakSeq = 0; // n° de la dernière prise de parole — garantit UNE SEULE voix à la fois
 let utterances = 0; // nombre de prises de parole lancées (l'annulation ne compte pas)
 let lastUtteranceAt = 0;
@@ -157,12 +164,16 @@ async function speakRemote(message, { voice, rate, pitch, volume = 1, onstart, o
   currentRequest = controller;
   const timeout = window.setTimeout(() => controller.abort(), timeoutMs ?? (gemini ? 28000 : TTS_REQUEST_TIMEOUT_MS));
   try {
+    const keys = loadApiKeys();
+    const voiceKeys = gemini ? { gemini_tts: keys.gemini_tts || "", google_tts: keys.google_tts || "" }
+      : { google_tts: keys.google_tts || "" };
+    const personalKeys = Object.fromEntries(Object.entries(voiceKeys).filter(([, value]) => value));
     const r = await fetch(`${API}/tts/${gemini ? "gemini" : "google"}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(gemini
-        ? { text: phonetic(message) }
-        : { text: phonetic(message), voice, rate, pitch }),
+        ? { text: phonetic(message), keys: personalKeys }
+        : { text: phonetic(message), voice, rate, pitch, keys: personalKeys }),
       credentials: "include",
       signal: controller.signal,
     });

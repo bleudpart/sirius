@@ -1,5 +1,24 @@
 /* Mobile only: override desktop geometry, including positions restored inline. */
 @media (max-width: 1023px) {
+  .sirius-display.sirius-display {
+    left: 8px !important;
+    right: 8px !important;
+    top: var(--display-header-space, 72px) !important;
+    bottom: var(--display-command-space, calc(180px + env(safe-area-inset-bottom, 0px))) !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0;
+    max-height: none;
+    transform: none !important;
+  }
+  .sirius-display.sirius-display.minimized { bottom: auto !important; }
+  .sirius-display .sd-bar { flex-wrap: wrap; cursor: default; touch-action: pan-y pinch-zoom; }
+  .sirius-display .sd-bar button { min-width: 36px; min-height: 36px; }
+  .sirius-display .sd-body { min-height: 0; overflow-y: auto; }
+  .sirius-display .sd-resize { display: none; }
+}
+
+@media (max-width: 1023px) {
   .mobile-window-controls {
     position: relative;
     padding-right: 112px !important;

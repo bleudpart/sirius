@@ -1,6 +1,7 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import Odysseia from "./Odysseia";
+import { ODYSSEIA_HUD_QUOTES, ODYSSEIA_HUD_INSPIRATIONS } from "./odysseiaData";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 let host;
@@ -67,4 +68,20 @@ test("citations can be moved up and down through controls and keyboard navigatio
 test("ODYSSEIA stays closed until requested", async () => {
   await render(false);
   expect(document.querySelector('[data-testid="odysseia"]')).toBeNull();
+});
+
+test("all 43 former HUD quotations are preserved and navigable without automatic speech", async () => {
+  await render();
+  expect(ODYSSEIA_HUD_QUOTES).toHaveLength(15);
+  expect(ODYSSEIA_HUD_INSPIRATIONS).toHaveLength(28);
+  for (const quote of [...ODYSSEIA_HUD_QUOTES, ...ODYSSEIA_HUD_INSPIRATIONS]) {
+    expect(document.querySelector('[data-testid="odysseia-citation-list"]').textContent).toContain(quote.text);
+  }
+  const filter = document.querySelector('[aria-label="Filtrer par figure"]');
+  await act(async () => {
+    filter.value = "Socrate";
+    filter.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  expect(document.querySelectorAll(".odysseia-citation")).toHaveLength(2);
+  expect(document.querySelector(".odysseia-featured").textContent).toContain("L'attribution et la formulation historique n'ont pas été vérifiées.");
 });

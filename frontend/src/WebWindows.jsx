@@ -1,6 +1,7 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useRef, useState } from "react";
 import { X, RotateCw, ExternalLink, Globe, ShieldCheck } from "lucide-react";
+import useWindowGesture, { isPrimaryGesture } from "./windowGesture";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -10,6 +11,7 @@ let zCounter = 70;
 // Sites bloquant l'iframe (X-Frame-Options / CSP) → affichés via le proxy ΣIRIUS
 function WebWindow({ win, onClose }) {
   const ref = useRef(null);
+  const gesture = useWindowGesture();
   const [reloadKey, setReloadKey] = useState(0);
   const [z, setZ] = useState(() => ++zCounter);
 
@@ -20,7 +22,7 @@ function WebWindow({ win, onClose }) {
     : win.url;
 
   const onBarDown = (e) => {
-    if (e.target.closest("button")) return;
+    if (!isPrimaryGesture(e) || e.target.closest("button")) return;
     const el = ref.current;
     const r = el.getBoundingClientRect();
     const dx = e.clientX - r.left;
@@ -33,15 +35,12 @@ function WebWindow({ win, onClose }) {
     };
     const up = () => {
       el.classList.remove("dragging");
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
     };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    e.preventDefault();
+    gesture(e, { element: el, onMove: move, onEnd: up });
   };
 
   const onResizeDown = (e) => {
+    if (!isPrimaryGesture(e)) return;
     const el = ref.current;
     const r = el.getBoundingClientRect();
     const sx = e.clientX, sy = e.clientY;
@@ -54,12 +53,8 @@ function WebWindow({ win, onClose }) {
     };
     const up = () => {
       el.classList.remove("dragging");
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
     };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    e.preventDefault();
+    gesture(e, { element: el, onMove: move, onEnd: up });
     e.stopPropagation();
   };
 

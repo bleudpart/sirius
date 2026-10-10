@@ -470,7 +470,9 @@ def make_pantheon_oracle_router(db, rate_ok, require_user):
                 logger.error(f"[ORACLE] crypto: {e}")
 
         stocks, stocks_live = [], False
-        key_av = (av_key or "").strip() or os.environ.get("ALPHA_VANTAGE_API_KEY", "")
+        from provider_access import provider_env
+        av_key = (request.headers.get("x-sirius-alphavantage-key") or av_key or "").strip()[:256]
+        key_av = provider_env("alphavantage", "ALPHA_VANTAGE_API_KEY", keys={"alphavantage": av_key} if av_key else None)
         if key_av:
             if time.time() - _stocks_cache["ts"] < 14400 and _stocks_cache["data"]:
                 stocks, stocks_live = list(_stocks_cache["data"]), True
