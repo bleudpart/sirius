@@ -72,9 +72,9 @@ export const FR_NAMES = {
 // Règles contextuelles qui ne se réduisent pas à un mot isolé.
 const FR_RULES = [
   [/\bS\.I\.R\.I\.U\.S\b/gi, "Siriusse"],
-  // « e-mail » devient « e mail » au nettoyage, que le TTS français lit « eu mail ».
-  [/\be[- ]?mails\b/gi, "imèls"],
-  [/\be[- ]?mail\b/gi, "imèl"],
+  // Le mot français évite l'épellation de l'anglicisme par certains moteurs.
+  [/(?<![\p{L}\p{N}_@.+-])(?:e[-\u2010\u2011 ]?)?mails(?![\p{L}\p{N}_@+-]|\.\p{L})/giu, "courriels"],
+  [/(?<![\p{L}\p{N}_@.+-])(?:e[-\u2010\u2011 ]?)?mail(?![\p{L}\p{N}_@+-]|\.\p{L})/giu, "courriel"],
   // Prénoms étrangers : le « ee » final se lit « é » en français alors qu'il se dit « i ».
   [/(\p{Lu}\p{L}*?)ee\b/gu, "$1i"],
 ];

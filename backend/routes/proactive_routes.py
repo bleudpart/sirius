@@ -4,6 +4,7 @@
 from fastapi import APIRouter, Request
 
 import proactive
+from briefing_news import fetch_briefing_news
 
 
 def make_proactive_router(db, require_user):
@@ -13,7 +14,12 @@ def make_proactive_router(db, require_user):
     async def suggestions_evaluate(request: Request):
         """Suggestions proactives issues de la mémoire réelle (projets, épisodes, habitudes)."""
         uid = (await require_user(request, db))["user_id"]
-        return proactive.evaluate(uid)
+        news = await fetch_briefing_news()
+        result = proactive.evaluate(uid, news_sections=news["sections"])
+        result["news_status"] = "partial" if any(
+            section["status"] == "unavailable" for section in news["sections"]
+        ) else "ok"
+        return result
 
     @router.post("/suggestions/settings")
     async def suggestions_settings(payload: dict, request: Request):

@@ -1,5 +1,5 @@
 import { Capacitor } from "@capacitor/core";
-import { speakCinematic, speakFr, speakAsCharacter, cancelSpeech } from "./voice";
+import { speakCinematic, speakFr, speakAsCharacter, cancelSpeech, cleanTextForDisplay } from "./voice";
 import { speakNative, stopNativeSpeech } from "./nativeVoice";
 
 jest.mock("@capacitor/core", () => ({
@@ -231,8 +231,10 @@ test("the web keeps its browser synthesis instead of calling the native plugin",
   };
   window.SpeechSynthesisUtterance = function (text) { this.text = text; };
   try {
-    speakFr("Bonjour");
+    speakFr("Vos e-mails sont prêts.");
     expect(window.speechSynthesis.speak).toHaveBeenCalled();
+    expect(window.speechSynthesis.speak.mock.calls[0][0].text).toBe("Vos courriels sont prêts.");
+    expect(cleanTextForDisplay("Vos e-mails sont prêts.")).toBe("Vos e-mails sont prêts.");
     expect(speakNative).not.toHaveBeenCalled();
     expect(stopNativeSpeech).not.toHaveBeenCalled();
   } finally {

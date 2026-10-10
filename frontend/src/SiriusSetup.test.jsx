@@ -2,7 +2,7 @@ import React, { act, useState } from "react";
 import { createRoot } from "react-dom/client";
 import AuthGate, { useAuth } from "./AuthGate";
 import SiriusSetup from "./SiriusSetup";
-import { loadApiKeys, setKeyAccount } from "./apiKeyStorage";
+import { loadApiKeys, readStoredVault, setKeyAccount } from "./apiKeyStorage";
 
 jest.mock("./components/ReactorVisuals", () => ({
   CoreRings: () => null,
@@ -134,6 +134,14 @@ test("services tab distinguishes the trial from a personal encrypted vault", asy
     expect(apiButton.textContent).toContain("GÉRER MES CLÉS API");
     await act(async () => apiButton.click());
     expect(apiTab.className).toContain("active");
+    const guide = container.querySelector('[data-testid="setup-api-guide"]');
+    expect(guide).not.toBeNull();
+    expect(guide.querySelectorAll('a[href^="https://"]')).toHaveLength(8);
+    expect(guide.querySelectorAll('[data-testid^="setup-guide-"]')).toHaveLength(8);
+    expect(guide.textContent).toContain("La mémoire locale de ZIRIUS ne nécessite pas de clé API");
+    expect(guide.textContent).toContain("Enregistrer toutes les clés renseignées ensemble");
+    expect(guide.textContent).toContain("Maps JavaScript API");
+    expect(guide.textContent).toContain("Cloud Text-to-Speech API");
     expect(container.querySelector('[data-testid="setup-trial"]').textContent).toContain("Essai actif");
     expect(container.querySelector('[data-testid="vault-controls"]').textContent).toContain("Mes clés personnelles");
     expect(container.querySelector('[data-testid="setup-account-quotas"]').textContent).toContain("2 / 150");
@@ -170,6 +178,7 @@ test.each(["unverifiable", "refused"])("saving a %s fal key never declares it va
         Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(field, "a-long-test-password");
         field.dispatchEvent(new Event("input", { bubbles: true }));
       });
+
     }
     await act(async () => container.querySelector('[data-testid="vault-save"]').click());
     expect(loadApiKeys()).toEqual({});
@@ -184,3 +193,67 @@ test.each(["unverifiable", "refused"])("saving a %s fal key never declares it va
     act(() => root.unmount()); setKeyAccount(""); confirm.mockRestore(); global.fetch = originalFetch;
   }
 });
+
+test("successful vault protection clears the stale profile warning and permits saving", async () => {
+        const originalFetch = global.fetch;
+        const originalCrypto = Object.getOwnPropertyDescriptor(globalThis, "crypto");
+        const originalEncoder = globalThis.TextEncoder;
+        const originalDecoder = globalThis.TextDecoder;
+        const { webcrypto } = require("crypto");
+        const { TextEncoder, TextDecoder } = require("util");
+        Object.defineProperty(globalThis, "crypto", { configurable: true, value: webcrypto });
+        globalThis.TextEncoder = TextEncoder;
+        globalThis.TextDecoder = TextDecoder;
+        const container = document.createElement("div");
+        const root = createRoot(container);
+        const onComplete = jest.fn();
+        setKeyAccount("maps-warning-test");
+        const confirm = jest.spyOn(window, "confirm").mockReturnValue(true);
+        global.fetch = jest.fn((url) => Promise.resolve({
+          ok: true,
+          json: async () => String(url).endsWith("/keys/validate")
+            ? { ok: false, status: "unverifiable", message: "Clé de carte utilisée dans le navigateur." }
+            : { mode: "trial_then_personal", services: [], trial: { state: "expired" }, quotas: { enabled: false } },
+        }));
+        try {
+          await act(async () => root.render(
+            <SiriusSetup initialProfile={{ name: "Test" }} initialKeys={{ gmaps: "test-maps-key" }}
+              initialTab="api" onComplete={onComplete} onCancel={jest.fn()} />,
+          ));
+          act(() => container.querySelector("form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+          expect(container.textContent).toContain("Vos clés ont été modifiées mais pas protégées");
+          for (const id of ["vault-password", "vault-confirm"]) {
+            const field = container.querySelector(`[data-testid="${id}"]`);
+            act(() => {
+              Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(field, "a-long-test-password");
+              field.dispatchEvent(new Event("input", { bubbles: true }));
+            });
+          }
+          await act(async () => {
+            container.querySelector('[data-testid="vault-save"]').click();
+            const deadline = Date.now() + 8000;
+            while (!readStoredVault() && Date.now() < deadline) {
+              await new Promise((resolve) => setTimeout(resolve, 50));
+            }
+          });
+          expect(container.textContent).toContain("Coffre chiffré enregistré");
+          expect(container.textContent).not.toContain("Vos clés ont été modifiées mais pas protégées");
+          expect(loadApiKeys().gmaps).toBe("test-maps-key");
+          expect(confirm).toHaveBeenCalledWith(expect.stringContaining("Clé Google Maps"));
+          await act(async () => {
+            container.querySelector("form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+            await new Promise((resolve) => setTimeout(resolve, 900));
+          });
+          expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({ name: "Test" }), expect.objectContaining({ gmaps: "test-maps-key" }));
+        } finally {
+          act(() => root.unmount());
+          localStorage.removeItem("sirius_vault_v1:maps-warning-test");
+          setKeyAccount("");
+          confirm.mockRestore();
+          global.fetch = originalFetch;
+          if (originalCrypto) Object.defineProperty(globalThis, "crypto", originalCrypto);
+          else delete globalThis.crypto;
+          globalThis.TextEncoder = originalEncoder;
+          globalThis.TextDecoder = originalDecoder;
+        }
+}, 15000);

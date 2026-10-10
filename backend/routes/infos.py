@@ -190,6 +190,11 @@ async def _gather_documentary_data(sujet: str):
 def make_infos_router():
     router = APIRouter(tags=["infos"])
 
+    @router.get("/news/briefing")
+    async def categorized_briefing_news():
+        from briefing_news import fetch_briefing_news
+        return await fetch_briefing_news()
+
     @router.get("/news/headlines")
     async def news_headlines(q: str = "", limit: int = 6):
         return await _fetch_headlines(q=q, limit=limit)

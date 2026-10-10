@@ -28,6 +28,43 @@ const KEY_META = {
   google_tts: { service: "google_tts", label: "Clé Google TTS", tag: "lecture vocale cloud · optionnelle", url: "https://console.cloud.google.com/apis/credentials", ph: "...", note: "La lecture locale de l'appareil reste possible sans cette clé." },
   gemini_tts: { service: "gemini_tts", label: "Clé Gemini TTS", tag: "lecture vocale Gemini · optionnelle", url: "https://aistudio.google.com/api-keys", ph: "...", note: "Service facultatif, soumis à la tarification de votre fournisseur." },
 };
+const KEY_GUIDE = {
+  groq_key: [
+    "Connectez-vous à la console Groq ou créez votre compte.",
+    "Dans API Keys, créez une nouvelle clé nommée « Mon ZIRIUS », puis copiez-la.",
+  ],
+  groq: [
+    "Connectez-vous à Moonshot et consultez les tarifs et le crédit disponible.",
+    "Dans API Keys, créez et copiez une clé. Une clé de la plateforme internationale Kimi doit correspondre au service configuré sur le backend ; ne la collez pas dans Groq.",
+  ],
+  serp: [
+    "Créez votre compte SerpAPI et choisissez une offre adaptée au nombre de recherches souhaité.",
+    "Dans Manage API Key, copiez la clé privée de votre compte.",
+  ],
+  fal: [
+    "Connectez-vous à fal.ai et vérifiez les tarifs des modèles et votre crédit.",
+    "Dans Keys, créez une clé autorisant les appels de modèles (préréglage API lorsqu'il est proposé), puis copiez-la.",
+  ],
+  gmaps: [
+    "Dans Google Cloud, choisissez ou créez un projet et vérifiez les conditions de facturation.",
+    "Activez Maps JavaScript API, puis ouvrez API et services → Identifiants → Créer des identifiants → Clé API.",
+    "Restreignez la clé à Maps JavaScript API et aux sites/origines autorisés. Ne supprimez pas les restrictions pour réussir un test serveur.",
+    "Le test serveur ne valide pas cette clé navigateur : vérifiez ensuite la carte LOCUS. La recherche d'adresses n'est pas disponible ; une carte OpenStreetMap reste possible sans clé Google.",
+  ],
+  alphavantage: [
+    "Sur la page Alpha Vantage, remplissez le formulaire de demande de clé API.",
+    "Copiez la clé fournie après la demande et vérifiez les quotas de votre offre.",
+  ],
+  google_tts: [
+    "Dans Google Cloud, choisissez ou créez un projet, puis vérifiez et configurez la facturation requise.",
+    "Activez Cloud Text-to-Speech API dans la bibliothèque des API.",
+    "Dans API et services → Identifiants, créez une clé API dédiée et restreignez-la à Cloud Text-to-Speech API. Les restrictions doivent convenir aux appels du backend, pas aux seuls sites Web.",
+  ],
+  gemini_tts: [
+    "Connectez-vous à Google AI Studio et ouvrez la page API Keys.",
+    "Créez une clé dans le projet approprié, puis copiez-la. Vérifiez l'accès aux modèles vocaux, les quotas et la facturation : une clé valide ne garantit pas cet accès.",
+  ],
+};
 
 // Composant stable (hors du parent) : préserve le DOM et le focus à chaque frappe
 function KeyField({ k, value, status, onChange, onTest }) {
@@ -599,8 +636,34 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
         {tab === "api" && (
           <section className="setup-section setup-single" data-testid="setup-panel-api">
             <AccountServices />
+            <details data-testid="setup-api-guide">
+              <summary>OBTENIR MES CLÉS API — GUIDE COMPLET PAS À PAS</summary>
+              <p className="setup-note">Il n'existe pas de clé universelle ni de création de toutes les clés en un clic. Chaque fournisseur demande un compte personnel. Commencez par Groq ; les sept autres services sont facultatifs. La mémoire locale de ZIRIUS ne nécessite pas de clé API.</p>
+              <ol>
+                {Object.entries(KEY_META).map(([name, meta]) => (
+                  <li key={name} data-testid={`setup-guide-${name}`}>
+                    <h3>{meta.label}</h3>
+                    <a className="setup-link" href={meta.url} target="_blank" rel="noreferrer">
+                      Ouvrir {meta.label.replace(/^Clé /, "")} <ExternalLink size={11} />
+                    </a>
+                    <ol>
+                      {KEY_GUIDE[name].map((step) => <li key={step}>{step}</li>)}
+                      <li>Dans le coffre ci-dessous, cochez « {meta.tag} », collez la clé dans « {meta.label} », puis cliquez sur TESTER. Ne communiquez pas votre clé par email ou dans une capture d'écran.</li>
+                    </ol>
+                  </li>
+                ))}
+              </ol>
+              <h3>Enregistrer toutes les clés renseignées ensemble</h3>
+              <ol>
+                <li>Après les tests, choisissez un mot de passe de coffre d'au moins 12 caractères et confirmez-le.</li>
+                <li>Cliquez une seule fois sur « Protéger et enregistrer » pour chiffrer toutes les clés renseignées. Une clé refusée doit être corrigée ; une clé non vérifiable nécessite votre accord explicite et reste non vérifiée.</li>
+                <li>Utilisez « Exporter le coffre » pour conserver une sauvegarde chiffrée. Gardez le mot de passe séparément : il sera nécessaire pour restaurer les clés.</li>
+                <li>À la prochaine session, saisissez le mot de passe et cliquez sur « Déverrouiller » ; inutile de recréer les clés.</li>
+              </ol>
+              <p className="setup-note">Gmail et Outlook se connectent dans le Centre des connexions : leurs comptes ne sont pas des clés à coller ici. Les coûts et quotas restent ceux de chaque fournisseur ; aucune gratuité permanente n'est garantie.</p>
+            </details>
             <VaultControls keys={keys} validateKeys={validateKeys} onKeys={(next) => {
-              setKeys(next); setKeyStatus({});
+              setKeys(next); setKeyStatus({}); setSaveError("");
               setSelectedServices([...new Set(["groq_key", ...Object.keys(next).filter((name) => KEY_META[name])])]);
             }}>
               <fieldset className="vault-services">

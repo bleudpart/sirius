@@ -1,4 +1,5 @@
 import asyncio
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -44,11 +45,18 @@ def test_briefing_enrichment_uses_the_dedicated_prompt(monkeypatch):
         {"t": 0.0, "key": "", "txt": ""},
     )
 
-    result = asyncio.run(sirius_brain.enrich_briefing({"date": "2026-08-19"}))
+    data = {"date": "2026-08-19", "actualites_par_rubrique": [{"label": "Culture", "description": "Contexte " * 3100}]}
+    result = asyncio.run(sirius_brain.enrich_briefing(data))
 
     assert result == "Briefing complet."
     assert captured["client"]["base_url"] == sirius_brain.GROQ_LLM_ENDPOINT
     assert captured["model"] == sirius_brain.GROQ_LLM_PRIMARY
     assert captured["messages"][0]["content"] == sirius_brain.BRIEFING_PROMPT
+    assert json.loads(captured["messages"][1]["content"]) == data
+    assert captured["max_tokens"] == 2600
     for section in ("MÉTÉO", "MARCHÉS ET CRYPTO", "ACTUALITÉS", "CIEL", "VOTRE JOURNÉE", "SYNTHÈSE"):
         assert section in sirius_brain.BRIEFING_PROMPT
+    for section in ("France", "International", "Politique", "Économie", "Sport", "Santé",
+                    "Sciences et technologies", "Environnement", "Culture"):
+        assert section in sirius_brain.BRIEFING_PROMPT
+    assert "650 à 750 mots" in sirius_brain.BRIEFING_PROMPT

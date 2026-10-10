@@ -10,13 +10,11 @@ import MythosBackdrop from "@/MythosBackdrop";
 import useDraggableCards from "@/useDraggableCards";
 import Analysis3D from "@/Analysis3D";
 import "./Oracle.css";
+import { API_BASE_URL } from "@/lib/api";
 
-const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
+const API = API_BASE_URL;
 const EXTERNAL_BRIEFING_RESOURCES = [
-  { key: "news", path: "/news/top", fallback: "/news/headlines?limit=4", normalize: normalizeItems },
-  { key: "worldNews", path: "/news/world", fallback: "/news/headlines?q=monde&limit=4", normalize: normalizeItems },
-  { key: "franceNews", path: "/news/france", fallback: "/news/headlines?q=France&limit=4", normalize: normalizeItems },
-  { key: "sport", path: "/sport/results", fallback: "/news/headlines?q=sport&limit=4", normalize: normalizeItems },
+  { key: "sections", path: "/news/briefing", normalize: (payload) => payload.sections || [] },
   { key: "weather", path: "/weather/today", fallback: "/weather/current", normalize: normalizeWeather },
   { key: "fact", path: "/system/fact_of_day", normalize: normalizeFact },
   { key: "mails", path: "/mail/important", fallback: "/microsoft/mail?top=5", normalize: normalizeItems },
@@ -204,8 +202,19 @@ export default function OracleDivin({ onClose }) {
         const resource = EXTERNAL_BRIEFING_RESOURCES[index];
         if (result.status === "fulfilled") {
           next[result.value[0]] = result.value[1];
+          if (resource.key === "sections") {
+            const sections = result.value[1];
+            const articles = (id) => sections.find((section) => section.id === id)?.articles || [];
+            next.news = sections.flatMap((section) => section.articles);
+            next.worldNews = articles("monde");
+            next.franceNews = articles("france");
+            next.sport = articles("sport");
+          }
         } else {
           next.errors[resource.key] = true;
+          if (resource.key === "sections") {
+            for (const key of ["news", "worldNews", "franceNews", "sport"]) next.errors[key] = true;
+          }
         }
       });
       setBriefing(next);
@@ -301,7 +310,7 @@ export default function OracleDivin({ onClose }) {
   }, []);
 
   const dragRef = useDraggableCards([data]);
-  const briefingText = externalBriefingText(briefing);
+  const briefingText = data?.briefing || externalBriefingText(briefing);
 
   return (
     <div className="prime-screen" data-testid="oracle-divin-panel" ref={dragRef}>
@@ -332,6 +341,22 @@ export default function OracleDivin({ onClose }) {
             )}
           </div>
           <p className="oracle-briefing-text">{briefingText}</p>
+          {briefing.errors.sections && <p role="status">Actualités par rubrique indisponibles.</p>}
+          {(data?.news_sections || briefing.sections || []).map((section) => (
+            <details key={section.id} data-testid={`oracle-news-${section.id}`}>
+              <summary>{section.label}</summary>
+              {section.articles.length === 0 && <p>{section.status === "unavailable"
+                ? "Source temporairement indisponible."
+                : "Aucune information datée des dernières 48 heures disponible."}</p>}
+              {section.articles.map((article) => (
+                <div className="oracle-news-row" key={article.url}>
+                  <a href={article.url} target="_blank" rel="noreferrer" className="oracle-news-text">{article.titre}</a>
+                  <span className="prime-conf-note">{article.description}</span>
+                  <span className="prime-conf-note">{article.source} · {article.date}</span>
+                </div>
+              ))}
+            </details>
+          ))}
         </section>
 
         {/* Météo */}

@@ -584,32 +584,12 @@ def make_pantheon_oracle_router(db, rate_ok, require_user):
             parts.append(f"Agenda Microsoft : {len(ms_events)} événement{'s' if len(ms_events) > 1 else ''} aujourd'hui, dont « {first['titre']} » à {first['debut'][11:16]}.")
         if ms_unread:
             parts.append(f"Outlook : {ms_unread} mail{'s' if ms_unread > 1 else ''} non lu{'s' if ms_unread > 1 else ''}.")
-        live_titles = []
-        live_sport_titles = []
-        from routes.infos import NEWS_API_KEY, _fetch_headlines
-        if NEWS_API_KEY:
-            try:
-                live = await _fetch_headlines(limit=5)
-                live_titles = [a["titre"] for a in live["articles"][:5] if a["titre"]]
-                if live_titles:
-                    parts.append("Actualités : " + ". ".join(live_titles[:3]) + ".")
-            except Exception:
-                pass
-            try:
-                sport = await _fetch_headlines(q="sport", limit=5)
-                live_sport_titles = [a["titre"] for a in sport["articles"][:5] if a["titre"]]
-                if live_sport_titles:
-                    parts.append("Sport : " + ". ".join(live_sport_titles[:2]) + ".")
-            except Exception:
-                pass
-        if not live_titles:
-            fallback_titles = [str(item.get("text", "")).strip() for item in news[:3] if item.get("text")]
-            if fallback_titles:
-                parts.append("Actualités : " + ". ".join(fallback_titles) + ".")
-            else:
-                parts.append("Actualités : aucune donnée disponible pour le moment.")
-        if not live_sport_titles:
-            parts.append("Sport : aucune actualité sportive vérifiée disponible pour le moment.")
+        from briefing_news import fetch_briefing_news, news_briefing_text
+        news_sections = (await fetch_briefing_news())["sections"]
+        sports_articles = next(section["articles"] for section in news_sections if section["id"] == "sport")
+        live_sport_titles = [article["titre"] for article in sports_articles]
+        live_titles = [article["titre"] for section in news_sections for article in section["articles"]]
+        parts.append("Actualités par rubrique : " + news_briefing_text(news_sections))
         point_attention = (
             f"la volatilité de {crypto[0]['name']}" if crypto and crypto[0].get("volatile")
             else "l'équilibre entre vos priorités et votre charge prévue"
@@ -624,8 +604,9 @@ def make_pantheon_oracle_router(db, rate_ok, require_user):
                     "meteo_7_jours": weather,
                     "crypto_eur": crypto,
                     "marches_actions": stocks,
-                    "actualites_titres": live_titles or [n.get("text", "") for n in news],
+                    "actualites_titres": live_titles,
                     "actualites_sportives": live_sport_titles,
+                    "actualites_par_rubrique": news_sections,
                     "lune": moon,
                     "evenements_celestes": upcoming,
                     "habitudes_utilisateur": personal,
@@ -633,6 +614,7 @@ def make_pantheon_oracle_router(db, rate_ok, require_user):
                     "mails_outlook_non_lus": ms_unread,
                 })
                 required_sections = ("météo", "march", "crypto", "actualité", "sport", "ciel", "journée", "synthèse")
+                required_sections += tuple(section["label"].lower() for section in news_sections)
                 normalized_enriched = enriched.lower()
                 if enriched and all(section in normalized_enriched for section in required_sections):
                     briefing_txt = enriched
@@ -642,7 +624,7 @@ def make_pantheon_oracle_router(db, rate_ok, require_user):
                 logger.error(f"[ORACLE] briefing LLM: {e}")
 
         return {"weather": weather, "crypto": crypto, "stocks": stocks, "stocks_live": stocks_live,
-                "news": news,
+                "news": news, "sports_news": sports_articles, "news_sections": news_sections,
                 "personal": personal, "moon": moon, "astro": upcoming,
                 "ms_events": ms_events, "ms_unread": ms_unread,
                 "briefing": briefing_txt, "date": today.isoformat()}

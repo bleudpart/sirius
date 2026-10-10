@@ -114,7 +114,7 @@ def _candidates(user_id: str, now) -> list:
             "description": "Les infos du jour n'ont pas encore été lancées : météo, marchés, actus et ta journée.",
             "urgency": "moyenne",
             "reason": "Il est entre 6 h et 10 h et le briefing quotidien n'a pas été demandé aujourd'hui.",
-            "benefit": "Démarrer la journée avec l'essentiel en 2 minutes, sans rien chercher.",
+            "benefit": "Démarrer la journée avec un journal d'environ 5 minutes, sans rien chercher.",
             "confidence": 0.8,
             "action": {"type": "command", "text": "infos du jour"},
         })
@@ -166,17 +166,21 @@ def _candidates(user_id: str, now) -> list:
             continue
         project = work_item.get("project") or ""
         subject = project or work_item.get("title") or "intervention récente"
+        status = work_item.get("status") or "running"
+        state = {"running": "en cours", "done": "terminée", "error": "en erreur",
+                 "cancelled": "annulée"}.get(status, "à vérifier")
+        result = (work_item.get("result") or "").strip()[:240]
         items.append({
             "kind": f"intervention:{work_item['id']}",
+            "state": status,
             "title": "Suivi d'intervention",
-            "description": f"Reprendre : {subject}",
-            "urgency": "moyenne" if work_item.get("status") == "running" else "faible",
-            "reason": f"ΣIRIUS a {'démarré' if work_item.get('status') == 'running' else 'terminé'} cette intervention récemment : « {work_item.get('title')} ».",
+            "description": f"{work_item.get('title') or subject} : dernier état enregistré {state}." + (f" {result}" if result else ""),
+            "urgency": "haute" if status == "error" else "moyenne" if status == "running" else "faible",
+            "reason": f"Journal d'intervention : « {work_item.get('title')} », état {state}, commencé le {work_item['started_at']}.",
             "benefit": "Conserver le fil du travail engagé et identifier la prochaine action utile.",
-            "confidence": 0.75 if work_item.get("status") == "running" else 0.6,
+            "confidence": 0.75 if status in {"running", "error"} else 0.6,
             "action": {"type": "command", "text": f"Fais le point et reprends : {subject}."},
         })
-        break
 
     # 5) Habitude horaire : même intention, même heure (±1 h), au moins 3 fois
     habit_best = None
@@ -325,6 +329,12 @@ _URGENCY_ORDER = {"haute": 0, "moyenne": 1, "faible": 2}
 def _intervention(item: dict) -> dict:
     """Décide comment Sirius peut prendre en charge une suggestion sans agir à l'aveugle."""
     kind = item["kind"].split(":", 1)[0]
+    if kind == "actualite":
+        return {
+            "decision": "informer",
+            "message": "C'est un titre publié récemment, pas nécessairement un événement survenu aujourd'hui. Quel point souhaites-tu approfondir ?",
+            "alternative": "Le briefing complet rassemble les autres rubriques avec leurs sources.",
+        }
     if kind == "briefing":
         return {
             "decision": "agir",
@@ -374,13 +384,46 @@ def _intervention(item: dict) -> dict:
     }
 
 
-def evaluate(user_id: str, now=None) -> dict:
+def _news_candidates(news_sections: list[dict], now: datetime) -> list[dict]:
+    """Informe même sans tâche préalable, uniquement depuis des sources récentes."""
+    articles = []
+    for section in news_sections:
+        if section["status"] != "ok":
+            continue
+        for article in section["articles"]:
+            published = datetime.fromisoformat(article["date"])
+            if published.tzinfo is not None and timedelta(0) <= now - published <= timedelta(hours=24):
+                articles.append((published, section["label"], article))
+    articles.sort(key=lambda entry: entry[0], reverse=True)
+    seen = set()
+    candidates = []
+    for published, label, article in articles:
+        if article["url"] in seen:
+            continue
+        seen.add(article["url"])
+        candidates.append({
+            "kind": "actualite:" + hashlib.sha1(article["url"].encode("utf-8")).hexdigest()[:16],
+            "title": f"À suivre · {label}",
+            "description": f"Dans la rubrique {label}, {article['source']} titre : « {article['titre']} ».",
+            "urgency": "faible",
+            "reason": f"Publication du {published.isoformat()} : {article['url']}",
+            "benefit": "Rester informé sans devoir demander systématiquement les nouvelles.",
+            "confidence": 0.65,
+            "action": {"type": "command", "text": f"Explique cette actualité, vérifie les faits et le contexte : {article['titre']}. Source : {article['url']}"},
+        })
+        if len(candidates) == 2:
+            break
+    return candidates
+
+
+def evaluate(user_id: str, now=None, *, news_sections: list[dict] | None = None) -> dict:
     """Évalue et retourne les suggestions actives pour l'utilisateur."""
     now = now or datetime.now(timezone.utc)
     mode = get_mode(user_id)
     muted = _muted_kinds(user_id, now)
 
-    candidates = [c for c in _candidates(user_id, now) if c["kind"] not in muted]
+    candidates = [c for c in _candidates(user_id, now) + _news_candidates(news_sections or [], now)
+                  if c["kind"] not in muted]
     candidates.sort(key=lambda c: (_URGENCY_ORDER.get(c["urgency"], 3), -c["confidence"]))
     selected = candidates[: _MODE_LIMITS[mode]]
 
@@ -388,7 +431,8 @@ def evaluate(user_id: str, now=None) -> dict:
     stamp = now.isoformat()
     with _conn() as con:
         for c in selected:
-            sid = _suggestion_id(user_id, c["kind"])
+            identity = f"{c['kind']}:{c['state']}" if "state" in c else c["kind"]
+            sid = _suggestion_id(user_id, identity)
             intervention = _intervention(c)
             con.execute(
                 "INSERT OR REPLACE INTO proactive_items "

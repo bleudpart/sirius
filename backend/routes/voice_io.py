@@ -36,11 +36,16 @@ _TTS_CACHE_MAX = 64
 _TTS_CACHE_MAX_BYTES = 32 * 1024 * 1024
 
 _SIGMA_NAME = re.compile(r"Σ\s?IRIUS", re.IGNORECASE)
+_MAIL_WORD = re.compile(
+    r"(?<![\w@.+-])(?:e[-\u2010\u2011 ]?)?mail(s?)(?![\w@+-]|\.[^\W\d_])",
+    re.IGNORECASE,
+)
 
 
 def _speakable(text: str) -> str:
-    """« ΣIRIUS » se prononce « Sirius » : sans cela la synthèse lit « sigma irius »."""
-    return _SIGMA_NAME.sub("Sirius", text or "").strip()
+    """Normalise les mots mal lus sans modifier le texte affiché."""
+    text = _SIGMA_NAME.sub("Sirius", text or "")
+    return _MAIL_WORD.sub(lambda match: "courriel" + match.group(1).lower(), text).strip()
 
 
 def _cache_get(key: tuple) -> dict | None:

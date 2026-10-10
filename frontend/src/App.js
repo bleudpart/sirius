@@ -5185,6 +5185,10 @@ function App() {
   
   // ---- Reconnaissance vocale navigateur (Web Speech API) ----
   const handleTranscript = useCallback((transcript, isFinal, { requireWakeWord = false } = {}) => {
+    if (String(transcript || "").trim()) {
+      lastActivityRef.current = Date.now();
+      window.dispatchEvent(new CustomEvent("sirius:activity"));
+    }
     if (speakingRef.current) return false; // Sirius parle → on ignore (évite l'écho)
     const normalizedTranscript = normalizeVoiceTranscript(transcript).trim();
     setVoiceTranscript(normalizedTranscript);
@@ -7292,6 +7296,10 @@ function App() {
       {/* Suggestions proactives issues de la mémoire réelle (projets, épisodes, habitudes).
           Le panneau reste invisible tant que le moteur n'a rien de pertinent à proposer. */}
       <ProactivePanel
+        canSpeak={() => !speakingRef.current && !pttRef.current && !voiceSeriesPendingRef.current
+          && !voiceSessionRef.current.stopped
+          && !["thinking", "speaking"].includes(wakeStatusRef.current)
+          && Date.now() - lastActivityRef.current >= 45000}
         onAction={(a) => {
           if (!a || !a.type) return;
           if (a.type === "command") {

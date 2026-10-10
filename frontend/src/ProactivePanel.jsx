@@ -3,16 +3,26 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Zap, Play, Wrench, Clock3, XCircle, HelpCircle, ShieldAlert, BrainCircuit } from "lucide-react";
 import "./Proactive.css";
 import { trackWindowGesture, isPrimaryGesture } from "./windowGesture";
+import { API_BASE_URL } from "./lib/api";
 
-const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
+const API = API_BASE_URL;
+const IDLE_BEFORE_SUGGESTION_MS = 45000;
+const ANNOUNCEMENT_GAP_MS = 120000;
 
-export default function ProactivePanel({ onAction, onSpeak }) {
+export default function ProactivePanel({ onAction, onSpeak, canSpeak }) {
   const [suggestions, setSuggestions] = useState([]);
   const [why, setWhy] = useState({});
   const [confirming, setConfirming] = useState({});
   const announcedIdsRef = useRef(new Set());
   const onSpeakRef = useRef(onSpeak);
-  const lastUserActivityRef = useRef(0);
+  const canSpeakRef = useRef(canSpeak);
+  const lastUserActivityRef = useRef(Date.now());
+  const lastAnnouncementRef = useRef(null);
+  const suggestionsRef = useRef([]);
+  const evaluatingRef = useRef(false);
+  const mountedRef = useRef(false);
+  const voiceBusyRef = useRef(false);
+  const [error, setError] = useState("");
   const panelRef = useRef(null);
   const hasSuggestions = suggestions.length > 0;
 
@@ -70,54 +80,94 @@ export default function ProactivePanel({ onAction, onSpeak }) {
 
   useEffect(() => {
     onSpeakRef.current = onSpeak;
-  }, [onSpeak]);
+    canSpeakRef.current = canSpeak;
+  }, [onSpeak, canSpeak]);
+
+  const announce = useCallback(() => {
+    const now = Date.now();
+    if (!mountedRef.current || !onSpeakRef.current || document.visibilityState === "hidden"
+        || voiceBusyRef.current || canSpeakRef.current?.() === false
+        || now - lastUserActivityRef.current < IDLE_BEFORE_SUGGESTION_MS
+        || (lastAnnouncementRef.current !== null && now - lastAnnouncementRef.current < ANNOUNCEMENT_GAP_MS)) return;
+    const suggestion = suggestionsRef.current.find((item) => !announcedIdsRef.current.has(item.id));
+    if (!suggestion) return;
+    onSpeakRef.current(`${suggestion.description} ${suggestion.intervention || ""}`.trim());
+    announcedIdsRef.current.add(suggestion.id);
+    lastAnnouncementRef.current = now;
+  }, []);
 
   const evaluate = useCallback(async (trigger) => {
+    if (evaluatingRef.current) return;
+    evaluatingRef.current = true;
     try {
       const r = await fetch(`${API}/suggestions/evaluate`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ trigger }),
       });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const d = await r.json();
+      if (!Array.isArray(d.suggestions)) throw new Error("Réponse de proactivité invalide");
+      if (!mountedRef.current) return;
       const nextSuggestions = d.suggestions || [];
+      suggestionsRef.current = nextSuggestions;
       setSuggestions(nextSuggestions);
-      if (Date.now() - lastUserActivityRef.current > 15000) {
-        const nextSuggestion = nextSuggestions.find((suggestion) => !announcedIdsRef.current.has(suggestion.id));
-        if (nextSuggestion) {
-          announcedIdsRef.current.add(nextSuggestion.id);
-          onSpeakRef.current?.(nextSuggestion.intervention || `J'ai repéré un point utile : ${nextSuggestion.description}`);
-        }
-      }
-    } catch (_) {}
-  }, []);
+      setError(d.news_status === "partial" ? "Veille actualités partiellement indisponible. Les autres suggestions restent actives." : "");
+      announce();
+    } catch (cause) {
+      console.error("Évaluation de la proactivité impossible :", cause);
+      if (mountedRef.current) setError("Proactivité indisponible : vérifiez la connexion au backend.");
+    } finally {
+      evaluatingRef.current = false;
+    }
+  }, [announce]);
 
   useEffect(() => {
+    mountedRef.current = true;
     evaluate("app_open");
+    let activityTimer;
     const onActivity = () => {
       lastUserActivityRef.current = Date.now();
-      evaluate("activity");
+      window.clearTimeout(activityTimer);
+      activityTimer = window.setTimeout(() => evaluate("activity"), 2000);
+    };
+    const onVoice = (event) => {
+      voiceBusyRef.current = event.detail !== "idle";
+      lastUserActivityRef.current = Date.now();
     };
     window.addEventListener("sirius:activity", onActivity);
-    // Certaines suggestions dépendent de l'heure (briefing du matin, habitudes horaires) et
-    // doivent réapparaître même sans interaction utilisateur — sans ce minuteur, une app restée
-    // ouverte et inactive ne les proposerait jamais tant qu'aucun événement "activity" ne survient.
-    const timer = window.setInterval(() => evaluate("timer"), 10 * 60 * 1000);
+    window.addEventListener("pointerdown", onActivity);
+    window.addEventListener("keydown", onActivity);
+    window.addEventListener("sirius-voice-phase", onVoice);
+    const timer = window.setInterval(() => evaluate("timer"), 60000);
+    const announcementTimer = window.setInterval(announce, 5000);
     return () => {
+      mountedRef.current = false;
       window.removeEventListener("sirius:activity", onActivity);
+      window.removeEventListener("pointerdown", onActivity);
+      window.removeEventListener("keydown", onActivity);
+      window.removeEventListener("sirius-voice-phase", onVoice);
+      window.clearTimeout(activityTimer);
       window.clearInterval(timer);
+      window.clearInterval(announcementTimer);
     };
-  }, [evaluate]);
+  }, [evaluate, announce]);
 
-  const remove = (id) => setSuggestions((l) => l.filter((s) => s.id !== id));
+  const remove = (id) => {
+    suggestionsRef.current = suggestionsRef.current.filter((s) => s.id !== id);
+    setSuggestions(suggestionsRef.current);
+  };
 
   const act = async (s, action) => {
     try {
       const r = await fetch(`${API}/suggestions/${s.id}/action`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, token: confirming[s.id] || null }),
       });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const d = await r.json();
       if (d.needs_confirmation) {
         setConfirming((c) => ({ ...c, [s.id]: d.token }));
@@ -127,7 +177,10 @@ export default function ProactivePanel({ onAction, onSpeak }) {
       if (action === "executer" && d.executed) onAction && onAction(d.proposed_action);
       if (action === "preparer" && d.prepared) onAction && onAction({ ...d.proposed_action, prepare: true });
       remove(s.id);
-    } catch (_) {}
+    } catch (cause) {
+      console.error("Action proactive impossible :", cause);
+      setError("Action impossible. La suggestion a été conservée.");
+    }
   };
 
   const askWhy = async (s) => {
@@ -136,13 +189,17 @@ export default function ProactivePanel({ onAction, onSpeak }) {
       return;
     }
     try {
-      const r = await fetch(`${API}/suggestions/${s.id}/why`);
+      const r = await fetch(`${API}/suggestions/${s.id}/why`, { credentials: "include" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const d = await r.json();
       setWhy((w) => ({ ...w, [s.id]: d }));
-    } catch (_) {}
+    } catch (cause) {
+      console.error("Explication proactive indisponible :", cause);
+      setError("Explication indisponible pour le moment.");
+    }
   };
 
-  if (!suggestions.length) return null;
+  if (!suggestions.length && !error) return null;
 
   return (
     <div ref={panelRef} className="proactive-stack" data-testid="proactive-panel">
@@ -150,6 +207,7 @@ export default function ProactivePanel({ onAction, onSpeak }) {
         <Zap size={11} />
         <span className="pro-mode-label"><BrainCircuit size={11} /> SIRIUS ANTICIPE</span>
       </div>
+      {error && <p role="alert">{error}</p>}
       {suggestions.map((s) => (
         <div className={`sugg-card urg-${s.urgency}`} key={s.id} data-testid="suggestion-card">
           <div className="sugg-head">
@@ -167,7 +225,7 @@ export default function ProactivePanel({ onAction, onSpeak }) {
           <div className="sugg-confidence" title={s.reason || "Suggestion issue de la mémoire locale"}>
             <span>CONFIANCE {Math.round((s.confidence || 0) * 100)} %</span>
             <i><b style={{ width: `${Math.round((s.confidence || 0) * 100)}%` }} /></i>
-            <small>{s.source === "projet" ? "PROJET EN MÉMOIRE" : s.source === "habitude" ? "HABITUDE DÉTECTÉE" : "CONTEXTE RÉCENT"}</small>
+            <small>{s.source === "actualite" ? "ACTUALITÉ SOURCÉE" : s.source === "projet" ? "PROJET EN MÉMOIRE" : s.source === "habitude" ? "HABITUDE DÉTECTÉE" : "CONTEXTE RÉCENT"}</small>
           </div>
           {confirming[s.id] && (
             <p className="sugg-confirm" data-testid="sugg-confirm-msg">

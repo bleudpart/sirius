@@ -11,6 +11,17 @@ from routes import voice_io
 from auth_api import create_access_token
 
 
+@pytest.mark.parametrize("word", ["emails", "e-mails", "e mails", "EMAILS", "mails", "e\u2011mails"])
+def test_mail_words_are_not_spelled_by_tts(word):
+    assert voice_io._speakable(f"Vos {word} sont prêts.") == "Vos courriels sont prêts."
+
+
+def test_mail_pronunciation_preserves_addresses():
+    assert voice_io._speakable("Un e-mail. email@example.test prénom.mail@example.test") == (
+        "Un courriel. email@example.test prénom.mail@example.test"
+    )
+
+
 def audio_payload():
     output = io.BytesIO()
     with wave.open(output, "wb") as audio:

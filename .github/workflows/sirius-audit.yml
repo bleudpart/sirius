@@ -38,7 +38,7 @@ jobs:
       - name: Backend syntax and focused tests
         run: |
           python -m py_compile server.py sirius_brain.py proactive.py enterprise.py account_deletion.py auth_api.py local_memory.py routers/files.py routes/pantheon_oracle.py routes/work_dossiers.py
-          python -m pytest tests/test_proactive.py tests/test_briefing_intent.py tests/test_enterprise.py tests/test_sirius_doctor.py tests/test_auth_api_unit.py tests/test_account_inactivity.py tests/test_account_deletion.py tests/test_server_hardening.py tests/test_local_docstore.py tests/test_work_dossiers.py tests/test_brain_response_latency.py tests/test_sirius_targeted_research.py -q
+          python -m pytest tests/test_proactive.py tests/test_briefing_intent.py tests/test_briefing_news.py tests/test_sports_news.py tests/test_gemini_tts.py tests/test_enterprise.py tests/test_sirius_doctor.py tests/test_auth_api_unit.py tests/test_account_inactivity.py tests/test_account_deletion.py tests/test_server_hardening.py tests/test_local_docstore.py tests/test_work_dossiers.py tests/test_brain_response_latency.py tests/test_sirius_targeted_research.py -q
         working-directory: backend
       - name: Frontend automated tests
         run: npm test -- --watchAll=false --runInBand

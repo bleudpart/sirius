@@ -14,7 +14,7 @@ beforeEach(() => {
   host = document.createElement("div");
   document.body.appendChild(host);
   root = createRoot(host);
-  global.fetch = jest.fn().mockResolvedValue({ json: async () => ({ suggestions: [suggestion] }) });
+  global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ suggestions: [suggestion] }) });
 });
 
 afterEach(async () => {
@@ -68,4 +68,54 @@ test("saved panel position is restored and clamped to the viewport", async () =>
   expect(parseFloat(panel.style.top)).toBeLessThanOrEqual(window.innerHeight);
   pointer(host.querySelector(".pro-mode-row"), "pointerdown", 0, 0, 2);
   expect(panel.classList.contains("dragging")).toBe(false);
+});
+
+test("announces during silence, never during speech, and never repeats an item", async () => {
+  const onSpeak = jest.fn();
+  let available = false;
+  await act(async () => root.render(<ProactivePanel onSpeak={onSpeak} canSpeak={() => available} />));
+  await act(async () => jest.advanceTimersByTime(45000));
+  expect(onSpeak).not.toHaveBeenCalled();
+  available = true;
+  act(() => window.dispatchEvent(new CustomEvent("sirius-voice-phase", { detail: "speaking" })));
+  await act(async () => jest.advanceTimersByTime(50000));
+  expect(onSpeak).not.toHaveBeenCalled();
+  act(() => window.dispatchEvent(new CustomEvent("sirius-voice-phase", { detail: "idle" })));
+  await act(async () => jest.advanceTimersByTime(45000));
+  expect(onSpeak).toHaveBeenCalledTimes(1);
+  expect(onSpeak).toHaveBeenCalledWith("Test");
+  await act(async () => jest.advanceTimersByTime(300000));
+  expect(onSpeak).toHaveBeenCalledTimes(1);
+  expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/suggestions/evaluate"),
+    expect.objectContaining({ credentials: "include" }));
+});
+
+test("respects user activity and the minimum gap between distinct initiatives", async () => {
+  const onSpeak = jest.fn();
+  global.fetch.mockResolvedValue({ ok: true, json: async () => ({
+    suggestions: [suggestion, { ...suggestion, id: "second", description: "Autre nouvelle" }],
+  }) });
+  await act(async () => root.render(<ProactivePanel onSpeak={onSpeak} />));
+  await act(async () => jest.advanceTimersByTime(40000));
+  act(() => window.dispatchEvent(new Event("keydown")));
+  await act(async () => jest.advanceTimersByTime(44000));
+  expect(onSpeak).not.toHaveBeenCalled();
+  await act(async () => jest.advanceTimersByTime(1000));
+  expect(onSpeak).toHaveBeenCalledTimes(1);
+  await act(async () => jest.advanceTimersByTime(115000));
+  expect(onSpeak).toHaveBeenCalledTimes(1);
+  await act(async () => jest.advanceTimersByTime(5000));
+  expect(onSpeak).toHaveBeenCalledTimes(2);
+});
+
+test("reports HTTP errors instead of silently hiding failed evaluations", async () => {
+  const consoleError = jest.spyOn(console, "error").mockImplementation(() => {});
+  global.fetch.mockResolvedValue({ ok: false, status: 401 });
+  try {
+    await act(async () => root.render(<ProactivePanel onSpeak={jest.fn()} />));
+    expect(host.querySelector('[role="alert"]').textContent).toContain("Proactivité indisponible");
+    expect(consoleError).toHaveBeenCalled();
+  } finally {
+    consoleError.mockRestore();
+  }
 });

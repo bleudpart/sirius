@@ -2,6 +2,20 @@ import { applyFrenchPhonetics, normalizeFrenchElisions } from "./phoneticFr";
 
 beforeEach(() => localStorage.clear());
 
+test.each(["emails", "e-mails", "e mails", "EMAILS", "mails", "e\u2011mails"])(
+  "lit %s comme courriels sans épeler",
+  (word) => expect(applyFrenchPhonetics(`Vos ${word} sont prêts.`)).toBe("Vos courriels sont prêts."),
+);
+
+test.each(["email", "e-mail", "mail"])("lit %s au singulier", (word) => {
+  expect(applyFrenchPhonetics(`Un ${word}.`)).toBe("Un courriel.");
+});
+
+test("préserve les adresses et les mots contenant mail", () => {
+  const text = "email@example.test prénom.mail@example.test https://mail.example.test emailing";
+  expect(applyFrenchPhonetics(text)).toBe(text);
+});
+
 test("épelle les sigles que le moteur lirait comme un mot", () => {
   expect(applyFrenchPhonetics("Le plan HACCP est prêt")).toBe("Le plan ache a cé cé pé est prêt");
   expect(applyFrenchPhonetics("Export PDF")).toBe("Export pé dé èf");

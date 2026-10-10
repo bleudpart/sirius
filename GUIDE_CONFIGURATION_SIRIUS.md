@@ -27,6 +27,11 @@ Vous pouvez préparer vos clés avant la fin de l'essai.
 La **page de configuration** s'ouvre avec le bouton **Réglages**
 (icône de réglages du profil) dans le HUD, puis l'onglet **CLÉS API ET SERVICES**, ou le bouton **GÉRER MES CLÉS API** dans **PROFIL**.
 
+Dans cet onglet, ouvrez **OBTENIR MES CLÉS API — GUIDE COMPLET PAS À PAS** :
+les huit fournisseurs ont chacun leur lien et leurs étapes, suivis de la procédure
+pour enregistrer toutes les clés renseignées ensemble dans le coffre chiffré.
+Chaque fournisseur exige son propre compte ; la mémoire locale ne demande aucune clé API.
+
 1. Ouvrez **Configuration → Clés API et services**.
 2. Choisissez les services dont vous avez besoin. Pour discuter, commencez
    par la clé **Groq** ; les autres services sont facultatifs.

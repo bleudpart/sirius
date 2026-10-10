@@ -4,6 +4,36 @@
 Assistant vocal personnel avec HUD futuriste style « Iron Man ».
 Frontend **React** + Backend **FastAPI** (Python), packagé en application Windows autonome via **Electron**.
 
+Le briefing ORACLE récupère sans clé API neuf rubriques RSS Franceinfo : France,
+international, politique, économie, sport, santé, sciences et technologies,
+environnement et culture. Les publications datées des dernières 48 heures sont
+présentées avec source et lien dans l'interface ; un flux indisponible est signalé,
+pas remplacé par une actualité inventée. La rédaction vocale vise un journal original
+de 650 à 750 mots (environ 5 minutes selon le débit), sans remplissage si les données
+manquent. Les flux sont chargés en parallèle et un résultat complet est conservé
+5 minutes (1 minute lors d'une panne partielle). Un flux valide mais vide est
+également conservé pour éviter des rechargements inutiles. Les sources RSS ne
+garantissent pas une couverture exhaustive.
+
+La synthèse vocale remplace le mot « emails » (ou « e-mails » / « mails »)
+par « courriels » pour éviter une lecture lettre par lettre ; le texte affiché
+et les adresses de messagerie restent inchangés.
+
+SIRIUS ANTICIPE vérifie les suggestions chaque minute, y compris jusqu'à deux
+actualités sourcées publiées depuis moins de 24 heures : aucune tâche préalable
+n'est nécessaire. Une annonce attend au moins 45 secondes sans interaction,
+sans réponse vocale ou traitement en cours, puis respecte au moins 2 minutes
+entre deux initiatives. Une même suggestion n'est annoncée qu'une fois par
+session du panneau ; « plus tard » et « ne plus proposer » restent disponibles.
+Les initiatives sont suspendues lorsque la fenêtre est masquée ou la session
+vocale arrêtée. Le dialogue peut approfondir un sujet par une question de suivi
+concrète, sans relance automatique après un refus ou une conclusion.
+Le suivi des interventions annonce l'état enregistré et le résultat disponible :
+en cours, terminé, annulé ou en erreur. Un changement d'état peut donner lieu à
+une nouvelle annonce ; un échec n'est pas présenté comme un travail terminé.
+Ce suivi couvre les tâches enregistrées par SIRIUS, pas les applications externes
+auxquelles il n'a pas accès.
+
 La synthèse vocale traite **PLUTOS** comme un nom propre (« Ploutoss »), et non
 comme un sigle à épeler. Les élisions françaises sont réunies avant la lecture
 et son découpage, y compris avec une apostrophe pleine largeur ou des séparateurs
