@@ -156,7 +156,7 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "ΣIRIUS",
-      "artifactName": "ΣIRIUS-Windows-${version}.exe",
+      "artifactName": "sirius-setup-${version}.exe",
       "uninstallDisplayName": "ΣIRIUS ${version}",
       "license": "../CONTRAT_LICENCE.txt",
       "installerLanguages": [
@@ -167,7 +167,7 @@
       "deleteAppDataOnUninstall": false
     },
     "portable": {
-      "artifactName": "ΣIRIUS-Portable-${version}.exe"
+      "artifactName": "SIRIUS-Portable-${version}.exe"
     }
   },
   "browserslist": {

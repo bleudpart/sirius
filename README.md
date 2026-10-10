@@ -206,6 +206,8 @@ Validation ciblée depuis `frontend` :
    - compile le HUD React,
    - transforme le backend Python en exécutable autonome (PyInstaller),
    - génère l'installateur **NSIS** et une version **portable** dans `frontend\dist`.
+   - noms uniques : `sirius-setup-<version>.exe` et `SIRIUS-Portable-<version>.exe`, identiques aux fichiers publiés sur GitHub (aucune copie renommée nécessaire).
+   - fermer l'édition installée avant d'essayer le portable : les deux utilisent le service local sur le port 8001. Un écran FDE_OMEGA peut signaler un fichier d'interface devenu indisponible ; fermer les instances puis relancer une seule édition avant de réessayer.
 2. Dans `frontend\dist`, lance **`SIRIUS Setup 1.0.0.exe`** et suis l'assistant d'installation.
 3. SIRIUS apparaît ensuite dans le menu Démarrer comme n'importe quel logiciel.
 
