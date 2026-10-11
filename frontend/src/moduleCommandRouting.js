@@ -6,6 +6,7 @@ const STOP_WORDS = new Set([
 ]);
 
 export const MODULE_ALIASES = {
+  "voice-profile": "ma voix diction profil vocal ma prononciation mes extraits vocaux",
   nummarius: "bourse marches finances actions cryptos portus",
   cortex: "zeus cerveau intelligence centrale",
   themis: "facturation factures devis clients stocks comptabilite",

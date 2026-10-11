@@ -6,6 +6,7 @@ import {
   GripHorizontal, Minus,
 } from "lucide-react";
 import HudPanel from "@/hud/HudPanel";
+import MinimizedWindowPill from "../MinimizedWindowPill";
 import useWindowGesture, { isPrimaryGesture, fixedWindowFrame } from "../windowGesture";
 import {
   useHudHiddenKeys, restoreHudPanel, hideHudPanel,
@@ -630,9 +631,8 @@ function InfoWheelDialog({ onClose, weather, connected, ecoMode, setEcoMode, onO
   if (minimized) {
     return (
       <div className="modwheel-overlay is-minimized" data-testid="info-wheel" onKeyDown={onKeyDown}>
-        <button type="button" className="modwheel-restore" onClick={() => setMinimized(false)} data-testid="info-wheel-restore" title="Rouvrir le centre d'information">
-          <span className="modwheel-sigma">Σ</span> INFOS
-        </button>
+        <MinimizedWindowPill label="INFOS" onRestore={() => setMinimized(false)} onClose={onClose}
+          restoreProps={{ "data-testid": "info-wheel-restore", title: "Rouvrir le centre d'information" }} />
       </div>
     );
   }

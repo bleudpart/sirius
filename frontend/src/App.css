@@ -7173,6 +7173,14 @@ body.hud-minimal .guardian-rig { display: none; }
   transition: box-shadow 0.2s, background-color 0.2s;
 }
 .holo-dock-pill:hover { box-shadow: 0 0 22px rgba(145, 230, 242, 0.5); }
+.holo-dock-pill { padding: 3px 5px 3px 10px; gap: 5px; }
+.hdp-restore {
+  display: inline-flex; align-items: center; gap: 7px; padding: 6px 4px;
+  border: 0; background: transparent; color: inherit; font: inherit;
+  letter-spacing: inherit; cursor: pointer; min-width: 0;
+}
+.hdp-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hdp-restore:focus-visible { outline: 2px solid #f0d590; outline-offset: 2px; border-radius: 8px; }
 @keyframes pillIn { from { opacity: 0; transform: translateY(12px) scale(0.9); } to { opacity: 1; transform: translateY(0) scale(1); } }
 .hdp-dot { width: 6px; height: 6px; border-radius: 50%; background: #d8b875; box-shadow: 0 0 8px rgba(216, 184, 117, 0.9); animation: coreFlicker 1.6s ease-in-out infinite; }
 

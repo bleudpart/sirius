@@ -1,5 +1,6 @@
 import { withBackendResponse } from "../lib/backendRequest";
 import { loadApiKeys } from "../apiKeyStorage";
+import { validateVoiceVocabulary } from "../voiceVocabulary";
 
 export const ASSISTANT_TIMEOUTS = Object.freeze({
   stream: 60000,
@@ -39,7 +40,10 @@ export function requestAssistantIntent(command, { signal }) {
   });
 }
 
-export function requestTranscription(form, { signal }) {
+export function requestTranscription(form, { signal, vocabulary = [] }) {
+  const terms = validateVoiceVocabulary(vocabulary);
+  form.delete("vocabulary");
+  if (terms.length) form.append("vocabulary", JSON.stringify(terms));
   return withBackendResponse("/stt", { method: "POST", body: form }, readJson, {
     signal, timeoutMs: ASSISTANT_TIMEOUTS.transcription,
   });

@@ -10,7 +10,7 @@ import {
   AtlasPanel, HeraclesPanel, HephaistosPanel, MythosGallery, Odysseia, ConsultPanel, PrometheePanel, CalliopePanel, CalendarPanel,
   FaceIdPanel, PythagorePanel, PackagerPanel, TrailerGallery, SiriusSetup, FirstRunWizard, PromoPanel, ThemisPanel,
   AdminPanel, EnterprisePanel, PortusNummarius, AgoraPipeline, NewsPanel, ReveilPanel, SpotifyPanel, MediaHUD, ProductivityPanel,
-  FloorPlanPanel, Photo3DPanel, ConnectionsPanel, WorkModulesPanel, WorkDossiersPanel, SportCoachPanel, MediaModulesPanel,
+  FloorPlanPanel, Photo3DPanel, ConnectionsPanel, WorkModulesPanel, WorkDossiersPanel, SportCoachPanel, MediaModulesPanel, VoiceProfilePanel,
 } from "@/lazyModules";
 import { pushStats, setStatsOffline } from "@/liveStats";
 import { formatLocalDate, formatLocalTime, getLocalDateKey } from "@/dateTime";
@@ -50,6 +50,7 @@ import GettingStarted, { gettingStartedKey } from "@/components/GettingStarted";
 import { createVoiceSession } from "@/voiceSession";
 import { streamConversation, requestConversation, requestAssistantIntent, requestTranscription } from "@/services/assistantApi";
 import { connectStreamingStt } from "@/services/streamingStt";
+import { enabledVoiceVocabulary } from "@/voiceVocabulary";
 import { speakFr, cancelSpeech, speakSeries, speakAsCharacter as speakCharacterVoice, spokenCount, lastSpokenAt } from "@/voice";
 import { isWindowCommand, observeWindowChanges, shortStatusToSpeak, snapshotWindows, windowChangeConfirmation } from "@/voiceConfirmation";
 import { KEY_STORAGE_EVENT, loadApiKeys, saveApiKeys } from "@/apiKeyStorage";
@@ -346,7 +347,7 @@ function App() {
         setShowAgora, setShowSolon, setShowPromethee, setShowCalliope, setShowPythagore, setShowNews,
         setShowPackager, setShowInstall, setShowScripts, setShowVision, setShowAdmin, setShowSetup,
         setShowGallery, setShowSpotifyWin, setShowMediaHud, setShowMediaModules, setShowProductivity, setShowInfoWheel,
-        setActiveWorkModule, setShowPlans, setShowPhoto3D, setShowConnections, setShowReveil, setShowEnterprise, setShowWorkDossiers, setShowSportCoach,
+        setActiveWorkModule, setShowPlans, setShowPhoto3D, setShowConnections, setShowReveil, setShowEnterprise, setShowWorkDossiers, setShowSportCoach, setShowVoiceProfile,
       });
       if (controller.close(target)) { confirm(d.say || "Fenêtre fermée."); return true; }
       return false;
@@ -953,6 +954,7 @@ function App() {
   const [activeWorkModule, setActiveWorkModule] = useState(null);
   const [showWorkDossiers, setShowWorkDossiers] = useState(false);
   const [showSportCoach, setShowSportCoach] = useState(false);
+  const [showVoiceProfile, setShowVoiceProfile] = useState(false);
   const [themisSource, setThemisSource] = useState(null);
   const [haccpSource, setHaccpSource] = useState(null);
   const [showCalliope, setShowCalliope] = useState(false);
@@ -980,6 +982,8 @@ function App() {
   const [showNummarius, setShowNummarius] = useState(false);
   const auth = useAuth() || {};
   const authUser = auth.user;
+  const voiceProfileUserRef = useRef(authUser);
+  voiceProfileUserRef.current = authUser;
   useEffect(() => {
     const syncKeys = () => setKeys(loadApiKeys());
     window.addEventListener(KEY_STORAGE_EVENT, syncKeys);
@@ -5195,18 +5199,10 @@ function App() {
     if (speakingRef.current) return false; // Sirius parle → on ignore (évite l'écho)
     const normalizedTranscript = normalizeVoiceTranscript(transcript).trim();
     setVoiceTranscript(normalizedTranscript);
-    const t = normalizedTranscript.toLowerCase().trim();
     if (!isFinal) {
       setStatus("listening");
       setText(normalizedTranscript);
       return false;
-    }
-    // Réponse vocale « oui / non » à une proposition de lecture à voix haute
-    const hasRequiredWakeWord = !requireWakeWord || startsWithVoiceWakeWord(normalizedTranscript);
-    const readAloudAnswer = requireWakeWord ? removeVoiceWakeWord(normalizedTranscript).toLowerCase() : t;
-    if (hasRequiredWakeWord && window.__siriusReadAloudAnswer && window.__siriusReadAloudAnswer(readAloudAnswer)) {
-      setStatus("idle");
-      return true;
     }
     const command = extractVoiceCommand(normalizedTranscript, { requireWakeWord });
     if (!command) {
@@ -5268,6 +5264,7 @@ function App() {
         const keys = loadApiKeys() || {};
         return (keys.groq_key || keys.groq || "").trim();
       },
+      vocabulary: () => enabledVoiceVocabulary(voiceProfileUserRef.current),
     });
     handsFreeRef.current = controller;
     controller.available().then(({ available }) => {
@@ -5345,6 +5342,7 @@ function App() {
         contentType: recorder.mimeType || "audio/webm",
         groqKey: userGroqKey,
         signal: voiceSignal,
+        vocabulary: enabledVoiceVocabulary(voiceProfileUserRef.current),
       }).then((connection) => {
         if (!connection) {
           streamSttFailed = true;
@@ -5448,7 +5446,7 @@ function App() {
             const extension = blob.type.includes("mp4") ? "m4a" : "webm";
             form.append("file", blob, `sirius-voice.${extension}`);
             if (userGroqKey) form.append("groq_key", userGroqKey);
-            const response = await requestTranscription(form, { signal: voiceSignal });
+            const response = await requestTranscription(form, { signal: voiceSignal, vocabulary: enabledVoiceVocabulary(voiceProfileUserRef.current) });
             payload = response.data;
             if (!response.ok) throw new Error(payload.detail || "Transcription vocale impossible.");
           }
@@ -6783,9 +6781,10 @@ function App() {
       openGettingStarted: () => setShowGettingStarted(true),
       openWorkDossiers: () => setShowWorkDossiers(true),
       openSportCoach: () => setShowSportCoach(true),
+      openVoiceProfile: () => setShowVoiceProfile(true),
   };
   const moduleItems = useMemo(() => createModuleRegistry({
-    icons: { RotateCcw, Monitor, Clapperboard, FolderOpen, BadgeInfo, Link2, Camera, Workflow, Ruler, Boxes,
+    icons: { Mic, RotateCcw, Monitor, Clapperboard, FolderOpen, BadgeInfo, Link2, Camera, Workflow, Ruler, Boxes,
       PantheonLogo, Zap, Orbit, Eye, Landmark, Library, ShieldCheck, Sparkles, Code2, BarChart3, Brain, Database,
       Radar, History, KeyRound, Calendar, Fingerprint, AlarmClock, HomeIcon, Globe2, Hammer, MythosLogo, Radio, MapPin,
       ThemisLogo, TrendingUp, Scale, Flame, BookOpen, Sigma, Newspaper, Package, Wrench, FileCode, Music, Building2, Activity },
@@ -7033,6 +7032,7 @@ function App() {
         onOpenThemis={(source) => { setThemisSource(source || null); setShowWorkDossiers(false); setShowThemis(true); }}
         onOpenHaccp={(source) => { setHaccpSource(source || null); setShowWorkDossiers(false); setHaccp({ sujet: "", auto: false }); }} />}
       {showSportCoach && <SportCoachPanel key={authUser?.id || authUser?._id || authUser?.email || "local"} user={authUser} onClose={() => setShowSportCoach(false)} />}
+      {showVoiceProfile && <VoiceProfilePanel key={authUser?.user_id || authUser?.id || authUser?._id || authUser?.email || "none"} user={authUser} onBeforeRecord={stopVoice} onClose={() => setShowVoiceProfile(false)} />}
       {showCalliope && <CalliopePanel onClose={() => setShowCalliope(false)} />}
       {showCalendar && <CalendarPanel onClose={() => setShowCalendar(false)} />}
       {showConnections && <ConnectionsPanel mailCache={mailCache} onReadCachedMail={(message) => { setStatus("speaking"); setText(message); speakOut(message); }} onClose={() => {

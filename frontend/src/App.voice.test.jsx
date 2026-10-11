@@ -9,6 +9,7 @@ import { createNativeRecognition } from "./nativeSpeechRecognition";
 import { connectStreamingStt } from "./services/streamingStt";
 import { pttBeep } from "./appLogic";
 import { createNativeHandsFree } from "./nativeHandsFree";
+import { saveVoiceVocabulary } from "./voiceVocabulary";
 
 jest.mock("./nativeSpeechRecognition", () => ({ createNativeRecognition: jest.fn() }));
 jest.mock("./nativeHandsFree", () => ({ createNativeHandsFree: jest.fn() }));
@@ -143,6 +144,19 @@ async function mount() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   await act(async () => root.render(<QueryClientProvider client={client}><App /></QueryClientProvider>));
 }
+
+test("ordinary native STT reads only this account's opted-in text and drops disabled hints", async () => {
+  const platform = jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  saveVoiceVocabulary("other-account", { enabled: true, terms: ["Autre compte"] });
+  saveVoiceVocabulary("voice-test", { enabled: false, terms: ["Daniel Partel"] });
+  await mount();
+  expect(handsFreeOptions.vocabulary()).toEqual([]);
+  saveVoiceVocabulary("voice-test", { enabled: true, terms: ["Daniel Partel"] });
+  expect(handsFreeOptions.vocabulary()).toEqual(["Daniel Partel"]);
+  saveVoiceVocabulary("voice-test", { enabled: false, terms: ["Daniel Partel"] });
+  expect(handsFreeOptions.vocabulary()).toEqual([]);
+  platform.mockRestore();
+});
 
 async function send(command) {
   const input = host.querySelector('[data-testid="sirius-cmd-form"] input[type="text"]');
@@ -491,7 +505,7 @@ test("Android conversation resumes after each answer without requiring the wake 
   expect(global.fetch.mock.calls.some(([url]) => /\/(?:intent|chat)(?:\/stream)?$/.test(String(url)))).toBe(false);
 });
 
-test("Android conversation accepts read-aloud confirmation without the wake word", async () => {
+test("Android conversation no longer consumes old read-aloud pill confirmations", async () => {
   jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
   localStorage.setItem("sirius_android_stt", "native");
   const readAnswer = jest.fn(() => true);
@@ -500,7 +514,7 @@ test("Android conversation accepts read-aloud confirmation without the wake word
     await mount();
     await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
     await act(async () => nativeCalls[0].resolve("oui"));
-    expect(readAnswer).toHaveBeenCalledWith("oui");
+    expect(readAnswer).not.toHaveBeenCalled();
     await act(async () => jest.advanceTimersByTime(5000));
     expect(nativeCalls).toHaveLength(2);
   } finally {
@@ -612,6 +626,7 @@ test("holding Space prevents browser page scrolling from repeated keydown events
 });
 
 test.each([false, true])("Android waits for microphone readiness and handles early release=%s", async (earlyRelease) => {
+  saveVoiceVocabulary("voice-test", { enabled: true, terms: ["Daniel Partel"] });
   const previousRecorder = window.MediaRecorder;
   const previousMediaDevices = Object.getOwnPropertyDescriptor(navigator, "mediaDevices");
   let resolveMicrophone;
@@ -658,6 +673,7 @@ test.each([false, true])("Android waits for microphone readiness and handles ear
       expect(pttBeep).not.toHaveBeenCalled();
     } else {
       expect(recorders[0].state).toBe("recording");
+      expect(connectStreamingStt).toHaveBeenCalledWith(expect.objectContaining({ vocabulary: ["Daniel Partel"] }));
       expect(host.querySelector('[data-testid="sirius-ptt-btn"]').textContent).toContain("OUVERTURE");
       expect(pttBeep).not.toHaveBeenCalled();
       await act(async () => recorders[0].onstart());

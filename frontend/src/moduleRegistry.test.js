@@ -40,3 +40,12 @@ test("information and enterprise entries keep the Sigma brand", () => {
     expect(registry("android").find((item) => item.id === id).label).toContain("ΣIRIUS");
   }
 });
+
+test.each(["web", "android"])("voice profile is available in the %s module wheel", (platform) => {
+  const open = jest.fn();
+  const item = createModuleRegistry({ platform, icons: {}, actions: { openVoiceProfile: open }, state: {}, user: { user_id: "A" } })
+    .find((entry) => entry.id === "voice-profile");
+  expect(item.label).toBe("Ma voix et ma diction");
+  item.run();
+  expect(open).toHaveBeenCalled();
+});

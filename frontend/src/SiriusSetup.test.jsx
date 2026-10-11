@@ -11,6 +11,25 @@ jest.mock("./components/ReactorVisuals", () => ({
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
+test("la configuration propose AÈDES et conserve son préréglage conteur", async () => {
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  const saved = localStorage.getItem("sirius_voice");
+  try {
+    await act(async () => root.render(<SiriusSetup initialProfile={{ name: "Local" }}
+      onComplete={jest.fn()} onCancel={jest.fn()} />));
+    await act(async () => container.querySelector('[data-testid="setup-tab-voix"]').click());
+    await act(async () => container.querySelector('[data-testid="setup-voice-preset-aedes"]').click());
+    expect(JSON.parse(localStorage.getItem("sirius_voice"))).toEqual({ name: "browser-aedes", rate: 0.9, pitch: 0.94 });
+    expect(container.querySelector('[data-testid="setup-voice-name"]').value).toBe("browser-aedes");
+    expect(container.querySelector('[data-testid="setup-voice-preset-aedes"]').textContent).toContain("ACTIVE");
+  } finally {
+    await act(async () => root.unmount());
+    if (saved === null) localStorage.removeItem("sirius_voice");
+    else localStorage.setItem("sirius_voice", saved);
+  }
+});
+
 function SettingsHarness() {
   const { openProfile } = useAuth();
   const [showSetup, setShowSetup] = useState(true);

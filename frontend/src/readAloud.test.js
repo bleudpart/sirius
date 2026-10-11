@@ -1,7 +1,7 @@
 jest.mock("@/voice", () => ({ speakFr: jest.fn(), cancelSpeech: jest.fn() }));
 
 import { speakFr } from "@/voice";
-import { parseReadPanelCommand, readPanelAloud } from "./readAloud";
+import { initReadAloud, parseReadPanelCommand, readPanelAloud } from "./readAloud";
 
 const addPanel = (label, body) => {
   const panel = document.createElement("div");
@@ -81,5 +81,31 @@ describe("lecture à voix haute sur commande", () => {
   test("readPanelAloud renvoie false sans fenêtre visible", () => {
     expect(readPanelAloud("zeus")).toBe(false);
     expect(speakFr).not.toHaveBeenCalled();
+  });
+
+  test("une cible inconnue ne fait pas lire une autre fenêtre", () => {
+    addPanel("Météo", "Grand soleil sur Paris");
+    expect(readPanelAloud("ODYSSEIA")).toBe(false);
+    expect(speakFr).not.toHaveBeenCalled();
+  });
+
+  test("aucune pastille ni mini-écoute sur Windows, web ou Android", async () => {
+    const recognition = jest.fn();
+    window.SpeechRecognition = recognition;
+    initReadAloud();
+    addPanel("ODYSSEIA", "Une histoire mythologique. ".repeat(20));
+    await Promise.resolve();
+    expect(document.querySelector(".read-aloud-bar")).toBeNull();
+    expect(recognition).not.toHaveBeenCalled();
+    expect(speakFr).not.toHaveBeenCalled();
+    delete window.SpeechRecognition;
+  });
+
+  test("lecture du contenu dédié sans les contrôles ni les autres sections", () => {
+    const panel = addPanel("ODYSSEIA", "Navigation décorative");
+    panel.insertAdjacentHTML("beforeend", '<article data-read-content><p>Dis-moi cette citation.</p><button>Suivante</button><p data-no-read>Ne pas lire</p></article>');
+    expect(readPanelAloud("ODYSSEIA")).toBe(true);
+    expect(speakFr.mock.calls[0][0]).toContain("Dis-moi cette citation");
+    expect(speakFr.mock.calls[0][0]).not.toMatch(/Navigation|Suivante|Ne pas lire/);
   });
 });

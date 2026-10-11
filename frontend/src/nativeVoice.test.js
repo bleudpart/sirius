@@ -40,6 +40,17 @@ test("prefers French from France over the first Canadian voice", async () => {
   expect(TextToSpeech.speak).toHaveBeenCalledWith(expect.objectContaining({ voice: 1, lang: "fr-FR" }));
 });
 
+test("selects the requested French gender and preserves configured native settings", async () => {
+  TextToSpeech.getSupportedVoices.mockResolvedValueOnce({ voices: [
+    { lang: "fr-FR", name: "French female", localService: true },
+    { lang: "fr-FR", name: "Paul", localService: true },
+  ] });
+  await speakNative("Dis-moi la suite.", { gender: "male", rate: 0.9, pitch: 0.85 });
+  expect(TextToSpeech.speak).toHaveBeenCalledWith(expect.objectContaining({
+    text: "Dis-moi la suite.", lang: "fr-FR", voice: 1, rate: 0.9, pitch: 0.85,
+  }));
+});
+
 test("cancellation during voice discovery cannot speak later", async () => {
   let resolve;
   TextToSpeech.getSupportedVoices.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));

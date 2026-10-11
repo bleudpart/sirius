@@ -1272,7 +1272,12 @@ def make_work_dossiers_router(db, require_user):
         dossiers = await db.sirius_work_dossiers.find(query, {"_id": 0}).to_list(11)
         updates, errors = [], []
         ai_used = False
+        scheduled = []
         for dossier in dossiers[:10]:
+            state = await db.sirius_work_live_states.find_one({"user_id": uid, "dossier_id": dossier["id"]})
+            scheduled.append((state.get("next_ai_at", 0) if state else 0, dossier))
+        # Serve the least recently attempted dossier first, not insertion order.
+        for _, dossier in sorted(scheduled, key=lambda item: item[0]):
             did = dossier["id"]
             async with work_lock(uid, did):
                 fresh_uid, scope, _ = await context(request)

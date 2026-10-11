@@ -43,6 +43,8 @@ def client(monkeypatch):
     monkeypatch.delenv("GEMINI_TTS_MODEL", raising=False)
     monkeypatch.delenv("GEMINI_TTS_VOICE", raising=False)
     monkeypatch.delenv("GOOGLE_TTS_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_CLOUD_TTS_API_KEY", raising=False)
+    monkeypatch.delenv("TTS_BACKEND_URL", raising=False)
     monkeypatch.delenv("GEMINI_TTS_FALLBACK_VOICE", raising=False)
     monkeypatch.delenv("GEMINI_TTS_PRIMARY", raising=False)
     voice_io._TTS_CACHE.clear()
@@ -224,3 +226,208 @@ def test_cache_limits_audio_memory(monkeypatch):
     assert list(voice_io._TTS_CACHE) == [("second",)]
     voice_io._cache_set(("oversized",), {"audio_base64": "x" * 11})
     assert not voice_io._TTS_CACHE
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("dis moi", "dis moi"),
+    ("Dis-moi ce que tu veux.", "Dis-moi ce que tu veux."),
+    ("  ΣIRIUS\nlit mes e-mails : café, 12,50 €.\t", "Sirius lit mes courriels : café, 12,50 €."),
+    ("cafe\u0301\u00a0et\u202fœufs", "café et œufs"),
+    ("email@example.test et prénom.mail@example.test", "email@example.test et prénom.mail@example.test"),
+])
+def test_shared_french_text_is_idempotent_and_preserves_words(text, expected):
+    assert voice_io._speakable(text) == expected
+    assert voice_io._speakable(expected) == expected
+
+
+@pytest.mark.parametrize("provider", ["google", "gemini", "chirp", "proxy"])
+def test_french_provider_matrix(client, monkeypatch, provider):
+    import json
+
+    original = "  ΣIRIUS\nDis-moi : café, 12,50 €, mes e-mails. "
+    expected = "Sirius Dis-moi : café, 12,50 €, mes courriels."
+    calls = []
+    monkeypatch.setenv("GOOGLE_TTS_API_KEY", "mock-google")
+    monkeypatch.setenv("GEMINI_TTS_PRIMARY", "1" if provider == "gemini" else "0")
+    if provider == "proxy":
+        monkeypatch.setenv("TTS_BACKEND_URL", "https://proxy.test/tts")
+        monkeypatch.setattr(voice_io, "owner_allowed", lambda user: True)
+
+    def handler(request):
+        body = json.loads(request.content)
+        calls.append(body)
+        if provider == "gemini":
+            content = body["input"][0]["content"][0]
+            assert content["text"] == expected
+            style = content["annotations"][0]["style"]
+            assert "mot pour mot" in style and "ne reformule pas" in style
+            assert "sans accent anglais" in style
+            return httpx.Response(200, json=audio_payload())
+        if provider == "proxy":
+            assert body["text"] == expected
+            assert body["voice"] == "fr-FR-Neural2-G"
+            return httpx.Response(200, json={"audio_base64": "mock", "engine": "custom",
+                                           "voice": "fr-FR-custom", "language_code": "fr-FR"})
+        assert body["input"]["text"] == expected
+        assert body["voice"]["languageCode"] == "fr-FR"
+        return httpx.Response(200, json={
+            "audioContent": audio_payload()["steps"][0]["content"][0]["data"],
+        })
+
+    mock_upstream(monkeypatch, handler)
+    route = {"google": "/api/tts/google", "gemini": "/api/tts/gemini",
+             "chirp": "/api/tts/gemini", "proxy": "/api/tts"}[provider]
+    payload = {"text": original}
+    response = client.post(route, json=payload)
+    assert response.status_code == 200
+    assert payload["text"] == original
+    result = response.json()
+    assert result["language_code"] == "fr-FR"
+    assert result["engine"] == {"google": "google", "gemini": "gemini",
+                                "chirp": "google-chirp", "proxy": "custom"}[provider]
+    assert result["voice"] == {"google": "fr-FR-Neural2-G", "gemini": "Aoede",
+                               "chirp": "Aoede", "proxy": "fr-FR-custom"}[provider]
+    if provider != "proxy":
+        assert result["effective_voice"] == {
+            "google": "fr-FR-Neural2-G", "gemini": "Aoede", "chirp": "fr-FR-Chirp3-HD-Aoede",
+        }[provider]
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize("route", ["/api/tts/google", "/api/tts/gemini"])
+def test_cloud_receives_shared_french_text_and_preserves_metadata(client, monkeypatch, route):
+    from unittest.mock import AsyncMock
+
+    monkeypatch.delenv("GOOGLE_TTS_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_TTS_API_KEY", raising=False)
+    monkeypatch.setattr(voice_io.cloud_link, "should_relay_tts", lambda name: True)
+    result = {"audio_base64": "mock", "engine": "remote", "voice": "remote-voice"}
+    relay = AsyncMock(return_value=result)
+    monkeypatch.setattr(voice_io.cloud_link, "relay_json", relay)
+    mock_upstream(monkeypatch, lambda request: pytest.fail("Local provider must not run"))
+    response = client.post(route, json={"text": " ΣIRIUS\nlit mes e-mails. "})
+    assert response.status_code == 200
+    assert response.json() == result
+    forwarded = relay.call_args.args[1]
+    assert forwarded["text"] == "Sirius lit mes courriels."
+    assert forwarded["keys"] == {}
+    if route.endswith("google"):
+        assert forwarded["voice"] == "fr-FR-Neural2-G"
+
+
+@pytest.mark.parametrize("name,value", [
+    ("GEMINI_TTS_VOICE", "en-US-Aoede"),
+    ("GEMINI_TTS_VOICE", ""),
+    ("GEMINI_TTS_MODEL", "gemini-chat"),
+    ("GEMINI_TTS_MODEL", ""),
+    ("GEMINI_TTS_FALLBACK_VOICE", "en-US-Chirp3-HD-Aoede"),
+    ("GEMINI_TTS_FALLBACK_VOICE", "fr-FR-Chirp3-HD-Unknown"),
+    ("GEMINI_TTS_FALLBACK_VOICE", ""),
+])
+def test_invalid_server_voice_config_is_explicit_and_never_sent(client, monkeypatch, name, value):
+    monkeypatch.setenv(name, value)
+    monkeypatch.setenv("GOOGLE_TTS_API_KEY", "mock-google")
+    mock_upstream(monkeypatch, lambda request: pytest.fail("Invalid config must not reach provider"))
+    response = client.post("/api/tts/gemini", json={"text": "Bonjour"})
+    assert response.status_code == 503
+    assert name in response.json()["detail"]
+    assert not voice_io._TTS_CACHE
+
+
+def test_chirp_override_metadata_reports_actual_voice(client, monkeypatch):
+    monkeypatch.setenv("GOOGLE_TTS_API_KEY", "mock-google")
+    monkeypatch.setenv("GEMINI_TTS_FALLBACK_VOICE", "fr-FR-Chirp3-HD-Kore")
+    mock_upstream(monkeypatch, lambda request: httpx.Response(200, json={
+        "audioContent": audio_payload()["steps"][0]["content"][0]["data"],
+    }))
+    result = client.post("/api/tts/gemini", json={"text": "Bonjour"}).json()
+    assert result["voice"] == "Aoede"
+    assert result["effective_voice"] == "fr-FR-Chirp3-HD-Kore"
+    assert result["language_code"] == "fr-FR"
+    assert client.post("/api/tts/gemini", json={"text": "Bonjour"}).json() == result
+
+
+def test_gemini_failure_keeps_same_french_text_in_chirp(client, monkeypatch):
+    import json
+
+    monkeypatch.setenv("GOOGLE_TTS_API_KEY", "mock-google")
+    monkeypatch.setenv("GEMINI_TTS_PRIMARY", "1")
+    calls = []
+
+    def handler(request):
+        body = json.loads(request.content)
+        calls.append(request.url.host)
+        if request.url.host == "generativelanguage.googleapis.com":
+            assert body["input"][0]["content"][0]["text"] == "Sirius Dis-moi : café et courriels."
+            return httpx.Response(429)
+        assert body["input"]["text"] == "Sirius Dis-moi : café et courriels."
+        return httpx.Response(200, json={"audioContent": audio_payload()["steps"][0]["content"][0]["data"]})
+
+    mock_upstream(monkeypatch, handler)
+    result = client.post("/api/tts/gemini", json={"text": "ΣIRIUS\nDis-moi : cafe\u0301 et e-mails."})
+    assert result.status_code == 200
+    assert result.json()["engine"] == "google-chirp"
+    assert result.json()["effective_voice"] == "fr-FR-Chirp3-HD-Aoede"
+    assert calls == ["generativelanguage.googleapis.com", "texttospeech.googleapis.com"]
+
+
+def test_google_french_fallback_and_exact_rate_cache(client, monkeypatch):
+    import json
+
+    monkeypatch.setenv("GOOGLE_TTS_API_KEY", "mock-google")
+    calls = []
+
+    def handler(request):
+        body = json.loads(request.content)
+        calls.append(body)
+        assert body["voice"] == {"languageCode": "fr-FR", "name": "fr-FR-Neural2-G"}
+        return httpx.Response(200, json={"audioContent": "mock"})
+
+    mock_upstream(monkeypatch, handler)
+    for rate in [1.001, 1.002, 1.002]:
+        response = client.post("/api/tts/google", json={"text": "Dis-moi.", "voice": "en-US-Standard-A", "rate": rate})
+        assert response.status_code == 200
+        assert response.json()["voice"] == "fr-FR-Neural2-G"
+    assert len(calls) == 2
+    assert [body["audioConfig"]["speakingRate"] for body in calls] == [1.001, 1.002]
+
+
+def test_empty_proxy_text_does_not_consume_or_call_provider(client, monkeypatch):
+    from unittest.mock import AsyncMock
+
+    monkeypatch.setenv("TTS_BACKEND_URL", "https://proxy.test/tts")
+    monkeypatch.setattr(voice_io, "owner_allowed", lambda user: True)
+    consume = AsyncMock()
+    monkeypatch.setattr(voice_io.usage_quota, "consume", consume)
+    mock_upstream(monkeypatch, lambda request: pytest.fail("Empty proxy input"))
+    assert client.post("/api/tts", json={"text": " \n "}).status_code == 400
+    consume.assert_not_awaited()
+
+
+def test_edge_promo_uses_shared_french_text(tmp_path, monkeypatch):
+    import asyncio
+    import sys
+    from types import SimpleNamespace
+    import modules_api
+
+    class StopAfterSpeech(RuntimeError):
+        pass
+
+    class FakeSpeech:
+        async def save(self, path):
+            raise StopAfterSpeech
+
+    def communicate(text, voice, rate):
+        assert text == "Sirius Dis-moi : café et courriels."
+        assert voice == "fr-FR-HenriNeural"
+        assert rate == "-5%"
+        return FakeSpeech()
+
+    monkeypatch.setitem(sys.modules, "edge_tts", SimpleNamespace(Communicate=communicate))
+    monkeypatch.setattr(modules_api, "STATIC", tmp_path)
+    monkeypatch.setattr(modules_api, "PROMO_EXPORT", {})
+    monkeypatch.setattr(modules_api, "PROMO_SHOTS", [{
+        "voix": " ΣIRIUS\nDis-moi : cafe\u0301 et e-mails. ", "image": "unused.jpg",
+    }])
+    with pytest.raises(StopAfterSpeech):
+        asyncio.run(modules_api._render_promo_video())

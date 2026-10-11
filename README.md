@@ -25,6 +25,53 @@ que « vérifie l'authenticité de ce document » garde son sens. Les ornements
 (étoiles, puces, flèches, emojis) sont retirés de la narration, pas de l'affichage ;
 les montants en euros, pourcentages et températures Celsius sont prononcés en mots.
 
+La sélection locale des voix est commune au navigateur, à Electron et à Android :
+elle privilégie une voix française disponible, sans repli silencieux sur une voix
+non française. Le catalogue navigateur peut être chargé avec un délai borné ;
+une absence de voix française est signalée. Le choix local et les réglages
+compatibles sont respectés sur Android. Le découpage protège les élisions et les
+groupes avec pronoms, sans remplacer artificiellement « dis-moi ».
+Les moteurs distants partagent une préparation française du texte ; Gemini reçoit
+une consigne de lecture fidèle, sans reformulation. La voix et la langue effectives
+sont indiquées dans les réponses TTS quand le moteur les fournit. Ces contrôles
+ne garantissent pas la phonétique produite : la diction doit être confirmée à
+l'écoute avec la voix réellement installée ou le fournisseur choisi.
+
+La reconnaissance distante accepte un vocabulaire personnel facultatif :
+32 termes au maximum, 80 caractères par terme et 1 600 caractères au total.
+Le champ `vocabulary` est un tableau JSON en HTTP multipart et un tableau dans
+l'événement WebSocket `start`. Les termes validés enrichissent le lexique de
+reconnaissance, sans imposer de substitutions au résultat. Ils accompagnent
+uniquement la requête choisie et ne sont pas conservés par le backend.
+Un proxy personnalisé peut ne pas prendre en charge cette option.
+L'audio d'une transcription distante ordinaire est nécessairement transmis au
+fournisseur ; ce parcours est distinct du stockage local d'extraits du profil.
+Ce vocabulaire n'est pas un entraînement acoustique ni une identification vocale.
+
+**Ma voix et ma diction** s'ouvre depuis les modules ou par commande vocale.
+Les extraits sont enregistrés volontairement, réécoutés puis confirmés avec leur
+transcription exacte : 15 secondes et 2 Mo par extrait, 20 extraits maximum.
+Ils restent dans IndexedDB sur l'appareil, séparés par compte, sans synchronisation
+ni envoi automatique. Chaque extrait et le profil complet sont supprimables.
+Les expressions utiles sont validées séparément ; le guidage textuel des prochaines
+transcriptions distantes est désactivé par défaut et exige l'activation explicite
+dans la fenêtre. Les moteurs locaux ne sont pas entraînés avec ces extraits.
+
+Dans **Configuration → Voix**, le profil **Voix des AÈDES — ODYSSEIA** propose
+un conteur français masculin local, avec débit posé (0,90) et hauteur douce (0,94).
+Il utilise une voix française installée sur l'appareil, pas une voix clonée ni un
+nouveau moteur ; le timbre dépend des voix disponibles. Les autres profils restent
+sélectionnables et ce profil peut devenir la voix générale de SIRIUS.
+La lecture des modules se demande à la voix, par exemple « Sirius, lis ODYSSEIA » :
+aucune pastille « Oui, lis-le / Non » ni mini-écoute supplémentaire sur Windows,
+portable, navigateur ou Android. Dans ODYSSEIA, la citation sélectionnée ou le
+texte de la section ouverte est lu ; une lecture de module reste limitée à
+2 500 caractères et signale que la suite est à l'écran.
+Les fenêtres réduites dans le HUD ont deux actions distinctes : le nom restaure
+la fenêtre, la petite croix ferme directement le module sans le restaurer.
+Cela couvre les pastilles du dock et les roues MODULES, INFOS et ODYSSEIA ;
+le Display conserve sa propre commande de fermeture en mode réduit.
+
 SIRIUS ANTICIPE vérifie les suggestions chaque minute, y compris jusqu'à deux
 actualités sourcées publiées depuis moins de 24 heures : aucune tâche préalable
 n'est nécessaire. Une annonce attend au moins 45 secondes sans interaction,
@@ -58,7 +105,9 @@ jamais exécuter une commande, un envoi, une écriture métier ou une décision.
 
 Limites : 50 sources par dossier, les 10 premiers dossiers actifs par vérification,
 un appel IA au maximum par vérification et par minute pour un même dossier.
-Les changements intermédiaires sont regroupés au prochain appel autorisé. L'usage
+Les changements intermédiaires sont regroupés au prochain appel autorisé. Le suivi
+IA donne priorité au dossier dont la dernière tentative est la plus ancienne,
+afin qu'un dossier changeant souvent ne monopolise pas les interprétations. L'usage
 en ligne respecte les clés personnelles, l'essai et les quotas existants.
 Une panne IA laisse les différences locales disponibles avec un message explicite.
 « Comparer maintenant » utilise ces mêmes limites ; aucune analyse n'est garantie

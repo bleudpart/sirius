@@ -207,3 +207,23 @@ def test_invalid_ai_payload_returns_explicit_error_without_network(monkeypatch):
     result = asyncio.run(explain_changes([{"value": float("nan")}], {}))
     assert result["status"] == "error"
     assert result["error"]
+
+
+def test_frequently_changing_dossier_cannot_starve_other_ai_dossiers(app_client, monkeypatch):
+    client, db = app_client
+    ai = AsyncMock(return_value={"status": "ready", "text": "Vérifiez.", "error": ""})
+    monkeypatch.setattr("routes.work_dossiers.explain_changes", ai)
+    first = setup_dossier(client, db)
+    second = client.post("/api/work-dossiers", headers=OWNER, json={"title": "Autre dossier"}).json()["dossier"]["id"]
+    proposal = client.get("/api/work-dossiers/proposals", headers=OWNER).json()["proposals"][0]
+    client.post(f"/api/work-dossiers/{second}/proposals/{proposal['id']}", headers=OWNER)
+    enable(client, first, True)
+    enable(client, second, True)
+    update_stock(db, 1)
+    assert [item["dossier_id"] for item in evaluate(client).json()["updates"]] == [first]
+    update_stock(db, 0)
+    result = evaluate(client).json()["updates"]
+    assert [item["dossier_id"] for item in result] == [second]
+    assert result[0]["changes"][0]["fields"][0]["before"] == 2
+    assert result[0]["changes"][0]["fields"][0]["after"] == 0
+    assert ai.await_count == 2

@@ -1,0 +1,12 @@
+.voice-profile-panel { border-radius: 28px; max-width: 960px; overflow: hidden; }
+.voice-profile-content { padding: 20px; overflow-y: auto; max-height: calc(85vh - 80px); color: #d9edf9; }
+.voice-profile-content p { line-height: 1.5; }
+.voice-profile-actions, .voice-profile-draft, .voice-profile-sample { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; padding: 16px; border: 1px solid #46c8e755; border-radius: 18px; background: #071b2bd9; }
+.voice-profile-draft label, .voice-profile-sample p { width: 100%; }
+.voice-profile-content textarea { display: block; width: 100%; min-height: 80px; background: #061321; color: #eefaff; border: 1px solid #46c8e777; border-radius: 10px; padding: 10px; }
+.voice-profile-content button { border: 1px solid #46c8e777; border-radius: 12px; background: #10334c; color: #eefaff; padding: 10px 14px; cursor: pointer; }
+.voice-profile-content button:disabled { opacity: .5; cursor: default; }
+.voice-profile-content audio { max-width: 100%; }
+.voice-profile-content input:not([type="checkbox"]) { max-width: 100%; border-radius: 8px; padding: 8px; background: #061321; color: #eefaff; border: 1px solid #46c8e777; }
+.voice-profile-content [role="alert"] { color: #ffb8b8; }
+@media (max-width: 600px) { .voice-profile-content { padding: 12px; } .voice-profile-actions button { width: 100%; } }

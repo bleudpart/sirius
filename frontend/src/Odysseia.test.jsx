@@ -70,6 +70,15 @@ test("ODYSSEIA stays closed until requested", async () => {
   expect(document.querySelector('[data-testid="odysseia"]')).toBeNull();
 });
 
+test("la croix de la pastille ferme ODYSSEIA sans restaurer la roue", async () => {
+  await render();
+  await act(async () => document.querySelector('[aria-label="Réduire ODYSSEIA"]').click());
+  expect(document.querySelector(".odysseia-window")).toBeNull();
+  await act(async () => document.querySelector('.minimized-pill-close[aria-label="Fermer ODYSSEIA"]').click());
+  expect(onClose).toHaveBeenCalledTimes(1);
+  expect(document.querySelector(".odysseia-window")).toBeNull();
+});
+
 test("all 43 former HUD quotations are preserved and navigable without automatic speech", async () => {
   await render();
   expect(ODYSSEIA_HUD_QUOTES).toHaveLength(15);

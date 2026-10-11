@@ -75,3 +75,4 @@ export const ConnectionsPanel = wrap(() => import("@/ConnectionsPanel"));
 export const WorkModulesPanel = wrap(() => import("@/WorkModulesPanel"));
 export const WorkDossiersPanel = wrap(() => import("@/WorkDossiersPanel"));
 export const SportCoachPanel = wrap(() => import("@/SportCoachPanel"));
+export const VoiceProfilePanel = wrap(() => import("@/VoiceProfilePanel"));

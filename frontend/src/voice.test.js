@@ -1,5 +1,5 @@
 import { Capacitor } from "@capacitor/core";
-import { speakCinematic, speakFr, speakAsCharacter, cancelSpeech, cleanTextForDisplay } from "./voice";
+import { AEDES_VOICE, speakCinematic, speakFr, speakAsCharacter, cancelSpeech, cleanTextForDisplay } from "./voice";
 import { speakNative, stopNativeSpeech } from "./nativeVoice";
 
 jest.mock("@capacitor/core", () => ({
@@ -21,6 +21,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   Capacitor.getPlatform.mockReturnValue("android");
   localStorage.clear();
+  localStorage.setItem("sirius_voice", JSON.stringify({ name: "fr-FR-Neural2-G", rate: 1, pitch: -3 }));
   clock += 600001;
   jest.spyOn(Date, "now").mockReturnValue(clock);
   global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 503 });
@@ -33,6 +34,15 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
+test("le profil AÈDES utilise un conteur français local sur Android sans requête distante", async () => {
+  localStorage.setItem("sirius_voice", JSON.stringify(AEDES_VOICE));
+  speakFr("Dis-moi l'histoire d'Odysseia.");
+  await flush();
+  expect(global.fetch).not.toHaveBeenCalled();
+  expect(speakNative).toHaveBeenCalledWith(expect.stringContaining("Dis-moi"),
+    expect.objectContaining({ gender: "male", rate: expect.any(Number), pitch: expect.any(Number) }));
+});
+
 test("Android narration requests Gemini and falls back explicitly when unconfigured", async () => {
   const originalFetch = global.fetch;
   global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 503 });
@@ -43,7 +53,7 @@ test("Android narration requests Gemini and falls back explicitly when unconfigu
     speakCinematic("Bonjour", { onstart, onend });
     await fallback;
     expect(speakNative).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
-      onstart: expect.any(Function), onend: expect.any(Function), rate: 1.05, pitch: 1,
+      onstart: expect.any(Function), onend: expect.any(Function), rate: 0.85, pitch: 0.95,
     }));
     const callbacks = speakNative.mock.calls[0][1];
     callbacks.onstart();
@@ -236,11 +246,12 @@ test("playback rejection reports degradation before native fallback", async () =
 
 test("the web keeps its browser synthesis instead of calling the native plugin", () => {
   Capacitor.getPlatform.mockReturnValue("web");
+  localStorage.setItem("sirius_voice", JSON.stringify({ name: "browser-female", rate: 1, pitch: 1.08 }));
   const previous = window.speechSynthesis;
   const previousUtterance = window.SpeechSynthesisUtterance;
   window.speechSynthesis = {
     cancel: jest.fn(), resume: jest.fn(),
-    getVoices: () => [{ lang: "fr-FR", name: "Amelie" }],
+    getVoices: () => [{ lang: "fr-FR", name: "Amelie", localService: true }],
     speak: jest.fn(),
   };
   window.SpeechSynthesisUtterance = function (text) { this.text = text; };
@@ -257,9 +268,89 @@ test("the web keeps its browser synthesis instead of calling the native plugin",
   }
 });
 
+test.each(["web", "android"])("%s local configuration preserves French text and preferences", async (platform) => {
+  Capacitor.getPlatform.mockReturnValue(platform);
+  localStorage.setItem("sirius_voice", JSON.stringify({ name: "browser", rate: 0.9, pitch: 0.85 }));
+  const previous = window.speechSynthesis;
+  const previousUtterance = window.SpeechSynthesisUtterance;
+  window.speechSynthesis = {
+    cancel: jest.fn(), resume: jest.fn(), speak: jest.fn(),
+    getVoices: () => [{ lang: "fr-FR", name: "French female", localService: true }, { lang: "fr-FR", name: "Paul", localService: true }],
+  };
+  window.SpeechSynthesisUtterance = function (text) { this.text = text; };
+  try {
+    speakFr("Dis\u2011moi l\u200b’\u200beffet. Dis moi la suite.");
+    await flush();
+    expect(global.fetch).not.toHaveBeenCalled();
+    if (platform === "android") {
+      expect(speakNative).toHaveBeenCalledWith("Dis-moi l'effet. Dis moi la suite.", expect.objectContaining({
+        gender: "male", pitch: expect.any(Number), rate: expect.any(Number),
+      }));
+      expect(speakNative.mock.calls[0][1].pitch).toBeLessThanOrEqual(0.85);
+    } else {
+      const utterance = window.speechSynthesis.speak.mock.calls[0][0];
+      expect(utterance.text).toBe("Dis-moi l'effet. Dis moi la suite.");
+      expect(utterance.voice.name).toBe("Paul");
+      expect(utterance.lang).toBe("fr-FR");
+    }
+  } finally {
+    window.speechSynthesis = previous;
+    window.SpeechSynthesisUtterance = previousUtterance;
+  }
+});
+
+test("Android local narration and characters bypass remote TTS and keep their profiles", () => {
+  localStorage.setItem("sirius_voice", JSON.stringify({ name: "browser-female" }));
+  localStorage.setItem("sirius_char_voices", JSON.stringify({ "ARGUS#": { rate: 0.8, gPitch: -3 } }));
+  speakCinematic("Dis-moi la suite.");
+  expect(speakNative).toHaveBeenLastCalledWith("Dis-moi la suite.", expect.objectContaining({ rate: 0.85, pitch: 0.95 }));
+  speakAsCharacter("Dis moi la suite.", { module: "ARGUS#" });
+  expect(speakNative).toHaveBeenLastCalledWith("Dis moi la suite.", expect.objectContaining({ rate: 0.8, pitch: 0.8, gender: "male" }));
+  expect(global.fetch).not.toHaveBeenCalled();
+});
+
+test("browser waits for French voices, uses their language, and bounds discovery", () => {
+  jest.useFakeTimers();
+  Capacitor.getPlatform.mockReturnValue("web");
+  localStorage.setItem("sirius_voice", JSON.stringify({ name: "browser-female" }));
+  const previous = window.speechSynthesis;
+  const previousUtterance = window.SpeechSynthesisUtterance;
+  const synth = new EventTarget();
+  let voices = [{ lang: "en-US", name: "English" }];
+  Object.assign(synth, { cancel: jest.fn(), resume: jest.fn(), speak: jest.fn(), getVoices: () => voices });
+  window.speechSynthesis = synth;
+  window.SpeechSynthesisUtterance = function (text) { this.text = text; };
+  const ended = jest.fn();
+  const error = jest.fn();
+  window.addEventListener("sirius-voice-error", error);
+  try {
+    speakFr("Dis-moi.", { onend: ended });
+    expect(synth.speak).not.toHaveBeenCalled();
+    voices.push({ lang: "fr-CA", name: "Julie", localService: true });
+    synth.dispatchEvent(new Event("voiceschanged"));
+    expect(synth.speak.mock.calls[0][0].lang).toBe("fr-CA");
+    cancelSpeech();
+    synth.speak.mockClear();
+    voices = [{ lang: "en-US", name: "English" }, { lang: "fr-FR", name: "French network", localService: false }];
+    speakFr("Bonjour.", { onend: ended });
+    jest.advanceTimersByTime(1500);
+    expect(synth.speak).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(ended).toHaveBeenCalledTimes(1);
+    synth.dispatchEvent(new Event("voiceschanged"));
+    expect(ended).toHaveBeenCalledTimes(1);
+  } finally {
+    window.removeEventListener("sirius-voice-error", error);
+    window.speechSynthesis = previous;
+    window.SpeechSynthesisUtterance = previousUtterance;
+    jest.useRealTimers();
+  }
+});
+
 test("canceling before browser voices load prevents delayed speech and stale callbacks", () => {
   jest.useFakeTimers();
   Capacitor.getPlatform.mockReturnValue("web");
+  localStorage.setItem("sirius_voice", JSON.stringify({ name: "browser-female", rate: 1, pitch: 1.08 }));
   const previous = window.speechSynthesis;
   const previousUtterance = window.SpeechSynthesisUtterance;
   const synth = { cancel: jest.fn(), resume: jest.fn(), getVoices: () => [], speak: jest.fn() };
@@ -272,7 +363,7 @@ test("canceling before browser voices load prevents delayed speech and stale cal
     cancelSpeech();
     jest.advanceTimersByTime(200);
     expect(synth.speak).not.toHaveBeenCalled();
-    synth.getVoices = () => [{ lang: "fr-FR", name: "Amelie" }];
+    synth.getVoices = () => [{ lang: "fr-FR", name: "Amelie", localService: true }];
     speakFr("Nouvelle réponse", { onstart: start, onend: end });
     const utterance = synth.speak.mock.calls[0][0];
     cancelSpeech();
@@ -304,5 +395,43 @@ test("voice phases reflect playback events, not just the response being requeste
     expect(phases).toEqual(["preparing", "speaking", "idle"]);
   } finally {
     window.removeEventListener("sirius-voice-phase", listener);
+  }
+});
+
+test.each(["web", "android", "remote"])("%s cancellation publishes idle and ignores stale completion", async (path) => {
+  Capacitor.getPlatform.mockReturnValue(path === "remote" ? "android" : path);
+  if (path !== "remote") localStorage.setItem("sirius_voice", JSON.stringify({ name: "browser-female", rate: 1, pitch: 1.08 }));
+  const previous = window.speechSynthesis;
+  const previousUtterance = window.SpeechSynthesisUtterance;
+  const audio = { play: jest.fn().mockResolvedValue(), pause: jest.fn() };
+  global.Audio = jest.fn(() => audio);
+  if (path === "remote") global.fetch.mockResolvedValue({ ok: true, json: async () => ({ audio_base64: "wav" }) });
+  window.speechSynthesis = {
+    cancel: jest.fn(), resume: jest.fn(), speak: jest.fn(),
+    getVoices: () => [{ lang: "fr-FR", name: "Amelie", localService: true }],
+  };
+  window.SpeechSynthesisUtterance = function (text) { this.text = text; };
+  const phases = [];
+  const listener = (event) => phases.push(event.detail);
+  const ended = jest.fn();
+  window.addEventListener("sirius-voice-phase", listener);
+  try {
+    speakFr("Bonjour.", { onend: ended });
+    await flush();
+    const callbacks = path === "web" ? window.speechSynthesis.speak.mock.calls[0][0]
+      : path === "android" ? speakNative.mock.calls[0][1] : { onstart: audio.onplay, onend: audio.onended };
+    callbacks.onstart();
+    cancelSpeech();
+    callbacks.onend();
+    if (path === "web") callbacks.onerror();
+    await flush();
+    expect(phases).toEqual(["preparing", "speaking", "idle"]);
+    expect(ended).not.toHaveBeenCalled();
+    if (path === "remote") expect(audio.pause).toHaveBeenCalled();
+    if (path === "android") expect(stopNativeSpeech).toHaveBeenCalled();
+  } finally {
+    window.removeEventListener("sirius-voice-phase", listener);
+    window.speechSynthesis = previous;
+    window.SpeechSynthesisUtterance = previousUtterance;
   }
 });

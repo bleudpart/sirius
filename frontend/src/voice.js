@@ -7,10 +7,10 @@ import { speakNative, stopNativeSpeech } from "./nativeVoice";
 import { API_BASE_URL } from "./lib/api";
 import { KEY_STORAGE_EVENT, loadApiKeys } from "./apiKeyStorage";
 import { formatSpeechDate } from "./dateTime";
+import { selectFrenchVoice } from "./frenchVoiceSelection";
 
 const API = API_BASE_URL;
 const TTS_REQUEST_TIMEOUT_MS = 8000;
-const MALE = /(paul|henri|thomas|nicolas|claude|mathieu|guillaume|daniel|jerome|male|homme|man|wavenet-d|wavenet-b|standard-b|standard-d)/i;
 const FEMALE = /(female|femme|amelie|audrey|marie|julie|celine|hortense|denise|eloise|charline|virginie|chantal|neural2-f|neural2-a|neural2-c|neural2-e|wavenet-a|wavenet-c|wavenet-e)/i;
 
 // Triche phonétique : lexique français intégré (sigles, anglicismes, noms propres)
@@ -42,7 +42,7 @@ export function cleanTextForDisplay(t) {
 }
 
 function cleanTextForSpeech(t) {
-  return normalizeFrenchElisions(String(t || "")
+  return normalizeFrenchElisions(normalizeFrenchElisions(String(t || ""))
     // « ΣIRIUS » : la synthèse lit le sigma grec (« sigma irius ») ; le nom se prononce « Sirius ».
     .replace(/Σ\s?IRIUS/gi, "Sirius")
     .replace(/```[\s\S]*?```/g, " ")            // blocs de code entiers
@@ -84,6 +84,7 @@ const isUrgent = (text) => /!|\b(urgent|vite|attention|alerte|imm[ée]diatement|
 
 // ---- Google Cloud TTS (via backend, clé jamais exposée) ----
 let currentAudio = null;
+let cancelVoiceDiscovery = null;
 let finishCurrentAudio = null;
 let currentRequest = null;
 let googleDownUntil = 0; // clé absente / API en panne → on évite de retenter pendant 10 min
@@ -100,6 +101,10 @@ export const lastSpokenAt = () => lastUtteranceAt;
 
 // Coupe TOUS les canaux audio (synthèse navigateur + audio Google) avant chaque nouvelle voix
 function stopChannels() {
+  if (cancelVoiceDiscovery) {
+    cancelVoiceDiscovery();
+    cancelVoiceDiscovery = null;
+  }
   if (currentRequest) {
     currentRequest.abort();
     currentRequest = null;
@@ -125,9 +130,10 @@ function reportGeminiFailure(reason) {
 
 // Préférences de voix (écran Profil) : voix, débit, gravité
 export const DEFAULT_VOICE = { name: "browser-female", rate: 1.0, pitch: 1.08 };
+export const AEDES_VOICE = { name: "browser-aedes", rate: 0.9, pitch: 0.94 };
 const LEGACY_DEFAULT_VOICE = { name: "fr-FR-Neural2-G", rate: 1.05, pitch: -2 };
-const isBrowserVoice = (name) => name === "browser" || name === "browser-female";
-const getBrowserGender = (name) => name === "browser" ? "male" : "female";
+const isBrowserVoice = (name) => name === "browser" || name === "browser-female" || name === AEDES_VOICE.name;
+const getBrowserGender = (name) => name === "browser-female" ? "female" : "male";
 
 export const loadVoiceConfig = () => {
   try {
@@ -254,7 +260,7 @@ function speakBrowser(message, { rate = 1.0, pitch = 1.08, volume = 1, gender = 
   const seq = speakSeq;
   if (Capacitor.getPlatform() === "android") {
     stopChannels();
-    void speakNative(phonetic(message), { rate, pitch, volume, onstart, onend });
+    void speakNative(phonetic(message), { rate, pitch, volume, gender, onstart, onend });
     return;
   }
   const synth = window.speechSynthesis;
@@ -265,17 +271,21 @@ function speakBrowser(message, { rate = 1.0, pitch = 1.08, volume = 1, gender = 
     try {
       stopChannels();
       synth.resume();
+      const voices = synth.getVoices() || [];
+      const chosen = selectFrenchVoice(voices, { gender, localOnly: true });
+      if (!chosen) {
+        window.dispatchEvent(new CustomEvent("sirius-voice-error", {
+          detail: "Voix française locale indisponible. Installez une voix française dans les paramètres de synthèse vocale.",
+        }));
+        end();
+        return;
+      }
       const u = new SpeechSynthesisUtterance(phonetic(message));
-      u.lang = "fr-FR";
+      u.lang = chosen.lang;
       u.rate = rate;
       u.pitch = pitch;
       u.volume = Math.max(0.2, Math.min(1, volume));
-      const voices = synth.getVoices() || [];
-      const fr = voices.filter((v) => /fr/i.test(v.lang));
-      const chosen = gender === "female"
-        ? (fr.find((v) => FEMALE.test(v.name)) || fr.find((v) => !MALE.test(v.name)) || fr[0] || voices[0] || null)
-        : (fr.find((v) => MALE.test(v.name)) || fr.find((v) => !FEMALE.test(v.name)) || fr[0] || voices[0] || null);
-      if (chosen) u.voice = chosen;
+      u.voice = chosen;
       // Contournement bug Chrome : la synthèse se coupe après ~15 s sans resume()
       let keepAlive = null;
       const clearKA = () => { if (keepAlive) { clearInterval(keepAlive); keepAlive = null; } };
@@ -289,7 +299,25 @@ function speakBrowser(message, { rate = 1.0, pitch = 1.08, volume = 1, gender = 
       synth.speak(u);
     } catch (e) { end(); }
   };
-  (synth.getVoices() || []).length === 0 ? setTimeout(doSpeak, 200) : doSpeak();
+  if (selectFrenchVoice(synth.getVoices(), { gender, localOnly: true })) {
+    doSpeak();
+    return;
+  }
+  let timer;
+  const cleanup = () => {
+    clearTimeout(timer);
+    synth.removeEventListener?.("voiceschanged", ready);
+    if (cancelVoiceDiscovery === cleanup) cancelVoiceDiscovery = null;
+  };
+  const ready = () => {
+    if (!selectFrenchVoice(synth.getVoices(), { gender, localOnly: true })) return;
+    cleanup();
+    doSpeak();
+  };
+  cancelVoiceDiscovery = cleanup;
+  synth.addEventListener?.("voiceschanged", ready);
+  timer = setTimeout(() => { cleanup(); doSpeak(); }, 1500);
+  ready();
 }
 
 // Voix feutrée nocturne : entre 22 h et 5 h, ΣIRIUS parle plus lentement, plus grave et plus doucement
@@ -327,7 +355,11 @@ export function speakFr(message, { onpending, onstart, onend } = {}) {
   ({ onstart, onend } = speechCallbacks(seq, onstart, onend));
   if (onpending) onpending();
   const fem = FEMALE.test(cfg.name);
-  const bPitch = (fem ? 1.12 : (urgent ? 0.92 : 0.85)) * (night ? 0.95 : 1);
+  const bPitch = (isBrowserVoice(cfg.name) ? cfg.pitch : (fem ? 1.12 : (urgent ? 0.92 : 0.85))) * (night ? 0.95 : 1);
+  if (isBrowserVoice(cfg.name)) {
+    speakBrowser(message, { rate, pitch: bPitch, volume, gender: getBrowserGender(cfg.name), onstart, onend });
+    return;
+  }
   if (Capacitor.getPlatform() === "android") {
     speakRemote(message, {
       voice: "fr-FR-Neural2-G",
@@ -338,13 +370,9 @@ export function speakFr(message, { onpending, onstart, onend } = {}) {
       onend,
     }, seq).then((ok) => {
       if (!ok && seq === speakSeq) {
-        speakBrowser(message, { rate: 1.05, pitch: 1, volume, gender: "female", onstart, onend });
+        speakBrowser(message, { rate, pitch: bPitch, volume, gender: fem ? "female" : "male", onstart, onend });
       }
     });
-    return;
-  }
-  if (isBrowserVoice(cfg.name)) {
-    speakBrowser(message, { rate, pitch: bPitch, volume, gender: getBrowserGender(cfg.name), onstart, onend });
     return;
   }
   speakRemote(message, { voice: cfg.name, rate, pitch: night ? cfg.pitch - 1.5 : cfg.pitch, volume, onstart, onend }, seq).then((ok) => {
@@ -358,6 +386,7 @@ export function cancelSpeech() {
   seriesId += 1; // interrompt la file de lecture progressive
   seriesChain = Promise.resolve();
   stopChannels();
+  window.dispatchEvent(new CustomEvent("sirius-voice-phase", { detail: "idle" }));
 }
 
 // ---- Lecture progressive : les phrases s'enchaînent dans l'ordre, sans se couper ----
@@ -408,6 +437,10 @@ export function speakCinematic(message, { onstart, onend } = {}) {
   const seq = ++speakSeq; utterances += 1; lastUtteranceAt = Date.now();
   stopChannels();
   ({ onstart, onend } = speechCallbacks(seq, onstart, onend));
+  if (isBrowserVoice(cfg.name)) {
+    speakBrowser(message, { rate: 0.85, pitch: 0.95, gender: getBrowserGender(cfg.name), onstart, onend });
+    return;
+  }
   if (Capacitor.getPlatform() === "android") {
     speakRemote(message, {
       voice: "fr-FR-Neural2-G",
@@ -418,13 +451,9 @@ export function speakCinematic(message, { onstart, onend } = {}) {
       timeoutMs: 6000,
     }, seq).then((ok) => {
       if (!ok && seq === speakSeq) {
-        speakBrowser(message, { rate: 1.05, pitch: 1, gender: "female", onstart, onend });
+        speakBrowser(message, { rate: 0.85, pitch: 0.95, gender: FEMALE.test(cfg.name) ? "female" : "male", onstart, onend });
       }
     });
-    return;
-  }
-  if (isBrowserVoice(cfg.name)) {
-    speakBrowser(message, { rate: 0.85, pitch: 0.95, gender: getBrowserGender(cfg.name), onstart, onend });
     return;
   }
   speakRemote(message, { voice: cfg.name, rate: 0.85, pitch: Math.max(-10, cfg.pitch - 3), onstart, onend }, seq).then((ok) => {
@@ -466,10 +495,24 @@ export function speakAsCharacter(message, { profile, module, pitch = 1, rate = 1
   const seq = ++speakSeq; utterances += 1; lastUtteranceAt = Date.now();
   stopChannels();
   ({ onstart, onend } = speechCallbacks(seq, onstart, onend));
+  if (isBrowserVoice(cfg.name)) {
+    const ov = (module && loadCharOverrides()[module]) || {};
+    speakBrowser(safeText, {
+      rate: p ? (ov.rate ?? p.rate) : Math.max(0.55, Math.min(1.6, rate)),
+      pitch: p ? (ov.gPitch != null ? _gToB(ov.gPitch) : p.bPitch) : Math.max(0.4, Math.min(1.8, pitch)),
+      gender: p?.gender || getBrowserGender(cfg.name), onstart, onend,
+    });
+    return;
+  }
   if (Capacitor.getPlatform() === "android") {
     speakRemote(safeText, { rate: 1.05, pitch: 0, onstart, onend }, seq).then((ok) => {
       if (!ok && seq === speakSeq) {
-        speakBrowser(safeText, { rate: 1.05, pitch: 1, onstart, onend });
+        const ov = (module && loadCharOverrides()[module]) || {};
+        speakBrowser(safeText, {
+          rate: p ? (ov.rate ?? p.rate) : Math.max(0.55, Math.min(1.6, rate)),
+          pitch: p ? (ov.gPitch != null ? _gToB(ov.gPitch) : p.bPitch) : Math.max(0.4, Math.min(1.8, pitch)),
+          gender: p?.gender || (FEMALE.test(cfg.name) ? "female" : "male"), onstart, onend,
+        });
       }
     });
     return;
@@ -479,10 +522,6 @@ export function speakAsCharacter(message, { profile, module, pitch = 1, rate = 1
     const gPitch = ov.gPitch ?? p.gPitch;
     const vRate = ov.rate ?? p.rate;
     const bPitch = ov.gPitch != null ? _gToB(ov.gPitch) : p.bPitch;
-    if (isBrowserVoice(cfg.name)) {
-      speakBrowser(safeText, { rate: vRate, pitch: bPitch, gender: p.gender, onstart, onend });
-      return;
-    }
     speakRemote(safeText, { voice: p.google, rate: vRate, pitch: gPitch, onstart, onend }, seq).then((ok) => {
       if (!ok && seq === speakSeq) speakBrowser(safeText, { rate: vRate, pitch: bPitch, gender: p.gender, onstart, onend });
     });
@@ -490,10 +529,6 @@ export function speakAsCharacter(message, { profile, module, pitch = 1, rate = 1
   }
   const bp = Math.max(0.4, Math.min(1.8, pitch));
   const br = Math.max(0.55, Math.min(1.6, rate));
-  if (isBrowserVoice(cfg.name)) {
-    speakBrowser(safeText, { rate: br, pitch: bp, gender: getBrowserGender(cfg.name), onstart, onend });
-    return;
-  }
   const gPitch = Math.max(-14, Math.min(14, Math.round((pitch - 0.9) * 13)));
   speakRemote(safeText, { voice: cfg.name, rate: br, pitch: gPitch, onstart, onend }, seq).then((ok) => {
     if (!ok && seq === speakSeq) speakBrowser(safeText, { rate: br, pitch: bp, onstart, onend });

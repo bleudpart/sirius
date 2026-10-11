@@ -77,6 +77,19 @@ test("transcription keeps FormData and leaves multipart headers to the browser",
   expect(global.fetch.mock.calls[0][1].headers).toBeUndefined();
 });
 
+test("ordinary STT sends only confirmed lexical hints and removes hints when disabled", async () => {
+  const form = new FormData();
+  const ordinary = new Blob(["ordinary"], { type: "audio/webm" });
+  form.append("file", ordinary, "ordinary.webm");
+  global.fetch.mockResolvedValue(response({ text: "bonjour" }));
+  await requestTranscription(form, { vocabulary: ["Daniel Partel"] });
+  expect(form.get("vocabulary")).toBe('["Daniel Partel"]');
+  expect([...form.keys()]).toEqual(["file", "vocabulary"]);
+  await requestTranscription(form, {});
+  expect(form.has("vocabulary")).toBe(false);
+  expect([...form.keys()]).toEqual(["file"]);
+});
+
 test.each([
   ["conversation", () => requestConversation("{}", {}), ASSISTANT_TIMEOUTS.conversation],
   ["intent", () => requestAssistantIntent("ouvre", {}), ASSISTANT_TIMEOUTS.intent],

@@ -1,6 +1,8 @@
 import { API_BASE_URL } from "../lib/api";
+import { validateVoiceVocabulary } from "../voiceVocabulary";
 
-export async function connectStreamingStt({ contentType, groqKey, signal }) {
+export async function connectStreamingStt({ contentType, groqKey, signal, vocabulary = [] }) {
+  const terms = validateVoiceVocabulary(vocabulary);
   if (typeof WebSocket === "undefined") throw new Error("WebSocket indisponible.");
   if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
 
@@ -44,6 +46,7 @@ export async function connectStreamingStt({ contentType, groqKey, signal }) {
         action: "start",
         content_type: contentType,
         groq_key: groqKey || "",
+        ...(terms.length ? { vocabulary: terms } : {}),
       }));
     } catch (error) {
       fail(error);

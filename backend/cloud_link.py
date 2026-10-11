@@ -172,8 +172,13 @@ async def relay_get_json(path: str) -> dict:
     return data
 
 
-async def relay_stt(filename: str, data: bytes, content_type: str) -> dict:
-    response = await _send("POST", "/api/stt", files={"file": (filename, data, content_type)})
+async def relay_stt(filename: str, data: bytes, content_type: str, *, vocabulary: list[str] | None = None) -> dict:
+    # Explicit per-request text hints only; never upload a stored voice profile.
+    from speech_vocabulary import confirmed_vocabulary
+
+    terms = confirmed_vocabulary(vocabulary)
+    kwargs = {"data": {"vocabulary": json.dumps(terms, ensure_ascii=False)}} if terms else {}
+    response = await _send("POST", "/api/stt", files={"file": (filename, data, content_type)}, **kwargs)
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code, detail=_detail(response, "Transcription Cloud indisponible."))
     return response.json()

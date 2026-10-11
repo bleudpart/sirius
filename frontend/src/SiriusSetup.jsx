@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { User, KeyRound, Sparkles, ExternalLink, X, Download, Upload, Music, Volume2, Brain, Monitor, RotateCcw, CheckCircle2, XCircle, Loader2, Zap, Layers, Rocket, HardDrive } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import { speakFr, speakAsCharacter, CHAR_PROFILES, MYTHOS_VOICES, loadCharOverrides, DEFAULT_VOICE, loadVoiceConfig } from "@/voice";
+import { speakFr, speakAsCharacter, CHAR_PROFILES, MYTHOS_VOICES, loadCharOverrides, DEFAULT_VOICE, AEDES_VOICE, loadVoiceConfig } from "@/voice";
 import { HUD_DEFAULTS, loadHud, saveHud } from "@/hudPrefs";
 import { ConfirmButton } from "@/ConfirmButton";
 import { exportAccountProfile, importAccountProfile, validatePersonalService } from "@/accountSetup";
@@ -445,13 +445,22 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
               <span>Débit 1.00× · Gravité +2 · Timbre clair et dynamique · Articulation précise</span>
               {voiceCfg.name === "fr-FR-Neural2-F" && voiceCfg.rate === 1 && voiceCfg.pitch === 2 && <i className="setup-preset-check">ACTIVE</i>}
             </button>
+            <button type="button"
+              className={`setup-voice-preset ${voiceCfg.name === AEDES_VOICE.name ? "active" : ""}`}
+              onClick={() => updateVoice({ ...AEDES_VOICE })}
+              data-testid="setup-voice-preset-aedes">
+              <b>Voix des AÈDES — ODYSSEIA</b>
+              <span>Conteur français masculin · Débit posé · Voix locale de l’appareil, sans clé API</span>
+              {voiceCfg.name === AEDES_VOICE.name && <i className="setup-preset-check">ACTIVE</i>}
+            </button>
             <label className="setup-label">Voix</label>
-            <select className="setup-input" value={voiceCfg.name} onChange={(e) => updateVoice({ name: e.target.value })} data-testid="setup-voice-name">
+            <select className="setup-input" value={voiceCfg.name} onChange={(e) => updateVoice(e.target.value === AEDES_VOICE.name ? { ...AEDES_VOICE } : { name: e.target.value })} data-testid="setup-voice-name">
               <option value="browser-female">Féminine synthétique — locale (recommandée)</option>
               <option value="fr-FR-Neural2-G">Neural2-G — neurale premium (recommandée)</option>
               <option value="fr-FR-Neural2-F">Neural2-F — féminine premium (claire & dynamique)</option>
               <option value="fr-FR-Wavenet-G">Wavenet-G — WaveNet</option>
               <option value="browser">Masculine synthétique — locale</option>
+              <option value="browser-aedes">Voix des AÈDES — ODYSSEIA (conteur local)</option>
             </select>
             <label className="setup-label">Débit <span className="setup-tag opt">{voiceCfg.rate.toFixed(2)}×</span></label>
             <input className="setup-range" type="range" min="0.7" max="1.4" step="0.05" value={voiceCfg.rate}

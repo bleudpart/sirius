@@ -61,11 +61,13 @@ export function createModuleRegistry({ icons, actions, state, user, platform = "
     openWorkModule,
     openWorkDossiers,
     openSportCoach,
+    openVoiceProfile,
     openGettingStarted,
   } = actions;
 
   return [
     { id: "getting-started", group: "OUTILS", label: "Guide de démarrage", Icon: icons.BadgeInfo, run: openGettingStarted },
+    { id: "voice-profile", group: "SYSTÈME", label: "Ma voix et ma diction", Icon: icons.Mic, run: openVoiceProfile },
     { id: "reload", group: "SYSTÈME", label: "Recharger ΣIRIUS", Icon: icons.RotateCcw, run: reload },
     { id: "display", group: "MÉDIAS", label: "ΣIRIUS DISPLAY", Icon: icons.Monitor, active: state.displayOpen, run: toggleDisplay },
     { id: "media-modules", group: "MÉDIAS", label: "Modules multimédia", Icon: icons.Clapperboard, active: platform === "android" ? state.showMediaModules : state.displayOpen && state.displayType === "media", run: showMediaModules },

@@ -131,6 +131,24 @@ html:has(.modwheel-overlay:not(.is-minimized)) .sirius-stage *::after { animatio
 }
 .modwheel-restore:hover { background: rgba(40, 30, 8, 0.9); }
 .modwheel-restore .modwheel-sigma { position: static; font-size: 16px; }
+.modwheel-minimized-pill {
+  display: inline-flex; align-items: center; pointer-events: auto;
+  border: 1px solid rgba(240, 190, 80, .75); border-radius: 999px;
+  background: rgba(4, 14, 26, .88); padding-right: 5px;
+  box-shadow: 0 0 16px rgba(240, 190, 80, .25);
+}
+.modwheel-minimized-pill .modwheel-restore { border: 0; box-shadow: none; background: transparent; }
+.minimized-pill-close {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 auto; width: 28px; height: 28px; padding: 0;
+  border-radius: 50%; border: 1px solid rgba(216, 184, 117, .3);
+  background: rgba(216, 184, 117, .08); color: #f0d590; cursor: pointer;
+}
+.minimized-pill-close:hover { background: rgba(216, 184, 117, .22); }
+.minimized-pill-close:focus-visible { outline: 2px solid #f0d590; outline-offset: 2px; }
+@media (max-width: 1023px) {
+  .minimized-pill-close { width: 44px; height: 44px; }
+}
 
 /* --- Roue --- */
 .modwheel-dial {

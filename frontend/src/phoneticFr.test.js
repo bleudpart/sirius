@@ -2,6 +2,18 @@ import { applyFrenchPhonetics, normalizeFrenchElisions } from "./phoneticFr";
 
 beforeEach(() => localStorage.clear());
 
+test("an invisible separator between words does not concatenate them", () => {
+  expect(normalizeFrenchElisions("deux\u200bmots")).toBe("deux mots");
+});
+
+test.each(["Dis-moi.", "Dis moi.", "Dis\u2011moi.", "Dis-\u200bmoi."])(
+  "normalizes typography without phonetic aliases: %s", (text) => {
+    const normalized = normalizeFrenchElisions(text);
+    expect(normalized).toBe(text === "Dis moi." ? "Dis moi." : "Dis-moi.");
+    expect(applyFrenchPhonetics(normalized)).toBe(normalized);
+  },
+);
+
 test.each(["emails", "e-mails", "e mails", "EMAILS", "mails", "e\u2011mails"])(
   "lit %s comme courriels sans épeler",
   (word) => expect(applyFrenchPhonetics(`Vos ${word} sont prêts.`)).toBe("Vos courriels sont prêts."),

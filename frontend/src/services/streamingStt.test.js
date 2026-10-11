@@ -38,6 +38,7 @@ test("sends audio chunks before requesting a final transcript", async () => {
     contentType: "audio/webm;codecs=opus",
     groqKey: "user-key",
   });
+
   const socket = global.lastStreamingSocket;
   const chunk = new Blob(["audio"], { type: "audio/webm" });
 
@@ -56,4 +57,13 @@ test("sends audio chunks before requesting a final transcript", async () => {
     data: JSON.stringify({ type: "transcript", data: { text: "Bonjour." } }),
   });
   await expect(result).resolves.toEqual({ text: "Bonjour." });
+});
+
+test("stream start sends only explicit text vocabulary, never profile samples", async () => {
+  global.WebSocket = MockWebSocket;
+  const stream = await connectStreamingStt({ contentType: "audio/webm", vocabulary: ["Daniel Partel"] });
+  expect(JSON.parse(global.lastStreamingSocket.sent[0])).toEqual({
+    action: "start", content_type: "audio/webm", groq_key: "", vocabulary: ["Daniel Partel"],
+  });
+  stream.close();
 });

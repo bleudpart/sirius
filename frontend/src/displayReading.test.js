@@ -1,5 +1,13 @@
 import { displayReadingText, splitDisplayReading, isDisplayReadCommand } from "./displayReading";
 
+test.each(["dis moi", "donne moi", "explique nous", "dis\u2011moi", "l ’ effet"])(
+  "keeps %s together at a chunk boundary", (phrase) => {
+    const chunks = splitDisplayReading(`${"mot ".repeat(199)}${phrase} attendu.`);
+    expect(chunks.every((chunk) => !/\b(?:dis|donne|explique|l')$/.test(chunk))).toBe(true);
+    expect(chunks.every((chunk) => chunk.length <= 800)).toBe(true);
+  },
+);
+
 test("reads text, contacts, mails and editable drafts without interface buttons", () => {
   const body = document.createElement("div");
   body.innerHTML = '<h2>Infos du jour</h2><p>Une information.</p><button>Voter</button><div>Alice</div><div>Objet du courrier</div><input value="Sujet modifié"><textarea>Texte du brouillon</textarea>';

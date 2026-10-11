@@ -26,6 +26,14 @@ export function splitDisplayReading(text, limit = 800) {
     const prefix = remaining.slice(0, limit + 1);
     let end = Math.max(prefix.lastIndexOf(". "), prefix.lastIndexOf("! "), prefix.lastIndexOf("? "), prefix.lastIndexOf("\n"));
     if (end < limit / 2) end = prefix.lastIndexOf(" ");
+    if (end > 0 && remaining[end] === " ") {
+      const before = remaining.slice(0, end);
+      const after = remaining.slice(end).trimStart();
+      if (/^(?:moi|nous|le|la|les|lui|leur|en|y)\b/i.test(after)) {
+        const previous = before.lastIndexOf(" ");
+        if (previous > 0) end = previous;
+      }
+    }
     if (end <= 0) end = limit;
     else if (/[.!?]/.test(remaining[end])) end += 1;
     chunks.push(remaining.slice(0, end).trim());

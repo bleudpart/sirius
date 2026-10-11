@@ -108,4 +108,7 @@ export const applyFrenchPhonetics = (input) => {
 };
 
 export const normalizeFrenchElisions = (input) => String(input ?? "")
-  .replace(/\b(qu|[cdjlmnst])[\s\u200b\u200c\u200d\u2060\ufeff]*['’‘ʼ＇][\s\u200b\u200c\u200d\u2060\ufeff]*(?=\p{L})/giu, "$1'");
+  .replace(/[\u2010\u2011\u2012]/g, "-")
+  .replace(/[\u200b\u200c\u200d\u2060\ufeff]*-[\u200b\u200c\u200d\u2060\ufeff]*/g, "-")
+  .replace(/\b(qu|[cdjlmnst])[\s\u200b\u200c\u200d\u2060\ufeff]*['’‘ʼ＇][\s\u200b\u200c\u200d\u2060\ufeff]*(?=\p{L})/giu, "$1'")
+  .replace(/[\u200b\u200c\u200d\u2060\ufeff]/g, " ");

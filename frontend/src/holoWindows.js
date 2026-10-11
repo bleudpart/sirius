@@ -210,17 +210,22 @@ function titleOf(el) {
 function minimize(el) {
   if (el.__pill) return;
   el.classList.add("holo-minimized");
-  const pill = document.createElement("button");
+  const pill = document.createElement("div");
   pill.className = "holo-dock-pill";
   pill.setAttribute("data-testid", "holo-dock-pill");
-  pill.title = "Restaurer la fenêtre";
+  const restore = document.createElement("button");
+  restore.type = "button";
+  restore.className = "hdp-restore";
+  restore.title = "Restaurer la fenêtre";
+  restore.setAttribute("aria-label", `Rouvrir ${titleOf(el)}`);
   const dot = document.createElement("span");
   dot.className = "hdp-dot";
   const label = document.createElement("span");
   label.className = "hdp-label";
   label.textContent = titleOf(el);
-  pill.append(dot, label);
-  pill.addEventListener("click", () => {
+  restore.append(dot, label);
+  pill.appendChild(restore);
+  restore.addEventListener("click", () => {
     pill.remove();
     el.__pill = null;
     if (document.body.contains(el)) {
@@ -228,6 +233,27 @@ function minimize(el) {
       el.style.zIndex = bumpZ();
     }
   });
+  const close = [...el.querySelectorAll("button")].find((button) =>
+    button.closest(`${SEL}, ${MOBILE_SEL}`) === el
+      && (button.querySelector(".lucide-x") || /fermer/i.test(button.getAttribute("aria-label") || "")
+        || button.matches(".setup-close, .zeus-close, .eu-close, .fp-close, .p3d-close, .keys-close, .media-close-btn"))
+  );
+  if (close) {
+    const dismiss = document.createElement("button");
+    dismiss.type = "button";
+    dismiss.className = "minimized-pill-close";
+    dismiss.setAttribute("aria-label", `Fermer ${titleOf(el)}`);
+    dismiss.title = `Fermer ${titleOf(el)}`;
+    dismiss.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+    dismiss.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (close.disabled) return;
+      close.click();
+      pill.remove();
+      el.__pill = null;
+    });
+    pill.appendChild(dismiss);
+  }
   dock().appendChild(pill);
   el.__pill = pill;
 }

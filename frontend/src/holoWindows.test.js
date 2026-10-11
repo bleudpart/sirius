@@ -33,7 +33,7 @@ test.each(["prime-screen", "fp-overlay", "p3d-overlay", "vision-card", "keys-pan
     expect(panel.classList.contains("holo-minimized")).toBe(true);
     const pill = document.querySelector(".holo-dock-pill");
     expect(pill.textContent).toBe("FENÊTRE DE TEST");
-    pill.click();
+    pill.querySelector(".hdp-restore").click();
     expect(panel.classList.contains("holo-minimized")).toBe(false);
     expect(document.querySelector(".holo-dock-pill")).toBeNull();
     expect(panel.querySelector("input").value).toBe("contenu conservé");
@@ -43,6 +43,27 @@ test.each(["prime-screen", "fp-overlay", "p3d-overlay", "vision-card", "keys-pan
     expect(document.querySelector(".holo-dock-pill")).toBeNull();
   }
 );
+
+test.each([true, false])("la croix ferme le module réduit sans le restaurer (mobile=%s)", (mobile) => {
+  window.matchMedia.mockReturnValue({ matches: mobile });
+  const panel = document.createElement("section");
+  panel.className = "prime-screen";
+  panel.innerHTML = '<header><h2>Module réduit</h2><button aria-label="Fermer"><svg class="lucide-x"></svg></button></header><input value="état">';
+  const close = jest.fn(() => panel.remove());
+  panel.querySelector('[aria-label="Fermer"]').addEventListener("click", close);
+  document.body.appendChild(panel);
+  initHoloWindows();
+  panel.querySelector(".holo-win-min").click();
+  const restore = jest.fn();
+  document.querySelector(".hdp-restore").addEventListener("click", restore);
+  const button = document.querySelector(".minimized-pill-close");
+  expect(button.getAttribute("aria-label")).toBe("Fermer MODULE RÉDUIT");
+  button.click();
+  expect(close).toHaveBeenCalledTimes(1);
+  expect(restore).not.toHaveBeenCalled();
+  expect(document.body.contains(panel)).toBe(false);
+  expect(document.querySelector(".holo-dock-pill")).toBeNull();
+});
 
 test("an extra mobile panel is left unchanged on desktop", () => {
   window.matchMedia.mockReturnValue({ matches: false });

@@ -28,6 +28,7 @@ from typing import Optional, List, Literal
 
 from auth_api import require_user
 from promo_shots import PROMO_SHOTS
+from speech_text import speakable_text
 
 TRAILER_SHOTS = [
     {"id": 1, "title": "LE NOYAU", "desc": "Le réacteur ΣIRIUS s'éveille au cœur du vide.", "image": "/api/trailer/img/shot1.jpg"},
@@ -107,7 +108,7 @@ async def _render_promo_video():
     for i, s in enumerate(PROMO_SHOTS, 1):
         PROMO_EXPORT.update(progress=int(5 + (i - 1) / total * 78), step=f"Plan {i}/{total} — voix et animation")
         voice = work / f"voice{i}.mp3"
-        await edge_tts.Communicate(s["voix"], "fr-FR-HenriNeural", rate="-5%").save(str(voice))
+        await edge_tts.Communicate(speakable_text(s["voix"]), "fr-FR-HenriNeural", rate="-5%").save(str(voice))
         dur = await _media_duration(voice) + 1.6
         frames = int(dur * 25)
         seg = work / f"seg{i}.mp4"

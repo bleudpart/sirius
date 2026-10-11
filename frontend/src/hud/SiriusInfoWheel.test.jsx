@@ -27,6 +27,16 @@ test("info wheel stays closed until requested", async () => {
   expect(wheel()).toBeNull();
 });
 
+test("la pastille INFOS permet de fermer directement la roue réduite", async () => {
+  const onClose = jest.fn();
+  await act(async () => root.render(<SiriusInfoWheel open onClose={onClose} connected ecoMode={false} setEcoMode={jest.fn()} />));
+  await act(async () => document.querySelector(".modwheel-min").click());
+  expect(document.querySelector('[data-testid="info-wheel-restore"]')).not.toBeNull();
+  await act(async () => document.querySelector('[aria-label="Fermer INFOS"]').click());
+  expect(onClose).toHaveBeenCalledTimes(1);
+  expect(document.querySelector(".modwheel")).toBeNull();
+});
+
 test("info wheel switches sections and closes with Escape or the close button", async () => {
   const onClose = jest.fn();
   await act(async () => root.render(<SiriusInfoWheel open onClose={onClose} connected ecoMode={false} setEcoMode={jest.fn()} />));

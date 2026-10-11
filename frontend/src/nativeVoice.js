@@ -1,4 +1,5 @@
 import { TextToSpeech } from "@capacitor-community/text-to-speech";
+import { selectFrenchVoice } from "./frenchVoiceSelection";
 
 let session = 0;
 let active = false;
@@ -18,7 +19,7 @@ export function stopNativeSpeech() {
   stopChain = stopChain.then(() => TextToSpeech.stop()).catch(reportError);
 }
 
-export async function speakNative(message, { rate = 1, pitch = 1, volume = 1, onstart, onend } = {}) {
+export async function speakNative(message, { rate = 1, pitch = 1, volume = 1, gender = "female", onstart, onend } = {}) {
   stopNativeSpeech();
   const current = session;
   try {
@@ -26,8 +27,8 @@ export async function speakNative(message, { rate = 1, pitch = 1, volume = 1, on
     if (current !== session) return;
     const { voices } = await TextToSpeech.getSupportedVoices();
     if (current !== session) return;
-    let voice = voices.findIndex((item) => item.lang === "fr-FR" && item.localService);
-    if (voice < 0) voice = voices.findIndex((item) => /^fr(?:-|$)/i.test(item.lang) && item.localService);
+    const selected = selectFrenchVoice(voices, { localOnly: true, gender });
+    const voice = voices.indexOf(selected);
     if (voice < 0) throw new Error("Aucune voix française locale installée.");
     active = true;
     if (onstart) onstart();

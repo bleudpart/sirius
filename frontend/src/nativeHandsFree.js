@@ -5,7 +5,7 @@ import { isWhisperHallucination } from "./microphoneCapture";
 const audio = registerPlugin("SiriusAudio");
 
 export function createNativeHandsFree({
-  plugin = audio, transcribe = requestTranscription, onState, onTranscript, groqKey = () => "",
+  plugin = audio, transcribe = requestTranscription, onState, onTranscript, groqKey = () => "", vocabulary = () => [],
 }) {
   let session = null;
   let blocked = true;
@@ -53,7 +53,7 @@ export function createNativeHandsFree({
       form.append("file", new Blob([bytes], { type: "audio/wav" }), "sirius-native.wav");
       const key = groqKey();
       if (key) form.append("groq_key", key);
-      const response = await transcribe(form, { signal: current.controller.signal });
+      const response = await transcribe(form, { signal: current.controller.signal, vocabulary: vocabulary() });
       if (session !== current || current.controller.signal.aborted) return;
       if (!response.ok) throw new Error(response.data?.detail || "Transcription native impossible.");
       const raw = String(response.data?.text || response.data?.transcript || "").trim();

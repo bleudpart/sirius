@@ -5,6 +5,7 @@ import { Clapperboard, Cpu, GripHorizontal, Landmark, LayoutGrid, Minus, Search,
 import "./ModulesMenu.css";
 import { WORK_MODULES, workModuleName } from "./workModules";
 import useWheelWindow from "./useWheelWindow";
+import MinimizedWindowPill from "./MinimizedWindowPill";
 
 // Roue orbitale centrée : la catégorie active pivote en haut, ses modules s'affichent à côté.
 const GROUPS = [
@@ -111,9 +112,8 @@ function ModulesMenu({ open, onClose, items }) {
   if (minimized) {
     return createPortal(
       <div className="modwheel-overlay is-minimized" data-testid="modules-menu" onKeyDown={onKeyDown}>
-        <button type="button" className="modwheel-restore" onClick={() => setMinimized(false)} data-testid="modules-menu-restore" title="Rouvrir le menu des modules">
-          <span className="modwheel-sigma">Σ</span> MODULES
-        </button>
+        <MinimizedWindowPill label="MODULES" onRestore={() => setMinimized(false)} onClose={onClose}
+          restoreProps={{ "data-testid": "modules-menu-restore", title: "Rouvrir le menu des modules" }} />
       </div>,
       document.body
     );

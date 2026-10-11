@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowDown, ArrowUp, BookOpen, GripHorizontal, Landmark, Link2, Minus, X } from "lucide-react";
 import useWheelWindow from "@/useWheelWindow";
+import MinimizedWindowPill from "./MinimizedWindowPill";
 import { ODYSSEIA_HISTORY, ODYSSEIA_QUOTES, ODYSSEIA_SOURCES } from "@/odysseiaData";
 import "@/ModulesMenu.css";
 import "./Odysseia.css";
@@ -93,7 +94,7 @@ function MarkdownArticle({ markdown }) {
           {headings.map((heading) => <option key={heading.id} value={heading.id}>{heading.title}</option>)}
         </select>
       </nav>
-      <article className="odysseia-article">
+      <article className="odysseia-article" data-read-content>
         <section className="odysseia-lead">
           <h2>Le ciel, les récits et le nom de SIRIUS</h2>
           {ODYSSEIA_HISTORY.map((item) => <div key={item.id}><h3>{item.title}</h3><p>{item.text}</p></div>)}
@@ -210,9 +211,7 @@ function OdysseiaWindow({ onClose }) {
   if (minimized) {
     return (
       <div className="modwheel-overlay is-minimized odysseia-overlay" data-testid="odysseia">
-        <button type="button" className="modwheel-restore" onClick={() => setMinimized(false)} aria-label="Rouvrir ODYSSEIA">
-          <span className="modwheel-sigma">Ω</span> ODYSSEIA
-        </button>
+        <MinimizedWindowPill label="ODYSSEIA" symbol="Ω" onRestore={() => setMinimized(false)} onClose={onClose} />
       </div>
     );
   }
@@ -303,7 +302,7 @@ function OdysseiaWindow({ onClose }) {
                     </button>
                   ))}
                 </div>
-                {selected && <article className="odysseia-featured" aria-live="polite">
+                {selected && <article className="odysseia-featured" aria-live="polite" data-read-content>
                   <span>{selected.attributionUnverified ? "ATTRIBUTION À VÉRIFIER" : "INSPIRATION"} — {selected.voice.toUpperCase()}</span>
                   <blockquote>« {selected.text} »</blockquote>
                   <p>{selected.attributionUnverified
