@@ -12,6 +12,7 @@ import { speakCinematic, cancelSpeech, cleanTextForDisplay } from "@/voice";
 import { WORK_MODULES } from "@/workModules";
 import { API_BASE_URL } from "@/lib/api";
 import { generateBootPresentation } from "@/bootPresentation";
+import { readAccountSetup } from "@/accountSetup";
 
 const BRAIN_RETRY_MS = 2000;
 const BRAIN_DEADLINE_MS = 20000;
@@ -493,16 +494,32 @@ export function CentralCard({ card, weather, onClose }) {
   );
 }
 
-export function BootScreen({ onDone, userName, onOpenModule, connected, probeBrain = probeBrainOnce }) {
+export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeBrainOnce, probeServices = readAccountSetup }) {
   // État du cerveau (serveur) : null = recherche en cours, true = joint, false = injoignable.
-  const [brain, setBrain] = useState(connected ? true : null);
+  const [brain, setBrain] = useState(null);
+  const [services, setServices] = useState(null);
+  const [servicesError, setServicesError] = useState("");
+  const [servicesDone, setServicesDone] = useState(false);
   const [brainAttempt, setBrainAttempt] = useState(0);
   const [brainRun, setBrainRun] = useState(0);
   const brainRef = useRef(brain);
   brainRef.current = brain;
   useEffect(() => {
-    if (connected) setBrain(true);
-  }, [connected]);
+    let active = true;
+    setServicesDone(false);
+    setServices(null);
+    setServicesError("");
+    Promise.resolve().then(() => probeServices()).then((data) => {
+      if (!data || !Array.isArray(data.services)) throw new Error("Réponse des services invalide.");
+      if (active) setServices(data.services);
+    }).catch((error) => {
+      if (active) {
+        console.warn("Initialisation des services :", error);
+        setServicesError(error.message || "Vérification des services indisponible.");
+      }
+    }).finally(() => { if (active) setServicesDone(true); });
+    return () => { active = false; };
+  }, [brainRun, probeServices]);
   useEffect(() => {
     if (brainRef.current === true) return undefined;
     let cancelled = false;
@@ -540,26 +557,20 @@ export function BootScreen({ onDone, userName, onOpenModule, connected, probeBra
     return [
       { label: "Interface ΣIRIUS", state: true, success: "Initialisée", scope: "Initialisation de l'interface." },
       { label: "Serveur ΣIRIUS", state: brain === null ? null : brain === true, success: "Joignable", scope: "Joignabilité du serveur ; modèle et services externes non testés." },
+      { label: "Configuration des services", state: !servicesDone ? null : services !== null, success: "Reçue", scope: servicesError || "Configuration reçue du serveur ; fournisseurs non testés." },
       { label: "API de lecture audio", state: speech, success: "Présente", scope: "API présente ; synthèse et sortie audible non vérifiées par ce contrôle." },
       { label: "API de capture micro", state: recog, success: "Présente", scope: "API présente ; permission, capture et qualité audio non vérifiées par ce contrôle." },
     ];
-  }, [brain]);
+  }, [brain, servicesDone, services, servicesError]);
 
-  const lines = useMemo(() => {
-    const dots = (label) => ".".repeat(Math.max(3, 42 - label.length));
-    const rows = checks.map((c) => (
-      c.state === null
-        ? `> ${c.label} ...`
-        : `> ${c.label} ${dots(c.label)} ${c.state ? c.success.toUpperCase() : "INDISPONIBLE"}`
-    ));
-    const status = brain === false ? "serveur injoignable." : "interface prête.";
-    rows.push(userName ? `> Bienvenue, ${userName}. ΣIRIUS ${status}` : `> ΣIRIUS ${status}`);
-    return rows;
-  }, [checks, brain, userName]);
-  const [shown, setShown] = useState(0);
-  const [progress, setProgress] = useState(0);
+  const lines = useMemo(() => checks.map((c) => ({
+    label: c.label,
+    status: c.state === null ? "EN COURS" : c.state ? c.success.toUpperCase() : "INDISPONIBLE",
+    tone: c.state === null ? "pending" : c.state ? "ok" : "fail",
+  })), [checks]);
+  const progress = Math.round(checks.filter(({ state }) => state !== null).length / checks.length * 100);
   const [closing, setClosing] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const loaded = checks.every(({ state }) => state !== null);
   const [speechDone, setSpeechDone] = useState(false);
   const [speechUnavailable, setSpeechUnavailable] = useState(false);
   const [speechPlaying, setSpeechPlaying] = useState(false);
@@ -592,7 +603,7 @@ export function BootScreen({ onDone, userName, onOpenModule, connected, probeBra
   }, [brain, checks, presentationError]);
   const presentationAttemptedRef = useRef(false);
   useEffect(() => {
-    if (brain === null || presentationAttemptedRef.current) return;
+    if (!loaded || presentationAttemptedRef.current) return;
     presentationAttemptedRef.current = true;
     if (!brain) { setNarrationReady(true); return; }
     const controller = new AbortController();
@@ -617,16 +628,21 @@ export function BootScreen({ onDone, userName, onOpenModule, connected, probeBra
     };
     // Les faits sont figés au premier verdict de connexion.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [brain]);
+  }, [brain, loaded]);
   const padRef = useRef(null);
-  const serviceSpeech = checks.map(({ label, state, success }) =>
-    `${label.replace(/ΣIRIUS/g, "Sirius")}. ${state === null ? "En cours." : state ? `${success}.` : "Indisponible."}`
+  const serviceSpeech = checks.map(({ label, state, success, scope }) =>
+    `${label.replace(/ΣIRIUS/g, "Sirius")}. ${state === null ? "En cours." : state ? `${success}.` : "Indisponible."} ${scope}`
   ).join(" ");
-  const introSpeech = (presentation ? `${presentation} ` : "") + serviceSpeech + " " +
-    (brain === false
-      ? "Je n'arrive pas encore à joindre mon cerveau... vérifiez la connexion Internet."
-      : "Mon interface est prête. La qualité du microphone reste à vérifier lors de votre première demande.") +
-    (userName ? ` Bienvenue, ${userName}.` : " Bienvenue.");
+  const allChecksOk = checks.every(({ state }) => state === true);
+  const readyMessage = allChecksOk
+    ? `${userName ? `${userName}, votre` : "Votre"} système est en place et fonctionnel.`
+    : `${userName ? `${userName}, certaines` : "Certaines"} vérifications ont échoué.`;
+  const introSpeech = "Initialisation de votre espace. " + (presentation ? `${presentation} ` : "") + serviceSpeech + " " +
+    (services ? services.map(({ label, state }) => `${label}. ${state === "configured" ? "Configuré, fournisseur non testé."
+      : state === "available" ? "Disponible selon le serveur." : state === "not_configured" ? "Non configuré."
+        : state === "restricted" ? "Accès restreint." : "État non reconnu."}`).join(" ") + " " : "") +
+    (brain === false ? "Je n'arrive pas encore à joindre mon cerveau... vérifiez la connexion Internet. " : "") +
+    readyMessage;
   const playIntroSpeech = () => {
     speechFinishedRef.current = false;
     setSpeechDone(false);
@@ -707,27 +723,12 @@ export function BootScreen({ onDone, userName, onOpenModule, connected, probeBra
     const hardStop = setTimeout(() => {
       if (speechFinishedRef.current || closingRef.current) return;
       console.warn("La narration de démarrage n'a pas terminé dans le délai de sécurité.");
-      setLoaded(true);
       setSpeechUnavailable(true);
       setSpeechPlaying(false);
       setSpeechDone(true);
       if (brainRef.current !== false) closeBoot();
     }, Math.max(120000, introSpeech.length * 200));
-    const step = 520;
-    const dur = lines.length * step + 600;
-    let i = 0;
-    const lineTimer = setInterval(() => {
-      i += 1;
-      setShown(i);
-      if (i >= lines.length) clearInterval(lineTimer);
-    }, step);
-    const start = Date.now();
-    const progTimer = setInterval(() => {
-      const p = Math.min(100, Math.round(((Date.now() - start) / dur) * 100));
-      setProgress(p);
-      if (p >= 100) { setLoaded(true); clearInterval(progTimer); }
-    }, 40);
-    return () => { clearInterval(lineTimer); clearInterval(progTimer); clearTimeout(hardStop); stopPad(); };
+    return () => { clearTimeout(hardStop); stopPad(); };
   }, [lines.length, onDone, narrationReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Une voix qui ne démarre pas ne doit pas immobiliser le HUD.
@@ -754,8 +755,8 @@ export function BootScreen({ onDone, userName, onOpenModule, connected, probeBra
     }}>
       <div className="boot-grid" />
       <div className="boot-scan" />
-      <div className="boot-modules" data-testid="boot-modules">
-        <div className="boot-modules-title font-divine">Panthéon des Modules</div>
+      <div className="boot-modules workspace-surface" data-testid="boot-modules">
+        <h2 className="boot-modules-title">L’univers de ΣIRIUS</h2>
         {[
           ["argus", "ARGUS", "Surveillance & réparation"],
           ["atlas", "ATLAS", "Carte & navigation"],
@@ -799,6 +800,7 @@ export function BootScreen({ onDone, userName, onOpenModule, connected, probeBra
         ))}
       </div>
       <div className="boot-center">
+        <h1 className="boot-welcome">Bienvenue{userName ? `, ${userName}` : ""}.</h1>
         <div className="boot-reactor" data-testid="boot-reactor">
           <CoreRings />
           <ReactorCore status="thinking" volume={0.35} color="#91e6f2" eco={false} />
@@ -811,14 +813,42 @@ export function BootScreen({ onDone, userName, onOpenModule, connected, probeBra
             </span>
           ))}
         </div>
+        <p className="boot-signature">ΣIRIUS — Votre intelligence au travail</p>
+        <p className="boot-tagline">Organisez vos activités. Analysez vos données. Passez à l'action.</p>
+      </div>
+      <section className="boot-status workspace-surface" aria-label="Initialisation de votre espace">
+        <span className="workspace-kicker">MISE EN ROUTE</span>
+        <h2>Initialisation de votre espace</h2>
+        <details className="boot-check-details">
+          <summary>Détail des vérifications</summary>
+          <ul>
+            {checks.map(({ label, state, success, scope }) => (
+              <li key={label}>
+                <strong>{label} : {state === null ? "en cours" : state ? success : "indisponible"}</strong>
+                <span>{scope}</span>
+              </li>
+            ))}
+          </ul>
+          {services && <ul>{services.map(({ id, label, state }) => (
+            <li key={id}>{label} : {state === "configured" ? "configuré, fournisseur non testé"
+              : state === "available" ? "disponible selon le serveur"
+                : state === "not_configured" ? "non configuré"
+                  : state === "restricted" ? "accès restreint" : "état non reconnu"}</li>
+          ))}</ul>}
+        </details>
         <div className="boot-log">
           {presentation && <p data-testid="boot-presentation">{cleanTextForDisplay(presentation)}</p>}
           {presentationError && <p role="status">{presentationError}</p>}
-          {lines.slice(0, shown).map((l, idx) => (
-            <div key={idx} className="boot-line">{l}</div>
+          {lines.map((l) => (
+            <div key={l.label} className={`boot-line boot-line-${l.tone}`}>
+              <span className="boot-line-label">{l.label}</span>
+              <span className="boot-line-state">{l.status}</span>
+            </div>
           ))}
+          {loaded && <p className="boot-ready" data-testid="boot-ready">{readyMessage}</p>}
         </div>
-        <div className="boot-bar">
+        <div className="boot-bar" role="progressbar" aria-label="Chargement de ΣIRIUS"
+          aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
           <div className="boot-bar-fill" style={{ width: `${progress}%` }} />
         </div>
         <div className="boot-pct">{progress}%  —          {speechUnavailable
@@ -828,6 +858,10 @@ export function BootScreen({ onDone, userName, onOpenModule, connected, probeBra
                   : speechDone && !speechStartedRef.current
                     ? "ouverture du HUD…"
                     : "touchez pour activer la voix"}</div>
+        {servicesError && <div onClick={(event) => event.stopPropagation()}>
+          <p role="alert">{servicesError}</p>
+          <button type="button" onClick={retryBrain}>Revérifier les services</button>
+        </div>}
         {brain === null && brainAttempt > 1 && (
           <div className="boot-brain-wait" data-testid="boot-brain-wait" role="status">
             Connexion au cerveau ΣIRIUS… tentative {brainAttempt}
@@ -848,8 +882,8 @@ export function BootScreen({ onDone, userName, onOpenModule, connected, probeBra
             </div>
           </div>
         )}
-        <div className="boot-copyright">COPYRIGHT © 2026 ΣIRIUS par Daniel Partel – Tous droits réservés.</div>
-      </div>
+      </section>
+      <div className="boot-copyright">COPYRIGHT © 2026 ΣIRIUS par Daniel Partel – Tous droits réservés.</div>
     </div>
   );
 }

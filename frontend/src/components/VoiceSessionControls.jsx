@@ -1,3 +1,5 @@
+import { AudioLines, Mic, Square } from "lucide-react";
+
 const LABELS = {
   idle: "Prêt",
   requesting: "Ouverture du microphone…",
@@ -9,11 +11,15 @@ const LABELS = {
 };
 
 export default function VoiceSessionControls({ phase, message, onStop, androidRecognition, onRecognitionChange }) {
+  const state = Object.hasOwn(LABELS, phase) ? phase : "idle";
+  const StatusIcon = state === "speaking" || state === "preparing" ? AudioLines : Mic;
   return (
-    <div className="voice-session-controls" data-testid="sirius-voice-controls">
-      <div role="status" aria-live="polite" aria-atomic="true">
-        <span>{LABELS[phase] || LABELS.idle}</span>
-        {message && <small>{message}</small>}
+    <div className="voice-session-controls" data-phase={state} data-testid="sirius-voice-controls">
+      <span className="voice-session-emblem" aria-hidden="true"><StatusIcon size={19} /></span>
+      <div className="voice-session-status" role="status" aria-live="polite" aria-atomic="true">
+        <span className="voice-session-caption" aria-hidden="true">DIALOGUE VOCAL</span>
+        <span className="voice-session-label">{LABELS[state]}</span>
+        {message && <small className="voice-session-detail">{message}</small>}
       </div>
       {androidRecognition && (
         <label>
@@ -32,7 +38,7 @@ export default function VoiceSessionControls({ phase, message, onStop, androidRe
         aria-label="Arrêter le microphone et la réponse"
         title="Interrompre l'écoute et la réponse ; une action déjà envoyée ne sera pas annulée"
       >
-        <span aria-hidden="true">■</span> Arrêter
+        <Square size={11} aria-hidden="true" /> Arrêter
       </button>
     </div>
   );

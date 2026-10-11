@@ -22,7 +22,7 @@ from runtime_paths import data_file, write_json_atomic
 logger = logging.getLogger(__name__)
 
 _STATE_FILE = "cloud_link.json"
-_LOCAL_BRAIN_ENV = ("GROQ_KEY", "GROQ_API_KEY", "K3_API_KEY", "DANIEL_DEV_K3")
+_LOCAL_BRAIN_ENV = ("CEREBRAS_API_KEY", "GROQ_KEY", "GROQ_API_KEY", "K3_API_KEY", "DANIEL_DEV_K3")
 _TIMEOUT = httpx.Timeout(90.0, connect=15.0)
 
 # Remplaçable dans les tests (httpx.MockTransport).
@@ -70,7 +70,7 @@ def linked() -> bool:
 
 def should_relay_chat(keys: dict | None) -> bool:
     keys = keys or {}
-    user_key = str(keys.get("groq_key") or keys.get("groq_real") or keys.get("k3") or keys.get("groq") or "").strip()
+    user_key = str(keys.get("cerebras") or keys.get("cerebras_key") or keys.get("groq_key") or keys.get("groq_real") or keys.get("k3") or keys.get("groq") or "").strip()
     return relay_allowed() and not user_key and not _env_has(*_LOCAL_BRAIN_ENV) and linked()
 
 

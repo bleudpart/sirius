@@ -9,6 +9,9 @@ import MediaHudWindow from "@/MediaHudWindow";
 import FdeErrorBoundary from "@/FdeErrorBoundary";
 import { initFdeOmega } from "@/fdeOmega";
 import PublicStore from "@/PublicStore";
+import "./siriusVisualTheme.css";
+
+document.documentElement.dataset.siriusVisualTheme = "classic";
 
 const queryClient = new QueryClient({
   defaultOptions: {

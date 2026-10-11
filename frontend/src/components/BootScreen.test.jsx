@@ -3,8 +3,10 @@ import { createRoot } from "react-dom/client";
 import { BootScreen } from "./HudPanels";
 import { speakCinematic, cancelSpeech } from "@/voice";
 import { generateBootPresentation } from "@/bootPresentation";
+import { readAccountSetup } from "@/accountSetup";
 
 jest.mock("@/bootPresentation", () => ({ generateBootPresentation: jest.fn() }));
+jest.mock("@/accountSetup", () => ({ readAccountSetup: jest.fn() }));
 
 jest.mock("@/voice", () => ({
   speakCinematic: jest.fn(),
@@ -19,12 +21,16 @@ jest.mock("@/components/ReactorVisuals", () => ({
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 let container;
 let root;
+let originalFetch;
 const render = (element) => act(async () => root.render(element));
 const tap = () => act(() => container.querySelector('[data-testid="boot-screen"]').click());
 
 beforeEach(() => {
   jest.useFakeTimers();
   jest.clearAllMocks();
+  originalFetch = global.fetch;
+  global.fetch = jest.fn().mockResolvedValue({ ok: true });
+  readAccountSetup.mockResolvedValue({ services: [] });
   generateBootPresentation.mockResolvedValue("Je suis Sirius. Je vous aide à consulter et comprendre les informations disponibles.");
   delete window.__siriusBootSpoken;
   container = document.createElement("div");
@@ -35,6 +41,7 @@ afterEach(() => {
   act(() => root.unmount());
   jest.clearAllTimers();
   jest.useRealTimers();
+  global.fetch = originalFetch;
 });
 
 test("opens the HUD when loading and narration both finish", async () => {
@@ -105,6 +112,64 @@ const flush = async (ms) => {
   });
 };
 
+test("presentation welcomes the user and exposes real loading progress in its dedicated frame", async () => {
+  await render(<BootScreen connected userName="Daniel" onDone={jest.fn()} />);
+  expect(container.querySelector("h1").textContent).toBe("Bienvenue, Daniel.");
+  expect(container.querySelector('[aria-label="Initialisation de votre espace"]').className).toContain("workspace-surface");
+  expect(container.querySelector('[data-testid="boot-reactor"]')).not.toBeNull();
+  expect(container.querySelectorAll(".boot-signature")).toHaveLength(1);
+  expect(container.querySelector(".boot-signature").textContent).toBe("ΣIRIUS — Votre intelligence au travail");
+  expect(container.querySelector(".boot-tagline").textContent)
+    .toBe("Organisez vos activités. Analysez vos données. Passez à l'action.");
+  expect(container.querySelector(".boot-signature").nextElementSibling.className).toBe("boot-tagline");
+  expect(container.querySelector(".boot-welcome-sub")).toBeNull();
+  expect(container.textContent).not.toContain("Votre assistant intelligent");
+  expect(container.textContent).not.toContain("Votre espace prend vie");
+  expect(container.textContent).not.toContain("VOTRE INTELLIGENCE · VOTRE UNIVERS");
+  expect(container.textContent).not.toContain("Une intelligence à votre écoute");
+  expect(container.querySelectorAll(".boot-acro-item")).toHaveLength(6);
+  const catalogue = container.querySelector('[data-testid="boot-modules"]');
+  expect(catalogue.querySelector("h2").textContent).toBe("L’univers de ΣIRIUS");
+  expect(catalogue.querySelector(".workspace-kicker")).toBeNull();
+  const progress = container.querySelector('[role="progressbar"]');
+  expect(progress.getAttribute("aria-valuenow")).toBe("100");
+});
+
+test("progress waits for real server and service responses rather than elapsed time", async () => {
+  let finishBrain;
+  let finishServices;
+  const brain = new Promise((resolve) => { finishBrain = resolve; });
+  const services = new Promise((resolve) => { finishServices = resolve; });
+  await render(<BootScreen connected onDone={jest.fn()} probeBrain={() => brain} probeServices={() => services} />);
+  const progress = container.querySelector('[role="progressbar"]');
+  const initial = progress.getAttribute("aria-valuenow");
+  await flush(10000);
+  expect(progress.getAttribute("aria-valuenow")).toBe(initial);
+  expect(speakCinematic).not.toHaveBeenCalled();
+  await act(async () => finishBrain(true));
+  expect(Number(progress.getAttribute("aria-valuenow"))).toBeLessThan(100);
+  await act(async () => finishServices({ services: [{ id: "chat", label: "Réponses IA", state: "not_configured" }] }));
+  expect(progress.getAttribute("aria-valuenow")).toBe("100");
+  expect(container.textContent).toContain("Réponses IA : non configuré");
+  expect(speakCinematic.mock.calls[0][0]).toContain("Initialisation de votre espace.");
+  expect(speakCinematic.mock.calls[0][0]).toContain("Réponses IA. Non configuré.");
+});
+
+test("a failed service check is a completed failure, never a successful service", async () => {
+  const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    readAccountSetup.mockRejectedValue(new Error("Services HTTP 503"));
+    await render(<BootScreen onDone={jest.fn()} />);
+    expect(container.querySelector('[role="progressbar"]').getAttribute("aria-valuenow")).toBe("100");
+    expect(container.textContent).toContain("Services HTTP 503");
+    expect(container.textContent).toContain("Configuration des services");
+    expect(container.textContent).toContain("INDISPONIBLE");
+    expect(container.textContent).toContain("Revérifier les services");
+  } finally {
+    warn.mockRestore();
+  }
+});
+
 test("retries the brain, then explains the failure instead of opening a dead HUD", async () => {
   const onDone = jest.fn();
   const probeBrain = jest.fn().mockResolvedValue(false);
@@ -172,7 +237,7 @@ test("reads every service and ends with the user's welcome without cutting off l
   expect(message).toContain("Serveur Sirius. Joignable.");
   expect(message).toMatch(/API de lecture audio\. (Présente|Indisponible)\./);
   expect(message).toMatch(/API de capture micro\. (Présente|Indisponible)\./);
-  expect(message).toMatch(/Bienvenue, Daniel\.$/);
+  expect(message).toMatch(/Daniel, (votre système est en place et fonctionnel|certaines vérifications ont échoué)\.$/);
   act(() => callbacks.onstart());
   act(() => jest.advanceTimersByTime(45000));
   tap();

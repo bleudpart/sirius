@@ -15,9 +15,10 @@ afterEach(() => {
 });
 
 test("vault encrypts keys, authenticates content and rejects the wrong password", async () => {
-  const keys = { groq_key: "personal-test-key", serp: "personal-web-key" };
+  const keys = { cerebras: "personal-cerebras-key", groq_key: "personal-test-key", serp: "personal-web-key" };
   const envelope = await encryptVault(keys, "long-unique-password");
   expect(JSON.stringify(envelope)).not.toContain("personal-test-key");
+  expect(JSON.stringify(envelope)).not.toContain("personal-cerebras-key");
   expect(envelope.iterations).toBe(600000);
   expect(await decryptVault(parseVault(JSON.stringify(envelope)), "long-unique-password")).toEqual(keys);
   await expect(decryptVault(envelope, "wrong-long-password")).rejects.toThrow("Mot de passe incorrect");

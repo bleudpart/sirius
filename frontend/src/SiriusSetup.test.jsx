@@ -30,6 +30,46 @@ test("la configuration propose AÈDES et conserve son préréglage conteur", asy
   }
 });
 
+test("la configuration distingue Cerebras rapide, Groq vocal et Kimi réflexion", async () => {
+  const originalFetch = global.fetch;
+  global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ services: [] }) });
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  try {
+    await act(async () => root.render(<SiriusSetup initialTab="api"
+      initialKeys={{ cerebras: "fake-cerebras", groq_key: "fake-groq" }}
+      onComplete={jest.fn()} onCancel={jest.fn()} />));
+    expect(container.querySelector('[data-testid="setup-key-cerebras"]').value).toBe("fake-cerebras");
+    expect(container.querySelector('[data-testid="setup-key-groq_key"]').value).toBe("fake-groq");
+    expect(container.textContent).toContain("gpt-oss-120b");
+    expect(container.textContent).toContain("transcription et repli IA");
+  } finally {
+    await act(async () => root.unmount());
+    global.fetch = originalFetch;
+  }
+});
+
+test("Cerebras est prêt à configurer sans clé et sans empêcher Groq", async () => {
+  const originalFetch = global.fetch;
+  global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ services: [] }) });
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  try {
+    await act(async () => root.render(<SiriusSetup initialTab="api"
+      initialKeys={{ groq_key: "fake-groq" }}
+      onComplete={jest.fn()} onCancel={jest.fn()} />));
+    const cerebras = container.querySelector('[data-testid="setup-key-cerebras"]');
+    expect(cerebras.value).toBe("");
+    expect(cerebras.required).toBe(false);
+    expect(cerebras.placeholder).toBe("Votre future clé API Cerebras");
+    expect(container.textContent).toContain("laissez ce champ vide");
+    expect(container.querySelector('[data-testid="setup-key-groq_key"]').value).toBe("fake-groq");
+  } finally {
+    await act(async () => root.unmount());
+    global.fetch = originalFetch;
+  }
+});
+
 function SettingsHarness() {
   const { openProfile } = useAuth();
   const [showSetup, setShowSetup] = useState(true);
@@ -155,8 +195,8 @@ test("services tab distinguishes the trial from a personal encrypted vault", asy
     expect(apiTab.className).toContain("active");
     const guide = container.querySelector('[data-testid="setup-api-guide"]');
     expect(guide).not.toBeNull();
-    expect(guide.querySelectorAll('a[href^="https://"]')).toHaveLength(8);
-    expect(guide.querySelectorAll('[data-testid^="setup-guide-"]')).toHaveLength(8);
+    expect(guide.querySelectorAll('a[href^="https://"]')).toHaveLength(9);
+    expect(guide.querySelectorAll('[data-testid^="setup-guide-"]')).toHaveLength(9);
     expect(guide.textContent).toContain("La mémoire locale de ZIRIUS ne nécessite pas de clé API");
     expect(guide.textContent).toContain("Enregistrer toutes les clés renseignées ensemble");
     expect(guide.textContent).toContain("Maps JavaScript API");

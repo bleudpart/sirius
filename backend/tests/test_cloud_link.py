@@ -16,7 +16,7 @@ def pc(tmp_path, monkeypatch):
     monkeypatch.setenv("SIRIUS_PACKAGED", "1")
     monkeypatch.setenv("SIRIUS_CLOUD_URL", "https://cloud.test")
     monkeypatch.delenv("SIRIUS_CLOUD_RELAY", raising=False)
-    for name in ("GROQ_KEY", "GROQ_API_KEY", "K3_API_KEY", "DANIEL_DEV_K3", "WHISPER_API_URL",
+    for name in ("CEREBRAS_API_KEY", "GROQ_KEY", "GROQ_API_KEY", "K3_API_KEY", "DANIEL_DEV_K3", "WHISPER_API_URL",
                  "STT_BACKEND_URL", "GEMINI_TTS_API_KEY", "GOOGLE_TTS_API_KEY"):
         monkeypatch.delenv(name, raising=False)
     calls = []
@@ -88,6 +88,17 @@ def test_relay_only_without_local_key(pc, monkeypatch):
     monkeypatch.setenv("GROQ_KEY", "gsk_local")
     assert cloud_link.should_relay_chat({}) is False
     assert cloud_link.should_relay_stt("") is False
+
+
+def test_cerebras_prevents_chat_relay_but_not_groq_transcription(pc, monkeypatch):
+    use, _ = pc
+    use(login_handler)
+    local_app().post("/api/cloud/link", json={"email": "lea@example.com", "password": "secret123"})
+    assert cloud_link.should_relay_chat({"cerebras": "personal-cerebras"}) is False
+    assert cloud_link.should_relay_chat({"cerebras_key": "personal-cerebras"}) is False
+    monkeypatch.setenv("CEREBRAS_API_KEY", "owner-cerebras")
+    assert cloud_link.should_relay_chat({}) is False
+    assert cloud_link.should_relay_stt("") is True
 
 
 def test_stt_is_relayed_and_session_refreshed_on_401(pc):

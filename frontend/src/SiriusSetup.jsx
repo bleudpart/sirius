@@ -19,8 +19,9 @@ const TABS = [
   { id: "api", label: "CLÉS API ET SERVICES", Icon: KeyRound },
 ];
 const KEY_META = {
-  groq_key: { service: "groq_real", label: "Clé Groq (réponses IA — principale)", tag: "cerveau principal · recommandée", url: "https://console.groq.com/keys", ph: "gsk_...", note: "Créez une clé dans votre compte Groq. Consultez les quotas et tarifs du fournisseur ; les autres services sont facultatifs." },
-  groq: { service: "k3", label: "Clé Kimi K3 (Moonshot)", tag: "réflexion approfondie · optionnelle", url: "https://platform.moonshot.cn/console/api-keys", ph: "sk-...", note: "Facultative : n'ajoute que le mode réflexion approfondie. Sans clé, ΣIRIUS répond déjà normalement si la clé Groq est renseignée." },
+  cerebras: { service: "cerebras", label: "Clé Cerebras (gpt-oss-120b)", tag: "conversation rapide · optionnelle", url: "https://cloud.cerebras.ai", ph: "Votre future clé API Cerebras", note: "Prêt à configurer plus tard : laissez ce champ vide tant que vous n'avez pas de clé Cerebras. Groq reste utilisable sans cette clé ; la transcription vocale continue avec Groq. Une fois votre clé ajoutée, Cerebras devient prioritaire pour les réponses rapides. Consultez ses quotas et tarifs." },
+  groq_key: { service: "groq_real", label: "Clé Groq (transcription et repli IA)", tag: "microphone · repli conversation", url: "https://console.groq.com/keys", ph: "gsk_...", note: "Conservez cette clé pour la transcription vocale. Sans clé Cerebras, Groq continue à fournir les réponses IA." },
+  groq: { service: "k3", label: "Clé Kimi (Moonshot)", tag: "réflexion approfondie · optionnelle", url: "https://platform.moonshot.cn/console/api-keys", ph: "sk-...", note: "Kimi 2.6 apporte la réflexion approfondie ; Cerebras ou Groq formule la réponse. Le modèle Kimi existant est conservé." },
   serp: { service: "serp", label: "Clé SerpAPI", tag: "recherche web", url: "https://serpapi.com/manage-api-key", ph: "...", note: "Infos du web en temps réel (météo, actualités)." },
   fal: { service: "fal", label: "Clé fal.ai", tag: "clips vidéo", url: "https://fal.ai/dashboard/keys", ph: "...", note: "Génération de clips vidéo uniquement." },
   gmaps: { service: "gmaps", label: "Clé Google Maps", tag: "carte Google LOCUS", url: "https://console.cloud.google.com/apis/credentials", ph: "AIza...", note: "Clé Maps JavaScript API utilisée dans le navigateur. Restreignez-la aux origines autorisées. Le test côté serveur ne confirme pas la carte ; la recherche d'adresses n'est pas disponible actuellement." },
@@ -29,6 +30,10 @@ const KEY_META = {
   gemini_tts: { service: "gemini_tts", label: "Clé Gemini TTS", tag: "lecture vocale Gemini · optionnelle", url: "https://aistudio.google.com/api-keys", ph: "...", note: "Service facultatif, soumis à la tarification de votre fournisseur." },
 };
 const KEY_GUIDE = {
+  cerebras: [
+    "Connectez-vous à Cerebras Cloud et consultez les quotas et tarifs.",
+    "Créez une clé API dans votre compte, puis copiez-la dans ce champ dédié, jamais dans Groq ou Kimi.",
+  ],
   groq_key: [
     "Connectez-vous à la console Groq ou créez votre compte.",
     "Dans API Keys, créez une nouvelle clé nommée « Mon ZIRIUS », puis copiez-la.",
@@ -95,7 +100,7 @@ function KeyField({ k, value, status, onChange, onTest }) {
 export default function SiriusSetup({ initialProfile, initialKeys, initialTab = "profil", onComplete, onCancel, onOpenAccount, showAdvanced = false }) {
   const [tab, setTab] = useState(initialTab);
   const [selectedServices, setSelectedServices] = useState(() => [...new Set([
-    "groq_key", ...Object.keys(KEY_META).filter((name) => initialKeys?.[name]),
+    "cerebras", "groq_key", ...Object.keys(KEY_META).filter((name) => initialKeys?.[name]),
   ])]);
   const visibleTabs = TABS;
   const [profile, setProfile] = useState({
@@ -103,6 +108,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
     ...(initialProfile || {}),
   });
   const [keys, setKeys] = useState({
+    cerebras: (initialKeys && initialKeys.cerebras) || "",
     groq_key: (initialKeys && initialKeys.groq_key) || "",
     groq: (initialKeys && initialKeys.groq) || "",
     serp: (initialKeys && initialKeys.serp) || "",
@@ -647,7 +653,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
             <AccountServices />
             <details data-testid="setup-api-guide">
               <summary>OBTENIR MES CLÉS API — GUIDE COMPLET PAS À PAS</summary>
-              <p className="setup-note">Il n'existe pas de clé universelle ni de création de toutes les clés en un clic. Chaque fournisseur demande un compte personnel. Commencez par Groq ; les sept autres services sont facultatifs. La mémoire locale de ZIRIUS ne nécessite pas de clé API.</p>
+              <p className="setup-note">Il n'existe pas de clé universelle ni de création de toutes les clés en un clic. Chaque fournisseur demande un compte personnel. Conservez Groq pour la transcription vocale et la conversation sans Cerebras ; vous pourrez ajouter votre clé Cerebras plus tard. Les autres services sont facultatifs. La mémoire locale de ZIRIUS ne nécessite pas de clé API.</p>
               <ol>
                 {Object.entries(KEY_META).map(([name, meta]) => (
                   <li key={name} data-testid={`setup-guide-${name}`}>
@@ -673,7 +679,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
             </details>
             <VaultControls keys={keys} validateKeys={validateKeys} onKeys={(next) => {
               setKeys(next); setKeyStatus({}); setSaveError("");
-              setSelectedServices([...new Set(["groq_key", ...Object.keys(next).filter((name) => KEY_META[name])])]);
+              setSelectedServices([...new Set(["cerebras", "groq_key", ...Object.keys(next).filter((name) => KEY_META[name])])]);
             }}>
               <fieldset className="vault-services">
                 <legend>Quels services souhaitez-vous configurer ?</legend>

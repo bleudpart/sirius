@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, ShieldCheck, ArrowRight, Mic, Boxes, Radio, UserRound, Zap, Crown, Home, BrainCircuit, ChartNoAxesCombined, FileText } from "lucide-react";
+import { Check, ShieldCheck, ArrowRight, Mic, FolderOpen, Mail, UserRound, Zap, Star, Home, Search, ChartNoAxesCombined, FileText } from "lucide-react";
 import PublicLegal from "./PublicLegal";
 import "./PublicStore.css";
 
@@ -8,16 +8,16 @@ const API = `${process.env.REACT_APP_BACKEND_URL || "https://api.sirius-assistan
 const PLANS = [
   { id: "standard", cardClass: "card-standard", name: "Standard", icon: UserRound, tagline: "L'essentiel pour automatiser votre quotidien.", price: "79", suffix: " unique", features: ["Assistant conversationnel", "Emails et documents", "HUD ΣIRIUS", "Windows et mobile"] },
   { id: "pro", cardClass: "card-pro", name: "Pro", icon: Zap, tagline: "La puissance métier sans friction.", price: "149", suffix: " unique", featured: true, badge: "RECOMMANDÉ", features: ["Tout Standard", "Automatisations métier", "HACCP et productivité", "Commandes vocales", "Support prioritaire"] },
-  { id: "lifetime", cardClass: "card-lifetime", name: "Lifetime", icon: Crown, tagline: "L'accès complet, pour longtemps.", price: "299", suffix: " unique", badge: "MEILLEURE VALEUR", features: ["Tout Pro", "Mises à jour incluses", "Futurs modules inclus", "Licence à vie"] },
+  { id: "lifetime", cardClass: "card-lifetime", name: "Lifetime", icon: Star, tagline: "L'accès complet, pour longtemps.", price: "299", suffix: " unique", badge: "MEILLEURE VALEUR", features: ["Tout Pro", "Mises à jour incluses", "Futurs modules inclus", "Licence à vie"] },
 ];
 
 const MATRIX_ACTIONS = [
   { icon: Mic, text: "Dicter une demande", detail: "Le microphone nécessite votre autorisation. La transcription Android envoie un extrait audio au serveur." },
-  { icon: Boxes, text: "Organiser ses dossiers", detail: "Les six modules métier locaux proposent une sauvegarde JSON et une restauration par fusion." },
-  { icon: Radio, text: "Préparer un email", detail: "Les fonctions email nécessitent un compte connecté et les autorisations du fournisseur." },
+  { icon: FolderOpen, text: "Organiser ses dossiers", detail: "Les six modules métier locaux proposent une sauvegarde JSON et une restauration par fusion." },
+  { icon: Mail, text: "Préparer un email", detail: "Les fonctions email nécessitent un compte connecté et les autorisations du fournisseur." },
   { icon: Home, text: "Piloter des équipements", detail: "La domotique nécessite une connexion configurée et des équipements compatibles." },
   { icon: FileText, text: "Rédaction de documents", detail: "L'IA vous aide à préparer des textes et des brouillons. Relisez et validez le contenu avant de l'utiliser." },
-  { icon: BrainCircuit, text: "Analyse assistée par IA", detail: "Obtenez une synthèse ou une explication des informations fournies. Vérifiez les conclusions ; un service IA configuré et une connexion réseau sont nécessaires." },
+  { icon: Search, text: "Analyse assistée par IA", detail: "Obtenez une synthèse ou une explication des informations fournies. Vérifiez les conclusions ; un service IA configuré et une connexion réseau sont nécessaires." },
 ];
 
 export default function PublicStore() {

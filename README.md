@@ -122,11 +122,53 @@ changé. Les vues relues masquent les analyses périmées ou non autorisées ;
 les messages déjà affichés dans l'historique du dialogue ne sont pas effacés.
 Le connecteur vers des fichiers externes n'est pas inclus dans cette première couche.
 
-Sur les grandes fenêtres Windows (largeur de vue supérieure à 1023 px), les
-intérieurs des modules historiques partagent un habillage sobre : cartes
-arrondies, titres dorés, champs et onglets arrondis, sans cadres cyan lumineux
-ni coins coupés. Les états d'alerte, les cartes géographiques et la géométrie
-des fenêtres restent inchangés. Le style mobile reste indépendant.
+Le HUD, les fenêtres de modules, les roues MODULES/INFOS/ODYSSEIA et la boutique
+partagent un habillage bleu nuit, cyan et or avec des cadres arrondis, des
+liserés dorés animés, des accents RGB et des sous-titres blancs. Ces animations
+respectent la préférence de réduction des mouvements. L'échelle initiale est
+de 100 % ; les réglages de zoom mémorisés et le pincement restent disponibles.
+Sur les vues PC (plus de 1023 px), une navigation latérale
+donne accès aux modules, dossiers et profil vocal ; une colonne contextuelle
+affiche l'heure réelle et la disponibilité du serveur. Sur téléphone et tablette,
+la navigation tactile existante prend le relais. Le réacteur réel conserve ses
+anneaux et sa rotation, avec un diamètre réduit de 25 % et une taille compacte
+en paysage. Les états d'alerte, les couleurs propres aux modules, les cartes
+géographiques, la géométrie sauvegardée et les actions de réduction/fermeture
+restent inchangés. Le style commun est chargé aussi dans les fenêtres Electron
+multimédia et la boutique ; les installateurs Windows/portable et l'APK Android
+doivent être reconstruits pour intégrer ces changements.
+
+L'écran de présentation au démarrage reprend ces cadres : accueil personnalisé
+et cœur animé au centre, catalogue de modules à gauche sur grand écran, état réel
+du chargement à droite. Sur téléphone, l'accueil et le chargement s'empilent.
+Les colonnes latérales sont équilibrées pour centrer le cœur sur grand écran ;
+le catalogue est légèrement rentré et les contours RGB circulent sur les quatre
+bords. L'acronyme conserve ses mots dorés. Sans description secondaire,
+la signature principale sous le cœur est
+« ΣIRIUS — Votre intelligence au travail ».
+Elle est suivie en doré de « Organisez vos activités. Analysez vos données.
+Passez à l'action. ».
+Le cercle de démarrage est réduit uniformément de 10 % sans modifier l'espace
+réservé ni déplacer les textes et les cadres environnants.
+La narration, les nouvelles tentatives de connexion et l'ouverture des modules
+conservent leur fonctionnement.
+Le panneau « Initialisation de votre espace » mesure la réponse HTTP de santé
+et récupère la configuration du compte via `/api/setup/status`. Sa progression
+correspond aux contrôles terminés, jamais à une durée d'animation ; un échec
+reste affiché comme tel. La narration attend les résultats et annonce leur portée.
+La présence d'une clé ou d'une API audio ne valide pas le fournisseur ni le micro :
+aucune capture micro ou vérification payante supplémentaire n'est déclenchée.
+
+Pour la conversation rapide, une clé `CEREBRAS_API_KEY` côté backend ou une clé
+Cerebras personnelle dans la configuration active `gpt-oss-120b` sur
+`https://api.cerebras.ai/v1`. Le raisonnement du modèle est réglé sur `low` et
+masqué dans les réponses. Une réserve de 2048 tokens est ajoutée au budget de
+complétion Cerebras pour ce raisonnement ; elle ne garantit pas un délai ou une
+longueur de réponse. Kimi `kimi-k2.6` reste le moteur de réflexion approfondie.
+Sans clé Cerebras, Groq conserve la conversation ; la transcription vocale reste
+chez Groq dans tous les cas. Une clé personnelle Groq reste prioritaire sur une
+clé Cerebras du serveur, et une clé Cerebras refusée n'est pas remplacée par une
+autre clé Cerebras. Aucun compte ni crédit fournisseur n'est créé automatiquement.
 
 La synthèse vocale traite **PLUTOS** comme un nom propre (« Ploutoss »), et non
 comme un sigle à épeler. Les élisions françaises sont réunies avant la lecture

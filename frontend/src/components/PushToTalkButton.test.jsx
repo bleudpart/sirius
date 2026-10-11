@@ -8,17 +8,19 @@ test("keeps the same label container and exposes only the current status", () =>
   const container = document.createElement("div");
   const root = createRoot(container);
   try {
-    for (const [active, ready, label] of [
-      [false, false, "ESPACE"],
-      [true, false, "OUVERTURE…"],
-      [true, true, "À VOUS"],
-      [false, false, "ESPACE"],
+    for (const [active, ready, label, accessibleLabel] of [
+      [false, false, "ESPACE", "Maintenir pour parler, relâcher pour envoyer"],
+      [true, false, "OUVERTURE…", "Ouverture du microphone"],
+      [true, true, "À VOUS", "Microphone ouvert : relâchez pour envoyer"],
+      [false, false, "ESPACE", "Maintenir pour parler, relâcher pour envoyer"],
     ]) {
       act(() => root.render(<PushToTalkButton active={active} ready={ready} onStart={() => {}} onStop={() => {}} />));
       const button = container.querySelector("button");
       expect(button.querySelector(".ptt-label > span").textContent).toBe(label);
       expect(button.textContent).toBe(label);
       expect(button.getAttribute("aria-pressed")).toBe(String(active));
+      expect(button.getAttribute("aria-label")).toBe(accessibleLabel);
+      expect(button.querySelector("svg").getAttribute("aria-hidden")).toBe("true");
     }
   } finally {
     act(() => root.unmount());

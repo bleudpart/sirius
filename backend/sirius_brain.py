@@ -33,12 +33,53 @@ GROQ_LLM_FALLBACK = MODELS[1]
 GROQ_FALLBACK_MODELS = MODELS
 K3_MODEL = "kimi-k2.6"
 GROQ_JSON_OPTIONS = {"reasoning_effort": "low"}
+ENV_CEREBRAS_KEY = (os.getenv("CEREBRAS_API_KEY") or "").strip()
+CEREBRAS_ENDPOINT = "https://api.cerebras.ai/v1"
+CEREBRAS_MODEL = "gpt-oss-120b"
 KIMI_REFLECTION_TIMEOUT = 8.0
 
 # Initialisation du client Groq / OpenAI (réutilisé entre requêtes : connexions HTTP conservées
 # en pool, évite l'aller-retour TLS/handshake d'une création par appel).
 client = AsyncOpenAI(api_key=GROQ_API_KEY, base_url=GROQ_LLM_ENDPOINT, max_retries=0) if GROQ_API_KEY else None
 _k3_clients: dict[str, AsyncOpenAI] = {}
+_cerebras_clients: dict[str, AsyncOpenAI] = {}
+
+
+def fast_provider(keys=None):
+    """Choose the configured fast provider without using another provider's credential."""
+    if personal_key("groq", keys) and not personal_key("cerebras", keys):
+        return "groq", provider_key("groq", ENV_GROQ_LLM_KEY, keys), GROQ_LLM_ENDPOINT, GROQ_FALLBACK_MODELS
+    if personal_key("k3", keys) and not personal_key("cerebras", keys):
+        return "groq", provider_key("groq", ENV_GROQ_LLM_KEY, keys), GROQ_LLM_ENDPOINT, GROQ_FALLBACK_MODELS
+    key = provider_key("cerebras", ENV_CEREBRAS_KEY, keys)
+    if key:
+        return "cerebras", key, CEREBRAS_ENDPOINT, [CEREBRAS_MODEL]
+    key = provider_key("groq", ENV_GROQ_LLM_KEY, keys)
+    return "groq", key, GROQ_LLM_ENDPOINT, GROQ_FALLBACK_MODELS
+
+
+def fast_client(service, key):
+    if service == "groq":
+        if client and key == ENV_GROQ_LLM_KEY:
+            return client
+        return AsyncOpenAI(api_key=key, base_url=GROQ_LLM_ENDPOINT, max_retries=0)
+    cache_key = hashlib.sha256(key.encode("utf-8")).hexdigest()
+    if cache_key not in _cerebras_clients:
+        _cerebras_clients[cache_key] = AsyncOpenAI(api_key=key, base_url=CEREBRAS_ENDPOINT, max_retries=0)
+    return _cerebras_clients[cache_key]
+
+
+def fast_options(service, output_tokens):
+    if service == "cerebras":
+        return {
+            "max_completion_tokens": output_tokens + 2048,
+            "extra_body": {"reasoning_effort": "low", "reasoning_format": "hidden"},
+        }
+    return {
+        "max_tokens": output_tokens,
+        "top_p": 0.95, "presence_penalty": 0.9, "frequency_penalty": 0.4,
+        "extra_body": GROQ_JSON_OPTIONS,
+    }
 
 # --- CLIENT K3 (Kimi / Moonshot), fabrique réutilisable pour Thémis (OCR factures) et les
 # modules internes : chaque appelant peut fournir sa propre clé (BYOK) ou utiliser la clé serveur.
@@ -332,15 +373,14 @@ async def parse_intent(prompt: str):
     if any(k in prompt_lower for k in ["spotify", "musique", "chanson", "morceau"]):
         return {"action": "spotify", "query": prompt}
 
-    intent_key = provider_key("groq", ENV_GROQ_LLM_KEY)
-    intent_client = (client if intent_key == ENV_GROQ_LLM_KEY else
-                     AsyncOpenAI(api_key=intent_key, base_url=GROQ_LLM_ENDPOINT, max_retries=0)) if intent_key else None
+    service, intent_key, _, models = fast_provider()
+    intent_client = fast_client(service, intent_key) if intent_key else None
     if not intent_client:
-        logging.warning("parse_intent: GROQ_API_KEY absente, fallback local.")
+        logging.warning("parse_intent: clé du fournisseur rapide absente, fallback local.")
         return {"action": "general", "query": prompt}
 
     last_error = None
-    for model in MODELS:
+    for model in models:
         try:
             response = await intent_client.chat.completions.create(
                 model=model,
@@ -348,10 +388,9 @@ async def parse_intent(prompt: str):
                     {"role": "system", "content": _INTENT_SYSTEM_PROMPT},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=200,
                 temperature=0.2,
                 response_format={"type": "json_object"},
-                extra_body=GROQ_JSON_OPTIONS,
+                **fast_options(service, 200),
                 timeout=8.0,
             )
             content = response.choices[0].message.content
@@ -426,7 +465,7 @@ async def enrich_briefing(data, keys=None):
     if not data:
         return ""
     keys = keys or {}
-    groq_key = provider_key("groq", ENV_GROQ_LLM_KEY, keys)
+    service, groq_key, fast_endpoint, fast_models = fast_provider(keys)
     k3_key = provider_key("k3", ENV_K3_KEY, keys)
     if not groq_key and not k3_key:
         return ""
@@ -442,8 +481,8 @@ async def enrich_briefing(data, keys=None):
 
     try:
         api_key = groq_key or k3_key
-        base_url = GROQ_LLM_ENDPOINT if groq_key else K3_ENDPOINT
-        model = GROQ_LLM_PRIMARY if groq_key else K3_MODEL
+        base_url = fast_endpoint if groq_key else K3_ENDPOINT
+        model = fast_models[0] if groq_key else K3_MODEL
         briefing_client = AsyncOpenAI(
             api_key=api_key,
             base_url=base_url,
@@ -456,9 +495,9 @@ async def enrich_briefing(data, keys=None):
                 {"role": "system", "content": BRIEFING_PROMPT},
                 {"role": "user", "content": payload},
             ],
-            max_tokens=2600,
             # Kimi K3 accepte uniquement temperature=1.0.
             temperature=1.0 if base_url == K3_ENDPOINT else 0.2,
+            **(fast_options(service, 2600) if groq_key else {"max_tokens": 2600}),
         )
         content = resp.choices[0].message.content or ""
         briefing = str(content).strip()
@@ -779,7 +818,7 @@ def _extract_per_kilo_prices_from_text(text: str):
 
 
 async def _kimi_reflect(prompt, profile=None, memory=None, mode="normal", mood=None, key=None, environment=None, *, history=None):
-    """Produit une analyse privée que Groq utilise pour formuler une réponse approfondie."""
+    """Produit une analyse privée utilisée pour formuler une réponse approfondie."""
     client_k3 = k3_client(key)
     if not client_k3:
         return ""
@@ -963,25 +1002,24 @@ async def summarize_episode(history):
         for t in (history or [])
         if isinstance(t, dict) and (t.get("content") or "").strip()
     ]
-    key = provider_key("groq", ENV_GROQ_LLM_KEY)
+    service, key, endpoint, models = fast_provider()
     if len(turns) < 2 or not key:
         return None
     transcript = "\n".join(turns[-24:])[:5000]
     episode_client = AsyncOpenAI(
-        api_key=key, base_url=GROQ_LLM_ENDPOINT, max_retries=0, timeout=20.0
+        api_key=key, base_url=endpoint, max_retries=0, timeout=20.0
     )
     for attempt in range(3):
         try:
             resp = await episode_client.chat.completions.create(
-                model=GROQ_LLM_PRIMARY,
+                model=models[0],
                 messages=[
                     {"role": "system", "content": EPISODE_PROMPT},
                     {"role": "user", "content": transcript},
                 ],
-                max_tokens=1000,
                 temperature=0.2,
                 response_format={"type": "json_object"},
-                extra_body={"reasoning_effort": "low"},
+                **fast_options(service, 1000),
             )
             data = json.loads(resp.choices[0].message.content or "{}")
             resume = str(data.get("resume") or "").strip()
@@ -1013,12 +1051,11 @@ async def summarize_episode(history):
 async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="normal", keys=None, mood=None, environment=None):
     """
     Cerveau central et unique de ΣIRIUS.
-    Groq formule la réponse utilisateur ; Kimi 2.6 apporte une réflexion en mode profond.
+    Cerebras (ou Groq sans clé Cerebras) répond ; Kimi 2.6 réfléchit en mode profond.
     """
     keys = keys or {}
     k3_key = provider_key("k3", ENV_K3_KEY, keys)
-    user_groq_key = personal_key("groq", keys)
-    groq_key = provider_key("groq", ENV_GROQ_LLM_KEY, keys)
+    service, groq_key, _, fast_models = fast_provider(keys)
     serp_key = provider_key("serp", ENV_SERP_KEY, keys)
     is_turbo = (mode or "normal").lower() == "turbo"
 
@@ -1051,7 +1088,7 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
             sys_prompt += _targeted_answer_guidance(targeted_research, prompt)
         # En mode turbo : un seul modèle rapide et un timeout court. En mode normal : tous les modèles
         # de repli disponibles et un délai plus généreux, pour privilégier la qualité de réponse.
-        models_to_try = GROQ_FALLBACK_MODELS[:1] if is_turbo else GROQ_FALLBACK_MODELS
+        models_to_try = fast_models[:1] if is_turbo else fast_models
         # 15 s suffisent largement pour 1200 tokens sur Groq : au-delà, le modèle est bloqué et
         # attendre 30 s par modèle ne fait qu'empiler la latence avant le repli.
         timeout = 10.0 if is_turbo else 15.0
@@ -1062,7 +1099,7 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
         # Réutilise le client HTTP partagé (pool de connexions conservé entre requêtes) plutôt
         # que d'en recréer un neuf à chaque appel — évite le handshake TLS répété et réduit la
         # latence perçue. Le timeout reste ajustable par appel (turbo vs normal).
-        client_groq = client if (client and not user_groq_key) else AsyncOpenAI(api_key=groq_key, base_url=GROQ_LLM_ENDPOINT, max_retries=0)
+        client_groq = fast_client(service, groq_key)
 
         # Historique resserré : 10 tours à 800 caractères (au lieu de 20 tours à 2000) — la
         # mémoire épisodique condensée prend déjà le relais pour le contexte plus ancien.
@@ -1088,13 +1125,9 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
                         *history_messages,
                         {"role": "user", "content": prompt},
                     ],
-                    max_tokens=max_tokens,
                     temperature=0.8,
-                    top_p=0.95,
-                    presence_penalty=0.9,
-                    frequency_penalty=0.4,
                     response_format={"type": "json_object"},
-                    extra_body=GROQ_JSON_OPTIONS,
+                    **fast_options(service, max_tokens),
                     timeout=timeout,
                 )
                 raw_json = resp.choices[0].message.content.strip()
@@ -1112,7 +1145,7 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
         if last_error:
             logger.warning(f"{tag} Repli suite à : {repr(last_error)}")
     elif not groq_key:
-        logger.warning(f"{tag} Aucune clé Groq disponible, retour local.")
+        logger.warning(f"{tag} Aucune clé de fournisseur rapide disponible, repli.")
 
     if k3_key:
         try:
@@ -1184,8 +1217,7 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
     """
     is_turbo = (mode or "normal").lower() == "turbo"
     k3_key = provider_key("k3", ENV_K3_KEY, keys)
-    user_groq_key = personal_key("groq", keys)
-    groq_key = provider_key("groq", ENV_GROQ_LLM_KEY, keys)
+    service, groq_key, _, fast_models = fast_provider(keys)
     serp_key = provider_key("serp", ENV_SERP_KEY, keys)
 
     # ⚡ APPRENTISSAGE INSTANTANÉ : mémorisation/correction sans aller-retour LLM.
@@ -1213,7 +1245,7 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
         else:
             yield "Je n'ai pas pu générer de réponse pour le moment. Réessaie dans un instant."
         return
-    models_to_try = GROQ_FALLBACK_MODELS[:1] if is_turbo else GROQ_FALLBACK_MODELS
+    models_to_try = fast_models[:1] if is_turbo else fast_models
     if reflection:
         sys_prompt += "\n\nNOTES DE RÉFLEXION PRIVÉES :\n" + reflection
     if research:
@@ -1225,7 +1257,7 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
     # ça n'a jamais de sens à l'oral et ça ne fait qu'allonger le pire cas de génération.
     max_tokens = 512 if is_turbo else 1200
     client_groq = (
-        (client if (client and not user_groq_key) else AsyncOpenAI(api_key=groq_key, base_url=GROQ_LLM_ENDPOINT, max_retries=0))
+        fast_client(service, groq_key)
         if groq_key else None
     )
 
@@ -1251,14 +1283,10 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
                     *history_messages,
                     {"role": "user", "content": prompt},
                 ],
-                max_tokens=max_tokens,
                 temperature=temperature,
                 timeout=timeout,
                 stream=True,
-                **({
-                    "top_p": 0.95, "presence_penalty": 0.9, "frequency_penalty": 0.4,
-                    "extra_body": GROQ_JSON_OPTIONS,
-                } if model_name != K3_MODEL else {}),
+                **(fast_options(service, max_tokens) if model_name != K3_MODEL else {"max_tokens": max_tokens}),
             )
             async for chunk in stream:
                 delta = chunk.choices[0].delta.content if chunk.choices else None
@@ -1295,13 +1323,13 @@ async def extract_memory_background(prompt, answer):
     Appelée en tâche de fond APRÈS que la réponse a déjà été restituée (voix + affichage) :
     n'ajoute donc aucune latence perçue. Best-effort — toute erreur est avalée silencieusement.
     """
-    key = provider_key("groq", ENV_GROQ_LLM_KEY)
+    service, key, _, models = fast_provider()
     if not key or not prompt or not answer:
         return []
     try:
-        client_groq = client if key == ENV_GROQ_LLM_KEY and client else AsyncOpenAI(api_key=key, base_url=GROQ_LLM_ENDPOINT, max_retries=0)
+        client_groq = fast_client(service, key)
         resp = await client_groq.chat.completions.create(
-            model=GROQ_LLM_PRIMARY,
+            model=models[0],
             messages=[
                 {"role": "system", "content": (
                     "Tu extrais les faits durables nouvellement appris sur l'utilisateur à partir d'un "
@@ -1312,10 +1340,9 @@ async def extract_memory_background(prompt, answer):
                 )},
                 {"role": "user", "content": f"Utilisateur : {prompt}\nSirius : {answer}"},
             ],
-            max_tokens=200,
             temperature=0.2,
             response_format={"type": "json_object"},
-            extra_body=GROQ_JSON_OPTIONS,
+            **fast_options(service, 200),
             timeout=8.0,
         )
         raw = (resp.choices[0].message.content or "").strip()

@@ -368,7 +368,7 @@ async def ui_intent(req: IntentRequest, request: Request):
             raise
     # After the trial without a personal key, parse_intent uses its local parser only.
     # Per-provider precedence: only a personal Groq key replaces the owner key for intent parsing.
-    if owner_allowed(user) and not personal_key("groq", req.keys):
+    if owner_allowed(user) and not (personal_key("groq", req.keys) or personal_key("cerebras", req.keys)):
         await usage_quota.consume(db, user, "chat")
     result = await parse_intent((req.text or "").strip())
     return result
@@ -391,9 +391,9 @@ async def chat(req: ChatRequest, request: Request):
         return await cloud_link.relay_json("/api/chat", req.model_dump())
     session_id = f"{uid}:{req.session_id or 'default'}"
     autonomous_action = detect_autonomous_action(texte)
-    if not autonomous_action and not personal_key("k3", req.keys):
+    if not autonomous_action and not (personal_key("k3", req.keys) or personal_key("cerebras", req.keys)):
         require_personal("groq", req.keys)
-    if not autonomous_action and not (personal_key("groq", req.keys) or personal_key("k3", req.keys)):
+    if not autonomous_action and not (personal_key("groq", req.keys) or personal_key("k3", req.keys) or personal_key("cerebras", req.keys)):
         await usage_quota.consume(db, user, "chat")
 
     # Historique de la session (8 derniers échanges)
@@ -491,9 +491,9 @@ async def chat_stream(req: ChatRequest, request: Request):
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
     autonomous_action = detect_autonomous_action(texte)
-    if not autonomous_action and not personal_key("k3", req.keys):
+    if not autonomous_action and not (personal_key("k3", req.keys) or personal_key("cerebras", req.keys)):
         require_personal("groq", req.keys)
-    if not autonomous_action and not (personal_key("groq", req.keys) or personal_key("k3", req.keys)):
+    if not autonomous_action and not (personal_key("groq", req.keys) or personal_key("k3", req.keys) or personal_key("cerebras", req.keys)):
         await usage_quota.consume(db, user, "chat")
     session_id = f"{uid}:{req.session_id or 'default'}"
     doc = await db.sirius_chats.find_one({"session_id": session_id}, {"_id": 0, "history": 1})
@@ -552,7 +552,7 @@ async def chat_stream(req: ChatRequest, request: Request):
                         from sirius_brain import extract_memory_background
                         # After the response: owner use still counts against the daily trial quota.
                         async with metered_scope(db, account, req.keys) as state:
-                            if state["blocked"] and not personal_key("groq", req.keys):
+                            if state["blocked"] and not (personal_key("groq", req.keys) or personal_key("cerebras", req.keys)):
                                 return
                             memories = await extract_memory_background(texte, answer)
                         for m in memories:
@@ -667,7 +667,7 @@ class KeysCheckRequest(BaseModel):
 _KEY_CHECK_SPECS = {
     "groq": {
         "label": "Cerveau ΣIRIUS",
-        "env": ("GROQ_API_KEY", "GROQ_KEY", "K3_API_KEY", "DANIEL_DEV_K3"),
+        "env": ("CEREBRAS_API_KEY", "GROQ_API_KEY", "GROQ_KEY", "K3_API_KEY", "DANIEL_DEV_K3"),
     },
     "serp": {
         "label": "SerpAPI",
@@ -694,6 +694,8 @@ def _keys_check_response(keys: dict[str, str]) -> dict:
 
     for service, spec in _KEY_CHECK_SPECS.items():
         browser_key = (keys.get(service) or "").strip()
+        if service == "groq":
+            browser_key = personal_key("cerebras", keys) or personal_key("groq", keys) or personal_key("k3", keys)
         server_key = _env_key(*spec["env"])
         if browser_key or server_key:
             state = "ok"
@@ -795,6 +797,10 @@ async def keys_validate(body: KeyValidateIn, request: Request):
                 r = await cx.get(f"{K3_ENDPOINT}/models", headers={"Authorization": f"Bearer {k}"})
                 return {"ok": r.status_code == 200,
                         "message": "Clé Kimi K3 valide." if r.status_code == 200 else f"Clé refusée par Moonshot ({r.status_code})."}
+            if s in ("cerebras", "cerebras_key"):
+                r = await cx.get("https://api.cerebras.ai/v1/models", headers={"Authorization": f"Bearer {k}"})
+                return {"ok": r.status_code == 200,
+                        "message": "Clé Cerebras valide." if r.status_code == 200 else f"Clé refusée par Cerebras ({r.status_code})."}
             if s in ("groq", "groq_key", "groq_real", "groq-real", "groqreal"):
                 r = await cx.get("https://api.groq.com/openai/v1/models", headers={"Authorization": f"Bearer {k}"})
                 return {"ok": r.status_code == 200,
@@ -2072,7 +2078,7 @@ from outlook_graph import make_outlook_router
 async def chat_status():
     import sirius_brain as _sb
     gmaps_env = (os.environ.get("GOOGLE_MAPS_API_KEY") or os.environ.get("MAPS_PLATFORM_API_Key") or "").strip()
-    return {"groq_env": owner_allowed() and bool(_sb.ENV_GROQ_LLM_KEY or _sb.ENV_K3_KEY),
+    return {"groq_env": owner_allowed() and bool(_sb.ENV_CEREBRAS_KEY or _sb.ENV_GROQ_LLM_KEY or _sb.ENV_K3_KEY),
             "gmaps_env": owner_allowed() and bool(gmaps_env)}
 
 api_router.include_router(make_outlook_router(db))
@@ -2192,6 +2198,7 @@ async def setup_status(request: Request):
     allowed = owner_allowed(user)
     services = []
     specs = {
+        "cerebras": ("Conversation rapide", ("CEREBRAS_API_KEY",)),
         "groq": ("Conversation et transcription", ("GROQ_KEY", "GROQ_API_KEY")),
         "k3": ("Kimi", ("K3_API_KEY", "DANIEL_DEV_K3")),
         "serp": ("Recherche web", ("SERP_API_KEY",)),
@@ -2202,7 +2209,7 @@ async def setup_status(request: Request):
         "alphavantage": ("Marchés", ("ALPHA_VANTAGE_API_KEY",)),
     }
     # Maps runs in the browser with the user key; Alpha Vantage via Oracle av_key; fal via req.keys.fal.
-    personal_capable = {"groq", "k3", "serp", "google_tts", "gemini_tts", "fal", "gmaps", "alphavantage"}
+    personal_capable = {"cerebras", "groq", "k3", "serp", "google_tts", "gemini_tts", "fal", "gmaps", "alphavantage"}
 
     def owner_has(names):
         return allowed and any(os.getenv(name, "").strip() for name in names)
@@ -2216,11 +2223,11 @@ async def setup_status(request: Request):
         return item
 
     # Aggregate capabilities first: the client wizard reads ids "chat", "stt" and "tts".
-    if owner_has(specs["groq"][1] + specs["k3"][1]):
-        services.append(entry("chat", "Conversation IA", "configured", "owner", True, ["groq", "k3"]))
+    if owner_has(specs["cerebras"][1] + specs["groq"][1] + specs["k3"][1]):
+        services.append(entry("chat", "Conversation IA", "configured", "owner", True, ["cerebras", "groq", "k3"]))
     else:
         services.append(entry("chat", "Conversation IA", "not_configured",
-                              "owner" if allowed else "personal", True, ["groq", "k3"]))
+                              "owner" if allowed else "personal", True, ["cerebras", "groq", "k3"]))
     if owner_has(specs["groq"][1]):
         services.append(entry("stt", "Transcription vocale", "configured", "owner", True, ["groq"]))
     else:
@@ -2246,7 +2253,7 @@ async def setup_status(request: Request):
     relay_chat = cloud_link.should_relay_chat({})
     relayed = set()
     if relay_chat:
-        relayed |= {"chat", "groq", "k3"}
+        relayed |= {"chat", "cerebras", "groq", "k3"}
     if cloud_link.should_relay_stt(""):
         relayed |= {"stt", "groq"}
     if cloud_link.should_relay_tts("GOOGLE_TTS_API_KEY"):
@@ -2299,7 +2306,10 @@ class SetupTestChatIn(BaseModel):
 
 
 def _setup_chat_target(keys: dict[str, str]):
-    from sirius_brain import GROQ_LLM_ENDPOINT, GROQ_LLM_PRIMARY, K3_ENDPOINT, K3_MODEL
+    from sirius_brain import GROQ_LLM_ENDPOINT, GROQ_LLM_PRIMARY, K3_ENDPOINT, K3_MODEL, CEREBRAS_ENDPOINT, CEREBRAS_MODEL
+    cerebras = personal_key("cerebras", keys)
+    if cerebras:
+        return "cerebras", cerebras, CEREBRAS_ENDPOINT, CEREBRAS_MODEL, True
     groq = personal_key("groq", keys)
     kimi = personal_key("k3", keys)
     if groq:
@@ -2310,7 +2320,10 @@ def _setup_chat_target(keys: dict[str, str]):
     if not owner_allowed():
         raise HTTPException(status_code=403, detail=PERSONAL_REQUIRED)
     owner_groq = (os.getenv("GROQ_KEY") or os.getenv("GROQ_API_KEY") or "").strip()
+    owner_cerebras = (os.getenv("CEREBRAS_API_KEY") or "").strip()
     owner_kimi = (os.getenv("K3_API_KEY") or os.getenv("DANIEL_DEV_K3") or "").strip()
+    if owner_cerebras:
+        return "cerebras", owner_cerebras, CEREBRAS_ENDPOINT, CEREBRAS_MODEL, False
     if owner_groq:
         return "groq", owner_groq, GROQ_LLM_ENDPOINT, GROQ_LLM_PRIMARY, False
     if owner_kimi:
@@ -2335,17 +2348,21 @@ async def setup_test_chat(body: SetupTestChatIn, request: Request):
             raise _cloud_setup_error(error) from error
         ok = remote.get("ok") is True
         message = remote.get("message") if isinstance(remote.get("message"), str) else ""
-        return {"ok": ok, "provider": remote.get("provider") if remote.get("provider") in ("groq", "kimi") else "cloud",
+        return {"ok": ok, "provider": remote.get("provider") if remote.get("provider") in ("cerebras", "groq", "kimi") else "cloud",
                 "source": "cloud", "message": message or ("Connexion ΣIRIUS Cloud réussie." if ok else "ΣIRIUS Cloud n'a pas confirmé la connexion.")}
     provider, key, endpoint, model, personal = _setup_chat_target(keys)
     # Registers the credential for log redaction without changing which key is used.
-    provider_key("groq" if provider == "groq" else "k3", "" if personal else key)
+    provider_key("k3" if provider == "kimi" else provider, "" if personal else key)
     if not personal:
         await usage_quota.consume(db, user, "chat")
-    label = "Groq" if provider == "groq" else "Kimi"
+    label = {"groq": "Groq", "cerebras": "Cerebras", "kimi": "Kimi"}[provider]
     payload = {"model": model, "messages": [{"role": "user", "content": "Réponds uniquement : OK"}], "max_tokens": 64}
-    if provider == "groq":
+    if provider in ("groq", "cerebras"):
         payload["reasoning_effort"] = "low"
+    if provider == "cerebras":
+        payload.pop("max_tokens")
+        payload["max_completion_tokens"] = 2112
+        payload["reasoning_format"] = "hidden"
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(15.0, connect=5.0)) as cx:
             response = await cx.post(f"{endpoint.rstrip('/')}/chat/completions", json=payload,

@@ -30,6 +30,15 @@ jest.mock("./lazyModules", () => new Proxy({}, { get: (_, key) => {
   if (key === "MediaModulesPanel") return ({ onClose }) => (
     <div data-testid="media-modules-panel"><button onClick={onClose}>Fermer le catalogue</button></div>
   );
+  if (key === "SiriusSetup") return ({ onCancel }) => (
+    <div data-testid="workspace-SiriusSetup"><button onClick={onCancel}>Fermer</button></div>
+  );
+  if (key === "Odysseia") return ({ open, onClose }) => open ? (
+    <div data-testid="workspace-Odysseia"><button onClick={onClose}>Fermer</button></div>
+  ) : null;
+  if (["VoiceProfilePanel", "WorkDossiersPanel"].includes(key)) return ({ onClose }) => (
+    <div data-testid={`workspace-${key}`}><button onClick={onClose}>Fermer</button></div>
+  );
   if (key === "SiriusDisplay") return ({ item, onRead }) => <div data-testid="sirius-display">
     <button data-testid="sirius-display-read" onClick={onRead}>Lire</button>
     <div data-testid="sirius-display-body">{item.contenu}</div>
@@ -171,6 +180,33 @@ test("the HUD no longer mounts the next-actions pill", async () => {
   await mount();
   expect(host.querySelector('[data-testid="sirius-title"]')).not.toBeNull();
   expect(host.querySelector(".shud-next")).toBeNull();
+});
+
+test("the desktop workspace connects to existing wheels, settings, dossiers and personal voice", async () => {
+  await mount();
+  const nav = host.querySelector('[data-testid="workspace-navigation"]');
+  const clickEntry = async (label) => {
+    const button = [...nav.querySelectorAll("button")].find((entry) => entry.textContent === label);
+    await act(async () => button.click());
+  };
+  await clickEntry("Modules");
+  expect(document.querySelector('[data-testid="modules-menu"]')).not.toBeNull();
+  await act(async () => document.querySelector('[data-testid="modules-menu-close"]').click());
+  await clickEntry("Informations");
+  expect(host.querySelector('[data-testid="info-wheel"]')).not.toBeNull();
+  for (const [label, panel] of [
+    ["Configuration", "SiriusSetup"], ["ODYSSEIA", "Odysseia"],
+    ["Mes dossiers", "WorkDossiersPanel"], ["Ma voix et ma diction", "VoiceProfilePanel"],
+  ]) {
+    await clickEntry(label);
+    const window = host.querySelector(`[data-testid="workspace-${panel}"]`);
+    expect(window).not.toBeNull();
+    await act(async () => window.querySelector("button").click());
+    expect(host.querySelector(`[data-testid="workspace-${panel}"]`)).toBeNull();
+  }
+  await clickEntry("Assistant");
+  await act(async () => jest.advanceTimersByTime(0));
+  expect(document.activeElement).toBe(host.querySelector('[data-testid="sirius-cmd-input"]'));
 });
 
 test("une initiative rejoint le Display et le contexte de la reponse suivante", async () => {

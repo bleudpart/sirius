@@ -1,6 +1,6 @@
 const ITERATIONS = 600000;
 const MAX_FILE_BYTES = 128 * 1024;
-const KEY_NAMES = ["groq_key", "groq", "serp", "fal", "gmaps", "alphavantage", "google_tts", "gemini_tts"];
+const KEY_NAMES = ["cerebras", "groq_key", "groq", "serp", "fal", "gmaps", "alphavantage", "google_tts", "gemini_tts"];
 const utf8 = (text) => new TextEncoder().encode(text);
 
 function cryptoApi() {

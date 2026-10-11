@@ -324,28 +324,29 @@ def test_google_tts_validation_rejects_long_but_invalid_key(server_api, monkeypa
     assert "private key detail" not in response.text
 
 
-def test_real_chat_intent_and_stream_routes_bind_personal_scope(server_api, monkeypatch):
+@pytest.mark.parametrize("provider, key_name", [("groq", "groq_key"), ("cerebras", "cerebras")])
+def test_real_chat_intent_and_stream_routes_bind_personal_scope(server_api, monkeypatch, provider, key_name):
     import sirius_brain
     client, _, server = server_api
     seen = []
     async def memory(*args):
         return []
     async def answer(**kwargs):
-        seen.append(access.provider_key("groq", "owner-brain"))
+        seen.append(access.provider_key(provider, "owner-brain"))
         assert access.provider_key("k3", "owner-reflection") == ""
         return {"reponse": "personnel"}
     async def intent(text):
-        seen.append(access.provider_key("groq", "owner-intent"))
+        seen.append(access.provider_key(provider, "owner-intent"))
         return {"action": "general", "query": text}
     async def stream(**kwargs):
-        seen.append(access.provider_key("groq", "owner-stream"))
+        seen.append(access.provider_key(provider, "owner-stream"))
         yield "personnel"
     monkeypatch.setattr(server, "_gather_memory_context", memory)
     monkeypatch.setattr(server, "ask_sirius", answer)
     monkeypatch.setattr(server, "parse_intent", intent)
     monkeypatch.setattr(server, "should_extract_memory", lambda *args: False)
     monkeypatch.setattr(sirius_brain, "ask_sirius_stream", stream)
-    body = {"text": "bonjour", "keys": {"groq_key": "invalid-personal"}}
+    body = {"text": "bonjour", "keys": {key_name: "invalid-personal"}}
     assert client.post("/api/chat", json=body).status_code == 200
     assert client.post("/api/chat/stream", json=body).status_code == 200
     assert client.post("/api/intent", json=body).status_code == 200
@@ -1133,22 +1134,47 @@ def _status_services(client):
     return {service["id"]: service for service in response.json()["services"]}
 
 
-@pytest.mark.parametrize("env_name", ["GROQ_KEY", "K3_API_KEY"])
+@pytest.mark.parametrize("env_name", ["CEREBRAS_API_KEY", "GROQ_KEY", "K3_API_KEY"])
 def test_status_aggregate_chat_is_configured_from_groq_or_kimi_during_trial(server_api, monkeypatch, env_name):
     client, user, server = server_api
     asyncio.run(server.db.users.update_one({"user_id": user["user_id"]}, {"$set": {"trial_started_at": access.utc_now()}}))
-    for name in ("GROQ_KEY", "GROQ_API_KEY", "K3_API_KEY", "DANIEL_DEV_K3", "GOOGLE_TTS_API_KEY",
+    for name in ("CEREBRAS_API_KEY", "GROQ_KEY", "GROQ_API_KEY", "K3_API_KEY", "DANIEL_DEV_K3", "GOOGLE_TTS_API_KEY",
                  "GOOGLE_CLOUD_TTS_API_KEY", "GEMINI_TTS_API_KEY"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv(env_name, "owner-private")
     services = _status_services(client)
     assert (services["chat"]["state"], services["chat"]["scope"]) == ("configured", "owner")
-    assert services["chat"]["providers"] == ["groq", "k3"]
+    assert services["chat"]["providers"] == ["cerebras", "groq", "k3"]
     expected_stt = "configured" if env_name == "GROQ_KEY" else "not_configured"
     assert (services["stt"]["state"], services["stt"]["scope"]) == (expected_stt, "owner")
     assert (services["tts"]["state"], services["tts"]["scope"]) == ("available", "local")
     monkeypatch.setenv("GEMINI_TTS_API_KEY", "owner-voice-private")
     assert (_status_services(client)["tts"]["state"]) == "configured"
+
+
+def test_cerebras_setup_uses_personal_endpoint_after_trial(server_api, monkeypatch):
+    client, _, server = server_api
+    requests = []
+
+    def provider(request):
+        requests.append(request)
+        return httpx.Response(200, json={"choices": [{"message": {"content": "OK"}}]})
+
+    mock_server_http(monkeypatch, server, provider)
+    response = client.post("/api/setup/test-chat", json={"keys": {"cerebras": "personal-test-cerebras"}})
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+    assert response.json()["provider"] == "cerebras"
+    assert response.json()["source"] == "personal"
+    assert requests[0].url.host == "api.cerebras.ai"
+    import json
+    payload = json.loads(requests[0].content)
+    assert payload["model"] == "gpt-oss-120b"
+    assert payload["reasoning_effort"] == "low"
+    assert payload["reasoning_format"] == "hidden"
+    assert payload["max_completion_tokens"] == 2112
+    assert "max_tokens" not in payload
+    assert "personal-test-cerebras" not in response.text
 
 
 def _as_local_admin(client, server):

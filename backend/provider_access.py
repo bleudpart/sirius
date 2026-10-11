@@ -26,6 +26,7 @@ _owner_uses = ContextVar("sirius_owner_uses", default=None)
 _quota_block = ContextVar("sirius_quota_block", default=None)
 _charged = ContextVar("sirius_quota_charged", default=None)
 _ALIASES = {
+    "cerebras": ("cerebras", "cerebras_key"),
     "groq": ("groq_key", "groq_real"),
     "k3": ("k3", "kimi", "groq"),
     "serp": ("serp", "serpapi"),

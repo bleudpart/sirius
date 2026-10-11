@@ -1,4 +1,4 @@
-import { Radio } from "lucide-react";
+import { Mic } from "lucide-react";
 
 export default function PushToTalkButton({ active, ready, onStart, onStop }) {
   return (
@@ -17,8 +17,9 @@ export default function PushToTalkButton({ active, ready, onStart, onStop }) {
       data-testid="sirius-ptt-btn"
       title="Talkie-walkie : maintenir pour parler, relâcher pour envoyer (ou touche Espace)"
       aria-pressed={active}
+      aria-label={active ? (ready ? "Microphone ouvert : relâchez pour envoyer" : "Ouverture du microphone") : "Maintenir pour parler, relâcher pour envoyer"}
     >
-      <Radio size={15} />
+      <Mic size={18} aria-hidden="true" />
       <span className="ptt-label">
         <span>{active ? (ready ? "À VOUS" : "OUVERTURE…") : "ESPACE"}</span>
       </span>

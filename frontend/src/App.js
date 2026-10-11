@@ -34,6 +34,7 @@ import { startWakeSequence } from "@/wakeSequence";
 import CommandPalette from "@/CommandPalette";
 import ModulesMenu from "@/ModulesMenu";
 import MobileNavigation from "@/MobileNavigation";
+import { WorkspaceNavigation, WorkspaceSummary } from "@/components/WorkspaceRails";
 import { useAuth } from "@/AuthGate";
 import useMailCache from "@/hooks/useMailCache";
 import { App as CapacitorApp } from "@capacitor/app";
@@ -6593,7 +6594,7 @@ function App() {
     const storedScale = localStorage.getItem("sirius_hud_scale");
     const saved = Number(storedScale);
     if (storedScale !== null && Number.isFinite(saved)) return Math.min(1.1, Math.max(0.8, saved));
-    return window.innerWidth <= 900 ? 0.82 : 1;
+    return 1;
   });
   const hudScaleStartRef = useRef(hudScale);
   const touchToastTimer = useRef(null);
@@ -7132,7 +7133,7 @@ function App() {
       {/* Barre supérieure */}
       <header className="top-bar">
         <div className="brand-tag" data-testid="sirius-brand-tag">
-          Σ I R I U S
+          ΣIRIUS
         </div>
         <div className="sys-indicators" data-testid="sirius-indicators">
           <span className="ind"><i className="ind-dot orange" />IA</span>
@@ -7391,6 +7392,16 @@ function App() {
 
       {/* Tableau de bord principal ΣIRIUS — noyau central + fenêtre d'info unique */}
       <main className="sirius-dashboard sirius-dashboard--hub">
+        <WorkspaceNavigation
+          active={showModulesMenu ? "modules" : showOdysseia ? "odysseia" : showInfoWheel ? "info" : showSetup ? "settings" : "assistant"}
+          onAssistant={() => navigateMobile("assistant")}
+          onModules={() => navigateMobile("modules")}
+          onInfo={() => navigateMobile("info")}
+          onSettings={() => navigateMobile("profile")}
+          onOdysseia={() => moduleActionsRef.current.openOdysseia()}
+          onDossiers={() => moduleActionsRef.current.openWorkDossiers()}
+          onVoice={() => moduleActionsRef.current.openVoiceProfile()}
+        />
         {mobileDestination === "info" && (
           <aside className="sirius-column sirius-column--left">
             <SiriusInfoHub
@@ -7427,16 +7438,16 @@ function App() {
             )}
           </div>
           <div className="sirius-identity">
+            <span className="workspace-kicker">L’INTELLIGENCE À VOTRE SERVICE</span>
             <h1 className="sirius-title" data-testid="sirius-title">
               <span className="sirius-title-label">
-                <span className="sirius-wordmark">ΣIRIUS</span>
-                <span className="sirius-tagline">TON ASSISTANT PRIVILÉGIÉ</span>
+                <span className="sirius-wordmark workspace-welcome">
+                  {["dusk", "night"].includes(phaseOfDay()) ? "Bonsoir" : "Bonjour"}{userName ? `, ${userName}` : ""}.
+                </span>
+                <span className="sirius-tagline">Que souhaitez-vous explorer aujourd’hui ?</span>
               </span>
             </h1>
           </div>
-        </section>
-      </main>
-
       <div className="sirius-command-area">
 
         {/* Zone de réponse supprimée : Sirius répond uniquement dans ΣIRIUS DISPLAY */}
@@ -7467,7 +7478,7 @@ function App() {
             type="text"
             value={cmd}
             onChange={(e) => setCmd(e.target.value)}
-            placeholder="Tapez une commande... (ex: allume le salon, quelle heure est-il)"
+            placeholder="Écrivez votre demande à ΣIRIUS…"
             data-testid="sirius-cmd-input"
           />
           <PushToTalkButton active={pttActive} ready={captureMicOn} onStart={pttDown} onStop={pttUp} />
@@ -7476,6 +7487,11 @@ function App() {
         <VoiceSessionControls phase={voicePhase} message={voiceMessage} onStop={stopVoice}
           androidRecognition={Capacitor.getPlatform() === "android" ? androidRecognition : null}
           onRecognitionChange={changeAndroidRecognition} />
+        <div className="workspace-shortcuts" role="group" aria-label="Raccourcis de votre espace">
+          <button type="button" onClick={() => navigateMobile("modules")}>Ouvrir mes modules</button>
+          <button type="button" onClick={() => moduleActionsRef.current.openOdysseia()}>Explorer ODYSSEIA</button>
+          <button type="button" onClick={() => moduleActionsRef.current.openWorkDossiers()}>Mes dossiers</button>
+        </div>
         {handsFreeAvailable && (
           <details data-testid="native-audio-diagnostics">
             <summary>Capture native expérimentale et essais audio (Diagnostic)</summary>
@@ -7535,6 +7551,12 @@ function App() {
           <span className="hud-version-badge footer-version-badge" title={APP_RELEASE}>v{APP_VERSION}</span>
         </footer>
       </div>
+        </section>
+        <WorkspaceSummary connected={connected}
+          onDossiers={() => moduleActionsRef.current.openWorkDossiers()}
+          onVoice={() => moduleActionsRef.current.openVoiceProfile()}
+          onOdysseia={() => moduleActionsRef.current.openOdysseia()} />
+      </main>
 
       <MobileNavigation active={showModulesMenu ? "modules" : mobileDestination} onNavigate={navigateMobile} />
 
