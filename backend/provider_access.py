@@ -258,6 +258,7 @@ class ProviderAccessMiddleware:
         "/api/news/headlines", "/api/weather/current", "/api/country", "/api/technews/bulletin",
         "/api/documentary", "/api/europeana/search", "/api/oracle/overview", "/api/pantheon/ocr",
         "/api/nummarius/market", "/api/nummarius/alerts", "/api/hephaistos/diagnostic", "/api/agora/coach",
+        "/api/work-dossiers/live/evaluate",
     }
     _optional_prefixes = ("/api/task/video/status/", "/api/nummarius/history/")
 

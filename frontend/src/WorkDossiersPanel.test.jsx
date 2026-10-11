@@ -72,7 +72,7 @@ const invoice = { source: { kind: "facture", id: "invoice-1", module: "themis" }
 const haccp = { source: { kind: "haccp_nonconformity", id: "nc-1", module: "haccp" },
   data: { type: "Température", description: "Frigo hors plage" }, fingerprint: "nc-v1" };
 
-async function workspace({ entries = [], sources = [stock, invoice, haccp], failWrite = false, suggestions, unavailableSources = 0, proposals = [], day, dayFailure = false, preparationResponse, reviewQueue = [], clientTimeline } = {}) {
+async function workspace({ entries = [], sources = [stock, invoice, haccp], failWrite = false, suggestions, unavailableSources = 0, proposals = [], day, dayFailure = false, preparationResponse, reviewQueue = [], clientTimeline, initialDossierId = "" } = {}) {
   const originalFetch = global.fetch;
   const dossiers = [{ id: "d1", title: "Boutique", category: "commerce", notes: [], sources: sources.map((item) => item.source) },
     { id: "d2", title: "Chantier", category: "chantier", notes: [], sources: [] }];
@@ -116,7 +116,7 @@ async function workspace({ entries = [], sources = [stock, invoice, haccp], fail
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
-  await act(async () => root.render(<WorkDossiersPanel onClose={() => {}} onOpenThemis={openThemis} onOpenHaccp={openHaccp} />));
+  await act(async () => root.render(<WorkDossiersPanel onClose={() => {}} onOpenThemis={openThemis} onOpenHaccp={openHaccp} initialDossierId={initialDossierId} />));
   const button = (label) => [...container.querySelectorAll("button")].find((node) => node.textContent === label);
   const field = (label) => [...container.querySelectorAll("label")].find((node) => node.firstChild.textContent === label)?.querySelector("input,select,textarea");
   const change = async (node, value) => {
@@ -145,6 +145,19 @@ const explainedProposal = {
     proposed_action: { module: "themis", label: "Examiner le stock" },
     why_suggested: { source: stock.source, rule: "stock <= alert", threshold: 3, observed: 2, verified_at: "2026-10-02T12:00:00Z", missing_info: ["Délai fournisseur"] },
   };
+
+test("ouvre le dossier demandé par une initiative sans verrouiller la sélection", async () => {
+  const ui = await workspace({ initialDossierId: "d2" });
+  try {
+    expect(ui.button("Chantier · Chantier").getAttribute("aria-pressed")).toBe("true");
+    expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/d2/thread"), expect.anything());
+    await ui.click("Boutique · Commerce");
+    expect(ui.button("Boutique · Commerce").getAttribute("aria-pressed")).toBe("true");
+    expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/d1/thread"), expect.anything());
+  } finally {
+    ui.cleanup();
+  }
+});
 
   test("daily overview unifies sourced signals and active commitments, with transparent métier preparation", async () => {
     const ui = await workspace({ proposals: [explainedProposal], entries: [{

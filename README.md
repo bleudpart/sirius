@@ -40,6 +40,39 @@ une nouvelle annonce ; un échec n'est pas présenté comme un travail terminé.
 Ce suivi couvre les tâches enregistrées par SIRIUS, pas les applications externes
 auxquelles il n'a pas accès.
 
+### Suivi contextuel des dossiers
+
+Dans **Dossiers de travail**, « Comprendre le travail en cours » propose un suivi
+désactivé par défaut. La confirmation porte sur un seul dossier : comparaison
+locale seule, ou interprétation IA en ligne explicitement autorisée. Seules les
+sources déjà liées et encore autorisées sont lues ; aucun fichier ouvert, écran,
+dossier Windows ou document extérieur n'est surveillé.
+
+Quand l'application est ouverte et visible, une vérification est proposée chaque
+minute, hors traitement vocal. Les différences numériques sont calculées localement ;
+un pourcentage n'est pas inventé si la valeur précédente est zéro. L'IA reçoit les
+champs modifiés et leurs valeurs précédentes/actuelles, pas les documents binaires.
+L'ajout d'une source transmet les champs autorisés de cette nouvelle source.
+L'interprétation est étiquetée « à vérifier » et peut suggérer une vérification,
+jamais exécuter une commande, un envoi, une écriture métier ou une décision.
+
+Limites : 50 sources par dossier, les 10 premiers dossiers actifs par vérification,
+un appel IA au maximum par vérification et par minute pour un même dossier.
+Les changements intermédiaires sont regroupés au prochain appel autorisé. L'usage
+en ligne respecte les clés personnelles, l'essai et les quotas existants.
+Une panne IA laisse les différences locales disponibles avec un message explicite.
+« Comparer maintenant » utilise ces mêmes limites ; aucune analyse n'est garantie
+à la seconde près.
+
+Une initiative rejoint le dialogue, avec les différences, « Ouvrir le dossier » et
+« Mettre ce point de côté ». Retirer l'autorisation IA rétablit un nouveau point
+de comparaison sans IA. Arrêter le suivi efface sa mémoire de comparaison, pas
+les données métier. Une requête IA déjà envoyée ne peut pas être retirée du
+fournisseur, mais son résultat est rejeté si le consentement ou les sources ont
+changé. Les vues relues masquent les analyses périmées ou non autorisées ;
+les messages déjà affichés dans l'historique du dialogue ne sont pas effacés.
+Le connecteur vers des fichiers externes n'est pas inclus dans cette première couche.
+
 Sur les grandes fenêtres Windows (largeur de vue supérieure à 1023 px), les
 intérieurs des modules historiques partagent un habillage sobre : cartes
 arrondies, titres dorés, champs et onglets arrondis, sans cadres cyan lumineux

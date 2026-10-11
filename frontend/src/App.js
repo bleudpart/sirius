@@ -619,6 +619,7 @@ function App() {
   const [display, setDisplay] = useState({ type: "idle" });
   const [displayHistory, setDisplayHistory] = useState([]);
   const [displayOpen, setDisplayOpen] = useState(false);
+  const [liveDossierId, setLiveDossierId] = useState("");
   const displayCloseTimer = useRef(null);
   const pinDisplay = useCallback(() => { clearTimeout(displayCloseTimer.current); }, []);
   useEffect(() => {
@@ -7028,7 +7029,7 @@ function App() {
         if (id === "plans") setShowPlans(true);
         setActiveWorkModule(null);
       }} />}
-      {showWorkDossiers && <WorkDossiersPanel onClose={() => setShowWorkDossiers(false)}
+      {showWorkDossiers && <WorkDossiersPanel initialDossierId={liveDossierId} onClose={() => { setShowWorkDossiers(false); setLiveDossierId(""); }}
         onOpenThemis={(source) => { setThemisSource(source || null); setShowWorkDossiers(false); setShowThemis(true); }}
         onOpenHaccp={(source) => { setHaccpSource(source || null); setShowWorkDossiers(false); setHaccp({ sujet: "", auto: false }); }} />}
       {showSportCoach && <SportCoachPanel key={authUser?.id || authUser?._id || authUser?.email || "local"} user={authUser} onClose={() => setShowSportCoach(false)} />}
@@ -7319,7 +7320,10 @@ function App() {
           history={displayHistory}
           onSuggestionAction={async (a) => {
             if (!a || !a.type) throw new Error("Action proactive invalide");
-            if (a.type === "command") {
+            if (a.type === "work_dossier") {
+              setLiveDossierId(a.dossier_id);
+              setShowWorkDossiers(true);
+            } else if (a.type === "command") {
               if (a.prepare) setCmd(a.text || "");
               else if (processCommandRef.current) await processCommandRef.current(a.text);
             } else if (a.type === "memory_confirm" && a.memory_id) {

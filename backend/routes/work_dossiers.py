@@ -50,6 +50,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, StringConstraints
 
 from enterprise import effective_permissions
 from haccp import doc_status, trace_status
+from live_work import AI_INTERVAL_SECONDS, MAX_SOURCES, compare_sources, explain_changes, factual_summary, fingerprint, now_iso, work_lock
 
 
 class DossierIn(BaseModel):
@@ -68,6 +69,16 @@ Identifier = Annotated[str, StringConstraints(strip_whitespace=True, min_length=
 
 class WorkInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+class LiveSettingsIn(WorkInput):
+    enabled: StrictBool
+    allow_ai: StrictBool
+
+
+class LiveEvaluateIn(WorkInput):
+    keys: dict[Literal["groq_key", "groq", "k3", "kimi"], Annotated[str, StringConstraints(strict=True, max_length=512)]] = Field(default_factory=dict, max_length=4)
+    dossier_id: str | None = Field(default=None, min_length=1, max_length=120)
 
 
 class SourceIn(WorkInput):
@@ -1190,6 +1201,147 @@ def make_work_dossiers_router(db, require_user):
                 if snapshot:
                     snapshots.append(snapshot)
         return snapshots
+
+    @router.put("/{dossier_id}/live-settings")
+    async def live_settings(dossier_id: str, body: LiveSettingsIn, request: Request):
+        uid, scope, _ = await context(request)
+        async with work_lock(uid, dossier_id):
+            dossier = await dossier_for(dossier_id, uid)
+            if body.allow_ai and not body.enabled:
+                raise HTTPException(422, "Activez le suivi avant d'autoriser l'IA.")
+            sources = await current_sources(dossier, uid, scope) if body.enabled else []
+            if body.enabled and len(dossier.get("sources", [])) > MAX_SOURCES:
+                raise HTTPException(422, "Le suivi est limité à 50 sources par dossier.")
+            settings = {**body.model_dump(), "updated_at": _now()}
+            if body.enabled:
+                await db.sirius_work_live_states.update_one(
+                    {"user_id": uid, "dossier_id": dossier_id},
+                    {"$set": {"user_id": uid, "dossier_id": dossier_id, "sources": sources,
+                              "latest": None, "checked_at": _now(), "next_ai_at": 0,
+                              "settings_version": str(uuid.uuid4())}},
+                    upsert=True,
+                )
+            else:
+                await db.sirius_work_live_states.delete_many({"user_id": uid, "dossier_id": dossier_id})
+            await db.sirius_work_dossiers.update_one(
+                {"user_id": uid, "id": dossier_id}, {"$set": {"live_settings": settings}},
+            )
+        return {"settings": settings}
+
+    async def visible_live_event(event, uid, scope, dossier):
+        if not event or event.get("dismissed"):
+            return False
+        linked = {(item["kind"], item["id"]) for item in dossier.get("sources", [])}
+        for item in event["changes"]:
+            if (item["source"]["kind"], item["source"]["id"]) not in linked:
+                return False
+            current = await capture(item["source"], uid, scope)
+            if not current or current["fingerprint"] != item["fingerprint"]:
+                return False
+        return True
+
+    @router.get("/{dossier_id}/live")
+    async def live_status(dossier_id: str, request: Request):
+        uid, scope, _ = await context(request)
+        dossier = await dossier_for(dossier_id, uid)
+        settings = dossier.get("live_settings", {"enabled": False, "allow_ai": False})
+        state = await db.sirius_work_live_states.find_one({"user_id": uid, "dossier_id": dossier_id})
+        latest = state.get("latest") if state and settings["enabled"] else None
+        if not await visible_live_event(latest, uid, scope, dossier):
+            latest = None
+        return {"settings": settings, "checked_at": state.get("checked_at") if state else None, "latest": latest}
+
+    @router.post("/{dossier_id}/live/dismiss")
+    async def dismiss_live(dossier_id: str, body: NoteIn, request: Request):
+        uid, _, _ = await context(request)
+        async with work_lock(uid, dossier_id):
+            await dossier_for(dossier_id, uid)
+            await db.sirius_work_live_states.update_one(
+                {"user_id": uid, "dossier_id": dossier_id, "latest.id": body.text},
+                {"$set": {"latest.dismissed": True}},
+            )
+        return {"dismissed": True}
+
+    @router.post("/live/evaluate")
+    async def evaluate_live(body: LiveEvaluateIn, request: Request):
+        uid, scope, _ = await context(request)
+        query = {"user_id": uid, "live_settings.enabled": True}
+        if body.dossier_id:
+            await dossier_for(body.dossier_id, uid)
+            query["id"] = body.dossier_id
+        dossiers = await db.sirius_work_dossiers.find(query, {"_id": 0}).to_list(11)
+        updates, errors = [], []
+        ai_used = False
+        for dossier in dossiers[:10]:
+            did = dossier["id"]
+            async with work_lock(uid, did):
+                fresh_uid, scope, _ = await context(request)
+                if fresh_uid != uid:
+                    raise HTTPException(403, "La session a changé ; relancez la vérification.")
+                dossier = await dossier_for(did, uid)
+                settings = dossier.get("live_settings", {})
+                if not settings.get("enabled"):
+                    continue
+                if len(dossier.get("sources", [])) > MAX_SOURCES:
+                    errors.append({"dossier_id": did, "message": "Limite de 50 sources dépassée. Suivi suspendu pour ce dossier."})
+                    continue
+                state = await db.sirius_work_live_states.find_one({"user_id": uid, "dossier_id": did})
+                current = await current_sources(dossier, uid, scope)
+                checked_at = now_iso()
+                if not state:
+                    errors.append({"dossier_id": did, "message": "Réactivez le suivi pour établir un point de comparaison."})
+                    continue
+                changes = compare_sources(state.get("sources", []), current)
+                latest = state.get("latest")
+                if not changes:
+                    await db.sirius_work_live_states.update_one(
+                        {"user_id": uid, "dossier_id": did},
+                        {"$set": {"sources": current, "checked_at": checked_at}},
+                    )
+                    if await visible_live_event(latest, uid, scope, dossier):
+                        updates.append(latest)
+                    continue
+                version = state.get("settings_version")
+                previous_fingerprint = fingerprint(state.get("sources", []))
+                use_ai = settings.get("allow_ai")
+                if use_ai:
+                    timestamp = datetime.now(timezone.utc).timestamp()
+                    if ai_used or timestamp < state.get("next_ai_at", 0):
+                        continue
+                    ai_used = True
+                    await db.sirius_work_live_states.update_one(
+                        {"user_id": uid, "dossier_id": did},
+                        {"$set": {"next_ai_at": timestamp + AI_INTERVAL_SECONDS}},
+                    )
+            # Do not hold the settings lock during a network call: stopping is immediate.
+            analysis = await explain_changes(changes, body.keys) if use_ai else {
+                "status": "not_authorized", "text": "", "error": "",
+            }
+            async with work_lock(uid, did):
+                fresh_uid, scope, _ = await context(request)
+                dossier = await dossier_for(did, uid)
+                state = await db.sirius_work_live_states.find_one({"user_id": uid, "dossier_id": did})
+                if (fresh_uid != uid or not dossier.get("live_settings", {}).get("enabled")
+                        or not state or state.get("settings_version") != version
+                        or fingerprint(state.get("sources", [])) != previous_fingerprint):
+                    continue
+                fresh = await current_sources(dossier, uid, scope)
+                if fingerprint(fresh) != fingerprint(current):
+                    continue
+                latest = {
+                    "id": str(uuid.uuid4()), "dossier_id": did, "title": dossier["title"],
+                    "verified_at": now_iso(), "changes": changes, "analysis": analysis,
+                    "description": factual_summary(dossier["title"], changes),
+                    "dismissed": False, "executed": False,
+                }
+                await db.sirius_work_live_states.update_one(
+                    {"user_id": uid, "dossier_id": did},
+                    {"$set": {"sources": current, "latest": latest, "checked_at": checked_at}},
+                )
+                if await visible_live_event(latest, uid, scope, dossier):
+                    updates.append(latest)
+        return {"updates": updates, "errors": errors, "truncated": len(dossiers) > 10,
+                "poll_interval_seconds": 60}
 
     @router.post("/{dossier_id}/snapshots", status_code=201)
     async def checkpoint(dossier_id: str, request: Request):

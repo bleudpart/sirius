@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Play, Wrench, Clock3, XCircle, HelpCircle } from "lucide-react";
 import "./Proactive.css";
 import { API_BASE_URL } from "./lib/api";
+import { liveWorkKeys } from "./LiveWorkSettings";
 
 const API = API_BASE_URL;
 const IDLE_BEFORE_SUGGESTION_MS = 45000;
@@ -15,6 +16,7 @@ export default function ProactivePanel({ onSpeak, canSpeak, onInitiative, onErro
   const lastUserActivityRef = useRef(Date.now());
   const lastAnnouncementRef = useRef(null);
   const suggestionsRef = useRef([]);
+  const liveSuggestionsRef = useRef([]);
   const evaluatingRef = useRef(false);
   const mountedRef = useRef(false);
   const voiceBusyRef = useRef(false);
@@ -41,7 +43,8 @@ export default function ProactivePanel({ onSpeak, canSpeak, onInitiative, onErro
         || voiceBusyRef.current || canSpeakRef.current?.() === false
         || now - lastUserActivityRef.current < IDLE_BEFORE_SUGGESTION_MS
         || (lastAnnouncementRef.current !== null && now - lastAnnouncementRef.current < ANNOUNCEMENT_GAP_MS)) return;
-    const suggestion = suggestionsRef.current.find((item) => !announcedIdsRef.current.has(item.id));
+    const suggestion = [...liveSuggestionsRef.current, ...suggestionsRef.current]
+      .find((item) => !announcedIdsRef.current.has(item.id));
     if (!suggestion) return;
     const message = `${suggestion.description} ${suggestion.intervention || ""}`.trim();
     onInitiativeRef.current?.(suggestion, message);
@@ -107,6 +110,60 @@ export default function ProactivePanel({ onSpeak, canSpeak, onInitiative, onErro
     };
   }, [evaluate, announce]);
 
+  useEffect(() => {
+    let active = true;
+    let pending = false;
+    let generation = 0;
+    const controller = new AbortController();
+    const invalidate = (event) => {
+      generation += 1;
+      liveSuggestionsRef.current = liveSuggestionsRef.current.filter((item) => item.dossier_id !== event.detail);
+    };
+    const poll = async () => {
+      if (pending || document.visibilityState === "hidden" || voiceBusyRef.current
+          || canSpeakRef.current?.() === false) return;
+      pending = true;
+      const startedGeneration = generation;
+      try {
+        const response = await fetch(`${API}/work-dossiers/live/evaluate`, {
+          method: "POST", credentials: "include", signal: controller.signal,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ keys: liveWorkKeys() }),
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        if (!Array.isArray(data.updates)) throw new Error("Réponse de suivi invalide");
+        if (!active || generation !== startedGeneration) return;
+        liveSuggestionsRef.current = data.updates.map((item) => ({
+          id: item.id, dossier_id: item.dossier_id, source: "live_work", title: item.title,
+          description: item.description,
+          intervention: item.analysis.text ? `Interprétation à vérifier : ${item.analysis.text}` : "",
+          live: item,
+        }));
+        if (data.errors?.length || data.truncated) {
+          onErrorRef.current?.(data.errors?.map((item) => item.message).join(" ")
+            || "Le suivi automatique est limité aux 10 premiers dossiers actifs.");
+        }
+        announce();
+      } catch (cause) {
+        if (!active || cause.name === "AbortError") return;
+        console.error("Suivi contextuel indisponible :", cause);
+        onErrorRef.current?.("Suivi contextuel indisponible : vérifiez la connexion au backend.");
+      } finally {
+        pending = false;
+      }
+    };
+    poll();
+    window.addEventListener("sirius:live-settings-changed", invalidate);
+    const timer = window.setInterval(poll, 60000);
+    return () => {
+      active = false;
+      controller.abort();
+      window.removeEventListener("sirius:live-settings-changed", invalidate);
+      window.clearInterval(timer);
+    };
+  }, [announce]);
+
   return null;
 }
 
@@ -163,6 +220,43 @@ export function ProactiveConversation({ suggestion, onAction, onSpeak }) {
 
   const s = suggestion;
   if (completed) return <p className="pro-conversation-result" role="status">Votre choix a été pris en compte.</p>;
+  if (s.source === "live_work") return <div className="pro-conversation" data-testid="live-work-conversation">
+    {error && <p role="alert">{error}</p>}
+    <p>Sources vérifiées le {new Date(s.live.verified_at).toLocaleString("fr-FR")} · aucune action exécutée.</p>
+    {s.live.analysis.error && <p role="status">{s.live.analysis.error}</p>}
+    <details><summary>Voir les différences calculées</summary>
+      {s.live.changes.map((change) => <div key={`${change.source.kind}:${change.source.id}`}>
+        <strong>{change.source.kind} · {change.source.id}</strong>
+        <ul>{change.fields.map((field) => <li key={field.name}>
+          {field.name} : {JSON.stringify(field.before)} → {JSON.stringify(field.after)}
+          {field.delta != null && ` · différence ${field.delta}${field.percent != null ? ` (${field.percent} %)` : ""}`}
+        </li>)}</ul>
+      </div>)}
+    </details>
+    <fieldset className="sugg-actions" disabled={busy}>
+      <button className="sugg-btn" onClick={async () => {
+        setBusy(true);
+        try {
+          if (!onAction) throw new Error("Action de dossier non disponible");
+          await onAction({ type: "work_dossier", dossier_id: s.dossier_id });
+        }
+        catch (cause) { console.error("Ouverture du dossier impossible :", cause); setError("Ouverture du dossier impossible."); }
+        finally { setBusy(false); }
+      }}>Ouvrir le dossier</button>
+      <button className="sugg-btn" onClick={async () => {
+        setBusy(true);
+        try {
+          const response = await fetch(`${API}/work-dossiers/${encodeURIComponent(s.dossier_id)}/live/dismiss`, {
+            method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: s.id }),
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          setCompleted(true);
+        } catch (cause) { console.error("Mise de côté impossible :", cause); setError("Impossible de mettre ce point de côté."); }
+        finally { setBusy(false); }
+      }}>Mettre ce point de côté</button>
+    </fieldset>
+  </div>;
 
   return (
     <div className="pro-conversation" data-testid="proactive-conversation">

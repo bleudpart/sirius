@@ -3,6 +3,7 @@ import { FolderOpen, X } from "lucide-react";
 import { API_BASE_URL } from "./lib/api";
 import { formatDocumentDate } from "./dateTime";
 import "./WorkDossiersPanel.css";
+import LiveWorkSettings from "./LiveWorkSettings";
 
 const BASE = `${API_BASE_URL}/work-dossiers`;
 const CATEGORIES = [
@@ -699,13 +700,14 @@ function WorkThread({ dossier, revision, disabled, queue, onError, onOpenThemis,
   </section>;
 }
 
-export default function WorkDossiersPanel({ onClose, onOpenThemis, onOpenHaccp }) {
+export default function WorkDossiersPanel({ onClose, onOpenThemis, onOpenHaccp, initialDossierId = "" }) {
   const [dossiers, setDossiers] = useState([]);
   const [proposals, setProposals] = useState([]);
   const [integrations, setIntegrations] = useState([]);
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("general");
   const [selectedId, setSelectedId] = useState("");
+  const appliedInitialId = useRef("");
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -812,6 +814,13 @@ export default function WorkDossiersPanel({ onClose, onOpenThemis, onOpenHaccp }
     } });
   };
   const selected = dossiers.find((d) => d.id === selectedId);
+  useEffect(() => {
+    if (initialDossierId && appliedInitialId.current !== initialDossierId
+      && dossiers.some((d) => d.id === initialDossierId)) {
+      appliedInitialId.current = initialDossierId;
+      setSelectedId(initialDossierId);
+    }
+  }, [initialDossierId, dossiers]);
   const queueProposalDecision = (event) => {
     event.preventDefault();
     if (!proposalDecision || !rationale.trim()) {
@@ -924,6 +933,8 @@ export default function WorkDossiersPanel({ onClose, onOpenThemis, onOpenHaccp }
               key={d.id} disabled={busy || !!review} aria-pressed={selectedId === d.id} onClick={() => { setSelectedId(d.id); setNote(""); setDailyThread(null); setProposalDecision(null); setRationale(""); }}>{d.title} · {CATEGORIES.find(([key]) => key === d.category)?.[1]}</button>)}
             {selected && <>
               <h3>{selected.title}</h3>
+              <LiveWorkSettings key={`live-${selectedId}`} dossier={selected}
+                disabled={busy || !!review} queue={setReview} onError={setError} />
               <form onSubmit={addNote} className="work-dossiers-form">
                 <label>Note<textarea disabled={busy || !!review} required maxLength={2000} value={note} onChange={(e) => setNote(e.target.value)} /></label>
                 <button type="submit" disabled={busy || !!review || !note.trim()}>Ajouter une note</button>

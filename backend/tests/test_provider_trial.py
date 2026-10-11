@@ -107,6 +107,11 @@ def api(db, monkeypatch):
     async def local_tool():
         return {"ok": True, "owner": access.provider_key("groq", "owner-local")}
 
+    @app.post("/api/work-dossiers/live/evaluate")
+    async def live_analysis(request: Request):
+        key = access.require_key("groq", "owner-live", keys=(await request.json()).get("keys", {}))
+        return {"used": key}
+
     @app.post("/api/chat/stream")
     async def stream(request: Request):
         user = await auth_api.require_user(request, db)
@@ -133,6 +138,7 @@ def mock_voice(monkeypatch, handler):
     ("/api/tts", {"text": "bonjour"}),
     ("/api/task/image", {"prompt": "bonjour"}),
     ("/api/chat/stream", {"text": "bonjour"}),
+    ("/api/work-dossiers/live/evaluate", {"keys": {}}),
 ])
 def test_expired_missing_key_and_optional_modules_never_call_owner(api, monkeypatch, path, payload):
     client, _ = api
@@ -143,6 +149,13 @@ def test_expired_missing_key_and_optional_modules_never_call_owner(api, monkeypa
     response = client.post(path, json=payload)
     assert response.status_code == 403
     assert "essai" in response.json()["detail"]
+
+
+def test_expired_live_analysis_accepts_only_personal_credentials(api):
+    client, _ = api
+    response = client.post("/api/work-dossiers/live/evaluate", json={"keys": {"groq_key": "personal-live"}})
+    assert response.status_code == 200
+    assert response.json() == {"used": "personal-live"}
 
 
 def test_expired_stt_uses_personal_key_not_owner_or_proxy(api, monkeypatch):
