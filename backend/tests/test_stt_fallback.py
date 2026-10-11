@@ -74,3 +74,13 @@ def test_stt_stream_forwards_recorded_audio(monkeypatch):
         "audio": b"first-chunksecond-chunk",
         "content_type": "audio/webm;codecs=opus",
     }
+
+
+def test_stt_stream_disconnect_during_capture_does_not_receive_or_send_again(caplog):
+    with TestClient(app) as session:
+        session.headers.update(client.headers)
+        with session.websocket_connect("/api/stt/stream") as websocket:
+            websocket.send_json({"action": "start", "groq_key": "configured-key"})
+            assert websocket.receive_json() == {"type": "ready"}
+            websocket.send_bytes(b"unfinished-audio")
+    assert "Erreur inattendue du flux WebSocket" not in caplog.text

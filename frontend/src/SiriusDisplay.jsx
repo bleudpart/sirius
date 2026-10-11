@@ -11,6 +11,7 @@ import { cleanTextForDisplay } from "./voice";
 import MediaPlayer from "@/components/MediaPlayer";
 import ProviderLogo from "@/components/ProviderLogo";
 import useWindowGesture, { isPrimaryGesture } from "./windowGesture";
+import { ProactiveConversation } from "./ProactivePanel";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const GEO_KEY = "sirius_display_geo_v2";
@@ -213,7 +214,7 @@ const readGeo = () => {
 };
 
 // Panneau d'affichage ΣIRIUS : ouvert par Sirius quand il a du contenu à montrer (messages, web, vidéos, images)
-export default function SiriusDisplay({ item, history, onSelect, onClose, onInteract, onSpeak, onRead }) {
+export default function SiriusDisplay({ item, history, onSelect, onClose, onInteract, onSpeak, onRead, onSuggestionAction }) {
   const ref = useRef(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [minimized, setMinimized] = useState(() => !!readGeo().min);
@@ -574,6 +575,10 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
               <div className="sd-message" data-testid="sirius-display-message">
                 {item.titre && <div className="sd-msg-title">{item.titre}</div>}
                 <p>{cleanTextForDisplay(item.contenu)}</p>
+                {item.suggestion && (
+                  <ProactiveConversation key={item.suggestion.id} suggestion={item.suggestion}
+                    onAction={onSuggestionAction} onSpeak={onSpeak} />
+                )}
                 <div className="sd-feedback" data-testid="sirius-display-feedback">
                   <button
                     className={`sd-vote up ${feedbackVote === "up" ? "active" : ""}`}

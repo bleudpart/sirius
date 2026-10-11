@@ -1,18 +1,14 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Zap, Play, Wrench, Clock3, XCircle, HelpCircle, ShieldAlert, BrainCircuit } from "lucide-react";
+import { Play, Wrench, Clock3, XCircle, HelpCircle } from "lucide-react";
 import "./Proactive.css";
-import { trackWindowGesture, isPrimaryGesture } from "./windowGesture";
 import { API_BASE_URL } from "./lib/api";
 
 const API = API_BASE_URL;
 const IDLE_BEFORE_SUGGESTION_MS = 45000;
 const ANNOUNCEMENT_GAP_MS = 120000;
 
-export default function ProactivePanel({ onAction, onSpeak, canSpeak }) {
-  const [suggestions, setSuggestions] = useState([]);
-  const [why, setWhy] = useState({});
-  const [confirming, setConfirming] = useState({});
+export default function ProactivePanel({ onSpeak, canSpeak, onInitiative, onError }) {
   const announcedIdsRef = useRef(new Set());
   const onSpeakRef = useRef(onSpeak);
   const canSpeakRef = useRef(canSpeak);
@@ -23,60 +19,16 @@ export default function ProactivePanel({ onAction, onSpeak, canSpeak }) {
   const mountedRef = useRef(false);
   const voiceBusyRef = useRef(false);
   const [error, setError] = useState("");
-  const panelRef = useRef(null);
-  const hasSuggestions = suggestions.length > 0;
+  const onInitiativeRef = useRef(onInitiative);
+  const onErrorRef = useRef(onError);
 
   useEffect(() => {
-    const panel = panelRef.current;
-    if (!panel) return undefined;
-    const header = panel.querySelector(".pro-mode-row");
-    const key = "sirius_panel_pos";
-    const readPositions = () => JSON.parse(localStorage.getItem(key) || "{}");
-    const position = (x, y) => {
-      panel.style.left = `${Math.min(Math.max(0, x), Math.max(0, window.innerWidth - panel.offsetWidth))}px`;
-      // Keep the handle reachable even when the suggestions exceed the viewport.
-      panel.style.top = `${Math.min(Math.max(0, y), Math.max(0, window.innerHeight - header.offsetHeight))}px`;
-    };
-    try {
-      const saved = readPositions()["proactive-panel"];
-      if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) position(saved.x, saved.y);
-    } catch (cause) { console.error("Restauration de la position SIRIUS ANTICIPE impossible :", cause); }
-    let drag = null;
-    let disposeGesture = null;
-    const onDown = (event) => {
-      if (!isPrimaryGesture(event)) return;
-      disposeGesture?.();
-      const rect = panel.getBoundingClientRect();
-      drag = { x: event.clientX - rect.left, y: event.clientY - rect.top, id: event.pointerId };
-      panel.classList.add("dragging");
-      disposeGesture = trackWindowGesture(event, { element: panel, onMove, onEnd: onUp });
-    };
-    const onMove = (event) => {
-      if (drag && event.pointerId === drag.id) position(event.clientX - drag.x, event.clientY - drag.y);
-    };
-    const onUp = (event) => {
-      if (!drag || (event?.pointerId != null && event.pointerId !== drag.id)) return;
-      drag = null;
-      panel.classList.remove("dragging");
-      try {
-        const saved = readPositions();
-        const rect = panel.getBoundingClientRect();
-        saved["proactive-panel"] = { x: rect.left, y: rect.top };
-        localStorage.setItem(key, JSON.stringify(saved));
-      } catch (cause) { console.error("Sauvegarde de la position SIRIUS ANTICIPE impossible :", cause); }
-    };
-    const onResize = () => {
-      const rect = panel.getBoundingClientRect();
-      position(rect.left, rect.top);
-    };
-    header.addEventListener("pointerdown", onDown);
-    window.addEventListener("resize", onResize);
-    return () => {
-      header.removeEventListener("pointerdown", onDown);
-      disposeGesture?.();
-      window.removeEventListener("resize", onResize);
-    };
-  }, [hasSuggestions]);
+    onInitiativeRef.current = onInitiative;
+    onErrorRef.current = onError;
+  }, [onInitiative, onError]);
+  useEffect(() => {
+    if (error) onErrorRef.current?.(error);
+  }, [error]);
 
   useEffect(() => {
     onSpeakRef.current = onSpeak;
@@ -91,7 +43,9 @@ export default function ProactivePanel({ onAction, onSpeak, canSpeak }) {
         || (lastAnnouncementRef.current !== null && now - lastAnnouncementRef.current < ANNOUNCEMENT_GAP_MS)) return;
     const suggestion = suggestionsRef.current.find((item) => !announcedIdsRef.current.has(item.id));
     if (!suggestion) return;
-    onSpeakRef.current(`${suggestion.description} ${suggestion.intervention || ""}`.trim());
+    const message = `${suggestion.description} ${suggestion.intervention || ""}`.trim();
+    onInitiativeRef.current?.(suggestion, message);
+    onSpeakRef.current(message);
     announcedIdsRef.current.add(suggestion.id);
     lastAnnouncementRef.current = now;
   }, []);
@@ -112,7 +66,6 @@ export default function ProactivePanel({ onAction, onSpeak, canSpeak }) {
       if (!mountedRef.current) return;
       const nextSuggestions = d.suggestions || [];
       suggestionsRef.current = nextSuggestions;
-      setSuggestions(nextSuggestions);
       setError(d.news_status === "partial" ? "Veille actualités partiellement indisponible. Les autres suggestions restent actives." : "");
       announce();
     } catch (cause) {
@@ -154,12 +107,19 @@ export default function ProactivePanel({ onAction, onSpeak, canSpeak }) {
     };
   }, [evaluate, announce]);
 
-  const remove = (id) => {
-    suggestionsRef.current = suggestionsRef.current.filter((s) => s.id !== id);
-    setSuggestions(suggestionsRef.current);
-  };
+  return null;
+}
 
+export function ProactiveConversation({ suggestion, onAction, onSpeak }) {
+  const [why, setWhy] = useState({});
+  const [confirming, setConfirming] = useState({});
+  const [error, setError] = useState("");
+  const [completed, setCompleted] = useState(false);
+  const [busy, setBusy] = useState(false);
   const act = async (s, action) => {
+    if (busy) return;
+    setBusy(true);
+    setError("");
     try {
       const r = await fetch(`${API}/suggestions/${s.id}/action`, {
         method: "POST",
@@ -174,12 +134,14 @@ export default function ProactivePanel({ onAction, onSpeak, canSpeak }) {
         onSpeak && onSpeak(d.message || "Cette action est sensible — confirmez-vous ?");
         return;
       }
-      if (action === "executer" && d.executed) onAction && onAction(d.proposed_action);
-      if (action === "preparer" && d.prepared) onAction && onAction({ ...d.proposed_action, prepare: true });
-      remove(s.id);
+      if (action === "executer" && d.executed && onAction) await onAction(d.proposed_action);
+      if (action === "preparer" && d.prepared && onAction) await onAction({ ...d.proposed_action, prepare: true });
+      setCompleted(true);
     } catch (cause) {
       console.error("Action proactive impossible :", cause);
       setError("Action impossible. La suggestion a été conservée.");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -199,34 +161,13 @@ export default function ProactivePanel({ onAction, onSpeak, canSpeak }) {
     }
   };
 
-  if (!suggestions.length && !error) return null;
+  const s = suggestion;
+  if (completed) return <p className="pro-conversation-result" role="status">Votre choix a été pris en compte.</p>;
 
   return (
-    <div ref={panelRef} className="proactive-stack" data-testid="proactive-panel">
-      <div className="pro-mode-row" title="Glisser pour déplacer SIRIUS ANTICIPE">
-        <Zap size={11} />
-        <span className="pro-mode-label"><BrainCircuit size={11} /> SIRIUS ANTICIPE</span>
-      </div>
+    <div className="pro-conversation" data-testid="proactive-conversation">
       {error && <p role="alert">{error}</p>}
-      {suggestions.map((s) => (
-        <div className={`sugg-card urg-${s.urgency}`} key={s.id} data-testid="suggestion-card">
-          <div className="sugg-head">
-            <b className="sugg-title">{s.title}</b>
-            <span className={`sugg-badge urg-${s.urgency}`}>{s.urgency.toUpperCase()}</span>
-            {s.risk_level !== "faible" && (
-              <span className={`sugg-badge risk-${s.risk_level}`}>
-                <ShieldAlert size={9} /> {s.risk_level.toUpperCase()}
-              </span>
-            )}
-          </div>
-          <p className="sugg-desc">{s.description}</p>
-          {s.intervention && <p className="sugg-intervention">{s.intervention}</p>}
           {s.alternative && <p className="sugg-alternative">Alternative : {s.alternative}</p>}
-          <div className="sugg-confidence" title={s.reason || "Suggestion issue de la mémoire locale"}>
-            <span>CONFIANCE {Math.round((s.confidence || 0) * 100)} %</span>
-            <i><b style={{ width: `${Math.round((s.confidence || 0) * 100)}%` }} /></i>
-            <small>{s.source === "actualite" ? "ACTUALITÉ SOURCÉE" : s.source === "projet" ? "PROJET EN MÉMOIRE" : s.source === "habitude" ? "HABITUDE DÉTECTÉE" : "CONTEXTE RÉCENT"}</small>
-          </div>
           {confirming[s.id] && (
             <p className="sugg-confirm" data-testid="sugg-confirm-msg">
               Action sensible — cliquez à nouveau sur EXÉCUTER pour confirmer.
@@ -239,7 +180,7 @@ export default function ProactivePanel({ onAction, onSpeak, canSpeak }) {
               <p><b>Confiance :</b> {Math.round((why[s.id].confidence || 0) * 100)} %</p>
             </div>
           )}
-          <div className="sugg-actions">
+          <fieldset className="sugg-actions" disabled={busy}>
             <button className="sugg-btn exec" onClick={() => act(s, "executer")} data-testid="sugg-exec-btn">
               <Play size={10} /> EXÉCUTER
             </button>
@@ -255,9 +196,7 @@ export default function ProactivePanel({ onAction, onSpeak, canSpeak }) {
             <button className="sugg-btn ghost" onClick={() => askWhy(s)} data-testid="sugg-why-btn">
               <HelpCircle size={10} /> POURQUOI ?
             </button>
-          </div>
-        </div>
-      ))}
+          </fieldset>
     </div>
   );
 }

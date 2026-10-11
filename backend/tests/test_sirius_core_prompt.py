@@ -4,6 +4,14 @@
 from sirius_brain import SIRIUS_CORE_PROMPT, build_system_prompt
 
 
+def test_proactive_dialogue_keeps_the_context_of_the_initiative():
+    prompt = build_system_prompt(environment={"proactive_message": "Je peux préparer le briefing du jour."})
+    assert "DERNIÈRE INITIATIVE AFFICHÉE DANS LE DIALOGUE" in prompt
+    assert "Je peux préparer le briefing du jour." in prompt
+    assert "sans résultat d'outil" in prompt
+    assert "DERNIÈRE INITIATIVE" not in build_system_prompt(environment={"proactive_message": None})
+
+
 def test_system_prompt_matches_the_current_sirius_production_contract():
     prompt = build_system_prompt(
         profile={"name": "Daniel"},

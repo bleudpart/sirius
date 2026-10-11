@@ -394,6 +394,7 @@ def make_voice_io_router(db=None):
                                 "Lexique SIRIUS en français : SIRIUS, Daniel Partel, ARGUS, OMEGA, ATLAS, "
                                 "Outlook, Hotmail, Thémis, Panthéon, Héphaïstos, Héraclès, Pythagore, "
                                 "Calliope, Prométhée, Hermès, Agora. Transcrire ces noms exactement."
+                                " Vocabulaire courant : actualité, actualités, infos du jour, briefing."
                             ),
                         },
                     )
@@ -444,6 +445,9 @@ def make_voice_io_router(db=None):
 
             while True:
                 message = await websocket.receive()
+                if message["type"] == "websocket.disconnect":
+                    logger.debug("[STT] Capture interrompue par le client")
+                    return
                 if message.get("bytes") is not None:
                     chunk = message["bytes"]
                     if len(audio) + len(chunk) > _MAX_STREAM_AUDIO_BYTES:

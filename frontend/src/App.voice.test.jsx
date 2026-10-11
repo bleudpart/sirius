@@ -16,6 +16,11 @@ jest.mock("./services/streamingStt", () => ({ connectStreamingStt: jest.fn() }))
 jest.mock("./appLogic", () => ({ ...jest.requireActual("./appLogic"), pttBeep: jest.fn() }));
 
 jest.mock("./AuthGate", () => ({ useAuth: () => ({ user: { id: "voice-test", name: "Validation" } }) }));
+jest.mock("./ProactivePanel", () => ({ onInitiative }) => (
+  <button data-testid="test-initiative" onClick={() => onInitiative(
+    { id: "initiative-test" }, "Je peux préparer le briefing du jour."
+  )}>Initiative de test</button>
+));
 jest.mock("./voice", () => ({
   speakFr: jest.fn(), cancelSpeech: jest.fn(), speakSeries: jest.fn(() => Promise.resolve()), speakAsCharacter: jest.fn(),
 }));
@@ -152,6 +157,18 @@ test("the HUD no longer mounts the next-actions pill", async () => {
   await mount();
   expect(host.querySelector('[data-testid="sirius-title"]')).not.toBeNull();
   expect(host.querySelector(".shud-next")).toBeNull();
+});
+
+test("une initiative rejoint le Display et le contexte de la reponse suivante", async () => {
+  await mount();
+  await act(async () => host.querySelector('[data-testid="test-initiative"]').click());
+  expect(host.querySelector('[data-testid="sirius-display-body"]').textContent)
+    .toContain("Je peux préparer le briefing du jour.");
+  expect(host.querySelector(".proactive-stack")).toBeNull();
+  await send("Explique ce que tu proposes");
+  const request = global.fetch.mock.calls.find(([url]) => String(url).endsWith("/chat/stream"));
+  expect(JSON.parse(request[1].body).environment.proactive_message)
+    .toBe("Je peux préparer le briefing du jour.");
 });
 
 test("native hands-free is diagnostic-only, explicitly started, and stopped before manual capture", async () => {

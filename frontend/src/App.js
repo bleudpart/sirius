@@ -71,6 +71,7 @@ import { restoreHudPanel } from "@/hud/hudPanelState";
 import { BACKEND_BASE_URL } from "@/lib/api";
 import "@/App.css";
 import "@/mobileModulePages.css";
+import "@/desktopModuleInteriors.css";
 import { AmbientEngine } from "@/ambientAudio";
 import { APP_RELEASE, APP_VERSION } from "@/version";
 import ProviderLogo from "@/components/ProviderLogo";
@@ -1559,6 +1560,7 @@ function App() {
       environment: {
         active_tasks: tasks.filter((task) => task.status === "running").map((task) => task.titre),
         display_open: displayOpen,
+        proactive_message: display?.suggestion ? display.contenu : "",
         activity: cmdTimesRef.current?.length >= 3 ? "intense" : "exploration",
       },
     });
@@ -1743,7 +1745,7 @@ function App() {
     speakOut(fallback);
     showOnDisplay({ type: "message", titre: "ΣIRIUS — RÉPONSE LOCALE", contenu: fallback });
 
-  }, [speakOut, keys, profile, computeMood, showOnDisplay, streamOnDisplay, sysMode, tasks, displayOpen, renderVoiceSignal]);
+  }, [speakOut, keys, profile, computeMood, showOnDisplay, streamOnDisplay, sysMode, tasks, displayOpen, display.contenu, display?.suggestion, renderVoiceSignal]);
 
   // ---- Interruption naturelle : le micro écoute PENDANT que Sirius parle ----
   const stopInterruptListener = useCallback(() => {
@@ -4595,7 +4597,7 @@ function App() {
       return;
     }
     // 0octies) Actualités en direct : « les actualités », « les news tech »...
-    const newsM = low.match(/(?:actualit[ée]s?|les news|les infos|quoi de neuf)(?:\s+(?:sur|de la|de|du|des|en)\s+(.+))?/);
+    const newsM = low.match(/(?:actualit[ée]s?|les news|les infos|quoi de neuf|^(?:actus|infos|nouvelles)$)(?:\s+(?:sur|de la|de|du|des|en)\s+(.+))?/);
     if (newsM) {
       mark("actualités");
       launchNews((newsM[1] || "").replace(/[?!.]+$/, "").trim());
@@ -7293,27 +7295,17 @@ function App() {
       {/* Pop-ups holographiques contextuels (gérés par Sirius) */}
       <HoloPopups popups={popups} onClose={closePopup} onImage={setArchiveView} />
 
-      {/* Suggestions proactives issues de la mémoire réelle (projets, épisodes, habitudes).
-          Le panneau reste invisible tant que le moteur n'a rien de pertinent à proposer. */}
+      {/* Les initiatives rejoignent le dialogue, sans panneau de notifications. */}
       <ProactivePanel
         canSpeak={() => !speakingRef.current && !pttRef.current && !voiceSeriesPendingRef.current
           && !voiceSessionRef.current.stopped
           && !["thinking", "speaking"].includes(wakeStatusRef.current)
           && Date.now() - lastActivityRef.current >= 45000}
-        onAction={(a) => {
-          if (!a || !a.type) return;
-          if (a.type === "command") {
-            if (a.prepare) { setCmd(a.text || ""); }
-            else if (processCommandRef.current) { processCommandRef.current(a.text); }
-          } else if (a.type === "memory_confirm" && a.memory_id) {
-            fetch(`${API}/memory/${a.memory_id}`, { credentials: "include",
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ fields: a.prepare ? {} : { status: "active", confidence: 0.95 } }),
-            }).catch(() => {});
-            speakRef.current("Information confirmée et retenue.");
-          }
+        onInitiative={(suggestion, message) => {
+          setText(message);
+          showOnDisplay({ type: "message", titre: "SIRIUS", contenu: message, suggestion });
         }}
+        onError={(message) => setVoiceMessage(message)}
         onSpeak={(m) => speakRef.current(m)}
       />
 
@@ -7325,6 +7317,21 @@ function App() {
         <SiriusDisplay
           item={display}
           history={displayHistory}
+          onSuggestionAction={async (a) => {
+            if (!a || !a.type) throw new Error("Action proactive invalide");
+            if (a.type === "command") {
+              if (a.prepare) setCmd(a.text || "");
+              else if (processCommandRef.current) await processCommandRef.current(a.text);
+            } else if (a.type === "memory_confirm" && a.memory_id) {
+              const response = await fetch(`${API}/memory/${a.memory_id}`, {
+                credentials: "include", method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ fields: a.prepare ? {} : { status: "active", confidence: 0.95 } }),
+              });
+              if (!response.ok) throw new Error(`Confirmation impossible : HTTP ${response.status}`);
+              speakRef.current(a.prepare ? "Information prête à confirmer." : "Information confirmée et retenue.");
+            }
+          }}
           onSelect={(h) => { pinDisplay(); setDisplay(h); }}
           onClose={() => setDisplayOpen(false)}
           onInteract={pinDisplay}

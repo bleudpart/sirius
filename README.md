@@ -18,13 +18,19 @@ garantissent pas une couverture exhaustive.
 La synthèse vocale remplace le mot « emails » (ou « e-mails » / « mails »)
 par « courriels » pour éviter une lecture lettre par lettre ; le texte affiché
 et les adresses de messagerie restent inchangés.
+Les commandes vocales d'un seul mot « actualité », « actualités », « actus »,
+« infos » et « nouvelles » sont acceptées. La confusion reconnue « authenticité »
+est corrigée uniquement dans une commande courte d'actualités ; une phrase telle
+que « vérifie l'authenticité de ce document » garde son sens. Les ornements
+(étoiles, puces, flèches, emojis) sont retirés de la narration, pas de l'affichage ;
+les montants en euros, pourcentages et températures Celsius sont prononcés en mots.
 
 SIRIUS ANTICIPE vérifie les suggestions chaque minute, y compris jusqu'à deux
 actualités sourcées publiées depuis moins de 24 heures : aucune tâche préalable
 n'est nécessaire. Une annonce attend au moins 45 secondes sans interaction,
 sans réponse vocale ou traitement en cours, puis respecte au moins 2 minutes
 entre deux initiatives. Une même suggestion n'est annoncée qu'une fois par
-session du panneau ; « plus tard » et « ne plus proposer » restent disponibles.
+session ; « plus tard » et « ne plus proposer » restent disponibles dans le dialogue.
 Les initiatives sont suspendues lorsque la fenêtre est masquée ou la session
 vocale arrêtée. Le dialogue peut approfondir un sujet par une question de suivi
 concrète, sans relance automatique après un refus ou une conclusion.
@@ -33,6 +39,12 @@ en cours, terminé, annulé ou en erreur. Un changement d'état peut donner lieu
 une nouvelle annonce ; un échec n'est pas présenté comme un travail terminé.
 Ce suivi couvre les tâches enregistrées par SIRIUS, pas les applications externes
 auxquelles il n'a pas accès.
+
+Sur les grandes fenêtres Windows (largeur de vue supérieure à 1023 px), les
+intérieurs des modules historiques partagent un habillage sobre : cartes
+arrondies, titres dorés, champs et onglets arrondis, sans cadres cyan lumineux
+ni coins coupés. Les états d'alerte, les cartes géographiques et la géométrie
+des fenêtres restent inchangés. Le style mobile reste indépendant.
 
 La synthèse vocale traite **PLUTOS** comme un nom propre (« Ploutoss »), et non
 comme un sigle à épeler. Les élisions françaises sont réunies avant la lecture
@@ -97,8 +109,10 @@ Images / SIRIUS Captures. Dans la barre du haut, l'icône appareil photo capture
 l'interface entière et l'icône de recadrage lance la sélection d'une zone.
 La sélection d'une zone peut être annulée avec Échap.
 Les raccourcis de capture Windows restent indépendants de ces commandes.
-Le panneau **SIRIUS ANTICIPE** se déplace en glissant son en-tête ; sa position
-est mémorisée sur cet appareil, sans modifier les actions des suggestions.
+**SIRIUS ANTICIPE** intervient dans le dialogue et la voix, sans pile de notifications
+flottantes ni badges d'urgence. Le message est conservé dans l'historique du Display.
+Les actions, leur explication et la confirmation des actions sensibles restent
+accessibles sous le message. Il ne se ferme pas automatiquement pendant votre choix.
 
 ## Cache mail facultatif
 

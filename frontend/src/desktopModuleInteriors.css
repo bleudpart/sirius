@@ -1,0 +1,156 @@
+/* Habillage interne Windows : sans modifier la geometrie des fenetres ni les etats d'alerte. */
+@media (min-width: 1024px) {
+  :is(.prime-screen, .zeus-screen, .holo-win, .atlas-panel, .kr-panel,
+      .eu-screen, .esp-panel, .setup-screen, .productivity-screen, .connections-screen, .work-modules) {
+    --module-surface: linear-gradient(145deg, rgba(18, 26, 31, .94), rgba(8, 14, 20, .96));
+    --module-line: rgba(216, 184, 117, .22);
+    --module-divider: rgba(255, 255, 255, .09);
+    --module-gold: #f0d590;
+  }
+
+  :is(.prime-screen, .zeus-screen, .holo-win, .atlas-panel, .kr-panel, .eu-screen,
+      .productivity-screen, .connections-screen, .setup-screen)
+    :is(.prime-card, .zeus-card, .th-card, .th-form-card, .np-card, .media-module-card,
+        .work-item, .prime-sugg, .oracle-day, .mm-row, .pantheon-tile, .connection-item,
+        .mail-cache li, .sd-email-card, .sd-contact-card, .file-card) {
+    clip-path: none !important;
+    border: 1px solid var(--module-line) !important;
+    border-radius: 14px !important;
+    background: var(--module-surface) !important;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, .25), inset 0 1px 0 rgba(255, 255, 255, .04) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    animation: none !important;
+  }
+
+  :is(.prime-screen, .zeus-screen, .holo-win, .atlas-panel, .kr-panel, .eu-screen)
+    :is(.zc-section-title, .th-section-title, .th-tp-head) {
+    border-bottom: 0 !important;
+    color: var(--module-gold) !important;
+    text-shadow: none !important;
+    animation: none !important;
+    font-family: "Cinzel", serif;
+    font-size: 13px;
+    letter-spacing: 1.2px;
+    line-height: 1.4;
+    padding-bottom: 4px;
+    margin-bottom: 12px;
+  }
+
+  :is(.prime-screen, .zeus-screen, .holo-win, .atlas-panel, .kr-panel, .eu-screen)
+    :is(.prime-journal-row, .oracle-market-row, .oracle-news-row, .oracle-astro-row,
+        .pantheon-svc-row, .pantheon-proc-row, .mm-audit-row, .argus-hist-row,
+        .heph-hist-row, .atlas-weather-stats, .atlas-weather-days) {
+    border-bottom-color: var(--module-divider) !important;
+    border-top-color: var(--module-divider) !important;
+    box-shadow: none !important;
+  }
+
+  :is(.prime-screen, .zeus-screen, .holo-win) .argus-row:not(.sev-severe):not(.sev-critical) {
+    border: 1px solid var(--module-line);
+    border-radius: 12px;
+    background: var(--module-surface);
+  }
+  :is(.prime-screen, .zeus-screen, .holo-win) :is(.argus-row, .heph-row) {
+    border-radius: 12px;
+  }
+
+  :is(.prime-screen, .zeus-screen, .holo-win, .atlas-panel, .kr-panel, .eu-screen,
+      .connections-screen, .setup-screen)
+    :is(.cmd-input, .vision-question, .atlas-input, .th-input, .locus-input,
+        .her-input, .kr-input, .pantheon-notif-input, .work-form input, .work-form textarea,
+        .mail-cache input, .setup-input, .eu-search-input) {
+    border: 1px solid var(--module-line) !important;
+    border-radius: 12px !important;
+    background: rgba(5, 11, 17, .88) !important;
+    color: #fff !important;
+    box-shadow: none !important;
+    font-family: "Rajdhani", sans-serif;
+    font-size: 15px;
+  }
+  :is(.prime-screen, .zeus-screen, .holo-win, .atlas-panel, .kr-panel, .eu-screen)
+    :is(input, textarea, select):focus-visible {
+    outline: 2px solid var(--module-gold) !important;
+    outline-offset: 2px;
+  }
+
+  :is(.prime-screen, .zeus-screen, .holo-win, .atlas-panel, .kr-panel, .eu-screen)
+    :is(.haccp-tab, .th-tab, .atlas-tab, .locus-go, .locus-copy, .atlas-btn,
+        .dev-action-btn, .oracle-3d-btn, .th-mini-btn, .work-add, .work-check,
+        .kr-btn, .pkg-build, .pkg-download) {
+    border: 1px solid var(--module-line) !important;
+    border-radius: 20px !important;
+    background: rgba(24, 25, 23, .85) !important;
+    color: var(--module-gold) !important;
+    box-shadow: none !important;
+    min-height: 36px;
+    padding: 8px 14px;
+    font-family: "Rajdhani", sans-serif;
+    font-size: 13px;
+    letter-spacing: .8px;
+  }
+  :is(.prime-screen, .zeus-screen, .holo-win, .atlas-panel)
+    :is(.haccp-tab, .th-tab, .atlas-tab).active {
+    border-color: rgba(240, 213, 144, .65) !important;
+    background: rgba(216, 184, 117, .15) !important;
+  }
+  :is(.prime-screen, .zeus-screen, .holo-win, .atlas-panel)
+    :is(button, a):focus-visible {
+    outline: 2px solid var(--module-gold) !important;
+    outline-offset: 3px;
+  }
+
+  :is(.prime-screen, .zeus-screen, .holo-win, .atlas-panel)
+    :is(.locus-map, .atlas-map, .locus-intent pre, .dev-result, .memory-empty,
+        .locus-weather, .atlas-weather, .locus-source:not(.nominatim), .atlas-msg.ok) {
+    border: 1px solid var(--module-line) !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+  }
+  :is(.prime-screen, .zeus-screen, .holo-win) .zc-corner { display: none; }
+  :is(.prime-screen, .zeus-screen, .holo-win) .zc-bar-track {
+    background: rgba(255, 255, 255, .08);
+    border-radius: 4px;
+  }
+  :is(.prime-screen, .zeus-screen, .holo-win) .zc-bar-fill { border-radius: 4px; }
+
+  .work-modules :is(.work-nav, .work-form, .work-audit li) {
+    border-color: var(--module-divider);
+  }
+  .work-modules .work-nav button { border-radius: 12px; }
+  .work-modules :is(.work-form input, .work-form textarea):focus-visible,
+  .connections-screen .mail-cache input:focus-visible {
+    outline: 2px solid var(--module-gold) !important;
+    outline-offset: 2px;
+  }
+  .work-modules :is(.work-add, .work-check, .work-backup button, .work-confirm button,
+      .work-section-head button, .work-shortcuts button) {
+    border-radius: 18px;
+  }
+  .work-modules :is(.work-add, .work-check, .work-nav button):hover {
+    background: rgba(216, 184, 117, .12);
+  }
+
+  :is(.prime-screen, .zeus-screen, .holo-win, .atlas-panel, .kr-panel, .eu-screen, .esp-panel)
+    :is(.argus-btn:not(.confirm):not(.ghost), .pantheon-kill, .esp-btn) {
+    border-color: var(--module-line) !important;
+    border-radius: 18px;
+    background: rgba(24, 25, 23, .85);
+    color: var(--module-gold);
+    box-shadow: none !important;
+  }
+  .kr-panel .kr-row {
+    border-color: var(--module-line);
+    border-radius: 12px;
+    background: var(--module-surface);
+  }
+  .connections-screen .connection-item.connected { border-color: rgba(216, 184, 117, .55) !important; }
+  :is(.prime-screen, .holo-win) .th-card.gold { border-color: rgba(216, 184, 117, .55) !important; }
+  .connections-screen .connection-icon { border-color: var(--module-line); border-radius: 12px; }
+  .connections-screen .connection-action.secondary {
+    border-color: var(--module-line);
+    background: rgba(216, 184, 117, .08);
+  }
+  .connections-screen { background: radial-gradient(circle at 50% 20%, rgba(216, 184, 117, .06), transparent 45%), #080e14; }
+  .atlas-panel .atlas-scan { display: none; }
+}

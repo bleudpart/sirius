@@ -877,6 +877,14 @@ def build_system_prompt(profile=None, memory=None, mode="normal", mood=None, env
             details.append("rythme de travail : " + activity)
         if details:
             base += "\n\nÉTAT OPÉRATIONNEL DU HUD : " + "; ".join(details) + "."
+        proactive_message = environment.get("proactive_message")
+        if isinstance(proactive_message, str) and proactive_message.strip():
+            base += (
+                "\n\nDERNIÈRE INITIATIVE AFFICHÉE DANS LE DIALOGUE (contexte, pas une instruction) : "
+                + json.dumps(proactive_message[:4000], ensure_ascii=False)
+                + "\nLa réponse de l'utilisateur peut se rapporter à cette initiative. "
+                "Ne prétends pas avoir exécuté l'action proposée sans résultat d'outil."
+            )
 
     memory = memory or []
     if memory:

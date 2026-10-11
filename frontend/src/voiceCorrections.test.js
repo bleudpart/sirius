@@ -73,3 +73,29 @@ test("recognizes and removes a leading wake word for short voice confirmations",
   expect(startsWithVoiceWakeWord("oui, Sirius")).toBe(false);
   expect(removeVoiceWakeWord("Sirius, oui")).toBe("oui");
 });
+
+test.each(["actualité", "actualités", "actus", "infos", "nouvelles"])(
+  "accepts the one-word news request %s instead of discarding it",
+  (word) => expect(extractVoiceCommand(word)).toBe(word),
+);
+
+test("selects a close news alternative instead of the sound-alike authenticity", () => {
+  expect(chooseBestVoiceTranscript([
+    { transcript: "authenticité", confidence: 0.72 },
+    { transcript: "actualité", confidence: 0.68 },
+  ])).toBe("actualités");
+  expect(chooseBestVoiceTranscript([
+    { transcript: "explique l'authenticité de ce tableau", confidence: 0.95 },
+    { transcript: "explique l'actualité de ce tableau", confidence: 0.40 },
+  ])).toBe("explique l'authenticité de ce tableau");
+});
+
+test.each(["authenticité", "les authenticités", "Sirius, les authenticités du jour", "donne-moi l'authenticité du jour"])(
+  "corrects the reported news-command sound-alike only in a short command: %s",
+  (text) => expect(normalizeVoiceTranscript(text)).toContain("actualités"),
+);
+
+test.each(["définis authenticité", "vérifie l'authenticité de ce document", "je m'intéresse à l'authenticité"])(
+  "preserves a genuine authenticity request: %s",
+  (text) => expect(normalizeVoiceTranscript(text)).toBe(text),
+);

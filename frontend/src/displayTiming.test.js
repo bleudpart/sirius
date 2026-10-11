@@ -1,5 +1,9 @@
 import { getDisplayAutoCloseDelay } from "./displayTiming";
 
+test("une initiative reste visible pour permettre de repondre", () => {
+  expect(getDisplayAutoCloseDelay({ type: "message", contenu: "Suggestion", suggestion: { id: "one" } })).toBeNull();
+});
+
 test("keeps short display responses open for at least two minutes", () => {
   expect(getDisplayAutoCloseDelay({ type: "message", contenu: "Réponse courte." })).toBe(120000);
 });

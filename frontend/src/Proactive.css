@@ -1,137 +1,21 @@
-/* © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France). */
-/* ΣIRIUS — Suggestions proactives */
-.proactive-stack {
-  position: fixed;
-  left: 26px;
-  top: 120px;
-  width: 316px;
-  z-index: 45;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  pointer-events: auto;
+/* Actions des initiatives, integrees au dialogue du Display. */
+.pro-conversation { margin-top: 18px; font: 15px/1.5 "Rajdhani", sans-serif; }
+.pro-conversation .sugg-actions {
+  display: flex; flex-wrap: wrap; border: 0; padding: 0; margin: 12px 0 0; gap: 8px;
 }
-
-.pro-mode-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: #ffffff;
-  font-family: "Orbitron", sans-serif;
-  font-size: 8px;
-  letter-spacing: 2px;
-  cursor: grab;
-  touch-action: none;
-  user-select: none;
-}
-.proactive-stack.dragging .pro-mode-row { cursor: grabbing; }
-.pro-mode-label { display: inline-flex; align-items: center; gap: 4px; margin-right: 4px; opacity: 0.95; color: #f2d99a; text-shadow: 0 0 9px rgba(216, 184, 117, 0.55); }
-.pro-mode-btn {
-  background: rgba(0, 20, 34, 0.7);
-  border: 1px solid rgba(145, 230, 242, 0.35);
-  color: #ffffff;
-  font-family: "Orbitron", sans-serif;
-  font-size: 7px;
-  letter-spacing: 1.5px;
-  padding: 3px 7px;
+.pro-conversation .sugg-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 40px; padding: 8px 14px; border-radius: 20px;
+  background: rgba(216, 184, 117, .08); border: 1px solid rgba(216, 184, 117, .3);
+  color: #f0d590; font: 600 13px "Rajdhani", sans-serif; letter-spacing: .5px;
   cursor: pointer;
-  transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
 }
-.pro-mode-btn.on {
-  background: rgba(145, 230, 242, 0.22);
-  color: #ffffff;
-  box-shadow: 0 0 10px rgba(145, 230, 242, 0.45);
-}
-
-.sugg-card {
-  background: rgba(0, 5, 12, 0.9);
-  border: 1px solid rgba(145, 230, 242, 0.55);
-  box-shadow: 0 0 16px rgba(145, 230, 242, 0.22), 0 14px 30px rgba(0, 0, 0, 0.5);
-  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
-  padding: 11px 13px;
-  animation: suggIn 0.4s ease both;
-}
-@keyframes suggIn {
-  from { opacity: 0; transform: translateX(-18px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-.sugg-card.urg-haute { border-color: rgba(255, 149, 0, 0.75); }
-
-.sugg-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.sugg-title {
-  color: #ffffff;
-  font-family: "Orbitron", sans-serif;
-  font-size: 10px;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  flex: 1;
-}
-.sugg-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-family: "Orbitron", sans-serif;
-  font-size: 7px;
-  letter-spacing: 1px;
-  padding: 2px 6px;
-  border: 1px solid rgba(145, 230, 242, 0.4);
-  color: #ffffff;
-}
-.sugg-badge.urg-haute { border-color: #ff9500; color: #ffb347; }
-.sugg-badge.risk-eleve { border-color: #c26b60; color: #ff7a7a; }
-.sugg-badge.risk-moyen { border-color: #ffd24d; color: #ffe08a; }
-
-.sugg-desc {
-  color: #ffffff;
-  font-size: 11.5px;
-  line-height: 1.45;
-  margin: 7px 0 9px;
-}
-.sugg-intervention {
-  margin: -3px 0 9px;
-  color: #f2d99a;
-  font-size: 10.5px;
-  line-height: 1.4;
-}
-.sugg-confidence { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 7px; margin: 0 0 9px; font-family: "Orbitron", sans-serif; font-size: 6.5px; letter-spacing: 1px; color: #d8b875; }
-.sugg-confidence i { display: block; height: 3px; background: rgba(145, 230, 242, 0.16); overflow: hidden; }
-.sugg-confidence i b { display: block; height: 100%; background: linear-gradient(90deg, #91e6f2, #f2d99a); box-shadow: 0 0 7px rgba(242, 217, 154, 0.65); }
-.sugg-confidence small { color: rgba(255, 255, 255, 0.78); font-size: 6px; white-space: nowrap; }
-.sugg-confirm {
-  color: #ffb347;
-  font-size: 10.5px;
-  margin: 0 0 8px;
-}
-.sugg-why {
-  border-left: 2px solid rgba(145, 230, 242, 0.5);
-  padding: 4px 8px;
-  margin: 0 0 9px;
-}
-.sugg-why p { color: #ffffff; font-size: 10px; margin: 2px 0; }
-.sugg-why b { color: #ffffff; }
-
-.sugg-actions { display: flex; flex-wrap: wrap; gap: 5px; }
-.sugg-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: rgba(0, 24, 40, 0.8);
-  border: 1px solid rgba(145, 230, 242, 0.4);
-  color: #ffffff;
-  font-family: "Orbitron", sans-serif;
-  font-size: 7.5px;
-  letter-spacing: 1px;
-  padding: 4px 8px;
-  cursor: pointer;
-  transition: background-color 0.2s, box-shadow 0.2s, color 0.2s;
-}
-.sugg-btn:hover { background: rgba(145, 230, 242, 0.16); box-shadow: 0 0 10px rgba(145, 230, 242, 0.35); }
-.sugg-btn.exec { border-color: rgba(0, 255, 170, 0.55); color: #7dffd4; }
-.sugg-btn.exec:hover { background: rgba(0, 255, 170, 0.14); }
-.sugg-btn.danger { border-color: rgba(255, 90, 90, 0.5); color: #ff9d9d; }
-.sugg-btn.danger:hover { background: rgba(255, 90, 90, 0.12); }
-.sugg-btn.ghost { border-color: rgba(120, 160, 180, 0.4); color: rgba(255, 255, 255, 0.78); }
-
-@media (max-width: 900px) {
-  .proactive-stack { width: 260px; left: 12px; top: 96px; }
-}
+.pro-conversation .sugg-btn:hover { background: rgba(216, 184, 117, .16); }
+.pro-conversation .sugg-btn:focus-visible { outline: 2px solid #f0d590; outline-offset: 3px; }
+.pro-conversation .sugg-btn:disabled { opacity: .5; cursor: wait; }
+.pro-conversation .sugg-btn.danger { color: #e8aba4; }
+.pro-conversation .sugg-why { border-left: 2px solid #d8b875; padding: 4px 12px; margin-top: 12px; }
+.pro-conversation .sugg-why p, .pro-conversation .sugg-confirm { font-size: 14px; }
+.pro-conversation .sugg-confirm { color: #ffb347; }
+.pro-conversation [role="alert"] { color: #ffb4a8; }
+.pro-conversation-result { color: #f0d590; }

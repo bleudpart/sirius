@@ -1,4 +1,5 @@
 from voice_corrections import normalize_voice_transcript
+import pytest
 
 
 def test_normalizes_creator_name_from_common_stt_mistakes():
@@ -18,3 +19,15 @@ def test_normalizes_sirius_module_lexicon():
 
 def test_normalizes_briefing_transcription_typo():
     assert normalize_voice_transcript("brieffing du soir") == "briefing du soir"
+
+
+@pytest.mark.parametrize("text", ["authenticité", "les authenticités", "Sirius, les authenticités du jour",
+                                 "donne-moi l'authenticité du jour"])
+def test_news_command_sound_alike_is_corrected(text):
+    assert "actualités" in normalize_voice_transcript(text)
+
+
+@pytest.mark.parametrize("text", ["définis authenticité", "vérifie l'authenticité de ce document",
+                                 "je m'intéresse à l'authenticité"])
+def test_actual_authenticity_requests_are_preserved(text):
+    assert normalize_voice_transcript(text) == text

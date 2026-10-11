@@ -55,6 +55,11 @@ function cleanTextForSpeech(t) {
     .replace(/(\*\*|__)(.*?)\1/g, "$2")          // **gras** __gras__
     .replace(/(\*|_)(.*?)\1/g, "$2")             // *italique* _italique_
     .replace(/[*_#`~|]/g, " ")                   // symboles Markdown restants
+    .replace(/[•▪◦‣·→←↔⇒➜]/gu, ", ")
+    .replace(/[\p{Extended_Pictographic}\p{Regional_Indicator}★☆✓✔✗✘\uFE0F\u200D]/gu, " ")
+    .replace(/(\d)\s*€/g, "$1 euros")
+    .replace(/(\d)\s*%/g, "$1 pour cent")
+    .replace(/(\d)\s*°\s*C\b/gi, "$1 degrés Celsius")
     .replace(/\b(?:ton|le)\s+((?:sirius|zirius)\s+display)\b/gi, "mon $1")
     .replace(/[\u2010\u2011\u2012]/g, "-")       // tirets Unicode (insécables) → tiret simple
     // Élision mal orthographiée par le LLM : « dites-m-en » → « dites-m'en » (sinon « m » se lit « meu »).
@@ -68,6 +73,8 @@ function cleanTextForSpeech(t) {
     .replace(/(?<!\p{L})-|-(?!\p{L})/gu, " ")
     .replace(/[()\[\]{}<>]/g, "")    // supprime parenthèses / crochets / accolades / chevrons
     .replace(/\/+/g, " ")            // supprime barres
+    .replace(/(?:,\s*){2,}/g, ", ")
+    .replace(/,\s*(?=[.!?])/g, "")
     .replace(/[ \t]+/g, " ")         // normalise espaces (garde les fins de phrase)
     .trim()).replace(/\bL'(?=\p{L})/gu, "l'");
 }

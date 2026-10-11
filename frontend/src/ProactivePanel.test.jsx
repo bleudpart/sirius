@@ -1,6 +1,6 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import ProactivePanel from "./ProactivePanel";
+import ProactivePanel, { ProactiveConversation } from "./ProactivePanel";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const originalFetch = global.fetch;
@@ -25,49 +25,39 @@ afterEach(async () => {
   jest.useRealTimers();
 });
 
-function pointer(target, type, x, y, button = 0) {
-  const event = new Event(type, { bubbles: true, cancelable: true });
-  Object.assign(event, { clientX: x, clientY: y, button, pointerId: 1 });
-  target.dispatchEvent(event);
-}
-
-test("anticipation header moves the panel and persists its position", async () => {
-  await act(async () => root.render(<ProactivePanel />));
-  const panel = host.querySelector(".proactive-stack");
-  panel.getBoundingClientRect = () => ({
-    left: parseFloat(panel.style.left) || 26,
-    top: parseFloat(panel.style.top) || 120,
-  });
-  pointer(host.querySelector(".pro-mode-row"), "pointerdown", 30, 125);
-  pointer(window, "pointermove", 104, 205);
-  act(() => jest.advanceTimersByTime(20));
-  expect(panel.style.left).toBe("100px");
-  expect(panel.style.top).toBe("200px");
-  pointer(window, "pointerup", 104, 205);
-  expect(JSON.parse(localStorage.getItem("sirius_panel_pos"))["proactive-panel"]).toEqual({ x: 100, y: 200 });
-  expect(panel.classList.contains("dragging")).toBe(false);
+test("une initiative entre dans le dialogue au moment de parler sans alerte flottante", async () => {
+  const onInitiative = jest.fn();
+  const onSpeak = jest.fn();
+  await act(async () => root.render(<ProactivePanel onSpeak={onSpeak} onInitiative={onInitiative} />));
+  expect(host.innerHTML).toBe("");
+  expect(onInitiative).not.toHaveBeenCalled();
+  await act(async () => jest.advanceTimersByTime(45000));
+  expect(onInitiative).toHaveBeenCalledWith(suggestion, "Test");
+  expect(onSpeak).toHaveBeenCalledWith("Test");
+  await act(async () => jest.advanceTimersByTime(300000));
+  expect(onInitiative).toHaveBeenCalledTimes(1);
 });
 
-test("suggestion buttons do not start a drag and retain their actions", async () => {
-  await act(async () => root.render(<ProactivePanel />));
-  const panel = host.querySelector(".proactive-stack");
+test("les actions restent disponibles sous le message sans badges d'urgence", async () => {
+  await act(async () => root.render(<ProactiveConversation suggestion={suggestion} />));
+  expect(host.querySelector(".sugg-badge")).toBeNull();
   const button = host.querySelector('[data-testid="sugg-later-btn"]');
-  pointer(button, "pointerdown", 30, 125);
-  pointer(window, "pointermove", 200, 250);
-  expect(panel.style.left).toBe("");
   await act(async () => button.click());
   expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/suggestions/test/action"),
     expect.objectContaining({ body: JSON.stringify({ action: "plus_tard", token: null }) }));
 });
 
-test("saved panel position is restored and clamped to the viewport", async () => {
-  localStorage.setItem("sirius_panel_pos", JSON.stringify({ "proactive-panel": { x: -30, y: 99999 } }));
-  await act(async () => root.render(<ProactivePanel />));
-  const panel = host.querySelector(".proactive-stack");
-  expect(panel.style.left).toBe("0px");
-  expect(parseFloat(panel.style.top)).toBeLessThanOrEqual(window.innerHeight);
-  pointer(host.querySelector(".pro-mode-row"), "pointerdown", 0, 0, 2);
-  expect(panel.classList.contains("dragging")).toBe(false);
+test("les actions sensibles demandent toujours une confirmation", async () => {
+  const onAction = jest.fn();
+  global.fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ needs_confirmation: true, token: "confirm" }) })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ executed: true, proposed_action: { type: "command", text: "test" } }) });
+  await act(async () => root.render(<ProactiveConversation suggestion={suggestion} onAction={onAction} />));
+  await act(async () => host.querySelector('[data-testid="sugg-exec-btn"]').click());
+  expect(onAction).not.toHaveBeenCalled();
+  expect(host.querySelector('[data-testid="sugg-confirm-msg"]')).not.toBeNull();
+  await act(async () => host.querySelector('[data-testid="sugg-exec-btn"]').click());
+  expect(global.fetch.mock.calls[1][1].body).toBe(JSON.stringify({ action: "executer", token: "confirm" }));
+  expect(onAction).toHaveBeenCalledWith({ type: "command", text: "test" });
 });
 
 test("announces during silence, never during speech, and never repeats an item", async () => {
@@ -110,10 +100,11 @@ test("respects user activity and the minimum gap between distinct initiatives", 
 
 test("reports HTTP errors instead of silently hiding failed evaluations", async () => {
   const consoleError = jest.spyOn(console, "error").mockImplementation(() => {});
+  const onError = jest.fn();
   global.fetch.mockResolvedValue({ ok: false, status: 401 });
   try {
-    await act(async () => root.render(<ProactivePanel onSpeak={jest.fn()} />));
-    expect(host.querySelector('[role="alert"]').textContent).toContain("Proactivité indisponible");
+    await act(async () => root.render(<ProactivePanel onSpeak={jest.fn()} onError={onError} />));
+    expect(onError).toHaveBeenCalledWith(expect.stringContaining("Proactivité indisponible"));
     expect(consoleError).toHaveBeenCalled();
   } finally {
     consoleError.mockRestore();

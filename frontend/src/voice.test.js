@@ -157,6 +157,20 @@ test.each(["answer", "character", "presentation"])("%s speech keeps Plutos and i
   expect(speakNative.mock.calls[0][0]).toBe("Ploutoss explique l'effet et l'histoire.");
 });
 
+test.each(["answer", "character", "presentation"])("%s speech removes decorative signs and narrates units", async (kind) => {
+  const text = "★ Actualités • France → Sport ✅. Budget : 12 € ; progression : 50 %.";
+  if (kind === "character") speakAsCharacter(text, { module: "ARGUS" });
+  else if (kind === "presentation") speakCinematic(text);
+  else speakFr(text);
+  await flush();
+  const request = global.fetch.mock.calls.find(([url]) => String(url).includes("/tts/gemini"));
+  const spoken = JSON.parse(request[1].body).text;
+  expect(spoken).not.toMatch(/[★•→✅€%]/u);
+  expect(spoken).toContain("12 euros");
+  expect(spoken).toContain("50 pour cent");
+  expect(cleanTextForDisplay(text)).toContain("★");
+});
+
 test("Gemini WAV plays once and ends once without native fallback", async () => {
   const audio = { play: jest.fn().mockResolvedValue(), pause: jest.fn() };
   global.Audio = jest.fn(() => audio);

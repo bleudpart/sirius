@@ -2,7 +2,7 @@
 
 export function normalizeVoiceTranscript(text) {
   if (!text) return "";
-  return [
+  const corrected = [
     [/\bbrieffing\b/gi, "briefing"],
     [/\bdaniel\s*[,;:]?\s*pontel\b/gi, "Daniel Partel"],
     [/\bdaniel\s*[,;:]?\s*parti\b/gi, "Daniel Partel"],
@@ -37,6 +37,10 @@ export function normalizeVoiceTranscript(text) {
     [/\bout look\b/gi, "Outlook"],
     [/\bhot mail\b/gi, "Hotmail"],
   ].reduce((value, [pattern, replacement]) => value.replace(pattern, replacement), String(text));
+  return corrected.replace(
+    /^(\s*(?:SIRIUS[\s,.:;-]+)?(?:(?:donne|lis|affiche|montre)(?:[- ]moi)?\s+)?(?:les?\s+|l['’])?)authenticit[ée]s?(\s*(?:(?:du\s+jour|d['’]aujourd['’]hui|aujourd['’]hui)\s*)?[.!?]*\s*)$/i,
+    "$1actualités$2",
+  );
 }
 
 export function chooseBestVoiceTranscript(alternatives) {
@@ -59,7 +63,7 @@ export function chooseBestVoiceTranscript(alternatives) {
 }
 
 const WAKE_WORD = /\b(?:sirius|syrius|cirius|sirus|cyrus|serious|s[ée]rieux|cilius|syriusse|sirio)\b/gi;
-const SHORT_COMMANDS = new Set(["stop", "silence", "pause", "briefing", "continue", "annule", "annuler", "bonjour", "bonsoir", "salut"]);
+const SHORT_COMMANDS = new Set(["stop", "silence", "pause", "briefing", "actualité", "actualités", "actus", "infos", "nouvelles", "continue", "annule", "annuler", "bonjour", "bonsoir", "salut"]);
 const GREETING_WITH_NAME = new RegExp(`^\\s*(?:bonjour|bonsoir|salut)[\\s,]+${WAKE_WORD.source}[\\s,.!?]*$`, "i");
 
 export function hasVoiceWakeWord(text) {

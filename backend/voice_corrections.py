@@ -45,4 +45,11 @@ def normalize_voice_transcript(text: str) -> str:
     )
     for pattern, replacement in replacements:
         corrected = re.sub(pattern, replacement, corrected, flags=re.IGNORECASE)
-    return corrected
+    return re.sub(
+        r"^(\s*(?:SIRIUS[\s,.:;-]+)?(?:(?:donne|lis|affiche|montre)(?:[- ]moi)?\s+)?"
+        r"(?:les?\s+|l['’])?)authenticit[ée]s?"
+        r"(\s*(?:(?:du\s+jour|d['’]aujourd['’]hui|aujourd['’]hui)\s*)?[.!?]*\s*)$",
+        r"\1actualités\2",
+        corrected,
+        flags=re.IGNORECASE,
+    )
