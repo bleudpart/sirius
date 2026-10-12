@@ -106,7 +106,7 @@ export function buildReceiptDraft({ kind, fields, seller, customer, description 
   ].filter((line) => line !== null).join("\n");
 }
 
-export async function readDocumentLocally(file, onProgress, { signal, timeoutMs = 90000 } = {}) {
+export async function readDocumentLocally(file, onProgress, { signal, timeoutMs = 90000, gzip = true } = {}) {
   let worker;
   let finished = false;
   let rejectStopped;
@@ -123,7 +123,7 @@ export async function readDocumentLocally(file, onProgress, { signal, timeoutMs 
     if (finished || signal?.aborted) throw new Error("Lecture annulée.");
     const base = new URL(`${process.env.PUBLIC_URL || "."}/ocr/`, document.baseURI).href;
     const created = await createWorker("fra", 1, {
-      workerPath: `${base}worker.min.js`, corePath: base, langPath: base,
+      workerPath: `${base}worker.min.js`, corePath: base, langPath: base, gzip,
       logger: ({ status, progress }) => {
         if (!finished) onProgress(status === "recognizing text"
           ? `Lecture du document : ${Math.round(progress * 100)} %` : "Chargement du lecteur local…");

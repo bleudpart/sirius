@@ -92,9 +92,17 @@ test("OCR uses bundled same-origin resources and always releases its worker", as
   const options = createWorker.mock.calls[0][2];
   expect(new URL(options.workerPath).origin).toBe(window.location.origin);
   expect(new URL(options.langPath).origin).toBe(window.location.origin);
+  expect(options.gzip).toBe(true);
   expect(result.fields.total_ttc).toBe("5.00");
   expect(worker.recognize).toHaveBeenCalledWith(expect.any(HTMLCanvasElement), { rotateAuto: true });
   expect(worker.terminate).toHaveBeenCalledTimes(1);
+});
+
+test("Android can request the uncompressed model actually packaged by AAPT", async () => {
+  const worker = { recognize: jest.fn().mockResolvedValue({ data: { text: "TOTAL TTC 5,00" } }), terminate: jest.fn().mockResolvedValue() };
+  createWorker.mockResolvedValue(worker);
+  await readDocumentLocally(new Blob(["image"]), jest.fn(), { gzip: false });
+  expect(createWorker.mock.calls[0][2].gzip).toBe(false);
 });
 
 test("cancel stops a pending OCR without waiting forever for recognition", async () => {

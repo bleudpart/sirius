@@ -140,7 +140,7 @@ export default function DocumentScanner({ initialDossier, initialFolder = "Compt
     try {
       const result = await readDocumentLocally(file,
         (message) => { if (alive.current && !cancelRead.current) setProgress(message); },
-        { signal: readController.current.signal });
+        { signal: readController.current.signal, gzip: Capacitor.getPlatform() !== "android" });
       if (alive.current && !cancelRead.current) {
         setText(result.text); setFields(result.fields); setDescription(result.text.slice(0, 10000)); setDraft("");
       }
