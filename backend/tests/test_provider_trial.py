@@ -43,7 +43,7 @@ def test_activation_is_atomic_persisted_and_never_resets(db):
 def test_trial_exact_seven_day_boundary_and_admin():
     start = datetime(2026, 1, 1, tzinfo=timezone.utc)
     user = account(started=start.isoformat())
-    boundary = start + timedelta(days=7)
+    boundary = start + timedelta(days=15)
     assert access.trial_status(user, boundary - timedelta(microseconds=1))["state"] == "active"
     assert access.trial_status(user, boundary)["state"] == "expired"
     assert access.trial_status(user, boundary)["remaining_seconds"] == 0
@@ -54,17 +54,17 @@ def test_trial_exact_seven_day_boundary_and_admin():
 @pytest.mark.parametrize("quota_flag", ["off", "0", "false", "on"])
 def test_expiration_enforced_even_when_quota_disabled(db, monkeypatch, quota_flag):
     monkeypatch.setenv("SIRIUS_QUOTA", quota_flag)
-    expired = account(started=access.utc_now() - timedelta(days=7))
+    expired = account(started=access.utc_now() - timedelta(days=15))
     with pytest.raises(HTTPException) as failure:
         asyncio.run(usage_quota.consume(db, expired, "chat"))
     assert failure.value.status_code == 403
-    assert "7 jours" in failure.value.detail
+    assert "15 jours" in failure.value.detail
     asyncio.run(usage_quota.consume(db, account(role="admin"), "chat"))
 
 
 def test_personal_keys_isolate_concurrent_tasks_and_do_not_fallback():
     async def request(key):
-        expired = account(started=access.utc_now() - timedelta(days=8))
+        expired = account(started=access.utc_now() - timedelta(days=16))
         with access.provider_scope(expired, {"groq_key": key}):
             await asyncio.sleep(0)
             assert access.provider_key("groq", "owner-secret") == key
@@ -88,7 +88,7 @@ def test_personal_keys_isolate_concurrent_tasks_and_do_not_fallback():
 
 @pytest.fixture
 def api(db, monkeypatch):
-    user = account(started=access.utc_now() - timedelta(days=8))
+    user = account(started=access.utc_now() - timedelta(days=16))
     asyncio.run(db.users.insert_one(user))
     app = FastAPI()
     app.add_middleware(access.ProviderAccessMiddleware, db=db)
@@ -224,7 +224,7 @@ def test_optional_llm_and_embedding_do_not_use_owner_after_trial(monkeypatch):
     monkeypatch.setattr(sirius_brain, "ENV_GROQ_LLM_KEY", "owner-groq")
     monkeypatch.setattr(semantic_vectors, "_local_model_instance", None)
     monkeypatch.setattr(semantic_vectors, "_EMBED_API_KEY", "owner-embedding")
-    with access.provider_scope(account(started=access.utc_now() - timedelta(days=8))):
+    with access.provider_scope(account(started=access.utc_now() - timedelta(days=16))):
         assert sirius_brain.k3_client() is None
         assert asyncio.run(sirius_brain.extract_memory_background("prompt", "answer")) == []
         assert asyncio.run(sirius_brain.summarize_episode([{"content": "p"}, {"content": "a"}])) is None
@@ -238,7 +238,7 @@ def server_api(db, monkeypatch):
     monkeypatch.setattr(server.cloud_link, "relay_allowed", lambda: False)
     monkeypatch.setattr(server.cloud_link, "should_relay_chat", lambda keys: False)
     server._RATE.clear()
-    user = account(started=access.utc_now() - timedelta(days=8))
+    user = account(started=access.utc_now() - timedelta(days=16))
     asyncio.run(db.users.insert_one(user))
     app = FastAPI()
     app.add_middleware(access.ProviderAccessMiddleware, db=db)
@@ -373,7 +373,7 @@ def test_real_brain_invalid_personal_does_not_try_owner(monkeypatch):
     monkeypatch.setattr(brain, "ENV_GROQ_LLM_KEY", "owner-brain")
     monkeypatch.setattr(brain, "ENV_K3_KEY", "owner-fallback")
     monkeypatch.setattr(brain, "client", None)
-    with access.provider_scope(account(started=access.utc_now() - timedelta(days=8)), {"groq_key": "bad-personal"}):
+    with access.provider_scope(account(started=access.utc_now() - timedelta(days=16)), {"groq_key": "bad-personal"}):
         result = asyncio.run(brain.ask_sirius("bonjour", keys={"groq_key": "bad-personal"}))
     assert created == ["bad-personal"]
     assert isinstance(result, dict)
@@ -433,7 +433,7 @@ def test_logout_login_does_not_restart_first_activation(db):
 def test_packaged_flag_does_not_extend_non_admin_trial(db, monkeypatch):
     monkeypatch.setenv("SIRIUS_PACKAGED", "1")
     with pytest.raises(HTTPException) as failure:
-        asyncio.run(usage_quota.consume(db, account(started=access.utc_now() - timedelta(days=8)), "stt"))
+        asyncio.run(usage_quota.consume(db, account(started=access.utc_now() - timedelta(days=16)), "stt"))
     assert failure.value.status_code == 403
 
 
@@ -497,7 +497,7 @@ def test_hephaistos_probe_never_sends_owner_kimi_key_after_trial(monkeypatch):
     source = inspect.getsource(hephaistos)
     assert "DANIEL_DEV_K3','')" not in source and 'environ.get("DANIEL_DEV_K3")' not in source
     monkeypatch.setenv("DANIEL_DEV_K3", "owner-kimi")
-    with access.provider_scope(account(started=access.utc_now() - timedelta(days=8)), {}):
+    with access.provider_scope(account(started=access.utc_now() - timedelta(days=16)), {}):
         assert access.provider_env("k3", "K3_API_KEY", "DANIEL_DEV_K3") == ""
 
 
@@ -519,7 +519,7 @@ def test_fal_personal_client_never_changes_environment(server_api, monkeypatch):
 def test_scheduled_summary_skips_expired_accounts_without_personal_keys(db):
     import episodic
     async def scenario():
-        user = account(started=access.utc_now() - timedelta(days=8))
+        user = account(started=access.utc_now() - timedelta(days=16))
         await db.users.insert_one(user)
         await db.sirius_chats.insert_one({
             "session_id": user["user_id"] + ":default",
@@ -594,7 +594,7 @@ def test_setup_test_chat_expired_unrelated_or_anonymous_never_call_owner(server_
     calls = []
     mock_server_http(monkeypatch, server, lambda request: calls.append(request) or httpx.Response(200, json={"choices": [{}]}))
     expired = client.post("/api/setup/test-chat", json={"keys": {}})
-    assert expired.status_code == 403 and "7 jours" in expired.json()["detail"]
+    assert expired.status_code == 403 and "15 jours" in expired.json()["detail"]
     unrelated = client.post("/api/setup/test-chat", json={"keys": {"serp": "personal-search", "gmaps": "personal-maps"}})
     assert unrelated.status_code == 403 and unrelated.json()["detail"] == access.PERSONAL_REQUIRED
     client.headers.pop("Authorization")
@@ -653,7 +653,7 @@ def test_active_trial_unrelated_personal_key_keeps_owner_chat_and_stream(server_
     assert seen == ["owner-brain", "owner-brain"] and _usage(db, user) == 2
     assert client.post("/api/chat", json=body).status_code == 429
     # Expired: the same partial vault never reaches the owner key.
-    asyncio.run(db.users.update_one({"user_id": user["user_id"]}, {"$set": {"trial_started_at": access.utc_now() - timedelta(days=7, seconds=1)}}))
+    asyncio.run(db.users.update_one({"user_id": user["user_id"]}, {"$set": {"trial_started_at": access.utc_now() - timedelta(days=15, seconds=1)}}))
     for path in ("/api/chat", "/api/chat/stream"):
         assert client.post(path, json=body).status_code == 403
     assert seen == ["owner-brain", "owner-brain"]
@@ -724,7 +724,7 @@ def cookie_client(db, started):
 
 def test_ws_stt_expired_without_personal_key_is_refused_before_recording(db, monkeypatch):
     from starlette.websockets import WebSocketDisconnect
-    client, _ = cookie_client(db, access.utc_now() - timedelta(days=8))
+    client, _ = cookie_client(db, access.utc_now() - timedelta(days=16))
     monkeypatch.setenv("GROQ_KEY", "owner-groq")
     monkeypatch.setenv("WHISPER_API_URL", "http://owner-whisper.invalid/stt")
     mock_voice(monkeypatch, lambda request: pytest.fail("Owner STT called"))
@@ -743,7 +743,7 @@ def test_ws_stt_expired_without_personal_key_is_refused_before_recording(db, mon
     (False, "personal-groq", "Bearer personal-groq"),
 ])
 def test_ws_stt_uses_personal_key_or_owner_only_during_trial(db, monkeypatch, expired, setup_key, expected):
-    started = access.utc_now() - timedelta(days=8 if expired else 1)
+    started = access.utc_now() - timedelta(days=16 if expired else 1)
     client, _ = cookie_client(db, started)
     monkeypatch.setenv("GROQ_KEY", "owner-groq")
     monkeypatch.delenv("WHISPER_API_URL", raising=False)
@@ -812,7 +812,7 @@ def test_tts_cache_filled_during_trial_is_not_served_after_expiry(db, monkeypatc
     assert first.status_code == 200 and calls
     assert voice_io._TTS_CACHE
     asyncio.run(db.users.update_one({"user_id": user["user_id"]},
-                                    {"$set": {"trial_started_at": access.utc_now() - timedelta(days=8)}}))
+                                    {"$set": {"trial_started_at": access.utc_now() - timedelta(days=16)}}))
     before = len(calls)
     again = client.post(path, json={"text": "bonjour"})
     assert again.status_code == 403
@@ -860,7 +860,7 @@ def modules(db, monkeypatch):
     import sirius_brain
     from routes import infos
     from routes.pantheon_oracle import make_pantheon_oracle_router
-    user = account(started=access.utc_now() - timedelta(days=8))
+    user = account(started=access.utc_now() - timedelta(days=16))
     asyncio.run(db.users.insert_one(user))
     for name, value in {"NEWS_API_KEY": "owner-news", "OPENWEATHER_API_KEY": "owner-weather",
                         "RESTCOUNTRIES_API_KEY": "owner-countries"}.items():
@@ -1443,7 +1443,7 @@ def test_background_memory_extraction_uses_daily_quota_limit_expiry_and_personal
     # Expiry between the response and the background task: no owner key, nothing charged.
     monkeypatch.setenv("SIRIUS_QUOTA_CHAT", "10")
     assert client.post("/api/chat/stream", json={"text": "je m'appelle Daniel", "keys": {"k3": "personal-kimi"}}).status_code == 200
-    asyncio.run(db.users.update_one({"user_id": user["user_id"]}, {"$set": {"trial_started_at": access.utc_now() - timedelta(days=7, seconds=1)}}))
+    asyncio.run(db.users.update_one({"user_id": user["user_id"]}, {"$set": {"trial_started_at": access.utc_now() - timedelta(days=15, seconds=1)}}))
     run_next()
     assert seen == ["owner-bg", "personal-groq", ""] and _usage(db, user) == 2
 

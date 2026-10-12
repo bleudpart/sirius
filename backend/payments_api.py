@@ -2,17 +2,19 @@
 # Paiements Stripe pour les deals Hermès Agora : lien d'encaissement (acompte ou total), suivi, webhook.
 import os
 import asyncio
-from datetime import datetime, timedelta, timezone
+import logging
+from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 import stripe
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, StrictBool
 
 from email_signature import load_signature_identity
 
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+logger = logging.getLogger(__name__)
 _LOCAL_CHECKOUT_ORIGINS = {"http://localhost:3000", "http://127.0.0.1:3000"}
 
 
@@ -51,6 +53,7 @@ class DealCheckoutIn(BaseModel):
 class LicenseCheckoutIn(BaseModel):
     tier: str
     origin_url: str
+    subscription_accepted: StrictBool = False
 
 
 class PublicLicenseCheckoutIn(LicenseCheckoutIn):
@@ -64,11 +67,31 @@ class PublicLicensePortalIn(BaseModel):
 
 
 _LICENSE_PRICE_ENV = {
-    "standard": "STRIPE_PRICE_STANDARD_79",
-    "pro": "STRIPE_PRICE_PRO_149",
-    "lifetime": "STRIPE_PRICE_LIFETIME_299",
-    "monthly": "STRIPE_PRICE_MONTHLY_35",
+    "standard": "STRIPE_PRICE_STANDARD_69",
+    "pro": "STRIPE_PRICE_PRO_135",
+    "lifetime": "STRIPE_PRICE_LIFETIME_269",
+    "monthly": "STRIPE_PRICE_MONTHLY_32",
 }
+_LICENSE_AMOUNT_CENTS = {"standard": 6900, "pro": 13500, "lifetime": 26900, "monthly": 3200}
+
+
+def _monthly_intro_coupon() -> str:
+    coupon_id = (os.getenv("STRIPE_COUPON_MONTHLY_FIRST_10") or "").strip()
+    if not coupon_id:
+        raise HTTPException(status_code=503, detail="L'offre du premier mois n'est pas encore configurée.")
+    try:
+        coupon = stripe.Coupon.retrieve(coupon_id)
+    except stripe.error.StripeError as error:
+        logger.error("Vérification de la remise Stripe impossible (%s)", type(error).__name__)
+        raise HTTPException(status_code=502, detail="La remise Stripe ne peut pas être vérifiée. Réessayez.") from error
+    if (
+        not coupon.get("valid") or coupon.get("duration") != "once"
+        or coupon.get("currency") != "eur" or coupon.get("amount_off") != 2200
+        or coupon.get("percent_off") is not None or coupon.get("applies_to")
+    ):
+        logger.error("Remise Stripe incohérente ; première location bloquée.")
+        raise HTTPException(status_code=503, detail="La remise du premier mois doit être mise à jour avant paiement.")
+    return coupon_id
 
 
 def _license_price(tier: str) -> tuple[str, str]:
@@ -77,11 +100,56 @@ def _license_price(tier: str) -> tuple[str, str]:
     price_id = (os.getenv(env_name or "") or "").strip()
     if not env_name or not price_id.startswith("price_"):
         raise HTTPException(status_code=503, detail="Cette licence Stripe n'est pas encore configurée.")
+    try:
+        price = stripe.Price.retrieve(price_id)
+    except stripe.error.StripeError as error:
+        logger.error("Vérification du tarif Stripe impossible (%s)", type(error).__name__)
+        raise HTTPException(status_code=502, detail="Le tarif Stripe ne peut pas être vérifié. Réessayez.") from error
+    recurring = price.get("recurring")
+    valid_period = (
+        isinstance(recurring, dict) and recurring.get("interval") == "month" and recurring.get("interval_count") == 1
+        if normalized == "monthly" else recurring is None
+    )
+    if (
+        not price.get("active") or price.get("currency") != "eur"
+        or price.get("unit_amount") != _LICENSE_AMOUNT_CENTS[normalized] or not valid_period
+        or price.get("transform_quantity") or price.get("custom_unit_amount")
+    ):
+        logger.error("Tarif Stripe incohérent pour la formule %s ; paiement bloqué.", normalized)
+        raise HTTPException(status_code=503, detail="Le tarif de cette formule doit être mis à jour avant paiement.")
     return normalized, price_id
+
+
+def _subscription_expiry(subscription: dict) -> str | None:
+    period_end = subscription.get("current_period_end")
+    if period_end is None:
+        items = (subscription.get("items") or {}).get("data") or []
+        ends = [item.get("current_period_end") for item in items]
+        if ends and all(isinstance(end, int) and not isinstance(end, bool) for end in ends):
+            period_end = min(ends)
+    if not isinstance(period_end, int) or isinstance(period_end, bool):
+        logger.warning("Abonnement Stripe sans échéance de facturation exploitable.")
+        return None
+    try:
+        return datetime.fromtimestamp(period_end, timezone.utc).isoformat()
+    except (OverflowError, OSError, ValueError):
+        logger.warning("Échéance de facturation Stripe invalide.")
+        return None
 
 
 def make_payments_router(db):
     r = APIRouter()
+
+    async def monthly_terms(body: LicenseCheckoutIn, uid: str, email: str):
+        if not body.subscription_accepted:
+            raise HTTPException(status_code=422, detail="Acceptez le renouvellement à 32 EUR/mois avant de souscrire.")
+        previous = await db.payment_transactions.find_one(
+            {"$or": [{"user_id": uid}, {"user_id": email}, {"buyer_email": email}],
+             "kind": "license", "tier": "monthly", "status": {"$in": ["completed", "refunded"]}},
+        )
+        eligible = previous is None
+        coupon_id = await asyncio.to_thread(_monthly_intro_coupon) if eligible else None
+        return eligible, coupon_id
 
     async def _uid(request: Request) -> str:
         from auth_api import require_user
@@ -153,26 +221,38 @@ def make_payments_router(db):
     async def license_checkout(body: LicenseCheckoutIn, request: Request):
         uid = await _uid(request)
         origin = _checkout_origin(body.origin_url)
-        tier, price_id = _license_price(body.tier)
+        tier, price_id = await asyncio.to_thread(_license_price, body.tier)
         subscription = tier == "monthly"
-        trial_days = max(0, min(int(os.getenv("STRIPE_TRIAL_DAYS", "7")), 30))
+        buyer_email = ""
+        if subscription:
+            user = await db.users.find_one({"user_id": uid}, {"email": 1, "_id": 0})
+            buyer_email = str((user or {}).get("email") or "").strip().lower()
+            if not buyer_email:
+                raise HTTPException(status_code=422, detail="Une adresse email de compte est nécessaire pour la location.")
+        intro, coupon_id = await monthly_terms(body, uid, buyer_email) if subscription else (False, None)
         kwargs = {
             "line_items": [{"price": price_id, "quantity": 1}],
             "mode": "subscription" if subscription else "payment",
-            "success_url": f"{origin}/?payment=success&session_id={{CHECKOUT_SESSION_ID}}",
+            "success_url": f"{origin}/?payment=success&tier={tier}&session_id={{CHECKOUT_SESSION_ID}}",
             "cancel_url": f"{origin}/?payment=cancel",
             "client_reference_id": uid,
             "metadata": {"kind": "license", "tier": tier, "user_id": uid},
         }
-        if subscription and trial_days:
-            kwargs["subscription_data"] = {"trial_period_days": trial_days, "metadata": {"tier": tier, "user_id": uid}}
+        if subscription:
+            kwargs["customer_email"] = buyer_email
+            kwargs["subscription_data"] = {"metadata": {"tier": tier, "user_id": uid}}
+            kwargs["custom_text"] = {"submit": {"message": "10 EUR le premier mois pour une première location, puis 32 EUR/mois. Renouvellement automatique, résiliation depuis le portail Stripe. Aucun nouvel essai gratuit à cette souscription." if intro else "32 EUR/mois. Renouvellement automatique, résiliation depuis le portail Stripe."}}
+            if coupon_id:
+                kwargs["discounts"] = [{"coupon": coupon_id}]
         try:
             session = await asyncio.to_thread(stripe.checkout.Session.create, **kwargs)
         except stripe.error.StripeError as error:
             raise HTTPException(status_code=502, detail=f"Stripe indisponible : {str(error)[:120]}") from error
         await db.payment_transactions.insert_one({
             "session_id": session.id, "user_id": uid, "kind": "license", "tier": tier,
+            "buyer_email": buyer_email,
             "price_id": price_id, "status": "initiated", "payment_status": "pending",
+            "intro_offer": intro, "subscription_accepted": body.subscription_accepted,
             "created_at": now_iso(), "updated_at": now_iso(),
         })
         return {"checkout_url": session.url, "session_id": session.id, "tier": tier}
@@ -180,21 +260,24 @@ def make_payments_router(db):
     @r.post("/public/license-checkout")
     async def public_license_checkout(body: PublicLicenseCheckoutIn, request: Request):
         origin = _checkout_origin(body.origin_url)
-        tier, price_id = _license_price(body.tier)
+        tier, price_id = await asyncio.to_thread(_license_price, body.tier)
         buyer_email = str(body.email).strip().lower()
         buyer_phone = (body.phone or "").strip()
         subscription = tier == "monthly"
-        trial_days = max(0, min(int(os.getenv("STRIPE_TRIAL_DAYS", "7")), 30))
+        intro, coupon_id = await monthly_terms(body, buyer_email, buyer_email) if subscription else (False, None)
         kwargs = {
             "line_items": [{"price": price_id, "quantity": 1}],
             "mode": "subscription" if subscription else "payment",
-            "success_url": f"{origin}/?payment=success&session_id={{CHECKOUT_SESSION_ID}}",
+            "success_url": f"{origin}/?payment=success&tier={tier}&session_id={{CHECKOUT_SESSION_ID}}",
             "cancel_url": f"{origin}/?payment=cancel",
             "customer_email": buyer_email,
             "metadata": {"kind": "license", "tier": tier, "user_id": buyer_email, "buyer_email": buyer_email},
         }
-        if subscription and trial_days:
-            kwargs["subscription_data"] = {"trial_period_days": trial_days, "metadata": {"tier": tier, "user_id": buyer_email}}
+        if subscription:
+            kwargs["subscription_data"] = {"metadata": {"tier": tier, "user_id": buyer_email}}
+            kwargs["custom_text"] = {"submit": {"message": "10 EUR le premier mois pour une première location, puis 32 EUR/mois. Renouvellement automatique, résiliation depuis le portail Stripe. Aucun nouvel essai gratuit à cette souscription." if intro else "32 EUR/mois. Renouvellement automatique, résiliation depuis le portail Stripe."}}
+            if coupon_id:
+                kwargs["discounts"] = [{"coupon": coupon_id}]
         try:
             session = await asyncio.to_thread(stripe.checkout.Session.create, **kwargs)
         except stripe.error.StripeError as error:
@@ -203,6 +286,7 @@ def make_payments_router(db):
             "session_id": session.id, "user_id": buyer_email, "buyer_email": buyer_email,
             "buyer_phone": buyer_phone,
             "kind": "license", "tier": tier, "price_id": price_id,
+            "intro_offer": intro, "subscription_accepted": body.subscription_accepted,
             "status": "initiated", "payment_status": "pending",
             "created_at": now_iso(), "updated_at": now_iso(),
         })
@@ -396,7 +480,7 @@ def make_payments_router(db):
                         "status": "trialing" if tier == "monthly" and obj.get("payment_status") == "no_payment_required" else "active",
                         "stripe_customer_id": obj.get("customer"), "stripe_subscription_id": subscription_id,
                         "updated_at": now_iso(),
-                        "expires_at": None if tier == "lifetime" else (datetime.now(timezone.utc) + timedelta(days=max(0, int(os.getenv("STRIPE_TRIAL_DAYS", "7"))))).isoformat() if tier == "monthly" else None,
+                        **({"expires_at": None} if tier != "monthly" else {}),
                     }},
                     upsert=True,
                 )
@@ -406,7 +490,8 @@ def make_payments_router(db):
             if uid and tier:
                 await db.user_licenses.update_one(
                     {"user_id": uid},
-                    {"$set": {"tier": tier, "status": "canceled" if t.endswith("deleted") else obj.get("status", "active"), "stripe_subscription_id": obj.get("id"), "updated_at": now_iso()}},
+                    {"$set": {"tier": tier, "status": "canceled" if t.endswith("deleted") else obj.get("status", "active"), "stripe_subscription_id": obj.get("id"), "updated_at": now_iso(),
+                              "expires_at": _subscription_expiry(obj), "cancel_at_period_end": bool(obj.get("cancel_at_period_end"))}},
                     upsert=True,
                 )
         elif t in {"invoice.payment_succeeded", "invoice.payment_failed"}:

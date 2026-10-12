@@ -21,6 +21,12 @@ In the project directory, you can run:
 
 ## Scanner et documents papier
 
+Le Store conserve le slogan et les textes de présentation existants. Il présente
+d'abord le contexte métier, le parcours document/relecture/classement et les
+captures de situations, avant les fonctions et les offres. ODYSSEIA reste disponible
+plus bas, après le parcours d'achat. Aucun gain de temps ni conformité comptable
+n'est présenté comme démontré.
+
 Le scanner est accessible dans la médiathèque et dans « Mes dossiers ». Il conserve
 la photo originale sur le serveur SIRIUS après confirmation. La lecture du texte
 se fait localement avec les ressources OCR embarquées ; les champs extraits doivent

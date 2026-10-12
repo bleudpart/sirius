@@ -6,18 +6,19 @@ import "./PublicStore.css";
 const API = `${process.env.REACT_APP_BACKEND_URL || "https://api.sirius-assistant.fr"}/api`;
 
 const PLANS = [
-  { id: "standard", cardClass: "card-standard", name: "Standard", icon: UserRound, tagline: "L'essentiel pour automatiser votre quotidien.", price: "79", suffix: " unique", features: ["Assistant conversationnel", "Emails et documents", "HUD ΣIRIUS", "Windows et mobile"] },
-  { id: "pro", cardClass: "card-pro", name: "Pro", icon: Zap, tagline: "La puissance métier sans friction.", price: "149", suffix: " unique", featured: true, badge: "RECOMMANDÉ", features: ["Tout Standard", "Automatisations métier", "HACCP et productivité", "Commandes vocales", "Support prioritaire"] },
-  { id: "lifetime", cardClass: "card-lifetime", name: "Lifetime", icon: Star, tagline: "L'accès complet, pour longtemps.", price: "299", suffix: " unique", badge: "MEILLEURE VALEUR", features: ["Tout Pro", "Mises à jour incluses", "Futurs modules inclus", "Licence à vie"] },
+  { id: "monthly", cardClass: "card-entreprise", name: "Location", icon: Zap, tagline: "Essayez sans carte, puis choisissez votre abonnement.", price: "10", suffix: " le premier mois", features: ["15 jours gratuits sans carte à la première connexion", "Première location : 10 € le premier mois", "Puis 32 €/mois, renouvellement automatique", "Résiliation depuis le portail Stripe", "Après l'essai, clés IA personnelles nécessaires"] },
+  { id: "standard", cardClass: "card-standard", name: "Standard", icon: UserRound, tagline: "L'essentiel pour automatiser votre quotidien.", price: "69", suffix: " unique", features: ["Assistant conversationnel", "Emails et documents", "HUD ΣIRIUS", "Windows et mobile"] },
+  { id: "pro", cardClass: "card-pro", name: "Pro", icon: Zap, tagline: "La puissance métier sans friction.", price: "135", suffix: " unique", featured: true, badge: "RECOMMANDÉ", features: ["Tout Standard", "Automatisations métier", "HACCP et productivité", "Commandes vocales", "Support prioritaire"] },
+  { id: "lifetime", cardClass: "card-lifetime", name: "Lifetime", icon: Star, tagline: "L'accès complet, pour longtemps.", price: "269", suffix: " unique", badge: "MEILLEURE VALEUR", features: ["Tout Pro", "Mises à jour incluses", "Futurs modules inclus", "Licence à vie"] },
 ];
 
 const MATRIX_ACTIONS = [
-  { icon: Mic, text: "Dicter une demande", detail: "Le microphone nécessite votre autorisation. La transcription Android envoie un extrait audio au serveur." },
   { icon: FolderOpen, text: "Organiser ses dossiers", detail: "Les six modules métier locaux proposent une sauvegarde JSON et une restauration par fusion." },
-  { icon: Mail, text: "Préparer un email", detail: "Les fonctions email nécessitent un compte connecté et les autorisations du fournisseur." },
-  { icon: Home, text: "Piloter des équipements", detail: "La domotique nécessite une connexion configurée et des équipements compatibles." },
   { icon: FileText, text: "Rédaction de documents", detail: "L'IA vous aide à préparer des textes et des brouillons. Relisez et validez le contenu avant de l'utiliser." },
   { icon: Search, text: "Analyse assistée par IA", detail: "Obtenez une synthèse ou une explication des informations fournies. Vérifiez les conclusions ; un service IA configuré et une connexion réseau sont nécessaires." },
+  { icon: Mail, text: "Préparer un email", detail: "Les fonctions email nécessitent un compte connecté et les autorisations du fournisseur." },
+  { icon: Mic, text: "Dicter une demande", detail: "Le microphone nécessite votre autorisation. La transcription Android envoie un extrait audio au serveur." },
+  { icon: Home, text: "Piloter des équipements", detail: "La domotique nécessite une connexion configurée et des équipements compatibles." },
 ];
 
 export default function PublicStore() {
@@ -28,6 +29,7 @@ export default function PublicStore() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [selected, setSelected] = useState("pro");
+  const [subscriptionAccepted, setSubscriptionAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [portalBusy, setPortalBusy] = useState(false);
@@ -96,12 +98,17 @@ export default function PublicStore() {
   const checkout = async (event) => {
     event.preventDefault();
     setError("");
+    if (selected === "monthly" && !subscriptionAccepted) {
+      setError("Acceptez les conditions de renouvellement de la location.");
+      return;
+    }
     setBusy(true);
     try {
       const response = await fetch(`${API}/public/license-checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), phone: phone.trim(), tier: selected, origin_url: window.location.origin }),
+        body: JSON.stringify({ email: email.trim(), phone: phone.trim(), tier: selected, origin_url: window.location.origin,
+          ...(selected === "monthly" ? { subscription_accepted: subscriptionAccepted } : {}) }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.checkout_url) throw new Error(data.detail || "Impossible d'ouvrir le paiement.");
@@ -165,7 +172,7 @@ export default function PublicStore() {
         <p className="public-eyebrow">ΣIRIUS · Assistant personnel et professionnel</p>
         <h1>ZIRIUS <em>travaille pour vous.</em></h1>
         <p className="public-value">Il organise vos tâches, simplifie votre travail et vous libère du temps.</p>
-        <p className="public-trial-highlight">7 jours d'essai gratuit des services IA dès votre première connexion.</p>
+        <p className="public-trial-highlight">15 jours d'essai gratuit des services IA dès votre première connexion.</p>
         <div className="public-benefits"><span>Emails</span><span>Documents</span><span>Automatisation métier</span><span>Domotique</span></div>
         <div className="public-hero-actions"><a className="public-primary-cta" href="#offres">Découvrir les offres <ArrowRight size={17} /></a><a className="public-secondary-cta" href="#matrice-demo">Explorer l'interface <ArrowRight size={17} /></a></div>
       </section>
@@ -175,12 +182,45 @@ export default function PublicStore() {
         <p className="public-preview-caption">Une interface pour vos commandes, vos outils et vos modules.</p>
       </section>
       </div>
+      <section className="public-why" aria-labelledby="public-why-title">
+        <h2 id="public-why-title" className="public-section-title">Pourquoi ΣIRIUS a-t-il été conçu ?</h2>
+        <p>ΣIRIUS a été conçu pour aider les particuliers, les commerçants, les artisans, les indépendants et les entreprises à mieux organiser leur activité au quotidien. Il permet de centraliser les documents, notes, factures, informations comptables, tâches, rendez-vous et projets dans un espace unique. Grâce à ses capacités de classement, de recherche et de synthèse, ΣIRIUS facilite le suivi administratif, l'organisation du travail et la prise de décision.</p>
+      </section>
+      <section className="public-workflow" aria-labelledby="public-workflow-title">
+        <h2 id="public-workflow-title" className="public-section-title">De vos documents au travail préparé</h2>
+        <p>Pour un commerçant ou un indépendant, la valeur n'est pas seulement d'obtenir une réponse IA : c'est de retrouver les pièces, préparer le travail et conserver un résultat relu dans le bon dossier.</p>
+        <ol className="public-workflow-steps">
+          <li><strong>Rassembler dans un dossier</strong><p>Photographiez un ticket ou choisissez une image. La lecture du texte se fait sur l'appareil ; la photo originale est conservée sur le serveur SIRIUS après confirmation.</p></li>
+          <li><strong>Préparer et vérifier</strong><p>Relisez les champs proposés et comparez les identifiants fiscaux signalés avec la photo. Une information non identifiée reste à compléter, elle n'est pas inventée.</p></li>
+          <li><strong>Conserver un résultat utilisable</strong><p>Classez le justificatif et téléchargez sa fiche de dépense en PDF A4. Une vente reste un brouillon de facture non émis ; vous gardez la main sur sa validation.</p></li>
+        </ol>
+        <p className="public-function-note">Une IA comme Claude peut participer à certaines étapes. ΣIRIUS réunit ici la capture, la relecture, le classement et le document préparé dans un même parcours. Ce parcours ne garantit ni la conformité comptable ni un temps gagné ; ces résultats doivent être vérifiés dans votre activité.</p>
+      </section>
+      <section className="public-situations" aria-labelledby="public-situations-title">
+        <h2 id="public-situations-title" className="public-section-title">ΣIRIUS en situation</h2>
+        <p>Captures de l'application locale avec des données fictives de démonstration. Elles illustrent les dossiers et le planning, pas une réponse IA ni une connexion à un service externe.</p>
+        <div className="public-situations-grid">
+          <figure>
+            <a href="/demo/sirius-dossiers.png" target="_blank" rel="noopener noreferrer" aria-label="Agrandir la capture des dossiers">
+              <img src="/demo/sirius-dossiers.png" alt="MNÉMOSYNE : dossier Atelier Horizon avec un client fictif" width="1440" height="1000" loading="lazy" />
+            </a>
+            <figcaption><strong>MNÉMOSYNE — Dossiers et archives</strong><span>Un dossier, son contact et sa description. Données de démonstration.</span></figcaption>
+          </figure>
+          <figure>
+            <a href="/demo/sirius-planning.png" target="_blank" rel="noopener noreferrer" aria-label="Agrandir la capture du planning">
+              <img src="/demo/sirius-planning.png" alt="CHRONOS : échéance de relecture associée au dossier fictif Atelier Horizon" width="1440" height="1000" loading="lazy" />
+            </a>
+            <figcaption><strong>CHRONOS — Planning et échéances</strong><span>Une tâche datée associée à un dossier. Données de démonstration.</span></figcaption>
+          </figure>
+        </div>
+      </section>
       <section className="public-trial" aria-labelledby="public-trial-title">
-        <h2 id="public-trial-title" className="public-section-title">7 jours pour découvrir les services IA</h2>
-        <p>L'essai commence à votre première connexion activant votre compte. Pendant 7 jours, les services IA autorisés utilisent les clés de SIRIUS, dans la limite des quotas quotidiens.</p>
+        <h2 id="public-trial-title" className="public-section-title">15 jours pour découvrir les services IA</h2>
+        <p>L'essai commence à votre première connexion activant votre compte. Pendant 15 jours, les services IA autorisés utilisent les clés de SIRIUS, dans la limite des quotas quotidiens.</p>
         <p><strong>Sans engagement ni paiement automatique à la fin de l'essai.</strong> Vous pouvez arrêter d'utiliser l'essai à tout moment : aucun abonnement à annuler.</p>
         <p>Ensuite, l'assistant de configuration vous guide pour ajouter vos propres clés API qui restent chiffrées sur votre appareil. Les outils et dossiers locaux restent accessibles ; les fournisseurs peuvent facturer l'utilisation de vos clés.</p>
-        <small>L'essai des services IA est distinct de l'achat d'une licence présenté ci-dessous. Une déconnexion ou une réinstallation ne relance pas les 7 jours.</small>
+        <p>Sans carte bancaire pour l'essai. Pour continuer en location, souscrivez volontairement : 10 € le premier mois pour une première location, puis 32 €/mois. Le renouvellement est automatique après souscription, pas après l'essai gratuit.</p>
+        <small>L'essai des services IA est distinct de l'achat d'une licence présenté ci-dessous. Une déconnexion ou une réinstallation ne relance pas les 15 jours. Souscrire avant la fin de l'essai déclenche le premier paiement immédiatement, sans nouvel essai Stripe.</small>
       </section>
       <section className="public-matrix" id="matrice-demo" aria-label="La matrice de ΣIRIUS">
         <div className="public-section-intro"><span className="public-section-icon"><ChartNoAxesCombined size={21} /></span><div><h2 className="public-section-title">Découvrez les fonctionnalités de ΣIRIUS</h2><p>Une présentation des usages et de leurs prérequis, pas une démonstration en direct.</p></div></div>
@@ -204,48 +244,12 @@ export default function PublicStore() {
         </div>
         <p className="public-function-note">La capture d'écran ci-dessus présente le HUD. L'animation du noyau illustre son apparence, sans exécuter de commande. Les fonctions IA et les services connectés nécessitent une connexion réseau ; leur délai de réponse peut varier.</p>
       </section>
-      <section className="public-situations" aria-labelledby="public-situations-title">
-        <h2 id="public-situations-title" className="public-section-title">ΣIRIUS en situation</h2>
-        <p>Captures de l'application locale avec des données fictives de démonstration. Elles illustrent les dossiers et le planning, pas une réponse IA ni une connexion à un service externe.</p>
-        <div className="public-situations-grid">
-          <figure>
-            <a href="/demo/sirius-dossiers.png" target="_blank" rel="noopener noreferrer" aria-label="Agrandir la capture des dossiers">
-              <img src="/demo/sirius-dossiers.png" alt="MNÉMOSYNE : dossier Atelier Horizon avec un client fictif" width="1440" height="1000" loading="lazy" />
-            </a>
-            <figcaption><strong>MNÉMOSYNE — Dossiers et archives</strong><span>Un dossier, son contact et sa description. Données de démonstration.</span></figcaption>
-          </figure>
-          <figure>
-            <a href="/demo/sirius-planning.png" target="_blank" rel="noopener noreferrer" aria-label="Agrandir la capture du planning">
-              <img src="/demo/sirius-planning.png" alt="CHRONOS : échéance de relecture associée au dossier fictif Atelier Horizon" width="1440" height="1000" loading="lazy" />
-            </a>
-            <figcaption><strong>CHRONOS — Planning et échéances</strong><span>Une tâche datée associée à un dossier. Données de démonstration.</span></figcaption>
-          </figure>
-        </div>
-      </section>
-      <section className="public-odysseia-card" aria-labelledby="public-odysseia-card-title">
-        <img src="/Designer%20(16).png" alt="Athéna, illustration de la bibliothèque ODYSSEIA" loading="lazy" />
-        <div>
-          <p className="public-eyebrow">ODYSSEIA · Mythes et histoire</p>
-          <h2 id="public-odysseia-card-title" className="public-section-title">L’ère mythologique grecque</h2>
-          <p>Des récits du Cosmos aux héros de Troie : découvrez ce que racontent les mythes et ce que l’histoire peut réellement établir.</p>
-          <button
-            type="button"
-            className="public-secondary-cta"
-            onClick={(event) => {
-              mythOpenerRef.current = event.currentTarget;
-              setMythWindowOpen(true);
-            }}
-          >
-            Lire la synthèse <ArrowRight size={17} />
-          </button>
-        </div>
-      </section>
       <section className="public-plans" id="offres" aria-label="Offres ΣIRIUS">
         <h2 className="public-section-title">Choisissez votre formule</h2>
         {PLANS.map((plan) => {
           const PlanIcon = plan.icon;
           return (
-            <button key={plan.id} type="button" aria-pressed={selected === plan.id} className={`public-plan public-plan-${plan.id} ${plan.cardClass} ${selected === plan.id ? "selected" : ""} ${plan.featured ? "featured" : ""}`} onClick={() => setSelected(plan.id)}>
+            <button key={plan.id} type="button" aria-pressed={selected === plan.id} className={`public-plan public-plan-${plan.id} ${plan.cardClass} ${selected === plan.id ? "selected" : ""} ${plan.featured ? "featured" : ""}`} onClick={() => { setSelected(plan.id); setSubscriptionAccepted(false); }}>
               {plan.badge && <span className={`public-popular ${plan.id === "lifetime" ? "public-popular-alt" : ""}`}>{plan.badge}</span>}
               <span className="public-plan-icon" aria-hidden="true"><PlanIcon size={19} /></span>
               <span className="public-plan-name">{plan.name}</span>
@@ -263,7 +267,7 @@ export default function PublicStore() {
         <p className="public-eyebrow">Votre licence</p>
         <h2 className="public-section-title">Commencer avec ΣIRIUS</h2>
         </div>
-        <p className="public-order-summary" aria-live="polite"><span>{selectedPlan.name}</span><strong>{selectedPlan.price} €</strong><small>Paiement unique</small></p>
+        <p className="public-order-summary" aria-live="polite"><span>{selectedPlan.name}</span><strong>{selectedPlan.price} €</strong><small>{selected === "monthly" ? "Premier mois d'une première location, puis 32 €/mois" : "Paiement unique"}</small></p>
         </div>
         <label htmlFor="public-email">Votre adresse e-mail</label>
         <div className="public-form-row">
@@ -275,6 +279,10 @@ export default function PublicStore() {
           <input id="public-phone" type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="06 12 34 56 78" />
           <a className="public-demo-link" href="#matrice-demo">Voir les fonctions <ArrowRight size={17} /></a>
         </div>
+        {selected === "monthly" && <label className="public-subscription-consent">
+          <input type="checkbox" checked={subscriptionAccepted} required onChange={(event) => setSubscriptionAccepted(event.target.checked)} />
+          J'accepte le paiement immédiat de 10 € pour le premier mois de ma première location, puis le renouvellement automatique à 32 €/mois jusqu'à résiliation. Si j'ai déjà souscrit une location, le tarif est de 32 €/mois dès la souscription. Les clés IA personnelles restent nécessaires après l'essai.
+        </label>}
         {selected !== "monthly" && (
           <button type="button" className="public-paypal-btn" onClick={checkoutPaypal} disabled={paypalBusy}>
             <ShieldCheck size={16} /> {paypalBusy ? "Ouverture..." : "Payer avec PayPal"}
@@ -289,14 +297,28 @@ export default function PublicStore() {
           {paypalStatus.ok ? `Paiement PayPal confirmé — licence ${paypalStatus.tier} activée.` : paypalStatus.message}
         </p>
       )}
-      {paymentSucceeded && checkoutSessionId && <section className="public-subscription-success">
-        <strong>Paiement confirmé.</strong>
+      {paymentSucceeded && checkoutSessionId && new URLSearchParams(window.location.search).get("tier") === "monthly" && <section className="public-subscription-success">
+        <strong>Retour de la souscription Stripe.</strong>
         <span>Gérez ou résiliez votre abonnement depuis le portail Stripe sécurisé.</span>
         <button type="button" onClick={manageSubscription} disabled={portalBusy}>{portalBusy ? "Ouverture..." : "Gérer mon abonnement"}</button>
       </section>}
-      <section className="public-why" aria-labelledby="public-why-title">
-        <h2 id="public-why-title" className="public-section-title">Pourquoi ΣIRIUS a-t-il été conçu ?</h2>
-        <p>ΣIRIUS a été conçu pour aider les particuliers, les commerçants, les artisans, les indépendants et les entreprises à mieux organiser leur activité au quotidien. Il permet de centraliser les documents, notes, factures, informations comptables, tâches, rendez-vous et projets dans un espace unique. Grâce à ses capacités de classement, de recherche et de synthèse, ΣIRIUS facilite le suivi administratif, l'organisation du travail et la prise de décision.</p>
+      <section className="public-odysseia-card" aria-labelledby="public-odysseia-card-title">
+        <img src="/Designer%20(16).png" alt="Athéna, illustration de la bibliothèque ODYSSEIA" loading="lazy" />
+        <div>
+          <p className="public-eyebrow">ODYSSEIA · Mythes et histoire</p>
+          <h2 id="public-odysseia-card-title" className="public-section-title">L’ère mythologique grecque</h2>
+          <p>Des récits du Cosmos aux héros de Troie : découvrez ce que racontent les mythes et ce que l’histoire peut réellement établir.</p>
+          <button
+            type="button"
+            className="public-secondary-cta"
+            onClick={(event) => {
+              mythOpenerRef.current = event.currentTarget;
+              setMythWindowOpen(true);
+            }}
+          >
+            Lire la synthèse <ArrowRight size={17} />
+          </button>
+        </div>
       </section>
       <footer className="public-footer">
         <p className="public-slogan">ZIRIUS travaille pour vous.</p>

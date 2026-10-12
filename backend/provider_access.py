@@ -9,10 +9,10 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException
 
-TRIAL_DAYS = 7
-PERSONAL_REQUIRED = "Votre essai de 7 jours est terminé. Déverrouillez vos clés personnelles dans la configuration."
+TRIAL_DAYS = 15
+PERSONAL_REQUIRED = "Votre essai de 15 jours est terminé. Ajoutez vos clés personnelles dans la configuration."
 OWNER_ONLY_EXPIRED = (
-    "Votre essai de 7 jours est terminé. Ce service en ligne fonctionne uniquement avec les clés "
+    "Votre essai de 15 jours est terminé. Ce service en ligne fonctionne uniquement avec les clés "
     "du serveur ΣIRIUS ; vos outils et dossiers locaux restent accessibles."
 )
 PERSONAL_MISSING = "Clé personnelle manquante pour ce service. Ajoutez-la dans la configuration."

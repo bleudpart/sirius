@@ -13,9 +13,9 @@ _LOCAL_CHECKOUT_ORIGINS = {"http://localhost:3000", "http://127.0.0.1:3000"}
 
 # Mêmes tarifs que Stripe (prix public, EUR) — l'abonnement mensuel n'est pas proposé ici.
 _LICENSE_PRICES_EUR = {
-    "standard": "79.00",
-    "pro": "149.00",
-    "lifetime": "299.00",
+    "standard": "69.00",
+    "pro": "135.00",
+    "lifetime": "269.00",
 }
 
 

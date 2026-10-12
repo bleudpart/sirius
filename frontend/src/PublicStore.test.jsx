@@ -26,13 +26,22 @@ afterEach(() => {
 
 test("offer selection updates the accessible state and checkout summary", () => {
   const plans = container.querySelectorAll(".public-plan");
-  expect(plans).toHaveLength(3);
-  expect(plans[1].getAttribute("aria-pressed")).toBe("true");
-  act(() => plans[2].click());
-  expect(plans[1].getAttribute("aria-pressed")).toBe("false");
+  expect(plans).toHaveLength(4);
   expect(plans[2].getAttribute("aria-pressed")).toBe("true");
-  expect(container.querySelector(".public-order-summary").textContent).toContain("Lifetime299 €");
+  act(() => plans[3].click());
+  expect(plans[2].getAttribute("aria-pressed")).toBe("false");
+  expect(plans[3].getAttribute("aria-pressed")).toBe("true");
+  expect(container.querySelector(".public-order-summary").textContent).toContain("Lifetime269 €");
 });
+
+test.each([["standard", "69"], ["pro", "135"], ["lifetime", "269"]])(
+  "the %s card and checkout summary display the same reduced price", (tier, price) => {
+    const card = container.querySelector(`.public-plan-${tier}`);
+    expect(card.querySelector(".public-price").textContent).toContain(`${price} €`);
+    act(() => card.click());
+    expect(container.querySelector(".public-order-summary strong").textContent).toBe(`${price} €`);
+  },
+);
 
 test("store displays the requested slogan in the hero and footer", () => {
   expect(container.querySelector(".public-hero h1").textContent).toBe("ZIRIUS travaille pour vous.");
@@ -49,8 +58,22 @@ test("store explains why Sirius was designed with the requested text", () => {
   expect(section.querySelector(":scope > p").textContent).toBe("ΣIRIUS a été conçu pour aider les particuliers, les commerçants, les artisans, les indépendants et les entreprises à mieux organiser leur activité au quotidien. Il permet de centraliser les documents, notes, factures, informations comptables, tâches, rendez-vous et projets dans un espace unique. Grâce à ses capacités de classement, de recherche et de synthèse, ΣIRIUS facilite le suivi administratif, l'organisation du travail et la prise de décision.");
 });
 
+test("business context and workflow precede functions and offers without removing existing sections", () => {
+  const sections = [...container.querySelectorAll("main > section")].map((section) => section.className);
+  expect(sections.indexOf("public-why")).toBeLessThan(sections.indexOf("public-workflow"));
+  expect(sections.indexOf("public-workflow")).toBeLessThan(sections.indexOf("public-situations"));
+  expect(sections.indexOf("public-situations")).toBeLessThan(sections.indexOf("public-matrix"));
+  expect(sections.indexOf("public-matrix")).toBeLessThan(sections.indexOf("public-plans"));
+  expect(sections.indexOf("public-plans")).toBeLessThan(sections.indexOf("public-odysseia-card"));
+  const steps = container.querySelectorAll(".public-workflow-steps li");
+  expect(steps).toHaveLength(3);
+  expect(steps[1].textContent).toContain("Relisez les champs");
+  expect(steps[2].textContent).toContain("brouillon de facture non émis");
+  expect(container.querySelector(".public-workflow").textContent).toContain("ne garantit ni la conformité comptable ni un temps gagné");
+  expect(container.querySelector(".public-matrix-actions li strong").textContent).toBe("Organiser ses dossiers");
+});
 test("trial explains activation, limits and personal keys without automatic payment", () => {
-  expect(container.querySelector(".public-trial-highlight").textContent).toContain("7 jours d'essai gratuit");
+  expect(container.querySelector(".public-trial-highlight").textContent).toContain("15 jours d'essai gratuit");
   const trial = container.querySelector(".public-trial");
   expect(trial.textContent).toContain("première connexion activant votre compte");
   expect(trial.textContent).toContain("quotas quotidiens");
@@ -58,9 +81,31 @@ test("trial explains activation, limits and personal keys without automatic paym
   expect(trial.textContent).toContain("aucun abonnement à annuler");
   expect(trial.textContent).toContain("vos propres clés API");
   expect(trial.textContent).toContain("distinct de l'achat d'une licence");
-  expect(trial.textContent).toContain("ne relance pas les 7 jours");
+  expect(trial.textContent).toContain("ne relance pas les 15 jours");
 });
 
+test("rental exposes the first month and renewal price and requires explicit consent", async () => {
+  act(() => container.querySelector(".public-plan-monthly").click());
+  expect(container.querySelector(".public-order-summary").textContent).toContain("10 €");
+  expect(container.querySelector(".public-order-summary").textContent).toContain("32 €/mois");
+  expect(container.querySelector(".public-paypal-btn")).toBeNull();
+  const email = container.querySelector("#public-email");
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(email, "client@example.com");
+    email.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => container.querySelector("form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+  expect(global.fetch).not.toHaveBeenCalled();
+  expect(container.querySelector('[role="alert"]').textContent).toContain("Acceptez");
+  act(() => container.querySelector('.public-subscription-consent input').click());
+  await act(async () => container.querySelector("form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+  expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/public/license-checkout"), expect.objectContaining({
+    body: JSON.stringify({ email: "client@example.com", phone: "", tier: "monthly", origin_url: window.location.origin, subscription_accepted: true }),
+  }));
+  act(() => container.querySelector(".public-plan-standard").click());
+  act(() => container.querySelector(".public-plan-monthly").click());
+  expect(container.querySelector('.public-subscription-consent input').checked).toBe(false);
+});
 test("the core rotates transparent rings rather than the square emblem", () => {
   const rings = container.querySelectorAll(".public-core-ring");
   expect(rings).toHaveLength(2);

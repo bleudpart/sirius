@@ -25,6 +25,40 @@ Une entrée absente ou un nom ambigu provoque une erreur explicite. Le script
 n'enregistre aucun son et ne modifie pas le microphone du navigateur ou d'Android,
 qui utilisent leurs propres identifiants, pas les index PyAudio.
 
+### Tarifs du Store et configuration du paiement
+
+Les nouvelles offres sont Standard **69 EUR**, Pro **135 EUR**, Lifetime
+**269 EUR**, en paiement unique. La quatrième carte propose la location :
+**10 EUR le premier mois d'une première location, puis 32 EUR/mois**.
+Les services IA peuvent être essayés **15 jours sans carte**, à partir de la
+première activation du compte, sans souscription ni débit automatique.
+La souscription est volontaire et le premier paiement immédiat ; elle ne
+rajoute pas d'essai Stripe. Ensuite, renouvellement automatique jusqu'à
+résiliation dans le portail Stripe. Après l'essai, les clés IA personnelles
+et les éventuels coûts fournisseurs restent à la charge de l'utilisateur.
+PayPal utilise les montants des trois licences uniques.
+
+Avant de déployer ces tarifs, créer les nouveaux prix dans Stripe et renseigner
+sur le serveur `STRIPE_PRICE_STANDARD_69`, `STRIPE_PRICE_PRO_135`,
+`STRIPE_PRICE_LIFETIME_269` et `STRIPE_PRICE_MONTHLY_32` avec leurs identifiants
+`price_...`. Les trois premiers doivent être des prix uniques en EUR ; le dernier
+doit être récurrent chaque mois. Les anciens noms de variables ne servent pas
+de repli : un prix absent, inactif ou incohérent bloque le nouveau paiement avec
+une erreur explicite, au lieu de facturer davantage que le prix annoncé.
+Les abonnements existants ne sont pas migrés automatiquement ; les transactions
+déjà créées gardent leur montant historique.
+
+Créer également un coupon Stripe en EUR, `amount_off=2200`, `duration=once`,
+sans restriction produit, et renseigner son identifiant dans
+`STRIPE_COUPON_MONTHLY_FIRST_10`. Le prix de base reste 3200 centimes :
+la première facture est donc de 1000 centimes, puis les suivantes de 3200.
+Le serveur vérifie le coupon et bloque une première location si sa configuration
+est absente ou incohérente. La remise est réservée à une seule première location
+par compte/adresse email ; une reprise après résiliation démarre à 32 EUR.
+`STRIPE_TRIAL_DAYS` n'est plus utilisé. L'essai des comptes conserve la date
+d'activation initiale : passer à 15 jours prolonge également les essais existants
+jusqu'à cette nouvelle échéance, sans remettre leur compteur à zéro.
+
 Le briefing ORACLE récupère sans clé API neuf rubriques RSS Franceinfo : France,
 international, politique, économie, sport, santé, sciences et technologies,
 environnement et culture. Les publications datées des dernières 48 heures sont
@@ -229,7 +263,7 @@ La section « Découvrez les fonctionnalités de ΣIRIUS » présente six cadres
 dont la rédaction de documents et l'analyse assistée par IA, avec leurs limites.
 La section « Pourquoi ΣIRIUS a-t-il été conçu ? » présente le texte explicatif
 sans les trois anciens cadres Organiser / Préparer / Connecter.
-La boutique explique l'essai gratuit des services IA pendant 7 jours dès la
+La boutique explique l'essai gratuit des services IA pendant 15 jours dès la
 première connexion activant le compte : quotas quotidiens, aucun paiement
 automatique à expiration, puis configuration des clés personnelles. Cet essai
 est distinct de l'achat de la licence ; les coûts des fournisseurs restent séparés.
@@ -303,7 +337,7 @@ ni de lecture vocale. Les 43 anciennes phrases du HUD sont conservées dans
 attributions philosophiques sont signalées comme non vérifiées, distinctes
 des créations contemporaines inspirées des figures mythologiques.
 
-### Essai de 7 jours, puis configuration personnelle
+### Essai de 15 jours, puis configuration personnelle
 
 Le parcours prévu distingue un essai avec les services autorisés du serveur,
 soumis aux quotas quotidiens, et l'utilisation des clés personnelles après

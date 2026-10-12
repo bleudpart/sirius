@@ -17,7 +17,7 @@ const CONTENT = {
     title: "Conditions générales de vente",
     sections: [
       ["Offres et paiement", "Les tarifs et fonctionnalités affichés sur la boutique constituent les offres en vigueur. Le paiement est réalisé de manière sécurisée via Stripe."],
-      ["Abonnement Entreprise", "L'abonnement est mensuel après la période d'essai affichée lors de la commande. Sa gestion et sa résiliation sont accessibles depuis le portail client Stripe."],
+      ["Location mensuelle", "L'essai des services IA dure 15 jours à partir de la première activation du compte, sans carte et sans paiement automatique à son terme. La location nécessite une souscription volontaire distincte : 10 EUR le premier mois pour une première location, puis 32 EUR par mois en renouvellement automatique jusqu'à résiliation. Une nouvelle souscription après une location précédente est à 32 EUR par mois dès le départ. Le premier paiement est immédiat lors de la souscription, même si l'essai du compte n'est pas terminé. Sa gestion et sa résiliation sont accessibles depuis le portail client Stripe. Après l'essai, les clés IA personnelles restent nécessaires et les fournisseurs peuvent facturer leur utilisation."],
       ["Résiliation et facturation en cours", "La résiliation peut être demandée à tout moment depuis le portail Stripe. La date d'effet, le maintien de l'accès et l'éventuel calcul au prorata du mois en cours sont appliqués selon la configuration Stripe du service et le droit applicable ; ils sont indiqués au client avant confirmation."],
       ["Licences à paiement unique", "Les offres Standard, Pro et Lifetime sont facturées une seule fois. Elles donnent accès aux fonctions indiquées au moment de l'achat, selon les limites de la licence."],
       ["Droit de rétractation", "Pour un contenu ou service numérique fourni avant la fin du délai légal, le client est invité à donner son accord exprès au démarrage immédiat et à reconnaître la perte éventuelle de son droit de rétractation, selon le cadre légal applicable."],
@@ -35,7 +35,7 @@ export default function PublicLegal() {
       <p>ΣIRIUS</p>
       <h1>{page.title}</h1>
       {page.sections.map(([heading, text]) => <section key={heading}><h2>{heading}</h2><p>{text}</p></section>)}
-      <p className="public-legal-updated">Dernière mise à jour : {page.updated || "20 septembre 2026"}.</p>
+      <p className="public-legal-updated">Dernière mise à jour : {page.updated || "12 octobre 2026"}.</p>
     </article>
   </main>;
 }

@@ -2,7 +2,7 @@
 
 ## Commencer sans chercher de clés
 
-Connectez-vous à votre compte SIRIUS. Votre essai dure **7 jours à partir
+Connectez-vous à votre compte SIRIUS. Votre essai dure **15 jours à partir
 de la première activation du compte**, avec des limites quotidiennes.
 Pendant cet essai, les services autorisés utilisent les clés du serveur :
 vous n'avez pas à les connaître, les copier ou les demander.
@@ -12,7 +12,7 @@ facultative absente n'empêche pas d'utiliser les autres fonctions.
 Les limites quotidiennes sont visibles dans **Configuration → Clés API et services**.
 Se déconnecter ou réinstaller l'application ne recommence pas l'essai.
 
-> **Important : après ces 7 jours, les services en ligne qui utilisent les
+> **Important : après ces 15 jours, les services en ligne qui utilisent les
 > clés de SIRIUS ne fonctionneront plus avec ces clés. Pour continuer à
 > utiliser ces services, la configuration de vos propres clés devient
 > obligatoire. Préparez-la avant la fin de l'essai pour éviter une interruption.**

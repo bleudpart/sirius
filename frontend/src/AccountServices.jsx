@@ -31,8 +31,8 @@ export default function AccountServices() {
   return (
     <section data-testid="account-services">
       <h2>Essai et services de mon compte</h2>
-      <p className="setup-note">Pendant 7 jours, les services autorisés utilisent les clés du serveur sans vous les transmettre. Ensuite, configurez vos propres clés.</p>
-      <p className="setup-warn">Après 7 jours, les services utilisant les clés de SIRIUS sont bloqués. Vos propres clés deviennent obligatoires pour continuer ces services. Les dossiers et outils locaux restent accessibles.</p>
+      <p className="setup-note">Pendant 15 jours, les services autorisés utilisent les clés du serveur sans vous les transmettre. Ensuite, configurez vos propres clés.</p>
+      <p className="setup-warn">Après 15 jours, les services utilisant les clés de SIRIUS sont bloqués. Vos propres clés deviennent obligatoires pour continuer ces services. Les dossiers et outils locaux restent accessibles.</p>
       {loading && <p role="status">Vérification des services…</p>}
       {error && <p className="fw-status ko" role="alert">{error}</p>}
       {!loading && <button type="button" className="setup-io-btn" onClick={() => setAttempt((value) => value + 1)}>Revérifier</button>}

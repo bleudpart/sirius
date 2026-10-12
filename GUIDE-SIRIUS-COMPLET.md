@@ -11,13 +11,20 @@
 
 | Offre | Prix | Paiement | Comprend |
 |---|---:|---|---|
-| Abonnement | 35 EUR / mois | Recurrent | HUD complet, mises a jour, memoire et proactivite |
-| Standard | 79 EUR | Unique | Licence permanente, HUD professionnel, modules essentiels |
-| Pro | 149 EUR | Unique | Modules metiers avances, productivite, HACCP, support prioritaire |
-| Lifetime | 299 EUR | Unique | Acces a vie, toutes les fonctions Pro, evolutions futures |
+| Location | 10 EUR le premier mois, puis 32 EUR / mois | Recurrent | Premiere location uniquement a 10 EUR, gestion et resiliation dans Stripe |
+| Standard | 69 EUR | Unique | Licence permanente, HUD professionnel, modules essentiels |
+| Pro | 135 EUR | Unique | Modules metiers avances, productivite, HACCP, support prioritaire |
+| Lifetime | 269 EUR | Unique | Acces a vie, toutes les fonctions Pro, evolutions futures |
 
-L'Abonnement propose 7 jours d'essai gratuit avant la facturation mensuelle,
-selon la configuration Stripe active. Les paiements publics passent par Stripe.
+L'essai des services IA dure 15 jours des la premiere activation du compte,
+sans carte bancaire ni debit automatique. La location necessite une souscription
+volontaire distincte avec paiement immediat : 10 EUR le premier mois pour une
+premiere location, puis renouvellement automatique a 32 EUR / mois jusqu'a
+resiliation. Une reprise apres resiliation commence a 32 EUR / mois. Apres
+l'essai, les cles IA personnelles restent necessaires ; les couts des fournisseurs
+ne sont pas inclus dans la location. Les paiements passent par Stripe, ou par
+PayPal pour les licences uniques. Les nouveaux prix et le coupon Stripe doivent
+etre configures sur le serveur avant la mise en production.
 
 ## Connexion locale
 

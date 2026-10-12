@@ -136,7 +136,7 @@
 .public-matrix-actions li { min-height:100px; flex-direction:column; justify-content:center; gap:10px; padding:16px; border:1px solid rgba(145,230,242,.22); background:rgba(8,29,45,.7); border-radius:7px; font:500 14px/1.35 "Inter",sans-serif; }
 .public-matrix-actions li svg { margin:0; color:var(--store-gold-strong); }
 .public-matrix-video { display:none; }
-.public-plans { grid-template-columns:repeat(3,1fr); gap:18px; margin:0 auto 118px; }
+.public-plans { grid-template-columns:repeat(4,minmax(0,1fr)); gap:18px; margin:0 auto 118px; }
 .public-plans>.public-section-title { margin:0 0 16px; }
 .public-plan { min-height:410px; padding:28px 24px; border-radius:8px; font-family:"Inter",sans-serif; }
 .public-plan-name { font-size:27px; margin-bottom:10px; }
@@ -188,6 +188,14 @@
 .public-metrics { margin-bottom:80px; border-radius:10px; overflow:hidden; }
 .public-metrics div { min-height:96px; }
 .public-matrix,.public-plans,.public-trust,.public-why { margin-bottom:80px; }
+.public-workflow { max-width:var(--store-content); margin:0 auto 80px; }
+.public-workflow > p { line-height:1.7; }
+.public-workflow-steps { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:20px; padding:0; list-style:none; counter-reset:workflow-step; }
+.public-workflow-steps li { counter-increment:workflow-step; padding:22px; border:1px solid var(--store-line); border-radius:12px; background:var(--store-panel); }
+.public-workflow-steps li::before { content:counter(workflow-step); display:block; margin-bottom:14px; color:var(--store-gold-strong); font:600 26px/1.2 "Inter",sans-serif; }
+.public-workflow-steps strong { color:var(--store-gold-strong); }
+.public-workflow-steps p { margin-bottom:0; font-size:14px; line-height:1.7; }
+@media(max-width:800px) { .public-workflow-steps { grid-template-columns:1fr; } }
 .public-section-title { font-size:clamp(24px,2.6vw,32px); line-height:1.25; }
 .public-matrix-layout { display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:stretch; }
 .public-core-preview { flex-direction:column; justify-content:center; gap:16px; text-align:center; margin:0; padding:28px; border-radius:12px; }
@@ -222,6 +230,9 @@
 .public-order-summary strong { font-size:26px; line-height:1.2; }
 .public-order-summary small { color:rgba(255, 255, 255, 0.78); font-size:11px; }
 .public-checkout label { font-size:13px; }
+.public-checkout .public-subscription-consent { display:flex; align-items:flex-start; gap:12px; line-height:1.7; }
+.public-subscription-consent input { flex-shrink:0; margin-top:5px; }
+.public-order-summary small { max-width:260px; }
 .public-form-row { align-items:stretch; }
 .public-demo-link { min-height:48px; justify-content:center; }
 .public-checkout .public-checkout-note { max-width:none; margin:12px 0 0; line-height:1.6; }

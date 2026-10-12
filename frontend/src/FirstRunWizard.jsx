@@ -198,7 +198,7 @@ export default function FirstRunWizard({ userName = "", userEmail = "", keys = {
                 <button type="button" className="fw-secondary" onClick={checkBrain}>Réessayer</button>
               </>
             )}
-            {brain.setup?.trial?.state === "active" && <p>Essai SIRIUS : 7 jours avec quotas, jusqu'au {new Date(brain.setup.trial.expires_at).toLocaleString("fr-FR")}. Ensuite, utilisez vos propres clés.</p>}
+            {brain.setup?.trial?.state === "active" && <p>Essai SIRIUS : 15 jours avec quotas, jusqu'au {new Date(brain.setup.trial.expires_at).toLocaleString("fr-FR")}. Ensuite, utilisez vos propres clés.</p>}
             {brain.state === "missing" && <p className="fw-status ko">Service IA non disponible pour ce compte. Ajoutez vos clés personnelles dans Réglages.</p>}
             {brain.state === "configured" && <button type="button" className="fw-primary" onClick={testChat} disabled={chatTest.state === "testing"} data-testid="fw-chat-test">Tester une réponse IA</button>}
             {chatTest.state === "testing" && <p role="status">Test IA en cours…</p>}
@@ -206,7 +206,7 @@ export default function FirstRunWizard({ userName = "", userEmail = "", keys = {
             {chatTest.state === "error" && <p role="alert" className="fw-status ko">{chatTest.message}</p>}
             {brain.state === "link" && (
               <form className="fw-link" onSubmit={linkAccount} data-testid="fw-link-form">
-                <p>Reliez votre compte SIRIUS pour les services de l'essai de 7 jours, sous quotas. Les clés personnelles prennent ensuite le relais.</p>
+                <p>Reliez votre compte SIRIUS pour les services de l'essai de 15 jours, sous quotas. Les clés personnelles prennent ensuite le relais.</p>
                 <div className="fw-tabs">
                   <button type="button" className={mode === "login" ? "on" : ""} onClick={() => setMode("login")}>J'ai un compte</button>
                   <button type="button" className={mode === "register" ? "on" : ""} onClick={() => setMode("register")} data-testid="fw-mode-register">Créer un compte</button>
