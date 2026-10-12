@@ -39,13 +39,12 @@ Chaque fournisseur exige son propre compte ; la mémoire locale ne demande aucun
    créez votre compte et votre clé, puis copiez-la dans le champ correspondant.
 4. Cliquez sur **TESTER**. Un résultat refusé, un quota atteint ou un problème
    de connexion doit être résolu avant de considérer le service utilisable.
-5. Choisissez un **mot de passe de coffre d'au moins 12 caractères**,
-   confirmez-le et cliquez sur **Protéger et enregistrer**.
+5. Cliquez sur **ENREGISTRER** pour conserver les clés sur cet appareil.
 
 SIRIUS chiffre et enregistre les clés sur cet appareil. Il n'est pas nécessaire
 de modifier du code, des fichiers `.env` ou des variables d'environnement.
-Les champs de clés ne sont pas sauvegardés par le simple bouton général
-**ENREGISTRER** : utilisez bien **Protéger et enregistrer**.
+Le mot de passe n'est nécessaire que pour une sauvegarde portable, pas pour
+l'enregistrement habituel sur l'appareil.
 
 > Les fournisseurs peuvent demander une validation de compte, l'activation
 > d'une API ou un moyen de paiement. Consultez leurs tarifs et leurs quotas.
@@ -56,28 +55,44 @@ Les champs de clés ne sont pas sauvegardés par le simple bouton général
 Si vous possédez un fichier **sirius.vault**, vous n'avez pas à recopier les
 clés une par une :
 
-1. Ouvrez **Clés API et services** et sélectionnez **Importer un coffre chiffré**.
+1. Ouvrez **Clés API et services → Avancé → Restaurer une sauvegarde**.
 2. Choisissez votre fichier, puis saisissez le mot de passe de ce coffre.
-3. Cliquez sur **Déverrouiller et confirmer l'import**. Relisez la liste des
-   services avant de confirmer le remplacement du coffre de votre compte
-   sur cet appareil.
+3. Cliquez sur **Restaurer**. Les clés sont vérifiées puis enregistrées sur l'appareil.
 
-Les champs sont remplis et les clés deviennent utilisables pour cette session.
 L'import ne modifie pas les clés du serveur, les autres comptes ou votre rôle.
-Après import, testez les services : une clé peut avoir expiré depuis l'export.
+Une clé refusée ou non vérifiable doit être contrôlée auprès de son fournisseur.
+
+## Créer un coffre portable sans ouvrir SIRIUS
+
+Depuis un terminal à la racine du projet, avec Node.js installé :
+
+```powershell
+node .\scripts\create-vault.mjs "$env:USERPROFILE\Desktop\sirius.vault"
+```
+
+L'outil réutilise le chiffrement de SIRIUS et ne fait aucun appel réseau.
+Collez vos clés dans les invites masquées ; appuyez sur Entrée pour ignorer
+un fournisseur. Choisissez et confirmez un mot de passe de 12 caractères minimum.
+Seul le coffre chiffré est enregistré ; un fichier existant n'est jamais écrasé.
+Les clés ne sont pas testées auprès des fournisseurs avant la création : cette
+vérification se fait à l'import dans SIRIUS.
+
+Transportez le fichier sur votre téléphone ou un autre PC, puis utilisez
+**Clés API et services → Avancé → Restaurer une sauvegarde**.
+Conservez le mot de passe séparément : il n'est ni stocké ni récupérable.
+Les fichiers `.vault` sont exclus du suivi Git. N'envoyez jamais vos clés ou
+votre mot de passe dans une conversation.
 
 ## À la prochaine ouverture
 
-Les clés restent chiffrées sur l'appareil. Dans **Clés API et services**,
-saisissez le mot de passe du coffre et cliquez sur **Déverrouiller**.
-Vous n'avez pas à saisir à nouveau toutes vos clés.
-
-**Verrouiller** retire les clés déverrouillées de la session sans supprimer
-le coffre. La déconnexion ou le changement de compte les verrouille également.
+Les clés restent chiffrées sur l'appareil et se rechargent automatiquement
+pour votre compte. Vous n'avez pas à saisir à nouveau vos clés ou le mot de passe
+de la sauvegarde à chaque ouverture.
 
 ## Sauvegarder ou changer d'appareil
 
-Cliquez sur **Exporter le coffre** après avoir protégé et enregistré vos clés.
+Dans **Avancé**, choisissez un mot de passe de 12 caractères minimum puis
+cliquez sur **Télécharger une sauvegarde**, après avoir enregistré vos clés.
 Conservez le fichier **sirius.vault** et son mot de passe séparément.
 Sur le nouvel appareil, connectez-vous à votre compte et importez ce fichier.
 
@@ -86,9 +101,9 @@ Le fichier de profil `.json` contient uniquement des informations de profil :
 
 ## Si vous aviez déjà enregistré des clés dans l'ancienne version
 
-Utilisez **Migrer mes anciennes clés** sur votre appareil personnel.
-Confirmez que ces clés vous appartiennent, vérifiez les champs et cliquez
-sur **Protéger et enregistrer**.
+Dans **Avancé**, utilisez **Reprendre mes anciennes clés** sur votre appareil
+personnel. Pour un ancien coffre, utilisez **Récupérer mon ancien coffre**
+avec son mot de passe une dernière fois.
 L'ancienne copie dans le stockage du navigateur est alors retirée.
 Les anciens exports JSON ne sont pas automatiquement supprimés : protégez
 ou supprimez vous-même ces anciennes copies.
