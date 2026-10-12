@@ -1,0 +1,25 @@
+.document-scanner { position: fixed; inset: 0; z-index: 15000; display: flex; justify-content: center; align-items: center; background: rgba(2, 10, 20, .94); padding: 12px; box-sizing: border-box; }
+.document-scanner-card { width: min(680px, 100%); max-height: calc(100dvh - 24px); overflow: auto; padding: 20px; box-sizing: border-box; border: 1px solid #d8b875; border-radius: 18px; color: #fff; background: #061824; font: 14px/1.5 "Segoe UI", sans-serif; }
+.document-scanner header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.document-scanner h2 { color: #d8b875; margin: 0; font-size: 23px; }
+.document-scanner fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.document-scanner label { display: flex; flex-direction: column; gap: 5px; margin-block: 12px; }
+.document-scanner :is(button, input, select, textarea) { font: inherit; box-sizing: border-box; }
+.document-scanner :is(button, input, select, textarea) { border-radius: 8px; border: 1px solid #537185; padding: 10px; color: #fff; background: #10283d; }
+.document-scanner button { cursor: pointer; min-height: 44px; }
+.document-scanner :disabled { opacity: .55; cursor: default; }
+.document-scanner :is(input, select, textarea) { width: 100%; min-width: 0; }
+.document-scanner input[type="checkbox"] { width: 20px; height: 20px; }
+.document-scanner-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.document-scanner .document-scanner-file { margin: 0; flex: 1; min-width: 180px; }
+.document-scanner-preview :is(img, video) { display: block; width: 100%; max-height: 340px; object-fit: contain; margin-block: 12px; background: #03111d; }
+.document-scanner-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
+.document-scanner textarea { min-height: 90px; resize: vertical; }
+.document-scanner .document-scanner-draft { min-height: 260px; }
+.document-scanner .document-scanner-save { width: 100%; margin-top: 16px; color: #061824; background: #d8b875; font-weight: 600; }
+.document-scanner [role="alert"] { color: #ffb6b6; }
+@media (max-width: 599px) {
+  .document-scanner { padding: max(8px, env(safe-area-inset-top, 0px)) 8px max(8px, env(safe-area-inset-bottom, 0px)); }
+  .document-scanner-card { padding: 14px; max-height: 100%; }
+  .document-scanner-fields { grid-template-columns: minmax(0, 1fr); }
+}

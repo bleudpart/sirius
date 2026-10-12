@@ -171,7 +171,7 @@ export default function FirstRunWizard({ userName = "", userEmail = "", keys = {
   };
 
   const brainLabel = {
-    personal: "Clés personnelles déverrouillées — test IA proposé",
+    personal: "Clés personnelles prêtes — test IA proposé",
     cloud: "Compte SIRIUS Cloud relié — test IA proposé",
     server: "Service IA configuré sur le serveur — test IA proposé",
   }[brain.via];
@@ -199,7 +199,7 @@ export default function FirstRunWizard({ userName = "", userEmail = "", keys = {
               </>
             )}
             {brain.setup?.trial?.state === "active" && <p>Essai SIRIUS : 7 jours avec quotas, jusqu'au {new Date(brain.setup.trial.expires_at).toLocaleString("fr-FR")}. Ensuite, utilisez vos propres clés.</p>}
-            {brain.state === "missing" && <p className="fw-status ko">Service IA non disponible pour ce compte. Configurez ou déverrouillez vos clés personnelles.</p>}
+            {brain.state === "missing" && <p className="fw-status ko">Service IA non disponible pour ce compte. Ajoutez vos clés personnelles dans Réglages.</p>}
             {brain.state === "configured" && <button type="button" className="fw-primary" onClick={testChat} disabled={chatTest.state === "testing"} data-testid="fw-chat-test">Tester une réponse IA</button>}
             {chatTest.state === "testing" && <p role="status">Test IA en cours…</p>}
             {chatTest.state === "ok" && <p className="fw-status ok" data-testid="fw-chat-ok">Réponse IA testée avec {chatTest.provider}.</p>}
@@ -227,7 +227,7 @@ export default function FirstRunWizard({ userName = "", userEmail = "", keys = {
               </form>
             )}
             <div className="fw-actions">
-              {onExpert && <button type="button" className="fw-link-btn" onClick={onExpert} data-testid="fw-expert">Configurer mes clés / importer mon coffre</button>}
+              {onExpert && <button type="button" className="fw-link-btn" onClick={onExpert} data-testid="fw-expert">Configurer mes clés</button>}
               <button type="button" className="fw-primary" onClick={() => setStep(1)} data-testid="fw-next-brain">
                 Suivant
               </button>

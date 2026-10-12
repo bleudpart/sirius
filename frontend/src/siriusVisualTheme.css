@@ -479,6 +479,12 @@ html[data-sirius-visual-theme="classic"] .public-popular { border-radius: 0 20px
   html[data-sirius-visual-theme="classic"] .modwheel-grid { padding: 10px; }
 }
 @media (max-width: 599px) and (orientation: portrait) {
+  html[data-sirius-visual-theme="classic"] .sirius-root .sirius-command-area :is(.cmd-bar, .voice-session-controls) {
+    width: 86vw;
+    max-width: 86vw;
+    align-self: center;
+    margin-inline: auto;
+  }
   html[data-sirius-visual-theme="classic"] .sirius-center .sirius-stage { height: min(23vh, 190px); }
   html[data-sirius-visual-theme="classic"] .sirius-stage .reactor-wrap {
     width: min(14.58vh, 106.3125px);
@@ -630,7 +636,7 @@ html[data-sirius-visual-theme="classic"] .public-popular { border-radius: 0 20px
     html[data-sirius-visual-theme="classic"] .boot-screen { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; padding: 16px 14px; gap: 12px; align-content: start; }
     html[data-sirius-visual-theme="classic"] .boot-screen .boot-reactor { width: 112px; height: 112px; margin: 36px 0 30px; }
     html[data-sirius-visual-theme="classic"] .boot-screen .boot-reactor .core-orbit { display: none; }
-    html[data-sirius-visual-theme="classic"] .boot-welcome { font-size: 26px; margin: 4px 0; }
+    html[data-sirius-visual-theme="classic"] .boot-welcome { font-size: 26px; margin: max(40px, calc(env(safe-area-inset-top, 0px) + 24px)) 0 4px; }
     html[data-sirius-visual-theme="classic"] .boot-acronym { margin-top: 8px; }
     html[data-sirius-visual-theme="classic"] .boot-signature { margin-top: 8px; }
     html[data-sirius-visual-theme="classic"] .boot-status { max-height: none; padding: 14px 16px; height: auto; width: 100%; margin-right: 0; overflow: visible; }
@@ -653,3 +659,27 @@ html[data-sirius-visual-theme="classic"] .public-popular { border-radius: 0 20px
     html[data-sirius-visual-theme="classic"] .boot-status :is(.workspace-kicker, .boot-check-details) { display: none; }
     html[data-sirius-visual-theme="classic"] .boot-status { height: auto; }
   }
+
+/* Téléphones : les liserés animés repeignent toute la fenêtre à chaque étape.
+   On garde la rotation mais moins souvent et on coupe le défilement continu du spectre,
+   pour laisser le processeur graphique aux animations du réacteur et aux images. */
+@media (max-width: 1023px) and (pointer: coarse) {
+  html[data-sirius-visual-theme="classic"] :is(
+    .prime-screen, .zeus-screen, .eu-screen, .setup-screen, .holo-win, .iw-panel,
+    .atlas-panel, .kr-panel, .esp-panel, .about-panel, .media-hud-window,
+    .productivity-screen, .connections-screen, .vision-card, .keys-panel,
+    .sp-journal, .getting-started, .hud-panel, .shud-hub,
+    .web-window, .sirius-display, .fv-window, .p3d-panel, .fp-panel, .an3d-overlay,
+    .cmdp-box, .voice-capture-panel, .auth-card, .overlay-bar, .overlay-answer,
+    .shud-panel, .float-card, .central-card, .holo-popup
+  ),
+  html[data-sirius-visual-theme="classic"] .modwheel::before,
+  html[data-sirius-visual-theme="classic"] :is(.sirius-display, .web-window, .shud-panel)::after {
+    animation: sirFrameSpin 14s steps(120) infinite !important;
+  }
+  html[data-sirius-visual-theme="classic"] :is(.workspace-surface, .sirius-root .voice-session-controls, .sirius-root .cmd-bar),
+  html[data-sirius-visual-theme="classic"] .boot-screen :is(.boot-modules, .boot-status) {
+    animation: sirFrameSpin 14s steps(120) infinite;
+  }
+  html[data-sirius-visual-theme="classic"] .holo-win::before { animation: none !important; }
+}

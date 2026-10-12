@@ -4,7 +4,34 @@ This project was bootstrapped with [Create React App](https://github.com/faceboo
 
 ## Available Scripts
 
+## Navigation sur téléphone
+
+Sous 600 px, la navigation est un tiroir replié en bas de l'écran. Faites glisser
+la poignée « Menu » vers le haut pour afficher Accueil, Infos, Assistant, Modules
+et Réglages, puis vers le bas pour les masquer. Un appui sur la poignée fonctionne
+aussi. Le tiroir se replie après le choix d'une rubrique et ne redimensionne pas
+le dialogue lorsqu'il s'ouvre. La navigation latérale sur tablette reste inchangée.
+
+Le réacteur utilise son rendu allégé sur mobile : moins de détails et pas de flou
+canvas. Les animations de bordure tactiles sont également moins fréquentes.
+Ces optimisations ne modifient ni la reconnaissance vocale ni les protections
+thermiques du système Android.
+
 In the project directory, you can run:
+
+## Scanner et documents papier
+
+Le scanner est accessible dans la médiathèque et dans « Mes dossiers ». Il conserve
+la photo originale sur le serveur SIRIUS après confirmation. La lecture du texte
+se fait localement avec les ressources OCR embarquées ; les champs extraits doivent
+être relus avant enregistrement. Le mode Achat prépare une fiche de dépense ;
+le mode Vente prépare un brouillon de facture non émis.
+
+Les modèles PDF A4 classique et professionnel incluent sur chaque page la signature
+ΣIRIUS avec l'icône des e-mails et les coordonnées de signature du compte.
+Le champ « Nom affiché » des signatures est prioritaire sur le nom du profil.
+Cette présentation n'est pas une signature électronique certifiée et ne remplace
+ni les mentions obligatoires ni la validation comptable du justificatif.
 
 ### `npm start`
 

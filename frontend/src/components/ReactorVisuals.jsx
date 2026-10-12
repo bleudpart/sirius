@@ -83,21 +83,22 @@ export function ReactorCore({ status, volume, color, eco }) {
       return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
     };
 
-    const isMobile = isMobileViewport();
     let lastFrame = 0;
     const draw = (ts) => {
       raf = requestAnimationFrame(draw);
+      if (document.hidden) return;
+      const isMobile = isMobileViewport();
+      const s = stateRef.current;
+      const light = s.eco || isMobile;
+      const minDt = light ? (s.status === "idle" || s.status === "listening" ? 110 : 55) : 33;
+      if (ts && ts - lastFrame < minDt) return;
       // Figé pendant le déplacement d'une fenêtre : libère le GPU pour un glissement fluide.
       if (document.documentElement.classList.contains("sirius-dragging")) return;
       // Figé aussi derrière la roue ouverte (HUD flouté, animations CSS en pause).
       if (document.querySelector(".modwheel-overlay:not(.is-minimized)")) return;
       // Mobile : une fenêtre de module recouvre tout l'écran, inutile de dessiner dessous.
       if (isMobile && document.querySelector(MOBILE_COVER_SELECTOR)) return;
-      const s = stateRef.current;
-      // Mode économie (et mobile) : rafraîchissement ralenti, surtout en veille
-      const light = s.eco || isMobile;
-      const minDt = light ? (s.status === "idle" || s.status === "listening" ? 110 : 55) : 33;
-      if (ts && ts - lastFrame < minDt) return;
+      if (!canvas.width || !canvas.height) return;
       const dt = lastFrame ? Math.min(0.2, (ts - lastFrame) / 1000) : 0.033;
       lastFrame = ts || 0;
       s.t += dt;
@@ -130,7 +131,7 @@ export function ReactorCore({ status, volume, color, eco }) {
       halo.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = halo;
       ctx.fillRect(0, 0, W, H);
-      if (!s.eco) {
+      if (!light) {
         const halo2 = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 0.6);
         halo2.addColorStop(0, `rgba(${r},${g},${b},${0.35 + energy * 0.3})`);
         halo2.addColorStop(1, "rgba(0,0,0,0)");
@@ -149,7 +150,7 @@ export function ReactorCore({ status, volume, color, eco }) {
       ctx.arc(cx, cy, pr, 0, Math.PI * 2);
       ctx.fill();
       // 2e onde de pulse déphasée (expansion visible vers l'extérieur)
-      if (!s.eco) {
+      if (!light) {
         const pw2 = ((s.t * 0.55) % 1);
         const pr2 = R * (0.5 + pw2 * 0.55);
         ctx.save();
@@ -181,7 +182,7 @@ export function ReactorCore({ status, volume, color, eco }) {
           ctx.stroke();
         }
         // reflets spéculaires vifs sur l'anneau (blanc incandescent + scintillement)
-        if (!s.eco) {
+        if (!light) {
           const shimmer = 0.75 + 0.25 * Math.sin(s.t * 5 + radius);
           ctx.strokeStyle = `rgba(255,255,255,${Math.min(1, alpha * 0.85 * shimmer)})`;
           ctx.lineWidth = lw * 0.55 * DPR;
@@ -251,7 +252,7 @@ export function ReactorCore({ status, volume, color, eco }) {
       drawRing(R * 0.86, 2, 3, 0.18, 0.25, 0.5);
       drawRing(R * 0.74, 5, 24, 0.45, -0.35, 0.55);
       drawRing(R * 0.62, 2, 6, 0.25, 0.6, 0.7);
-      if (!s.eco) {
+      if (!light) {
         // Structure holographique riche — VISIBLE EN PERMANENCE (intensifiée quand Sirius réfléchit/parle)
         drawFragments(R * 0.97, 1.5, FRAGS_A, 0.14, active ? 0.55 : 0.42);
         drawFragments(R * 0.93, 3, FRAGS_B, -0.3, active ? 0.6 + energy * 0.3 : 0.45);

@@ -4,6 +4,7 @@ import { API_BASE_URL } from "./lib/api";
 import { formatDocumentDate } from "./dateTime";
 import "./WorkDossiersPanel.css";
 import LiveWorkSettings from "./LiveWorkSettings";
+import ScannedDocuments from "./ScannedDocuments";
 
 const BASE = `${API_BASE_URL}/work-dossiers`;
 const CATEGORIES = [
@@ -933,6 +934,7 @@ export default function WorkDossiersPanel({ onClose, onOpenThemis, onOpenHaccp, 
               key={d.id} disabled={busy || !!review} aria-pressed={selectedId === d.id} onClick={() => { setSelectedId(d.id); setNote(""); setDailyThread(null); setProposalDecision(null); setRationale(""); }}>{d.title} · {CATEGORIES.find(([key]) => key === d.category)?.[1]}</button>)}
             {selected && <>
               <h3>{selected.title}</h3>
+              <ScannedDocuments key={`scans-${selectedId}`} dossier={selected} disabled={busy || !!review} />
               <LiveWorkSettings key={`live-${selectedId}`} dossier={selected}
                 disabled={busy || !!review} queue={setReview} onError={setError} />
               <form onSubmit={addNote} className="work-dossiers-form">

@@ -30,7 +30,8 @@ test("shows sourced proposals and never performs the proposed business action au
     const path = new URL(url, "http://localhost").pathname;
     let body;
     let status = 200;
-    if (path.endsWith("/review-queue") && !options?.method) body = { items: [], truncated: false };
+    if (path.endsWith("/document-scans") && !options?.method) body = { items: [] };
+    else if (path.endsWith("/review-queue") && !options?.method) body = { items: [], truncated: false };
     else if (path.endsWith("/day") && !options?.method) body = { proposals: proposals.filter((item) => !dismissed.has(item.id)), commitments: [], on: "2026-10-02", verified_at: "2026-10-02T12:00:00Z", missing_info: [], read_only: true };
     else if (path.endsWith("/proposals") && !options?.method) body = {
       proposals: proposals.filter((item) => !dismissed.has(item.id)),
@@ -80,6 +81,9 @@ async function workspace({ entries = [], sources = [stock, invoice, haccp], fail
   const openThemis = jest.fn();
   const openHaccp = jest.fn();
   global.fetch = jest.fn(async (url, options) => {
+    if (new URL(url, "http://localhost").pathname.endsWith("/document-scans") && !options?.method) {
+      return { ok: true, json: async () => ({ items: [] }) };
+    }
     const path = new URL(url, "http://localhost").pathname.replace(/^.*\/work-dossiers/, "");
     if (!options?.method) {
       if (path === "/day" && dayFailure) return { ok: false, status: 503, json: async () => ({ detail: "Journée indisponible" }) };

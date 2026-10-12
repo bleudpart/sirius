@@ -8,7 +8,7 @@ import { ConfirmButton } from "@/ConfirmButton";
 import { exportAccountProfile, importAccountProfile, validatePersonalService } from "@/accountSetup";
 import { assertSecureKeyTransport, loadApiKeys } from "@/apiKeyStorage";
 import AccountServices from "@/AccountServices";
-import VaultControls from "@/VaultControls";
+import VaultControls, { persistPersonalKeys } from "@/VaultControls";
 
 const TABS = [
   { id: "profil", label: "PROFIL", Icon: User },
@@ -18,6 +18,7 @@ const TABS = [
   { id: "stockage", label: "STOCKAGE", Icon: HardDrive },
   { id: "api", label: "CLÉS API ET SERVICES", Icon: KeyRound },
 ];
+const MAIN_KEYS = ["cerebras", "groq_key"];
 const KEY_META = {
   cerebras: { service: "cerebras", label: "Clé Cerebras (gpt-oss-120b)", tag: "conversation rapide · optionnelle", url: "https://cloud.cerebras.ai", ph: "Votre future clé API Cerebras", note: "Prêt à configurer plus tard : laissez ce champ vide tant que vous n'avez pas de clé Cerebras. Groq reste utilisable sans cette clé ; la transcription vocale continue avec Groq. Une fois votre clé ajoutée, Cerebras devient prioritaire pour les réponses rapides. Consultez ses quotas et tarifs." },
   groq_key: { service: "groq_real", label: "Clé Groq (transcription et repli IA)", tag: "microphone · repli conversation", url: "https://console.groq.com/keys", ph: "gsk_...", note: "Conservez cette clé pour la transcription vocale. Sans clé Cerebras, Groq continue à fournir les réponses IA." },
@@ -99,9 +100,7 @@ function KeyField({ k, value, status, onChange, onTest }) {
 // Écran de configuration — les réglages techniques restent réservés à l'administrateur.
 export default function SiriusSetup({ initialProfile, initialKeys, initialTab = "profil", onComplete, onCancel, onOpenAccount, showAdvanced = false }) {
   const [tab, setTab] = useState(initialTab);
-  const [selectedServices, setSelectedServices] = useState(() => [...new Set([
-    "cerebras", "groq_key", ...Object.keys(KEY_META).filter((name) => initialKeys?.[name]),
-  ])]);
+  const [savingKeys, setSavingKeys] = useState(false);
   const visibleTabs = TABS;
   const [profile, setProfile] = useState({
     name: "", age: "", profession: "", city: "", gender: "", interests: "", style: "",
@@ -143,7 +142,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
     for (const [name, value] of Object.entries(nextKeys)) {
       if (!value) continue;
       const meta = KEY_META[name];
-      if (!meta) throw new Error("Le coffre contient un service non pris en charge.");
+      if (!meta) throw new Error("Ces clés contiennent un service non pris en charge.");
       const result = await validatePersonalService(meta.service, value);
       const ok = result.ok === true;
       setKeyStatus((current) => ({ ...current, [name]: { ok, message: result.message || (ok ? "Test réussi." : "Service non validé.") } }));
@@ -304,7 +303,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
       try {
         const data = importAccountProfile(JSON.parse(reader.result));
         setProfile((p) => ({ ...p, ...data.profile }));
-        if (data.ignoredKeys) alert("Profil importé. Les anciennes clés JSON ne sont pas importées : utilisez le coffre chiffré ou la migration.");
+        if (data.ignoredKeys) alert("Profil importé. Les anciennes clés JSON ne sont pas importées : collez-les dans l'onglet API puis enregistrez.");
       } catch (err) {
         alert("Fichier .json invalide. Vérifiez son contenu et réessayez.");
       }
@@ -313,15 +312,24 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
     e.target.value = "";
   };
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     setSaveError("");
     if (!profile.name.trim()) { setTab("profil"); return; }
     const activeKeys = loadApiKeys();
-    if (Object.entries(keys).some(([name, value]) => (value || "").trim() !== (activeKeys[name] || ""))) {
-      setTab("api");
-      setSaveError("Vos clés ont été modifiées mais pas protégées. Utilisez « Protéger et enregistrer » dans le coffre avant d'enregistrer le profil.");
-      return;
+    const allNames = new Set([...Object.keys(keys), ...Object.keys(activeKeys)]);
+    if ([...allNames].some((name) => (keys[name] || "").trim() !== (activeKeys[name] || ""))) {
+      setSavingKeys(true);
+      try {
+        const result = await persistPersonalKeys(keys, validateKeys);
+        if (!result) { setTab("api"); setSaveError("Enregistrement annulé."); return; }
+      } catch (failure) {
+        setTab("api");
+        setSaveError(failure.message || "Enregistrement des clés impossible.");
+        return;
+      } finally {
+        setSavingKeys(false);
+      }
     }
     if (musicSource === "ask") localStorage.removeItem("sirius_music_source");
     else localStorage.setItem("sirius_music_source", musicSource);
@@ -663,40 +671,29 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
                     </a>
                     <ol>
                       {KEY_GUIDE[name].map((step) => <li key={step}>{step}</li>)}
-                      <li>Dans le coffre ci-dessous, cochez « {meta.tag} », collez la clé dans « {meta.label} », puis cliquez sur TESTER. Ne communiquez pas votre clé par email ou dans une capture d'écran.</li>
+                      <li>Collez la clé dans « {meta.label} » ci-dessous. Ne communiquez pas votre clé par email ou dans une capture d'écran.</li>
                     </ol>
                   </li>
                 ))}
               </ol>
-              <h3>Enregistrer toutes les clés renseignées ensemble</h3>
+              <h3>Enregistrer vos clés</h3>
               <ol>
-                <li>Après les tests, choisissez un mot de passe de coffre d'au moins 12 caractères et confirmez-le.</li>
-                <li>Cliquez une seule fois sur « Protéger et enregistrer » pour chiffrer toutes les clés renseignées. Une clé refusée doit être corrigée ; une clé non vérifiable nécessite votre accord explicite et reste non vérifiée.</li>
-                <li>Utilisez « Exporter le coffre » pour conserver une sauvegarde chiffrée. Gardez le mot de passe séparément : il sera nécessaire pour restaurer les clés.</li>
-                <li>À la prochaine session, saisissez le mot de passe et cliquez sur « Déverrouiller » ; inutile de recréer les clés.</li>
+                <li>Cliquez sur « ENREGISTRER ». Les clés sont testées, chiffrées sur cet appareil et rechargées automatiquement à chaque démarrage.</li>
+                <li>Pour changer d'appareil, ouvrez « Avancé » et téléchargez une sauvegarde.</li>
               </ol>
               <p className="setup-note">Gmail et Outlook se connectent dans le Centre des connexions : leurs comptes ne sont pas des clés à coller ici. Les coûts et quotas restent ceux de chaque fournisseur ; aucune gratuité permanente n'est garantie.</p>
             </details>
-            <VaultControls keys={keys} validateKeys={validateKeys} onKeys={(next) => {
-              setKeys(next); setKeyStatus({}); setSaveError("");
-              setSelectedServices([...new Set(["cerebras", "groq_key", ...Object.keys(next).filter((name) => KEY_META[name])])]);
-            }}>
-              <fieldset className="vault-services">
-                <legend>Quels services souhaitez-vous configurer ?</legend>
-                <p className="setup-note">Commencez par les réponses IA. Ajoutez seulement les fonctions utiles.</p>
-                <p className="setup-note">Décocher un service masque son champ sans effacer une clé déjà renseignée. Pour la retirer du coffre, videz le champ puis protégez à nouveau le coffre.</p>
-                {Object.entries(KEY_META).map(([name, meta]) => (
-                  <label key={name}>
-                    <input type="checkbox" checked={selectedServices.includes(name)}
-                      onChange={(event) => setSelectedServices((current) => event.target.checked
-                        ? [...current, name] : current.filter((value) => value !== name))} />
-                    {meta.tag}
-                  </label>
-                ))}
-              </fieldset>
-              {selectedServices.filter((name) => KEY_META[name]).map((k) => (
+            <VaultControls validateKeys={validateKeys} onKeys={(next) => { setKeys(next); setKeyStatus({}); setSaveError(""); }}>
+              {MAIN_KEYS.map((k) => (
                 <KeyField key={k} k={k} value={keys[k] || ""} status={keyStatus[k]} onChange={setK(k)} onTest={() => testKey(k)} />
               ))}
+              <details className="vault-more-keys" data-testid="setup-more-keys"
+                open={Object.keys(KEY_META).some((name) => !MAIN_KEYS.includes(name) && initialKeys?.[name]) || undefined}>
+                <summary>Autres services (facultatif)</summary>
+                {Object.keys(KEY_META).filter((name) => !MAIN_KEYS.includes(name)).map((k) => (
+                  <KeyField key={k} k={k} value={keys[k] || ""} status={keyStatus[k]} onChange={setK(k)} onTest={() => testKey(k)} />
+                ))}
+              </details>
             </VaultControls>
           </section>
         )}
@@ -721,8 +718,8 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
           </div>
         )}
 
-        <button type="submit" className="setup-submit" data-testid="setup-submit">
-          {isEdit ? "ENREGISTRER" : "DÉMARRER ΣIRIUS"}
+        <button type="submit" className="setup-submit" data-testid="setup-submit" disabled={savingKeys}>
+          {savingKeys ? "VÉRIFICATION DES CLÉS…" : isEdit ? "ENREGISTRER" : "DÉMARRER ΣIRIUS"}
         </button>
         {saveError && <p className="fw-status ko" role="alert">{saveError}</p>}
 
@@ -742,7 +739,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
           <input ref={fileRef} type="file" accept="application/json,.json" onChange={importProfile} style={{ display: "none" }} data-testid="setup-import-input" />
         </div>
         <p className="setup-note" style={{ textAlign: "center", marginTop: "8px" }}>
-          Le fichier de profil ne contient aucune clé. Exportez vos clés séparément avec le coffre chiffré.
+          Le fichier de profil ne contient aucune clé. Vos clés restent enregistrées sur cet appareil.
         </p>
       </form>
     </div>

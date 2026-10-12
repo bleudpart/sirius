@@ -1,4 +1,6 @@
 import { BACKEND_BASE_URL } from "@/lib/api";
+import { validateVaultKeys } from "@/configurationVault";
+import { openKeys, sealKeys } from "@/deviceKeyStore";
 
 const STORAGE_KEY = "sirius_keys";
 let sessionKeys = {};
@@ -37,10 +39,58 @@ export function setKeyAccount(id) {
   if (accountId === id) return;
   accountId = id || "";
   lockApiKeys();
+  if (accountId) {
+    restorePersonalKeys().catch((error) => console.warn("Clés personnelles non rechargées.", error));
+  }
+}
+
+export function deviceKeysStorageKey() {
+  if (!accountId) throw new Error("Connectez-vous avant d'enregistrer vos clés.");
+  return `sirius_device_keys_v1:${accountId}`;
+}
+
+export function hasSavedPersonalKeys() {
+  return !!accountId && !!localStorage.getItem(deviceKeysStorageKey());
+}
+
+export async function savePersonalKeys(keys, expectedStorageKey = deviceKeysStorageKey()) {
+  const filled = Object.fromEntries(Object.entries(validateVaultKeys(keys)).filter(([, value]) => value));
+  if (!Object.keys(filled).length) {
+    forgetPersonalKeys();
+    return filled;
+  }
+  const envelope = await sealKeys(filled);
+  if (deviceKeysStorageKey() !== expectedStorageKey) {
+    throw new Error("Le compte a changé. Enregistrez à nouveau vos clés.");
+  }
+  localStorage.setItem(expectedStorageKey, JSON.stringify(envelope));
+  saveApiKeys(filled);
+  removeLegacyKeys();
+  return filled;
+}
+
+export async function restorePersonalKeys() {
+  if (!accountId) return false;
+  const storageKey = deviceKeysStorageKey();
+  const raw = localStorage.getItem(storageKey);
+  if (!raw) return false;
+  const keys = validateVaultKeys(await openKeys(JSON.parse(raw)));
+  if (!accountId || deviceKeysStorageKey() !== storageKey) return false;
+  saveApiKeys(keys);
+  return true;
+}
+
+export function forgetPersonalKeys() {
+  if (accountId) localStorage.removeItem(deviceKeysStorageKey());
+  lockApiKeys();
+}
+
+export function removeStoredVault() {
+  if (accountId) localStorage.removeItem(vaultStorageKey());
 }
 
 export function vaultStorageKey() {
-  if (!accountId) throw new Error("Connectez-vous avant d'enregistrer votre coffre.");
+  if (!accountId) throw new Error("Connectez-vous avant d'enregistrer vos clés.");
   return `sirius_vault_v1:${accountId}`;
 }
 
@@ -50,7 +100,7 @@ export function readStoredVault() {
 
 export function assertKeyAccount(expectedStorageKey) {
   if (vaultStorageKey() !== expectedStorageKey) {
-    throw new Error("Le compte a changé. Recommencez l'opération du coffre.");
+    throw new Error("Le compte a changé. Recommencez l'enregistrement de vos clés.");
   }
 }
 

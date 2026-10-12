@@ -5,6 +5,8 @@ import json
 import hashlib
 import logging
 import time
+from datetime import datetime
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from openai import AsyncOpenAI, BadRequestError, RateLimitError
 from media_intent import parse_media_intent
 from productivite.intent_productivite import parse_productivity_intent
@@ -877,9 +879,44 @@ async def _answer_context(prompt, history, profile, memory, mode, mood, k3_key, 
     )
 
 
+_JOURS_FR = ("lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche")
+_MOIS_FR = ("janvier", "février", "mars", "avril", "mai", "juin", "juillet",
+            "août", "septembre", "octobre", "novembre", "décembre")
+
+
+def current_moment_text(tz_name=None, now=None):
+    """Date et heure réelles, pour que le modèle ne devine pas la date depuis son entraînement."""
+    zone = None
+    for name in (tz_name, "Europe/Paris"):
+        if not name:
+            continue
+        try:
+            zone = ZoneInfo(str(name))
+            break
+        except (ZoneInfoNotFoundError, ValueError) as error:
+            logger.warning("Fuseau horaire indisponible (%s), utilisation du fuseau de secours.", type(error).__name__)
+            continue
+    if zone:
+        moment = (now or datetime.now(zone)).astimezone(zone)
+    else:
+        moment = (now or datetime.now()).astimezone()
+    label = zone.key if zone else "heure locale"
+    return (
+        f"{_JOURS_FR[moment.weekday()]} {moment.day} {_MOIS_FR[moment.month - 1]} {moment.year}, "
+        f"{moment:%H:%M} ({label})"
+    )
+
+
 def build_system_prompt(profile=None, memory=None, mode="normal", mood=None, environment=None):
     """Construit le prompt système en tenant compte du profil, de la mémoire, du mode et de l'humeur."""
     base = SIRIUS_CORE_PROMPT
+    environment = environment or {}
+
+    base += (
+        f"\n\nDATE ET HEURE ACTUELLES : {current_moment_text(environment.get('timezone'))}. "
+        "C'est la date réelle d'aujourd'hui : utilise-la pour toute question de date, de jour ou d'actualité, "
+        "et ne te fie jamais à la date de tes données d'entraînement."
+    )
 
     profile = profile or {}
     nom = profile.get("name") or profile.get("nom")
@@ -1317,8 +1354,33 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
         yield "Je n'ai pas pu générer de réponse pour le moment. Réessaie dans un instant."
 
 
-async def extract_memory_background(prompt, answer):
-    """Extraction différée des faits durables (identité, préférences, projets) après coup.
+_MEMORY_EXTRACTION_SYSTEM = (
+    "Tu es la mémoire à long terme de ΣIRIUS. Ton but : connaître l'utilisateur en profondeur, "
+    "comme un proche attentif, pour l'aider mieux chaque jour. À partir du dernier échange (et du "
+    "contexte récent), relève TOUT ce qui est durable et utile pour le connaître, même dit en passant :\n"
+    "- identité : prénom, nom, âge, date d'anniversaire, ville, logement, langue ;\n"
+    "- proches : conjoint, enfants, parents, amis, collègues, animaux — avec leurs prénoms, âges, liens, goûts ;\n"
+    "- travail : métier, entreprise, poste, clients, outils, horaires, contraintes, équipe ;\n"
+    "- santé et corps : allergies, régime, sport, sommeil, traitements, limites ;\n"
+    "- goûts : nourriture, musique, films, loisirs, marques, style, ce qu'il n'aime pas ;\n"
+    "- habitudes et routines, rythme de vie, moyens de transport, véhicule ;\n"
+    "- projets, objectifs, rêves, échéances, rendez-vous importants, événements à venir ;\n"
+    "- valeurs, opinions marquées, humeur durable, soucis récurrents, façon dont il veut qu'on lui parle ;\n"
+    "- corrections : si l'utilisateur rectifie une info, donne la version corrigée.\n"
+    "Déduis aussi ce qui est clairement implicite (« je file chercher ma fille à l'école » → il a une fille "
+    "scolarisée). Chaque fait doit être une phrase courte, autonome et précise, à la 3e personne "
+    "(« L'utilisateur… » est inutile : écris « Sa fille s'appelle Emma », « Il est cuisinier »). "
+    "Ignore les questions générales, les demandes ponctuelles et ce que dit ΣIRIUS lui-même. "
+    "N'invente rien. Ne répète pas un fait déjà connu, sauf pour le corriger ou le compléter.\n"
+    'Réponds UNIQUEMENT avec un objet JSON valide : {"memoire": []}. Formate chaque fait '
+    "« categorie: fait » avec categorie parmi preference (goûts, façons de faire, ce qu'il aime ou non), "
+    "projet (objectifs, échéances, travaux en cours, événements à venir), souvenir (identité, proches, "
+    "travail, santé, habitudes, tout le reste). Jusqu'à 6 faits ; liste vide [] s'il n'y a rien."
+)
+
+
+async def extract_memory_background(prompt, answer, history=None, known_facts=None):
+    """Extraction différée des faits durables sur l'utilisateur après coup.
 
     Appelée en tâche de fond APRÈS que la réponse a déjà été restituée (voix + affichage) :
     n'ajoute donc aucune latence perçue. Best-effort — toute erreur est avalée silencieusement.
@@ -1326,29 +1388,38 @@ async def extract_memory_background(prompt, answer):
     service, key, _, models = fast_provider()
     if not key or not prompt or not answer:
         return []
+    context_lines = []
+    for turn in (history or [])[-6:]:
+        content = str((turn or {}).get("content") or "").strip()
+        if content:
+            who = "Utilisateur" if (turn or {}).get("role") == "user" else "Sirius"
+            context_lines.append(f"{who} : {content[:400]}")
+    known = [str(f).strip() for f in (known_facts or []) if str(f or "").strip()][:40]
+    parts = []
+    if known:
+        parts.append("Déjà connu :\n- " + "\n- ".join(k[:200] for k in known))
+    if context_lines:
+        parts.append("Contexte récent :\n" + "\n".join(context_lines))
+    parts.append(f"Dernier échange :\nUtilisateur : {prompt}\nSirius : {answer[:1200]}")
     try:
         client_groq = fast_client(service, key)
         resp = await client_groq.chat.completions.create(
             model=models[0],
             messages=[
-                {"role": "system", "content": (
-                    "Tu extrais les faits durables nouvellement appris sur l'utilisateur à partir d'un "
-                    "échange (identité, préférences, projets, habitudes, corrections). Réponds UNIQUEMENT "
-                    'avec un objet JSON valide : {"memoire": []}. Formate chacun « categorie: fait » avec '
-                    "categorie parmi preference, projet, souvenir. Maximum 3 faits, uniquement s'ils sont "
-                    "nouveaux et durables ; sinon liste vide []."
-                )},
-                {"role": "user", "content": f"Utilisateur : {prompt}\nSirius : {answer}"},
+                {"role": "system", "content": _MEMORY_EXTRACTION_SYSTEM},
+                {"role": "user", "content": "\n\n".join(parts)},
             ],
             temperature=0.2,
             response_format={"type": "json_object"},
-            **fast_options(service, 200),
-            timeout=8.0,
+            **fast_options(service, 400),
+            timeout=10.0,
         )
         raw = (resp.choices[0].message.content or "").strip()
         data = json.loads(raw)
         memories = data.get("memoire", []) if isinstance(data, dict) else []
-        return memories if isinstance(memories, list) else []
+        if not isinstance(memories, list):
+            return []
+        return [m.strip() for m in memories if isinstance(m, str) and m.strip()][:6]
     except Exception as e:
         logger.warning(f"[ΣIRIUS:MEMORY-BG] extraction différée échouée: {repr(e)}")
         return []

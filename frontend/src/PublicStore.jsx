@@ -179,7 +179,7 @@ export default function PublicStore() {
         <h2 id="public-trial-title" className="public-section-title">7 jours pour découvrir les services IA</h2>
         <p>L'essai commence à votre première connexion activant votre compte. Pendant 7 jours, les services IA autorisés utilisent les clés de SIRIUS, dans la limite des quotas quotidiens.</p>
         <p><strong>Sans engagement ni paiement automatique à la fin de l'essai.</strong> Vous pouvez arrêter d'utiliser l'essai à tout moment : aucun abonnement à annuler.</p>
-        <p>Ensuite, l'assistant de configuration vous guide pour ajouter vos propres clés API dans votre coffre personnel chiffré. Les outils et dossiers locaux restent accessibles ; les fournisseurs peuvent facturer l'utilisation de vos clés.</p>
+        <p>Ensuite, l'assistant de configuration vous guide pour ajouter vos propres clés API qui restent chiffrées sur votre appareil. Les outils et dossiers locaux restent accessibles ; les fournisseurs peuvent facturer l'utilisation de vos clés.</p>
         <small>L'essai des services IA est distinct de l'achat d'une licence présenté ci-dessous. Une déconnexion ou une réinstallation ne relance pas les 7 jours.</small>
       </section>
       <section className="public-matrix" id="matrice-demo" aria-label="La matrice de ΣIRIUS">

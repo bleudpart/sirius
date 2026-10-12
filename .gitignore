@@ -101,6 +101,7 @@ audit-report.json
 *.dylib
 
 # Build caches
+/frontend/public/ocr/
 .cache/
 .scannerwork/
 

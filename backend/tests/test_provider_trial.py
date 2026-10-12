@@ -1415,7 +1415,7 @@ def test_background_memory_extraction_uses_daily_quota_limit_expiry_and_personal
         return []
     async def stream(**kwargs):
         yield "réponse"
-    async def extract(prompt, answer):
+    async def extract(prompt, answer, history=None, known_facts=None):
         seen.append(access.provider_key("groq", "owner-bg"))
         return []
     monkeypatch.setattr(server, "_gather_memory_context", memory)

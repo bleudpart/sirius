@@ -5,8 +5,11 @@ import { FolderOpen, X, Upload, Trash2, Download, FileText, Music, Image as Imag
 import DropZone, { autoAnalyze } from "./DropZone";
 import FileViewer from "./FileViewer";
 import { formatDocumentDate } from "./dateTime";
+import { API_BASE_URL } from "./lib/api";
+import DocumentScanner from "./DocumentScanner";
+import { downloadScanPdf } from "./ScannedDocuments";
 
-const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
+const API = API_BASE_URL;
 const MAX_MB = 20;
 
 const fmtSize = (b) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} Mo` : `${Math.max(1, Math.round(b / 1024))} Ko`);
@@ -29,6 +32,7 @@ export default function FilesPanel({ onClose }) {
   const [dragging, setDragging] = useState(null);
   const [overFolder, setOverFolder] = useState(null);
   const [viewing, setViewing] = useState(null);
+  const [scanning, setScanning] = useState(false);
   const [windowsFolder, setWindowsFolder] = useState(() => localStorage.getItem("sirius_windows_folder") || "");
   const inputRef = useRef(null);
 
@@ -154,6 +158,7 @@ export default function FilesPanel({ onClose }) {
 
         <DropZone onUploaded={load} />
         <div className="files-bar">
+          <button type="button" className="files-workspace-action primary" onClick={() => setScanning(true)} disabled={busy}>Scanner un document</button>
           <button className="files-workspace-action primary" onClick={() => inputRef.current && inputRef.current.click()} disabled={busy} data-testid="files-upload-btn">
             {busy ? <Loader2 size={15} className="dg-spin" /> : <Upload size={15} />}
             {busy ? "ENVOI EN COURS..." : "AJOUTER DES FICHIERS"}
@@ -248,6 +253,8 @@ export default function FilesPanel({ onClose }) {
                 )}
               </div>
               <div className="file-actions">
+                {f.scan?.accounting && <button type="button" className="file-btn gold" title="PDF A4 du document relu"
+                  onClick={() => downloadScanPdf(f).catch((cause) => flash(cause.message))}>PDF A4</button>}
                 {f.analyse ? (
                   <button className="file-btn gold" onClick={() => setOpenAna(openAna === f.id ? null : f.id)} title="Analyse IA" data-testid={`file-ana-toggle-${f.id}`}>
                     {openAna === f.id ? <ChevronUp size={14} /> : <Sparkles size={14} />}
@@ -263,7 +270,9 @@ export default function FilesPanel({ onClose }) {
             </div>
           ))}
         </div>
-        <div className="memory-foot">Stockage cloud persistant (ou dossier backend/uploads en installation locale Windows).</div>
+        <div className="memory-foot">Documents conservés dans le stockage du serveur SIRIUS, ou sur le PC en installation locale.</div>
+        {scanning && <DocumentScanner initialFolder={dossier === "Tous" ? "Comptabilité" : dossier}
+          onClose={() => setScanning(false)} onSaved={() => { setScanning(false); flash("Document enregistré ✓"); load(); }} />}
       </div>
       {viewing && <FileViewer file={viewing} onClose={() => setViewing(null)} onSaved={load} />}
     </div>

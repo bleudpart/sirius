@@ -1,13 +1,12 @@
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
-import VaultControls from "./VaultControls";
-import { encryptVault } from "./configurationVault";
-import { loadApiKeys, readStoredVault, setKeyAccount } from "./apiKeyStorage";
+import { openKeys, sealKeys } from "./deviceKeyStore";
+import VaultControls, { persistPersonalKeys } from "./VaultControls";
+import { hasSavedPersonalKeys, loadApiKeys, restorePersonalKeys, setKeyAccount } from "./apiKeyStorage";
 
-jest.mock("./configurationVault", () => ({
-  ...jest.requireActual("./configurationVault"),
-  encryptVault: jest.fn(),
-  decryptVault: jest.fn(),
+jest.mock("./deviceKeyStore", () => ({
+  sealKeys: jest.fn(),
+  openKeys: jest.fn(),
 }));
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -15,76 +14,80 @@ let host;
 let root;
 let onKeys;
 let validateKeys;
-const envelope = { ciphertext: "ciphertext-not-a-key" };
 
 beforeEach(() => {
+  sealKeys.mockImplementation(async (keys) => ({ sealed: JSON.stringify(keys) }));
+  openKeys.mockImplementation(async (envelope) => JSON.parse(envelope.sealed));
   localStorage.clear(); sessionStorage.clear(); setKeyAccount("one");
   host = document.createElement("div"); document.body.appendChild(host); root = createRoot(host);
-  onKeys = jest.fn(); validateKeys = jest.fn().mockResolvedValue();
-  encryptVault.mockResolvedValue(envelope);
+  onKeys = jest.fn(); validateKeys = jest.fn().mockResolvedValue([]);
 });
 afterEach(() => { act(() => root.unmount()); host.remove(); setKeyAccount(""); jest.restoreAllMocks(); });
-const input = (id, value) => {
-  const element = host.querySelector(`[data-testid="${id}"]`);
-  act(() => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(element, value);
-    element.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-};
 const render = () => act(() => root.render(
-  <VaultControls keys={{ groq_key: "my-personal-key" }} onKeys={onKeys} validateKeys={validateKeys}>Champs</VaultControls>,
+  <VaultControls onKeys={onKeys} validateKeys={validateKeys}>Champs</VaultControls>,
 ));
-const password = () => { input("vault-password", "my-long-password"); input("vault-confirm", "my-long-password"); };
+const keys = { groq_key: "my-personal-key" };
 
-test("protection tests services then stores ciphertext and removes legacy cache", async () => {
+test("saving tests the keys, stores them on the device and activates them without a password", async () => {
   localStorage.setItem("sirius_keys", '{"groq_key":"old-key"}');
-  render(); password();
-  await act(async () => host.querySelector('[data-testid="vault-save"]').click());
-  expect(validateKeys).toHaveBeenCalledWith({ groq_key: "my-personal-key" });
-  expect(readStoredVault()).toBe(JSON.stringify(envelope));
-  expect(loadApiKeys()).toEqual({ groq_key: "my-personal-key" });
+  const result = await persistPersonalKeys(keys, validateKeys);
+  expect(result).toEqual(expect.objectContaining({ unverified: [] }));
+  expect(validateKeys).toHaveBeenCalledWith(keys);
+  expect(hasSavedPersonalKeys()).toBe(true);
+  expect(loadApiKeys()).toEqual(keys);
   expect(localStorage.getItem("sirius_keys")).toBeNull();
-  expect(host.textContent).toContain("Coffre chiffré enregistré");
+});
+test("the panel has no separate save button and shows the saved status", async () => {
+  await persistPersonalKeys(keys, validateKeys);
+  render();
+  expect(host.querySelector('[data-testid="vault-save"]')).toBeNull();
+  expect(host.textContent).toContain("ENREGISTRER");
+  expect(host.querySelector('[data-testid="vault-saved-status"]')).not.toBeNull();
 });
 
-test("a refused service leaves legacy keys intact and does not activate or store them", async () => {
-  localStorage.setItem("sirius_keys", '{"groq_key":"old-key"}');
-  validateKeys.mockRejectedValue(new Error("Clé refusée."));
-  render(); password();
-  await act(async () => host.querySelector('[data-testid="vault-save"]').click());
-  expect(readStoredVault()).toBeNull();
+test("saved keys reload automatically when the account is set again", async () => {
+  await persistPersonalKeys(keys, validateKeys);
+  setKeyAccount("");
   expect(loadApiKeys()).toEqual({});
-  expect(localStorage.getItem("sirius_keys")).not.toBeNull();
-  expect(host.querySelector('[role="alert"]').textContent).toContain("Clé refusée");
+  setKeyAccount("one");
+  await restorePersonalKeys();
+  expect(loadApiKeys()).toEqual(keys);
 });
 
-test("short passwords fail before provider tests", async () => {
-  render(); input("vault-password", "short"); input("vault-confirm", "short");
-  await act(async () => host.querySelector('[data-testid="vault-save"]').click());
-  expect(validateKeys).not.toHaveBeenCalled();
-  expect(host.querySelector('[role="alert"]').textContent).toContain("12 caractères");
+test("a refused service is neither stored nor activated", async () => {
+  validateKeys.mockRejectedValue(new Error("Clé refusée."));
+  await expect(persistPersonalKeys(keys, validateKeys)).rejects.toThrow("Clé refusée");
+  expect(hasSavedPersonalKeys()).toBe(false);
+  expect(loadApiKeys()).toEqual({});
 });
 
-test.each([true, false])("unverifiable keys require explicit storage consent (%s)", async (accepted) => {
+test.each([true, false])("unverifiable keys require explicit consent (%s)", async (accepted) => {
   validateKeys.mockResolvedValue(["Clé fal.ai"]);
   jest.spyOn(window, "confirm").mockReturnValue(accepted);
-  render(); password();
-  await act(async () => host.querySelector('[data-testid="vault-save"]').click());
-  expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining("sans les déclarer fonctionnelles"));
-  expect(encryptVault).toHaveBeenCalledTimes(accepted ? 1 : 0);
-  expect(Boolean(readStoredVault())).toBe(accepted);
-  expect(loadApiKeys()).toEqual(accepted ? { groq_key: "my-personal-key" } : {});
-  if (accepted) expect(host.textContent).toContain("Services non vérifiés : Clé fal.ai");
+  const result = await persistPersonalKeys(keys, validateKeys);
+  expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining("Clé fal.ai"));
+  expect(Boolean(result)).toBe(accepted);
+  expect(hasSavedPersonalKeys()).toBe(accepted);
+  expect(loadApiKeys()).toEqual(accepted ? keys : {});
 });
 
 test("changing accounts during encryption cannot store keys under the new account", async () => {
   let complete;
-  encryptVault.mockImplementation(() => new Promise((resolve) => { complete = resolve; }));
-  render(); password();
-  await act(async () => host.querySelector('[data-testid="vault-save"]').click());
+  sealKeys.mockImplementationOnce(() => new Promise((resolve) => { complete = resolve; }));
+  const pending = persistPersonalKeys(keys, validateKeys);
+  while (!complete) await Promise.resolve();
   setKeyAccount("two");
-  await act(async () => complete(envelope));
-  expect(readStoredVault()).toBeNull();
+  complete({ sealed: "{}" });
+  await expect(pending).rejects.toThrow("compte a changé");
+  expect(hasSavedPersonalKeys()).toBe(false);
   expect(loadApiKeys()).toEqual({});
-  expect(host.querySelector('[role="alert"]').textContent).toContain("compte a changé");
+});
+
+test("advanced section can forget keys from the device", async () => {
+  await persistPersonalKeys(keys, validateKeys);
+  render();
+  jest.spyOn(window, "confirm").mockReturnValue(true);
+  await act(async () => host.querySelector('[data-testid="vault-forget"]').click());
+  expect(hasSavedPersonalKeys()).toBe(false);
+  expect(loadApiKeys()).toEqual({});
 });

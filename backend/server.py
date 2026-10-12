@@ -116,19 +116,23 @@ async def _gather_memory_context(texte: str, uid: str, extra_memory: list) -> li
     ]
 
 
+# Toute parole où l'utilisateur parle de lui, de ses proches, de son travail ou de sa vie
+# peut contenir quelque chose qui aide ΣIRIUS à le connaître : on laisse l'extracteur décider.
 _MEMORY_EXTRACTION_HINT_RE = re.compile(
-    r"\b(?:souviens[-\s]toi|retiens|m[ée]morise|note\s+que|"
-    r"je\s+(?:pr[ée]f[èe]re|d[ée]teste|travaille\s+sur|pr[ée]pare|dois|devrais|veux|aime)|"
-    r"mon\s+(?:projet|objectif|rappel|rdv|rendez[-\s]vous)|ma\s+(?:pr[ée]f[ée]rence|deadline|priorit[ée])|"
-    r"deadline|[ée]ch[ée]ance|avant\s+\d|pour\s+demain|c'est\s+faux|en\s+fait|"
-    r"je\s+t'ai\s+(?:d[ée]j[àa]\s+)?dit)\b",
+    r"(?:\b(?:je|moi|mon|ma|mes|nous|notre|nos|perso|personnellement|"
+    r"souviens|retiens|m[ée]morise|note|enregistre|garde|deadline|[ée]ch[ée]ance|"
+    r"demain|semaine|mois|ann[ée]e|toujours|jamais|d[ée]sormais|dor[ée]navant|"
+    r"en\s+fait|c'est\s+faux|plut[ôo]t)\b|\b[jm]['’])",
     re.IGNORECASE,
 )
 
 
 def should_extract_memory(texte: str, answer: str = "") -> bool:
-    """Évite le second appel LLM mémoire pour les échanges sans signal mémorisable."""
-    return bool(_MEMORY_EXTRACTION_HINT_RE.search(f"{texte or ''}\n{answer or ''}"))
+    """Évite le second appel LLM mémoire seulement pour les échanges sans aucun signal personnel."""
+    texte = (texte or "").strip()
+    if len(texte) < 8:
+        return False
+    return bool(_MEMORY_EXTRACTION_HINT_RE.search(texte))
 
 # =========================================================
 # INITIALISATION UNIQUE DE L'APPLICATION ET INTERCEPTATION OPTIONS
@@ -554,7 +558,10 @@ async def chat_stream(req: ChatRequest, request: Request):
                         async with metered_scope(db, account, req.keys) as state:
                             if state["blocked"] and not (personal_key("groq", req.keys) or personal_key("cerebras", req.keys)):
                                 return
-                            memories = await extract_memory_background(texte, answer)
+                            memories = await extract_memory_background(
+                                texte, answer, history=history,
+                                known_facts=[m.get("t") for m in merged_memory if isinstance(m, dict)],
+                            )
                         for m in memories:
                             try:
                                 learn_fact(m, user_id=uid)
@@ -2794,6 +2801,8 @@ app.add_middleware(ProviderAccessMiddleware, db=db)
 
 # Rattachement final du routeur /api à l'application (une seule fois, après les middlewares)
 app.include_router(api_router)
+from routes.document_scans import make_document_scans_router
+app.include_router(make_document_scans_router(db, require_user, _validate_upload_content))
 
 # Catalogue public des plateformes multimedia. La route reste hors de /api pour
 # conserver le contrat frontend /modules/media et fonctionner avec le proxy CRA.

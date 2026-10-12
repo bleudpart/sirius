@@ -77,6 +77,7 @@ import "@/desktopModuleInteriors.css";
 import { AmbientEngine } from "@/ambientAudio";
 import { APP_RELEASE, APP_VERSION } from "@/version";
 import ProviderLogo from "@/components/ProviderLogo";
+import { parseMemorizeCommand } from "@/memoryCommand";
 
 /* executeIntent moved into the real App component (see later in the file) */
 
@@ -1568,13 +1569,14 @@ function App() {
         display_open: displayOpen,
         proactive_message: display?.suggestion ? display.contenu : "",
         activity: cmdTimesRef.current?.length >= 3 ? "intense" : "exploration",
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Paris",
       },
     });
     const showServiceDenial = (status, data) => {
       const message = typeof data?.detail === "string" ? data.detail : status === 401
         ? "Connectez-vous à votre compte SIRIUS."
         : status === 429 ? "La limite d'utilisation est atteinte. Réessayez après sa remise à zéro."
-          : "Accès au service refusé. Vérifiez votre essai et vos clés dans Réglages → Services et coffre.";
+          : "Accès au service refusé. Vérifiez votre essai et vos clés dans Réglages → Services et clés.";
       setText(message);
       setVoiceMessage(message);
       showOnDisplay({ type: "message", titre: "ΣIRIUS — ACCÈS AU SERVICE", contenu: message });
@@ -5121,26 +5123,32 @@ function App() {
       setText(m); speakOut(m);
       return;
     }
- // 3) Mémoire : rappeler
-    if (/(qu['’ ]?est[- ]?ce que tu sais (sur|de) moi|que sais[- ]?tu (sur|de) moi|qu['’ ]?est[- ]?ce que tu retiens|que retiens[- ]?tu|ta m[ée]moire|tu sais quoi sur moi)/.test(low)) {
-      mark("mémoire · rappel");
-      setStatus("speaking");
-      const m = memoryRef.current.length
-        ? `Voici ce que je sais sur toi : ${memoryRef.current.map((f) => f.t).join(". ")}.`
-        : "Je ne retiens encore rien sur toi. Dis « souviens-toi que… » pour m'apprendre quelque chose.";
-      setText(m); speakOut(m);
-      return;
-    }
-    // 4) Mémoire : enregistrer
-    const memMatch = command.match(/(?:souviens[- ]?toi(?:\s+que)?|retiens(?:\s+que)?|note que|rappelle[- ]?toi(?:\s+que)?)\s+(.+)/i);
-    if (memMatch && memMatch[1]) {
+ // 3) Mémoire : enregistrer — avant le rappel, car « note ça dans ta mémoire » contient « ta mémoire ».
+    const memorize = parseMemorizeCommand(command);
+    if (memorize) {
       mark("mémoire · enregistrement");
-      const fait = memMatch[1].trim().replace(/[.!?]+$/, "");
+      const fait = memorize.fact;
+      if (!fait) {
+        setStatus("speaking");
+        const ask = "D'accord. Qu'est-ce que je dois retenir ? Dis par exemple « note ça : ma fille s'appelle Emma ».";
+        setText(ask); speakOut(ask);
+        return;
+      }
       const next = [...memoryRef.current.filter((f) => f.t.toLowerCase() !== fait.toLowerCase()), { t: fait, d: todayStr() }].slice(-30);
       saveMemory(next);
       addPopup({ kind: "memory", titre: "MÉMOIRE ENREGISTRÉE", contenu: fait });
       setStatus("speaking");
       const m = `C'est noté : ${fait}.`;
+      setText(m); speakOut(m);
+      return;
+    }
+ // 4) Mémoire : rappeler
+    if (/(qu['’ ]?est[- ]?ce que tu sais (sur|de) moi|que sais[- ]?tu (sur|de) moi|qu['’ ]?est[- ]?ce que tu retiens|que retiens[- ]?tu|ta m[ée]moire|tu sais quoi sur moi)/.test(low)) {
+      mark("mémoire · rappel");
+      setStatus("speaking");
+      const m = memoryRef.current.length
+        ? `Voici ce que je sais sur toi : ${memoryRef.current.map((f) => f.t).join(". ")}.`
+        : "Je ne retiens encore rien sur toi. Dis « note ça dans ta mémoire : … » pour m'apprendre quelque chose.";
       setText(m); speakOut(m);
       return;
     }

@@ -8,7 +8,7 @@ const STATE_LABELS = {
 const QUOTA_LABELS = { chat: "Messages IA", stt: "Transcriptions", tts: "Lectures vocales" };
 const SCOPE_LABELS = {
   owner: "Configuration du serveur. La présence d'une clé ne prouve pas le fonctionnement du fournisseur.",
-  personal: "Après l'essai, déverrouillez votre coffre personnel pour utiliser ce service.",
+  personal: "Après l'essai, enregistrez vos clés personnelles pour utiliser ce service.",
   none: "Ce service n'est pas disponible dans la configuration actuelle.",
   cloud: "Service relié à votre compte SIRIUS Cloud, avec ses limites d'essai.",
   local: "Fonction locale disponible sans clé de fournisseur.",
@@ -59,7 +59,7 @@ export default function AccountServices() {
               ))}
             </div>
           ) : <p className="setup-note">Quotas de compte non appliqués à cette session. Les limites des fournisseurs restent applicables.</p>}
-          {status.role === "admin" && <p className="setup-note">Vos clés de serveur restent dans son environnement. Le coffre personnel ne donne aucun droit administrateur.</p>}
+          {status.role === "admin" && <p className="setup-note">Vos clés de serveur restent dans son environnement. Vos clés personnelles ne donnent aucun droit administrateur.</p>}
         </>
       )}
     </section>

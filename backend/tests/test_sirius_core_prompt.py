@@ -1,7 +1,18 @@
 # © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 """Regression tests for the active ΣIRIUS production prompt."""
 
-from sirius_brain import SIRIUS_CORE_PROMPT, build_system_prompt
+from datetime import datetime, timezone
+
+from sirius_brain import SIRIUS_CORE_PROMPT, build_system_prompt, current_moment_text
+
+
+def test_system_prompt_gives_the_real_current_date():
+    moment = datetime(2026, 10, 12, 6, 30, tzinfo=timezone.utc)
+    assert current_moment_text("Europe/Paris", now=moment) == "lundi 12 octobre 2026, 08:30 (Europe/Paris)"
+    assert current_moment_text("Pas/Une_Zone", now=moment).endswith("(Europe/Paris)")
+    prompt = build_system_prompt(environment={"timezone": "Europe/Paris"})
+    assert "DATE ET HEURE ACTUELLES" in prompt
+    assert "ÉTAT OPÉRATIONNEL DU HUD :" not in prompt
 
 
 def test_proactive_dialogue_keeps_the_context_of_the_initiative():
