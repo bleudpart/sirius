@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Capacitor } from "@capacitor/core";
 import { API_BASE_URL } from "./lib/api";
-import { buildReceiptDraft, readDocumentLocally, scanMoney, SCAN_FIELDS } from "./documentScan";
+import { buildReceiptDraft, fiscalIdentifierWarnings, readDocumentLocally, scanMoney, SCAN_FIELDS } from "./documentScan";
 import "./DocumentScanner.css";
 
 async function responseData(response) {
@@ -26,6 +26,7 @@ export default function DocumentScanner({ initialDossier, initialFolder = "Compt
   const [fields, setFields] = useState({ ...SCAN_FIELDS });
   const [text, setText] = useState("");
   const [reviewed, setReviewed] = useState(false);
+  const [identifiersChecked, setIdentifiersChecked] = useState(false);
   const [seller, setSeller] = useState("");
   const [customer, setCustomer] = useState("");
   const [draft, setDraft] = useState("");
@@ -38,6 +39,8 @@ export default function DocumentScanner({ initialDossier, initialFolder = "Compt
   const lock = useRef(false);
   const alive = useRef(true);
   const cancelRead = useRef(false);
+  const identifierWarnings = fiscalIdentifierWarnings(fields.fiscal_identifiers);
+  const identifiersNeedReview = identifierWarnings.length > 0 && !identifiersChecked;
 
   const stopCamera = () => {
     stream.current?.getTracks().forEach((track) => track.stop());
@@ -87,6 +90,7 @@ export default function DocumentScanner({ initialDossier, initialFolder = "Compt
     setDraft("");
     setDescription("");
     setReviewed(false);
+    setIdentifiersChecked(false);
     setError("");
   };
   const openCamera = async () => {
@@ -132,6 +136,7 @@ export default function DocumentScanner({ initialDossier, initialFolder = "Compt
     cancelRead.current = false;
     readController.current = new AbortController();
     setBusy("ocr"); setError(""); setReviewed(false);
+    setIdentifiersChecked(false);
     try {
       const result = await readDocumentLocally(file,
         (message) => { if (alive.current && !cancelRead.current) setProgress(message); },
@@ -149,6 +154,7 @@ export default function DocumentScanner({ initialDossier, initialFolder = "Compt
   const update = (key, value) => {
     setFields((current) => ({ ...current, [key]: value }));
     setReviewed(false); setDraft("");
+    if (key === "fiscal_identifiers") setIdentifiersChecked(false);
   };
   const save = async (event) => {
     event.preventDefault();
@@ -158,6 +164,7 @@ export default function DocumentScanner({ initialDossier, initialFolder = "Compt
       if (fields[name] && scanMoney(fields[name]) === null) { setError("Les montants doivent être positifs avec deux décimales maximum."); return; }
     }
     if (kind !== "document" && !reviewed) { setError("Relisez et validez les informations comptables."); return; }
+    if (kind !== "document" && identifiersNeedReview) { setError("Comparez les identifiants fiscaux avec la photo et confirmez leur vérification."); return; }
     lock.current = true; setBusy("save"); setError("");
     try {
       const metadata = {
@@ -231,6 +238,12 @@ export default function DocumentScanner({ initialDossier, initialFolder = "Compt
           </div>
           <label>Référence du ticket / facture d'origine<input maxLength={120} value={fields.ticket_number} onChange={(event) => update("ticket_number", event.target.value)} /></label>
           <label>Identifiants fiscaux · reproduire ceux du justificatif<textarea maxLength={2000} value={fields.fiscal_identifiers} onChange={(event) => update("fiscal_identifiers", event.target.value)} placeholder="SIRET, SIREN, numéro de TVA, NIF…" /></label>
+          {identifierWarnings.length > 0 && <div role="alert">
+            {identifierWarnings.map((warning, index) => <p key={index}>{warning}</p>)}
+            <label><input type="checkbox" checked={identifiersChecked} onChange={(event) => {
+              setIdentifiersChecked(event.target.checked); setReviewed(false); setDraft("");
+            }} /> J'ai comparé ces identifiants avec la photo et corrigé les erreurs de lecture éventuelles.</label>
+          </div>}
           <label>Modèle papier A4<select value={template} onChange={(event) => setTemplate(event.target.value)}>
             <option value="professionnel">Professionnel · bleu nuit et or</option>
             <option value="classique">Classique · noir et blanc</option>
@@ -241,15 +254,15 @@ export default function DocumentScanner({ initialDossier, initialFolder = "Compt
             <label>Mes coordonnées de vendeur<textarea value={seller} maxLength={2000} onChange={(event) => { setSeller(event.target.value); setDraft(""); }} placeholder="Raison sociale, adresse, identifiant légal…" /></label>
             <label>Coordonnées du client<textarea value={customer} maxLength={2000} onChange={(event) => { setCustomer(event.target.value); setDraft(""); }} /></label>
           </>}
-          <label><input type="checkbox" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} /> J'ai relu les champs et laissé vides les informations non identifiées.</label>
-          <button type="button" disabled={!reviewed || !file} onClick={() => setDraft(buildReceiptDraft({ kind, fields, seller, customer, description }))}>
+          <label><input type="checkbox" checked={reviewed} disabled={identifiersNeedReview} onChange={(event) => setReviewed(event.target.checked)} /> J'ai relu les champs et laissé vides les informations non identifiées.</label>
+          <button type="button" disabled={!reviewed || !file || identifiersNeedReview} onClick={() => setDraft(buildReceiptDraft({ kind, fields, seller, customer, description }))}>
             {kind === "sale" ? "Préparer le brouillon de facture" : "Préparer la fiche de dépense"}
           </button>
         </>}
         {text && <details><summary>Texte lu · à corriger si nécessaire</summary>
           <textarea aria-label="Texte du document" value={text} onChange={(event) => { setText(event.target.value); setDraft(""); setReviewed(false); }} maxLength={30000} /></details>}
         {draft && <label>Brouillon modifiable · conservé avec le justificatif<textarea className="document-scanner-draft" value={draft} maxLength={30000} onChange={(event) => setDraft(event.target.value)} /></label>}
-        <button type="submit" className="document-scanner-save" disabled={!file || (kind !== "document" && !reviewed)}>
+        <button type="submit" className="document-scanner-save" disabled={!file || (kind !== "document" && (!reviewed || identifiersNeedReview))}>
           Enregistrer dans « {folder || "le dossier choisi"} »
         </button>
         {kind !== "document" && <p>Après enregistrement, le PDF A4 sera disponible dans le dossier. Une vente reste un brouillon non émis.</p>}

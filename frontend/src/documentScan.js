@@ -9,6 +9,47 @@ export function scanMoney(value) {
   return Number(normalized).toFixed(2);
 }
 
+export function fiscalIdentifierWarnings(text) {
+  const warnings = [];
+  const luhn = (digits) => [...digits].reverse().reduce((sum, digit, index) => {
+    const value = Number(digit) * (index % 2 ? 2 : 1);
+    return sum + (value > 9 ? value - 9 : value);
+  }, 0) % 10 === 0;
+  for (const match of String(text || "").matchAll(/\b(SIRET|SIREN)\s*[:.=-]?\s*([^\n;]+)/gi)) {
+    const label = match[1].toUpperCase();
+    const length = label === "SIRET" ? 14 : 9;
+    const digits = match[2].match(/^[\d \u00a0\u202f]+/)?.[0].replace(/\s/g, "") || "";
+    const postalException = label === "SIRET" && digits.startsWith("356000000")
+      && [...digits].reduce((sum, digit) => sum + Number(digit), 0) % 5 === 0;
+    if (digits.length !== length || (!luhn(digits) && !postalException)) {
+      warnings.push(`${label} à vérifier chiffre par chiffre sur la photo : longueur ou clé de contrôle incohérente. Aucun chiffre n'a été remplacé automatiquement.`);
+    }
+  }
+  return warnings;
+}
+
+export async function prepareOcrImage(file) {
+  const bitmap = await createImageBitmap(file);
+  try {
+    if (!bitmap.width || !bitmap.height) throw new Error("Dimensions de l'image invalides.");
+    const longest = Math.max(bitmap.width, bitmap.height);
+    const scale = longest > 2400 ? 2400 / longest : Math.min(2, 2000 / longest);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Le traitement local de l'image est indisponible.");
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    return canvas;
+  } finally {
+    bitmap.close();
+  }
+}
+
 export function extractScanFields(text) {
   const lines = String(text || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   const totals = [];
@@ -75,6 +116,9 @@ export async function readDocumentLocally(file, onProgress, { signal, timeoutMs 
   if (signal?.aborted) abort();
   const timeout = setTimeout(() => rejectStopped(new Error("La lecture a dépassé 90 secondes. Reprenez une photo plus nette.")), timeoutMs);
   const reading = (async () => {
+    if (signal?.aborted) throw new Error("Lecture annulée.");
+    const image = await prepareOcrImage(file);
+    if (finished || signal?.aborted) throw new Error("Lecture annulée.");
     const { createWorker } = await import("tesseract.js");
     if (finished || signal?.aborted) throw new Error("Lecture annulée.");
     const base = new URL(`${process.env.PUBLIC_URL || "."}/ocr/`, document.baseURI).href;
@@ -87,7 +131,7 @@ export async function readDocumentLocally(file, onProgress, { signal, timeoutMs 
     });
     worker = created;
     if (finished || signal?.aborted) { await created.terminate(); throw new Error("Lecture annulée."); }
-    const result = await created.recognize(file);
+    const result = await created.recognize(image, { rotateAuto: true });
     const text = result.data.text.trim();
     if (!text) throw new Error("Aucun texte lisible. Reprenez la photo, à plat et bien éclairée.");
     return { text, fields: extractScanFields(text) };

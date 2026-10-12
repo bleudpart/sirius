@@ -4,6 +4,27 @@
 Assistant vocal personnel avec HUD futuriste style « Iron Man ».
 Frontend **React** + Backend **FastAPI** (Python), packagé en application Windows autonome via **Electron**.
 
+### Diagnostic des microphones PyAudio sur PC
+
+Depuis la racine du dépôt :
+
+```powershell
+python -m pip install -r scripts\requirements-microphones.txt
+python scripts\select_microphone.py --list-only
+python scripts\select_microphone.py --interactive
+python scripts\select_microphone.py --name "USB"
+python scripts\select_microphone.py --index 2
+python scripts\select_microphone.py --name "USB" --json
+```
+
+Sans option, le script sélectionne l'entrée par défaut de PyAudio, ou l'unique
+microphone disponible. Il ne choisit pas arbitrairement entre plusieurs entrées.
+`--name` retrouve l'index au lancement : un index peut changer après branchement.
+Les sorties JSON contiennent `microphones`, `default_index` et `selected_index`.
+Une entrée absente ou un nom ambigu provoque une erreur explicite. Le script
+n'enregistre aucun son et ne modifie pas le microphone du navigateur ou d'Android,
+qui utilisent leurs propres identifiants, pas les index PyAudio.
+
 Le briefing ORACLE récupère sans clé API neuf rubriques RSS Franceinfo : France,
 international, politique, économie, sport, santé, sciences et technologies,
 environnement et culture. Les publications datées des dernières 48 heures sont

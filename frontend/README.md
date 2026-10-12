@@ -26,6 +26,10 @@ la photo originale sur le serveur SIRIUS après confirmation. La lecture du text
 se fait localement avec les ressources OCR embarquées ; les champs extraits doivent
 être relus avant enregistrement. Le mode Achat prépare une fiche de dépense ;
 le mode Vente prépare un brouillon de facture non émis.
+La copie destinée à l'OCR est redimensionnée et redressée sans modifier la photo
+originale. Une incohérence de longueur ou de clé SIRET/SIREN déclenche une alerte
+et demande une comparaison explicite avec la photo ; aucun chiffre n'est inventé.
+Ce contrôle ne vérifie pas l'existence du commerce dans un registre officiel.
 
 Les modèles PDF A4 classique et professionnel incluent sur chaque page la signature
 ΣIRIUS avec l'icône des e-mails et les coordonnées de signature du compte.

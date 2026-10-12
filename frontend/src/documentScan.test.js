@@ -1,7 +1,54 @@
-import { buildReceiptDraft, extractScanFields, readDocumentLocally, scanMoney } from "./documentScan";
+import { buildReceiptDraft, extractScanFields, fiscalIdentifierWarnings, prepareOcrImage, readDocumentLocally, scanMoney } from "./documentScan";
 import { createWorker } from "tesseract.js";
 
 jest.mock("tesseract.js", () => ({ createWorker: jest.fn() }));
+
+const originalBitmap = global.createImageBitmap;
+beforeEach(() => {
+  jest.clearAllMocks();
+  global.createImageBitmap = jest.fn().mockResolvedValue({ width: 900, height: 650, close: jest.fn() });
+  jest.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+    fillRect: jest.fn(), drawImage: jest.fn(),
+  });
+});
+afterEach(() => {
+  jest.restoreAllMocks();
+  global.createImageBitmap = originalBitmap;
+});
+
+test("checks fiscal identifier lengths and keys without changing the original digits", () => {
+  const text = "SIRET 12345678900812\nSIREN O3282932O";
+  expect(fiscalIdentifierWarnings(text)).toHaveLength(2);
+  expect(text).toContain("12345678900812");
+  expect(fiscalIdentifierWarnings("SIRET 732 829 320 00074\nSIREN 732829320")).toEqual([]);
+  expect(fiscalIdentifierWarnings("TVA intracom FR123456789")).toEqual([]);
+});
+
+test("large native photos are bounded for OCR and their bitmap is released", async () => {
+  const bitmap = { width: 8000, height: 6000, close: jest.fn() };
+  global.createImageBitmap.mockResolvedValue(bitmap);
+  const file = new Blob(["original"]);
+  const image = await prepareOcrImage(file);
+  expect(image.width).toBe(2400);
+  expect(image.height).toBe(1800);
+  expect(bitmap.close).toHaveBeenCalledTimes(1);
+  expect(file.size).toBe(8);
+});
+
+test("small scans are enlarged for recognition and retain their aspect ratio", async () => {
+  global.createImageBitmap.mockResolvedValue({ width: 900, height: 600, close: jest.fn() });
+  const image = await prepareOcrImage(new Blob(["original"]));
+  expect(image.width).toBe(1800);
+  expect(image.height).toBe(1200);
+});
+
+test("bitmap cleanup is guaranteed when canvas preparation fails", async () => {
+  const bitmap = { width: 900, height: 650, close: jest.fn() };
+  global.createImageBitmap.mockResolvedValue(bitmap);
+  HTMLCanvasElement.prototype.getContext.mockReturnValue(null);
+  await expect(prepareOcrImage(new Blob(["image"]))).rejects.toThrow("traitement local");
+  expect(bitmap.close).toHaveBeenCalledTimes(1);
+});
 
 test("extracts conservative amounts and preserves fiscal references from a receipt", () => {
   expect(extractScanFields("BOULANGERIE MARTIN\nSIRET 123 456 789 00012\nTVA intracom FR123456789\nTicket n° 0042\n12/10/2026\nPain 2,50\nTOTAL TTC 12,40\nTOTAL TVA 1,10"))
@@ -46,6 +93,7 @@ test("OCR uses bundled same-origin resources and always releases its worker", as
   expect(new URL(options.workerPath).origin).toBe(window.location.origin);
   expect(new URL(options.langPath).origin).toBe(window.location.origin);
   expect(result.fields.total_ttc).toBe("5.00");
+  expect(worker.recognize).toHaveBeenCalledWith(expect.any(HTMLCanvasElement), { rotateAuto: true });
   expect(worker.terminate).toHaveBeenCalledTimes(1);
 });
 
