@@ -81,6 +81,8 @@ test("store leads with accessible assistance, speed and continuity without promi
   const advantages = container.querySelector("#public-advantage-title").parentElement;
   expect(advantages.querySelectorAll("li")).toHaveLength(3);
   expect(advantages.textContent).toContain("rappels configurés");
+  expect(advantages.querySelector("p > strong").textContent).toBe("Parlez-lui simplement. Vous l'adopterez.");
+  expect(advantages.textContent).not.toContain("Essayez Zirius gratuitement.");
   expect(advantages.textContent).toContain("Claude, ChatGPT et d'autres outils peuvent intervenir à certaines étapes. Mais avec ΣIRIUS, vous avez un interlocuteur unique : vous lui parlez et, hop ! Il rassemble vos demandes, vos dossiers et vos outils, puis vous accompagne tout au long de votre travail.");
   expect(container.textContent).not.toContain("Tout se fait automatiquement");
 });
