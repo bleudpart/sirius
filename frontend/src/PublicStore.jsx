@@ -191,7 +191,7 @@ export default function PublicStore() {
           <li><strong>La continuité, dossier après dossier</strong><p>Conservez vos documents et vos notes, retrouvez le contexte enregistré et associez vos échéances à vos dossiers. Les rappels configurés vous aident à garder le fil des prochaines actions.</p></li>
         </ol>
         <p>Claude, ChatGPT et d'autres outils peuvent intervenir à certaines étapes. Mais avec ΣIRIUS, vous avez un interlocuteur unique : vous lui parlez et, hop ! Il rassemble vos demandes, vos dossiers et vos outils, puis vous accompagne tout au long de votre travail.</p>
-        <p><strong>Parlez-lui simplement. Vous l'adopterez.</strong></p>
+        <p><strong>Essayez ΣIRIUS gratuitement.</strong><br />Parlez-lui simplement. Vous l'adopterez.</p>
         <a className="public-primary-cta" href="#commencer">Découvrir ΣIRIUS <ArrowRight size={17} /></a>
       </section>
       <section className="public-why" aria-labelledby="public-why-title">
