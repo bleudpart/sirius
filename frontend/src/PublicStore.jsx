@@ -169,9 +169,9 @@ export default function PublicStore() {
       </header>
       <div className="public-showcase">
       <section className="public-hero">
-        <p className="public-eyebrow">ΣIRIUS · L'IA sans prise de tête, conçue pour votre travail</p>
-        <h1>Zirius, l'IA sans prompts compliqués : <em>parlez-lui, elle s'occupe de vos tâches.</em></h1>
-        <p className="public-value">Conçu pour ceux qui ne sont pas familiers avec l'IA, Zirius vous écoute, vous répond, exécute vos demandes et surveille vos tâches. Parlez-lui naturellement, sans avoir à rédiger de prompts compliqués.</p>
+        <p className="public-eyebrow">ΣIRIUS, conçue pour vous</p>
+        <h1>Zirius, sans prompts compliqués : <em>parlez-lui, Il s'occupe de vos tâches.</em></h1>
+        <p className="public-value">Conçu pour tous ceux qui ne sont pas à l'aise avec l'IA, Zirius vous aide : vous écoute, vous répond, exécute vos demandes et surveille vos tâches. Parlez-lui naturellement, sans avoir à rédiger de prompts compliqués.</p>
         <p className="public-trial-highlight">15 jours d'essai gratuit des services IA dès votre première connexion.</p>
         <div className="public-benefits"><span>Demandes naturelles</span><span>Réponses rapides</span><span>Plusieurs tâches, un espace</span><span>Suivi des dossiers</span></div>
         <div className="public-hero-actions"><a className="public-primary-cta" href="#offres">Découvrir les offres <ArrowRight size={17} /></a><a className="public-secondary-cta" href="#matrice-demo">Explorer l'interface <ArrowRight size={17} /></a></div>

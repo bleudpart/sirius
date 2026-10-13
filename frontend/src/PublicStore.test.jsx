@@ -44,8 +44,9 @@ test.each([["standard", "69"], ["pro", "135"], ["lifetime", "269"]])(
 );
 
 test("store displays the requested headline and description while preserving the footer slogan", () => {
-  expect(container.querySelector(".public-hero h1").textContent).toBe("Zirius, l'IA sans prompts compliqués : parlez-lui, elle s'occupe de vos tâches.");
-  expect(container.querySelector(".public-value").textContent).toBe("Conçu pour ceux qui ne sont pas familiers avec l'IA, Zirius vous écoute, vous répond, exécute vos demandes et surveille vos tâches. Parlez-lui naturellement, sans avoir à rédiger de prompts compliqués.");
+  expect(container.querySelector(".public-hero .public-eyebrow").textContent).toBe("ΣIRIUS, conçue pour vous");
+  expect(container.querySelector(".public-hero h1").textContent).toBe("Zirius, sans prompts compliqués : parlez-lui, Il s'occupe de vos tâches.");
+  expect(container.querySelector(".public-value").textContent).toBe("Conçu pour tous ceux qui ne sont pas à l'aise avec l'IA, Zirius vous aide : vous écoute, vous répond, exécute vos demandes et surveille vos tâches. Parlez-lui naturellement, sans avoir à rédiger de prompts compliqués.");
   expect(container.querySelector(".public-slogan").textContent).toBe("ZIRIUS travaille pour vous.");
 });
 
@@ -75,7 +76,7 @@ test("business context and workflow precede functions and offers without removin
   expect(container.querySelector(".public-matrix-actions li strong").textContent).toBe("Organiser ses dossiers");
 });
 test("store leads with accessible assistance, speed and continuity without promising unlimited autonomy", () => {
-  expect(container.querySelector(".public-eyebrow").textContent).toContain("L'IA sans prise de tête");
+  expect(container.querySelector(".public-eyebrow").textContent).toBe("ΣIRIUS, conçue pour vous");
   expect(container.querySelector(".public-hero").textContent).toContain("Parlez-lui naturellement");
   const advantages = container.querySelector("#public-advantage-title").parentElement;
   expect(advantages.querySelectorAll("li")).toHaveLength(3);
