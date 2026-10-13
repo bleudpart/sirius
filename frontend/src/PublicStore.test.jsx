@@ -43,9 +43,9 @@ test.each([["standard", "69"], ["pro", "135"], ["lifetime", "269"]])(
   },
 );
 
-test("store displays the requested slogan in the hero and footer", () => {
-  expect(container.querySelector(".public-hero h1").textContent).toBe("ZIRIUS travaille pour vous.");
-  expect(container.querySelector(".public-value").textContent).toBe("Il organise vos tâches, simplifie votre travail et vous libère du temps.");
+test("store displays the requested headline and description while preserving the footer slogan", () => {
+  expect(container.querySelector(".public-hero h1").textContent).toBe("Zirius, l'IA sans prompts compliqués : parlez-lui, elle s'occupe de vos tâches.");
+  expect(container.querySelector(".public-value").textContent).toBe("Conçu pour ceux qui ne sont pas familiers avec l'IA, Zirius vous écoute, vous répond, exécute vos demandes et surveille vos tâches. Parlez-lui naturellement, sans avoir à rédiger de prompts compliqués.");
   expect(container.querySelector(".public-slogan").textContent).toBe("ZIRIUS travaille pour vous.");
 });
 
@@ -60,17 +60,28 @@ test("store explains why Sirius was designed with the requested text", () => {
 
 test("business context and workflow precede functions and offers without removing existing sections", () => {
   const sections = [...container.querySelectorAll("main > section")].map((section) => section.className);
-  expect(sections.indexOf("public-why")).toBeLessThan(sections.indexOf("public-workflow"));
-  expect(sections.indexOf("public-workflow")).toBeLessThan(sections.indexOf("public-situations"));
+  const workflow = container.querySelector("#public-workflow-title").parentElement;
+  const workflowIndex = [...container.querySelectorAll("main > section")].indexOf(workflow);
+  expect(sections.indexOf("public-why")).toBeLessThan(workflowIndex);
+  expect(workflowIndex).toBeLessThan(sections.indexOf("public-situations"));
   expect(sections.indexOf("public-situations")).toBeLessThan(sections.indexOf("public-matrix"));
   expect(sections.indexOf("public-matrix")).toBeLessThan(sections.indexOf("public-plans"));
   expect(sections.indexOf("public-plans")).toBeLessThan(sections.indexOf("public-odysseia-card"));
-  const steps = container.querySelectorAll(".public-workflow-steps li");
+  const steps = workflow.querySelectorAll(".public-workflow-steps li");
   expect(steps).toHaveLength(3);
   expect(steps[1].textContent).toContain("Relisez les champs");
   expect(steps[2].textContent).toContain("brouillon de facture non émis");
-  expect(container.querySelector(".public-workflow").textContent).toContain("ne garantit ni la conformité comptable ni un temps gagné");
+  expect(workflow.textContent).toContain("Du document reçu au résultat conservé");
   expect(container.querySelector(".public-matrix-actions li strong").textContent).toBe("Organiser ses dossiers");
+});
+test("store leads with accessible assistance, speed and continuity without promising unlimited autonomy", () => {
+  expect(container.querySelector(".public-eyebrow").textContent).toContain("L'IA sans prise de tête");
+  expect(container.querySelector(".public-hero").textContent).toContain("Parlez-lui naturellement");
+  const advantages = container.querySelector("#public-advantage-title").parentElement;
+  expect(advantages.querySelectorAll("li")).toHaveLength(3);
+  expect(advantages.textContent).toContain("rappels configurés");
+  expect(advantages.textContent).toContain("Claude ou ChatGPT peuvent participer");
+  expect(container.textContent).not.toContain("Tout se fait automatiquement");
 });
 test("trial explains activation, limits and personal keys without automatic payment", () => {
   expect(container.querySelector(".public-trial-highlight").textContent).toContain("15 jours d'essai gratuit");

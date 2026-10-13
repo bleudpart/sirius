@@ -48,7 +48,7 @@
 }
 .modwheel::before {
   inset: -1px;
-  padding: 2px;
+  padding: 1px;
   border-radius: inherit;
   background: conic-gradient(from var(--modwheel-rgb),
     rgba(240, 190, 80, 0.15), #f0be50 12%, #fff1c2 18%, #f0be50 24%, rgba(240, 190, 80, 0.15) 40%,

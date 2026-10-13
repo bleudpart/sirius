@@ -169,11 +169,11 @@ export default function PublicStore() {
       </header>
       <div className="public-showcase">
       <section className="public-hero">
-        <p className="public-eyebrow">ΣIRIUS · Assistant personnel et professionnel</p>
-        <h1>ZIRIUS <em>travaille pour vous.</em></h1>
-        <p className="public-value">Il organise vos tâches, simplifie votre travail et vous libère du temps.</p>
+        <p className="public-eyebrow">ΣIRIUS · L'IA sans prise de tête, conçue pour votre travail</p>
+        <h1>Zirius, l'IA sans prompts compliqués : <em>parlez-lui, elle s'occupe de vos tâches.</em></h1>
+        <p className="public-value">Conçu pour ceux qui ne sont pas familiers avec l'IA, Zirius vous écoute, vous répond, exécute vos demandes et surveille vos tâches. Parlez-lui naturellement, sans avoir à rédiger de prompts compliqués.</p>
         <p className="public-trial-highlight">15 jours d'essai gratuit des services IA dès votre première connexion.</p>
-        <div className="public-benefits"><span>Emails</span><span>Documents</span><span>Automatisation métier</span><span>Domotique</span></div>
+        <div className="public-benefits"><span>Demandes naturelles</span><span>Réponses rapides</span><span>Plusieurs tâches, un espace</span><span>Suivi des dossiers</span></div>
         <div className="public-hero-actions"><a className="public-primary-cta" href="#offres">Découvrir les offres <ArrowRight size={17} /></a><a className="public-secondary-cta" href="#matrice-demo">Explorer l'interface <ArrowRight size={17} /></a></div>
       </section>
       <section className="public-hud-preview public-hud-hero" aria-label="Capture d'écran du HUD ΣIRIUS">
@@ -182,6 +182,18 @@ export default function PublicStore() {
         <p className="public-preview-caption">Une interface pour vos commandes, vos outils et vos modules.</p>
       </section>
       </div>
+      <section className="public-workflow" aria-labelledby="public-advantage-title">
+        <h2 id="public-advantage-title" className="public-section-title">Moins de temps à expliquer. Plus de temps à avancer.</h2>
+        <p>Vous n'avez pas à devenir expert en IA. ΣIRIUS a été conçu pour réunir l'assistance et l'organisation de votre activité, sans reconstruire votre façon de travailler à chaque demande.</p>
+        <ol className="public-workflow-steps">
+          <li><strong>La simplicité, dès la première demande</strong><p>Dites ce dont vous avez besoin, à la voix ou au clavier. Pas de formule technique à apprendre ni de prompt compliqué à préparer.</p></li>
+          <li><strong>La rapidité, sans multiplier les manipulations</strong><p>Préparez un document, retrouvez une information et organisez une tâche dans le même espace. Passez d'une demande à l'autre sans disperser votre travail entre plusieurs interfaces.</p></li>
+          <li><strong>La continuité, dossier après dossier</strong><p>Conservez vos documents et vos notes, retrouvez le contexte enregistré et associez vos échéances à vos dossiers. Les rappels configurés vous aident à garder le fil des prochaines actions.</p></li>
+        </ol>
+        <p>Claude ou ChatGPT peuvent participer à certaines étapes. L'avantage de ΣIRIUS : réunir vos demandes, vos dossiers et vos outils dans un parcours conçu pour votre travail.</p>
+        <p><strong>Essayez Zirius gratuitement.</strong><br />Demandez-lui de rédiger un message, organiser un rendez-vous ou suivre une demande. Parlez-lui simplement. Vous l'adopterez.</p>
+        <a className="public-primary-cta" href="#commencer">Découvrir ΣIRIUS <ArrowRight size={17} /></a>
+      </section>
       <section className="public-why" aria-labelledby="public-why-title">
         <h2 id="public-why-title" className="public-section-title">Pourquoi ΣIRIUS a-t-il été conçu ?</h2>
         <p>ΣIRIUS a été conçu pour aider les particuliers, les commerçants, les artisans, les indépendants et les entreprises à mieux organiser leur activité au quotidien. Il permet de centraliser les documents, notes, factures, informations comptables, tâches, rendez-vous et projets dans un espace unique. Grâce à ses capacités de classement, de recherche et de synthèse, ΣIRIUS facilite le suivi administratif, l'organisation du travail et la prise de décision.</p>
@@ -194,7 +206,7 @@ export default function PublicStore() {
           <li><strong>Préparer et vérifier</strong><p>Relisez les champs proposés et comparez les identifiants fiscaux signalés avec la photo. Une information non identifiée reste à compléter, elle n'est pas inventée.</p></li>
           <li><strong>Conserver un résultat utilisable</strong><p>Classez le justificatif et téléchargez sa fiche de dépense en PDF A4. Une vente reste un brouillon de facture non émis ; vous gardez la main sur sa validation.</p></li>
         </ol>
-        <p className="public-function-note">Une IA comme Claude peut participer à certaines étapes. ΣIRIUS réunit ici la capture, la relecture, le classement et le document préparé dans un même parcours. Ce parcours ne garantit ni la conformité comptable ni un temps gagné ; ces résultats doivent être vérifiés dans votre activité.</p>
+        <p className="public-function-note">Du document reçu au résultat conservé, ΣIRIUS réunit la capture, la relecture, le classement et le document préparé dans un même parcours.</p>
       </section>
       <section className="public-situations" aria-labelledby="public-situations-title">
         <h2 id="public-situations-title" className="public-section-title">ΣIRIUS en situation</h2>

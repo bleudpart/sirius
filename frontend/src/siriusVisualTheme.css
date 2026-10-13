@@ -308,13 +308,35 @@ html[data-sirius-visual-theme="classic"] :is(.sirius-display, .web-window, .shud
 }
 html[data-sirius-visual-theme="classic"] :is(.workspace-surface, .sirius-root .voice-session-controls, .sirius-root .cmd-bar) {
   border-color: transparent;
-  background: var(--workspace-rgb) 0 0 / 200% 2px repeat-x padding-box,
+  background: var(--workspace-rgb) 0 0 / 200% 1px repeat-x padding-box,
     var(--workspace-surface) padding-box, linear-gradient(#061824, #061824) padding-box,
     var(--workspace-frame) border-box;
   animation: sirFrameSpin 14s steps(360) infinite, workspaceSpectrumFrame 10s linear infinite;
 }
 @keyframes workspaceSpectrumFrame {
   to { background-position: 200% 0, 0 0, 0 0, 0 0; }
+}
+html :is(.sirius-tagline, .auth-tagline, .boot-tagline, .sirius-colleague),
+html[data-sirius-visual-theme="classic"] .auth-tagline.auth-tagline,
+html[data-sirius-visual-theme="classic"] .sirius-center .sirius-tagline,
+html[data-sirius-visual-theme="classic"] .boot-tagline {
+  font-family: "Cinzel", Georgia, serif !important;
+  color: var(--gold, #d8b875) !important;
+  -webkit-text-fill-color: var(--gold, #d8b875) !important;
+}
+.sirius-colleague {
+  display: block;
+  margin: 6px 0 0;
+  font-size: 10px;
+  line-height: 1.5;
+  letter-spacing: .08em;
+  text-align: center;
+}
+.boot-status .boot-display {
+  border: 1px solid var(--workspace-line, rgba(145, 230, 242, .3));
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(6, 23, 34, .65);
 }
 html[data-sirius-visual-theme="classic"] :is(
   .zeus-head, .eu-head, .setup-head, .iw-head, .atlas-bar, .kr-bar, .esp-bar,
@@ -326,7 +348,7 @@ html[data-sirius-visual-theme="classic"] :is(
   box-shadow: none !important;
 }
 html[data-sirius-visual-theme="classic"] .sirius-display .sd-bar {
-  background: var(--workspace-rgb) 0 100% / 200% 2px repeat-x,
+  background: var(--workspace-rgb) 0 100% / 200% 1px repeat-x,
     linear-gradient(#081c28, #081c28) !important;
 }
 html[data-sirius-visual-theme="classic"] :is(
@@ -600,7 +622,7 @@ html[data-sirius-visual-theme="classic"] .public-popular { border-radius: 0 20px
   html[data-sirius-visual-theme="classic"] .boot-acro-item b { font-size: clamp(30px, 2.8vw, 42px); line-height: 1.25; }
   html[data-sirius-visual-theme="classic"] .boot-acro-item i { color: var(--workspace-gold); font: 400 9px/1.5 var(--workspace-font); letter-spacing: 0; text-transform: none; }
   html[data-sirius-visual-theme="classic"] .boot-screen :is(.boot-modules, .boot-status) {
-    border: 2px solid transparent;
+    border: 1px solid transparent;
     border-image: none;
     background: var(--workspace-surface) padding-box,
       linear-gradient(#061824, #061824) padding-box,

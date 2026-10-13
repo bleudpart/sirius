@@ -180,7 +180,8 @@ function AuthScreen({ onAuth }) {
             </span>
             <h1 className="auth-title">ΣIRIUS</h1>
           </div>
-          <p className="auth-tagline">VOTRE ASSISTANT PRIVILÉGIÉ</p>
+          <p className="auth-tagline">Parlez-lui simplement. Zirius vous répond.</p>
+          <p className="sirius-colleague">LE COLLÈGUE SUR QUI VOUS POUVEZ COMPTER</p>
         </header>
         <p className="auth-sub">{registerMode ? "Créez votre compte pour accéder à ΣIRIUS" : "Identifiez-vous pour accéder à ΣIRIUS"}</p>
         <form onSubmit={resetMode ? resetPassword : submit} className="auth-form" data-testid="auth-form">

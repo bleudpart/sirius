@@ -7456,7 +7456,8 @@ function App() {
                 <span className="sirius-wordmark workspace-welcome">
                   {["dusk", "night"].includes(phaseOfDay()) ? "Bonsoir" : "Bonjour"}{userName ? `, ${userName}` : ""}.
                 </span>
-                <span className="sirius-tagline">Que souhaitez-vous explorer aujourd’hui ?</span>
+                <span className="sirius-tagline">Parlez-lui simplement. Zirius vous répond.</span>
+                <span className="sirius-colleague">LE COLLÈGUE SUR QUI VOUS POUVEZ COMPTER</span>
               </span>
             </h1>
           </div>

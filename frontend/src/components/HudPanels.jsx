@@ -11,7 +11,6 @@ import { getLocalDateKey } from "@/dateTime";
 import { speakCinematic, cancelSpeech, cleanTextForDisplay } from "@/voice";
 import { WORK_MODULES } from "@/workModules";
 import { API_BASE_URL } from "@/lib/api";
-import { generateBootPresentation } from "@/bootPresentation";
 import { readAccountSetup } from "@/accountSetup";
 
 const BRAIN_RETRY_MS = 2000;
@@ -570,6 +569,7 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
   })), [checks]);
   const progress = Math.round(checks.filter(({ state }) => state !== null).length / checks.length * 100);
   const [closing, setClosing] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const loaded = checks.every(({ state }) => state !== null);
   const [speechDone, setSpeechDone] = useState(false);
   const [speechUnavailable, setSpeechUnavailable] = useState(false);
@@ -590,59 +590,24 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
   }, []);
   // On attend le verdict du cerveau avant d'annoncer l'état à voix haute ; un « Réessayer »
   // ultérieur ne relance pas la présentation.
-  const [narrationReady, setNarrationReady] = useState(false);
-  const [presentation, setPresentation] = useState("");
-  const [presentationError, setPresentationError] = useState("");
+  const narrationReady = loaded;
   useEffect(() => {
     if (brain === null) return;
     window.__siriusStartupDiagnostic = {
       measuredAt: new Date().toISOString(),
       checks: checks.map(({ label, state, success, scope }) => ({ label, state, success, scope })),
-      presentationError,
     };
-  }, [brain, checks, presentationError]);
-  const presentationAttemptedRef = useRef(false);
-  useEffect(() => {
-    if (!loaded || presentationAttemptedRef.current) return;
-    presentationAttemptedRef.current = true;
-    if (!brain) { setNarrationReady(true); return; }
-    const controller = new AbortController();
-    let disposed = false;
-    const timeout = setTimeout(() => controller.abort(), 6000);
-    generateBootPresentation({ checks, signal: controller.signal }).then((text) => {
-      if (!disposed) setPresentation(text);
-    }).catch((error) => {
-      if (!disposed) {
-        console.warn("Présentation générée :", error);
-        setPresentationError("Présentation personnalisée indisponible ; état des services uniquement.");
-      }
-    }).finally(() => {
-      clearTimeout(timeout);
-      if (!disposed) setNarrationReady(true);
-    });
-    return () => {
-      disposed = true;
-      clearTimeout(timeout);
-      controller.abort();
-      if (!narrationReady) presentationAttemptedRef.current = false;
-    };
-    // Les faits sont figés au premier verdict de connexion.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [brain, loaded]);
+  }, [brain, checks]);
   const padRef = useRef(null);
-  const serviceSpeech = checks.map(({ label, state, success, scope }) =>
-    `${label.replace(/ΣIRIUS/g, "Sirius")}. ${state === null ? "En cours." : state ? `${success}.` : "Indisponible."} ${scope}`
-  ).join(" ");
-  const allChecksOk = checks.every(({ state }) => state === true);
-  const readyMessage = allChecksOk
-    ? `${userName ? `${userName}, votre` : "Votre"} système est en place et fonctionnel.`
-    : `${userName ? `${userName}, certaines` : "Certaines"} vérifications ont échoué.`;
-  const introSpeech = "Initialisation de votre espace. " + (presentation ? `${presentation} ` : "") + serviceSpeech + " " +
-    (services ? services.map(({ label, state }) => `${label}. ${state === "configured" ? "Configuré, fournisseur non testé."
-      : state === "available" ? "Disponible selon le serveur." : state === "not_configured" ? "Non configuré."
-        : state === "restricted" ? "Accès restreint." : "État non reconnu."}`).join(" ") + " " : "") +
-    (brain === false ? "Je n'arrive pas encore à joindre mon cerveau... vérifiez la connexion Internet. " : "") +
-    readyMessage;
+  const readyMessage = brain === true && services !== null
+    ? `Bonjour${userName ? ` ${userName}` : ""}, votre assistant Zirius est prêt à être utilisé.`
+    : `Bonjour${userName ? ` ${userName}` : ""}, ${brain === false
+      ? "le serveur ne répond pas encore. Vous pouvez réessayer la connexion."
+      : "la configuration des services n'a pas pu être vérifiée."}`;
+  const voiceWarnings = checks.filter(({ state, label }) =>
+    state === false && label.startsWith("API")).map(({ label }) =>
+    `${label === "API de capture micro" ? "La capture micro" : "La lecture audio"} est indisponible.`);
+  const introSpeech = [readyMessage, ...voiceWarnings].join(" ");
   const playIntroSpeech = () => {
     speechFinishedRef.current = false;
     setSpeechDone(false);
@@ -726,8 +691,7 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
       setSpeechUnavailable(true);
       setSpeechPlaying(false);
       setSpeechDone(true);
-      if (brainRef.current !== false) closeBoot();
-    }, Math.max(120000, introSpeech.length * 200));
+    }, 20000);
     return () => { clearTimeout(hardStop); stopPad(); };
   }, [lines.length, onDone, narrationReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -744,8 +708,8 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
     return () => clearTimeout(t);
   }, [loaded, speechDone]);
   useEffect(() => {
-    if (loaded && speechDone && brain !== false) closeBoot();
-  }, [loaded, speechDone, brain]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (loaded && speechDone && brain !== false && !detailsOpen) closeBoot();
+  }, [loaded, speechDone, brain, detailsOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
 
     <div className={`boot-screen ${closing ? "closing" : ""}`} data-testid="boot-screen" onClick={() => {
@@ -782,7 +746,7 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
             key={id}
             role="button"
             tabIndex={0}
-            style={{ animationDelay: `${0.9 + i * 0.28}s` }}
+            style={{ animationDelay: `${Math.min(i * 0.02, 0.3)}s` }}
             data-testid={`boot-module-${id}`}
             onClick={(e) => {
               e.stopPropagation();
@@ -814,12 +778,14 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
           ))}
         </div>
         <p className="boot-signature">ΣIRIUS — Votre intelligence au travail</p>
-        <p className="boot-tagline">Organisez vos activités. Analysez vos données. Passez à l'action.</p>
+        <p className="boot-tagline">Parlez-lui simplement. Zirius vous répond.</p>
+        <p className="sirius-colleague">LE COLLÈGUE SUR QUI VOUS POUVEZ COMPTER</p>
       </div>
       <section className="boot-status workspace-surface" aria-label="Initialisation de votre espace">
         <span className="workspace-kicker">MISE EN ROUTE</span>
         <h2>Initialisation de votre espace</h2>
-        <details className="boot-check-details">
+        <details className="boot-check-details" onClick={(event) => event.stopPropagation()}
+          onToggle={(event) => setDetailsOpen(event.currentTarget.open)}>
           <summary>Détail des vérifications</summary>
           <ul>
             {checks.map(({ label, state, success, scope }) => (
@@ -836,9 +802,7 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
                   : state === "restricted" ? "accès restreint" : "état non reconnu"}</li>
           ))}</ul>}
         </details>
-        <div className="boot-log">
-          {presentation && <p data-testid="boot-presentation">{cleanTextForDisplay(presentation)}</p>}
-          {presentationError && <p role="status">{presentationError}</p>}
+        <div className="boot-log boot-display" role="log" aria-label="Résultats des contrôles de démarrage" aria-live="polite" aria-relevant="additions text">
           {lines.map((l) => (
             <div key={l.label} className={`boot-line boot-line-${l.tone}`}>
               <span className="boot-line-label">{l.label}</span>
@@ -854,7 +818,7 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
         <div className="boot-pct">{progress}%  —          {speechUnavailable
           ? "voix indisponible — ouverture du HUD"
           : speechPlaying
-            ? "lecture des services et de l'accueil…"
+            ? "accueil vocal…"
                   : speechDone && !speechStartedRef.current
                     ? "ouverture du HUD…"
                     : "touchez pour activer la voix"}</div>

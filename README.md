@@ -27,6 +27,13 @@ qui utilisent leurs propres identifiants, pas les index PyAudio.
 
 ### Actualités et affichage Android — 1.0.43
 
+Le démarrage affiche les verdicts au fil des réponses réelles dans un journal
+compact façon Display. Il n'attend plus une présentation générée par l'IA et
+ne récite plus les services : l'accueil vocal est personnalisé et bref.
+Les limites et configurations restent dans « Détail des vérifications » ;
+l'ouverture de ce détail suspend la fermeture automatique. Un serveur
+injoignable reste annoncé comme tel, avec possibilité de réessayer.
+
 Le SDK est chargé dans un thread de fond avant le premier échange, pour éviter
 ses imports paresseux sur le chemin de réponse. La connexion Cerebras est
 préparée en arrière-plan au démarrage par une requête

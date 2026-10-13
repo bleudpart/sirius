@@ -8591,7 +8591,7 @@ footer.sirius-footer {
    (fond border-box) pour rester fixe pendant le défilement du contenu. */
 .holo-win,
 .setup-screen.holo-win {
-  border: 1.5px solid transparent !important;
+  border: 1px solid transparent !important;
   background:
     linear-gradient(180deg, rgba(143, 212, 227, 0.08), transparent 72px) padding-box no-repeat,
     linear-gradient(#07141f, #07141f) padding-box,
@@ -8614,7 +8614,7 @@ footer.sirius-footer {
 }
 /* Accent supérieur : spectre RGB de la roue */
 .holo-win::before {
-  height: 2px;
+  height: 1px;
   background: linear-gradient(90deg, #00e5ff, #4d7cff, #b04dff, #ff4d9d, #ffb84d, #7dff9a, #00e5ff);
   background-size: 200% 100%;
   opacity: 0.85;
@@ -8631,7 +8631,7 @@ footer.sirius-footer {
   position: absolute;
   inset: 0;
   z-index: 40;
-  padding: 1.5px;
+  padding: 1px;
   border-radius: inherit;
   pointer-events: none;
   background: conic-gradient(from var(--sir-frame-angle),
@@ -8655,7 +8655,7 @@ footer.sirius-footer {
   border-bottom: 0;
   box-shadow: inset 0 -1px 0 rgba(240, 190, 80, 0.22);
   background:
-    linear-gradient(90deg, #00e5ff, #4d7cff, #b04dff, #ff4d9d, #ffb84d, #7dff9a, #00e5ff) 0 100% / 200% 2px repeat-x,
+    linear-gradient(90deg, #00e5ff, #4d7cff, #b04dff, #ff4d9d, #ffb84d, #7dff9a, #00e5ff) 0 100% / 200% 1px repeat-x,
     linear-gradient(180deg, rgba(145, 230, 242, 0.14), rgba(145, 230, 242, 0.03));
   animation: sirSpectrumBar 10s linear infinite;
 }
