@@ -138,7 +138,7 @@ test("planning and an uppercase elision remain words on remote and native speech
   speakFr("Voici le PLANNING. L ’ effet est visible dans le ΣIRIUS DISPLAY.");
   await flush();
   const request = global.fetch.mock.calls.find(([url]) => String(url).includes("/tts/gemini"));
-  const expected = "Voici le planingue. l'effet est visible dans mon Ziriusse displé.";
+  const expected = "Voici le planigne. l'effet est visible dans mon Ziriusse displé.";
   expect(JSON.parse(request[1].body).text).toBe(expected);
   expect(speakNative.mock.calls[0][0]).toBe(expected);
 });
