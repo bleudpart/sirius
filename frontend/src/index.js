@@ -1,6 +1,7 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { Capacitor } from "@capacitor/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "./index.css";
 import App from "@/App";
@@ -12,6 +13,7 @@ import PublicStore from "@/PublicStore";
 import "./siriusVisualTheme.css";
 
 document.documentElement.dataset.siriusVisualTheme = "classic";
+document.documentElement.dataset.siriusPlatform = Capacitor.getPlatform();
 
 const queryClient = new QueryClient({
   defaultOptions: {

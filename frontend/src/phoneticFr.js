@@ -41,7 +41,7 @@ export const FR_ANGLICISMS = {
   template: "tempss-plète",
   templates: "tempss-plète",
   login: "logg-ine",
-  planning: "planingue",
+  planning: "planigne",
   meeting: "mi-tingue",
   reporting: "ripor-tingue",
 };

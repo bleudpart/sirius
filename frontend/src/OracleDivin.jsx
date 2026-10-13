@@ -386,7 +386,7 @@ export default function OracleDivin({ onClose }) {
           <div className="prime-hab-label">CRYPTO — TEMPS RÉEL (24H)</div>
           {data && data.crypto.map((m) => <MarketRow m={m} unit="%" key={m.name} />)}
           {data && data.crypto.length === 0 && <div className="memory-empty">Flux crypto indisponible.</div>}
-          <div className="prime-hab-label">{data && data.stocks_live ? "ACTIONS — TEMPS RÉEL (ALPHA VANTAGE)" : "INDICES & ACTIONS — ESTIMATION DU JOUR"}</div>
+          <div className="prime-hab-label">{data && data.stocks_live ? "ACTIONS — TEMPS RÉEL (ALPHA VANTAGE)" : "INDICES & ACTIONS — DONNÉES INDISPONIBLES"}</div>
           {data && data.stocks.map((m) => <MarketRow m={m} unit="%" key={m.name} />)}
         </section>
 
@@ -493,11 +493,12 @@ export default function OracleDivin({ onClose }) {
               <Moon size={34} color="#e0f2fe" style={{ filter: "drop-shadow(0 0 10px rgba(180,220,255,0.8))" }} />
               <div>
                 <b className="oracle-moon-name">{data.moon.name}</b>
-                <div className="prime-conf-note">ILLUMINATION {data.moon.illumination}%</div>
+                <div className="prime-conf-note">ILLUMINATION ESTIMÉE {data.moon.illumination}% · PHASE APPROXIMATIVE</div>
               </div>
             </div>
           )}
-          {data && data.astro.map((e) => (
+          {data && !data.astro?.length && <div className="prime-conf-note">Calendrier astronomique vérifié indisponible.</div>}
+          {data && (data.astro || []).map((e) => (
             <div className="oracle-astro-row" key={e.date}>
               <span className="prime-time">{e.date}</span>
               <span>{e.name}</span>

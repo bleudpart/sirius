@@ -89,6 +89,31 @@ def fake_provider(*, stream=False):
 
 
 @pytest.mark.parametrize("stream", [False, True])
+def test_news_answers_have_detail_guidance_and_larger_budget(monkeypatch, stream):
+    provider, create = fake_provider(stream=stream)
+    monkeypatch.setattr(brain, "AsyncOpenAI", lambda **kwargs: provider)
+
+    async def run():
+        kwargs = {"keys": {"groq_key": "fake-groq"}}
+        if stream:
+            return "".join([part async for part in brain.ask_sirius_stream("Explique les actualités du jour", **kwargs)])
+        return await brain.ask_sirius("Explique les actualités du jour", **kwargs)
+
+    asyncio.run(run())
+    payload = create.call_args.kwargs
+    assert payload["max_tokens"] == 2200
+    assert "250 à 450 mots" in payload["messages"][0]["content"]
+    assert "sans les mélanger" in payload["messages"][0]["content"]
+    assert "aucune source récente" in payload["messages"][0]["content"]
+
+
+def test_news_depth_does_not_force_a_long_answer_after_a_pause():
+    assert brain._is_news_request("Explique les conséquences\nCONTEXTE DU DERNIER BRIEFING :\nActualités")
+    assert not brain._is_news_request("Merci\nCONTEXTE DU DERNIER BRIEFING :\nActualités")
+    assert not brain._is_news_request("Bonjour")
+
+
+@pytest.mark.parametrize("stream", [False, True])
 def test_reflection_and_research_start_together(monkeypatch, stream):
     provider, create = fake_provider(stream=stream)
     monkeypatch.setattr(brain, "AsyncOpenAI", lambda **kwargs: provider)

@@ -74,3 +74,16 @@ def test_duplicate_events_and_empty_sections_are_not_invented():
     assert text.count("Fait confirmé") == 1
     assert "Politique : même événement déjà cité" in text
     assert "Sport : aucune information datée" in text
+
+
+def test_fallback_develops_two_distinct_available_stories_per_section():
+    def article(title, url):
+        return {"titre": title, "description": "Contexte factuel fourni.", "source": "Franceinfo",
+                "date": "2026-10-13T08:00:00+00:00", "url": url}
+    text = briefing_news.news_briefing_text([{
+        "label": "France", "status": "ok",
+        "articles": [article("Premier fait", "https://example.com/1"),
+                     article("Deuxième fait", "https://example.com/2")],
+    }])
+    assert "Premier fait" in text and "Deuxième fait" in text
+    assert text.count("Contexte factuel fourni.") == 2

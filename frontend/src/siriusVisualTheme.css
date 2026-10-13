@@ -181,7 +181,7 @@ html[data-sirius-visual-theme="classic"] .sirius-root .voice-session-controls {
   box-shadow: var(--workspace-shadow);
 }
 html[data-sirius-visual-theme="classic"] .voice-session-controls .voice-session-label { color: #ffffff; font-weight: 500; }
-html[data-sirius-visual-theme="classic"] .voice-session-controls .voice-session-detail { font-size: 12px; line-height: 1.5; }
+html[data-sirius-visual-theme="classic"] .voice-session-controls .voice-session-detail { font-size: 12px; line-height: 1.25; }
 html[data-sirius-visual-theme="classic"] .voice-session-controls .voice-session-emblem { color: var(--workspace-cyan); }
 html[data-sirius-visual-theme="classic"] .voice-session-controls[data-phase="listening"] .voice-session-emblem { color: #a9ddbf; }
 html[data-sirius-visual-theme="classic"] .voice-session-controls :is(.voice-session-caption, .voice-session-detail) { color: #ffffff; }
@@ -466,7 +466,7 @@ html[data-sirius-visual-theme="classic"] .public-popular { border-radius: 0 20px
   html[data-sirius-visual-theme="classic"] .sirius-root .sirius-command-area { gap: 8px; }
   html[data-sirius-visual-theme="classic"] .sirius-command-area .voice-session-controls { order: -1; }
   html[data-sirius-visual-theme="classic"] .sirius-root .cmd-input { font-size: 16px; }
-  html[data-sirius-visual-theme="classic"] .sirius-root .voice-session-controls { padding: 10px; gap: 9px; }
+  html[data-sirius-visual-theme="classic"] .sirius-root .voice-session-controls { padding: 4px 10px; gap: 9px; }
   html[data-sirius-visual-theme="classic"] .voice-session-controls label {
     order: 3;
     flex-basis: 100%;
@@ -682,4 +682,21 @@ html[data-sirius-visual-theme="classic"] .public-popular { border-radius: 0 20px
     animation: sirFrameSpin 14s steps(120) infinite;
   }
   html[data-sirius-visual-theme="classic"] .holo-win::before { animation: none !important; }
+}
+
+/* Android WebView: rotating gradient frames repaint even while windows are idle. */
+html[data-sirius-platform="android"][data-sirius-visual-theme="classic"] :is(
+  .prime-screen, .zeus-screen, .eu-screen, .setup-screen, .holo-win, .iw-panel,
+  .atlas-panel, .kr-panel, .esp-panel, .about-panel, .media-hud-window,
+  .productivity-screen, .connections-screen, .vision-card, .keys-panel,
+  .sp-journal, .getting-started, .modwheel, .hud-panel, .shud-hub,
+  .web-window, .sirius-display, .fv-window, .p3d-panel, .fp-panel, .an3d-overlay,
+  .cmdp-box, .voice-capture-panel, .auth-card, .overlay-bar, .overlay-answer,
+  .shud-panel, .float-card, .central-card, .holo-popup, .workspace-surface,
+  .voice-session-controls, .cmd-bar, .boot-modules, .boot-status
+),
+html[data-sirius-platform="android"][data-sirius-visual-theme="classic"] .modwheel::before,
+html[data-sirius-platform="android"][data-sirius-visual-theme="classic"] .holo-win::before,
+html[data-sirius-platform="android"][data-sirius-visual-theme="classic"] :is(.sirius-display, .web-window, .shud-panel)::after {
+  animation: none !important;
 }

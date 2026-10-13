@@ -25,6 +25,37 @@ Une entrée absente ou un nom ambigu provoque une erreur explicite. Le script
 n'enregistre aucun son et ne modifie pas le microphone du navigateur ou d'Android,
 qui utilisent leurs propres identifiants, pas les index PyAudio.
 
+### Actualités et affichage Android — 1.0.43
+
+Les diagnostics ne présentent plus de latences fixes ni de connexions fictives :
+les actualités sont vérifiées via les sources RSS, et la configuration d'un
+calendrier ne vaut pas preuve de connexion. Alpha Vantage est testé avec la clé
+autorisée et une réponse contenant un cours, jamais avec la clé de démonstration.
+ZEUS affiche les commandes et souvenirs réellement comptés ; le radar n'impose
+aucun minimum artificiel. Le calendrier astronomique codé en dur a été retiré
+faute de source vérifiée ; la phase lunaire calculée est indiquée approximative.
+Les captures du Store et les fixtures des tests restent explicitement distinctes
+des données réelles de l'application.
+
+Sur Android, les liserés colorés des fenêtres restent fixes : la rotation des
+dégradés repeignait les surfaces même au repos. Les autres plateformes conservent
+leurs animations. Ce changement réduit le travail de rendu ; il ne constitue
+pas une garantie d'absence de tous les ralentissements.
+
+Le briefing vocal utilise `POST /api/oracle/overview` pour transmettre les clés
+personnelles au moteur d'enrichissement, sans les placer dans l'URL ni dans la
+réponse. La consultation GET existante reste disponible. Les anciens briefings
+mis en cache sur l'appareil sont recalculés. Les marchés sans cours réel sont
+signalés indisponibles : aucune variation aléatoire ni actualité de démonstration
+n'est présentée comme une donnée réelle.
+
+Les réponses d'actualité reçoivent des consignes de contexte et d'approfondissement
+ainsi qu'un budget de sortie adapté, hors mode turbo. Les recherches de suivi
+portent sur la question, pas sur l'intégralité des sujets du dernier briefing.
+Les notes Kimi restent des hypothèses à vérifier, pas des sources d'actualité.
+Le développement dépend des extraits disponibles ; aucune longueur artificielle
+n'est imposée quand les sources manquent.
+
 ### Tarifs du Store et configuration du paiement
 
 Les nouvelles offres sont Standard **69 EUR**, Pro **135 EUR**, Lifetime

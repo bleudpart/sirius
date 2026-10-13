@@ -38,7 +38,7 @@ test("francise les anglicismes sous toutes leurs formes", () => {
   expect(applyFrenchPhonetics("Lance un scan")).toBe("Lance un skane");
   expect(applyFrenchPhonetics("Je scanne le document")).toBe("Je skane le document");
   expect(applyFrenchPhonetics("deux scans")).toBe("deux skane");
-  expect(applyFrenchPhonetics("PLANNING et planning")).toBe("planingue et planingue");
+  expect(applyFrenchPhonetics("PLANNING et planning")).toBe("planigne et planigne");
 });
 
 test("corrige les noms propres mal prononcés", () => {

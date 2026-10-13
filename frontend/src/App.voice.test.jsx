@@ -459,6 +459,9 @@ test("Android manual dictation routes the evening briefing when preceded by the 
   expect(nativeCalls).toHaveLength(1);
   await act(async () => nativeCalls[0].resolve("Sirius, brieffing du soir"));
   expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/oracle/overview"))).toBe(true);
+  const [, briefingOptions] = global.fetch.mock.calls.find(([url]) => String(url).endsWith("/oracle/overview"));
+  expect(briefingOptions.method).toBe("POST");
+  expect(JSON.parse(briefingOptions.body)).toEqual({ keys: expect.any(Object) });
   expect(global.fetch.mock.calls.some(([url]) => /\/(?:intent|chat)(?:\/stream)?$/.test(String(url)))).toBe(false);
   expect(webSpeech).not.toHaveBeenCalled();
 });

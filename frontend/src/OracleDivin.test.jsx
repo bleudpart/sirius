@@ -39,6 +39,8 @@ test("Oracle presents categorized dated news and the complete radio briefing wit
     expect(sport.textContent).toContain("2026-10-10T16:00:00+02:00");
     expect(sport.querySelector("a").href).toBe("https://www.franceinfo.fr/sports/test");
     expect(container.querySelector('[data-testid="oracle-news-sante"]').textContent).toContain("Source temporairement indisponible");
+    expect(container.querySelector('[data-testid="oracle-astro"]').textContent).toContain("Calendrier astronomique vérifié indisponible");
+    expect(container.querySelector('[data-testid="oracle-astro"]').textContent).toContain("PHASE APPROXIMATIVE");
     const urls = global.fetch.mock.calls.map(([url]) => String(url));
     expect(urls.filter((url) => url.endsWith("/news/briefing"))).toHaveLength(1);
     expect(urls.some((url) => /news\/headlines|sport\/results/.test(url))).toBe(false);

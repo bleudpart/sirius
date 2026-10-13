@@ -1777,7 +1777,7 @@ body.hud-minimal .medallion-halo { display: none; }
   justify-content: space-between;
   gap: 12px;
   margin-top: 6px;
-  padding: 12px 14px;
+  padding: 4px 14px;
   box-sizing: border-box;
   border: 1px solid rgba(216, 184, 117, .32);
   border-radius: 18px;
@@ -1786,7 +1786,7 @@ body.hud-minimal .medallion-halo { display: none; }
   color: #f0d590;
   font: 500 13px/1.4 "Rajdhani", sans-serif;
 }
-.voice-session-controls [role="status"] { min-width: 0; display: grid; gap: 3px; }
+.voice-session-controls [role="status"] { min-width: 0; display: grid; gap: 1px; }
 .voice-session-status { flex: 1; }
 .voice-session-caption { font-size: 9px; letter-spacing: .18em; color: #bca779; }
 .voice-session-label { font-size: 15px; font-weight: 600; line-height: 1.25; }
@@ -1812,7 +1812,7 @@ body.hud-minimal .medallion-halo { display: none; }
   .voice-session-controls .voice-session-emblem { animation: none; }
 }
 @media (max-width: 480px) {
-  .voice-session-controls { padding: 10px; gap: 9px; }
+  .voice-session-controls { padding: 4px 10px; gap: 9px; }
   .voice-session-emblem { flex-basis: 32px; width: 32px; height: 32px; }
   .voice-session-label { font-size: 14px; }
 }

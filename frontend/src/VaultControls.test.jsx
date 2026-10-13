@@ -3,6 +3,14 @@ import { createRoot } from "react-dom/client";
 import { openKeys, sealKeys } from "./deviceKeyStore";
 import VaultControls, { persistPersonalKeys } from "./VaultControls";
 import { hasSavedPersonalKeys, loadApiKeys, restorePersonalKeys, setKeyAccount } from "./apiKeyStorage";
+import { decryptVault } from "./configurationVault";
+
+global.TextEncoder = require("util").TextEncoder;
+
+jest.mock("./configurationVault", () => ({
+  ...jest.requireActual("./configurationVault"),
+  decryptVault: jest.fn(),
+}));
 
 jest.mock("./deviceKeyStore", () => ({
   sealKeys: jest.fn(),
@@ -21,6 +29,7 @@ beforeEach(() => {
   localStorage.clear(); sessionStorage.clear(); setKeyAccount("one");
   host = document.createElement("div"); document.body.appendChild(host); root = createRoot(host);
   onKeys = jest.fn(); validateKeys = jest.fn().mockResolvedValue([]);
+  decryptVault.mockReset();
 });
 afterEach(() => { act(() => root.unmount()); host.remove(); setKeyAccount(""); jest.restoreAllMocks(); });
 const render = () => act(() => root.render(
@@ -90,4 +99,73 @@ test("advanced section can forget keys from the device", async () => {
   await act(async () => host.querySelector('[data-testid="vault-forget"]').click());
   expect(hasSavedPersonalKeys()).toBe(false);
   expect(loadApiKeys()).toEqual({});
+});
+
+const chooseFile = (file) => act(() => {
+  const input = host.querySelector('[data-testid="vault-import"]');
+  Object.defineProperty(input, "files", { configurable: true, value: [file] });
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+});
+const enterImportPassword = () => act(() => {
+  const input = host.querySelector('[data-testid="vault-import-password"]');
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, "test-password-123");
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+});
+const vaultFile = () => ({
+  name: "sirius.vault", size: 100,
+  text: async () => JSON.stringify({
+    format: "sirius.vault", version: 1, kdf: "PBKDF2-SHA256", iterations: 600000, cipher: "AES-256-GCM",
+  }),
+});
+
+test("one visible import button opens the file picker outside advanced controls", () => {
+  render();
+  const input = host.querySelector('[data-testid="vault-import"]');
+  const click = jest.spyOn(input, "click");
+  act(() => host.querySelector('[data-testid="vault-import-button"]').click());
+  expect(click).toHaveBeenCalledTimes(1);
+  expect(host.querySelector('[data-testid="vault-import-button"]').closest("details")).toBeNull();
+});
+
+test("import decrypts, validates and saves keys without a second save step", async () => {
+  render();
+  decryptVault.mockResolvedValue(keys);
+  chooseFile(vaultFile());
+  enterImportPassword();
+  await act(async () => host.querySelector('[data-testid="vault-restore"]').click());
+  expect(decryptVault).toHaveBeenCalledWith(expect.objectContaining({ format: "sirius.vault" }), "test-password-123");
+  expect(validateKeys).toHaveBeenCalledWith(keys);
+  expect(loadApiKeys()).toEqual(keys);
+  expect(onKeys).toHaveBeenCalledWith(keys);
+  expect(host.querySelector('[data-testid="vault-import-password"]')).toBeNull();
+  expect(host.textContent).toContain("Coffre importé");
+});
+
+test("wrong password preserves the chosen file and does not replace existing keys", async () => {
+  await persistPersonalKeys(keys, validateKeys);
+  render();
+  decryptVault.mockRejectedValue(new Error("Mot de passe incorrect ou coffre altéré."));
+  chooseFile(vaultFile());
+  enterImportPassword();
+  await act(async () => host.querySelector('[data-testid="vault-restore"]').click());
+  expect(host.querySelector('[role="alert"]').textContent).toContain("Mot de passe incorrect");
+  expect(host.querySelector('[data-testid="vault-restore"]')).not.toBeNull();
+  expect(loadApiKeys()).toEqual(keys);
+  expect(onKeys).not.toHaveBeenCalled();
+});
+
+test("oversized file is rejected before decryption", () => {
+  render();
+  chooseFile({ ...vaultFile(), size: 128 * 1024 + 1 });
+  expect(host.querySelector('[role="alert"]').textContent).toContain("volumineux");
+  expect(decryptVault).not.toHaveBeenCalled();
+});
+
+test("cancelling import removes the file and password", () => {
+  render();
+  chooseFile(vaultFile());
+  enterImportPassword();
+  act(() => host.querySelector('[data-testid="vault-import-cancel"]').click());
+  expect(host.querySelector('[data-testid="vault-import-password"]')).toBeNull();
+  expect(decryptVault).not.toHaveBeenCalled();
 });

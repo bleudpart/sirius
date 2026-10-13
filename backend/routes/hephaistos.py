@@ -6,6 +6,8 @@ import logging
 import os
 import time
 from datetime import datetime, timezone
+from pathlib import Path
+import sys
 
 import httpx
 import psutil
@@ -48,9 +50,11 @@ def make_hephaistos_router(db):
                         r = await cx.get(base + path)
                     else:
                         r = await cx.post(base + path, json=payload)
-                    # 4xx attendus (validation) = endpoint vivant ; 5xx = panne
-                    healthy = r.status_code < 500
-                    core.append({"name": name, "status": "OK" if healthy else "FAIL",
+                    healthy = 200 <= r.status_code < 300 or (
+                        name in {"NOTIFY", "HERACLES"} and r.status_code in {400, 422}
+                    )
+                    status = "NON VÉRIFIÉ" if r.status_code in {401, 403} else "OK" if healthy else "FAIL"
+                    core.append({"name": name, "status": status,
                                  "code": r.status_code, "latency": int((time.perf_counter() - t0) * 1000)})
                 except Exception as e:
                     core.append({"name": name, "status": "FAIL", "code": None,
@@ -62,22 +66,25 @@ def make_hephaistos_router(db):
         try:
             mem = psutil.virtual_memory()
             cpu = psutil.cpu_percent(interval=0.3)
-            procs = {p.info["name"] for p in psutil.process_iter(["name"]) if p.info.get("name")}
             # Backend : trivialement actif (il exécute ce diagnostic)
             sysroot.append({"name": "BACKEND (uvicorn)", "status": "OK", "detail": "actif"})
-            # Frontend : processus node (dev) OU serveur local OU build statique servi par l'ingress (production)
-            front_up = any("node" in (n or "").lower() for n in procs)
-            front_detail = "actif (serveur de développement)"
+            front_up = False
+            front_detail = "introuvable"
+            try:
+                async with httpx.AsyncClient(timeout=4) as cx:
+                    r = await cx.get("http://localhost:3000/")
+                    front_up = r.status_code == 200 and "<html" in r.text.lower()
+                    if front_up:
+                        front_detail = "page HTML accessible (port 3000)"
+            except httpx.HTTPError as error:
+                logger.info("[HEPHAISTOS] frontend HTTP : %s", type(error).__name__)
             if not front_up:
-                try:
-                    async with httpx.AsyncClient(timeout=4) as cx:
-                        r = await cx.get("http://localhost:3000/")
-                        front_up = r.status_code < 500
-                        front_detail = "actif (port 3000)"
-                except Exception:
-                    front_up = True
-                    front_detail = "servi en statique (production)"
-            sysroot.append({"name": "FRONTEND (node)", "status": "OK" if front_up else "FAIL", "detail": front_detail if front_up else "introuvable"})
+                root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2]))
+                front_up = (root / "frontend" / "build" / "index.html").is_file()
+                if front_up:
+                    front_detail = "build statique présent (accès HTTP non vérifié)"
+            front_status = "NON VÉRIFIÉ" if front_up and "non vérifié" in front_detail else "OK" if front_up else "FAIL"
+            sysroot.append({"name": "FRONTEND (node)", "status": front_status, "detail": front_detail})
             sysroot.append({"name": "CPU", "status": "OK" if cpu < 92 else "FAIL", "detail": f"{cpu:.0f}%"})
             sysroot.append({"name": "MÉMOIRE", "status": "OK" if mem.percent < 92 else "FAIL", "detail": f"{mem.percent:.0f}%"})
         except Exception as e:
@@ -92,10 +99,11 @@ def make_hephaistos_router(db):
 
         from provider_access import provider_env
         kimi_key = provider_env("k3", "K3_API_KEY", "DANIEL_DEV_K3")
+        av_key = provider_env("alphavantage", "ALPHA_VANTAGE_API_KEY")
         ext = []
         integ = [
             ("KIMI K3 (LLM)", "https://api.moonshot.cn/v1/models", bool(kimi_key)),
-            ("ALPHA VANTAGE", "https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=AAPL&apikey=demo", bool(os.environ.get("ALPHA_VANTAGE_API_KEY"))),
+            ("ALPHA VANTAGE", "https://www.alphavantage.co/query", bool(av_key)),
             ("OPENSTREETMAP", "https://nominatim.openstreetmap.org/search?q=Paris&format=json&limit=1", True),
             ("OSRM (routes)", "https://router.project-osrm.org/route/v1/driving/2.35,48.85;4.83,45.76?overview=false", True),
             ("CALLMEBOT", "https://api.callmebot.com/whatsapp.php", True),
@@ -106,14 +114,27 @@ def make_hephaistos_router(db):
 
         async with httpx.AsyncClient(timeout=12, follow_redirects=True, headers=default_headers) as cx:
             for name, url, configured in integ:
+                if name == "CALLMEBOT":
+                    ext.append({"name": name, "status": "NON VÉRIFIÉ", "code": None,
+                                "configured": None, "latency": None,
+                                "detail": "Vérification nécessitant un numéro et une clé personnels ; aucun message envoyé."})
+                    continue
+                if not configured:
+                    ext.append({"name": name, "status": "NON CONFIGURÉ", "code": None,
+                                "configured": False, "latency": None})
+                    continue
                 t0 = time.perf_counter()
                 try:
                     req_headers = {}
                     if name.startswith("KIMI") and kimi_key:
                         req_headers["Authorization"] = "Bearer " + kimi_key
 
-                    r = await cx.get(url, headers=req_headers)
-                    reachable = r.status_code < 500
+                    params = {"function": "GLOBAL_QUOTE", "symbol": "AAPL", "apikey": av_key} if name == "ALPHA VANTAGE" else None
+                    r = await cx.get(url, headers=req_headers, params=params)
+                    reachable = 200 <= r.status_code < 300
+                    if name == "ALPHA VANTAGE" and reachable:
+                        quote = r.json().get("Global Quote") or {}
+                        reachable = float(quote.get("05. price") or 0) > 0
                     ext.append({
                         "name": name,
                         "status": "OK" if reachable else "FAIL",
@@ -128,7 +149,7 @@ def make_hephaistos_router(db):
                         "code": None,
                         "configured": configured,
                         "latency": None,
-                        "error": str(e)[:100]
+                        "error": type(e).__name__
                     })
         report["groups"]["integrations"] = ext
 

@@ -55,14 +55,52 @@ l'enregistrement habituel sur l'appareil.
 Si vous possédez un fichier **sirius.vault**, vous n'avez pas à recopier les
 clés une par une :
 
-1. Ouvrez **Clés API et services → Avancé → Restaurer une sauvegarde**.
+1. Ouvrez **Clés API et services → Importer mon coffre**.
 2. Choisissez votre fichier, puis saisissez le mot de passe de ce coffre.
-3. Cliquez sur **Restaurer**. Les clés sont vérifiées puis enregistrées sur l'appareil.
+3. Cliquez sur **Importer les clés**. Les clés sont vérifiées puis enregistrées sur l'appareil.
 
 L'import ne modifie pas les clés du serveur, les autres comptes ou votre rôle.
 Une clé refusée ou non vérifiable doit être contrôlée auprès de son fournisseur.
 
 ## Créer un coffre portable sans ouvrir SIRIUS
+
+### Programme Windows portable
+
+Ouvrez **SIRIUS-Coffre-Portable.exe** sur un PC Windows 10/11 64 bits.
+Il fonctionne sans installer SIRIUS, Node.js ou Python ; il utilise
+.NET Framework et le chiffrement natif de Windows. Vous pouvez emporter
+l'exécutable sur une clé USB. Le programme ne s'exécute pas sur Android :
+c'est le fichier `.vault` qu'il crée que vous transportez sur le téléphone.
+
+Renseignez les services utiles dans les champs masqués, choisissez et confirmez
+un mot de passe d'au moins 12 caractères, puis cliquez sur **Créer le coffre**.
+Choisissez où enregistrer le fichier. La fenêtre indique que le chiffrement
+est en cours ; aucun fichier existant n'est écrasé.
+
+Dans SIRIUS, sur PC ou téléphone, cliquez sur **Importer mon coffre** dans
+**Clés API et services**, choisissez le fichier, saisissez son mot de passe et
+cliquez sur **Importer les clés**. L'import remplace les clés de ce compte
+sur cet appareil et les enregistre directement, sans second bouton Enregistrer.
+Le sélecteur Android nécessite que le fichier soit accessible sur le téléphone,
+par exemple dans Téléchargements.
+
+Le programme est non signé : Windows peut afficher une alerte SmartScreen.
+Ne désactivez pas les protections Windows ; utilisez uniquement une copie
+de provenance vérifiée.
+
+Pour reconstruire depuis les sources du projet :
+
+```powershell
+.\scripts\portable-vault\build.ps1
+node .\scripts\portable-vault\verify.mjs
+```
+
+L'exécutable est produit dans `dist\portable-vault`. Le test utilise uniquement
+des secrets fictifs et vérifie son coffre avec le déchiffrement réel de SIRIUS.
+Chiffrement identique : PBKDF2-SHA256 (600 000 itérations), AES-256-GCM,
+sel et nonce aléatoires. Aucun appel réseau ni stockage de clés en clair.
+
+### Alternative en terminal
 
 Depuis un terminal à la racine du projet, avec Node.js installé :
 
@@ -78,7 +116,7 @@ Les clés ne sont pas testées auprès des fournisseurs avant la création : cet
 vérification se fait à l'import dans SIRIUS.
 
 Transportez le fichier sur votre téléphone ou un autre PC, puis utilisez
-**Clés API et services → Avancé → Restaurer une sauvegarde**.
+**Clés API et services → Importer mon coffre**.
 Conservez le mot de passe séparément : il n'est ni stocké ni récupérable.
 Les fichiers `.vault` sont exclus du suivi Git. N'envoyez jamais vos clés ou
 votre mot de passe dans une conversation.

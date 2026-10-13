@@ -194,7 +194,7 @@ export default function PantheonSystem({ onClose, keys }) {
           ))}
           <div className="zc-section-title" style={{ marginTop: 16 }}><LayoutDashboard size={12} style={{ marginRight: 6 }} />TABLEAU DE CONNECTIVITÉ</div>
           {services.map((s) => {
-            const health = s.status !== "CONNECTÉ" ? 0 : s.latency == null ? 100 : Math.max(20, 100 - Math.min(80, s.latency / 10));
+            const health = s.real && s.status === "CONNECTÉ" ? 100 : 0;
             return (
               <div className="zc-bar-row" key={s.name}>
                 <span className="prime-intent-name">{s.name}</span>

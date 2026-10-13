@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
 import { decryptVault, encryptVault, parseVault, validateVaultKeys } from "@/configurationVault";
 import {
   deviceKeysStorageKey, forgetPersonalKeys, hasSavedPersonalKeys, loadApiKeys, readLegacyKeys,
@@ -30,7 +30,10 @@ export default function VaultControls({ onKeys, validateKeys, children }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [password, setPassword] = useState("");
+  const [importPassword, setImportPassword] = useState("");
   const [backupFile, setBackupFile] = useState(null);
+  const importInput = useRef(null);
+  const importPasswordId = useId();
   const [savedOnDevice, setSavedOnDevice] = useState(hasSavedPersonalKeys);
   const oldVault = safeOldVault();
   const legacyKeys = safeLegacyKeys();
@@ -44,10 +47,11 @@ export default function VaultControls({ onKeys, validateKeys, children }) {
 
   const applyKeys = async (next, message) => {
     const result = await persistPersonalKeys(next, validateKeys);
-    if (!result) { setNotice("Enregistrement annulé."); return; }
+    if (!result) { setNotice("Enregistrement annulé."); return false; }
     onKeys(loadApiKeys());
     const pending = result.unverified.length ? ` Non vérifiées : ${result.unverified.join(", ")}.` : "";
     setNotice(Object.keys(result.saved).length ? `${message}${pending}` : "Clés effacées de cet appareil.");
+    return true;
   };
 
   const requirePassword = () => {
@@ -69,11 +73,11 @@ export default function VaultControls({ onKeys, validateKeys, children }) {
 
   const restoreBackup = () => run(async () => {
     if (!backupFile) throw new Error("Choisissez d'abord le fichier sirius.vault.");
-    requirePassword();
     if (backupFile.size > 128 * 1024) throw new Error("Fichier trop volumineux.");
-    const next = await decryptVault(parseVault(await backupFile.text()), password);
-    setPassword(""); setBackupFile(null);
-    await applyKeys(next, "Sauvegarde restaurée et enregistrée sur cet appareil.");
+    const next = await decryptVault(parseVault(await backupFile.text()), importPassword);
+    if (await applyKeys(next, "Coffre importé. Vos clés sont enregistrées sur cet appareil.")) {
+      setImportPassword(""); setBackupFile(null);
+    }
   });
 
   const recoverOldVault = () => run(async () => {
@@ -100,6 +104,33 @@ export default function VaultControls({ onKeys, validateKeys, children }) {
     <section data-testid="vault-controls">
       <h2>Mes clés personnelles</h2>
       <p className="setup-note">Collez votre clé, puis cliquez sur « ENREGISTRER » en bas. C'est tout : elle reste chiffrée sur cet appareil et se recharge toute seule.</p>
+      <div className="setup-actions">
+        <button type="button" className="setup-io-btn" onClick={() => importInput.current?.click()}
+          disabled={busy} data-testid="vault-import-button">Importer mon coffre</button>
+        <input ref={importInput} type="file" accept=".vault" hidden disabled={busy} data-testid="vault-import"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            if (!file) return;
+            setError(""); setNotice(""); setImportPassword("");
+            if (file.size > 128 * 1024) {
+              setBackupFile(null); setError("Fichier trop volumineux."); return;
+            }
+            setBackupFile(file);
+          }} />
+      </div>
+      {backupFile && <fieldset className="vault-key-fields" disabled={busy}>
+        <p className="setup-note">Fichier choisi : {backupFile.name}. L'import remplace les clés de ce compte sur cet appareil.</p>
+        <label className="setup-label" htmlFor={importPasswordId}>Mot de passe du coffre</label>
+        <input id={importPasswordId} className="setup-input" type="password" autoComplete="off"
+          value={importPassword} onChange={(event) => setImportPassword(event.target.value)}
+          data-testid="vault-import-password" />
+        <div className="setup-actions">
+          <button type="button" className="setup-io-btn" onClick={restoreBackup} data-testid="vault-restore">Importer les clés</button>
+          <button type="button" className="setup-io-btn" data-testid="vault-import-cancel"
+            onClick={() => { setBackupFile(null); setImportPassword(""); setError(""); }}>Annuler</button>
+        </div>
+      </fieldset>}
       {savedOnDevice && <p className="fw-status ok" data-testid="vault-saved-status">✓ Vos clés sont enregistrées sur cet appareil.</p>}
       <fieldset className="vault-key-fields" disabled={busy}>{children}</fieldset>
       {busy && <p role="status">Opération en cours…</p>}
@@ -114,11 +145,6 @@ export default function VaultControls({ onKeys, validateKeys, children }) {
         <div className="setup-actions">
           <button type="button" className="setup-io-btn" onClick={exportBackup} disabled={busy} data-testid="vault-export">Télécharger une sauvegarde</button>
         </div>
-        <label className="setup-label">Restaurer une sauvegarde (sirius.vault)
-          <input type="file" accept=".vault" disabled={busy} data-testid="vault-import"
-            onChange={(event) => { setBackupFile(event.target.files?.[0] || null); event.target.value = ""; }} />
-        </label>
-        {backupFile && <button type="button" className="setup-io-btn" onClick={restoreBackup} disabled={busy} data-testid="vault-restore">Restaurer {backupFile.name}</button>}
         {oldVault && <button type="button" className="setup-io-btn" onClick={recoverOldVault} disabled={busy} data-testid="vault-recover-old">Récupérer mon ancien coffre (mot de passe une dernière fois)</button>}
         {legacyKeys && <button type="button" className="setup-io-btn" onClick={recoverLegacy} disabled={busy}>Reprendre mes anciennes clés</button>}
         <div className="setup-actions">

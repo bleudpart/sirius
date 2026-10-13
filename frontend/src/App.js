@@ -6351,7 +6351,7 @@ function App() {
     try {
       try {
         const cached = JSON.parse(localStorage.getItem("sirius_daily_briefing_cache") || "null");
-        if (!force && cached?.date === todayStr() && Date.now() - (cached.saved_at || 0) < DAILY_BRIEFING_CACHE_MS && cached.msg) {
+        if (!force && cached?.version === 2 && cached?.date === todayStr() && Date.now() - (cached.saved_at || 0) < DAILY_BRIEFING_CACHE_MS && cached.msg) {
           localStorage.setItem("sirius_last_briefing", todayStr());
           localStorage.setItem("sirius_last_briefing_context", JSON.stringify({ saved_at: cached.saved_at, text: cached.msg.slice(-12000) }));
           streamDisplayIdRef.current = null;
@@ -6363,7 +6363,11 @@ function App() {
           return;
         }
       } catch (e) { /* cache briefing illisible — recalcul normal */ }
-      const r = await fetch(`${API}/oracle/overview`, { credentials: "include", signal });
+      const r = await fetch(`${API}/oracle/overview`, {
+        method: "POST", credentials: "include", signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keys: loadApiKeys() }),
+      });
       if (!r.ok) throw new Error("Briefing indisponible.");
       const d = await r.json();
       if (signal.aborted) return;
@@ -6497,7 +6501,7 @@ function App() {
           const displayMsg = planCards ? `${msg}\n\n— Plans d'action proposés —\n${planCards}` : msg;
           const savedAt = Date.now();
           localStorage.setItem("sirius_last_briefing_context", JSON.stringify({ saved_at: savedAt, text: msg.slice(-12000) }));
-          localStorage.setItem("sirius_daily_briefing_cache", JSON.stringify({ date: todayStr(), saved_at: savedAt, msg, displayMsg }));
+          localStorage.setItem("sirius_daily_briefing_cache", JSON.stringify({ version: 2, date: todayStr(), saved_at: savedAt, msg, displayMsg }));
           if (signal.aborted) return;
           streamDisplayIdRef.current = null; // nouvelle fenêtre dédiée au briefing, révélée progressivement
           streamOnDisplay(displayMsg, true, "INFOS DU JOUR");

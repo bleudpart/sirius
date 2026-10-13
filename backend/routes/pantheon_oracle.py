@@ -10,34 +10,16 @@ from datetime import datetime, timedelta, timezone
 import httpx
 import psutil
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from local_memory import list_service_log, log_service, prime_overview
 from sirius_brain import enrich_briefing, ocr_screen
 
 logger = logging.getLogger(__name__)
 
-# ---- ORACLE DIVIN : prédictions ----
-ASTRO_EVENTS = [
-    {"date": "2026-08-12", "name": "Pluie d'étoiles filantes des Perséides (pic d'activité)"},
-    {"date": "2026-08-28", "name": "Éclipse totale de Lune"},
-    {"date": "2026-09-22", "name": "Équinoxe d'automne"},
-    {"date": "2026-11-14", "name": "Superlune au périgée"},
-    {"date": "2026-12-14", "name": "Pluie d'étoiles filantes des Géminides (pic)"},
-    {"date": "2027-02-06", "name": "Éclipse annulaire de Soleil"},
-    {"date": "2027-03-20", "name": "Équinoxe de printemps"},
-]
-NEWS_POOL = [
-    {"theme": "TECHNOLOGIE", "text": "Accélération de l'IA embarquée sur les assistants personnels", "impact": 84},
-    {"theme": "ESPACE", "text": "Fenêtre de lancement lunaire Artemis en préparation", "impact": 61},
-    {"theme": "FINANCE", "text": "Décision de taux des banques centrales attendue cette semaine", "impact": 77},
-    {"theme": "ÉNERGIE", "text": "Progression des capacités solaires domestiques", "impact": 52},
-    {"theme": "CLIMAT", "text": "Épisode météo notable attendu sur l'Atlantique Nord", "impact": 66},
-    {"theme": "TECHNOLOGIE", "text": "Nouvelle génération de puces neuromorphiques annoncée", "impact": 58},
-    {"theme": "SANTÉ", "text": "Avancées des diagnostics assistés par IA en clinique", "impact": 71},
-    {"theme": "ESPACE", "text": "Activité solaire élevée : aurores possibles aux latitudes moyennes", "impact": 63},
-]
-STOCK_POOL = ["CAC 40", "S&P 500", "NASDAQ", "APPLE", "NVIDIA", "TOTALENERGIES"]
+class BriefingRequest(BaseModel):
+    keys: dict[str, str] = Field(default_factory=dict)
+
 _crypto_cache = {"ts": 0, "data": []}
 _stocks_cache = {"ts": 0, "data": []}
 AV_SYMBOLS = [("AAPL", "APPLE"), ("MSFT", "MICROSOFT"), ("NVDA", "NVIDIA"), ("TSLA", "TESLA")]
@@ -52,7 +34,7 @@ def _moon_phase():
              "PLEINE LUNE", "GIBBEUSE DÉCROISSANTE", "DERNIER QUARTIER", "DERNIER CROISSANT"]
     idx = int(phase * 8 + 0.5) % 8
     illum = round((1 - math.cos(2 * math.pi * phase)) / 2 * 100)
-    return {"name": names[idx], "illumination": illum}
+    return {"name": names[idx], "illumination": illum, "estimated": True}
 
 
 class OcrRequest(BaseModel):
@@ -111,18 +93,18 @@ def make_pantheon_oracle_router(db, rate_ok, require_user):
         def pct(keys):
             return round(sum(v for k, v in intents.items() if any(x in k.lower() for x in keys)) / total_intent * 100)
         return {
-            "activite_cognitive": min(99, 20 + today_events * 4),
-            "charge_memoire": min(99, total_facts * 4 + consults),
+            "activite_cognitive": today_events,
+            "charge_memoire": total_facts,
             "traitement_ms": db_ms,
             "cpu": cpu, "ram": ram, "disque": disk,
             "uptime_h": boot_h,
             "totaux": {"commandes": total_events, "aujourdhui": today_events,
                        "souvenirs": total_facts, "conversations": chats, "consultations": consults},
             "sous_systemes": {
-                "logique": max(8, pct(["calc", "pythagore", "math", "système", "diagnostic"])),
-                "langage": max(8, pct(["conversation", "libre", "question"])),
-                "vision": max(8, pct(["display", "vision", "photo", "image", "carte"])),
-                "intuition": max(8, pct(["suggestion", "briefing", "météo", "musique"])),
+                "logique": pct(["calc", "pythagore", "math", "système", "diagnostic"]),
+                "langage": pct(["conversation", "libre", "question"]),
+                "vision": pct(["display", "vision", "photo", "image", "carte"]),
+                "intuition": pct(["suggestion", "briefing", "météo", "musique"]),
             },
             "intents": [{"name": k, "count": v} for k, v in intents.items()],
         }
@@ -319,7 +301,7 @@ def make_pantheon_oracle_router(db, rate_ok, require_user):
     @router.get("/pantheon/connectivity")
     async def pantheon_connectivity(request: Request):
         await require_user(request, db)
-        services = [{"name": "NOYAU ΣIRIUS", "status": "CONNECTÉ", "latency": 1, "real": True}]
+        services = [{"name": "NOYAU ΣIRIUS", "status": "CONNECTÉ", "latency": None, "real": True}]
         checks = [
             ("MÉTÉO", "https://api.open-meteo.com/v1/forecast?latitude=48.85&longitude=2.35&current=temperature_2m"),
             ("MARCHÉS", "https://api.kraken.com/0/public/Time"),
@@ -330,17 +312,23 @@ def make_pantheon_oracle_router(db, rate_ok, require_user):
                 try:
                     r = await cx.get(url)
                     ok = r.status_code == 200
-                except Exception:
+                except httpx.HTTPError as error:
+                    logger.warning("[CONNECTIVITÉ] %s : %s", name, type(error).__name__)
                     ok = False
                 services.append({"name": name, "status": "CONNECTÉ" if ok else "DÉCONNECTÉ",
                                  "latency": int((time.perf_counter() - t0) * 1000) if ok else None, "real": True})
-        services.append({"name": "ACTUALITÉS", "status": "CONNECTÉ", "latency": 12, "real": False})
+        from briefing_news import fetch_briefing_news
+        sections = (await fetch_briefing_news())["sections"]
+        news_ok = any(section["status"] == "ok" and section["articles"] for section in sections)
+        services.append({"name": "ACTUALITÉS", "status": "CONNECTÉ" if news_ok else "DÉCONNECTÉ",
+                         "latency": None, "real": True})
         gcal_doc = await db.google_calendar.find_one({"_id": "default"})
-        services.append({"name": "GOOGLE CALENDAR", "status": "CONNECTÉ" if gcal_doc else "DÉCONNECTÉ",
-                         "latency": 20 if gcal_doc else None, "real": bool(gcal_doc)})
+        services.append({"name": "GOOGLE CALENDAR", "status": "CONFIGURÉ — NON VÉRIFIÉ" if gcal_doc else "NON CONFIGURÉ",
+                         "latency": None, "real": False})
         for name in ["EMAIL", "WHATSAPP"]:
-            services.append({"name": name, "status": "DÉCONNECTÉ", "latency": None, "real": False})
-        log_service("CONNECTIVITÉ", "Vérification globale des services", "OK")
+            services.append({"name": name, "status": "NON VÉRIFIÉ", "latency": None, "real": False})
+        log_service("CONNECTIVITÉ", "Vérification des services mesurables",
+                    "OK" if all(s["status"] == "CONNECTÉ" for s in services if s["real"]) else "ERREUR")
         return {"services": services}
 
     @router.post("/notify/whatsapp")
@@ -385,13 +373,12 @@ def make_pantheon_oracle_router(db, rate_ok, require_user):
         return {"log": list_service_log(25)}
 
     @router.get("/oracle/overview")
+    @router.post("/oracle/overview")
     async def oracle_overview(request: Request, lat: float = 48.85, lon: float = 2.35, av_key: str = "",
-                              wa_phone: str = "", wa_key: str = "", light: int = 0):
+                              wa_phone: str = "", wa_key: str = "", light: int = 0,
+                              body: BriefingRequest | None = None):
         await require_user(request, db)
-        import random as _rd
         today = datetime.now(timezone.utc).date()
-        seed = int(today.strftime("%Y%m%d"))
-        rd = _rd.Random(seed)
 
         if light:
             # Sonde de vivacité (diagnostic Héphaïstos) : pas d'appels externes ni de LLM
@@ -508,12 +495,7 @@ def make_pantheon_oracle_router(db, rate_ok, require_user):
                     logger.error(f"[ORACLE] alpha vantage: {e}")
                     stocks = []
         if not stocks:
-            stocks = [{"name": s, "change": round(rd.uniform(-2.6, 2.6), 2)} for s in rd.sample(STOCK_POOL, 4)]
-            for s in stocks:
-                s["signal"] = "HAUSSIER" if s["change"] >= 0 else "BAISSIER"
-                s["volatile"] = abs(s["change"]) > 1.8
-
-        news = rd.sample(NEWS_POOL, 4)
+            logger.info("[ORACLE] Aucun cours réel disponible ; marchés signalés indisponibles.")
 
         prime = prime_overview()
         hours = prime["habits"]["hours"]
@@ -530,7 +512,7 @@ def make_pantheon_oracle_router(db, rate_ok, require_user):
         }
 
         moon = _moon_phase()
-        upcoming = [e for e in ASTRO_EVENTS if e["date"] >= today.isoformat()][:4]
+        upcoming = []
 
         # Microsoft 365 : agenda du jour + mails non lus (si le compte est connecté)
         ms_events, ms_unread = [], 0
@@ -572,7 +554,7 @@ def make_pantheon_oracle_router(db, rate_ok, require_user):
             )
         else:
             parts.append("Crypto : données indisponibles pour le moment.")
-        parts.append(f"Ciel : lune {moon['name'].lower()}, illuminée à {moon['illumination']} %.")
+        parts.append(f"Ciel : phase lunaire approximative, {moon['name'].lower()}, illumination estimée à {moon['illumination']} %. Calendrier astronomique vérifié indisponible.")
         if peak_hour is not None:
             parts.append(f"Journée : votre pic d'activité habituel est vers {peak_hour} h, avec une charge prévue {charge.lower()}.")
         else:
@@ -589,6 +571,7 @@ def make_pantheon_oracle_router(db, rate_ok, require_user):
         sports_articles = next(section["articles"] for section in news_sections if section["id"] == "sport")
         live_sport_titles = [article["titre"] for article in sports_articles]
         live_titles = [article["titre"] for section in news_sections for article in section["articles"]]
+        news = [article for section in news_sections for article in section["articles"]]
         parts.append("Actualités par rubrique : " + news_briefing_text(news_sections))
         point_attention = (
             f"la volatilité de {crypto[0]['name']}" if crypto and crypto[0].get("volatile")
@@ -612,7 +595,7 @@ def make_pantheon_oracle_router(db, rate_ok, require_user):
                     "habitudes_utilisateur": personal,
                     "agenda_microsoft": ms_events,
                     "mails_outlook_non_lus": ms_unread,
-                })
+                }, keys=body.keys if body else None)
                 required_sections = ("météo", "march", "crypto", "actualité", "sport", "ciel", "journée", "synthèse")
                 required_sections += tuple(section["label"].lower() for section in news_sections)
                 normalized_enriched = enriched.lower()
@@ -625,7 +608,7 @@ def make_pantheon_oracle_router(db, rate_ok, require_user):
 
         return {"weather": weather, "crypto": crypto, "stocks": stocks, "stocks_live": stocks_live,
                 "news": news, "sports_news": sports_articles, "news_sections": news_sections,
-                "personal": personal, "moon": moon, "astro": upcoming,
+                "personal": personal, "moon": moon, "astro": upcoming, "astro_status": "unavailable",
                 "ms_events": ms_events, "ms_unread": ms_unread,
                 "briefing": briefing_txt, "date": today.isoformat()}
 

@@ -293,7 +293,7 @@ export default function ZeusCortex({ onClose, onAsk, answer }) {
         </div>
         <div className="zcx-spacer" />
         <div className="zcx-metrics">
-          <div className="zcx-hm"><span>CHARGE COGNITIVE</span><b data-testid="zeus-cog">{Math.round(stats?.activite_cognitive ?? 0)} %</b></div>
+          <div className="zcx-hm"><span>COMMANDES DU JOUR</span><b data-testid="zeus-cog">{nf(stats?.totaux?.aujourdhui)}</b></div>
           <div className="zcx-hm"><span>ACCÈS BASE</span><b data-testid="zeus-speed">{stats?.traitement_ms ?? 0} ms</b></div>
           <div className="zcx-hm"><span>DISPONIBILITÉ</span><b>{stats?.uptime_h ?? 0} h</b></div>
         </div>
@@ -309,7 +309,7 @@ export default function ZeusCortex({ onClose, onAsk, answer }) {
         <Kpi label="CONVERSATIONS" value={totals.conversations} delay={170} />
         <Kpi label="CONSULTATIONS" value={totals.consultations} delay={225} />
         <Kpi label="PIC HORAIRE" value={peak.hour ?? 0} suffix=" h" hint={`${nf(peak.count)} commandes`} delay={280} />
-        <Kpi label="CHARGE MÉMOIRE" value={stats?.charge_memoire} suffix=" %" delay={335} />
+        <Kpi label="MÉMOIRE SYSTÈME" value={stats?.ram} suffix=" %" delay={335} />
       </div>
 
       <div className="zcx-row zcx-rA">
