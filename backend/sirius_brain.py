@@ -3,11 +3,13 @@ import os
 import re
 import json
 import hashlib
+import importlib
 import logging
 import time
 from datetime import datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-from openai import AsyncOpenAI, BadRequestError, RateLimitError
+import httpx
+from openai import AsyncOpenAI, BadRequestError, DefaultAsyncHttpxClient, RateLimitError
 from media_intent import parse_media_intent
 from productivite.intent_productivite import parse_productivity_intent
 from provider_access import provider_key, personal_key
@@ -45,6 +47,33 @@ KIMI_REFLECTION_TIMEOUT = 8.0
 client = AsyncOpenAI(api_key=GROQ_API_KEY, base_url=GROQ_LLM_ENDPOINT, max_retries=0) if GROQ_API_KEY else None
 _k3_clients: dict[str, AsyncOpenAI] = {}
 _cerebras_clients: dict[str, AsyncOpenAI] = {}
+_cerebras_transport: httpx.AsyncClient | None = None
+
+
+def cerebras_transport():
+    global _cerebras_transport
+    if _cerebras_transport is None or _cerebras_transport.is_closed:
+        _cerebras_transport = DefaultAsyncHttpxClient(
+            limits=httpx.Limits(max_connections=100, max_keepalive_connections=20, keepalive_expiry=120),
+        )
+    return _cerebras_transport
+
+
+async def warm_cerebras_connection():
+    """Prepare SDK and DNS/TLS without credentials, inference or user content."""
+    await asyncio.to_thread(importlib.import_module, "openai.resources.chat.completions")
+    try:
+        await cerebras_transport().head(f"{CEREBRAS_ENDPOINT}/models", timeout=4.0)
+    except httpx.HTTPError as error:
+        logger.info("[ΣIRIUS:CONNECTION] Préchauffage Cerebras indisponible : %s", type(error).__name__)
+
+
+async def close_cerebras_connections():
+    global _cerebras_transport
+    _cerebras_clients.clear()
+    if _cerebras_transport is not None:
+        await _cerebras_transport.aclose()
+        _cerebras_transport = None
 
 
 def fast_provider(keys=None):
@@ -67,7 +96,10 @@ def fast_client(service, key):
         return AsyncOpenAI(api_key=key, base_url=GROQ_LLM_ENDPOINT, max_retries=0)
     cache_key = hashlib.sha256(key.encode("utf-8")).hexdigest()
     if cache_key not in _cerebras_clients:
-        _cerebras_clients[cache_key] = AsyncOpenAI(api_key=key, base_url=CEREBRAS_ENDPOINT, max_retries=0)
+        _cerebras_clients[cache_key] = AsyncOpenAI(
+            api_key=key, base_url=CEREBRAS_ENDPOINT, max_retries=0,
+            http_client=cerebras_transport(),
+        )
     return _cerebras_clients[cache_key]
 
 

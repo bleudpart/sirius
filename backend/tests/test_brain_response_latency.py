@@ -51,6 +51,52 @@ def test_personal_groq_is_not_replaced_by_owner_cerebras(monkeypatch):
     assert (service, key, endpoint) == ("groq", "personal-groq", brain.GROQ_LLM_ENDPOINT)
 
 
+def test_cerebras_clients_reuse_transport_without_sharing_credentials(monkeypatch):
+    transport = SimpleNamespace(is_closed=False)
+    monkeypatch.setattr(brain, "_cerebras_transport", transport)
+    created = []
+    monkeypatch.setattr(brain, "AsyncOpenAI", lambda **kwargs: created.append(kwargs) or SimpleNamespace())
+    first = brain.fast_client("cerebras", "personal-one")
+    second = brain.fast_client("cerebras", "personal-two")
+    assert first is brain.fast_client("cerebras", "personal-one")
+    assert second is not first
+    assert [item["api_key"] for item in created] == ["personal-one", "personal-two"]
+    assert all(item["http_client"] is transport for item in created)
+
+
+def test_cerebras_warmup_does_not_send_credentials_or_generate_text(monkeypatch):
+    transport = SimpleNamespace(is_closed=False, head=AsyncMock())
+    monkeypatch.setattr(brain, "_cerebras_transport", transport)
+    prepare = AsyncMock()
+    monkeypatch.setattr(brain.asyncio, "to_thread", prepare)
+    asyncio.run(brain.warm_cerebras_connection())
+    prepare.assert_awaited_once_with(brain.importlib.import_module, "openai.resources.chat.completions")
+    transport.head.assert_awaited_once_with(f"{brain.CEREBRAS_ENDPOINT}/models", timeout=4.0)
+
+
+def test_cerebras_transport_keeps_idle_connections_and_closes_on_shutdown(monkeypatch):
+    transport = SimpleNamespace(is_closed=False, aclose=AsyncMock())
+    options = []
+    monkeypatch.setattr(brain, "_cerebras_transport", None)
+    monkeypatch.setattr(brain, "DefaultAsyncHttpxClient", lambda **kwargs: options.append(kwargs) or transport)
+    assert brain.cerebras_transport() is brain.cerebras_transport()
+    assert options[0]["limits"].keepalive_expiry == 120
+    asyncio.run(brain.close_cerebras_connections())
+    transport.aclose.assert_awaited_once()
+    assert brain._cerebras_transport is None
+    assert not brain._cerebras_clients
+
+
+def test_cerebras_warmup_offline_is_logged_without_blocking_chat(monkeypatch, caplog):
+    import httpx
+    transport = SimpleNamespace(is_closed=False, head=AsyncMock(side_effect=httpx.ConnectError("offline")))
+    monkeypatch.setattr(brain, "_cerebras_transport", transport)
+    monkeypatch.setattr(brain.asyncio, "to_thread", AsyncMock())
+    with caplog.at_level("INFO"):
+        asyncio.run(brain.warm_cerebras_connection())
+    assert "Préchauffage Cerebras indisponible : ConnectError" in caplog.text
+
+
 @pytest.mark.parametrize("tokens", [64, 200, 512, 1000, 1200, 2600])
 def test_cerebras_reserves_reasoning_budget_without_changing_groq(tokens):
     assert brain.fast_options("cerebras", tokens)["max_completion_tokens"] == tokens + 2048

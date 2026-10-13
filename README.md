@@ -27,6 +27,15 @@ qui utilisent leurs propres identifiants, pas les index PyAudio.
 
 ### Actualités et affichage Android — 1.0.43
 
+Le SDK est chargé dans un thread de fond avant le premier échange, pour éviter
+ses imports paresseux sur le chemin de réponse. La connexion Cerebras est
+préparée en arrière-plan au démarrage par une requête
+HEAD sans clé ni contenu utilisateur, sans génération facturée. Le transport HTTP
+est réutilisé entre les clients et conserve les connexions inactives jusqu'à
+120 secondes, sous réserve des fermetures du fournisseur. Les clés restent
+propres à chaque requête. Ce préchauffage ne bloque pas le démarrage et ne garantit
+pas le délai de génération du fournisseur ni le délai vocal complet.
+
 Les diagnostics ne présentent plus de latences fixes ni de connexions fictives :
 les actualités sont vérifiées via les sources RSS, et la configuration d'un
 calendrier ne vaut pas preuve de connexion. Alpha Vantage est testé avec la clé

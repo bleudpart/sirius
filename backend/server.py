@@ -142,6 +142,7 @@ _watch_task = None
 _omega_task = None
 _episodic_task = None
 _vector_task = None
+_connection_task = None
 
 
 async def _delayed_background_loop(delay_seconds: float, factory):
@@ -166,7 +167,7 @@ async def _run_vector_warmup_loop_delayed():
 @asynccontextmanager
 async def _lifespan(_app):
     # --- Démarrage ---
-    global _watch_task, _omega_task, _episodic_task, _vector_task, client
+    global _watch_task, _omega_task, _episodic_task, _vector_task, _connection_task, client
     # TestClient et les redémarrages Electron créent plusieurs cycles de vie dans
     # le même processus : Motor ne peut pas être réutilisé après client.close().
     if _DB_MODE != "local":
@@ -185,18 +186,21 @@ async def _lifespan(_app):
     # Mémoire épisodique et vectorisation : imports et boucles décalés après le lancement.
     _episodic_task = asyncio.create_task(_delayed_background_loop(4.0, _run_episodic_loop_delayed))
     _vector_task = asyncio.create_task(_delayed_background_loop(6.0, _run_vector_warmup_loop_delayed))
+    from sirius_brain import warm_cerebras_connection, close_cerebras_connections
+    _connection_task = asyncio.create_task(warm_cerebras_connection())
     # (Stockage 100% local — plus d'initialisation cloud à faire ici.)
     try:
         yield
     finally:
         # --- Arrêt ---
         tasks = []
-        for task in (_watch_task, _omega_task, _episodic_task, _vector_task):
+        for task in (_watch_task, _omega_task, _episodic_task, _vector_task, _connection_task):
             if task:
                 task.cancel()
                 tasks.append(task)
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
+        await close_cerebras_connections()
         client.close()
 
 
