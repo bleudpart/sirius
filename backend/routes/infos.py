@@ -231,12 +231,16 @@ def make_infos_router():
 
     @router.get("/weather/bulletin")
     async def weather_bulletin(city: str = ""):
-        from weather_bulletin import fetch_weather_bulletin
+        from weather_bulletin import WeatherRateLimitedError, fetch_weather_bulletin
         if (not city.strip() or len(city) > 120 or re.search(r"[\x00-\x1f\x7f]", city)
                 or not any(character.isalnum() for character in city)):
             raise HTTPException(status_code=400, detail="Ville météo invalide.")
         try:
             return await fetch_weather_bulletin(city.strip())
+        except WeatherRateLimitedError as error:
+            logger.warning("[METEO BULLETIN] Limite Open-Meteo atteinte depuis le serveur")
+            raise HTTPException(status_code=503, detail="Prévisions météo temporairement limitées par le fournisseur.",
+                                headers={"Retry-After": "60"}) from error
         except (httpx.HTTPError, ValueError, KeyError, TypeError, IndexError) as error:
             logger.warning("[METEO BULLETIN] Source indisponible (%s)", type(error).__name__)
             raise HTTPException(status_code=502, detail="Prévisions météo indisponibles.") from error

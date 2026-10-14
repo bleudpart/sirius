@@ -741,6 +741,38 @@ test("an invalid weather payload is announced as unavailable instead of read", a
   expect(warn).toHaveBeenCalledWith("Météo du bulletin :", expect.any(Error));
 });
 
+test("when the server is rate limited, weather is fetched directly from the device", async () => {
+  localStorage.setItem("sirius_profile", JSON.stringify({ name: "Validation", city: "Lyon" }));
+  mockBulletinBackend();
+  const weather = parisWeather();
+  const raw = {
+    timezone: weather.timezone,
+    current_units: { time: "iso8601", temperature_2m: "°C", apparent_temperature: "°C", weather_code: "wmo code", wind_speed_10m: "km/h" },
+    daily_units: {
+      time: "iso8601", weather_code: "wmo code", temperature_2m_min: "°C", temperature_2m_max: "°C",
+      precipitation_probability_max: "%", wind_speed_10m_max: "km/h",
+    },
+    current: weather.current,
+    daily: Object.fromEntries(["date", "weather_code", "temperature_2m_min", "temperature_2m_max", "precipitation_probability_max", "wind_speed_10m_max"]
+      .map((field) => [field === "date" ? "time" : field, weather.days.map((day) => day[field])])),
+  };
+  const backend = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation((url, options) => {
+    if (String(url).includes("/weather/bulletin")) return Promise.resolve({ ok: false, status: 503, json: async () => ({ detail: "limite" }) });
+    if (String(url).startsWith("https://geocoding-api.open-meteo.com/")) {
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({ results: [{ name: "Lyon", country: "France", latitude: 45.75, longitude: 4.85 }] }) });
+    }
+    if (String(url).startsWith("https://api.open-meteo.com/")) return Promise.resolve({ ok: true, status: 200, json: async () => raw });
+    return backend(url, options);
+  });
+  await mount();
+  await send("les infos");
+  const read = speakSeries.mock.calls.map(([text]) => text).join(" ");
+  expect(read).toContain("Météo à Lyon, France.");
+  expect(read).toContain("18 degrés");
+  expect(read).not.toContain("indisponibles");
+});
+
 test("without a bulletin, repeat and continue stay with the ongoing conversation", async () => {
   const chatBodies = mockBulletinBackend();
   await mount();

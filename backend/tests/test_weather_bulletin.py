@@ -18,6 +18,13 @@ class FixedDateTime(datetime):
         return datetime(2026, 10, 14, 15, 45, tzinfo=timezone.utc).astimezone(tz)
 
 
+@pytest.fixture(autouse=True)
+def empty_weather_cache():
+    weather.clear_weather_cache()
+    yield
+    weather.clear_weather_cache()
+
+
 @pytest.fixture
 def forecast(monkeypatch):
     monkeypatch.setattr(weather, "datetime", FixedDateTime, raising=False)
@@ -311,3 +318,81 @@ def test_huge_numeric_measure_is_rejected_without_overflow(monkeypatch, forecast
     mock_http(monkeypatch, forecast)
     with pytest.raises(ValueError):
         fetch()
+
+
+def mock_sequence(monkeypatch, forecast, forecast_responses):
+    """Géocodage valide ; le forecast renvoie successivement les statuts donnés."""
+    calls = {"geocoding": 0, "forecast": 0}
+    statuses = list(forecast_responses)
+    locations = {"results": [{"name": "Rosny-sous-Bois", "country": "France",
+                              "latitude": 48.87, "longitude": 2.48}]}
+
+    def respond(request):
+        if "geocoding" in request.url.host:
+            calls["geocoding"] += 1
+            return httpx.Response(200, json=locations)
+        calls["forecast"] += 1
+        status, headers = statuses.pop(0) if statuses else (200, {})
+        return httpx.Response(status, headers=headers, json=forecast if status == 200 else {})
+
+    client = httpx.AsyncClient
+    monkeypatch.setattr(weather.httpx, "AsyncClient", lambda **kwargs: client(
+        **kwargs, transport=httpx.MockTransport(respond),
+    ))
+    sleeps = []
+
+    async def no_sleep(delay):
+        sleeps.append(delay)
+
+    monkeypatch.setattr(weather.asyncio, "sleep", no_sleep)
+    return calls, sleeps
+
+
+def test_rate_limit_retries_once_then_succeeds(monkeypatch, forecast):
+    calls, sleeps = mock_sequence(monkeypatch, forecast, [(429, {"Retry-After": "1"}), (200, {})])
+    assert fetch()["current"]["temperature_2m"] == 16.8
+    assert calls["forecast"] == 2 and sleeps == [1.0]
+
+
+def test_persistent_rate_limit_is_503_with_retry_after(monkeypatch, forecast):
+    calls, _ = mock_sequence(monkeypatch, forecast, [(429, {}), (429, {})])
+    response = api_client().get("/api/weather/bulletin", params={"city": "Rosny-sous-Bois"})
+    assert response.status_code == 503
+    assert response.headers["retry-after"] == "60"
+    assert calls["forecast"] == 2
+
+
+def test_long_retry_after_is_not_waited(monkeypatch, forecast):
+    calls, sleeps = mock_sequence(monkeypatch, forecast, [(429, {"Retry-After": "3600"})])
+    with pytest.raises(weather.WeatherRateLimitedError):
+        fetch()
+    assert calls["forecast"] == 1 and sleeps == []
+
+
+def test_cache_avoids_repeated_provider_calls(monkeypatch, forecast):
+    calls, _ = mock_sequence(monkeypatch, forecast, [])
+    first, second = fetch(), fetch("rosny sous bois")
+    assert first == second
+    assert calls == {"geocoding": 1, "forecast": 1}
+
+
+def test_expired_forecast_cache_is_refetched(monkeypatch, forecast):
+    calls, _ = mock_sequence(monkeypatch, forecast, [])
+    clock = [1000.0]
+    monkeypatch.setattr(weather.time, "monotonic", lambda: clock[0])
+    fetch()
+    clock[0] += weather.FORECAST_TTL + 1
+    fetch()
+    assert calls == {"geocoding": 1, "forecast": 2}
+
+
+def test_cached_forecast_that_became_stale_is_refetched(monkeypatch, forecast):
+    calls, _ = mock_sequence(monkeypatch, forecast, [])
+    fetch()
+    cached_key = next(iter(weather._forecast_cache))
+    stale = copy.deepcopy(forecast)
+    stale["current"]["time"] = "2026-10-14T09:00"
+    stamp, ttl, _ = weather._forecast_cache[cached_key]
+    weather._forecast_cache[cached_key] = (stamp, ttl, stale)
+    assert fetch()["current"]["time"] == "2026-10-14T17:45"
+    assert calls["forecast"] == 2

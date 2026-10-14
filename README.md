@@ -170,6 +170,14 @@ probabilité de précipitations. Dates, fuseau, unités et valeurs sont vérifi�
 Ce sont des prévisions modélisées, pas une alerte officielle ; une donnée périmée,
 incomplète ou incohérente est signalée comme indisponible.
 
+Le serveur garde en cache la ville géocodée pendant 24 h et les prévisions
+pendant 20 min. Les prévisions en cache sont revalidées à chaque lecture.
+Si Open-Meteo limite l'adresse IP partagée du serveur (HTTP 429), le serveur
+fait au plus un nouvel essai court, puis répond `503` avec `Retry-After`.
+L'application interroge alors Open-Meteo directement depuis l'appareil, avec la
+même exigence de correspondance exacte de la ville et les mêmes contrôles.
+Une ville introuvable (404) n'est pas relancée.
+
 Le bulletin est lu passage par passage. Pendant la session, « qui a fait quoi ? »
 ou « répète cette info » rappelle le passage réellement annoncé ; « quel temps
 tu as dit ? » rappelle la météo annoncée, sans nouvelle recherche. « Reprends

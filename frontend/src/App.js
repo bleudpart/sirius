@@ -53,6 +53,7 @@ import { streamConversation, requestConversation, requestAssistantIntent, reques
 import { newsBulletinScope } from "./newsCommandRouting";
 import { bulletinFollowUp, createBulletinContext, markSegmentCompleted, markSegmentStarted, releaseBulletinFocus } from "./bulletinDialogue";
 import { buildNewsBulletin, weatherBulletinText } from "./newsBulletin";
+import { fetchWeatherDirect } from "./weatherDirect";
 import { connectStreamingStt } from "@/services/streamingStt";
 import { enabledVoiceVocabulary } from "@/voiceVocabulary";
 import { speakFr, cancelSpeech, speakSeries, speakAsCharacter as speakCharacterVoice, spokenCount, lastSpokenAt } from "@/voice";
@@ -1970,9 +1971,14 @@ function App() {
   const requestBulletinWeather = useCallback((signal) => {
     const city = (profile?.city || "").trim();
     if (!city) return Promise.resolve({ text: "Météo : indiquez votre ville dans le profil pour recevoir des prévisions locales." });
+    const describe = (data) => ({ text: weatherBulletinText(data), source: data.source, url: data.url });
     return requestWeatherBulletin(city, { signal }).then((response) => {
-      if (!response.ok) throw new Error("Prévisions météo indisponibles.");
-      return { text: weatherBulletinText(response.data), source: response.data.source, url: response.data.url };
+      if (response.ok) return describe(response.data);
+      if ([400, 404].includes(response.status)) throw new Error("Ville météo introuvable.");
+      return fetchWeatherDirect(city, { signal }).then(describe);
+    }, (error) => {
+      if (signal.aborted) throw error;
+      return fetchWeatherDirect(city, { signal }).then(describe);
     }).catch((error) => {
       if (!signal.aborted) console.warn("Météo du bulletin :", error);
       return { text: `Météo à ${city} : prévisions indisponibles ou non vérifiables pour le moment.` };
