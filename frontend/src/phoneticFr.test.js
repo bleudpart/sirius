@@ -76,3 +76,12 @@ test("un dictionnaire utilisateur corrompu n'interrompt pas la synthèse", () =>
   localStorage.setItem("sirius_phonetic", "{pas du json");
   expect(applyFrenchPhonetics("Lance un scan")).toBe("Lance un skane");
 });
+
+test("l'adjectif content se prononce « contan », le verbe conter reste intact", () => {
+  expect(applyFrenchPhonetics("Je suis content de te voir.")).toBe("Je suis contant de te voir.");
+  expect(applyFrenchPhonetics("Content de t'entendre ! Ils sont contents.")).toBe("Contant de t'entendre ! Ils sont contants.");
+  expect(applyFrenchPhonetics("Il est mécontent.")).toBe("Il est mécontant.");
+  expect(applyFrenchPhonetics("Ils content une histoire, elles nous content la suite.")).toBe("Ils content une histoire, elles nous content la suite.");
+  expect(applyFrenchPhonetics("Je suis contente et ravie.")).toBe("Je suis contente et ravie.");
+  expect(applyFrenchPhonetics("le contentement")).toBe("le contentement");
+});

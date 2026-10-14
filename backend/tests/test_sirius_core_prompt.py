@@ -70,3 +70,12 @@ def test_system_prompt_matches_the_current_sirius_production_contract():
     assert "ΣIRIUS Display ouvert" in prompt
     assert "MÉMOIRE PERSISTANTE" in prompt
     assert "- Déployer le module HUD" in prompt
+
+
+def test_prompt_lists_real_modules_and_forbids_invented_acronyms():
+    prompt = build_system_prompt()
+    assert "TES MODULES RÉELS" in prompt
+    assert "HÉPHAÏSTOS : Auto-maintenance & diagnostic" in prompt
+    assert "CALLIOPE : Bibliothèque audio" in prompt
+    assert "ne fabrique JAMAIS de définition, d'acronyme" in prompt
+    assert "demande de répéter au lieu d'interpréter" in prompt

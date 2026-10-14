@@ -1075,9 +1075,41 @@ def current_moment_text(tz_name=None, now=None):
     )
 
 
+_MODULE_CATALOG_CACHE = None
+
+
+def module_catalog_text() -> str:
+    """Catalogue réel des modules ΣIRIUS, pour que le modèle ne les invente jamais."""
+    global _MODULE_CATALOG_CACHE
+    if _MODULE_CATALOG_CACHE is None:
+        lines = []
+        try:
+            from modules_api import MYTHOS_CHARACTERS
+            for item in MYTHOS_CHARACTERS:
+                name = str(item.get("module") or "").rstrip("#").strip()
+                character = str(item.get("character") or "").strip()
+                role = str(item.get("role") or "").strip()
+                if name and role:
+                    label = name if character.lower() in name.lower() else f"{name} ({character})"
+                    lines.append(f"- {label} : {role}")
+        except Exception as error:  # le prompt doit rester constructible même sans le catalogue
+            logging.warning("module_catalog_text: catalogue indisponible (%s)", type(error).__name__)
+        _MODULE_CATALOG_CACHE = (
+            "\n\nTES MODULES RÉELS (noms de la mythologie grecque, ce ne sont ni des logiciels tiers ni des acronymes) :\n"
+            + ("\n".join(lines) + "\n" if lines else "")
+            + "Autres modules : Nummarius (finances), Keraunos, Gallery, Files, Outlook, HACCP, News.\n"
+            "RÈGLE ANTI-INVENTION : si on te demande ce qu'est un nom, un module, un sigle ou un terme que tu ne "
+            "connais pas avec certitude (y compris un mot probablement mal transcrit par la reconnaissance vocale), "
+            "ne fabrique JAMAIS de définition, d'acronyme ni de développement de sigle. Dis simplement que tu ne "
+            "le connais pas ou propose le module réel le plus proche (« tu veux dire Prométhée ? »). Si la phrase "
+            "reçue est incohérente (bruit de fond, télévision, autre personne), demande de répéter au lieu d'interpréter."
+        )
+    return _MODULE_CATALOG_CACHE
+
+
 def build_system_prompt(profile=None, memory=None, mode="normal", mood=None, environment=None):
     """Construit le prompt système en tenant compte du profil, de la mémoire, du mode et de l'humeur."""
-    base = SIRIUS_CORE_PROMPT
+    base = SIRIUS_CORE_PROMPT + module_catalog_text()
     environment = environment or {}
 
     base += (

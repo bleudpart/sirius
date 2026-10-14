@@ -77,6 +77,10 @@ const FR_RULES = [
   [/(?<![\p{L}\p{N}_@.+-])(?:e[-\u2010\u2011 ]?)?mail(?![\p{L}\p{N}_@+-]|\.\p{L})/giu, "courriel"],
   // Prénoms étrangers : le « ee » final se lit « é » en français alors qu'il se dit « i ».
   [/(\p{Lu}\p{L}*?)ee\b/gu, "$1i"],
+  // Adjectif « content » : les moteurs le lisent comme le verbe « ils content » (« conte »).
+  // Le verbe est conservé après ils/elles/qui, avec un éventuel pronom complément.
+  [/(?<!(?:^|[^\p{L}])(?:ils|elles|qui)\s+(?:(?:leur|lui|nous|vous|en|y|me|te|se|le|la|les)\s+)?)(?<![\p{L}\p{N}_])(m[ée]c|C|c)ontent(s?)(?![\p{L}\p{N}_])/giu,
+    (_, start, plural) => `${start}ontant${plural}`],
 ];
 
 const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
