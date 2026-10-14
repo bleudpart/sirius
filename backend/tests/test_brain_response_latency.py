@@ -35,7 +35,9 @@ def test_kimi_writes_deep_answers_from_collected_sources(monkeypatch, stream):
     payload = create.call_args.kwargs
     assert payload["model"] == brain.K3_MODEL
     assert payload["max_tokens"] == 2600
-    assert payload["timeout"] == 35.0
+    assert payload["timeout"] == (35.0 if stream else 20.0)
+    assert payload["temperature"] == 0.6
+    assert payload["extra_body"] == {"thinking": {"type": "disabled"}}
     assert "Source vérifiée pour l'analyse." in payload["messages"][0]["content"]
     assert "tu rédiges directement la réponse finale" in payload["messages"][0]["content"]
 
@@ -112,8 +114,8 @@ class Stream:
         return self.chunks()
 
     async def chunks(self):
-        for text in ["La décision utile. ", "Son explication."]:
-            yield SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=text))])
+        for index, text in enumerate(["La décision utile. ", "Son explication."]):
+            yield SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=text), finish_reason="stop" if index else None)])
 
 
 def fake_provider(*, stream=False):
@@ -127,6 +129,168 @@ def fake_provider(*, stream=False):
     provider = SimpleNamespace(chat=SimpleNamespace(completions=completions))
     provider.with_options = lambda **kwargs: provider
     return provider, completions.create
+
+
+def test_first_visible_text_deadline_covers_stream_creation():
+    async def run():
+        provider, create = fake_provider(stream=True)
+        started = asyncio.Event()
+        cancelled = asyncio.Event()
+
+        async def blocked_create(**kwargs):
+            started.set()
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.set()
+
+        create.side_effect = blocked_create
+        with pytest.raises(TimeoutError):
+            await anext(brain._stream_visible_text(provider, {}, first_text_timeout=0.02))
+        assert started.is_set()
+        assert cancelled.is_set()
+
+    asyncio.run(run())
+
+
+def test_reasoning_only_stream_cannot_extend_first_visible_text_deadline():
+    class ReasoningStream:
+        close = AsyncMock()
+
+        def __aiter__(self):
+            return self.chunks()
+
+        async def chunks(self):
+            while True:
+                await asyncio.sleep(0.005)
+                yield SimpleNamespace(choices=[SimpleNamespace(
+                    delta=SimpleNamespace(content=None, reasoning_content="Analyse"), finish_reason=None,
+                )])
+
+    async def run():
+        provider, create = fake_provider(stream=True)
+        stream = ReasoningStream()
+        create.return_value = stream
+        with pytest.raises(TimeoutError):
+            await anext(brain._stream_visible_text(provider, {}, first_text_timeout=0.02))
+        stream.close.assert_awaited_once()
+
+    asyncio.run(run())
+
+
+def test_visible_stream_continues_after_first_text_deadline_and_closes():
+    class SlowStream:
+        close = AsyncMock()
+
+        def __aiter__(self):
+            return self.chunks()
+
+        async def chunks(self):
+            yield SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content="Bonjour."), finish_reason=None)])
+            await asyncio.sleep(0.04)
+            yield SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content="La suite."), finish_reason="stop")])
+
+    async def run():
+        provider, create = fake_provider(stream=True)
+        stream = SlowStream()
+        create.return_value = stream
+        assert [part async for part in brain._stream_visible_text(
+            provider, {}, first_text_timeout=0.02,
+        )] == ["Bonjour.", "La suite."]
+        stream.close.assert_awaited_once()
+
+    asyncio.run(run())
+
+
+def test_truncated_stream_raises_instead_of_confirming_a_partial_answer(monkeypatch):
+    class TruncatedStream:
+        close = AsyncMock()
+
+        def __aiter__(self):
+            return self.chunks()
+
+        async def chunks(self):
+            yield SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content="Selon les données par fr"), finish_reason=None)])
+            yield SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=None), finish_reason="length")])
+
+    provider, create = fake_provider(stream=True)
+    stream = TruncatedStream()
+    create.return_value = stream
+    monkeypatch.setattr(brain, "AsyncOpenAI", lambda **kwargs: provider)
+    parts = []
+
+    async def run():
+        async for part in brain.ask_sirius_stream("Explique cette décision", keys={"groq_key": "fake-groq"}):
+            parts.append(part)
+
+    with pytest.raises(brain.ModelResponseIncompleteError, match="limite"):
+        asyncio.run(run())
+    assert parts == ["Selon les données par fr"]
+    create.assert_awaited_once()
+    stream.close.assert_awaited_once()
+
+
+def test_truncated_kimi_http_answer_falls_back_without_accepting_its_partial_json(monkeypatch):
+    kimi, create = fake_provider()
+    create.return_value.choices[0].finish_reason = "length"
+    fast, fast_create = fake_provider()
+    monkeypatch.setattr(brain, "k3_client", lambda key: kimi)
+    monkeypatch.setattr(brain, "AsyncOpenAI", lambda **kwargs: fast)
+    result = asyncio.run(brain.ask_sirius(
+        "Explique cette décision", mode="profond",
+        keys={"groq_key": "fake-groq", "k3": "fake-kimi"},
+    ))
+    assert result["reponse"] == "La décision utile."
+    create.assert_awaited_once()
+    fast_create.assert_awaited_once()
+
+@pytest.mark.parametrize("finish_reason", [None, "content_filter"])
+def test_stream_without_completion_is_not_accepted(monkeypatch, finish_reason):
+    class IncompleteStream:
+        close = AsyncMock()
+
+        def __aiter__(self):
+            return self.chunks()
+
+        async def chunks(self):
+            yield SimpleNamespace(choices=[SimpleNamespace(
+                delta=SimpleNamespace(content="Début de réponse."), finish_reason=finish_reason,
+            )])
+
+    provider, create = fake_provider(stream=True)
+    stream = IncompleteStream()
+    create.return_value = stream
+    monkeypatch.setattr(brain, "AsyncOpenAI", lambda **kwargs: provider)
+    parts = []
+
+    async def run():
+        async for part in brain.ask_sirius_stream("Explique cette décision", keys={"groq_key": "fake-groq"}):
+            parts.append(part)
+
+    with pytest.raises(RuntimeError, match="confirmation|filtrage"):
+        asyncio.run(run())
+    assert parts == ["Début de réponse."]
+    create.assert_awaited_once()
+    stream.close.assert_awaited_once()
+
+
+def test_first_text_timeout_falls_back_to_fast_provider(monkeypatch, caplog):
+    kimi, kimi_create = fake_provider(stream=True)
+    kimi_create.side_effect = TimeoutError("Premier texte indisponible")
+    fast, fast_create = fake_provider(stream=True)
+    monkeypatch.setattr(brain, "k3_client", lambda key: kimi)
+    monkeypatch.setattr(brain, "AsyncOpenAI", lambda **kwargs: fast)
+
+    async def run():
+        return [part async for part in brain.ask_sirius_stream(
+            "Explique cette décision", mode="profond",
+            keys={"groq_key": "fake-groq", "k3": "fake-kimi"},
+        )]
+
+    assert asyncio.run(run()) == ["La décision utile. ", "Son explication."]
+    kimi_create.assert_awaited_once()
+    fast_create.assert_awaited_once()
+    assert "Premier texte indisponible" in caplog.text
 
 
 @pytest.mark.parametrize("stream", [False, True])
@@ -216,7 +380,7 @@ def test_kimi_deep_answer_uses_history_without_retries(monkeypatch):
     assert "décision utile" in result["reponse"]
     assert options == [{"max_retries": 0}]
     payload = create.call_args.kwargs
-    assert payload["timeout"] == 35.0
+    assert payload["timeout"] == 20.0
     assert payload["max_tokens"] == 2600
     assert {"role": "assistant", "content": "Deux choix : A et B."} in payload["messages"]
     assert "tu rédiges directement la réponse finale" in payload["messages"][0]["content"]
@@ -247,7 +411,7 @@ def test_partial_stream_failure_never_appends_another_model_answer(monkeypatch):
             return self.chunks()
 
         async def chunks(self):
-            yield SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content="Début de réponse."))])
+            yield SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content="Début de réponse."), finish_reason=None)])
             raise RuntimeError("Connection lost")
 
     provider, create = fake_provider(stream=True)

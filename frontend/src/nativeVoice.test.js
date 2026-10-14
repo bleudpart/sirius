@@ -6,6 +6,7 @@ jest.mock("@capacitor-community/text-to-speech", () => ({
     getSupportedVoices: jest.fn(),
     speak: jest.fn(),
     stop: jest.fn(),
+    addListener: jest.fn(),
   },
 }));
 
@@ -18,6 +19,24 @@ beforeEach(() => {
     { lang: "fr-FR", localService: true },
   ] });
   TextToSpeech.speak.mockResolvedValue();
+});
+
+test("reports native word progress and removes its listener after speech", async () => {
+  const remove = jest.fn().mockResolvedValue();
+  let emitRange;
+  TextToSpeech.addListener.mockImplementationOnce(async (event, listener) => {
+    expect(event).toBe("onRangeStart");
+    emitRange = listener;
+    return { remove };
+  });
+  const onprogress = jest.fn();
+  TextToSpeech.speak.mockImplementationOnce(async () => emitRange({ start: 0, end: 7 }));
+  await speakNative("Bonjour Daniel", { onprogress });
+  expect(onprogress).toHaveBeenCalledWith(0.5);
+  expect(remove).toHaveBeenCalledTimes(1);
+  stopNativeSpeech();
+  emitRange({ start: 8, end: 14 });
+  expect(onprogress).toHaveBeenCalledTimes(1);
 });
 
 test("uses a local French voice and finishes callbacks", async () => {

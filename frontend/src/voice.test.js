@@ -96,7 +96,7 @@ test.each(["ton ΣIRIUS Display", "ton Sirius Display", "ton Zirius Display", "l
     const request = global.fetch.mock.calls.find(([url]) => String(url).includes("/tts/gemini"));
     const text = JSON.parse(request[1].body).text;
     expect(text).toContain("ton briefing");
-    expect(text).toContain("dans mon Ziriusse displé");
+    expect(text).toContain("dans mon Siriusse displé");
     expect(text).not.toMatch(/dans ton /);
   }
 );
@@ -138,7 +138,7 @@ test("planning and an uppercase elision remain words on remote and native speech
   speakFr("Voici le PLANNING. L ’ effet est visible dans le ΣIRIUS DISPLAY.");
   await flush();
   const request = global.fetch.mock.calls.find(([url]) => String(url).includes("/tts/gemini"));
-  const expected = "Voici le planigne. l'effet est visible dans mon Ziriusse displé.";
+  const expected = "Voici le planigne. l'effet est visible dans mon Siriusse displé.";
   expect(JSON.parse(request[1].body).text).toBe(expected);
   expect(speakNative.mock.calls[0][0]).toBe(expected);
 });
@@ -198,6 +198,28 @@ test("Gemini WAV plays once and ends once without native fallback", async () => 
   expect(onstart).toHaveBeenCalledTimes(1);
   expect(onend).toHaveBeenCalledTimes(1);
   expect(speakNative).not.toHaveBeenCalled();
+});
+
+test("boot narration reports real audio progress only during current playback", async () => {
+  const audio = {
+    play: jest.fn().mockResolvedValue(), pause: jest.fn(), duration: 8, currentTime: 2,
+  };
+  global.Audio = jest.fn(() => audio);
+  global.fetch.mockResolvedValue({ ok: true, json: async () => ({ audio_base64: "wav-data" }) });
+  const onprogress = jest.fn();
+  speakCinematic("Je suis ΣIRIUS. Je suis prêt à vous accompagner.", { onprogress });
+  await flush();
+  expect(JSON.parse(global.fetch.mock.calls[0][1].body).text).toContain("Je suis Siriusse.");
+  audio.ontimeupdate();
+  expect(onprogress).not.toHaveBeenCalled();
+  audio.onplay();
+  expect(onprogress).toHaveBeenLastCalledWith(0);
+  audio.ontimeupdate();
+  expect(onprogress).toHaveBeenLastCalledWith(0.25);
+  const staleProgress = audio.ontimeupdate;
+  cancelSpeech();
+  staleProgress();
+  expect(onprogress).toHaveBeenCalledTimes(2);
 });
 
 test("cancellation aborts generation and rejects a late response", async () => {

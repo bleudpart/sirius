@@ -37,7 +37,7 @@ const KEY_GUIDE = {
   ],
   groq_key: [
     "Connectez-vous à la console Groq ou créez votre compte.",
-    "Dans API Keys, créez une nouvelle clé nommée « Mon ZIRIUS », puis copiez-la.",
+    "Dans API Keys, créez une nouvelle clé nommée « Mon ΣIRIUS », puis copiez-la.",
   ],
   groq: [
     "Connectez-vous à Moonshot et consultez les tarifs et le crédit disponible.",
@@ -661,7 +661,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
             <AccountServices />
             <details data-testid="setup-api-guide">
               <summary>OBTENIR MES CLÉS API — GUIDE COMPLET PAS À PAS</summary>
-              <p className="setup-note">Il n'existe pas de clé universelle ni de création de toutes les clés en un clic. Chaque fournisseur demande un compte personnel. Conservez Groq pour la transcription vocale et la conversation sans Cerebras ; vous pourrez ajouter votre clé Cerebras plus tard. Les autres services sont facultatifs. La mémoire locale de ZIRIUS ne nécessite pas de clé API.</p>
+              <p className="setup-note">Il n'existe pas de clé universelle ni de création de toutes les clés en un clic. Chaque fournisseur demande un compte personnel. Conservez Groq pour la transcription vocale et la conversation sans Cerebras ; vous pourrez ajouter votre clé Cerebras plus tard. Les autres services sont facultatifs. La mémoire locale de ΣIRIUS ne nécessite pas de clé API.</p>
               <ol>
                 {Object.entries(KEY_META).map(([name, meta]) => (
                   <li key={name} data-testid={`setup-guide-${name}`}>

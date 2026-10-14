@@ -22,13 +22,23 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 let container;
 let root;
 let originalFetch;
-const render = (element) => act(async () => root.render(element));
+let originalRecognition;
+const render = async (element, { paced = true } = {}) => {
+  await act(async () => root.render(element));
+  if (paced) {
+    for (let i = 0; i < 4; i += 1) {
+      await act(async () => jest.advanceTimersByTime(700));
+    }
+  }
+};
 const tap = () => act(() => container.querySelector('[data-testid="boot-screen"]').click());
 
 beforeEach(() => {
   jest.useFakeTimers();
   jest.clearAllMocks();
   originalFetch = global.fetch;
+  originalRecognition = window.SpeechRecognition;
+  window.SpeechRecognition = jest.fn();
   global.fetch = jest.fn().mockResolvedValue({ ok: true });
   readAccountSetup.mockResolvedValue({ services: [] });
   generateBootPresentation.mockResolvedValue("Je suis Sirius. Je vous aide à consulter et comprendre les informations disponibles.");
@@ -42,6 +52,8 @@ afterEach(() => {
   jest.clearAllTimers();
   jest.useRealTimers();
   global.fetch = originalFetch;
+  if (originalRecognition === undefined) delete window.SpeechRecognition;
+  else window.SpeechRecognition = originalRecognition;
 });
 
 test("opens the HUD when loading and narration both finish", async () => {
@@ -105,12 +117,36 @@ test("opening a module and automatic completion cannot hand off twice", async ()
 });
 
 const flush = async (ms) => {
-  await act(async () => {
-    jest.advanceTimersByTime(ms);
-    await Promise.resolve();
-    await Promise.resolve();
-  });
+  let remaining = ms;
+  do {
+    const step = Math.min(remaining, 700);
+    await act(async () => {
+      jest.advanceTimersByTime(step);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    remaining -= step;
+  } while (remaining > 0);
 };
+
+test("four truthful checks are paced over 2.8 seconds without delaying network probes", async () => {
+  const probeBrain = jest.fn().mockResolvedValue(true);
+  await render(<BootScreen onDone={jest.fn()} probeBrain={probeBrain} />, { paced: false });
+  const progress = container.querySelector('[role="progressbar"]');
+  expect(probeBrain).toHaveBeenCalledTimes(1);
+  expect(readAccountSetup).toHaveBeenCalledTimes(1);
+  expect(progress.getAttribute("aria-valuenow")).toBe("0");
+  expect(speakCinematic).not.toHaveBeenCalled();
+  await flush(700);
+  expect(progress.getAttribute("aria-valuenow")).toBe("25");
+  await flush(1400);
+  expect(progress.getAttribute("aria-valuenow")).toBe("75");
+  expect(speakCinematic).not.toHaveBeenCalled();
+  await flush(700);
+  expect(progress.getAttribute("aria-valuenow")).toBe("100");
+  expect(speakCinematic).toHaveBeenCalledTimes(1);
+  expect(container.querySelector('[role="log"]').textContent).toContain("CONNEXION ÉTABLIE");
+});
 
 test("presentation welcomes the user and exposes real loading progress in its dedicated frame", async () => {
   await render(<BootScreen connected userName="Daniel" onDone={jest.fn()} />);
@@ -120,7 +156,7 @@ test("presentation welcomes the user and exposes real loading progress in its de
   expect(container.querySelectorAll(".boot-signature")).toHaveLength(1);
   expect(container.querySelector(".boot-signature").textContent).toBe("ΣIRIUS — Votre intelligence au travail");
   expect(container.querySelector(".boot-tagline").textContent)
-    .toBe("Parlez-lui simplement. Zirius vous répond.");
+    .toBe("Parlez-lui simplement. ΣIRIUS vous répond.");
   expect(container.querySelector(".boot-signature").nextElementSibling.className).toBe("boot-tagline");
   expect(container.querySelector(".boot-welcome-sub")).toBeNull();
   expect(container.textContent).not.toContain("Votre assistant intelligent");
@@ -152,7 +188,7 @@ test("progress waits for real server and service responses rather than elapsed t
   await flush(5000);
   expect(progress.getAttribute("aria-valuenow")).toBe("100");
   expect(container.textContent).toContain("Réponses IA : non configuré");
-  expect(speakCinematic.mock.calls[0][0]).toContain("Bonjour, votre assistant Zirius est prêt à être utilisé.");
+  expect(speakCinematic.mock.calls[0][0]).toContain("Connexion établie. Bonjour. Je suis ΣIRIUS. Je suis prêt à vous accompagner.");
   expect(speakCinematic.mock.calls[0][0]).not.toContain("Réponses IA.");
   expect(generateBootPresentation).not.toHaveBeenCalled();
   expect(container.querySelector('[role="log"]').textContent).toContain("REÇUE");
@@ -161,13 +197,38 @@ test("progress waits for real server and service responses rather than elapsed t
 test("the real welcome message appears progressively at a readable pace", async () => {
   await render(<BootScreen connected onDone={jest.fn()} />);
   const ready = container.querySelector('[data-testid="boot-ready"]');
-  const fullMessage = "Bonjour, votre assistant Zirius est prêt à être utilisé.";
+  const fullMessage = "Connexion établie. Bonjour. Je suis ΣIRIUS. Je suis prêt à vous accompagner.";
   expect(ready.textContent).toBe("");
+  await flush(1000);
+  expect(ready.textContent).toBe("");
+  act(() => speakCinematic.mock.calls[0][1].onstart());
   await flush(320);
   expect(ready.textContent.length).toBeGreaterThan(0);
   expect(ready.textContent.length).toBeLessThan(fullMessage.length);
-  await flush(3000);
+  act(() => speakCinematic.mock.calls[0][1].onprogress(0.5));
+  expect(ready.textContent).toBe(fullMessage.slice(0, Math.floor(fullMessage.length / 2)));
+  await flush(1000);
+  expect(ready.textContent).toBe(fullMessage.slice(0, Math.floor(fullMessage.length / 2)));
+  act(() => speakCinematic.mock.calls[0][1].onprogress(0.2));
+  expect(ready.textContent).toBe(fullMessage.slice(0, Math.floor(fullMessage.length / 2)));
+  act(() => speakCinematic.mock.calls[0][1].onend());
   expect(ready.textContent).toBe(fullMessage);
+});
+
+test("missing microphone API is reported in both displayed and spoken final script", async () => {
+  delete window.SpeechRecognition;
+  await render(<BootScreen onDone={jest.fn()} />);
+  const [message, callbacks] = speakCinematic.mock.calls[0];
+  expect(message).toContain("L'interface vocale est indisponible.");
+  act(() => callbacks.onend());
+  expect(container.querySelector('[data-testid="boot-ready"]').textContent).toBe(message);
+});
+
+test("a voice error reveals the current personalized script rather than the initial checking message", async () => {
+  await render(<BootScreen userName="Daniel" onDone={jest.fn()} />);
+  const [message] = speakCinematic.mock.calls[0];
+  act(() => window.dispatchEvent(new CustomEvent("sirius-voice-error")));
+  expect(container.querySelector('[data-testid="boot-ready"]').textContent).toBe(message);
 });
 
 test("a failed service check is a completed failure, never a successful service", async () => {
@@ -209,7 +270,7 @@ test("retries the brain, then explains the failure instead of opening a dead HUD
   expect(container.querySelector('[data-testid="boot-brain-alert"]')).toBeNull();
   await flush(5000);
   expect(container.querySelector('[data-testid="boot-ready"]').textContent)
-    .toBe("Bonjour, votre assistant Zirius est prêt à être utilisé.");
+    .toBe("Connexion établie. Bonjour. Je suis ΣIRIUS. Je suis prêt à vous accompagner.");
   expect(container.querySelector('[data-testid="boot-screen"]').className).toContain("closing");
   await flush(500);
   expect(onDone).toHaveBeenCalledTimes(1);
@@ -232,7 +293,8 @@ test("a brain that answers late is announced as ready", async () => {
   tap();
   expect(speakCinematic).not.toHaveBeenCalled();
   await flush(2000);
-  expect(speakCinematic.mock.calls[0][0]).toContain("votre assistant Zirius est prêt à être utilisé");
+  await flush(700);
+  expect(speakCinematic.mock.calls[0][0]).toContain("Je suis ΣIRIUS. Je suis prêt à vous accompagner.");
 });
 
 test("an offline screen does not label completed speech as a stuck reader", async () => {
@@ -254,7 +316,7 @@ test("announces a short personalized welcome without reading every service or ge
   const onDone = jest.fn();
   await render(<BootScreen connected userName="Daniel" onDone={onDone} />);
   const [message, callbacks] = speakCinematic.mock.calls[0];
-  expect(message).toContain("Bonjour Daniel, votre assistant Zirius est prêt à être utilisé.");
+  expect(message).toBe("Connexion établie. Bonjour Daniel. Je suis ΣIRIUS. Je suis prêt à vous accompagner.");
   expect(message).not.toContain("fournisseur non testé");
   expect(message).not.toContain("Interface Sirius.");
   expect(message.split(/\s+/).length).toBeLessThanOrEqual(30);

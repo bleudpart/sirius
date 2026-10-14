@@ -170,8 +170,8 @@ export default function PublicStore() {
       <div className="public-showcase">
       <section className="public-hero">
         <p className="public-eyebrow">ΣIRIUS, conçue pour vous</p>
-        <h1>Zirius, sans prompts compliqués : <em>parlez-lui, Il s'occupe de vos tâches.</em></h1>
-        <p className="public-value">Conçu pour tous ceux qui ne sont pas à l'aise avec l'IA, Zirius vous aide : vous écoute, vous répond, exécute vos demandes et surveille vos tâches. Parlez-lui naturellement, sans avoir à rédiger de prompts compliqués.</p>
+        <h1>ΣIRIUS, sans prompts compliqués : <em>parlez-lui, Il s'occupe de vos tâches.</em></h1>
+        <p className="public-value">Conçu pour tous ceux qui ne sont pas à l'aise avec l'IA, ΣIRIUS vous aide : vous écoute, vous répond, exécute vos demandes et surveille vos tâches. Parlez-lui naturellement, sans avoir à rédiger de prompts compliqués.</p>
         <p className="public-trial-highlight">15 jours d'essai gratuit des services IA dès votre première connexion.</p>
         <div className="public-benefits"><span>Demandes naturelles</span><span>Réponses rapides</span><span>Plusieurs tâches, un espace</span><span>Suivi des dossiers</span></div>
         <div className="public-hero-actions"><a className="public-primary-cta" href="#offres">Découvrir les offres <ArrowRight size={17} /></a><a className="public-secondary-cta" href="#matrice-demo">Explorer l'interface <ArrowRight size={17} /></a></div>
@@ -333,7 +333,7 @@ export default function PublicStore() {
         </div>
       </section>
       <footer className="public-footer">
-        <p className="public-slogan">ZIRIUS travaille pour vous.</p>
+        <p className="public-slogan">ΣIRIUS travaille pour vous.</p>
         <p className="public-footer-secure"><ShieldCheck size={13} /> Paiement via Stripe ou PayPal</p>
         © 2026 ΣIRIUS par Daniel Partel · <a href="/mentions-legales">Mentions légales</a> · <a href="/conditions-generales">Conditions générales</a> · <a href="/confidentialite.html">Confidentialité</a> · <a href="/suppression-compte.html">Suppression du compte</a>
       </footer>

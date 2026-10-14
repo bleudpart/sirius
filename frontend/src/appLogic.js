@@ -13,7 +13,7 @@ export const STATES = {
 };
 
 // Réponses locales instantanées (heure / date exactes uniquement)
-export const CLOUD_RETRY_MSG = "Mon cerveau cloud est momentanément injoignable. Je n'ai exécuté aucune action distante. Réessaie dans un instant.";
+export const CLOUD_RETRY_MSG = "Le service IA n'a pas répondu. Je n'ai exécuté aucune action distante. Réessaie dans un instant.";
 
 export const isLocalTimeQuestion = (command) => {
   const normalized = String(command || "")

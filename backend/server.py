@@ -50,6 +50,7 @@ from sirius_brain import (
     detect_autonomous_action,
     detect_urgency,
     technical_video_comment,
+    ModelResponseIncompleteError,
 )
 
 # 2. Configuration des logs
@@ -587,10 +588,18 @@ async def chat_stream(req: ChatRequest, request: Request):
                 "key_source": k3_source()
             }
             yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
+        except ModelResponseIncompleteError as e:
+            logger.warning("[CHAT FLUX] Réponse tronquée : %s", e)
+            yield "data: " + json.dumps({
+                "type": "error", "code": "model_output_limit",
+                "message": "La réponse a été coupée par la limite du modèle. Une réponse complète est nécessaire.",
+            }, ensure_ascii=False) + "\n\n"
         except Exception as e:
             logger.error(f"[CHAT FLUX] Erreur: {e}")
-            yield "data: " + json.dumps({"type": "done", "answer": f"Erreur cerveau : {e}",
-                                        "used_search": False, "memories": [], "popups": []}, ensure_ascii=False) + "\n\n"
+            yield "data: " + json.dumps({
+                "type": "error", "code": "generation_failed",
+                "message": "Le service IA a interrompu la réponse.",
+            }, ensure_ascii=False) + "\n\n"
 
     return StreamingResponse(gen(), media_type="text/event-stream",
                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})

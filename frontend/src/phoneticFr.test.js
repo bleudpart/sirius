@@ -44,6 +44,8 @@ test("francise les anglicismes sous toutes leurs formes", () => {
 test("corrige les noms propres mal prononcés", () => {
   expect(applyFrenchPhonetics("Roger Partel")).toBe("Rojé Partel");
   expect(applyFrenchPhonetics("Sirius est prêt")).toBe("Siriusse est prêt");
+  expect(applyFrenchPhonetics("Sirius Display")).toBe("Siriusse displé");
+  expect(applyFrenchPhonetics("Zirius Display")).toBe("Siriusse displé");
 });
 
 test.each(["PLUTOS", "Plutos", "plutos"])("prononce le nom %s comme un mot, pas un sigle", (name) => {

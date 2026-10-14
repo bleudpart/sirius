@@ -324,6 +324,31 @@ def test_google_tts_validation_rejects_long_but_invalid_key(server_api, monkeypa
     assert "private key detail" not in response.text
 
 
+@pytest.mark.parametrize("limited", [True, False])
+def test_failed_stream_sends_an_error_without_success_or_saving_partial_history(server_api, monkeypatch, limited):
+    import sirius_brain
+    client, user, server = server_api
+
+    async def memory(*args):
+        return []
+
+    async def stream(**kwargs):
+        yield "Réponse partielle"
+        if limited:
+            raise sirius_brain.ModelResponseIncompleteError("limite")
+        raise RuntimeError("private provider failure")
+
+    monkeypatch.setattr(server, "_gather_memory_context", memory)
+    monkeypatch.setattr(sirius_brain, "ask_sirius_stream", stream)
+    response = client.post("/api/chat/stream", json={"text": "bonjour", "keys": {"groq_key": "fake"}, "session_id": "partial"})
+    assert response.status_code == 200
+    assert '"type": "error"' in response.text
+    assert '"type": "done"' not in response.text
+    assert "private provider failure" not in response.text
+    assert ("model_output_limit" in response.text) is limited
+    assert asyncio.run(server.db.sirius_chats.find_one({"session_id": f"{user['user_id']}:partial"})) is None
+
+
 @pytest.mark.parametrize("provider, key_name", [("groq", "groq_key"), ("cerebras", "cerebras")])
 def test_real_chat_intent_and_stream_routes_bind_personal_scope(server_api, monkeypatch, provider, key_name):
     import sirius_brain

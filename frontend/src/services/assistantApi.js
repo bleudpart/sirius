@@ -7,7 +7,20 @@ export const ASSISTANT_TIMEOUTS = Object.freeze({
   conversation: 30000,
   intent: 12000,
   transcription: 30000,
+  news: 12000,
 });
+
+export function requestNewsBriefing({ signal }) {
+  return withBackendResponse("/news/briefing", { method: "GET" }, readJson, {
+    signal, timeoutMs: ASSISTANT_TIMEOUTS.news,
+  });
+}
+
+export function requestWeatherBulletin(city, { signal }) {
+  return withBackendResponse(`/weather/bulletin?city=${encodeURIComponent(city)}`, { method: "GET" }, readJson, {
+    signal, timeoutMs: ASSISTANT_TIMEOUTS.news,
+  });
+}
 
 const jsonPost = (body) => ({
   method: "POST",

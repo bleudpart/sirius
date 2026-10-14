@@ -207,7 +207,7 @@ test("services tab distinguishes the trial from a personal encrypted vault", asy
     expect(guide).not.toBeNull();
     expect(guide.querySelectorAll('a[href^="https://"]')).toHaveLength(9);
     expect(guide.querySelectorAll('[data-testid^="setup-guide-"]')).toHaveLength(9);
-    expect(guide.textContent).toContain("La mémoire locale de ZIRIUS ne nécessite pas de clé API");
+    expect(guide.textContent).toContain("La mémoire locale de ΣIRIUS ne nécessite pas de clé API");
     expect(guide.textContent).toContain("Enregistrer vos clés");
     expect(guide.textContent).toContain("Maps JavaScript API");
     expect(guide.textContent).toContain("Cloud Text-to-Speech API");

@@ -182,6 +182,17 @@ test("the HUD no longer mounts the next-actions pill", async () => {
   expect(host.querySelector(".shud-next")).toBeNull();
 });
 
+test("the HUD places the colleague subtitle before the Sigma-branded tagline", async () => {
+  await mount();
+  const welcome = host.querySelector(".workspace-welcome");
+  const colleague = host.querySelector(".sirius-colleague");
+  const tagline = host.querySelector(".sirius-tagline");
+  expect(welcome.nextElementSibling).toBe(colleague);
+  expect(colleague.textContent).toBe("LE COLLÈGUE SUR QUI VOUS POUVEZ COMPTER");
+  expect(colleague.nextElementSibling).toBe(tagline);
+  expect(tagline.textContent).toBe("Parlez-lui simplement. ΣIRIUS vous répond.");
+});
+
 test("the desktop workspace connects to existing wheels, settings, dossiers and personal voice", async () => {
   await mount();
   const nav = host.querySelector('[data-testid="workspace-navigation"]');
@@ -403,6 +414,55 @@ test("an incomplete stream recovers the full answer in the same display instead 
   expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/chat"))).toHaveLength(1);
 });
 
+test("a deep stream timeout uses fast HTTP fallback without changing the saved mode", async () => {
+  localStorage.setItem("sirius_ia_mode", "profond");
+  const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+  const original = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation((url, options) => {
+    if (String(url).endsWith("/chat/stream")) {
+      return new Promise((resolve, reject) => {
+        options.signal.addEventListener("abort", () => reject(new DOMException("Délai dépassé", "AbortError")));
+      });
+    }
+    if (String(url).endsWith("/chat")) {
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({ answer: "Réponse rapide de secours." }) });
+    }
+    return original(url, options);
+  });
+  await mount();
+  await send("Explique le ciel bleu");
+  await act(async () => jest.advanceTimersByTime(60000));
+  const stream = global.fetch.mock.calls.find(([url]) => String(url).endsWith("/chat/stream"));
+  const fallback = global.fetch.mock.calls.find(([url]) => String(url).endsWith("/chat"));
+  expect(JSON.parse(stream[1].body).ia_mode).toBe("profond");
+  expect(JSON.parse(fallback[1].body)).toEqual(expect.objectContaining({ mode: "normal", ia_mode: "jarvis" }));
+  expect(localStorage.getItem("sirius_ia_mode")).toBe("profond");
+  expect(warn).toHaveBeenCalled();
+  await act(async () => jest.advanceTimersByTime(2500));
+  expect(host.querySelector('[data-testid="sirius-display-body"]').textContent).toContain("Réponse rapide de secours.");
+});
+
+test("a truncated deep answer is replaced by a complete fast answer in the same display", async () => {
+  localStorage.setItem("sirius_ia_mode", "profond");
+  jest.spyOn(console, "warn").mockImplementation(() => {});
+  mockConversationStream([
+    { type: "delta", text: "Selon les données par fr" },
+    { type: "error", code: "model_output_limit", message: "Limite de génération" },
+  ]);
+  const streamFetch = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation((url, options) => String(url).endsWith("/chat")
+    ? Promise.resolve({ ok: true, status: 200, json: async () => ({ answer: "Réponse complète de secours." }) })
+    : streamFetch(url, options));
+  await mount();
+  await send("Explique le ciel bleu");
+  await act(async () => jest.advanceTimersByTime(3000));
+  const fallback = global.fetch.mock.calls.find(([url]) => String(url).endsWith("/chat"));
+  expect(JSON.parse(fallback[1].body)).toEqual(expect.objectContaining({ mode: "normal", ia_mode: "jarvis" }));
+  expect(host.querySelectorAll('[data-testid="sirius-display"]')).toHaveLength(1);
+  expect(host.querySelector('[data-testid="sirius-display-body"]').textContent).toBe("Réponse complète de secours.");
+  expect(cancelSpeech).toHaveBeenCalled();
+});
+
 test("SSE accepts CRLF and a final done event without a trailing blank line", async () => {
   const reader = {
     read: jest.fn()
@@ -514,17 +574,196 @@ test.each([
   expect(global.fetch.mock.calls.some(([url]) => /\/(?:intent|chat)(?:\/stream)?$/.test(String(url)))).toBe(false);
 });
 
-test.each(["les infos", "les actualités"])("%s uses the structured daily briefing", async (command) => {
+test.each(["les infos", "les actualités", "Donne-moi toutes les infos du jour"])("%s uses dated France and international sources without a model call", async (command) => {
   const fallback = global.fetch.getMockImplementation();
-  global.fetch.mockImplementation((url, options) => String(url).endsWith("/oracle/overview")
-    ? Promise.resolve({ ok: true, json: async () => ({ briefing: "Actualités structurées par rubrique." }) })
+  const date = new Date().toISOString();
+  const sections = [
+    { id: "france", label: "France", status: "ok", articles: [{ titre: "Information française", source: "Franceinfo", date, url: "https://www.franceinfo.fr/france/article.html", description: "Les faits établis. Une phrase coup" }] },
+    { id: "monde", label: "International", status: "ok", articles: [{ titre: "Information internationale", source: "Franceinfo", date, url: "https://www.franceinfo.fr/monde/article.html" }] },
+    { id: "sport", label: "Sport", status: "ok", articles: [{ titre: "Résultat sportif", source: "Franceinfo", date, url: "https://www.franceinfo.fr/sport/article.html" }] },
+    { id: "sante", label: "Santé", status: "unavailable", articles: [] },
+  ];
+  global.fetch.mockImplementation((url, options) => String(url).endsWith("/news/briefing")
+    ? Promise.resolve({ ok: true, status: 200, json: async () => ({ sections }) })
     : fallback(url, options));
   await mount();
   await send(command);
-  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/oracle/overview"))).toBe(true);
+  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/news/briefing"))).toBe(true);
   expect(global.fetch.mock.calls.some(([url]) => String(url).includes("/news/headlines"))).toBe(false);
+  expect(global.fetch.mock.calls.some(([url]) => /\/(?:intent|chat|oracle\/overview)(?:\/stream)?$/.test(String(url)))).toBe(false);
   expect(host.querySelector('[data-testid="sirius-display"]')).not.toBeNull();
-  expect(speakFr.mock.calls.some(([message]) => message.includes("Actualités structurées par rubrique."))).toBe(true);
+  const message = speakSeries.mock.calls.map(([text]) => text).join(" ");
+  expect(message).toContain("Information française");
+  expect(message).toContain("Information internationale");
+  expect(message).toContain("Résultat sportif");
+  expect(message).toContain("Santé : source temporairement indisponible.");
+  expect(message).toContain("publié aujourd'hui à");
+  expect(message).not.toContain("Une phrase coup");
+  expect(localStorage.getItem("sirius_last_briefing_context")).toContain("Information internationale");
+});
+
+test.each([
+  ["Donne-moi les infos du jour en France.", "france", "Information internationale"],
+  ["les actualités internationales", "monde", "Information française"],
+])("%s preserves the requested news scope and rejects stale facts", async (command, id, excluded) => {
+  const fallback = global.fetch.getMockImplementation();
+  const recent = { source: "Franceinfo", date: new Date().toISOString(), description: "Faits datés." };
+  const sections = [
+    { id: "france", label: "France", status: "ok", articles: [{ ...recent, titre: "Information française", url: "https://www.franceinfo.fr/france/one" }] },
+    { id: "monde", label: "International", status: "ok", articles: [{ ...recent, titre: "Information internationale", url: "https://www.franceinfo.fr/monde/two" }] },
+  ];
+  sections.find((section) => section.id === id).articles.push({ ...recent, titre: "Titre périmé", url: "https://www.franceinfo.fr/old", date: new Date(Date.now() - 72 * 3600000).toISOString() });
+  global.fetch.mockImplementation((url, options) => String(url).endsWith("/news/briefing")
+    ? Promise.resolve({ ok: true, status: 200, json: async () => ({ sections }) })
+    : fallback(url, options));
+  await mount();
+  await send(command);
+  const message = speakSeries.mock.calls.map(([text]) => text).join(" ");
+  expect(message).not.toContain(excluded);
+  expect(message).not.toContain("Titre périmé");
+  expect(global.fetch.mock.calls.some(([url]) => /\/chat(?:\/stream)?$/.test(String(url)))).toBe(false);
+});
+
+function parisWeather() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(new Date());
+  const get = (type) => parts.find((part) => part.type === type).value;
+  const today = `${get("year")}-${get("month")}-${get("day")}`;
+  const tomorrow = new Date(Date.parse(`${today}T00:00:00Z`) + 86400000).toISOString().slice(0, 10);
+  return {
+    city: "Lyon", country: "France", source: "Open-Meteo", url: "https://open-meteo.com/", timezone: "Europe/Paris",
+    current: { time: `${today}T${get("hour")}:${get("minute")}`, temperature_2m: 18, apparent_temperature: 17, weather_code: 61, wind_speed_10m: 12 },
+    days: [
+      { date: today, weather_code: 61, temperature_2m_min: 12, temperature_2m_max: 19, precipitation_probability_max: 80, wind_speed_10m_max: 22 },
+      { date: tomorrow, weather_code: 0, temperature_2m_min: 10, temperature_2m_max: 20, precipitation_probability_max: 10, wind_speed_10m_max: 15 },
+    ],
+  };
+}
+
+function mockBulletinBackend({ weather = parisWeather() } = {}) {
+  const fallback = global.fetch.getMockImplementation();
+  const date = new Date().toISOString();
+  const sections = [
+    { id: "france", label: "France", status: "ok", articles: [{ titre: "Le maire annonce une décision", source: "Franceinfo", date, url: "https://www.franceinfo.fr/france/maire.html" }] },
+    { id: "monde", label: "International", status: "ok", articles: [{ titre: "Le parlement adopte le texte", source: "Franceinfo", date, url: "https://www.franceinfo.fr/monde/parlement.html" }] },
+  ];
+  const chatBodies = [];
+  global.fetch.mockImplementation((url, options) => {
+    if (String(url).endsWith("/news/briefing")) return Promise.resolve({ ok: true, status: 200, json: async () => ({ sections }) });
+    if (String(url).includes("/weather/bulletin")) return Promise.resolve({ ok: true, status: 200, json: async () => weather });
+    if (String(url).endsWith("/chat/stream")) return Promise.resolve({ ok: false });
+    if (String(url).endsWith("/chat")) {
+      chatBodies.push(JSON.parse(options.body).text);
+      return Promise.resolve({ ok: true, json: async () => ({ answer: "Réponse contextuelle." }) });
+    }
+    return fallback(url, options);
+  });
+  return chatBodies;
+}
+
+const lastSpoken = () => speakFr.mock.calls.at(-1)?.[0] || "";
+const newsFetches = () => global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/news/briefing")).length;
+
+test("the bulletin dialogue recalls what was really announced, resumes, and contextualises questions", async () => {
+  localStorage.setItem("sirius_profile", JSON.stringify({ name: "Validation", city: "Lyon" }));
+  const chatBodies = mockBulletinBackend();
+  speakSeries.mockImplementation((text, options) => {
+    options?.onstart?.();
+    return text.includes("Le parlement") ? new Promise(() => {}) : Promise.resolve();
+  });
+  await mount();
+  await send("les infos");
+  expect(global.fetch.mock.calls.find(([url]) => String(url).includes("/weather/bulletin"))[0]).toContain("city=Lyon");
+  const read = speakSeries.mock.calls.map(([text]) => text).join(" ");
+  expect(read).toContain("Météo à Lyon, France.");
+  expect(read).toContain("probabilité maximale de précipitations 80 pour cent");
+  expect(read).toContain("International : Le parlement adopte le texte.");
+  for (let i = 0; i < 30; i += 1) await act(async () => { jest.advanceTimersByTime(5000); });
+  expect(host.querySelector('[data-testid="sirius-display-body"]').textContent).toContain("Météo (Open-Meteo) : https://open-meteo.com/");
+
+  await send("qui a fait quoi ?");
+  expect(lastSpoken()).toContain("Voici ce que j'ai annoncé : International : Le parlement adopte le texte.");
+  expect(lastSpoken()).not.toContain("maire");
+  expect(cancelSpeech).toHaveBeenCalled();
+
+  await send("quel temps tu a dis ?");
+  expect(lastSpoken()).toContain("Météo à Lyon, France.");
+
+  speakSeries.mockClear();
+  await send("reprends");
+  expect(speakSeries.mock.calls[0][0]).toContain("International : Le parlement adopte le texte.");
+
+  await send("Pourquoi le parlement a adopté ce texte ?");
+  expect(chatBodies.at(-1)).toContain("Passage en cours : International : Le parlement adopte le texte.");
+  expect(chatBodies.at(-1)).toContain("N'invente aucun fait");
+
+  await send("répète");
+  expect(chatBodies.at(-1)).toBe("répète");
+  expect(newsFetches()).toBe(1);
+});
+
+test("a late callback from an interrupted bulletin cannot move the announced position", async () => {
+  mockBulletinBackend();
+  let staleStart;
+  speakSeries.mockImplementation((text, options) => {
+    if (text.includes("Le maire")) {
+      options.onstart();
+      return new Promise(() => {});
+    }
+    if (text.includes("Le parlement")) staleStart = options.onstart;
+    options?.onstart?.();
+    return Promise.resolve();
+  });
+  await mount();
+  await send("les infos");
+  await send("qui a fait quoi");
+  expect(lastSpoken()).toContain("France : Le maire annonce une décision.");
+  expect(staleStart).toBeUndefined();
+  speakSeries.mockClear();
+  await send("continue");
+  expect(speakSeries.mock.calls[0][0]).toContain("France : Le maire annonce une décision.");
+  expect(speakSeries.mock.calls.some(([text]) => text.includes("Le parlement"))).toBe(false);
+});
+
+test("an invalid weather payload is announced as unavailable instead of read", async () => {
+  localStorage.setItem("sirius_profile", JSON.stringify({ name: "Validation", city: "Lyon" }));
+  const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+  const weather = parisWeather();
+  weather.days[0].precipitation_probability_max = 180;
+  mockBulletinBackend({ weather });
+  await mount();
+  await send("les infos");
+  const read = speakSeries.mock.calls.map(([text]) => text).join(" ");
+  expect(read).toContain("Météo à Lyon : prévisions indisponibles ou non vérifiables pour le moment.");
+  expect(read).not.toContain("180");
+  expect(read).toContain("Le parlement adopte le texte.");
+  expect(warn).toHaveBeenCalledWith("Météo du bulletin :", expect.any(Error));
+});
+
+test("without a bulletin, repeat and continue stay with the ongoing conversation", async () => {
+  const chatBodies = mockBulletinBackend();
+  await mount();
+  await send("répète");
+  await send("continue");
+  expect(chatBodies).toEqual(["répète", "continue"]);
+  expect(speakFr.mock.calls.some(([text]) => text.includes("pas de bulletin récent"))).toBe(false);
+  await send("qui a fait quoi ?");
+  expect(lastSpoken()).toContain("pas de bulletin récent");
+  expect(newsFetches()).toBe(0);
+});
+
+test("unavailable news does not invent facts or call an ungrounded model", async () => {
+  const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+  const fallback = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation((url, options) => String(url).endsWith("/news/briefing")
+    ? Promise.resolve({ ok: false, status: 503, json: async () => ({ detail: "Source indisponible" }) })
+    : fallback(url, options));
+  await mount();
+  await send("les infos");
+  expect(speakFr.mock.calls.at(-1)[0]).toContain("ne peuvent pas être vérifiées");
+  expect(warn).toHaveBeenCalled();
+  expect(global.fetch.mock.calls.some(([url]) => /\/chat(?:\/stream)?$/.test(String(url)))).toBe(false);
 });
 
 test("a topic-specific news request uses deep research instead of headlines", async () => {

@@ -1,5 +1,5 @@
 # © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
-"""Infos externes : actualités (NewsAPI), météo (OpenWeatherMap), fiches pays,
+"""Infos externes : actualités (NewsAPI), météo (OpenWeatherMap/Open-Meteo), fiches pays,
 bulletin tech Hacker News, mini-documentaire multi-sources et recherche Europeana."""
 
 import logging
@@ -228,6 +228,20 @@ def make_infos_router():
             "tmin": round(m.get("temp_min", 0)),
             "tmax": round(m.get("temp_max", 0)),
         }
+
+    @router.get("/weather/bulletin")
+    async def weather_bulletin(city: str = ""):
+        from weather_bulletin import fetch_weather_bulletin
+        if (not city.strip() or len(city) > 120 or re.search(r"[\x00-\x1f\x7f]", city)
+                or not any(character.isalnum() for character in city)):
+            raise HTTPException(status_code=400, detail="Ville météo invalide.")
+        try:
+            return await fetch_weather_bulletin(city.strip())
+        except (httpx.HTTPError, ValueError, KeyError, TypeError, IndexError) as error:
+            logger.warning("[METEO BULLETIN] Source indisponible (%s)", type(error).__name__)
+            raise HTTPException(status_code=502, detail="Prévisions météo indisponibles.") from error
+        except LookupError as error:
+            raise HTTPException(status_code=404, detail="Ville introuvable.") from error
 
     @router.get("/country")
     async def country_info(name: str):

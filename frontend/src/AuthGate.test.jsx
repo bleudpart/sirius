@@ -2,7 +2,32 @@ import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import AuthGate, { ProfilePanel } from "./AuthGate";
 
+jest.mock("./components/ReactorVisuals", () => ({
+  CoreRings: () => null,
+  ReactorCore: () => null,
+}));
+
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+
+test("the login tagline uses the Sigma brand", async () => {
+  const originalFetch = global.fetch;
+  const originalWindowFetch = window.fetch;
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  const fetch = jest.fn().mockResolvedValue({ ok: false, status: 401 });
+  global.fetch = fetch;
+  window.fetch = fetch;
+  try {
+    await act(async () => root.render(<AuthGate><div>HUD</div></AuthGate>));
+    expect(container.querySelector(".auth-title").textContent).toBe("ΣIRIUS");
+    expect(container.querySelector(".auth-tagline").textContent).toBe("Parlez-lui simplement. ΣIRIUS vous répond.");
+  } finally {
+    await act(async () => root.unmount());
+    global.fetch = originalFetch;
+    window.fetch = originalWindowFetch;
+    container.remove();
+  }
+});
 
 test("the owner admin chip shows the complete name", async () => {
   const originalFetch = global.fetch;

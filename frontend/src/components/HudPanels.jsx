@@ -555,22 +555,31 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
         || (typeof window.MediaRecorder !== "undefined" && !!navigator.mediaDevices?.getUserMedia));
     return [
       { label: "Interface ΣIRIUS", state: true, success: "Initialisée", scope: "Initialisation de l'interface." },
-      { label: "Serveur ΣIRIUS", state: brain === null ? null : brain === true, success: "Joignable", scope: "Joignabilité du serveur ; modèle et services externes non testés." },
+      { label: "Connexion au serveur", state: brain === null ? null : brain === true, success: "Connexion établie", scope: "Joignabilité du serveur ; modèle et services externes non testés." },
       { label: "Configuration des services", state: !servicesDone ? null : services !== null, success: "Reçue", scope: servicesError || "Configuration reçue du serveur ; fournisseurs non testés." },
-      { label: "API de lecture audio", state: speech, success: "Présente", scope: "API présente ; synthèse et sortie audible non vérifiées par ce contrôle." },
-      { label: "API de capture micro", state: recog, success: "Présente", scope: "API présente ; permission, capture et qualité audio non vérifiées par ce contrôle." },
+      { label: "Interface vocale", state: speech && recog, success: "API disponibles", scope: "API audio et micro présentes ; permissions, capture et sortie audible non vérifiées par ce contrôle." },
     ];
   }, [brain, servicesDone, services, servicesError]);
 
-  const lines = useMemo(() => checks.map((c) => ({
+  const [verifiedCount, setVerifiedCount] = useState(0);
+  useEffect(() => {
+    setVerifiedCount(0);
+  }, [brainRun]);
+  useEffect(() => {
+    if (verifiedCount >= checks.length || checks[verifiedCount].state === null) return undefined;
+    const timer = setTimeout(() => setVerifiedCount((count) => count + 1), 700);
+    return () => clearTimeout(timer);
+  }, [checks, verifiedCount]);
+  const lines = useMemo(() => checks.map((c, index) => ({
     label: c.label,
-    status: c.state === null ? "EN COURS" : c.state ? c.success.toUpperCase() : "INDISPONIBLE",
-    tone: c.state === null ? "pending" : c.state ? "ok" : "fail",
-  })), [checks]);
-  const progress = Math.round(checks.filter(({ state }) => state !== null).length / checks.length * 100);
+    status: index >= verifiedCount ? index === verifiedCount ? "VÉRIFICATION…" : "EN ATTENTE"
+      : c.state ? c.success.toUpperCase() : "INDISPONIBLE",
+    tone: index >= verifiedCount ? "pending" : c.state ? "ok" : "fail",
+  })), [checks, verifiedCount]);
+  const progress = Math.round(verifiedCount / checks.length * 100);
   const [closing, setClosing] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const loaded = checks.every(({ state }) => state !== null);
+  const loaded = verifiedCount === checks.length && checks.every(({ state }) => state !== null);
   const [speechDone, setSpeechDone] = useState(false);
   const [speechUnavailable, setSpeechUnavailable] = useState(false);
   const [speechPlaying, setSpeechPlaying] = useState(false);
@@ -578,12 +587,21 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
   const closingRef = useRef(false);
   const speechStartedRef = useRef(false);
   const speechFinishedRef = useRef(false);
+  const textTimerRef = useRef(null);
+  const audioProgressRef = useRef(false);
+  const introSpeechRef = useRef("");
+  const finishText = () => {
+    clearInterval(textTimerRef.current);
+    textTimerRef.current = null;
+    setReadyTextLength(introSpeechRef.current.length);
+  };
   useEffect(() => {
     const reportVoiceError = () => {
       speechFinishedRef.current = true;
       setSpeechPlaying(false);
       setSpeechUnavailable(true);
       setSpeechDone(true);
+      finishText();
     };
     window.addEventListener("sirius-voice-error", reportVoiceError);
     return () => window.removeEventListener("sirius-voice-error", reportVoiceError);
@@ -600,31 +618,20 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
   }, [brain, checks]);
   const padRef = useRef(null);
   const readyMessage = brain === true && services !== null
-    ? `Bonjour${userName ? ` ${userName}` : ""}, votre assistant Zirius est prêt à être utilisé.`
+    ? `Connexion établie. Bonjour${userName ? ` ${userName}` : ""}. Je suis ΣIRIUS. Je suis prêt à vous accompagner.`
     : `Bonjour${userName ? ` ${userName}` : ""}, ${brain === false
       ? "le serveur ne répond pas encore. Vous pouvez réessayer la connexion."
       : "la configuration des services n'a pas pu être vérifiée."}`;
   const [readyTextLength, setReadyTextLength] = useState(0);
-  const readyTextComplete = readyTextLength >= readyMessage.length;
+  const voiceWarnings = checks.filter(({ state, label }) =>
+    state === false && label === "Interface vocale").map(() => "L'interface vocale est indisponible.");
+  const introSpeech = [readyMessage, ...voiceWarnings].join(" ");
+  introSpeechRef.current = introSpeech;
+  const readyTextComplete = readyTextLength >= introSpeech.length;
   useEffect(() => {
     setReadyTextLength(0);
-    if (!loaded) return undefined;
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
-      setReadyTextLength(readyMessage.length);
-      return undefined;
-    }
-    let length = 0;
-    const timer = setInterval(() => {
-      length = Math.min(readyMessage.length, length + 1);
-      setReadyTextLength(length);
-      if (length >= readyMessage.length) clearInterval(timer);
-    }, 45);
-    return () => clearInterval(timer);
-  }, [loaded, readyMessage]);
-  const voiceWarnings = checks.filter(({ state, label }) =>
-    state === false && label.startsWith("API")).map(({ label }) =>
-    `${label === "API de capture micro" ? "La capture micro" : "La lecture audio"} est indisponible.`);
-  const introSpeech = [readyMessage, ...voiceWarnings].join(" ");
+    return () => clearInterval(textTimerRef.current);
+  }, [introSpeech]);
   const playIntroSpeech = () => {
     speechFinishedRef.current = false;
     setSpeechDone(false);
@@ -638,8 +645,30 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
       }
     } catch (e) {}
     speakCinematic(introSpeech, {
-      onstart: () => { speechStartedRef.current = true; setSpeechPlaying(true); },
-      onend: () => { speechFinishedRef.current = true; setSpeechPlaying(false); setSpeechDone(true); },
+      onstart: () => {
+        speechStartedRef.current = true;
+        setSpeechPlaying(true);
+        audioProgressRef.current = false;
+        clearInterval(textTimerRef.current);
+        // Estimation jusqu'au premier événement de progression fourni par le lecteur.
+        textTimerRef.current = setInterval(() => {
+          if (!audioProgressRef.current) {
+            setReadyTextLength((length) => Math.min(introSpeech.length - 1, length + 1));
+          }
+        }, 65);
+      },
+      onprogress: (fraction) => {
+        if (!Number.isFinite(fraction) || speechFinishedRef.current || closingRef.current) return;
+        audioProgressRef.current = true;
+        const nextLength = Math.floor(introSpeech.length * Math.max(0, Math.min(1, fraction)));
+        setReadyTextLength((length) => Math.max(length, nextLength));
+      },
+      onend: () => {
+        finishText();
+        speechFinishedRef.current = true;
+        setSpeechPlaying(false);
+        setSpeechDone(true);
+      },
     });
   };
 
@@ -657,6 +686,7 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
     if (closingRef.current) return;
     closingRef.current = true;
     cancelSpeech();
+    clearInterval(textTimerRef.current);
     setClosing(true);
     stopPad();
     closeTimerRef.current = setTimeout(() => {
@@ -666,6 +696,7 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
   };
   useEffect(() => () => {
     clearTimeout(closeTimerRef.current);
+    clearInterval(textTimerRef.current);
     cancelSpeech();
   }, []);
 
@@ -681,6 +712,7 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
     } else {
       speechFinishedRef.current = true;
       setSpeechDone(true);
+      finishText();
     }
     // Nappe sonore cinématique discrète sous la voix (Web Audio, gratuite)
     try {
@@ -708,6 +740,7 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
       setSpeechUnavailable(true);
       setSpeechPlaying(false);
       setSpeechDone(true);
+      finishText();
     }, 20000);
     return () => { clearTimeout(hardStop); stopPad(); };
   }, [lines.length, onDone, narrationReady]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -720,6 +753,7 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
         console.warn("La voix de démarrage n'a pas pu démarrer.");
         setSpeechUnavailable(true);
         setSpeechDone(true);
+        finishText();
       }
     }, 10000);
     return () => clearTimeout(t);
@@ -795,7 +829,7 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
           ))}
         </div>
         <p className="boot-signature">ΣIRIUS — Votre intelligence au travail</p>
-        <p className="boot-tagline">Parlez-lui simplement. Zirius vous répond.</p>
+        <p className="boot-tagline">Parlez-lui simplement. ΣIRIUS vous répond.</p>
         <p className="sirius-colleague">LE COLLÈGUE SUR QUI VOUS POUVEZ COMPTER</p>
       </div>
       <section className="boot-status workspace-surface" aria-label="Initialisation de votre espace">
@@ -829,7 +863,7 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
           ))}
           {loaded && <p className={`boot-ready ${readyTextComplete ? "boot-ready-complete" : ""}`}
             data-testid="boot-ready" aria-live="off">
-            {readyMessage.slice(0, readyTextLength)}
+            {introSpeech.slice(0, readyTextLength)}
           </p>}
         </div>
         <div className="boot-bar" role="progressbar" aria-label="Chargement de ΣIRIUS"

@@ -27,6 +27,21 @@ qui utilisent leurs propres identifiants, pas les index PyAudio.
 
 ### Affichage des réponses et démarrage progressif — 1.0.44
 
+La conversation Kimi désactive explicitement la réflexion interne du fournisseur
+(température 0,6 requise), y compris pour le briefing et le secours HTTP. Le mode
+profond conserve Kimi, les sources collectées et la consigne d'analyse détaillée.
+Le flux attend au plus 12 secondes avant le premier texte visible par fournisseur :
+des fragments de réflexion seuls ne prolongent pas ce délai. Un échec avant le
+premier texte déclenche le fournisseur suivant ; un flux déjà commencé n'est pas
+mélangé à une seconde réponse. Le secours HTTP Kimi est limité à 20 secondes.
+Si le délai global du flux profond expire côté application, le secours utilise le
+mode normal plutôt que de relancer la même attente Kimi. Ce repli est indiqué à
+l'utilisateur et ne modifie pas son mode enregistré.
+Une limite de sortie (`finish_reason=length`), un filtrage du fournisseur ou une
+fin de flux sans confirmation `stop` ne valident jamais un fragment comme une
+réponse complète. Le serveur émet un événement SSE `error` au lieu de `done`
+et ne conserve pas cette réponse partielle dans l'historique.
+
 Le flux de réponse accepte les fins de flux SSE en LF ou CRLF, y compris quand
 l'événement final n'est pas suivi d'une ligne vide. Si le flux s'interrompt après
 avoir commencé, ΣIRIUS récupère la réponse complète par la voie HTTP de secours
@@ -34,9 +49,19 @@ et actualise la même fenêtre au lieu de laisser un fragment avec un avertissem
 d'interruption. Le rendu progressif s'arrête entre les fragments pour éviter des
 rafraîchissements continus pendant l'attente.
 
-Au démarrage, le message d'accueil s'écrit progressivement et les contrôles réels
-apparaissent les uns après les autres. Le rythme d'affichage est indépendant des
-vérifications réelles et respecte la préférence de réduction des animations.
+Au démarrage, quatre contrôles apparaissent progressivement en doré, espacés de
+700 ms : interface, connexion au serveur, configuration des services et présence
+des API vocales. Un verdict ne s'affiche qu'après le résultat réel ; ce parcours
+prend environ 2,8 secondes lorsque les réponses sont immédiates, sans retarder
+les requêtes réseau. Ces contrôles ne testent pas les fournisseurs IA ni les
+permissions du microphone.
+Le texte final et la narration partagent le même script :
+« Connexion établie. Bonjour Daniel. Je suis ΣIRIUS. Je suis prêt à vous accompagner. »
+Le prénom est adapté au compte, et le nom se prononce « Sirius », sans lire le sigma.
+Le texte commence avec la voix : sa progression suit la position de lecture audio
+ou les événements de mots de la synthèse locale. Sans ces événements, le rythme est
+estimé uniquement pendant la parole ; la fin de lecture complète le texte.
+Un échec de connexion ou de configuration remplace l'annonce de réussite.
 Le délai de première réponse reste tributaire de la connexion et du fournisseur ;
 le flux ou l'affichage progressif ne garantissent pas un délai de génération fixe.
 
@@ -131,6 +156,34 @@ manquent. Les flux sont chargés en parallèle et un résultat complet est conse
 5 minutes (1 minute lors d'une panne partielle). Un flux valide mais vide est
 également conservé pour éviter des rechargements inutiles. Les sources RSS ne
 garantissent pas une couverture exhaustive.
+
+Les demandes générales (« les infos », « les actualités en France », « les infos
+internationales ») utilisent directement cette sélection RSS, sans attendre une
+rédaction IA. Le bulletin annonce la météo de la ville du profil et les rubriques
+demandées ; au plus deux articles par rubrique sont retenus. Les liens restent
+visibles sans être lus. Sans ville renseignée ou sans prévisions vérifiables,
+l'absence de météo est annoncée, sans choisir Paris implicitement.
+
+La météo Open-Meteo distingue les conditions relevées et les prévisions
+d'aujourd'hui et de demain : température, ressenti, vent, minimum/maximum et
+probabilité de précipitations. Dates, fuseau, unités et valeurs sont vérifiés.
+Ce sont des prévisions modélisées, pas une alerte officielle ; une donnée périmée,
+incomplète ou incohérente est signalée comme indisponible.
+
+Le bulletin est lu passage par passage. Pendant la session, « qui a fait quoi ? »
+ou « répète cette info » rappelle le passage réellement annoncé ; « quel temps
+tu as dit ? » rappelle la météo annoncée, sans nouvelle recherche. « Reprends
+les infos » poursuit après le passage interrompu. Les questions d'explication
+utilisent le contexte annoncé, sans recommencer le bulletin. Ce suivi expire
+après deux heures et sa position de lecture n'est pas restaurée après un
+rechargement de l'application. Hors bulletin, « répète » et « continue » gardent
+le parcours de conversation habituel.
+
+Sur Android, l'interruption se fait par Stop ou l'appui pour parler : l'écoute
+simultanée pendant la synthèse vocale reste désactivée pour éviter l'écho.
+Le dialogue mains libres avec interruption vocale directe n'est pas certifié.
+Le nouveau bulletin exige le frontend mis à jour et le backend disposant de
+`/api/weather/bulletin` ; des tests locaux ne prouvent pas son déploiement.
 
 La synthèse vocale remplace le mot « emails » (ou « e-mails » / « mails »)
 par « courriels » pour éviter une lecture lettre par lettre ; le texte affiché
@@ -293,7 +346,7 @@ et son découpage, y compris avec une apostrophe pleine largeur ou des séparate
 invisibles. Ce traitement est commun aux requêtes vocales distantes et au repli
 Android ; la prononciation effective reste à vérifier avec la voix de l'appareil.
 Le lexique prononce « planning » sans tiret artificiel. À l'oral, « le/ton
-Sirius Display » devient « mon Zirius Display » ; les élisions « L'… » sont
+Sirius Display » devient « mon Sirius Display » ; les élisions « L'… » sont
 envoyées avec un « l » minuscule sans modifier les lettres isolées.
 L'indication d'écoute et le signal vocal du micro serveur attendent l'événement
 de démarrage du MediaRecorder. En capture native continue, la parole commencée
@@ -319,7 +372,7 @@ Les dates ISO isolées sont converties pour la voix avant les plages numériques
 ## Boutique publique
 
 La page `/acheter` est rendue par `frontend/src/PublicStore.jsx`.
-Son slogan est « ZIRIUS travaille pour vous. » avec le sous-titre
+Son slogan est « ΣIRIUS travaille pour vous. » avec le sous-titre
 « Il organise vos tâches, simplifie votre travail et vous libère du temps. ».
 La section « Découvrez les fonctionnalités de ΣIRIUS » présente six cadres,
 dont la rédaction de documents et l'analyse assistée par IA, avec leurs limites.

@@ -49,7 +49,10 @@ import { explainStartupDiagnostic } from "@/startupDiagnostic";
 import MicrophoneIndicator from "@/components/MicrophoneIndicator";
 import GettingStarted, { gettingStartedKey } from "@/components/GettingStarted";
 import { createVoiceSession } from "@/voiceSession";
-import { streamConversation, requestConversation, requestAssistantIntent, requestTranscription } from "@/services/assistantApi";
+import { streamConversation, requestConversation, requestAssistantIntent, requestTranscription, requestNewsBriefing, requestWeatherBulletin } from "@/services/assistantApi";
+import { newsBulletinScope } from "./newsCommandRouting";
+import { bulletinFollowUp, createBulletinContext, markSegmentCompleted, markSegmentStarted, releaseBulletinFocus } from "./bulletinDialogue";
+import { buildNewsBulletin, weatherBulletinText } from "./newsBulletin";
 import { connectStreamingStt } from "@/services/streamingStt";
 import { enabledVoiceVocabulary } from "@/voiceVocabulary";
 import { speakFr, cancelSpeech, speakSeries, speakAsCharacter as speakCharacterVoice, spokenCount, lastSpokenAt } from "@/voice";
@@ -228,6 +231,7 @@ function App() {
   }, [renderVoiceSignal]);
   const stopVoiceRef = useRef(() => {});
   const currentSpokenRef = useRef("");
+  const lastBulletinRef = useRef(null);
   const onSpeechStartRef = useRef(() => {});
   const onSpeechEndRef = useRef(() => {});
   const startInterruptListenerRef = useRef(() => {});
@@ -1590,6 +1594,8 @@ function App() {
     // NIVEAU 1 : VOIE FLUX STREAM (SSE) avec timeout global de 60 s
     // -------------------------------------------------------------
     let streamProducedOutput = false;
+    let streamTimedOut = false;
+    let streamOutputLimited = false;
     try {
       if (pid && progress?.log) progress.log(pid, "Interrogation du cerveau (voie stream)...", 30);
 
@@ -1643,6 +1649,9 @@ function App() {
               }
             } else if (ev.type === "done") {
               data = ev;
+            } else if (ev.type === "error") {
+              streamOutputLimited = ev.code === "model_output_limit";
+              throw new Error(ev.message || "Le serveur a interrompu la réponse.");
             }
           };
           const consumeSseBuffer = (flush = false) => {
@@ -1705,7 +1714,8 @@ function App() {
       });
       if (handled) return;
     } catch (e) {
-      if (!isAbortError(e)) {
+      streamTimedOut = isAbortError(e) && !externalSignal.aborted;
+      if (streamTimedOut || !isAbortError(e)) {
         console.warn("⚠️ Stream interrompu ou timeout (60s) -> Passage en voie classique...", e);
       }
       if (externalSignal?.aborted) {
@@ -1732,7 +1742,13 @@ function App() {
     try {
       if (pid && progress?.log) progress.log(pid, "Passage en voie classique de secours...", 60);
 
-      const resp = await requestConversation(payload, { signal: externalSignal });
+      const fallbackRequest = JSON.parse(payload);
+      if ((streamTimedOut || streamOutputLimited) && (fallbackRequest.mode === "profond" || fallbackRequest.ia_mode === "profond")) {
+        fallbackRequest.mode = "normal";
+        fallbackRequest.ia_mode = "jarvis";
+        setVoiceMessage("Le mode profond n'a pas fourni de réponse complète — essai du service rapide.");
+      }
+      const resp = await requestConversation(JSON.stringify(fallbackRequest), { signal: externalSignal });
       if ([401, 403, 429].includes(resp.status)) {
         showServiceDenial(resp.status, resp.data);
         return;
@@ -1763,7 +1779,7 @@ function App() {
     // NIVEAU 3 : RÉPONSE LOCALE (Mode Secours si le serveur est hors-ligne)
     // -------------------------------------------------------------
     if (pid && progress?.error) progress.error(pid, "Serveur cloud indisponible — réponse locale");
-    setVoiceMessage("Connexion au service IA indisponible — réponse locale.");
+    setVoiceMessage("Réponse du service IA indisponible — réponse locale.");
     const fallback = typeof localAnswer === "function" 
       ? localAnswer(command.toLowerCase()) 
       : "Mode secours : Le serveur Sirius ne répond pas actuellement.";
@@ -1902,6 +1918,114 @@ function App() {
     window.addEventListener("sirius-progress", onProg);
     return () => window.removeEventListener("sirius-progress", onProg);
   }, [speakOut]);
+
+  const speakBulletin = useCallback(async (bulletin, start = 0) => {
+    const signal = voiceSessionRef.current.signal;
+    const stale = () => signal.aborted || lastBulletinRef.current !== bulletin;
+    if (!bulletin || stale()) return;
+    if (start >= bulletin.segments.length) {
+      const message = "Le bulletin est terminé.";
+      setText(message);
+      speakOut(message);
+      return;
+    }
+    voiceSeriesPendingRef.current = true;
+    speakingRef.current = true;
+    stopCaptureRef.current();
+    void handsFreeRef.current?.setBlocked(true);
+    setStatus("speaking");
+    setVoicePhase("preparing");
+    try {
+      for (let index = start; index < bulletin.segments.length; index += 1) {
+        for (const phrase of splitDisplayReading(bulletin.segments[index].text)) {
+          if (stale()) return;
+          await speakSeries(phrase, { onstart: () => {
+            if (stale()) return;
+            markSegmentStarted(bulletin, index);
+            currentSpokenRef.current = phrase;
+            setVoicePhase("speaking");
+            onSpeechStartRef.current();
+            // Android garde la capture coupée pendant la synthèse (anti-écho) : startInterruptListener l'ignore.
+            if (autoMicRef.current) startInterruptListenerRef.current();
+          } });
+        }
+        if (stale()) return;
+        markSegmentCompleted(bulletin, index);
+      }
+    } catch (error) {
+      if (!stale()) {
+        console.error("Lecture du bulletin :", error);
+        setVoiceMessage("La lecture du bulletin a été interrompue.");
+      }
+    } finally {
+      if (!signal.aborted) {
+        voiceSeriesPendingRef.current = false;
+        stopInterruptListenerRef.current();
+        setVoicePhase("idle");
+        onSpeechEndRef.current();
+      }
+    }
+  }, [speakOut]);
+
+  const requestBulletinWeather = useCallback((signal) => {
+    const city = (profile?.city || "").trim();
+    if (!city) return Promise.resolve({ text: "Météo : indiquez votre ville dans le profil pour recevoir des prévisions locales." });
+    return requestWeatherBulletin(city, { signal }).then((response) => {
+      if (!response.ok) throw new Error("Prévisions météo indisponibles.");
+      return { text: weatherBulletinText(response.data), source: response.data.source, url: response.data.url };
+    }).catch((error) => {
+      if (!signal.aborted) console.warn("Météo du bulletin :", error);
+      return { text: `Météo à ${city} : prévisions indisponibles ou non vérifiables pour le moment.` };
+    });
+  }, [profile?.city]);
+
+  const launchNewsBulletin = useCallback(async (scope) => {
+    const signal = voiceSessionRef.current.signal;
+    setStatus("thinking");
+    setVoicePhase("thinking");
+    setText("Je consulte les informations datées par rubrique...");
+    try {
+      const [response, weather] = await Promise.all([requestNewsBriefing({ signal }), requestBulletinWeather(signal)]);
+      if (signal.aborted) return;
+      if (!response.ok) throw new Error(
+        typeof response.data?.detail === "string" ? response.data.detail : "La source d'actualités ne répond pas.",
+      );
+      const bulletin = buildNewsBulletin({ scope, sections: response.data?.sections, weather });
+      streamDisplayIdRef.current = null;
+      streamOnDisplay(bulletin.displayText, true, "INFOS DU JOUR");
+      localStorage.setItem("sirius_last_briefing", todayStr());
+      localStorage.setItem("sirius_last_briefing_context", JSON.stringify({ saved_at: Date.now(), text: bulletin.spokenText.slice(-12000) }));
+      setText(bulletin.spokenText);
+      lastBulletinRef.current = createBulletinContext({ scope, segments: bulletin.segments });
+      void speakBulletin(lastBulletinRef.current);
+    } catch (error) {
+      if (signal.aborted) return;
+      console.warn("Bulletin d'actualités indisponible :", error);
+      const message = "Les actualités ne peuvent pas être vérifiées pour le moment. Réessayez dans un instant.";
+      setVoiceMessage(message);
+      setText(message);
+      streamDisplayIdRef.current = null;
+      streamOnDisplay(message, true, "INFOS DU JOUR");
+      speakOut(message);
+    }
+  }, [speakOut, streamOnDisplay, requestBulletinWeather, speakBulletin]);
+
+  // Question sur un passage annoncé : le modèle reçoit ce passage et ne relance pas le bulletin.
+  const answerBulletinQuestion = useCallback(async (prompt) => {
+    const sessionSignal = voiceSessionRef.current.signal;
+    if (sessionSignal.aborted) return;
+    isBusy.current = true;
+    try {
+      await cloudAnswer(prompt, { signal: sessionSignal });
+    } catch (error) {
+      if (!sessionSignal.aborted) console.error("Question sur le bulletin :", error);
+    } finally {
+      if (sessionSignal === voiceSessionRef.current.signal && !sessionSignal.aborted) {
+        isBusy.current = false;
+        if (!speakingRef.current) { setStatus("idle"); setVoicePhase("idle"); }
+      }
+    }
+  }, [cloudAnswer]);
 
   // Les sujets d'actualité partent en recherche approfondie ; le briefing général garde son parcours dédié.
   const launchNews = useCallback(async (topic) => {
@@ -4021,6 +4145,30 @@ function App() {
       return;
     }
 
+    const followUp = bulletinFollowUp(command, lastBulletinRef.current);
+    if (followUp?.resumeAt !== undefined) {
+      void speakBulletin(lastBulletinRef.current, followUp.resumeAt);
+      return;
+    }
+    if (followUp?.analysis) {
+      lastBulletinRef.current.focused = false;
+      void answerBulletinQuestion(followUp.analysis);
+      return;
+    }
+    if (followUp) {
+      setText(followUp.text);
+      setStatus("speaking");
+      speakOut(followUp.text);
+      return;
+    }
+    releaseBulletinFocus(lastBulletinRef.current);
+
+    const newsScope = newsBulletinScope(command);
+    if (newsScope) {
+      void launchNewsBulletin(newsScope);
+      return;
+    }
+
     if (DAILY_BRIEFING_COMMAND.test(low) && runBriefingRef.current) {
       setMetrics((m) => ({
         ...m,
@@ -4302,7 +4450,7 @@ function App() {
     pendingEmailSetup, pendingEmailAction, pendingEmailCompose, handlePendingEmailCompose, applyEmailSetupAnswer, fetchEmailBriefing,
     confirmPendingEmailAction, resolveEmailOrdinal, runEmailAction, setEmailSenderRule,
     pendingActionPlan, confirmPendingActionPlan, startGuidedEmailCompose,
-    renderVoiceSignal, watchActionConfirmation, readOwnDisplay, showOnDisplay,
+    renderVoiceSignal, watchActionConfirmation, readOwnDisplay, showOnDisplay, launchNewsBulletin, speakBulletin, answerBulletinQuestion,
   ]);
 
   useEffect(() => {
@@ -7483,8 +7631,8 @@ function App() {
                 <span className="sirius-wordmark workspace-welcome">
                   {["dusk", "night"].includes(phaseOfDay()) ? "Bonsoir" : "Bonjour"}{userName ? `, ${userName}` : ""}.
                 </span>
-                <span className="sirius-tagline">Parlez-lui simplement. Zirius vous répond.</span>
                 <span className="sirius-colleague">LE COLLÈGUE SUR QUI VOUS POUVEZ COMPTER</span>
+                <span className="sirius-tagline">Parlez-lui simplement. ΣIRIUS vous répond.</span>
               </span>
             </h1>
           </div>

@@ -161,7 +161,7 @@ class _FakeStream:
             text = next(self.parts)
         except StopIteration:
             raise StopAsyncIteration
-        return SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=text))])
+        return SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=text), finish_reason="stop" if text.endswith("source.") else None)])
 
 
 class _DeflectingStream:
@@ -174,7 +174,7 @@ class _DeflectingStream:
             text = next(self.parts)
         except StopIteration:
             raise StopAsyncIteration
-        return SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=text))])
+        return SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=text), finish_reason="stop" if text.endswith("local.") else None)])
 
 
 class _FakeCompletions:

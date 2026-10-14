@@ -1,5 +1,5 @@
 import { API_BASE_URL } from "../lib/api";
-import { ASSISTANT_TIMEOUTS, streamConversation, requestConversation, requestAssistantIntent, requestTranscription } from "./assistantApi";
+import { ASSISTANT_TIMEOUTS, streamConversation, requestConversation, requestAssistantIntent, requestTranscription, requestNewsBriefing, requestWeatherBulletin } from "./assistantApi";
 import { lockApiKeys, saveApiKeys } from "../apiKeyStorage";
 
 const originalFetch = global.fetch;
@@ -34,6 +34,24 @@ test("chat uses the central backend, preserves payload and current authenticated
     headers: { "Content-Type": "application/json" }, signal: expect.any(AbortSignal),
   });
   expect(remove).toHaveBeenCalledWith("abort", expect.any(Function));
+});
+
+test("news uses the central authenticated backend and returns dated sections", async () => {
+  const data = { sections: [{ id: "monde", articles: [] }] };
+  global.fetch.mockResolvedValue(response(data));
+  await expect(requestNewsBriefing({})).resolves.toEqual({ ok: true, status: 200, data });
+  expect(global.fetch).toHaveBeenCalledWith(`${API_BASE_URL}/news/briefing`, expect.objectContaining({
+    method: "GET", credentials: "include", signal: expect.any(AbortSignal),
+  }));
+});
+
+test("weather preserves the requested city and uses the authenticated central backend", async () => {
+  const data = { city: "Rosny-sous-Bois", days: [] };
+  global.fetch.mockResolvedValue(response(data));
+  await expect(requestWeatherBulletin("Rosny-sous-Bois & Paris", {})).resolves.toEqual({ ok: true, status: 200, data });
+  expect(global.fetch).toHaveBeenCalledWith(`${API_BASE_URL}/weather/bulletin?city=Rosny-sous-Bois%20%26%20Paris`, expect.objectContaining({
+    method: "GET", credentials: "include", signal: expect.any(AbortSignal),
+  }));
 });
 
 test("HTTP chat failure is returned for the existing local fallback without parsing its body", async () => {
@@ -95,6 +113,8 @@ test.each([
   ["intent", () => requestAssistantIntent("ouvre", {}), ASSISTANT_TIMEOUTS.intent],
   ["transcription", () => requestTranscription(new FormData(), {}), ASSISTANT_TIMEOUTS.transcription],
   ["stream", () => streamConversation("{}", {}, () => {}), ASSISTANT_TIMEOUTS.stream],
+  ["news", () => requestNewsBriefing({}), ASSISTANT_TIMEOUTS.news],
+  ["weather", () => requestWeatherBulletin("Lyon", {}), ASSISTANT_TIMEOUTS.news],
 ])("%s aborts at its exact deadline without retry", async (name, request, deadline) => {
   let signal;
   global.fetch.mockImplementation((url, options) => {

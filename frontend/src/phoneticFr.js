@@ -48,8 +48,8 @@ export const FR_ANGLICISMS = {
 
 // Noms propres et vocabulaire ΣIRIUS.
 export const FR_NAMES = {
-  "Sirius Display": "Ziriusse displé",
-  "Zirius Display": "Ziriusse displé",
+  "Sirius Display": "Siriusse displé",
+  "Zirius Display": "Siriusse displé",
   Roger: "Rojé",
   Sirius: "Siriusse",
   cortex: "cortèxe",

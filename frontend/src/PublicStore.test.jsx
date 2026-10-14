@@ -45,9 +45,9 @@ test.each([["standard", "69"], ["pro", "135"], ["lifetime", "269"]])(
 
 test("store displays the requested headline and description while preserving the footer slogan", () => {
   expect(container.querySelector(".public-hero .public-eyebrow").textContent).toBe("ΣIRIUS, conçue pour vous");
-  expect(container.querySelector(".public-hero h1").textContent).toBe("Zirius, sans prompts compliqués : parlez-lui, Il s'occupe de vos tâches.");
-  expect(container.querySelector(".public-value").textContent).toBe("Conçu pour tous ceux qui ne sont pas à l'aise avec l'IA, Zirius vous aide : vous écoute, vous répond, exécute vos demandes et surveille vos tâches. Parlez-lui naturellement, sans avoir à rédiger de prompts compliqués.");
-  expect(container.querySelector(".public-slogan").textContent).toBe("ZIRIUS travaille pour vous.");
+  expect(container.querySelector(".public-hero h1").textContent).toBe("ΣIRIUS, sans prompts compliqués : parlez-lui, Il s'occupe de vos tâches.");
+  expect(container.querySelector(".public-value").textContent).toBe("Conçu pour tous ceux qui ne sont pas à l'aise avec l'IA, ΣIRIUS vous aide : vous écoute, vous répond, exécute vos demandes et surveille vos tâches. Parlez-lui naturellement, sans avoir à rédiger de prompts compliqués.");
+  expect(container.querySelector(".public-slogan").textContent).toBe("ΣIRIUS travaille pour vous.");
 });
 
 test("store explains why Sirius was designed with the requested text", () => {

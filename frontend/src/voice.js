@@ -170,7 +170,7 @@ export async function playAudio(base64, { volume = 1, onstart, onend } = {}) {
   }
 }
 
-async function speakRemote(message, { voice, rate, pitch, volume = 1, onstart, onend, timeoutMs }, seq) {
+async function speakRemote(message, { voice, rate, pitch, volume = 1, onstart, onend, onprogress, timeoutMs }, seq) {
   const gemini = Capacitor.getPlatform() === "android";
   if (Date.now() < (gemini ? geminiDownUntil : googleDownUntil)) return false;
   const controller = new AbortController();
@@ -224,12 +224,23 @@ async function speakRemote(message, { voice, rate, pitch, volume = 1, onstart, o
         audio.onplay = null;
         audio.onended = null;
         audio.onerror = null;
+        audio.ontimeupdate = null;
         if (currentAudio === audio) currentAudio = null;
         if (finishCurrentAudio === finish) finishCurrentAudio = null;
         resolve(ok);
       };
       finishCurrentAudio = finish;
-      audio.onplay = () => { started = true; if (seq === speakSeq && onstart) onstart(); };
+      audio.onplay = () => {
+        started = true;
+        if (seq !== speakSeq) return;
+        if (onstart) onstart();
+        if (onprogress) onprogress(0);
+      };
+      audio.ontimeupdate = () => {
+        if (started && seq === speakSeq && onprogress && Number.isFinite(audio.duration) && audio.duration > 0) {
+          onprogress(Math.min(1, audio.currentTime / audio.duration));
+        }
+      };
       audio.onended = () => {
         finish(true);
         if (seq === speakSeq && onend) onend();
@@ -256,11 +267,11 @@ async function speakRemote(message, { voice, rate, pitch, volume = 1, onstart, o
 }
 
 // ---- Synthèse du navigateur (fallback gratuit) ----
-function speakBrowser(message, { rate = 1.0, pitch = 1.08, volume = 1, gender = "female", onstart, onend } = {}) {
+function speakBrowser(message, { rate = 1.0, pitch = 1.08, volume = 1, gender = "female", onstart, onend, onprogress } = {}) {
   const seq = speakSeq;
   if (Capacitor.getPlatform() === "android") {
     stopChannels();
-    void speakNative(phonetic(message), { rate, pitch, volume, gender, onstart, onend });
+    void speakNative(phonetic(message), { rate, pitch, volume, gender, onstart, onend, onprogress });
     return;
   }
   const synth = window.speechSynthesis;
@@ -295,6 +306,11 @@ function speakBrowser(message, { rate = 1.0, pitch = 1.08, volume = 1, gender = 
         if (onstart) onstart();
       };
       u.onend = () => { clearKA(); if (seq === speakSeq) end(); };
+      u.onboundary = (event) => {
+        if (seq === speakSeq && onprogress && u.text.length > 0) {
+          onprogress(Math.min(1, (event.charIndex + (event.charLength || 0)) / u.text.length));
+        }
+      };
       u.onerror = () => { clearKA(); if (seq === speakSeq) end(); };
       synth.speak(u);
     } catch (e) { end(); }
@@ -429,7 +445,7 @@ export function speakSeries(sentence, opts = {}) {
 }
 
 // Présentation au démarrage : voix grave et posée, style bande-annonce de film
-export function speakCinematic(message, { onstart, onend } = {}) {
+export function speakCinematic(message, { onstart, onend, onprogress } = {}) {
   if (!message) { (onend || (() => {}))(); return; }
   message = cleanTextForSpeech(message);
   if (!message) { (onend || (() => {}))(); return; }
@@ -438,7 +454,7 @@ export function speakCinematic(message, { onstart, onend } = {}) {
   stopChannels();
   ({ onstart, onend } = speechCallbacks(seq, onstart, onend));
   if (isBrowserVoice(cfg.name)) {
-    speakBrowser(message, { rate: 0.85, pitch: 0.95, gender: getBrowserGender(cfg.name), onstart, onend });
+    speakBrowser(message, { rate: 0.85, pitch: 0.95, gender: getBrowserGender(cfg.name), onstart, onend, onprogress });
     return;
   }
   if (Capacitor.getPlatform() === "android") {
@@ -448,16 +464,17 @@ export function speakCinematic(message, { onstart, onend } = {}) {
       pitch: -3,
       onstart,
       onend,
+      onprogress,
       timeoutMs: 6000,
     }, seq).then((ok) => {
       if (!ok && seq === speakSeq) {
-        speakBrowser(message, { rate: 0.85, pitch: 0.95, gender: FEMALE.test(cfg.name) ? "female" : "male", onstart, onend });
+        speakBrowser(message, { rate: 0.85, pitch: 0.95, gender: FEMALE.test(cfg.name) ? "female" : "male", onstart, onend, onprogress });
       }
     });
     return;
   }
-  speakRemote(message, { voice: cfg.name, rate: 0.85, pitch: Math.max(-10, cfg.pitch - 3), onstart, onend }, seq).then((ok) => {
-    if (!ok && seq === speakSeq) speakBrowser(message, { rate: 0.85, pitch: 0.62, onstart, onend });
+  speakRemote(message, { voice: cfg.name, rate: 0.85, pitch: Math.max(-10, cfg.pitch - 3), onstart, onend, onprogress }, seq).then((ok) => {
+    if (!ok && seq === speakSeq) speakBrowser(message, { rate: 0.85, pitch: 0.62, onstart, onend, onprogress });
   });
 }
 

@@ -19,9 +19,10 @@ export function stopNativeSpeech() {
   stopChain = stopChain.then(() => TextToSpeech.stop()).catch(reportError);
 }
 
-export async function speakNative(message, { rate = 1, pitch = 1, volume = 1, gender = "female", onstart, onend } = {}) {
+export async function speakNative(message, { rate = 1, pitch = 1, volume = 1, gender = "female", onstart, onend, onprogress } = {}) {
   stopNativeSpeech();
   const current = session;
+  let rangeListener;
   try {
     await stopChain;
     if (current !== session) return;
@@ -30,6 +31,14 @@ export async function speakNative(message, { rate = 1, pitch = 1, volume = 1, ge
     const selected = selectFrenchVoice(voices, { localOnly: true, gender });
     const voice = voices.indexOf(selected);
     if (voice < 0) throw new Error("Aucune voix française locale installée.");
+    if (onprogress) {
+      rangeListener = await TextToSpeech.addListener("onRangeStart", ({ end }) => {
+        if (current === session && Number.isFinite(end) && message.length > 0) {
+          onprogress(Math.min(1, end / message.length));
+        }
+      });
+      if (current !== session) return;
+    }
     active = true;
     if (onstart) onstart();
     await TextToSpeech.speak({
@@ -44,6 +53,7 @@ export async function speakNative(message, { rate = 1, pitch = 1, volume = 1, ge
   } catch (error) {
     if (current === session) reportError(error);
   } finally {
+    if (rangeListener) await rangeListener.remove();
     if (current === session) {
       active = false;
       if (onend) onend();

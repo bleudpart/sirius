@@ -112,6 +112,60 @@ def fast_options(service, output_tokens):
         "extra_body": GROQ_JSON_OPTIONS,
     }
 
+
+def kimi_answer_options(output_tokens):
+    return {
+        "max_tokens": output_tokens,
+        "temperature": 0.6,
+        "extra_body": {"thinking": {"type": "disabled"}},
+    }
+
+
+class ModelResponseIncompleteError(RuntimeError):
+    pass
+
+
+def _require_complete_choice(choice):
+    finish_reason = getattr(choice, "finish_reason", None)
+    if finish_reason == "length":
+        raise ModelResponseIncompleteError("La limite de génération a coupé la réponse.")
+    if finish_reason == "content_filter":
+        raise RuntimeError("Le fournisseur a interrompu la réponse par filtrage.")
+
+
+async def _stream_visible_text(provider, request, first_text_timeout=12.0):
+    """Bound waiting for visible text, not just individual network reads."""
+    deadline = asyncio.get_running_loop().time() + first_text_timeout
+    stream = await asyncio.wait_for(
+        provider.chat.completions.create(**request), timeout=first_text_timeout,
+    )
+    visible = False
+    completed = False
+    iterator = stream.__aiter__()
+    try:
+        while True:
+            try:
+                if visible:
+                    chunk = await anext(iterator)
+                else:
+                    remaining = deadline - asyncio.get_running_loop().time()
+                    chunk = await asyncio.wait_for(anext(iterator), timeout=max(0, remaining))
+            except StopAsyncIteration:
+                break
+            delta = chunk.choices[0].delta.content if chunk.choices else None
+            if delta:
+                visible = True
+                yield delta
+            if chunk.choices:
+                _require_complete_choice(chunk.choices[0])
+                completed = completed or getattr(chunk.choices[0], "finish_reason", None) == "stop"
+        if visible and not completed:
+            raise RuntimeError("Le flux s'est terminé sans confirmation de réponse complète.")
+    finally:
+        close = getattr(stream, "close", None)
+        if close is not None:
+            await close()
+
 # --- CLIENT K3 (Kimi / Moonshot), fabrique réutilisable pour Thémis (OCR factures) et les
 # modules internes : chaque appelant peut fournir sa propre clé (BYOK) ou utiliser la clé serveur.
 def k3_client(key: str | None = None):
@@ -514,7 +568,9 @@ async def enrich_briefing(data, keys=None):
 
     providers = []
     if k3_key:
-        providers.append((k3_key, K3_ENDPOINT, K3_MODEL, 1.0, {"max_tokens": 2600}))
+        providers.append((k3_key, K3_ENDPOINT, K3_MODEL, 0.6, {
+            key: value for key, value in kimi_answer_options(2600).items() if key != "temperature"
+        }))
     if groq_key:
         providers.append((
             groq_key, fast_endpoint, fast_models[0], 0.2, fast_options(service, 2600),
@@ -537,6 +593,7 @@ async def enrich_briefing(data, keys=None):
                 temperature=temperature,
                 **token_options,
             )
+            _require_complete_choice(resp.choices[0])
             briefing = str(resp.choices[0].message.content or "").strip()
             if briefing:
                 _briefing_cache.update({"t": time.time(), "key": cache_key, "txt": briefing})
@@ -834,17 +891,17 @@ async def _kimi_answer(prompt, history, profile, memory, mode, mood, key, enviro
         '\n\nRéponds UNIQUEMENT avec un objet JSON valide, sans markdown, au format exact : '
         '{"reponse": "...", "memoire": [], "popups": []}'
     )
-    response = await k3_client(key).with_options(max_retries=0).chat.completions.create(
+    response = await asyncio.wait_for(k3_client(key).with_options(max_retries=0).chat.completions.create(
         model=K3_MODEL,
         messages=[
             {"role": "system", "content": system_prompt},
             *_conversation_history(history),
             {"role": "user", "content": prompt},
         ],
-        max_tokens=_response_token_budget(prompt, mode),
-        temperature=1.0,
-        timeout=35.0 if (mode or "normal").lower() == "profond" else 15.0,
-    )
+        **kimi_answer_options(_response_token_budget(prompt, mode)),
+        timeout=20.0,
+    ), timeout=20.0)
+    _require_complete_choice(response.choices[0])
     answer, memories, popups = _parse_structured(response.choices[0].message.content or "")
     answer = _finalize_targeted_answer(prompt, answer, targeted_research)
     return {
@@ -1293,6 +1350,7 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
                     **fast_options(service, max_tokens),
                     timeout=timeout,
                 )
+                _require_complete_choice(resp.choices[0])
                 raw_json = resp.choices[0].message.content.strip()
                 answer, memories, popups = _parse_structured(raw_json)
                 answer = _finalize_targeted_answer(prompt, answer, targeted_research)
@@ -1391,7 +1449,7 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
     # de renvoyer un historique brut aussi volumineux à chaque message.
     history_messages = _conversation_history(history)
     fast_providers = [(client_groq, name, 0.8) for name in models_to_try] if client_groq else []
-    kimi_provider = [(None, K3_MODEL, 1.0)] if k3_key else []
+    kimi_provider = [(None, K3_MODEL, 0.6)] if k3_key else []
     providers = (
         kimi_provider + fast_providers
         if kimi_provider and (mode or "normal").lower() == "profond"
@@ -1405,26 +1463,24 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
         try:
             if provider is None:
                 provider = k3_client(k3_key).with_options(max_retries=0)
-            stream = await provider.chat.completions.create(
-                model=model_name,
-                messages=[
+            request = {
+                "model": model_name,
+                "messages": [
                     {"role": "system", "content": sys_prompt + plain_instruction},
                     *history_messages,
                     {"role": "user", "content": prompt},
                 ],
-                temperature=temperature,
-                timeout=timeout,
-                stream=True,
-                **(fast_options(service, max_tokens) if model_name != K3_MODEL else {"max_tokens": max_tokens}),
-            )
-            async for chunk in stream:
-                delta = chunk.choices[0].delta.content if chunk.choices else None
-                if delta:
-                    if targeted_research and is_targeted_factual_question(prompt):
-                        buffered_targeted_answer.append(delta)
-                    else:
-                        output_started = True
-                        yield delta
+                "temperature": temperature,
+                "timeout": timeout,
+                "stream": True,
+                **(fast_options(service, max_tokens) if model_name != K3_MODEL else kimi_answer_options(max_tokens)),
+            }
+            async for delta in _stream_visible_text(provider, request, first_text_timeout=min(12.0, timeout)):
+                if targeted_research and is_targeted_factual_question(prompt):
+                    buffered_targeted_answer.append(delta)
+                else:
+                    output_started = True
+                    yield delta
             if buffered_targeted_answer:
                 draft = "".join(buffered_targeted_answer).strip()
                 yield _finalize_targeted_answer(prompt, draft, targeted_research)
