@@ -424,13 +424,16 @@ export default function AuthGate({ children }) {
     setKeyAccount(next.user_id || next.email);
     setUser(next);
   }} />;
+  const chipName = user.role === "admin" && user.name?.trim().toLowerCase() === "daniel"
+    ? "Daniel Partel"
+    : user.name || user.email;
 
   return (
     <AuthContext.Provider value={{ user, setUser, logout, openProfile: () => setShowProfile(true) }}>
       {children}
       <button className="auth-chip" onClick={() => setShowProfile(true)} title="Mon profil" data-testid="auth-user-chip">
         {user.picture ? <img src={user.picture} alt="" /> : <User size={13} />}
-        <span>{user.name || user.email}</span>
+        <span>{chipName}</span>
         {user.role === "admin" && <span className="auth-admin-badge" data-testid="auth-admin-badge">ADMIN</span>}
       </button>
       {showProfile && <ProfilePanel user={user} onClose={() => setShowProfile(false)} onUpdate={setUser} onLogout={logout} />}

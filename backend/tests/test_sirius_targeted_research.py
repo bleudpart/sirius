@@ -208,7 +208,6 @@ def _install_fake_llm(monkeypatch, answer="Le faux-filet co√ªte environ 34,90 ‚Ç
 @pytest.mark.parametrize("mode", ["turbo", "normal", "profond"])
 def test_answer_modes_receive_research_sources_and_mark_search_used(monkeypatch, mode):
     completions = _install_fake_llm(monkeypatch)
-    monkeypatch.setattr("sirius_brain._kimi_reflect", AsyncMock(return_value=""))
 
     result = asyncio.run(ask_sirius(
         "prix d'un au kg de faux-filet",
@@ -249,7 +248,6 @@ def test_non_streaming_deflection_is_replaced_by_the_sourced_answer(monkeypatch)
 @pytest.mark.parametrize("mode", ["turbo", "normal", "profond"])
 def test_streaming_answer_modes_receive_targeted_research(monkeypatch, mode):
     completions = _install_fake_llm(monkeypatch)
-    monkeypatch.setattr("sirius_brain._kimi_reflect", AsyncMock(return_value=""))
 
     async def collect():
         return "".join([

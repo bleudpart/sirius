@@ -4,6 +4,8 @@ import postcss from "postcss";
 
 const css = fs.readFileSync(path.join(__dirname, "siriusVisualTheme.css"), "utf8");
 const root = postcss.parse(css);
+const appCss = fs.readFileSync(path.join(__dirname, "App.css"), "utf8");
+const appRoot = postcss.parse(appCss);
 
 test("the shared window skin changes surfaces without overriding saved geometry or alert colours", () => {
   const surfaceRules = [];
@@ -13,7 +15,11 @@ test("the shared window skin changes surfaces without overriding saved geometry 
   const surfaceRule = surfaceRules.find((rule) => rule.nodes.some((node) => node.prop === "background"));
   expect(surfaceRule).toBeDefined();
   const props = surfaceRule.nodes.map((node) => node.prop);
-  expect(props).toEqual(expect.arrayContaining(["background", "border-radius", "box-shadow"]));
+  expect(props).toEqual(expect.arrayContaining(["background", "border", "border-radius", "box-shadow"]));
+  expect(surfaceRule.nodes.find((node) => node.prop === "border").value).toBe("1px solid transparent");
+  expect(surfaceRule.nodes.find((node) => node.prop === "border").important).toBe(true);
+  expect(surfaceRule.nodes.find((node) => node.prop === "border-radius").value).toBe("16px");
+  expect(surfaceRule.nodes.find((node) => node.prop === "border-radius").important).toBe(true);
   expect(props).not.toEqual(expect.arrayContaining(["position"]));
   for (const prop of ["top", "left", "right", "bottom", "width", "height", "transform", "display", "color"]) {
     expect(props).not.toContain(prop);
@@ -75,7 +81,7 @@ test("the command field stays on one line and the greeting keeps its original ca
   expect(declarationsFor('html[data-sirius-visual-theme="classic"] .sirius-center .sirius-wordmark')["text-transform"]).toBe("none");
 });
 
-test("original scenery remains visible and frames retain animated gold and RGB accents", () => {
+test("original scenery remains visible and frames retain restrained animated gold and cyan accents", () => {
   expect(css).not.toContain(".grid-bg");
   expect(css).not.toContain(".city-backdrop");
   expect(css).not.toContain(".vignette");
@@ -84,13 +90,37 @@ test("original scenery remains visible and frames retain animated gold and RGB a
   expect(css).toContain("animation: sirFrameSpin 14s steps(360) infinite");
   expect(css).toContain("animation: sirSpectrum 10s linear infinite");
   expect(css).toContain("@media (prefers-reduced-motion: reduce)");
+  expect(css).toContain("--workspace-rgb: linear-gradient(90deg, #c9a24d, #91e6f2 35%, #86a8ff 65%, #c9a24d)");
   root.walkDecls("--workspace-frame", (decl) => {
     expect(decl.parent.selector).toContain(".holo-win");
     expect(decl.parent.selector).not.toBe('html[data-sirius-visual-theme="classic"]');
   });
 
   expect(css).toContain("var(--workspace-frame-colours)");
-  expect(css).toContain("#00e5ff 36%");
+  expect(css).toContain("#91e6f2 38%");
+});
+
+test("startup frames stay static on touch screens and in reduced-motion mode", () => {
+  const rules = [];
+  root.walkRules((rule) => {
+    if (rule.selector.includes(".boot-screen") && rule.selector.includes(".boot-status")) rules.push(rule);
+  });
+  expect(rules.some((rule) =>
+    rule.parent.params === "(max-width: 1023px) and (pointer: coarse)" &&
+    rule.nodes.some((node) => node.prop === "animation" && node.value === "none" && node.important)
+  )).toBe(true);
+  expect(rules.some((rule) =>
+    rule.parent.params === "(prefers-reduced-motion: reduce)" &&
+    rule.nodes.some((node) => node.prop === "animation" && node.value === "none" && node.important)
+  )).toBe(true);
+});
+
+test("the fixed account pill has its own reserved space in the top bar", () => {
+  const topBar = appRoot.nodes
+    .filter((node) => node.type === "rule" && node.selector === ".top-bar")
+    .find((rule) => rule.nodes.some((node) => node.prop === "padding"));
+  expect(topBar.nodes.find((node) => node.prop === "padding").value).toBe("0 300px 0 32px");
+  expect(appCss).toContain("max-width: 260px");
 });
 
 test("presentation layout is enabled without requiring reduced motion", () => {

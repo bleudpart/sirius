@@ -5,12 +5,12 @@ html[data-sirius-visual-theme="classic"] {
   --workspace-text: #ffffff;
   --workspace-surface: linear-gradient(145deg, rgba(16, 40, 61, .98), rgba(6, 19, 33, .98));
   --workspace-line: rgba(145, 230, 242, .24);
-  --workspace-shadow: 0 16px 36px rgba(0, 5, 14, .34), inset 0 1px 0 rgba(145, 230, 242, .06);
+  --workspace-shadow: 0 14px 32px rgba(0, 5, 14, .3), inset 0 1px 0 rgba(145, 230, 242, .045);
   --workspace-font: "Segoe UI", system-ui, sans-serif;
-  --workspace-rgb: linear-gradient(90deg, #00e5ff, #4d7cff, #b04dff, #ff4d9d, #ffb84d, #7dff9a, #00e5ff);
-  --workspace-frame-colours: #d8b875, #fff1c2 12%, #d8b875 24%,
-    #00e5ff 36%, #4d7cff 44%, #b04dff 52%, #ff4d9d 60%, #ffb84d 68%, #7dff9a 76%,
-    #91e6f2 84%, #d8b875 94%;
+  --workspace-rgb: linear-gradient(90deg, #c9a24d, #91e6f2 35%, #86a8ff 65%, #c9a24d);
+  --workspace-frame-colours: #c9a24d, #f4e3b4 10%, #c9a24d 22%,
+    #91e6f2 38%, #6ea6b3 48%, #91e6f2 58%, #c9a24d 74%,
+    #91e6f2 86%, #c9a24d 96%;
 }
 
 /* Resolve the non-inherited animated angle on each frame, not on the document. */
@@ -273,8 +273,8 @@ html[data-sirius-visual-theme="classic"] :is(
   .shud-panel, .float-card, .central-card, .holo-popup
 ) {
   --workspace-frame: conic-gradient(from var(--sir-frame-angle), var(--workspace-frame-colours));
-  border-color: transparent !important;
-  border-radius: 22px !important;
+  border: 1px solid transparent !important;
+  border-radius: 16px !important;
   background: var(--workspace-surface) padding-box,
     linear-gradient(#061824, #061824) padding-box, var(--workspace-frame) border-box !important;
   animation: sirFrameSpin 14s steps(360) infinite !important;
@@ -307,7 +307,8 @@ html[data-sirius-visual-theme="classic"] :is(.sirius-display, .web-window, .shud
   background: var(--workspace-frame) !important;
 }
 html[data-sirius-visual-theme="classic"] :is(.workspace-surface, .sirius-root .voice-session-controls, .sirius-root .cmd-bar) {
-  border-color: transparent;
+  border: 1px solid transparent;
+  border-radius: 16px;
   background: var(--workspace-rgb) 0 0 / 200% 1px repeat-x padding-box,
     var(--workspace-surface) padding-box, linear-gradient(#061824, #061824) padding-box,
     var(--workspace-frame) border-box;
@@ -623,6 +624,7 @@ html[data-sirius-visual-theme="classic"] .public-popular { border-radius: 0 20px
   html[data-sirius-visual-theme="classic"] .boot-acro-item i { color: var(--workspace-gold); font: 400 9px/1.5 var(--workspace-font); letter-spacing: 0; text-transform: none; }
   html[data-sirius-visual-theme="classic"] .boot-screen :is(.boot-modules, .boot-status) {
     border: 1px solid transparent;
+    border-radius: 12px;
     border-image: none;
     background: var(--workspace-surface) padding-box,
       linear-gradient(#061824, #061824) padding-box,
@@ -721,4 +723,18 @@ html[data-sirius-platform="android"][data-sirius-visual-theme="classic"] .modwhe
 html[data-sirius-platform="android"][data-sirius-visual-theme="classic"] .holo-win::before,
 html[data-sirius-platform="android"][data-sirius-visual-theme="classic"] :is(.sirius-display, .web-window, .shud-panel)::after {
   animation: none !important;
+}
+
+@media (max-width: 1023px) and (pointer: coarse) {
+  html[data-sirius-visual-theme="classic"] .boot-screen :is(.boot-modules, .boot-status) {
+    animation: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-sirius-visual-theme="classic"] .boot-screen :is(
+    .boot-grid, .boot-modules, .boot-status, .core-ring, .core-orbit, .core-letter i, .core-pulse
+  ) {
+    animation: none !important;
+  }
 }

@@ -496,8 +496,8 @@ body.hud-minimal .antique-jar { display: none; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  /* Réserve la largeur de .auth-chip (fixe, à droite) : 155 px la laissaient recouvrir le dernier bouton. */
-  padding: 0 210px 0 32px;
+  /* Réserve la largeur maximale de .auth-chip (260 px) pour qu'il ne recouvre pas les boutons. */
+  padding: 0 300px 0 32px;
   z-index: 3;
 }
 .brand-tag {

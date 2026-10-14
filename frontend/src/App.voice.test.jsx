@@ -514,6 +514,42 @@ test.each([
   expect(global.fetch.mock.calls.some(([url]) => /\/(?:intent|chat)(?:\/stream)?$/.test(String(url)))).toBe(false);
 });
 
+test.each(["les infos", "les actualités"])("%s uses the structured daily briefing", async (command) => {
+  const fallback = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation((url, options) => String(url).endsWith("/oracle/overview")
+    ? Promise.resolve({ ok: true, json: async () => ({ briefing: "Actualités structurées par rubrique." }) })
+    : fallback(url, options));
+  await mount();
+  await send(command);
+  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/oracle/overview"))).toBe(true);
+  expect(global.fetch.mock.calls.some(([url]) => String(url).includes("/news/headlines"))).toBe(false);
+  expect(host.querySelector('[data-testid="sirius-display"]')).not.toBeNull();
+  expect(speakFr.mock.calls.some(([message]) => message.includes("Actualités structurées par rubrique."))).toBe(true);
+});
+
+test("a topic-specific news request uses deep research instead of headlines", async () => {
+  const fallback = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation((url, options) => {
+    if (String(url).endsWith("/chat/stream")) return Promise.resolve({ ok: false });
+    if (String(url).endsWith("/chat")) {
+      return Promise.resolve({ ok: true, json: async () => ({ answer: "Analyse approfondie terminée." }) });
+    }
+    return fallback(url, options);
+  });
+
+  await mount();
+  await send("les infos sur l'économie");
+
+  const chatRequest = global.fetch.mock.calls.find(([url]) => String(url).endsWith("/chat"));
+  expect(chatRequest).toBeDefined();
+  expect(JSON.parse(chatRequest[1].body)).toEqual(expect.objectContaining({
+    text: "Recherche approfondie sur les actualités récentes concernant l'économie.",
+    mode: "profond",
+  }));
+  expect(global.fetch.mock.calls.some(([url]) => String(url).includes("/news/headlines"))).toBe(false);
+  expect(speakFr.mock.calls.some(([message]) => message.includes("Analyse approfondie terminée."))).toBe(true);
+});
+
 test("Display reads the complete briefing before visual typing finishes", async () => {
   const longBriefing = `${"Une nouvelle importante pour cette journée. ".repeat(100)}Fin du briefing.`;
   const fallback = global.fetch.getMockImplementation();

@@ -171,7 +171,7 @@ const signaturePreviewText = (user) => {
 };
 const todayStr = () => getLocalDateKey();
 
-const DAILY_BRIEFING_COMMAND = /^\s*(?:(?:affiche(?:r)?|montre(?:r)?|lis|lire|lit|relis)(?:[-\s]+moi)?(?:\s+et\s+(?:affiche(?:r)?|montre(?:r)?|lis|lire|lit|relis)(?:[-\s]+moi)?)?\s+)?(?:(?:mon|le|les)\s+)?(?:brieff?ing(?:\s+(?:quotidien|du jour|matinal|du soir|de ce soir|soir))?|infos\s+du\s+jour|actualit[ée]s?\s+internationales?|br[èe]ves\s+internationales?|r[ée]sum[ée](?:[-\s]+moi)?(?:\s+(?:la|ma|du)\s+)?journ[ée]e?|fais[-\s]+moi\s+le\s+point(?:\s+sur\s+(?:ma\s+)?journ[ée]e?)?|qu'est[-\s]ce\s+qui\s+m'attend(?:\s+aujourd'hui)?|(?:mes\s+)?priorit[ée]s\s+du\s+jour|quoi\s+de\s+neuf\s+aujourd'hui)\s*[?.!]*\s*$/i;
+const DAILY_BRIEFING_COMMAND = /^\s*(?:(?:affiche(?:r)?|montre(?:r)?|lis|lire|lit|relis)(?:[-\s]+moi)?(?:\s+et\s+(?:affiche(?:r)?|montre(?:r)?|lis|lire|lit|relis)(?:[-\s]+moi)?)?\s+)?(?:(?:mon|le|les)\s+)?(?:brieff?ing(?:\s+(?:quotidien|du jour|matinal|du soir|de ce soir|soir))?|infos?(?:\s+du\s+jour)?|actualit[ée]s?\s+internationales?|actualit[ée]s?|br[èe]ves\s+internationales?|r[ée]sum[ée](?:[-\s]+moi)?(?:\s+(?:la|ma|du)\s+)?journ[ée]e?|fais[-\s]+moi\s+le\s+point(?:\s+sur\s+(?:ma\s+)?journ[ée]e?)?|qu'est[-\s]ce\s+qui\s+m'attend(?:\s+aujourd'hui)?|(?:mes\s+)?priorit[ée]s\s+du\s+jour|quoi\s+de\s+neuf\s+aujourd'hui)\s*[?.!]*\s*$/i;
 
 // Verbe exprimant une demande de liaison de compte, quelle que soit la tournure employée.
 const CONNECT_VERB = /\b(?:connect\w*|connexion|reconnect\w*|relie|relier|associe|associer|autorise|autoriser|lie|lier|branche|brancher)\b/i;
@@ -1533,10 +1533,10 @@ function App() {
   onSpeechStartRef.current = onSpeechStart;
   onSpeechEndRef.current = onSpeechEnd;
 
-  // Réponse intelligente via le cerveau cloud (Kimi K3 analyse → Groq formule, en flux avec fallbacks)
+  // Réponse intelligente via le cerveau cloud, en flux avec fallbacks
   // externalSignal : permet à resolveIntent d'annuler proprement ce flux si une action UI est
   // détectée entre-temps (les deux partent en parallèle pour ne pas s'additionner en latence).
-  const cloudAnswer = useCallback(async (command, { signal: externalSignal } = {}) => {
+  const cloudAnswer = useCallback(async (command, { signal: externalSignal, mode: requestedMode } = {}) => {
     externalSignal = externalSignal || renderVoiceSignal;
     if (externalSignal.aborted) return;
     setVoicePhase("thinking");
@@ -1561,7 +1561,7 @@ function App() {
       keys,
       profile: profile || {},
       memory: memoryRef.current,
-      mode: modeRef.current,
+      mode: requestedMode || modeRef.current,
       ia_mode: localStorage.getItem("sirius_ia_mode") || "jarvis",
       mood: computeMood(),
       frugal: sysMode === "frugal",
@@ -1903,36 +1903,44 @@ function App() {
     return () => window.removeEventListener("sirius-progress", onProg);
   }, [speakOut]);
 
-  // Actualités en direct (NewsAPI) : lecture vocale des titres + pop-up détaillé
+  // Les sujets d'actualité partent en recherche approfondie ; le briefing général garde son parcours dédié.
   const launchNews = useCallback(async (topic) => {
+    if (topic) {
+      await cloudAnswer(
+        `Recherche approfondie sur les actualités récentes concernant ${topic}.`,
+        { mode: "profond" },
+      );
+      return;
+    }
+
     setStatus("thinking");
-    setText(topic ? `Je consulte les actualités sur ${topic}...` : "Je consulte les actualités...");
+    setText("Je consulte les actualités...");
     try {
-      const r = await fetch(`${API}/news/headlines?limit=6${topic ? `&q=${encodeURIComponent(topic)}` : ""}`);
+      const r = await fetch(`${API}/news/headlines?limit=6`);
       const d = await r.json().catch(() => ({}));
       if (r.ok && d.articles && d.articles.length) {
         const top = d.articles.slice(0, 3).map((a) => a.titre).filter(Boolean);
         addPopup({
           kind: "info",
-          titre: topic ? `ACTUALITÉS — ${topic.toUpperCase()}` : "ACTUALITÉS FRANCE",
+          titre: "ACTUALITÉS FRANCE",
           contenu: d.articles.map((a) => `• ${a.titre}${a.source ? ` (${a.source})` : ""}`).join("\n"),
         });
         setStatus("speaking");
-        const m = `Voici les titres${topic ? ` sur ${topic}` : ""} : ${top.join(". ")}.`;
+        const m = `Voici les titres : ${top.join(". ")}.`;
         setText(m); speakOut(m);
         return;
       }
       setStatus("speaking");
       const m = r.status === 429
         ? "Le quota d'actualités du jour est atteint."
-        : topic ? `Aucune actualité trouvée sur ${topic}.` : "Les actualités sont indisponibles pour le moment.";
+        : "Les actualités sont indisponibles pour le moment.";
       setText(m); speakOut(m);
     } catch (e) {
       setStatus("speaking");
       const m = "Les actualités sont indisponibles pour le moment.";
       setText(m); speakOut(m);
     }
-  }, [speakOut, addPopup]);
+  }, [speakOut, addPopup, cloudAnswer]);
 
   // HERMÈS AGORA# — consultation commerciale vocale dans le chat principal (voix Mythos, ajustable)
   const AGORA_VOICE = { module: "HERMÈS AGORA#" };

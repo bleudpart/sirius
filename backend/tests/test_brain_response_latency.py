@@ -19,30 +19,25 @@ def isolated_providers(monkeypatch):
 
 
 @pytest.mark.parametrize("stream", [False, True])
-def test_cerebras_answers_while_kimi_keeps_deep_reflection(monkeypatch, stream):
+def test_kimi_writes_deep_answers_from_collected_sources(monkeypatch, stream):
     provider, create = fake_provider(stream=stream)
-    clients = []
-    monkeypatch.setattr(brain, "AsyncOpenAI", lambda **kwargs: clients.append(kwargs) or provider)
-    reflection = AsyncMock(return_value="Notes privées de réflexion.")
-    monkeypatch.setattr(brain, "_kimi_reflect", reflection)
+    monkeypatch.setattr(brain, "k3_client", lambda key: provider)
+    source = "- Décision publique | Journal Exemple\n  Source vérifiée pour l'analyse."
+    monkeypatch.setattr(brain, "_answer_context", AsyncMock(return_value=(source, "")))
 
     async def run():
-        kwargs = {"mode": "profond", "keys": {"cerebras": "fake-cerebras", "k3": "fake-kimi"}}
+        kwargs = {"mode": "profond", "keys": {"k3": "fake-kimi"}}
         if stream:
             return "".join([part async for part in brain.ask_sirius_stream("Explique cette décision", **kwargs)])
         return (await brain.ask_sirius("Explique cette décision", **kwargs))["reponse"]
 
     assert "décision utile" in asyncio.run(run())
-    assert clients[0]["base_url"] == "https://api.cerebras.ai/v1"
-    assert clients[0]["api_key"] == "fake-cerebras"
     payload = create.call_args.kwargs
-    assert payload["model"] == "gpt-oss-120b"
-    assert payload["extra_body"] == {"reasoning_effort": "low", "reasoning_format": "hidden"}
-    assert "presence_penalty" not in payload
-    assert "max_tokens" not in payload
-    assert payload["max_completion_tokens"] == 3248
-    assert "Notes privées de réflexion" in payload["messages"][0]["content"]
-    assert reflection.call_args.args[5] == "fake-kimi"
+    assert payload["model"] == brain.K3_MODEL
+    assert payload["max_tokens"] == 2600
+    assert payload["timeout"] == 35.0
+    assert "Source vérifiée pour l'analyse." in payload["messages"][0]["content"]
+    assert "tu rédiges directement la réponse finale" in payload["messages"][0]["content"]
 
 
 def test_personal_groq_is_not_replaced_by_owner_cerebras(monkeypatch):
@@ -159,34 +154,33 @@ def test_news_depth_does_not_force_a_long_answer_after_a_pause():
     assert not brain._is_news_request("Bonjour")
 
 
-@pytest.mark.parametrize("stream", [False, True])
-def test_reflection_and_research_start_together(monkeypatch, stream):
-    provider, create = fake_provider(stream=stream)
-    monkeypatch.setattr(brain, "AsyncOpenAI", lambda **kwargs: provider)
-
+def test_research_sources_are_collected_concurrently(monkeypatch):
     async def run():
-        reflection_started = asyncio.Event()
         research_started = asyncio.Event()
-
-        async def reflect(*args, **kwargs):
-            reflection_started.set()
-            await asyncio.wait_for(research_started.wait(), 0.5)
-            return "Comparer les risques avant de décider."
+        prices_started = asyncio.Event()
 
         async def research(*args, **kwargs):
             research_started.set()
-            await asyncio.wait_for(reflection_started.wait(), 0.5)
+            await asyncio.wait_for(prices_started.wait(), 0.5)
+            return "- Actualité | Journal Exemple\n  Analyse source."
+
+        async def prices(*args, **kwargs):
+            prices_started.set()
+            await asyncio.wait_for(research_started.wait(), 0.5)
             return ""
 
-        monkeypatch.setattr(brain, "_kimi_reflect", reflect)
         monkeypatch.setattr(brain, "_research_briefing_follow_up", research)
-        kwargs = dict(mode="profond", keys={"k3": "fake-kimi", "groq_key": "fake-groq"})
-        if stream:
-            return "".join([part async for part in brain.ask_sirius_stream("Analyse cette décision", **kwargs)])
-        return (await brain.ask_sirius("Analyse cette décision", **kwargs))["reponse"]
+        monkeypatch.setattr(brain, "_research_current_prices", prices)
+        return await brain._answer_context(
+            "actualité approfondie sur l'économie CONTEXTE DU DERNIER BRIEFING :\nRésumé",
+            "profond",
+            "",
+        )
 
-    assert "décision utile" in asyncio.run(run())
-    assert "Comparer les risques" in create.call_args.kwargs["messages"][0]["content"]
+    assert asyncio.run(run()) == (
+        "- Actualité | Journal Exemple\n  Analyse source.",
+        "",
+    )
 
 
 def test_stream_kimi_fallback_does_not_restart_groq_or_research(monkeypatch):
@@ -207,37 +201,31 @@ def test_stream_kimi_fallback_does_not_restart_groq_or_research(monkeypatch):
     brain._research_current_prices.assert_awaited_once()
 
 
-def test_reflection_uses_history_and_has_a_bounded_wait_without_retries(monkeypatch, caplog):
+def test_kimi_deep_answer_uses_history_without_retries(monkeypatch):
     provider, create = fake_provider()
     options = []
     provider.with_options = lambda **kwargs: options.append(kwargs) or provider
     monkeypatch.setattr(brain, "k3_client", lambda key: provider)
-    monkeypatch.setattr(brain, "KIMI_REFLECTION_TIMEOUT", 0.02)
-
-    async def slow(**kwargs):
-        await asyncio.Event().wait()
-
-    create.side_effect = slow
-    answer = asyncio.run(brain._kimi_reflect(
-        "Et pour le second choix ?", key="fake-kimi",
+    monkeypatch.setattr(brain, "_answer_context", AsyncMock(return_value=("", "")))
+    result = asyncio.run(brain.ask_sirius(
+        "Et pour le second choix ?",
+        mode="profond",
+        keys={"k3": "fake-kimi"},
         history=[{"role": "assistant", "content": "Deux choix : A et B."}],
     ))
-    assert answer == ""
-    assert "Kimi indisponible" in caplog.text
+    assert "décision utile" in result["reponse"]
     assert options == [{"max_retries": 0}]
     payload = create.call_args.kwargs
-    assert payload["timeout"] == 0.02
-    assert payload["max_tokens"] == 700
-    assert payload["messages"][1]["content"] == "Deux choix : A et B."
-    assert "Compare les options utiles" in payload["messages"][0]["content"]
+    assert payload["timeout"] == 35.0
+    assert payload["max_tokens"] == 2600
+    assert {"role": "assistant", "content": "Deux choix : A et B."} in payload["messages"]
+    assert "tu rédiges directement la réponse finale" in payload["messages"][0]["content"]
 
 
 @pytest.mark.parametrize("stream", [False, True])
 def test_normal_mode_improves_answer_guidance_without_an_extra_reflection_call(monkeypatch, stream):
     provider, create = fake_provider(stream=stream)
     monkeypatch.setattr(brain, "AsyncOpenAI", lambda **kwargs: provider)
-    reflect = AsyncMock(side_effect=AssertionError("No extra reflection in normal mode"))
-    monkeypatch.setattr(brain, "_kimi_reflect", reflect)
 
     async def run():
         kwargs = dict(keys={"groq_key": "fake-groq", "k3": "fake-kimi"})
@@ -246,7 +234,6 @@ def test_normal_mode_improves_answer_guidance_without_an_extra_reflection_call(m
         return await brain.ask_sirius("Explique cette décision", **kwargs)
 
     asyncio.run(run())
-    reflect.assert_not_called()
     payload = create.call_args.kwargs
     assert "Commence par une phrase courte" in payload["messages"][0]["content"]
     assert "Distingue les faits des hypothèses" in payload["messages"][0]["content"]

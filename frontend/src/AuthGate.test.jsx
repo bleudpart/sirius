@@ -1,8 +1,31 @@
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
-import { ProfilePanel } from "./AuthGate";
+import AuthGate, { ProfilePanel } from "./AuthGate";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+
+test("the owner admin chip shows the complete name", async () => {
+  const originalFetch = global.fetch;
+  const originalWindowFetch = window.fetch;
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  const fetch = jest.fn().mockResolvedValue({
+    ok: true, status: 200,
+    json: async () => ({ user_id: "admin", email: "daniel@example.test", name: "Daniel", role: "admin" }),
+  });
+  global.fetch = fetch;
+  window.fetch = fetch;
+  try {
+    await act(async () => root.render(<AuthGate><div>HUD</div></AuthGate>));
+    expect(container.querySelector('[data-testid="auth-user-chip"] > span').textContent).toBe("Daniel Partel");
+    expect(container.querySelector('[data-testid="auth-admin-badge"]').textContent).toBe("ADMIN");
+  } finally {
+    await act(async () => root.unmount());
+    global.fetch = originalFetch;
+    window.fetch = originalWindowFetch;
+    container.remove();
+  }
+});
 
 test("a queued deletion request does not log out or claim account erasure", async () => {
   const originalFetch = global.fetch;
