@@ -604,6 +604,23 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
     : `Bonjour${userName ? ` ${userName}` : ""}, ${brain === false
       ? "le serveur ne répond pas encore. Vous pouvez réessayer la connexion."
       : "la configuration des services n'a pas pu être vérifiée."}`;
+  const [readyTextLength, setReadyTextLength] = useState(0);
+  const readyTextComplete = readyTextLength >= readyMessage.length;
+  useEffect(() => {
+    setReadyTextLength(0);
+    if (!loaded) return undefined;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      setReadyTextLength(readyMessage.length);
+      return undefined;
+    }
+    let length = 0;
+    const timer = setInterval(() => {
+      length = Math.min(readyMessage.length, length + 1);
+      setReadyTextLength(length);
+      if (length >= readyMessage.length) clearInterval(timer);
+    }, 45);
+    return () => clearInterval(timer);
+  }, [loaded, readyMessage]);
   const voiceWarnings = checks.filter(({ state, label }) =>
     state === false && label.startsWith("API")).map(({ label }) =>
     `${label === "API de capture micro" ? "La capture micro" : "La lecture audio"} est indisponible.`);
@@ -708,8 +725,8 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
     return () => clearTimeout(t);
   }, [loaded, speechDone]);
   useEffect(() => {
-    if (loaded && speechDone && brain !== false && !detailsOpen) closeBoot();
-  }, [loaded, speechDone, brain, detailsOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (loaded && readyTextComplete && speechDone && brain !== false && !detailsOpen) closeBoot();
+  }, [loaded, readyTextComplete, speechDone, brain, detailsOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
 
     <div className={`boot-screen ${closing ? "closing" : ""}`} data-testid="boot-screen" onClick={() => {
@@ -803,13 +820,17 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
           ))}</ul>}
         </details>
         <div className="boot-log boot-display" role="log" aria-label="Résultats des contrôles de démarrage" aria-live="polite" aria-relevant="additions text">
-          {lines.map((l) => (
-            <div key={l.label} className={`boot-line boot-line-${l.tone}`}>
+          {lines.map((l, index) => (
+            <div key={l.label} className={`boot-line boot-line-${l.tone}`}
+              style={{ animationDelay: `${index * 0.35}s` }}>
               <span className="boot-line-label">{l.label}</span>
               <span className="boot-line-state">{l.status}</span>
             </div>
           ))}
-          {loaded && <p className="boot-ready" data-testid="boot-ready">{readyMessage}</p>}
+          {loaded && <p className={`boot-ready ${readyTextComplete ? "boot-ready-complete" : ""}`}
+            data-testid="boot-ready" aria-live="off">
+            {readyMessage.slice(0, readyTextLength)}
+          </p>}
         </div>
         <div className="boot-bar" role="progressbar" aria-label="Chargement de ΣIRIUS"
           aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
@@ -841,7 +862,10 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
                 : "Vérifiez que l'appareil est connecté à Internet (Wi-Fi ou données mobiles), puis réessayez."}
             </span>
             <div className="boot-brain-actions">
-              <button type="button" data-testid="boot-brain-retry" onClick={retryBrain}>Réessayer</button>
+              <button type="button" data-testid="boot-brain-retry" onClick={(event) => {
+                event.stopPropagation();
+                retryBrain();
+              }}>Réessayer</button>
               <button type="button" data-testid="boot-brain-continue" onClick={() => closeBoot()}>Continuer quand même</button>
             </div>
           </div>

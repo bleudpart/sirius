@@ -2170,11 +2170,25 @@ body.hud-minimal .medallion-halo { display: none; }
 }
 .boot-line {
   opacity: 0;
-  animation: bootlinein 0.3s ease forwards;
+  animation: bootlinein 0.45s ease both;
   text-shadow: 0 0 8px rgba(216, 184, 117, 0.45);
   margin: 2px 0;
 }
 @keyframes bootlinein { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+.boot-ready:not(.boot-ready-complete)::after {
+  content: "";
+  display: inline-block;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  border-right: 1px solid currentColor;
+  animation: bootCaret 0.8s steps(2, end) infinite;
+}
+@keyframes bootCaret { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .boot-line { animation-duration: 0.01ms; animation-delay: 0s !important; }
+  .boot-ready:not(.boot-ready-complete)::after { animation: none; }
+}
 .boot-bar {
   width: 100%;
   height: 6px;

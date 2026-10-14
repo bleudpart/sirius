@@ -384,14 +384,45 @@ test("speaks the first complete sentence before the model stream finishes", asyn
   }));
 });
 
-test("an incomplete stream keeps its interruption warning and never replays a partial response", async () => {
+test("an incomplete stream recovers the full answer in the same display instead of leaving a short fragment", async () => {
   const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
   mockConversationStream([{ type: "delta", text: "Réponse partielle. " }]);
+  const streamFetch = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation((url, options) => String(url).endsWith("/chat")
+    ? Promise.resolve({ ok: true, status: 200, json: async () => ({ answer: "Réponse complète récupérée." }) })
+    : streamFetch(url, options));
   await mount();
   await send("Explique le ciel bleu");
-  expect(host.querySelector(".voice-session-controls").textContent).toContain("Réponse interrompue avant la fin");
+  await act(async () => jest.advanceTimersByTime(2500));
+  expect(host.querySelectorAll('[data-testid="sirius-display"]')).toHaveLength(1);
+  expect(host.querySelector('[data-testid="sirius-display-body"]').textContent).toContain("Réponse complète récupérée.");
+  expect(host.querySelector('[data-testid="sirius-display-body"]').textContent).not.toContain("Réponse partielle");
+  expect(host.querySelector(".voice-session-controls").textContent).not.toContain("Réponse interrompue");
   expect(cancelSpeech).toHaveBeenCalled();
   expect(warn).toHaveBeenCalled();
+  expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/chat"))).toHaveLength(1);
+});
+
+test("SSE accepts CRLF and a final done event without a trailing blank line", async () => {
+  const reader = {
+    read: jest.fn()
+      .mockResolvedValueOnce({
+        done: false,
+        value: new Uint8Array(Buffer.from(
+          'data: {"type":"delta","text":"Réponse."}\r\n\r\ndata: {"type":"done","answer":"Réponse complète."}',
+        )),
+      })
+      .mockResolvedValueOnce({ done: true }),
+    cancel: jest.fn(async () => {}),
+  };
+  const fallback = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation((url, options) => String(url).endsWith("/chat/stream")
+    ? Promise.resolve({ ok: true, headers: { get: () => "text/event-stream" }, body: { getReader: () => reader } })
+    : fallback(url, options));
+  await mount();
+  await send("Explique le ciel bleu");
+  await act(async () => jest.advanceTimersByTime(5000));
+  expect(host.querySelector('[data-testid="sirius-display-body"]').textContent).toContain("Réponse complète.");
   expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/chat"))).toHaveLength(0);
 });
 

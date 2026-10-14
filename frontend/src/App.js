@@ -665,7 +665,7 @@ function App() {
     showOnDisplay({ type: "web", url, titre, iframeOk, noscript: !!noscript });
   }, [showOnDisplay]);
   // Réponse en direct : la fenêtre ΣIRIUS DISPLAY révèle le texte comme une frappe en
-  // temps réel. Le cerveau (Groq) génère souvent toute la réponse en une fraction de
+  // temps réel. Le cerveau peut générer toute la réponse très rapidement :
   // seconde : sans cadence d'affichage, le texte apparaîtrait d'un bloc. Un minuteur
   // révèle donc le texte à vitesse de lecture, en accélérant si le retard s'accumule.
   const streamDisplayIdRef = useRef(null);
@@ -695,9 +695,11 @@ function App() {
       cur.shown = Math.min(cur.target.length, cur.shown + Math.min(2, Math.max(1, Math.ceil(backlog / 250))));
       const visible = cur.target.slice(0, cur.shown);
       setDisplay((d) => (d && d.id === id ? { ...d, contenu: visible } : d));
-      if (cur.shown >= cur.target.length && cur.done) {
+      if (cur.shown >= cur.target.length) {
         clearInterval(cur.timer);
         cur.timer = null;
+      }
+      if (cur.shown >= cur.target.length && cur.done) {
         streamDisplayIdRef.current = null;
         setDisplayHistory((h) => h.map((e) => (e.id === id ? { ...e, contenu: cur.target } : e)));
         const closeDelay = getDisplayAutoCloseDelay({ type: "message", contenu: cur.target });
@@ -706,7 +708,7 @@ function App() {
           displayCloseTimer.current = setTimeout(() => setDisplayOpen(false), closeDelay);
         }
       }
-    }, 40);
+    }, 80);
   }, []);
   const closeWebWindow = useCallback((id) => {
     setWebWindows((ws) => ws.filter((w) => w.id !== id));
@@ -1621,33 +1623,51 @@ function App() {
             });
           };
 
+          const handleSseFrame = (frame) => {
+            const eventData = frame.split(/\r?\n/)
+              .filter((line) => line.startsWith("data:"))
+              .map((line) => line.slice(5).replace(/^ /, ""))
+              .join("\n");
+            if (!eventData) return;
+            let ev;
+            try { ev = JSON.parse(eventData); } catch (e) { return; }
+            if (ev.type === "delta") {
+              streamProducedOutput = true;
+              full += ev.text;
+              pending += ev.text;
+              streamOnDisplay(full);
+              let m;
+              while ((m = /^([\s\S]*?[.!?…])(?:\s+|$)/.exec(pending)) && m[1].trim().length > 1) {
+                speakChunk(m[1]);
+                pending = pending.slice(m[0].length);
+              }
+            } else if (ev.type === "done") {
+              data = ev;
+            }
+          };
+          const consumeSseBuffer = (flush = false) => {
+            let separator;
+            while ((separator = /\r?\n\r?\n/.exec(buf))) {
+              handleSseFrame(buf.slice(0, separator.index));
+              buf = buf.slice(separator.index + separator[0].length);
+            }
+            if (flush && buf.trim()) {
+              handleSseFrame(buf);
+              buf = "";
+            }
+          };
+
           try {
             for (;;) {
               const { done, value } = await reader.read();
               if (externalSignal.aborted) return true;
-              if (done) break;
-              buf += dec.decode(value, { stream: true });
-              let cut;
-              while ((cut = buf.indexOf("\n\n")) >= 0) {
-                const line = buf.slice(0, cut).trim();
-                buf = buf.slice(cut + 2);
-                if (!line.startsWith("data:")) continue;
-                let ev;
-                try { ev = JSON.parse(line.slice(5)); } catch (e) { continue; }
-                if (ev.type === "delta") {
-                  streamProducedOutput = true;
-                  full += ev.text; pending += ev.text;
-                  setText(full);
-                  streamOnDisplay(full);
-                  let m;
-                  while ((m = /^([\s\S]*?[.!?…])(?:\s+|$)/.exec(pending)) && m[1].trim().length > 1) {
-                    speakChunk(m[1]);
-                    pending = pending.slice(m[0].length);
-                  }
-                } else if (ev.type === "done") {
-                  data = ev;
-                }
+              if (done) {
+                buf += dec.decode();
+                consumeSseBuffer(true);
+                break;
               }
+              buf += dec.decode(value, { stream: true });
+              consumeSseBuffer();
             }
           } finally {
             await reader.cancel().catch(() => {});
@@ -1688,17 +1708,16 @@ function App() {
       if (!isAbortError(e)) {
         console.warn("⚠️ Stream interrompu ou timeout (60s) -> Passage en voie classique...", e);
       }
-      if (streamProducedOutput || externalSignal?.aborted) {
-        if (!externalSignal.aborted) {
-          cancelSpeech();
-          voiceSeriesPendingRef.current = false;
-          speakingRef.current = false;
-          setVoicePhase("idle");
-          setVoiceMessage("Réponse interrompue avant la fin. Réessayez.");
-        }
+      if (externalSignal?.aborted) {
         streamDisplayIdRef.current = null; // prochaine réponse : nouvelle fenêtre propre
-        if (pid && progress?.error) progress.error(pid, "Réponse interrompue après restitution partielle");
         return;
+      }
+      if (streamProducedOutput) {
+        cancelSpeech();
+        voiceSeriesPendingRef.current = false;
+        speakingRef.current = false;
+        setVoicePhase("thinking");
+        if (pid && progress?.log) progress.log(pid, "Récupération de la réponse complète...", 60);
       }
     }
 
@@ -1751,7 +1770,7 @@ function App() {
       
     setText(fallback);
     speakOut(fallback);
-    showOnDisplay({ type: "message", titre: "ΣIRIUS — RÉPONSE LOCALE", contenu: fallback });
+    streamOnDisplay(fallback, true, "ΣIRIUS — RÉPONSE LOCALE");
 
   }, [speakOut, keys, profile, computeMood, showOnDisplay, streamOnDisplay, sysMode, tasks, displayOpen, display.contenu, display?.suggestion, renderVoiceSignal]);
 

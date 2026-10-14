@@ -25,6 +25,21 @@ Une entrée absente ou un nom ambigu provoque une erreur explicite. Le script
 n'enregistre aucun son et ne modifie pas le microphone du navigateur ou d'Android,
 qui utilisent leurs propres identifiants, pas les index PyAudio.
 
+### Affichage des réponses et démarrage progressif — 1.0.44
+
+Le flux de réponse accepte les fins de flux SSE en LF ou CRLF, y compris quand
+l'événement final n'est pas suivi d'une ligne vide. Si le flux s'interrompt après
+avoir commencé, ΣIRIUS récupère la réponse complète par la voie HTTP de secours
+et actualise la même fenêtre au lieu de laisser un fragment avec un avertissement
+d'interruption. Le rendu progressif s'arrête entre les fragments pour éviter des
+rafraîchissements continus pendant l'attente.
+
+Au démarrage, le message d'accueil s'écrit progressivement et les contrôles réels
+apparaissent les uns après les autres. Le rythme d'affichage est indépendant des
+vérifications réelles et respecte la préférence de réduction des animations.
+Le délai de première réponse reste tributaire de la connexion et du fournisseur ;
+le flux ou l'affichage progressif ne garantissent pas un délai de génération fixe.
+
 ### Actualités et affichage Android — 1.0.43
 
 Le démarrage affiche les verdicts au fil des réponses réelles dans un journal

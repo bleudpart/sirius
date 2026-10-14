@@ -149,12 +149,25 @@ test("progress waits for real server and service responses rather than elapsed t
   await act(async () => finishBrain(true));
   expect(Number(progress.getAttribute("aria-valuenow"))).toBeLessThan(100);
   await act(async () => finishServices({ services: [{ id: "chat", label: "Réponses IA", state: "not_configured" }] }));
+  await flush(5000);
   expect(progress.getAttribute("aria-valuenow")).toBe("100");
   expect(container.textContent).toContain("Réponses IA : non configuré");
   expect(speakCinematic.mock.calls[0][0]).toContain("Bonjour, votre assistant Zirius est prêt à être utilisé.");
   expect(speakCinematic.mock.calls[0][0]).not.toContain("Réponses IA.");
   expect(generateBootPresentation).not.toHaveBeenCalled();
   expect(container.querySelector('[role="log"]').textContent).toContain("REÇUE");
+});
+
+test("the real welcome message appears progressively at a readable pace", async () => {
+  await render(<BootScreen connected onDone={jest.fn()} />);
+  const ready = container.querySelector('[data-testid="boot-ready"]');
+  const fullMessage = "Bonjour, votre assistant Zirius est prêt à être utilisé.";
+  expect(ready.textContent).toBe("");
+  await flush(320);
+  expect(ready.textContent.length).toBeGreaterThan(0);
+  expect(ready.textContent.length).toBeLessThan(fullMessage.length);
+  await flush(3000);
+  expect(ready.textContent).toBe(fullMessage);
 });
 
 test("a failed service check is a completed failure, never a successful service", async () => {
@@ -194,6 +207,10 @@ test("retries the brain, then explains the failure instead of opening a dead HUD
   });
   await flush(10);
   expect(container.querySelector('[data-testid="boot-brain-alert"]')).toBeNull();
+  await flush(5000);
+  expect(container.querySelector('[data-testid="boot-ready"]').textContent)
+    .toBe("Bonjour, votre assistant Zirius est prêt à être utilisé.");
+  expect(container.querySelector('[data-testid="boot-screen"]').className).toContain("closing");
   await flush(500);
   expect(onDone).toHaveBeenCalledTimes(1);
 });
@@ -265,6 +282,7 @@ test("details remain readable after the short welcome until they are closed", as
   await flush(1000);
   expect(onDone).not.toHaveBeenCalled();
   expect(details.textContent).toContain("modèle et services externes non testés");
+  await flush(2000);
   act(() => {
     details.open = false;
     details.dispatchEvent(new Event("toggle"));
