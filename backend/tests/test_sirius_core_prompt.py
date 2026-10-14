@@ -78,4 +78,14 @@ def test_prompt_lists_real_modules_and_forbids_invented_acronyms():
     assert "HÉPHAÏSTOS : Auto-maintenance & diagnostic" in prompt
     assert "CALLIOPE : Bibliothèque audio" in prompt
     assert "ne fabrique JAMAIS de définition, d'acronyme" in prompt
-    assert "demande de répéter au lieu d'interpréter" in prompt
+    assert "RÈGLE SILENCIEUSE" in prompt and "[[HORS_SUJET]]" in prompt
+
+
+def test_ignored_marker_helpers():
+    from sirius_brain import could_become_ignored_marker, is_ignored_answer
+    assert is_ignored_answer("  [[HORS_SUJET]]")
+    assert not is_ignored_answer("Calliope est ta bibliothèque audio.")
+    assert could_become_ignored_marker("")
+    assert could_become_ignored_marker(" [[HORS")
+    assert not could_become_ignored_marker("Bonjour")
+    assert not could_become_ignored_marker("[Note]")

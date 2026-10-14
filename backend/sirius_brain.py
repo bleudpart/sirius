@@ -1101,10 +1101,32 @@ def module_catalog_text() -> str:
             "RÈGLE ANTI-INVENTION : si on te demande ce qu'est un nom, un module, un sigle ou un terme que tu ne "
             "connais pas avec certitude (y compris un mot probablement mal transcrit par la reconnaissance vocale), "
             "ne fabrique JAMAIS de définition, d'acronyme ni de développement de sigle. Dis simplement que tu ne "
-            "le connais pas ou propose le module réel le plus proche (« tu veux dire Prométhée ? »). Si la phrase "
-            "reçue est incohérente (bruit de fond, télévision, autre personne), demande de répéter au lieu d'interpréter."
+            "le connais pas ou propose le module réel le plus proche (« tu veux dire Prométhée ? »)."
+            + IGNORED_INPUT_GUIDANCE
         )
     return _MODULE_CATALOG_CACHE
+
+
+IGNORED_INPUT_MARKER = "[[HORS_SUJET]]"
+IGNORED_INPUT_GUIDANCE = (
+    "\n\nBRUIT DE FOND — RÈGLE SILENCIEUSE : le micro capte parfois la télévision, la radio ou une autre "
+    "personne. Si le message reçu n'est manifestement pas adressé à toi (fragments sans lien, suite de "
+    "noms ou de mots sans demande, réplique de film ou de journal télévisé, conversation entre d'autres "
+    f"personnes), réponds UNIQUEMENT {IGNORED_INPUT_MARKER} et rien d'autre : pas d'excuse, pas de demande "
+    "de répétition. En cas de doute raisonnable, ou si le message pose une question, donne un ordre ou "
+    "prolonge la conversation en cours, réponds normalement."
+)
+
+
+def is_ignored_answer(text) -> bool:
+    """Vrai si le modèle a jugé que la phrase captée ne lui était pas adressée."""
+    return str(text or "").strip().startswith(IGNORED_INPUT_MARKER)
+
+
+def could_become_ignored_marker(text) -> bool:
+    """Vrai tant que le début du flux peut encore être le marqueur silencieux."""
+    stripped = str(text or "").lstrip()
+    return IGNORED_INPUT_MARKER.startswith(stripped) or stripped.startswith(IGNORED_INPUT_MARKER)
 
 
 def build_system_prompt(profile=None, memory=None, mode="normal", mood=None, environment=None):

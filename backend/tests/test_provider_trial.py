@@ -1543,3 +1543,35 @@ def test_frontend_kimi_field_groq_is_personal_kimi_not_groq(modules):
     with access.provider_scope(account(), {"groq": "personal-kimi", "groq_key": "personal-groq"}):
         assert access.provider_key("k3", "owner-kimi") == "personal-kimi"
         assert access.provider_key("groq", "owner-groq") == "personal-groq"
+
+
+@pytest.mark.parametrize("chunks,ignored", [
+    (["[[HORS", "_SUJET]]"], True),
+    (["[[", "Bon", "jour à toi."], False),
+    (["Calliope ", "est ta bibliothèque audio."], False),
+])
+def test_stream_stays_silent_for_background_noise(server_api, monkeypatch, chunks, ignored):
+    import json as _json
+    import sirius_brain
+    client, user, server = server_api
+
+    async def memory(*args):
+        return []
+
+    async def stream(**kwargs):
+        for chunk in chunks:
+            yield chunk
+
+    monkeypatch.setattr(server, "_gather_memory_context", memory)
+    monkeypatch.setattr(sirius_brain, "ask_sirius_stream", stream)
+    response = client.post("/api/chat/stream", json={"text": "bruit télé", "keys": {"groq_key": "fake"}, "session_id": "noise"})
+    events = [_json.loads(line[5:]) for line in response.text.splitlines() if line.startswith("data:")]
+    deltas = "".join(e["text"] for e in events if e["type"] == "delta")
+    done = events[-1]
+    assert done["type"] == "done"
+    assert bool(done.get("ignored")) is ignored
+    saved = asyncio.run(server.db.sirius_chats.find_one({"session_id": f"{user['user_id']}:noise"}))
+    if ignored:
+        assert deltas == "" and done["answer"] == "" and saved is None
+    else:
+        assert deltas == "".join(chunks) and saved is not None

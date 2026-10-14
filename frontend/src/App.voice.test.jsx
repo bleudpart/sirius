@@ -352,6 +352,16 @@ test("stream transport preserves incremental speech and does not send a duplicat
   expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/chat"))).toHaveLength(0);
 });
 
+test("background noise judged off-topic by the server stays silent and shows nothing", async () => {
+  mockConversationStream([{ type: "done", ignored: true, answer: "" }]);
+  await mount();
+  await send("et la suite du film ce soir sur la deux");
+  expect(speakSeries).not.toHaveBeenCalled();
+  expect(speakFr).not.toHaveBeenCalled();
+  expect(host.querySelector('[data-testid="sirius-display-body"]')).toBeNull();
+  expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/chat"))).toHaveLength(0);
+});
+
 test("an expired trial is shown explicitly without retrying chat or inventing a local answer", async () => {
   const fallback = global.fetch.getMockImplementation();
   const message = "Essai de 7 jours terminé : configurez vos clés personnelles.";

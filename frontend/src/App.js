@@ -1590,6 +1590,17 @@ function App() {
       if (pid && progress?.error) progress.error(pid, message);
       return true;
     };
+    // Bruit de fond (télé, autre personne) jugé non adressé à Sirius : aucune réponse,
+    // ni à l'écran ni à voix haute, et le micro reprend l'écoute s'il était en conversation.
+    const stayQuiet = () => {
+      voiceSeriesPendingRef.current = false;
+      speakingRef.current = false;
+      streamDisplayIdRef.current = null;
+      setVoicePhase("idle");
+      if (pid && progress?.done) progress.done(pid, "Bruit de fond ignoré");
+      onSpeechEndRef.current();
+      return true;
+    };
 
     // -------------------------------------------------------------
     // NIVEAU 1 : VOIE FLUX STREAM (SSE) avec timeout global de 60 s
@@ -1685,6 +1696,7 @@ function App() {
 
           if (data) {
             if (externalSignal.aborted) return true;
+            if (data.ignored && !full.trim()) return stayQuiet();
             if (dispatchAutonomousVideoAction(data.action)) {
               cancelSpeech();
               voiceSeriesPendingRef.current = false;
@@ -1758,6 +1770,10 @@ function App() {
       if (resp.ok) {
         const data = resp.data;
         if (externalSignal.aborted) return;
+        if (data?.ignored) {
+          stayQuiet();
+          return;
+        }
         if (dispatchAutonomousVideoAction(data.action)) {
           if (pid && progress?.done) progress.done(pid, "Action vidéo transmise");
           return;

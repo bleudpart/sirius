@@ -450,6 +450,13 @@ async def chat(req: ChatRequest, request: Request):
         logger.error("[CHAT] Erreur cerveau (%s)", type(e).__name__)
         raise HTTPException(status_code=502, detail="Le fournisseur de conversation a refusé la requête.")
 
+    from sirius_brain import is_ignored_answer
+    if not autonomous_action and is_ignored_answer(answer):
+        logger.info("[CHAT] Phrase captée jugée hors sujet : réponse silencieuse")
+        return {"ignored": True, "answer": "", "response": "", "text": "", "used_search": False,
+                "memories": [], "popups": [], "action": None, "key_source": k3_source(),
+                "timings": {"brain_ms": brain_ms}}
+
     # Persistance des nouveaux souvenirs dans la base locale (entre les sessions),
     # avec classement automatique en preference / projet / souvenir.
     for m in memories:
@@ -520,8 +527,9 @@ async def chat_stream(req: ChatRequest, request: Request):
                 answer = autonomous_action["technical_comment"]
                 yield f"data: {json.dumps({'type': 'delta', 'text': answer}, ensure_ascii=False)}\n\n"
             else:
-                from sirius_brain import ask_sirius_stream
+                from sirius_brain import ask_sirius_stream, could_become_ignored_marker, is_ignored_answer
                 parts = []
+                held = True
                 async for delta in ask_sirius_stream(
                     prompt=texte,
                     history=history,
@@ -533,8 +541,24 @@ async def chat_stream(req: ChatRequest, request: Request):
                     environment=req.environment or {},
                 ):
                     parts.append(delta)
+                    if held:
+                        # Tant que le début peut être le marqueur silencieux, rien n'est envoyé.
+                        if could_become_ignored_marker("".join(parts)):
+                            continue
+                        held = False
+                        delta = "".join(parts)
                     yield f"data: {json.dumps({'type': 'delta', 'text': delta}, ensure_ascii=False)}\n\n"
                 answer = "".join(parts).strip()
+                if is_ignored_answer(answer):
+                    logger.info("[CHAT FLUX] Phrase captée jugée hors sujet : réponse silencieuse")
+                    ignored = {"type": "done", "ignored": True, "answer": "", "response": "", "text": "",
+                               "memories": [], "popups": [], "action": None,
+                               "timings": {"brain_ms": int((time.perf_counter() - t0) * 1000)},
+                               "key_source": k3_source()}
+                    yield f"data: {json.dumps(ignored, ensure_ascii=False)}\n\n"
+                    return
+                if held and answer:
+                    yield f"data: {json.dumps({'type': 'delta', 'text': answer}, ensure_ascii=False)}\n\n"
 
             brain_ms = int((time.perf_counter() - t0) * 1000)
 

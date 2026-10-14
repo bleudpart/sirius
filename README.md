@@ -183,6 +183,14 @@ les blocs « Sources : » et les URL sont retirés juste avant la synthèse voca
 (`frontend/src/spokenSources.js`). Ils restent affichés dans ΣIRIUS DISPLAY.
 Elle peut donc toujours indiquer la source si l'utilisateur la demande.
 
+Bruit de fond : quand le micro capte une phrase manifestement non adressée à
+ΣIRIUS (télévision, radio, autre personne), le modèle répond le marqueur
+`[[HORS_SUJET]]`. Le serveur ne transmet alors aucun texte, n'enregistre rien
+dans l'historique et renvoie `ignored: true` ; l'application reste silencieuse
+et reprend l'écoute. En cas de doute, ΣIRIUS répond normalement. Le prompt
+système liste aussi ses vrais modules et lui interdit d'inventer une définition
+ou le développement d'un sigle.
+
 Le bulletin est lu passage par passage. Pendant la session, « qui a fait quoi ? »
 ou « répète cette info » rappelle le passage réellement annoncé ; « quel temps
 tu as dit ? » rappelle la météo annoncée, sans nouvelle recherche. « Reprends
