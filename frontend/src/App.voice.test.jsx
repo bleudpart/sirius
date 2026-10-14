@@ -597,7 +597,7 @@ test.each(["les infos", "les actualités", "Donne-moi toutes les infos du jour"]
   expect(message).toContain("Information internationale");
   expect(message).toContain("Résultat sportif");
   expect(message).toContain("Santé : source temporairement indisponible.");
-  expect(message).toContain("publié aujourd'hui à");
+  expect(message).toContain("Publié aujourd'hui à");
   expect(message).not.toContain("Une phrase coup");
   expect(localStorage.getItem("sirius_last_briefing_context")).toContain("Information internationale");
 });

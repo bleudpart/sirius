@@ -81,7 +81,7 @@ const sections = () => [
 test("the bulletin keeps only sourced items from the last 48 hours, with explicit sections and links", () => {
   const bulletin = buildNewsBulletin({ scope: "all", sections: sections(), weather: { text: "Météo à Lyon.", source: "Open-Meteo", url: "https://open-meteo.com/" }, now: NOW });
   expect(bulletin.segments.map((segment) => segment.kind)).toEqual(["intro", "weather", "news", "news", "status", "status"]);
-  expect(bulletin.segments[2].text).toMatch(/^France : Décision du maire\. Le conseil a voté\. Source : Franceinfo, publié aujourd'hui à \d{1,2} h 05\.$/);
+  expect(bulletin.segments[2].text).toMatch(/^France : Décision du maire\. Le conseil a voté\. Publié aujourd'hui à \d{1,2} h 05\. Source : Franceinfo\.$/);
   expect(bulletin.segments[3].text).toContain("International : Vote du parlement.");
   expect(bulletin.spokenText).not.toMatch(/périmé|futur|Sans lien|Une phrase coup|Ancien match/);
   expect(bulletin.spokenText).toContain("Santé : source temporairement indisponible.");

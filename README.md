@@ -178,6 +178,11 @@ L'application interroge alors Open-Meteo directement depuis l'appareil, avec la
 même exigence de correspondance exacte de la ville et les mêmes contrôles.
 Une ville introuvable (404) n'est pas relancée.
 
+À l'oral, ΣIRIUS ne cite ni ses sources ni ses liens : la phrase « Source : … »,
+les blocs « Sources : » et les URL sont retirés juste avant la synthèse vocale
+(`frontend/src/spokenSources.js`). Ils restent affichés dans ΣIRIUS DISPLAY.
+Elle peut donc toujours indiquer la source si l'utilisateur la demande.
+
 Le bulletin est lu passage par passage. Pendant la session, « qui a fait quoi ? »
 ou « répète cette info » rappelle le passage réellement annoncé ; « quel temps
 tu as dit ? » rappelle la météo annoncée, sans nouvelle recherche. « Reprends

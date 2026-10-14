@@ -145,7 +145,7 @@ export function buildNewsBulletin({ scope = "all", sections, weather, now = Date
       segments.push({
         kind: "news", section: section.label,
         article: { titre: article.titre, source: article.source, url: article.url, date: article.date },
-        text: `${section.label} : ${title}${description} Source : ${article.source}, publié ${publishedWhen(article.date, now)}.`,
+        text: `${section.label} : ${title}${description} Publié ${publishedWhen(article.date, now)}. Source : ${article.source}.`,
       });
     });
     if (!distinct.length) {

@@ -8,6 +8,7 @@ import { API_BASE_URL } from "./lib/api";
 import { KEY_STORAGE_EVENT, loadApiKeys } from "./apiKeyStorage";
 import { formatSpeechDate } from "./dateTime";
 import { selectFrenchVoice } from "./frenchVoiceSelection";
+import { stripSpokenSources } from "./spokenSources";
 
 const API = API_BASE_URL;
 const TTS_REQUEST_TIMEOUT_MS = 8000;
@@ -42,7 +43,7 @@ export function cleanTextForDisplay(t) {
 }
 
 function cleanTextForSpeech(t) {
-  return normalizeFrenchElisions(normalizeFrenchElisions(String(t || ""))
+  return normalizeFrenchElisions(normalizeFrenchElisions(stripSpokenSources(t))
     // « ΣIRIUS » : la synthèse lit le sigma grec (« sigma irius ») ; le nom se prononce « Sirius ».
     .replace(/Σ\s?IRIUS/gi, "Sirius")
     .replace(/```[\s\S]*?```/g, " ")            // blocs de code entiers
