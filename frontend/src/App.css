@@ -5192,6 +5192,13 @@ body.hud-minimal .medallion-halo { display: none; }
 .hc-dictation-field .memory-icon-btn.on { color: #f43f5e; border-color: rgba(244, 63, 94, 0.7); box-shadow: 0 0 12px rgba(244, 63, 94, 0.35); }
 .hc-form .cmd-input { flex: 1 1 130px; min-width: 110px; }
 .hc-form .hc-wide { flex: 2 1 260px; }
+/* .cmd-send est un carré de 34 px pensé pour la barre de chat : ici il porte un libellé. */
+.hc-form .cmd-send,
+.hc-label .cmd-send {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  width: auto; height: auto; min-height: 34px; padding: 6px 14px;
+  font-size: 13px; letter-spacing: 0.04em; white-space: nowrap;
+}
 .hc-select { appearance: auto; }
 .hc-list { display: flex; flex-direction: column; gap: 6px; max-height: 46vh; }
 .hc-row {
