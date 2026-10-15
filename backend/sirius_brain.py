@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import httpx
 from openai import AsyncOpenAI, BadRequestError, DefaultAsyncHttpxClient, RateLimitError
 from media_intent import parse_media_intent
+from motorsport_results import is_motorsport_question, motorsport_context
 from productivite.intent_productivite import parse_productivity_intent
 from provider_access import provider_key, personal_key
 
@@ -863,7 +864,8 @@ def _format_news_results(results) -> str:
 
 async def _research_current_prices(prompt: str, serp_key: str = "", *, timeout: float = 5.5) -> str:
     question = str(prompt or "").split("CONTEXTE DU DERNIER BRIEFING :", 1)[0].strip()
-    live_event = is_live_event_question(question) and not is_current_price_question(question)
+    motorsport = is_motorsport_question(question)
+    live_event = (is_live_event_question(question) or motorsport) and not is_current_price_question(question)
     if not is_targeted_factual_question(prompt) and not live_event:
         return ""
 
@@ -882,16 +884,21 @@ async def _research_current_prices(prompt: str, serp_key: str = "", *, timeout: 
     async def news():
         return await _google_news_results(question, timeout=timeout) if live_event else []
 
-    web_results, news_results = await asyncio.gather(
+    async def official_motorsport():
+        return await motorsport_context(question, timeout=timeout) if motorsport else ""
+
+    web_results, news_results, official = await asyncio.gather(
         asyncio.wait_for(web(), timeout=timeout), asyncio.wait_for(news(), timeout=timeout),
+        asyncio.wait_for(official_motorsport(), timeout=timeout),
         return_exceptions=True,
     )
-    for label, outcome in (("web", web_results), ("actualités", news_results)):
+    for label, outcome in (("web", web_results), ("actualités", news_results), ("sport auto", official)):
         if isinstance(outcome, BaseException):
             logger.warning("[ΣIRIUS:RECHERCHE] %s indisponible : %r", label, outcome)
+    official_text = official if isinstance(official, str) else ""
     news_text = _format_news_results(news_results) if isinstance(news_results, list) else ""
     web_text = _format_price_sources(web_results, question) if isinstance(web_results, list) else ""
-    return "\n".join(part for part in (news_text, web_text) if part)
+    return "\n".join(part for part in (official_text, news_text, web_text) if part)
 
 
 def _is_news_request(prompt: str) -> bool:
@@ -925,12 +932,17 @@ def _news_answer_guidance(prompt: str) -> str:
 
 
 def needs_targeted_guidance(prompt: str) -> bool:
-    return is_targeted_factual_question(prompt) or is_live_event_question(prompt)
+    return (
+        is_targeted_factual_question(prompt)
+        or is_live_event_question(prompt)
+        or is_motorsport_question(str(prompt or "").split("CONTEXTE DU DERNIER BRIEFING :", 1)[0])
+    )
 
 
 def _targeted_answer_guidance(sources: str, prompt: str = "") -> str:
     today = time.strftime("%d/%m/%Y")
-    live_event = is_live_event_question(prompt) and not is_current_price_question(prompt)
+    question = str(prompt or "").split("CONTEXTE DU DERNIER BRIEFING :", 1)[0]
+    live_event = (is_live_event_question(prompt) or is_motorsport_question(question)) and not is_current_price_question(prompt)
     freshness = (
         "ÉVÉNEMENT RÉCENT : base-toi uniquement sur les articles les plus récents ci-dessous (leur date de "
         "publication est indiquée) et donne le résultat ou le fait le plus récent, avec son jour. Si les "
