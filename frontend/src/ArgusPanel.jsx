@@ -171,7 +171,7 @@ export default function ArgusPanel({ onClose, onClientAction, onRepaired }) {
     <div className="prime-screen" data-testid="argus-panel" ref={dragRef}>
       <MythosBackdrop module="ARGUS#" state={scanning ? "busy" : (errors && errors.length) ? "alert" : "idle"} />
       <header className="zeus-head">
-        <div className="oracle-title font-divine"><Radar size={20} /> ARGUS — SURVEILLANCE & RÉPARATION</div>
+        <div className="oracle-title font-divine"><Radar size={20} /> ARGUS <span className="module-function">— SURVEILLANCE & RÉPARATION</span></div>
         <button className="setup-close zeus-close" onClick={onClose} data-testid="argus-close-btn"><X size={18} /></button>
       </header>
       {char && (

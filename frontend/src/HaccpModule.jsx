@@ -537,7 +537,7 @@ export default function HaccpModule({ onClose, initialSource }) {
   return (
     <div className="prime-screen" data-testid="haccp-panel">
       <header className="zeus-head">
-        <div className="oracle-title font-divine"><ClipboardCheck size={20} /> HACCP — HYGIÈNE &amp; SÉCURITÉ ALIMENTAIRE</div>
+        <div className="oracle-title font-divine"><ClipboardCheck size={20} /> HACCP <span className="module-function">— HYGIÈNE &amp; SÉCURITÉ ALIMENTAIRE</span></div>
         <button className="setup-close zeus-close" onClick={onClose} data-testid="haccp-close-btn"><X size={18} /></button>
       </header>
       <div className="prime-sub">TRAÇABILITÉ · TEMPÉRATURES · PMS · NON-CONFORMITÉS · NETTOYAGE · ALLERGÈNES · DOCUMENTS</div>

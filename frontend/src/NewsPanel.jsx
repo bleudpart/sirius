@@ -53,7 +53,7 @@ export default function NewsPanel({ onClose }) {
   return (
     <div className="prime-screen news-screen" data-testid="news-panel">
       <header className="zeus-head">
-        <div className="oracle-title font-divine"><Newspaper size={20} /> ACTUALITÉS — FLUX EN DIRECT</div>
+        <div className="oracle-title font-divine"><Newspaper size={20} /> ACTUALITÉS <span className="module-function">— FLUX EN DIRECT</span></div>
         <button className="setup-close zeus-close" onClick={onClose} data-testid="news-close-btn"><X size={18} /></button>
       </header>
 
