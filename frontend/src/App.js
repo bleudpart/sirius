@@ -676,12 +676,25 @@ function App() {
   // révèle donc le texte à vitesse de lecture, en accélérant si le retard s'accumule.
   const streamDisplayIdRef = useRef(null);
   const streamTypingRef = useRef({ timer: null, target: "", shown: 0, done: false });
+  const beginDisplayResponse = useCallback((question = "") => {
+    const previous = streamTypingRef.current;
+    clearInterval(previous.timer);
+    const id = streamDisplayIdRef.current;
+    if (id) {
+      const complete = (entry) => entry.id === id ? { ...entry, contenu: previous.target } : entry;
+      setDisplay(complete);
+      setDisplayHistory((history) => history.map(complete));
+    }
+    streamDisplayIdRef.current = null;
+    streamTypingRef.current = { timer: null, target: "", shown: 0, done: false, question };
+  }, []);
+  useEffect(() => () => clearInterval(streamTypingRef.current.timer), []);
   const streamOnDisplay = useCallback((contenu, done = false, titre = "ΣIRIUS — RÉPONSE") => {
     const st = streamTypingRef.current;
     st.target = contenu || "";
     if (done) st.done = true;
     if (!streamDisplayIdRef.current) {
-      const entry = { type: "message", titre, contenu: "", id: Date.now() + Math.random() };
+      const entry = { type: "message", titre, question: st.question, contenu: "", id: Date.now() + Math.random() };
       streamDisplayIdRef.current = entry.id;
       st.shown = 0;
       st.done = done;
@@ -1556,6 +1569,7 @@ function App() {
       return;
     }
 
+    beginDisplayResponse(command);
     let pid = null;
     if (typeof progress !== "undefined" && progress?.start) {
       pid = progress.start("Réponse de Sirius", { silent: true });
@@ -1806,7 +1820,7 @@ function App() {
     speakOut(fallback);
     streamOnDisplay(fallback, true, "ΣIRIUS — RÉPONSE LOCALE");
 
-  }, [speakOut, keys, profile, computeMood, showOnDisplay, streamOnDisplay, sysMode, tasks, displayOpen, display.contenu, display?.suggestion, renderVoiceSignal]);
+  }, [speakOut, keys, profile, computeMood, showOnDisplay, streamOnDisplay, beginDisplayResponse, sysMode, tasks, displayOpen, display.contenu, display?.suggestion, renderVoiceSignal]);
 
   // ---- Interruption naturelle : le micro écoute PENDANT que Sirius parle ----
   const stopInterruptListener = useCallback(() => {
@@ -2014,7 +2028,7 @@ function App() {
         typeof response.data?.detail === "string" ? response.data.detail : "La source d'actualités ne répond pas.",
       );
       const bulletin = buildNewsBulletin({ scope, sections: response.data?.sections, weather });
-      streamDisplayIdRef.current = null;
+      beginDisplayResponse();
       streamOnDisplay(bulletin.displayText, true, "INFOS DU JOUR");
       localStorage.setItem("sirius_last_briefing", todayStr());
       localStorage.setItem("sirius_last_briefing_context", JSON.stringify({ saved_at: Date.now(), text: bulletin.spokenText.slice(-12000) }));
@@ -2027,11 +2041,11 @@ function App() {
       const message = "Les actualités ne peuvent pas être vérifiées pour le moment. Réessayez dans un instant.";
       setVoiceMessage(message);
       setText(message);
-      streamDisplayIdRef.current = null;
+      beginDisplayResponse();
       streamOnDisplay(message, true, "INFOS DU JOUR");
       speakOut(message);
     }
-  }, [speakOut, streamOnDisplay, requestBulletinWeather, speakBulletin]);
+  }, [speakOut, streamOnDisplay, beginDisplayResponse, requestBulletinWeather, speakBulletin]);
 
   // Question sur un passage annoncé : le modèle reçoit ce passage et ne relance pas le bulletin.
   const answerBulletinQuestion = useCallback(async (prompt) => {
@@ -6552,7 +6566,7 @@ function App() {
         if (!force && cached?.version === 2 && cached?.date === todayStr() && Date.now() - (cached.saved_at || 0) < DAILY_BRIEFING_CACHE_MS && cached.msg) {
           localStorage.setItem("sirius_last_briefing", todayStr());
           localStorage.setItem("sirius_last_briefing_context", JSON.stringify({ saved_at: cached.saved_at, text: cached.msg.slice(-12000) }));
-          streamDisplayIdRef.current = null;
+          beginDisplayResponse();
           streamOnDisplay(cached.displayMsg || cached.msg, true, "INFOS DU JOUR");
           setStatus("speaking");
           setText(cached.msg);
@@ -6701,7 +6715,7 @@ function App() {
           localStorage.setItem("sirius_last_briefing_context", JSON.stringify({ saved_at: savedAt, text: msg.slice(-12000) }));
           localStorage.setItem("sirius_daily_briefing_cache", JSON.stringify({ version: 2, date: todayStr(), saved_at: savedAt, msg, displayMsg }));
           if (signal.aborted) return;
-          streamDisplayIdRef.current = null; // nouvelle fenêtre dédiée au briefing, révélée progressivement
+          beginDisplayResponse();
           streamOnDisplay(displayMsg, true, "INFOS DU JOUR");
           setStatus("speaking");
           setText(msg);
@@ -6723,7 +6737,7 @@ function App() {
         progress.error(pid, "Briefing indisponible");
       }
       finally { briefingInFlightRef.current = false; }
-  }, [streamOnDisplay, userName, profile, msFetch, presentNextActionPlan]);
+  }, [streamOnDisplay, beginDisplayResponse, userName, profile, msFetch, presentNextActionPlan]);
   useEffect(() => { runBriefingRef.current = runBriefingDisplay; }, [runBriefingDisplay]);
   useEffect(() => {
     // Briefing uniquement sur demande : activable via sirius_briefing_auto = "1".

@@ -666,11 +666,11 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
                     key={h.id}
                     className={`sd-chip ${active ? "active" : ""}`}
                     onClick={() => onSelect(h)}
-                    title={h.titre || h.legende || h.url || h.contenu || ""}
+                    title={h.question || h.titre || h.legende || h.url || h.contenu || ""}
                     data-testid={`sirius-display-chip-${h.id}`}
                   >
                     <M.Icon size={10} />
-                    <span>{(h.titre || h.legende || h.url || h.contenu || "—").slice(0, 22)}</span>
+                    <span>{(h.question || h.titre || h.legende || h.url || h.contenu || "—").slice(0, 22)}</span>
                   </button>
                 );
               })}

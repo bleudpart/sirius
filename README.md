@@ -728,6 +728,8 @@ données locales et secrets sont exclus du scan.
 ### Modules spécialisés
 - **HACCP** — hygiène & sécurité alimentaire (formulaires 2026)
 - **THÉMIS#** — devis, factures, paiements, pièces fournisseurs, journal comptable, synthèse TVA, rapprochement bancaire et bilan prévisionnel
+  - Les questions de gestion dans le chat (écrit ou vocal) utilisent un résumé des données THÉMIS du compte : factures non payées et solde restant, devis en cours, encaissements, clients et stocks bas. Les questions de suivi relisent les données à jour. Un compte vide ou une lecture indisponible sont signalés explicitement ; aucune relance par mail n'est envoyée par le chat.
+- **ΣIRIUS DISPLAY** — l'historique des réponses est repéré par la question posée. Chaque nouvel échange garde sa propre entrée, même si l'affichage progressif du précédent n'est pas terminé ; une récupération HTTP après interruption du flux reste dans la même entrée.
 - **ARGUS#** — surveillance & réparation système
 - **LOCUS#** — géolocalisation & itinéraires
 - **HERACLES#** — investigation OSINT

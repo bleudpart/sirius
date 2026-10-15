@@ -89,8 +89,10 @@ async def _with_themis_context(req, uid: str, history=None) -> None:
     if wants_business_context(req.text, history):
         own = await themis_context(db, uid)
         context = own or (provided if isinstance(provided, str) else "")
-        if context:
-            env["themis_context"] = context
+        env["themis_context"] = context or (
+            "THÉMIS ne contient encore aucune donnée pour ce compte. "
+            "Aucune facture, aucun client, aucun article ni paiement enregistré."
+        )
     req.environment = env
 
 
@@ -413,19 +415,17 @@ async def chat(req: ChatRequest, request: Request):
         raise HTTPException(status_code=400, detail="Texte vide")
     if not _rate_ok(uid):
         raise HTTPException(status_code=429, detail="Trop de requêtes, patientez un instant.")
-    await _with_themis_context(req, uid)
+    session_id = f"{uid}:{req.session_id or 'default'}"
+    doc = await db.sirius_chats.find_one({"session_id": session_id}, {"_id": 0, "history": 1})
+    history = (doc or {}).get("history", [])
+    await _with_themis_context(req, uid, history)
     if cloud_link.should_relay_chat(req.keys):
         return await cloud_link.relay_json("/api/chat", req.model_dump())
-    session_id = f"{uid}:{req.session_id or 'default'}"
     autonomous_action = detect_autonomous_action(texte)
     if not autonomous_action and not (personal_key("k3", req.keys) or personal_key("cerebras", req.keys)):
         require_personal("groq", req.keys)
     if not autonomous_action and not (personal_key("groq", req.keys) or personal_key("k3", req.keys) or personal_key("cerebras", req.keys)):
         await usage_quota.consume(db, user, "chat")
-
-    # Historique de la session (8 derniers échanges)
-    doc = await db.sirius_chats.find_one({"session_id": session_id}, {"_id": 0, "history": 1})
-    history = (doc or {}).get("history", [])
 
     # Mémoire locale (faits + épisodes condensés), rappel par pertinence sémantique/mots-clés —
     # les deux branches sont récupérées en parallèle (voir _gather_memory_context).
@@ -518,7 +518,10 @@ async def chat_stream(req: ChatRequest, request: Request):
         raise HTTPException(status_code=400, detail="Texte vide")
     if not _rate_ok(uid):
         raise HTTPException(status_code=429, detail="Trop de requêtes, patientez un instant.")
-    await _with_themis_context(req, uid)
+    session_id = f"{uid}:{req.session_id or 'default'}"
+    doc = await db.sirius_chats.find_one({"session_id": session_id}, {"_id": 0, "history": 1})
+    history = (doc or {}).get("history", [])
+    await _with_themis_context(req, uid, history)
     if cloud_link.should_relay_chat(req.keys):
         return StreamingResponse(
             cloud_link.relay_stream("/api/chat/stream", req.model_dump()),
@@ -530,9 +533,6 @@ async def chat_stream(req: ChatRequest, request: Request):
         require_personal("groq", req.keys)
     if not autonomous_action and not (personal_key("groq", req.keys) or personal_key("k3", req.keys) or personal_key("cerebras", req.keys)):
         await usage_quota.consume(db, user, "chat")
-    session_id = f"{uid}:{req.session_id or 'default'}"
-    doc = await db.sirius_chats.find_one({"session_id": session_id}, {"_id": 0, "history": 1})
-    history = (doc or {}).get("history", [])
     merged_memory = await _gather_memory_context(texte, uid, req.memory)
     requested_ia_mode = (req.ia_mode or "jarvis").lower()
     effective_mode = "turbo" if detect_urgency(texte) else (

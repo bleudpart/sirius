@@ -57,8 +57,8 @@ async def themis_context(db, uid: str, today: date | None = None) -> str:
         payments = await db.themis_payments.find(query, NO_ID).to_list(2000)
     except Exception as error:
         logger.warning("themis_context indisponible (%s)", type(error).__name__)
-        return ""
-    if not (docs or items or clients or orders):
+        return "Données THÉMIS indisponibles : la lecture a échoué. Ne déduis aucun montant ni absence de factures."
+    if not (docs or items or clients or orders or payments):
         return ""
 
     factures = [d for d in docs if d.get("kind") == "facture"]

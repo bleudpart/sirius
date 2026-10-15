@@ -39,9 +39,12 @@ jest.mock("./lazyModules", () => new Proxy({}, { get: (_, key) => {
   if (["VoiceProfilePanel", "WorkDossiersPanel"].includes(key)) return ({ onClose }) => (
     <div data-testid={`workspace-${key}`}><button onClick={onClose}>Fermer</button></div>
   );
-  if (key === "SiriusDisplay") return ({ item, onRead }) => <div data-testid="sirius-display">
+  if (key === "SiriusDisplay") return ({ item, history, onSelect, onRead }) => <div data-testid="sirius-display">
     <button data-testid="sirius-display-read" onClick={onRead}>Lire</button>
     <div data-testid="sirius-display-body">{item.contenu}</div>
+    <div data-testid="sirius-display-history">{history.map((entry) => (
+      <button key={entry.id} onClick={() => onSelect(entry)}>{entry.question || entry.titre}</button>
+    ))}</div>
   </div>;
   return () => null;
 } }));
@@ -350,6 +353,55 @@ test("stream transport preserves incremental speech and does not send a duplicat
   expect(host.querySelector(".voice-session-controls").textContent).not.toContain("Réponse interrompue");
   expect(reader.cancel).toHaveBeenCalledTimes(1);
   expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/chat"))).toHaveLength(0);
+});
+
+test("display keeps separate named exchanges when a new answer interrupts progressive rendering", async () => {
+  mockConversationStream([
+    { type: "delta", text: "Première réponse complète." },
+    { type: "done", answer: "Première réponse complète." },
+  ]);
+  await mount();
+  await send("Explique le ciel bleu");
+  await act(async () => jest.advanceTimersByTime(160));
+
+  mockConversationStream([
+    { type: "delta", text: "Deuxième réponse complète." },
+    { type: "done", answer: "Deuxième réponse complète." },
+  ]);
+  await send("Explique la couleur de la mer");
+  await act(async () => jest.advanceTimersByTime(3000));
+
+  const chips = host.querySelectorAll('[data-testid="sirius-display-history"] button');
+  expect([...chips].map((chip) => chip.textContent)).toEqual([
+    "Explique la couleur de la mer", "Explique le ciel bleu",
+  ]);
+  expect(host.querySelector('[data-testid="sirius-display-body"]').textContent).toBe("Deuxième réponse complète.");
+  await act(async () => chips[1].click());
+  expect(host.querySelector('[data-testid="sirius-display-body"]').textContent).toBe("Première réponse complète.");
+});
+
+test("display finalizes a slow stream in a single history entry", async () => {
+  let finishStream;
+  const reader = {
+    read: jest.fn()
+      .mockResolvedValueOnce({ done: false, value: new Uint8Array(Buffer.from('data: {"type":"delta","text":"Bonjour."}\n\n')) })
+      .mockImplementationOnce(() => new Promise((resolve) => { finishStream = resolve; }))
+      .mockResolvedValue({ done: true }),
+    cancel: jest.fn(async () => {}),
+  };
+  const fallback = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation((url, options) => String(url).endsWith("/chat/stream")
+    ? Promise.resolve({ ok: true, headers: { get: () => "text/event-stream" }, body: { getReader: () => reader } })
+    : fallback(url, options));
+  await mount();
+  await send("Explique le ciel bleu");
+  await act(async () => jest.advanceTimersByTime(1000));
+  await act(async () => finishStream({
+    done: false, value: new Uint8Array(Buffer.from('data: {"type":"done","answer":"Bonjour."}\n\n')),
+  }));
+  await act(async () => jest.advanceTimersByTime(1000));
+  expect(host.querySelectorAll('[data-testid="sirius-display-history"] button')).toHaveLength(1);
+  expect(host.querySelector('[data-testid="sirius-display-body"]').textContent).toBe("Bonjour.");
 });
 
 test("background noise judged off-topic by the server stays silent and shows nothing", async () => {
