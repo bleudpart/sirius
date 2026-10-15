@@ -33,11 +33,27 @@ apt-get install -y \
   git \
   gnupg \
   lsb-release \
-  python3.12 \
-  python3.12-venv \
-  python3-pip \
   ufw \
   unattended-upgrades
+
+# Les petits VPS (1-2 Go) manquent de mémoire pour pip et Chromium : swap de secours.
+if ! swapon --show | grep -q '/swapfile'; then
+  echo "==> Swap de 2 Go"
+  fallocate -l 2G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+
+# Python 3.12 via uv : identique quelle que soit la version d'Ubuntu (24.04, 26.04...).
+if ! command -v uv >/dev/null 2>&1; then
+  echo "==> Installation de uv"
+  curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
+fi
+export UV_PYTHON_INSTALL_DIR=/opt/python
+uv python install 3.12
+PYTHON_BIN="$(uv python find 3.12)"
 
 cat >/etc/apt/apt.conf.d/20auto-upgrades <<'AUTOUPGRADES'
 APT::Periodic::Update-Package-Lists "1";
@@ -93,14 +109,17 @@ if [[ ! -f "$BACKEND_DIR/requirements.txt" ]]; then
 fi
 
 echo "==> Environnement Python"
-sudo -u sirius python3.12 -m venv "$VENV_DIR"
+chmod -R a+rX /opt/python
+sudo -u sirius "$PYTHON_BIN" -m venv "$VENV_DIR"
 sudo -u sirius "$VENV_DIR/bin/python" -m pip install --upgrade pip wheel setuptools
 sudo -u sirius "$VENV_DIR/bin/python" -m pip install -r "$BACKEND_DIR/requirements.txt"
 
 if grep -Eq '^playwright([<=>=~! ]|$)' "$BACKEND_DIR/requirements.txt"; then
   echo "==> Navigateurs Playwright (Chromium)"
   install -d -o sirius -g sirius -m 0755 "$PLAYWRIGHT_BROWSERS_PATH"
-  PLAYWRIGHT_BROWSERS_PATH="$PLAYWRIGHT_BROWSERS_PATH" "$VENV_DIR/bin/python" -m playwright install --with-deps chromium
+  if ! PLAYWRIGHT_BROWSERS_PATH="$PLAYWRIGHT_BROWSERS_PATH" "$VENV_DIR/bin/python" -m playwright install --with-deps chromium; then
+    echo "AVERTISSEMENT : Chromium/Playwright non installé ; la navigation web automatisée sera indisponible." >&2
+  fi
   chown -R sirius:sirius "$PLAYWRIGHT_BROWSERS_PATH"
 fi
 

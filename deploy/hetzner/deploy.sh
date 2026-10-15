@@ -28,7 +28,7 @@ chown -R sirius:sirius "$APP_DIR"
 
 if [[ ! -x "$VENV_DIR/bin/python" ]]; then
   echo "==> Création du venv"
-  sudo -u sirius python3.12 -m venv "$VENV_DIR"
+  sudo -u sirius "$(UV_PYTHON_INSTALL_DIR=/opt/python uv python find 3.12)" -m venv "$VENV_DIR"
 fi
 
 AFTER_REQUIREMENTS="$(sha256sum "$BACKEND_DIR/requirements.txt" | awk '{print $1}')"
