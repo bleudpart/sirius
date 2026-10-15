@@ -134,6 +134,7 @@ if [[ ! -f "$ENV_FILE" ]]; then
 fi
 chmod 0600 "$ENV_FILE"
 chown root:root "$ENV_FILE"
+[[ -s "$ENV_FILE" && -n "$(tail -c1 "$ENV_FILE")" ]] && echo >> "$ENV_FILE"
 grep -q '^SIRIUS_DATA_DIR=' "$ENV_FILE" || echo "SIRIUS_DATA_DIR=$DATA_DIR" >> "$ENV_FILE"
 grep -q '^PLAYWRIGHT_BROWSERS_PATH=' "$ENV_FILE" || echo "PLAYWRIGHT_BROWSERS_PATH=$PLAYWRIGHT_BROWSERS_PATH" >> "$ENV_FILE"
 
