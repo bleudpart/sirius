@@ -99,3 +99,9 @@ test.each(["définis authenticité", "vérifie l'authenticité de ce document", 
   "preserves a genuine authenticity request: %s",
   (text) => expect(normalizeVoiceTranscript(text)).toBe(text),
 );
+
+test("reconnaît « Sérieuse » en tête d'énoncé comme l'appel de SIRIUS, sans toucher l'adjectif", () => {
+  expect(extractVoiceCommand("Sérieuse, donne-moi le résultat complet", { requireWakeWord: true }))
+    .toBe("donne-moi le résultat complet");
+  expect(normalizeVoiceTranscript("une affaire sérieuse")).toBe("une affaire sérieuse");
+});

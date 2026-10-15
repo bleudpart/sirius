@@ -17,6 +17,8 @@ export function normalizeVoiceTranscript(text) {
     [/\bsirus\b/gi, "SIRIUS"],
     [/\bcyrus\b/gi, "SIRIUS"],
     [/\bs[ée]rieux\b/gi, "SIRIUS"],
+    // « Sérieuse » est un vrai mot : on ne le corrige qu'en tête d'énoncé, là où l'on appelle SIRIUS.
+    [/^(\s*)s[ée]rieuses?(?=[\s,.:;!?-])/i, "$1SIRIUS"],
     [/\bargousse\b/gi, "ARGUS"],
     [/\bargus\b/gi, "ARGUS"],
     [/\bargue us\b/gi, "ARGUS"],

@@ -997,12 +997,14 @@ def _response_token_budget(prompt: str, mode: str) -> int:
     return 2200 if _is_news_request(prompt) else 1200
 
 
-async def _kimi_answer(prompt, history, profile, memory, mode, mood, key, environment, research, targeted_research):
+async def _kimi_answer(prompt, history, profile, memory, mode, mood, key, environment, research, targeted_research,
+                       research_prompt=None):
+    research_prompt = research_prompt or prompt
     system_prompt = build_system_prompt(profile, memory, mode, mood, environment)
     if research:
         system_prompt += "\n\nSOURCES WEB COLLECTÉES :\n" + research
-    if needs_targeted_guidance(prompt):
-        system_prompt += _targeted_answer_guidance(targeted_research, prompt)
+    if needs_targeted_guidance(research_prompt):
+        system_prompt += _targeted_answer_guidance(targeted_research, research_prompt)
     system_prompt += _news_answer_guidance(prompt)
     if (mode or "normal").lower() == "profond":
         system_prompt += _DEEP_ANSWER_GUIDANCE
@@ -1145,6 +1147,35 @@ def _conversation_history(history):
         if role in ("user", "assistant") and content:
             messages.append({"role": role, "content": content[:800]})
     return messages
+
+
+_FOLLOW_UP_RE = re.compile(
+    r"\b(?:r[ée]sultats?|classements?|complets?|d[ée]tails?|tous\s+les|toute\s+la|podium|"
+    r"qui\s+(?:a|est)|et\s+(?:le|la|les|en)|pilotes?|courses?|top|vainqueur|gagn[ée])\b",
+    re.I,
+)
+
+
+def _with_follow_up_topic(prompt, history):
+    """Une relance courte (« le résultat complet ») hérite du sujet sport auto de la question précédente."""
+    text = str(prompt or "")
+    question = text.split("CONTEXTE DU DERNIER BRIEFING :", 1)[0].strip()
+    if (
+        is_motorsport_question(question)
+        or len(question.split()) > 20
+        or not _FOLLOW_UP_RE.search(question)
+    ):
+        return prompt
+    previous_questions = [
+        str(turn.get("content") or "").strip()
+        for turn in (history or [])[-8:]
+        if isinstance(turn, dict) and turn.get("role") == "user"
+    ]
+    previous_questions = [item for item in previous_questions if item and item != question]
+    for previous in reversed(previous_questions[-2:]):
+        if is_motorsport_question(previous):
+            return f"{previous[:200]} — {text}"
+    return prompt
 
 
 async def _answer_context(prompt, mode, serp_key):
@@ -1458,14 +1489,15 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
 
     tag = f"[ΣIRIUS:{(mode or 'normal').upper()}]"
 
-    research, targeted_research = await _answer_context(prompt, mode, serp_key)
+    research_prompt = _with_follow_up_topic(prompt, history)
+    research, targeted_research = await _answer_context(research_prompt, mode, serp_key)
     deep_kimi = (mode or "normal").lower() == "profond" and bool(k3_key)
 
     if deep_kimi:
         try:
             return await _kimi_answer(
                 prompt, history, profile, memory, mode, mood, k3_key, environment,
-                research, targeted_research,
+                research, targeted_research, research_prompt,
             )
         except Exception as error:
             logger.warning("[ΣIRIUS:PROFOND] Kimi indisponible, repli vers le fournisseur rapide : %r", error)
@@ -1474,8 +1506,8 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
         sys_prompt = build_system_prompt(profile=profile, memory=memory, mode=mode, mood=mood, environment=environment)
         if research:
             sys_prompt += "\n\nSOURCES WEB COLLECTÉES :\n" + research
-        if needs_targeted_guidance(prompt):
-            sys_prompt += _targeted_answer_guidance(targeted_research, prompt)
+        if needs_targeted_guidance(research_prompt):
+            sys_prompt += _targeted_answer_guidance(targeted_research, research_prompt)
         sys_prompt += _news_answer_guidance(prompt)
         if (mode or "normal").lower() == "profond":
             sys_prompt += _DEEP_ANSWER_GUIDANCE
@@ -1594,19 +1626,20 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
         "\n\nRéponds directement en langage naturel, sans JSON, sans habillage, sans listes à puces "
         "sauf si explicitement demandé — uniquement le texte de ta réponse, prêt à être lu à voix haute."
     )
-    research, targeted_research = await _answer_context(prompt, mode, serp_key)
+    research_prompt = _with_follow_up_topic(prompt, history)
+    research, targeted_research = await _answer_context(research_prompt, mode, serp_key)
     if not groq_key and not k3_key:
         logger.warning("[ΣIRIUS:STREAM] Aucune clé LLM disponible, retour local.")
         if targeted_research:
-            yield _answer_from_research(prompt, targeted_research)
+            yield _answer_from_research(research_prompt, targeted_research)
         else:
             yield "Je n'ai pas pu générer de réponse pour le moment. Réessaie dans un instant."
         return
     models_to_try = fast_models[:1] if is_turbo else fast_models
     if research:
         sys_prompt += "\n\nSOURCES WEB COLLECTÉES :\n" + research
-    if needs_targeted_guidance(prompt):
-        sys_prompt += _targeted_answer_guidance(targeted_research, prompt)
+    if needs_targeted_guidance(research_prompt):
+        sys_prompt += _targeted_answer_guidance(targeted_research, research_prompt)
     sys_prompt += _news_answer_guidance(prompt)
     if (mode or "normal").lower() == "profond":
         sys_prompt += _DEEP_ANSWER_GUIDANCE

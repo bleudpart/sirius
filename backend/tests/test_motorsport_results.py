@@ -87,3 +87,20 @@ def test_research_puts_official_motorsport_data_before_articles(monkeypatch):
     assert context.startswith("DONNÉES OFFICIELLES SPORT AUTO")
     assert sirius_brain.needs_targeted_guidance(question)
     assert "N'utilise jamais tes connaissances" in sirius_brain._targeted_answer_guidance(context, question)
+
+
+def test_follow_up_inherits_previous_motorsport_topic():
+    import sirius_brain
+
+    history = [
+        {"role": "user", "content": "donne moi le résultat du MotoGP."},
+        {"role": "assistant", "content": "Bezzecchi a gagné en Indonésie."},
+    ]
+    follow_up = "SIRIUS, donne-moi le résultat complet avec tous les acteurs."
+
+    research_prompt = sirius_brain._with_follow_up_topic(follow_up, history)
+
+    assert motorsport.requested_series(research_prompt) == ["motogp"]
+    assert research_prompt.endswith(follow_up)
+    assert sirius_brain._with_follow_up_topic("quel temps fait-il à Lyon", history) == "quel temps fait-il à Lyon"
+    assert sirius_brain._with_follow_up_topic(follow_up, [{"role": "user", "content": "recette de crêpes"}]) == follow_up
