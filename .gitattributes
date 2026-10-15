@@ -1,0 +1,3 @@
+deploy/hetzner/*.sh text eol=lf
+deploy/hetzner/Caddyfile text eol=lf
+deploy/hetzner/sirius.service text eol=lf

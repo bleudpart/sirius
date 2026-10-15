@@ -1,0 +1,26 @@
+[Unit]
+Description=SIRIUS FastAPI backend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sirius
+Group=sirius
+WorkingDirectory=/opt/sirius/backend
+EnvironmentFile=/etc/sirius/sirius.env
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/sirius/.venv/bin/python -m uvicorn server:app --host 127.0.0.1 --port 8001 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGINT
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/sirius
+
+[Install]
+WantedBy=multi-user.target

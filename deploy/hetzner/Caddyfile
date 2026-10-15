@@ -1,0 +1,16 @@
+api.sirius-assistant.fr {
+	encode zstd gzip
+
+	reverse_proxy 127.0.0.1:8001 {
+		flush_interval -1
+		transport http {
+			dial_timeout 10s
+			response_header_timeout 0s
+			read_timeout 0s
+			write_timeout 0s
+		}
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+		header_up X-Real-IP {remote_host}
+	}
+}

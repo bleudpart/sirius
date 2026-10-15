@@ -1,0 +1,51 @@
+name: Deploy Hetzner
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - "backend/**"
+      - "deploy/**"
+      - ".github/workflows/deploy-hetzner.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-hetzner-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-hetzner-secret:
+    runs-on: ubuntu-latest
+    outputs:
+      has_host: ${{ steps.check.outputs.has_host }}
+    steps:
+      - name: Check Hetzner host secret
+        id: check
+        env:
+          HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
+        run: |
+          if [ -n "$HETZNER_HOST" ]; then
+            echo "has_host=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_host=false" >> "$GITHUB_OUTPUT"
+            echo "HETZNER_HOST is empty; deployment job will be skipped."
+          fi
+
+  deploy:
+    needs: check-hetzner-secret
+    if: ${{ needs.check-hetzner-secret.outputs.has_host == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy on Hetzner VPS
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_USER }}
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          command_timeout: 20m
+          script_stop: true
+          script: |
+            sudo /opt/sirius/deploy/hetzner/deploy.sh
