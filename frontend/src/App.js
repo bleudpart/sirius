@@ -75,6 +75,7 @@ import { getHUDStyleVariables, renderHUD } from "@/theme";
 import { SiriusInfoHub, SiriusInfoWheel } from "@/hud/SiriusHudPanels";
 import { restoreHudPanel } from "@/hud/hudPanelState";
 import { BACKEND_BASE_URL } from "@/lib/api";
+import { websocketProtocols } from "@/lib/sessionToken";
 import "@/App.css";
 import "@/mobileModulePages.css";
 import "@/desktopModuleInteriors.css";
@@ -1392,7 +1393,7 @@ function App() {
       if (stopped) return;
       cleanupSocket();
       try {
-        ws = new WebSocket(WS_URL);
+        ws = new WebSocket(WS_URL, websocketProtocols());
       } catch (e) {
         scheduleReconnect();
         return;

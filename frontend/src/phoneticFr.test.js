@@ -48,6 +48,10 @@ test("corrige les noms propres mal prononcés", () => {
   expect(applyFrenchPhonetics("Zirius Display")).toBe("Siriusse displé");
 });
 
+test.each(["SpaceX", "Space X", "Space-X", "SPACEX"])("prononce %s « spéïss-ex », pas « space exe »", (name) => {
+  expect(applyFrenchPhonetics(`Lancement ${name} réussi.`)).toBe("Lancement Spéïss-ex réussi.");
+});
+
 test.each(["PLUTOS", "Plutos", "plutos"])("prononce le nom %s comme un mot, pas un sigle", (name) => {
   expect(applyFrenchPhonetics(`J'ouvre ${name}.`)).toBe("J'ouvre Ploutoss.");
 });

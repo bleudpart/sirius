@@ -44,6 +44,29 @@ def test_stt_stream_requires_account():
     assert error.value.code == 1008
 
 
+def test_stt_stream_accepts_token_in_websocket_subprotocol(monkeypatch):
+    """L'app native ne peut ni envoyer Authorization ni rejouer le cookie sur un WebSocket."""
+    monkeypatch.setattr(voice_io.cloud_link, "should_relay_stt", lambda _key: True)
+    token = create_access_token("stt-test-user")
+
+    with TestClient(app).websocket_connect(
+        "/api/stt/stream", subprotocols=["sirius.bearer", token]
+    ) as websocket:
+        assert websocket.accepted_subprotocol == "sirius.bearer"
+        websocket.send_json({"action": "start", "groq_key": "configured-key"})
+        assert websocket.receive_json() == {"type": "ready"}
+
+
+def test_stt_stream_rejects_invalid_subprotocol_token():
+    with pytest.raises(WebSocketDisconnect) as error:
+        with TestClient(app).websocket_connect(
+            "/api/stt/stream", subprotocols=["sirius.bearer", "jeton-invalide"]
+        ):
+            pass
+
+    assert error.value.code == 1008
+
+
 def test_stt_stream_forwards_recorded_audio(monkeypatch):
     relayed = {}
 

@@ -210,7 +210,7 @@ app = FastAPI(title="Sirius Backend API", version="1.0.0", lifespan=_lifespan)
 # Imports des modules Sirius
 from storage import put_object, get_object, APP_NAME
 from local_memory import list_facts, add_fact, delete_fact, update_fact, log_event, prime_overview, log_service, list_service_log, recall_facts, learn_fact, recent_episodes
-from auth_api import _decode_token, is_direct_local_request, resolve_user_id, require_user  # noqa: E402
+from auth_api import _decode_token, is_direct_local_request, resolve_user_id, require_user, websocket_bearer, websocket_subprotocol  # noqa: E402
 from provider_access import (
     PERSONAL_REQUIRED, ProviderAccessMiddleware, bind_keys, owner_allowed, personal_key,
     metered_scope, provider_env, provider_key, provider_scope, require_env_key, require_personal, trial_status,
@@ -2670,6 +2670,8 @@ async def websocket_endpoint(websocket: WebSocket):
         authorization = websocket.headers.get("authorization", "")
         if authorization.lower().startswith("bearer "):
             token = authorization[7:].strip()
+    if not token:
+        token = websocket_bearer(websocket) or None
     if token:
         try:
             _decode_token(token, expected_type="access")
@@ -2689,7 +2691,7 @@ async def websocket_endpoint(websocket: WebSocket):
     if not token:
         await websocket.close(code=1008, reason="Authentification requise")
         return
-    await websocket.accept()
+    await websocket.accept(subprotocol=websocket_subprotocol(websocket))
     stats_task = asyncio.create_task(_stream_system_stats(websocket))
     try:
         while True:

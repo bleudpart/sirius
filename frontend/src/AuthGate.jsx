@@ -6,6 +6,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { BACKEND_BASE_URL, resolveBackendUrl } from "@/lib/api";
 import { CoreRings, ReactorCore } from "@/components/ReactorVisuals";
 import { lockApiKeys, setKeyAccount } from "@/apiKeyStorage";
+import { setSessionToken } from "@/lib/sessionToken";
 
 const API = BACKEND_BASE_URL;
 const BACKEND_URL_PREFIX = `${BACKEND_BASE_URL.replace(/\/$/, "")}/`;
@@ -23,6 +24,7 @@ let siriusAccessToken = null;
 function rememberAccessToken(payload) {
   if (payload && typeof payload.access_token === "string" && payload.access_token) {
     siriusAccessToken = payload.access_token;
+    setSessionToken(payload.access_token);
   }
 }
 
@@ -412,6 +414,7 @@ export default function AuthGate({ children }) {
       return;
     }
     siriusAccessToken = null;
+    setSessionToken(null);
     setKeyAccount("");
     setShowProfile(false);
     setUser(null);

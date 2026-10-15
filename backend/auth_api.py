@@ -279,12 +279,30 @@ def _inactivity_review(document: dict, now: datetime) -> dict:
     }
 
 
+WS_BEARER_PROTOCOL = "sirius.bearer"
+
+
+def websocket_bearer(connection) -> str:
+    """Jeton transmis par Sec-WebSocket-Protocol : le navigateur ne permet pas d'en-tête Authorization sur un WebSocket."""
+    offered = [part.strip() for part in (connection.headers.get("sec-websocket-protocol") or "").split(",")]
+    if len(offered) >= 2 and offered[0] == WS_BEARER_PROTOCOL:
+        return offered[1]
+    return ""
+
+
+def websocket_subprotocol(connection) -> str | None:
+    """Le sous-protocole doit être renvoyé à l'acceptation, sinon le navigateur ferme la connexion."""
+    return WS_BEARER_PROTOCOL if websocket_bearer(connection) else None
+
+
 async def require_user(request: Request, db=None) -> dict:
     token = request.cookies.get("access_token") or ""
     if not token:
         authorization = request.headers.get("authorization") or ""
         if authorization.lower().startswith("bearer "):
             token = authorization[7:].strip()
+    if not token:
+        token = websocket_bearer(request)
     if not token:
         raise HTTPException(status_code=401, detail="Authentification requise.")
     payload = _decode_token(token)

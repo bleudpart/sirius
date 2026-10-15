@@ -67,6 +67,10 @@ export const FR_NAMES = {
   "Face ID": "feïss aï di",
   FaceID: "feïss aï di",
   "Face-ID": "feïss aï di",
+  // Sans entrée, le moteur lit le X final comme « exe ».
+  SpaceX: "Spéïss-ex",
+  "Space X": "Spéïss-ex",
+  "Space-X": "Spéïss-ex",
 };
 
 // Règles contextuelles qui ne se réduisent pas à un mot isolé.

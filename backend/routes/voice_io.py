@@ -24,7 +24,7 @@ from starlette.datastructures import Headers
 from voice_corrections import normalize_voice_transcript
 from speech_text import SPEECH_LANGUAGE, SPEECH_TEXT_VERSION, speakable_text
 from speech_vocabulary import confirmed_vocabulary, transcription_prompt
-from auth_api import require_user
+from auth_api import require_user, websocket_subprotocol
 import cloud_link
 import usage_quota
 from provider_access import PERSONAL_REQUIRED, bind_keys, owner_allowed, personal_key, provider_env, require_personal
@@ -459,7 +459,7 @@ def make_voice_io_router(db=None):
         except HTTPException:
             await websocket.close(code=1008, reason="Authentification requise")
             return
-        await websocket.accept()
+        await websocket.accept(subprotocol=websocket_subprotocol(websocket))
         try:
             setup = await websocket.receive_json()
             if not isinstance(setup, dict) or setup.get("action") != "start":
