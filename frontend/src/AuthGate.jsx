@@ -6,7 +6,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { BACKEND_BASE_URL, resolveBackendUrl } from "@/lib/api";
 import { CoreRings, ReactorCore } from "@/components/ReactorVisuals";
 import { lockApiKeys, setKeyAccount } from "@/apiKeyStorage";
-import { setSessionToken } from "@/lib/sessionToken";
+import { isNativeSession, nativeSessionHeaders, setNativeRefreshToken, setSessionToken } from "@/lib/sessionToken";
 
 const API = BACKEND_BASE_URL;
 const BACKEND_URL_PREFIX = `${BACKEND_BASE_URL.replace(/\/$/, "")}/`;
@@ -26,11 +26,15 @@ function rememberAccessToken(payload) {
     siriusAccessToken = payload.access_token;
     setSessionToken(payload.access_token);
   }
+  if (payload && typeof payload.refresh_token === "string" && payload.refresh_token) {
+    setNativeRefreshToken(payload.refresh_token);
+  }
 }
 
 function requestLocalSession() {
   if (!localSessionBootstrap) {
-    localSessionBootstrap = window.fetch(`${BACKEND_URL_PREFIX}api/auth/local-session`, {
+    const sessionPath = isNativeSession() ? "api/auth/refresh" : "api/auth/local-session";
+    localSessionBootstrap = window.fetch(`${BACKEND_URL_PREFIX}${sessionPath}`, {
       method: "POST",
       credentials: "include",
     }).then(async (response) => {
@@ -59,7 +63,24 @@ if (!window[SIRIUS_FETCH_PATCH_FLAG]) {
     const requestOptions = isBackendRequest
       ? { ...options, credentials: "include" }
       : options;
-    const applyBearer = () => {
+    const applyNativeSession = () => {
+      const nativeHeaders = isAuthRequest ? nativeSessionHeaders() : {};
+      if (!Object.keys(nativeHeaders).length) return;
+      const headers = new Headers(
+        requestOptions.headers || (resolvedInput instanceof Request ? resolvedInput.headers : undefined)
+      );
+      Object.entries(nativeHeaders).forEach(([name, value]) => {
+        if (!headers.has(name)) headers.set(name, value);
+      });
+      requestOptions.headers = headers;
+    };
+    // Repart des en-têtes d'origine : un nouvel essai prend le jeton fraîchement renouvelé.
+    const applyHeaders = () => {
+      if (isBackendRequest) requestOptions.headers = options.headers;
+      applyAccessToken();
+      applyNativeSession();
+    };
+    const applyAccessToken = () => {
       if (!isBackendRequest || !siriusAccessToken) return;
       const headers = new Headers(
         options.headers || (resolvedInput instanceof Request ? resolvedInput.headers : undefined)
@@ -67,7 +88,7 @@ if (!window[SIRIUS_FETCH_PATCH_FLAG]) {
       if (!headers.has("Authorization")) headers.set("Authorization", `Bearer ${siriusAccessToken}`);
       requestOptions.headers = headers;
     };
-    applyBearer();
+    applyHeaders();
     const retryInput = resolvedInput instanceof Request ? resolvedInput.clone() : resolvedInput;
     const response = await nativeFetch(resolvedInput, requestOptions);
 
@@ -75,7 +96,7 @@ if (!window[SIRIUS_FETCH_PATCH_FLAG]) {
 
     const bootstrap = await requestLocalSession();
     if (!bootstrap.response.ok) return response;
-    applyBearer();
+    applyHeaders();
     return nativeFetch(retryInput, requestOptions);
   };
   window[SIRIUS_FETCH_PATCH_FLAG] = true;
@@ -415,6 +436,7 @@ export default function AuthGate({ children }) {
     }
     siriusAccessToken = null;
     setSessionToken(null);
+    setNativeRefreshToken(null);
     setKeyAccount("");
     setShowProfile(false);
     setUser(null);

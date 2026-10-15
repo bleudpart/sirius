@@ -242,13 +242,26 @@ def _set_cookies(response: Response, access_token: str, refresh_token: Optional[
         response.set_cookie("refresh_token", refresh_token, max_age=_REFRESH_TTL_SECONDS, **options)
 
 
-async def _issue_session(response: Response, user: dict, db) -> dict:
+NATIVE_SESSION_HEADER = "x-sirius-session"
+NATIVE_REFRESH_HEADER = "x-sirius-refresh-token"
+
+
+def _wants_native_session(request: Optional[Request]) -> bool:
+    # L'app mobile (WebView https://localhost) ne rejoue pas les cookies de l'API :
+    # elle conserve elle-même le refresh token dans son stockage privé.
+    return bool(request and request.headers.get(NATIVE_SESSION_HEADER, "").lower() == "native")
+
+
+async def _issue_session(response: Response, user: dict, db, request: Optional[Request] = None) -> dict:
     from provider_access import activate_trial
     user = await activate_trial(db, user)
     access = create_access_token(user)
     refresh = create_refresh_token(user)
     _set_cookies(response, access, refresh)
-    return {**_public_user(user), "access_token": access}
+    session = {**_public_user(user), "access_token": access}
+    if _wants_native_session(request):
+        session["refresh_token"] = refresh
+    return session
 
 
 def _activity_datetime(value) -> datetime:
@@ -444,7 +457,7 @@ def make_auth_router(db):
         return await _issue_session(response, user, db)
 
     @router.post("/register")
-    async def register(data: RegisterRequest, response: Response):
+    async def register(data: RegisterRequest, response: Response, request: Request = None):
         email = _normalize_email(data.email)
         password = _validate_new_password(data.password)
         if await db.users.find_one({"email": email}):
@@ -463,10 +476,10 @@ def make_auth_router(db):
             "updated_at": now,
         }
         await db.users.insert_one(user)
-        return await _issue_session(response, user, db)
+        return await _issue_session(response, user, db, request)
 
     @router.post("/login")
-    async def login(data: LoginRequest, response: Response):
+    async def login(data: LoginRequest, response: Response, request: Request = None):
         email = _normalize_email(data.email)
         identifier = f"login:{email}"
         now = datetime.now(timezone.utc)
@@ -486,18 +499,18 @@ def make_auth_router(db):
             raise HTTPException(status_code=401, detail="Code MFA requis ou invalide.")
         await db.login_attempts.delete_one({"identifier": identifier})
         await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"last_activity": now}})
-        return await _issue_session(response, user, db)
+        return await _issue_session(response, user, db, request)
 
     @router.post("/refresh")
     async def refresh_session(request: Request, response: Response):
-        token = request.cookies.get("refresh_token") or ""
+        token = request.cookies.get("refresh_token") or request.headers.get(NATIVE_REFRESH_HEADER) or ""
         if not token:
             raise HTTPException(status_code=401, detail="Session expirée.")
         payload = _decode_token(token, "refresh")
         user = await db.users.find_one({"user_id": payload.get("sub"), "disabled": {"$ne": True}})
         if not user:
             raise HTTPException(status_code=401, detail="Compte indisponible.")
-        return await _issue_session(response, user, db)
+        return await _issue_session(response, user, db, request)
 
     @router.post("/password-reset/request")
     async def password_reset_request(data: PasswordResetRequest):

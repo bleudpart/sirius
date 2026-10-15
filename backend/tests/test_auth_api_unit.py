@@ -228,3 +228,46 @@ def test_password_reset_code_is_hashed_and_changes_password(monkeypatch):
         Response(),
     ))
     assert logged_in["email"] == "reset@example.test"
+
+
+def _request(headers=None, cookies=None):
+    from starlette.requests import Request
+
+    raw = [(name.lower().encode(), value.encode()) for name, value in (headers or {}).items()]
+    if cookies:
+        raw.append((b"cookie", "; ".join(f"{k}={v}" for k, v in cookies.items()).encode()))
+    return Request({"type": "http", "method": "POST", "path": "/", "headers": raw, "query_string": b""})
+
+
+def test_native_session_returns_refresh_token_and_accepts_it_by_header():
+    db = Database()
+    router = auth_api.make_auth_router(db)
+    register = endpoint(router, "/auth/register")
+    refresh = endpoint(router, "/auth/refresh")
+
+    from starlette.responses import Response
+
+    web = asyncio.run(register(
+        auth_api.RegisterRequest(email="web@example.test", password="Mot-de-passe-1", name="Web"),
+        Response(),
+        _request(),
+    ))
+    assert "refresh_token" not in web
+
+    native = asyncio.run(register(
+        auth_api.RegisterRequest(email="mobile@example.test", password="Mot-de-passe-1", name="Mobile"),
+        Response(),
+        _request({"X-Sirius-Session": "native"}),
+    ))
+    assert native["refresh_token"]
+
+    renewed = asyncio.run(refresh(
+        _request({"X-Sirius-Session": "native", "X-Sirius-Refresh-Token": native["refresh_token"]}),
+        Response(),
+    ))
+    assert renewed["email"] == "mobile@example.test"
+    assert renewed["access_token"] and renewed["refresh_token"]
+
+    with pytest.raises(HTTPException) as failure:
+        asyncio.run(refresh(_request({"X-Sirius-Refresh-Token": native["access_token"]}), Response()))
+    assert failure.value.status_code == 401
