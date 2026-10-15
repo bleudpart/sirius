@@ -785,11 +785,89 @@ def _format_price_sources(results, prompt: str = "") -> str:
     return "\n".join(excerpts)
 
 
+_LIVE_EVENT_RE = re.compile(
+    r"\b(?:r[ée]sultats?|scores?|match(?:s|es)?|gagn[ée]s?|gagnant|vainqueur|victoire|d[ée]faite|"
+    r"classement|buteurs?|qualifi[ée]s?|[ée]limin[ée]s?|[ée]lections?|[ée]lus?|sondages?|"
+    r"transferts?|bilan|hier|ce week[- ]end|la nuit derni[èe]re|ce matin|cette nuit|"
+    r"ligue des champions|ligue 1|coupe du monde|euro \d{4}|jeux olympiques|grand prix)\b",
+    re.I,
+)
+_NEWS_QUERY_FILLER_RE = re.compile(
+    r"\b(?:sirius|quel(?:le)?s?|sont|est[- ]ce que|c['’]est|est|quoi|donne[- ]moi|dis[- ]moi|"
+    r"peux[- ]tu|pourrais[- ]tu|me|moi|stp|s['’]il te pla[iî]t|les?|la|des|du|de|d['’]|l['’]|un|une|"
+    r"a|à|au|aux|et|qui|que|sur|pour|en)\b",
+    re.I,
+)
+GOOGLE_NEWS_RSS = "https://news.google.com/rss/search"
+
+
+def is_live_event_question(prompt: str) -> bool:
+    question = str(prompt or "").split("CONTEXTE DU DERNIER BRIEFING :", 1)[0]
+    return bool(_LIVE_EVENT_RE.search(question) or _CURRENT_INFO_RE.search(question))
+
+
+def _news_search_query(question: str) -> str:
+    text = re.sub(r"[?!.,;:«»\"]", " ", str(question or ""))
+    keywords = " ".join(_NEWS_QUERY_FILLER_RE.sub(" ", text).split())
+    return keywords or " ".join(text.split())
+
+
+async def _google_news_results(question: str, *, timeout: float = 5.0, now=None) -> list[dict]:
+    """Recherche d'actualités datées, sans clé : Google News RSS, sept derniers jours."""
+    from email.utils import parsedate_to_datetime
+    from xml.etree import ElementTree
+
+    query = _news_search_query(question)
+    if not query:
+        return []
+    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+        response = await client.get(
+            GOOGLE_NEWS_RSS,
+            params={"q": f"{query} when:7d", "hl": "fr", "gl": "FR", "ceid": "FR:fr"},
+            headers={"User-Agent": "Mozilla/5.0 SIRIUS"},
+        )
+        response.raise_for_status()
+    content = response.content
+    if len(content) > 2 * 1024 * 1024 or b"<!DOCTYPE" in content.upper() or b"<!ENTITY" in content.upper():
+        raise ValueError("Flux Google News invalide")
+    root = ElementTree.fromstring(content)
+    current = now or datetime.now(ZoneInfo("UTC"))
+    results = []
+    for item in root.findall("./channel/item"):
+        title = " ".join((item.findtext("title") or "").split())
+        source = " ".join((item.findtext("source") or "").split())
+        try:
+            published = parsedate_to_datetime(item.findtext("pubDate") or "")
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if not title or published is None or published.tzinfo is None or published > current:
+            continue
+        if (current - published).total_seconds() > 7 * 86400:
+            continue
+        if source and title.endswith(f" - {source}"):
+            title = title[: -len(source) - 3].strip()
+        results.append({"title": title, "source": source, "published": published})
+    results.sort(key=lambda item: item["published"], reverse=True)
+    return results[:8]
+
+
+def _format_news_results(results) -> str:
+    paris = ZoneInfo("Europe/Paris")
+    lines = []
+    for item in results:
+        moment = item["published"].astimezone(paris)
+        when = f"{_JOURS_FR[moment.weekday()]} {moment.day} {_MOIS_FR[moment.month - 1]} {moment.year} à {moment:%H:%M}"
+        lines.append(f"- {item['title']} | {item['source']}\n  Article publié le {when}.")
+    return "\n".join(lines)
+
+
 async def _research_current_prices(prompt: str, serp_key: str = "", *, timeout: float = 5.5) -> str:
-    if not is_targeted_factual_question(prompt):
-        return ""
     question = str(prompt or "").split("CONTEXTE DU DERNIER BRIEFING :", 1)[0].strip()
-    try:
+    live_event = is_live_event_question(question) and not is_current_price_question(question)
+    if not is_targeted_factual_question(prompt) and not live_event:
+        return ""
+
+    async def web():
         from webagent import serp_results
 
         search_query = (
@@ -797,14 +875,23 @@ async def _research_current_prices(prompt: str, serp_key: str = "", *, timeout: 
             if is_current_price_question(question)
             else " ".join(question.split())
         )
-        results = await asyncio.wait_for(
-            serp_results(search_query, provider_key("serp", ENV_SERP_KEY, {"serp": serp_key} if serp_key else None)),
-            timeout=timeout,
+        return await serp_results(
+            search_query, provider_key("serp", ENV_SERP_KEY, {"serp": serp_key} if serp_key else None),
         )
-    except Exception as error:
-        logger.warning("[ΣIRIUS:PRICE] recherche web indisponible : %r", error)
-        return ""
-    return _format_price_sources(results, question)
+
+    async def news():
+        return await _google_news_results(question, timeout=timeout) if live_event else []
+
+    web_results, news_results = await asyncio.gather(
+        asyncio.wait_for(web(), timeout=timeout), asyncio.wait_for(news(), timeout=timeout),
+        return_exceptions=True,
+    )
+    for label, outcome in (("web", web_results), ("actualités", news_results)):
+        if isinstance(outcome, BaseException):
+            logger.warning("[ΣIRIUS:RECHERCHE] %s indisponible : %r", label, outcome)
+    news_text = _format_news_results(news_results) if isinstance(news_results, list) else ""
+    web_text = _format_price_sources(web_results, question) if isinstance(web_results, list) else ""
+    return "\n".join(part for part in (news_text, web_text) if part)
 
 
 def _is_news_request(prompt: str) -> bool:
@@ -837,17 +924,37 @@ def _news_answer_guidance(prompt: str) -> str:
     )
 
 
+def needs_targeted_guidance(prompt: str) -> bool:
+    return is_targeted_factual_question(prompt) or is_live_event_question(prompt)
+
+
 def _targeted_answer_guidance(sources: str, prompt: str = "") -> str:
     today = time.strftime("%d/%m/%Y")
+    live_event = is_live_event_question(prompt) and not is_current_price_question(prompt)
+    freshness = (
+        "ÉVÉNEMENT RÉCENT : base-toi uniquement sur les articles les plus récents ci-dessous (leur date de "
+        "publication est indiquée) et donne le résultat ou le fait le plus récent, avec son jour. Si les "
+        "articles ne mentionnent pas le score ou le détail demandé, dis ce qu'ils établissent et précise ce "
+        "qui manque. N'utilise jamais tes connaissances d'entraînement pour un résultat sportif, électoral "
+        "ou d'actualité : elles sont anciennes. "
+        if live_event else ""
+    )
     if sources:
         return (
-            f"\n\nRECHERCHE WEB EFFECTUÉE LE {today}. Réponds d'abord directement à la question, en donnant "
+            f"\n\nRECHERCHE WEB EFFECTUÉE LE {today}. {freshness}Réponds d'abord directement à la question, en donnant "
             "le fait, la valeur ou la fourchette utile. Appuie-toi sur les extraits ci-dessous et cite brièvement "
             "un ou deux titres/sites avec leur URL lorsqu'elle est fournie. Pour les prix, respecte l'unité "
             "demandée (ex. €/kg), distingue les qualités/enseignes et ne transforme pas un prix promotionnel "
             "en prix moyen. Pour les données divergentes, donne une fourchette et explique l'écart. N'invente "
             "aucun fait absent des sources et ne renvoie jamais l'utilisateur faire la recherche lui-même.\n"
             "SOURCES ET EXTRAITS :\n" + sources
+        )
+    if live_event:
+        return (
+            f"\n\nÉVÉNEMENT RÉCENT SANS SOURCE DISPONIBLE le {today}. Ta mémoire d'entraînement est ancienne : "
+            "ne donne AUCUN résultat, score, vainqueur ou fait d'actualité tiré de tes connaissances, même "
+            "présenté avec prudence. Dis simplement, en une ou deux phrases naturelles, que tu n'arrives pas "
+            "à vérifier l'information récente pour l'instant et propose de réessayer dans un moment."
         )
     return (
         f"\n\nQUESTION FACTUELLE CIBLÉE, sans résultat web exploitable le {today}. Réponds quand même avec "
@@ -882,7 +989,7 @@ async def _kimi_answer(prompt, history, profile, memory, mode, mood, key, enviro
     system_prompt = build_system_prompt(profile, memory, mode, mood, environment)
     if research:
         system_prompt += "\n\nSOURCES WEB COLLECTÉES :\n" + research
-    if is_targeted_factual_question(prompt):
+    if needs_targeted_guidance(prompt):
         system_prompt += _targeted_answer_guidance(targeted_research, prompt)
     system_prompt += _news_answer_guidance(prompt)
     if (mode or "normal").lower() == "profond":
@@ -1355,7 +1462,7 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
         sys_prompt = build_system_prompt(profile=profile, memory=memory, mode=mode, mood=mood, environment=environment)
         if research:
             sys_prompt += "\n\nSOURCES WEB COLLECTÉES :\n" + research
-        if is_targeted_factual_question(prompt):
+        if needs_targeted_guidance(prompt):
             sys_prompt += _targeted_answer_guidance(targeted_research, prompt)
         sys_prompt += _news_answer_guidance(prompt)
         if (mode or "normal").lower() == "profond":
@@ -1486,7 +1593,7 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
     models_to_try = fast_models[:1] if is_turbo else fast_models
     if research:
         sys_prompt += "\n\nSOURCES WEB COLLECTÉES :\n" + research
-    if is_targeted_factual_question(prompt):
+    if needs_targeted_guidance(prompt):
         sys_prompt += _targeted_answer_guidance(targeted_research, prompt)
     sys_prompt += _news_answer_guidance(prompt)
     if (mode or "normal").lower() == "profond":

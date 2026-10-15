@@ -296,3 +296,73 @@ def test_streaming_deflection_is_never_shown_before_source_fallback(monkeypatch)
     assert "consultez votre revendeur" not in answer.lower()
     assert "entre 24,91 et 32,99 €/kg" in answer
     assert "carrefour.example" in answer
+
+def test_live_event_question_uses_dated_news_and_forbids_old_knowledge(monkeypatch):
+    from datetime import datetime, timezone
+
+    import sirius_brain
+    import webagent
+
+    monkeypatch.setattr(webagent, "serp_results", AsyncMock(return_value=[]))
+    news = AsyncMock(return_value=[{
+        "title": "Manchester City-PSG (2-4)",
+        "source": "SO FOOT.com",
+        "published": datetime(2026, 10, 14, 22, 34, tzinfo=timezone.utc),
+    }])
+    monkeypatch.setattr(sirius_brain, "_google_news_results", news)
+    question = "quel est le résultat du match PSG Manchester City"
+
+    context = asyncio.run(_research_current_prices(question, ""))
+
+    assert "Manchester City-PSG (2-4) | SO FOOT.com" in context
+    assert "publié le jeudi 15 octobre 2026 à 00:34" in context
+    assert "N'utilise jamais tes connaissances" in _targeted_answer_guidance(context, question)
+    no_source = _targeted_answer_guidance("", question)
+    assert "ne donne AUCUN résultat" in no_source
+
+
+def test_news_query_keeps_only_useful_keywords():
+    from sirius_brain import _news_search_query, is_live_event_question
+
+    assert _news_search_query("Quel est le résultat du match PSG ?") == "résultat match PSG"
+    assert is_live_event_question("qui a gagné hier en Ligue des champions")
+    assert not is_live_event_question("c'est quoi Calliope ?")
+
+
+def test_google_news_rss_is_parsed_sorted_and_recent(monkeypatch):
+    from datetime import datetime, timezone
+
+    import sirius_brain
+
+    rss = b"""<?xml version="1.0"?><rss><channel>
+    <item><title>Vieux match - L'Equipe</title><source>L'Equipe</source><pubDate>Mon, 01 Jun 2026 10:00:00 GMT</pubDate></item>
+    <item><title>PSG gagne 4-2 - franceinfo</title><source>franceinfo</source><pubDate>Wed, 14 Oct 2026 21:00:00 GMT</pubDate></item>
+    <item><title>Analyse du match - SO FOOT</title><source>SO FOOT</source><pubDate>Wed, 14 Oct 2026 23:00:00 GMT</pubDate></item>
+    </channel></rss>"""
+
+    class Response:
+        content = rss
+
+        def raise_for_status(self):
+            return None
+
+    class Client:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def get(self, url, params=None, headers=None):
+            assert params["q"].endswith("when:7d")
+            return Response()
+
+    monkeypatch.setattr(sirius_brain.httpx, "AsyncClient", Client)
+    results = asyncio.run(sirius_brain._google_news_results(
+        "résultat PSG", now=datetime(2026, 10, 15, 6, 0, tzinfo=timezone.utc),
+    ))
+
+    assert [item["title"] for item in results] == ["Analyse du match", "PSG gagne 4-2"]
