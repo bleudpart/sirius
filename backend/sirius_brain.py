@@ -1339,6 +1339,8 @@ def build_system_prompt(profile=None, memory=None, mode="normal", mood=None, env
                 + "\nLa réponse de l'utilisateur peut se rapporter à cette initiative. "
                 "Ne prétends pas avoir exécuté l'action proposée sans résultat d'outil."
             )
+        from themis_context import themis_prompt_section
+        base += themis_prompt_section(environment.get("themis_context"))
 
     memory = memory or []
     if memory:

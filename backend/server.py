@@ -77,6 +77,23 @@ def _score_episodes(prompt: str, episodes: list, top_k: int = _EPISODE_TOP) -> l
     return [ep for _, ep in scored[:top_k]]
 
 
+async def _with_themis_context(req, uid: str, history=None) -> None:
+    """Ajoute les données THÉMIS à l'environnement si la question porte sur la gestion.
+
+    Fait avant un éventuel relais cloud, pour que les données locales accompagnent la question.
+    Un contexte déjà fourni (requête relayée) n'est conservé que si cette base n'a rien.
+    """
+    from themis_context import themis_context, wants_business_context
+    env = dict(req.environment or {})
+    provided = env.pop("themis_context", None)
+    if wants_business_context(req.text, history):
+        own = await themis_context(db, uid)
+        context = own or (provided if isinstance(provided, str) else "")
+        if context:
+            env["themis_context"] = context
+    req.environment = env
+
+
 async def _gather_memory_context(texte: str, uid: str, extra_memory: list) -> list:
     """Construit le contexte mémoire (faits + épisodes) à injecter dans le prompt.
 
@@ -396,6 +413,7 @@ async def chat(req: ChatRequest, request: Request):
         raise HTTPException(status_code=400, detail="Texte vide")
     if not _rate_ok(uid):
         raise HTTPException(status_code=429, detail="Trop de requêtes, patientez un instant.")
+    await _with_themis_context(req, uid)
     if cloud_link.should_relay_chat(req.keys):
         return await cloud_link.relay_json("/api/chat", req.model_dump())
     session_id = f"{uid}:{req.session_id or 'default'}"
@@ -500,6 +518,7 @@ async def chat_stream(req: ChatRequest, request: Request):
         raise HTTPException(status_code=400, detail="Texte vide")
     if not _rate_ok(uid):
         raise HTTPException(status_code=429, detail="Trop de requêtes, patientez un instant.")
+    await _with_themis_context(req, uid)
     if cloud_link.should_relay_chat(req.keys):
         return StreamingResponse(
             cloud_link.relay_stream("/api/chat/stream", req.model_dump()),
