@@ -52,6 +52,13 @@ test.each(["SpaceX", "Space X", "Space-X", "SPACEX"])("prononce %s « spéïss-e
   expect(applyFrenchPhonetics(`Lancement ${name} réussi.`)).toBe("Lancement Spéïss-ex réussi.");
 });
 
+test("prononce les pilotes en -ez à l'espagnole sans toucher le verbe", () => {
+  expect(applyFrenchPhonetics("Marc Marquez et Álex Márquez devant Raul Fernandez."))
+    .toBe("Marc Markèss et Álex Markèss devant Raul Fernandèss.");
+  expect(applyFrenchPhonetics("Sergio Pérez abandonne.")).toBe("Sergio Pérèss abandonne.");
+  expect(applyFrenchPhonetics("Vous marquez des points.")).toBe("Vous marquez des points.");
+});
+
 test.each(["PLUTOS", "Plutos", "plutos"])("prononce le nom %s comme un mot, pas un sigle", (name) => {
   expect(applyFrenchPhonetics(`J'ouvre ${name}.`)).toBe("J'ouvre Ploutoss.");
 });

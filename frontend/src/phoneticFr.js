@@ -73,6 +73,35 @@ export const FR_NAMES = {
   "Space-X": "Spéïss-ex",
 };
 
+// Noms hispaniques en -ez : sans entrée, « Marquez » est lu comme le verbe (« marqué »).
+// Sensibles à la casse pour ne pas toucher « vous marquez des points ».
+export const FR_CASED_NAMES = {
+  Marquez: "Markèss",
+  Márquez: "Markèss",
+  Fernandez: "Fernandèss",
+  Fernández: "Fernandèss",
+  Perez: "Pérèss",
+  Pérez: "Pérèss",
+  Hernandez: "Ernandèss",
+  Hernández: "Ernandèss",
+  Rodriguez: "Rodriguèss",
+  Rodríguez: "Rodriguèss",
+  Lopez: "Lopèss",
+  López: "Lopèss",
+  Gonzalez: "Gonnzalèss",
+  González: "Gonnzalèss",
+  Sanchez: "Sanntchèss",
+  Sánchez: "Sanntchèss",
+  Martinez: "Martinèss",
+  Martínez: "Martinèss",
+  Alvarez: "Alvarèss",
+  Álvarez: "Alvarèss",
+  Gutierrez: "Goutiérèss",
+  Gutiérrez: "Goutiérèss",
+  Dominguez: "Dominguèss",
+  Domínguez: "Dominguèss",
+};
+
 // Règles contextuelles qui ne se réduisent pas à un mot isolé.
 const FR_RULES = [
   [/\bS\.I\.R\.I\.U\.S\b/gi, "Siriusse"],
@@ -95,7 +124,10 @@ const wordBoundary = (word) => new RegExp(`(?<![\\p{L}\\p{N}_])${escapeRegExp(wo
 const BUILTIN_ENTRIES = Object.entries({ ...FR_ACRONYMS, ...FR_ANGLICISMS, ...FR_NAMES })
   // Les entrées les plus longues d'abord : « scannes » ne doit pas être coupé par « scanne ».
   .sort((a, b) => b[0].length - a[0].length)
-  .map(([mot, dit]) => [wordBoundary(mot), dit]);
+  .map(([mot, dit]) => [wordBoundary(mot), dit])
+  .concat(Object.entries(FR_CASED_NAMES).map(([mot, dit]) => [
+    new RegExp(`(?<![\\p{L}\\p{N}_])${escapeRegExp(mot)}(?![\\p{L}\\p{N}_])`, "gu"), dit,
+  ]));
 
 export const readUserLexicon = () => {
   try {
