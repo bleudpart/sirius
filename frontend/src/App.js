@@ -2066,8 +2066,8 @@ function App() {
       const d = await r.json().catch(() => ({}));
       if (r.ok && d.articles && d.articles.length) {
         const top = d.articles.slice(0, 3).map((a) => a.titre).filter(Boolean);
-        addPopup({
-          kind: "info",
+        showOnDisplay({
+          type: "message",
           titre: "ACTUALITÉS FRANCE",
           contenu: d.articles.map((a) => `• ${a.titre}${a.source ? ` (${a.source})` : ""}`).join("\n"),
         });
@@ -2086,7 +2086,7 @@ function App() {
       const m = "Les actualités sont indisponibles pour le moment.";
       setText(m); speakOut(m);
     }
-  }, [speakOut, addPopup, cloudAnswer]);
+  }, [speakOut, showOnDisplay, cloudAnswer]);
 
   // HERMÈS AGORA# — consultation commerciale vocale dans le chat principal (voix Mythos, ajustable)
   const AGORA_VOICE = { module: "HERMÈS AGORA#" };
@@ -2133,8 +2133,8 @@ function App() {
       const r = await fetch(`${API}/weather/current?city=${encodeURIComponent(target)}`);
       const d = await r.json().catch(() => ({}));
       if (r.ok) {
-        addPopup({
-          kind: "info",
+        showOnDisplay({
+          type: "message",
           titre: `MÉTÉO — ${(d.ville || target).toUpperCase()}`,
           contenu: `${d.description}\nTempérature : ${d.temp}°C (ressenti ${d.ressenti}°C)\nMin / Max : ${d.tmin}°C / ${d.tmax}°C\nHumidité : ${d.humidite} %\nVent : ${d.vent} km/h`,
         });
@@ -2151,7 +2151,7 @@ function App() {
       const m = "La météo est indisponible pour le moment.";
       setText(m); speakOut(m);
     }
-  }, [speakOut, addPopup, profile?.city]);
+  }, [speakOut, showOnDisplay, profile?.city]);
 
   // Fiche pays (REST Countries) : capitale, population, monnaie, langues...
   const launchCountry = useCallback(async (name, focus) => {
@@ -2162,8 +2162,8 @@ function App() {
       const d = await r.json().catch(() => ({}));
       if (r.ok) {
         const pop = d.population ? d.population.toLocaleString("fr-FR") : "inconnue";
-        addPopup({
-          kind: "info",
+        showOnDisplay({
+          type: "message",
           titre: `${d.drapeau ? d.drapeau + " " : ""}FICHE PAYS — ${(d.nom || name).toUpperCase()}`,
           contenu: `Capitale : ${d.capitale || "?"}\nPopulation : ${pop} habitants\nRégion : ${d.region}${d.sous_region ? " — " + d.sous_region : ""}\nSuperficie : ${d.superficie_km2 ? d.superficie_km2.toLocaleString("fr-FR") + " km²" : "?"}\nMonnaie : ${(d.monnaies || []).join(", ") || "?"}\nLangues : ${(d.langues || []).join(", ") || "?"}`,
         });
@@ -2184,7 +2184,7 @@ function App() {
       const m = "La fiche pays est indisponible.";
       setText(m); speakOut(m);
     }
-  }, [speakOut, addPopup]);
+  }, [speakOut, showOnDisplay]);
 
   // Bulletin tech Hacker News présenté par Sirius
   const launchTechBulletin = useCallback(async () => {
@@ -2198,7 +2198,7 @@ function App() {
       });
       const d = await r.json().catch(() => ({}));
       if (r.ok && d.bulletin) {
-        addPopup({ kind: "info", titre: "BULLETIN TECH — HACKER NEWS", contenu: d.bulletin });
+        showOnDisplay({ type: "message", titre: "BULLETIN TECH — HACKER NEWS", contenu: d.bulletin });
         setStatus("speaking");
         setText(d.bulletin);
         speakOut(d.bulletin);
@@ -2212,7 +2212,7 @@ function App() {
       const m = "Le bulletin tech est indisponible pour le moment.";
       setText(m); speakOut(m);
     }
-  }, [speakOut, addPopup, keys]);
+  }, [speakOut, showOnDisplay, keys]);
 
   // Mini-documentaire historique narré par Sirius (Wikipedia, Wikidata, Gallica, OpenLibrary)
   const launchDocumentary = useCallback(async (sujet) => {

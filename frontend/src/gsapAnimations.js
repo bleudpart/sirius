@@ -2,27 +2,25 @@
 // Animations GSAP centralisées : ouverture, fermeture, resize élastique, holographique.
 import { gsap } from "gsap";
 
+// Les fenêtres restent opaques pendant leurs transitions : sans fondu ni flou, le HUD
+// ne transparaît jamais et la WebView Android n'a pas de filtre coûteux à recalculer.
 export function animateWindowOpen(el) {
   gsap.killTweensOf(el);
   gsap.from(el, {
-    opacity: 0,
-    scale: 0.92,
-    y: 12,
-    filter: "brightness(1.8) blur(4px)",
-    duration: 0.38,
-    ease: "back.out(1.4)",
-    clearProps: "transform,opacity,filter",
+    scale: 0.97,
+    y: 10,
+    duration: 0.22,
+    ease: "power2.out",
+    clearProps: "transform",
   });
 }
 
 export function animateWindowClose(el, onComplete) {
   gsap.killTweensOf(el);
   gsap.to(el, {
-    opacity: 0,
-    scale: 0.9,
-    y: 16,
-    filter: "brightness(2.1) blur(5px)",
-    duration: 0.22,
+    scale: 0.97,
+    y: 10,
+    duration: 0.12,
     ease: "power2.in",
     onComplete,
   });
