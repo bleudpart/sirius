@@ -1601,7 +1601,13 @@ function App() {
       if (workConversationContextRef.current !== contextAtRequest) return;
       if (data.work_context) updateWorkConversationContext(data.work_context.dossier_id, data.work_context.expires_at);
       if (data.work_context_cleared) updateWorkConversationContext(null);
-      workPreviewPendingRef.current = !!(data.work_preview || data.work_batch);
+      if (data.work_batch || data.work_recording) {
+        workConversationContextRef.current = {
+          origin: "conversation", work_session_context: true,
+          expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        };
+      }
+      workPreviewPendingRef.current = !!(data.work_preview || data.work_batch || data.work_recording || data.work_recording_pending);
     };
     const payload = JSON.stringify({
       text: command,
@@ -1622,16 +1628,20 @@ function App() {
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Paris",
         ...(contextAtRequest.work_dossier_id
           ? { work_dossier_id: contextAtRequest.work_dossier_id }
-          : { work_context_clear: true }),
+          : contextAtRequest.work_session_context ? {} : { work_context_clear: true }),
       },
     });
     const showServiceDenial = (status, data) => {
-      const message = typeof data?.detail === "string" ? data.detail : status >= 500
+      const workDetail = isWorkConversationCommand(command) && typeof data?.detail?.message === "string"
+        ? [data.detail.message, ...(Array.isArray(data.detail.blocked) ? data.detail.blocked
+          .filter((item) => typeof item?.reason === "string").map((item) => item.reason) : [])].join("\n")
+        : "";
+      const message = typeof data?.detail === "string" ? data.detail : workDetail || (status >= 500
         ? "Service indisponible. Aucun résultat ne peut être vérifié ; aucune action n'est annoncée comme effectuée."
         : status === 401
         ? "Connectez-vous à votre compte SIRIUS."
         : status === 429 ? "La limite d'utilisation est atteinte. Réessayez après sa remise à zéro."
-          : "Accès au service refusé. Vérifiez votre essai et vos clés dans Réglages → Services et clés.";
+          : "Accès au service refusé. Vérifiez votre essai et vos clés dans Réglages → Services et clés.");
       setText(message);
       setVoiceMessage(message);
       showOnDisplay({ type: "message", titre: "ΣIRIUS — ACCÈS AU SERVICE", contenu: message });

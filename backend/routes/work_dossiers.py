@@ -118,6 +118,11 @@ class InvoiceFollowupsIn(WorkInput):
     timezone: str = Field(default="Europe/Paris", min_length=1, max_length=100)
 
 
+class RecordingIn(WorkInput):
+    session_id: str = Field(default="default", min_length=1, max_length=200)
+    dossier_id: str = Field(min_length=1, max_length=120)
+
+
 class ConfirmIn(WorkInput):
     confirmed: StrictBool
 
@@ -1190,6 +1195,7 @@ def make_work_dossiers_router(db, require_user, *, conversation=None):
                 "reason": "Texte préparé pour relecture humaine, paiement et adresse à vérifier."
                 if recipient_present else "Destinataire manquant ; complétez les coordonnées du client avant tout envoi.",
                 "overdue_days": overdue_days, "fingerprint": snapshot["fingerprint"], "content": content,
+                "data": snapshot["data"],
             })
         counts = {state: sum(item["state"] == state for item in rows) for state in ("prepared", "blocked", "skipped")}
         return {
@@ -1212,9 +1218,41 @@ def make_work_dossiers_router(db, require_user, *, conversation=None):
         return {
             "dossier_id": dossier_id, "source": snapshot["source"],
             "fingerprint": snapshot["fingerprint"], "content": content,
+            "data": snapshot["data"],
             "verified_at": _now(), "persisted": False, "executed": False,
             "confirmation_required": True, "execution": "manual_only",
         }
+
+    from work_draft_recordings import DraftRecordings
+
+    async def recording_preview(dossier_id, source_id, request):
+        return await draft_preview(
+            dossier_id, DraftIn(source=SourceIn(kind="facture", id=source_id)), request,
+        )
+
+    recordings = DraftRecordings(db, recording_preview, dossier_for)
+
+    @router.get("/draft-recordings")
+    async def list_recordings(request: Request):
+        uid, _, _ = await context(request)
+        return await recordings.listing(uid)
+
+    @router.post("/draft-recordings")
+    async def stage_recording(body: RecordingIn, request: Request):
+        uid, _, _ = await context(request)
+        return await recordings.stage(uid, body.session_id, body.dossier_id, request)
+
+    @router.get("/draft-recordings/{operation_id}")
+    async def recording_status(operation_id: str, request: Request):
+        uid, _, _ = await context(request)
+        return await recordings.status(uid, operation_id, request)
+
+    @router.post("/draft-recordings/{operation_id}/confirm")
+    async def record_drafts(operation_id: str, body: ConfirmIn, request: Request):
+        uid, _, _ = await context(request)
+        if body.confirmed is not True:
+            raise HTTPException(422, "Une confirmation explicite de l'enregistrement est requise.")
+        return await recordings.confirm(uid, operation_id, request)
 
     @router.post("/{dossier_id}/drafts", status_code=201)
     async def create_draft(dossier_id: str, body: DraftIn, request: Request):
@@ -1620,4 +1658,5 @@ def make_work_dossiers_router(db, require_user, *, conversation=None):
             )
 
         conversation.preview_invoice_batch = preview_invoice_batch
+        conversation.recordings = recordings
     return router

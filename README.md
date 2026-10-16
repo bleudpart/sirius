@@ -719,10 +719,11 @@ par le même générateur que le formulaire existant d'enregistrement de brouill
 Le chat renvoie `work_state=PREPARED`, `persisted=false`, `executed=false` et
 `work_preview` avec source, empreinte, date de vérification et contenu. Les
 paiements récents et le destinataire restent à vérifier ; une facture déjà
-soldée bloque la préparation. La conversation ne crée aucun brouillon persistant,
-n'envoie aucun message et n'active aucune surveillance. Les préparations
-enregistrées et validations restent dans les formulaires du dossier. Un « oui »
-ne déclenche pas d'envoi depuis cette prévisualisation.
+soldée bloque la préparation. Cette prévisualisation ne crée aucun brouillon
+métier persistant, n'envoie aucun message et n'active aucune surveillance.
+L'enregistrement conversationnel distinct ci-dessous demande un accord
+explicite ; la validation métier reste dans le formulaire du dossier. Un « oui »
+ne déclenche ni enregistrement ni envoi depuis cette prévisualisation.
 
 #### Relances en lot, sans envoi
 
@@ -759,7 +760,72 @@ préparations/anomalies ; les autres restent dans le résultat structuré.
 Les incidents de stockage ne deviennent pas un lot vide réussi. Un « oui »,
 « envoie-la » ou « annule » après le lot reste non exécutant, y compris lorsque
 toutes les factures sont bloquées. Cette étape est une prévisualisation,
-pas encore un orchestrateur d'envoi ou de reprise persistante.
+pas un orchestrateur d'envoi.
+
+#### Enregistrement confirmé et reprise des brouillons ARIANE
+
+Après une prévisualisation unitaire, « Enregistre ce brouillon » prépare une
+**demande d'enregistrement**, sans encore créer d'entrée dans le dossier.
+Pour un lot, dites « Enregistre ces préparations dans le dossier titre exact » :
+la destination doit être nommée sans ambiguïté et seules les factures déjà
+suivies dans ce dossier sont retenues. Les sources devenues inaccessibles,
+modifiées ou non suivies et les destinataires absents sont exclus avec un bilan.
+Un changement de dossier affiché empêche de réutiliser silencieusement la
+prévisualisation unitaire précédente.
+
+La réponse montre les textes retenus et une référence persistante. Après
+relecture, « Confirme l'enregistrement des brouillons » utilise uniquement la
+dernière demande affichée dans cette session, pendant les 30 minutes du contexte.
+La commande « Confirme l'enregistrement référence » désigne explicitement une
+demande du compte, y compris après redémarrage. Un « oui » ou « envoie-les » seul
+reste non exécutant. Les commandes mélangeant enregistrement et envoi ne sont
+pas interprétées comme une autorisation.
+À cette étape, tous les textes retenus sont affichés avant l'accord (jusqu'à
+100 pour un lot), pas seulement les dix détails du résumé initial.
+
+L'accord crée des entrées `draft`, au statut **proposé**, dans le fil existant
+du dossier. **Enregistré n'est ni validé métier, ni envoyé, ni reçu.** Les
+permissions, rattachements et empreintes facture/client sont vérifiés à nouveau
+avant chaque nouvelle insertion. Une modification entre préparation et accord
+bloque la ligne concernée plutôt que d'enregistrer un texte recalculé non relu.
+Les états `AWAITING_CONFIRMATION`, `APPROVED`, `BLOCKED`, `PARTIAL`, `RECORDED`
+et `EXPIRED` décrivent les résultats réellement persistés ; `executed=false`
+et `sent=false` indiquent toujours l'absence d'action extérieure.
+
+« Liste mes enregistrements de brouillons » retrouve les vingt demandes les
+plus récentes, avec un indicateur de liste partielle. « Suivi de l'enregistrement
+référence » relit leur résultat. « Reprends l'enregistrement référence » ne peut
+reprendre que les demandes déjà approuvées ; sinon l'accord est demandé.
+Les sources révoquées masquent les anciens textes et coordonnées dans le suivi.
+« Annule » abandonne le contexte temporaire sans effacer les brouillons déjà
+enregistrés ni les demandes persistantes ; la confirmation contextuelle est
+alors retirée. L'effacement de compte inclut ces nouvelles demandes.
+
+Les demandes et accords sont persistés dans `sirius_work_recordings`. Chaque
+brouillon possède une identité déterministe liée à sa référence d'enregistrement :
+une réponse perdue, un double clic ou une reprise après une insertion partielle
+ne créent pas un second brouillon pour **la même référence**. SQLite utilise
+une transaction `BEGIN IMMEDIATE` couvrant recherche et insertion, vérifiée
+entre processus ; MongoDB utilise son index unique natif `_id`. Le chemin
+Mongo est vérifié par tests de contrat, sans serveur Mongo réel dans les tests
+locaux. Une nouvelle prévisualisation peut produire une nouvelle référence :
+il ne s'agit pas d'une déduplication globale de toutes les relances.
+Le résultat est reconstruit depuis les entrées réellement enregistrées, pas
+depuis un simple indicateur de réussite. Les insertions ne tournent jamais
+dans un thread de lecture pouvant continuer après un délai dépassé.
+
+Les nouvelles insertions expirent 24 heures après la préparation de la demande ;
+les brouillons déjà enregistrés restent consultables. Aucune tentative d'envoi
+ni synchronisation entre backends n'est réalisée. En cas d'erreur de stockage,
+consultez le suivi puis reprenez **la même référence**, sans recréer le lot.
+
+API authentifiée correspondante :
+- `POST /api/work-dossiers/draft-recordings` : `session_id`, `dossier_id`,
+  depuis la prévisualisation serveur de cette session, sans contenu client arbitraire ;
+- `GET /api/work-dossiers/draft-recordings` : références récentes et compteurs ;
+- `GET /api/work-dossiers/draft-recordings/{reference}` : résultat et sources revalidées ;
+- `POST /api/work-dossiers/draft-recordings/{reference}/confirm` :
+  `{"confirmed": true}` strict, enregistrement/reprise idempotente sans envoi.
 
 Le choix produit est un futur mode hybride, avec autorité
 serveur et copie locale, mais cette étape n'effectue aucune migration et ne

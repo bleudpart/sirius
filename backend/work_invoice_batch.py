@@ -52,6 +52,8 @@ def batch_report(batch: dict) -> str:
     lines.append(
         "Brouillons temporaires non enregistrés. Aucun message envoyé, aucune facture modifiée. "
         "Les preuves de règlements récents ne sont pas disponibles dans cette source. "
-        "Pour enregistrer une proposition, utilisez le parcours Brouillon du dossier après relecture."
+        "Après relecture, dites « Enregistre ces préparations dans le dossier titre exact » ; "
+        "seules les factures déjà suivies dans ce dossier pourront être retenues, "
+        "puis un accord distinct lié à une référence sera demandé."
     )
     return "\n".join(lines)

@@ -3,6 +3,9 @@ import { isChronosCommand } from "./chronos";
 export function isWorkConversationCommand(command) {
   const text = String(command || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .replace(/’/g, "'").toLowerCase().trim();
+  if (/\b(?:liste|montre|affiche)\b.*\benregistrements\b.*\bbrouillons\b/.test(text)) return true;
+  if (/\b(?:enregistre|enregistrer)\b.*\b(?:brouillons?|preparations?|relances?)\b/.test(text)) return true;
+  if (/\b(?:confirme|reprends|reprendre|etat|suivi)\b.*\benregistrement\b/.test(text)) return true;
   if (/^(?:confirme|annule) la previsualisation de relance[\s.!?]*$/.test(text)) return true;
   if (/^(?:oublie|efface) (?:le contexte de |le contexte du )?(?:ce dossier|dossier courant)[.!?]*$/.test(text)) return true;
   if (/\b(?:ouvre|ouvrir|ferme|fermer)\b/.test(text)) return false;

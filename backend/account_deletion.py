@@ -19,7 +19,7 @@ PERSONAL_COLLECTIONS = (
     "sirius_work_dossiers", "sirius_work_entries", "sirius_work_snapshots", "sirius_work_live_states",
     "sirius_work_proposal_mutes", "agora_deals", "agora_settings",
     "agora_coach_history",     "nummarius_alerts", "chronos_actions",
-    "sirius_work_contexts",
+    "sirius_work_contexts", "sirius_work_recordings",
 )
 REVIEW_COLLECTIONS = (
     "themis_docs", "themis_clients", "themis_items", "themis_stock_movements",

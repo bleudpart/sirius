@@ -13,6 +13,7 @@ API couverte (celle réellement utilisée par le backend) :
 - filtres : égalité (clés pointées incluses), $lt, $lte, $gt, $gte, $ne, $in,
   $nin, $exists, $regex, $or, $and
 - mises à jour : $set, $unset, $inc, $push, $addToSet (+ $each)
+- insert_once(document, identity) : insertion atomique par identité explicite
 - create_index / create_indexes : no-op (SQLite locale, volumétrie personnelle)
 """
 
@@ -263,6 +264,10 @@ class LocalCollection:
         pk = self._store._insert(self._name, dict(document))
         return _Results(inserted_id=pk, acknowledged=True)
 
+    async def insert_once(self, document: dict, identity: dict):
+        """Insert atomically unless an identical identity already exists."""
+        return self._store._insert_once(self._name, dict(document), identity)
+
     async def update_one(self, query, update, upsert=False):
         return self._store._update(self._name, query, update, upsert=upsert, many=False)
 
@@ -420,6 +425,26 @@ class LocalDocStore:
                 "WHERE pk = ? AND collection = ?",
                 (_dumps(document), *values, pk, collection),
             )
+
+    def _insert_once(self, collection: str, document: dict, identity: dict):
+        if not identity or any(key.startswith("$") or key == "_id" or isinstance(value, dict) for key, value in identity.items()):
+            raise ValueError("Une identité d'égalité explicite est requise.")
+        if not _matches(document, identity):
+            raise ValueError("L'identité doit correspondre au document.")
+        document.pop("_id", None)
+        where, params = self._where_from_indexed_query(collection, identity)
+        with _lock, closing(self._conn()) as con, con:
+            con.execute("BEGIN IMMEDIATE")
+            for row in con.execute(f"SELECT doc FROM documents WHERE {where}", params):
+                existing = json.loads(row["doc"])
+                if _matches(existing, identity):
+                    return existing, False
+            con.execute(
+                "INSERT INTO documents (collection, doc, user_id, session_id, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (collection, _dumps(document), *_indexed_values(document)),
+            )
+            return document, True
 
     def _delete_pk(self, collection: str, pk: int):
         with _lock, self._conn() as con:

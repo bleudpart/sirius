@@ -1,6 +1,7 @@
 """Tests du docstore SQLite local (compatibilité motor/MongoDB)."""
 import asyncio
 import sqlite3
+from concurrent.futures import ProcessPoolExecutor
 
 import pytest
 
@@ -15,6 +16,41 @@ def store(tmp_path):
 
 def run(coro):
     return asyncio.run(coro)
+
+
+def _process_insert_once(args):
+    path, index = args
+    store = LocalDocStore(path)
+    return run(store.once.insert_once(
+        {"user_id": "u1", "id": "stable", "index": index},
+        {"user_id": "u1", "id": "stable"},
+    ))
+
+
+def test_insert_once_is_atomic_between_processes(tmp_path):
+    path = str(tmp_path / "processes.db")
+    store = LocalDocStore(path)
+    with ProcessPoolExecutor(max_workers=2) as workers:
+        results = list(workers.map(_process_insert_once, [(path, index) for index in range(8)]))
+    assert sum(created for _, created in results) == 1
+    assert len({document["index"] for document, _ in results}) == 1
+    assert run(store.once.count_documents({})) == 1
+
+
+def test_insert_once_validates_identity_and_keeps_accounts_independent(store):
+    document = {"user_id": "u1", "id": "stable", "value": 42}
+    first, created = run(store.once.insert_once(document, {"user_id": "u1", "id": "stable"}))
+    assert created and first == document
+    second, created = run(store.once.insert_once(
+        {**document, "value": 99}, {"user_id": "u1", "id": "stable"},
+    ))
+    assert not created and second["value"] == 42
+    assert run(store.once.insert_once(
+        {**document, "user_id": "u2"}, {"user_id": "u2", "id": "stable"},
+    ))[1]
+    for identity in ({}, {"id": {"$ne": "x"}}, {"id": "different"}):
+        with pytest.raises(ValueError):
+            run(store.once.insert_once(document, identity))
 
 
 # ---------- CRUD de base ----------

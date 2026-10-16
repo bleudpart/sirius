@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import re
+import sqlite3
 import unicodedata
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -10,10 +11,12 @@ from typing import Awaitable, Callable
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import HTTPException, Request
+from pymongo.errors import PyMongoError
 
 from local_docstore import DatabaseRouter, LocalDocStore
 from work_briefing import work_briefing_text
 from work_invoice_batch import batch_days, batch_report
+from work_draft_recordings import DraftRecordings, recording_report
 
 logger = logging.getLogger(__name__)
 Reader = Callable[..., Awaitable[dict]]
@@ -31,6 +34,12 @@ def normalized(text: str) -> str:
 
 def work_intent(text: str) -> str | None:
     value = normalized(text)
+    if re.search(r"\b(?:liste|montre|affiche)\b.*\benregistrements\b.*\bbrouillons\b", value):
+        return "recordings_list"
+    if re.search(r"\b(?:enregistre|enregistrer)\b.*\b(?:brouillons?|preparations?|relances?)\b", value):
+        return "record_drafts"
+    if re.search(r"\b(?:confirme|reprends|reprendre|etat|suivi)\b.*\benregistrement\b", value):
+        return "recording"
     if re.fullmatch(r"(?:confirme|annule) la previsualisation de relance[\s.!?]*", value):
         return "preview_reply"
     if re.fullmatch(r"(?:oublie|efface) (?:le contexte de |le contexte du )?(?:ce dossier|dossier courant)[.!?]*", value):
@@ -118,6 +127,7 @@ class WorkConversation:
         self.readers: WorkReaders | None = None
         self.preview_invoice: Reader | None = None
         self.preview_invoice_batch: Reader | None = None
+        self.recordings: DraftRecordings | None = None
         self._indexes_ready = False
         self._index_lock = asyncio.Lock()
 
@@ -149,13 +159,24 @@ class WorkConversation:
         if self.readers is None:
             logger.error("Work conversation readers are not configured")
             raise HTTPException(503, "Le service de conversation métier n'est pas configuré.")
+        # Mutations must not run in a timed-out reader thread that could write later.
+        if intent in ("record_drafts", "recording", "recordings_list"):
+            try:
+                await self._ensure_indexes()
+                return await self._record(req, user, request, intent)
+            except (sqlite3.Error, PyMongoError) as exc:
+                logger.exception("Draft recording storage unavailable; inspect persistent operation before retry")
+                raise HTTPException(503, "Le stockage des préparations est indisponible. L'enregistrement peut être partiel : "
+                                    "consultez le suivi de la référence affichée puis reprenez la même référence, "
+                                    "sans créer une nouvelle préparation. Aucun message envoyé.") from exc
         try:
             async with asyncio.timeout(READ_TIMEOUT):
                 await self._ensure_indexes()
                 if intent is None:
                     pending = await self.db.sirius_work_contexts.find_one({
                         "user_id": user["user_id"], "session_id": req.session_id or "default",
-                        "preview_pending": True, "expires_at": {"$gt": datetime.now(timezone.utc).isoformat()},
+                        "$or": [{"preview_pending": True}, {"recording_pending": True}],
+                        "expires_at": {"$gt": datetime.now(timezone.utc).isoformat()},
                     })
                     if not pending or (req.environment or {}).get("work_context_clear"):
                         return None
@@ -164,6 +185,97 @@ class WorkConversation:
         except TimeoutError as exc:
             logger.warning("Work conversation authorized read timed out")
             raise HTTPException(503, "Lecture métier trop longue. Aucune action effectuée ; réessayez après vérification de la connexion.") from exc
+
+    async def _record(self, req, user, request, intent):
+        if self.recordings is None or self.readers is None:
+            logger.error("Draft recording service is not configured")
+            raise HTTPException(503, "L'enregistrement de brouillons est indisponible.")
+        uid, session = user["user_id"], req.session_id or "default"
+        text = normalized(req.text)
+        if (req.environment or {}).get("work_context_clear"):
+            await self.db.sirius_work_contexts.delete_many({"user_id": uid, "session_id": session})
+        if intent == "recordings_list":
+            listing = await self.recordings.listing(uid)
+            lines = ["Suivi des demandes d'enregistrement de brouillons (aucun envoi)."]
+            for item in listing["items"]:
+                lines.append(f"- {item['id']} · {item['dossier_title']} : "
+                             f"{item['recorded']}/{item['total']} brouillon(s) enregistré(s), "
+                             f"{item['excluded']} préparation(s) exclue(s).")
+            if not listing["items"]:
+                lines.append("Aucune demande d'enregistrement accessible.")
+            if listing["truncated"]:
+                lines.append("Liste partielle : vingt demandes les plus récentes.")
+            lines.append("Dites « Suivi de l'enregistrement référence » pour relire un résultat "
+                         "ou « Reprends l'enregistrement référence » pour reprendre une demande déjà approuvée.")
+            return {"state": "READ_ONLY", "executed": False, "answer": "\n".join(lines),
+                    "work_recordings": listing}
+        if intent == "recording":
+            match = re.fullmatch(
+                r"(confirme|reprends|reprendre|etat|suivi) (?:l'enregistrement|de l'enregistrement) ([a-f0-9]{32})[\s.!?]*", text,
+            )
+            if re.fullmatch(r"confirme l'enregistrement (?:de ces|des) brouillons[\s.!?]*", text):
+                saved = await self.db.sirius_work_contexts.find_one({
+                    "user_id": uid, "session_id": session,
+                    "expires_at": {"$gt": datetime.now(timezone.utc).isoformat()},
+                }) if not (req.environment or {}).get("work_context_clear") else None
+                operation_id = (saved or {}).get("recording_id")
+                if operation_id:
+                    match = re.fullmatch(
+                        r"(confirme) (?:l'enregistrement) ([a-f0-9]{32})",
+                        f"confirme l'enregistrement {operation_id}",
+                    )
+            if not match:
+                return {"state": "NEEDS_CLARIFICATION", "executed": False, "persisted": False,
+                        "answer": "Indiquez la référence exacte : « Suivi de l'enregistrement référence » "
+                                  "ou « Confirme l'enregistrement référence ». Un oui seul n'autorise aucun enregistrement."}
+            operation_id = match[2]
+            if match[1] in ("confirme", "reprends", "reprendre"):
+                # Reprise also requires the exact reference of an already approved operation.
+                if match[1] != "confirme":
+                    previous = await self.recordings.status(uid, operation_id, request)
+                    if not previous["approved"]:
+                        result = previous
+                    else:
+                        result = await self.recordings.confirm(uid, operation_id, request)
+                else:
+                    result = await self.recordings.confirm(uid, operation_id, request)
+            else:
+                result = await self.recordings.status(uid, operation_id, request)
+        else:
+            environment = req.environment or {}
+            if environment.get("work_context_clear"):
+                raise HTTPException(409, "Le contexte de préparation a été effacé. Préparez de nouveau la relance.")
+            context = await self.db.sirius_work_contexts.find_one({
+                "user_id": uid, "session_id": session, "expires_at": {"$gt": datetime.now(timezone.utc).isoformat()},
+            })
+            preview = (context or {}).get("recording_preview") or {}
+            single = re.fullmatch(r"(?:enregistre|enregistrer) (?:ce|le) brouillon[\s.!?]*", text)
+            target = re.fullmatch(
+                r"(?:enregistre|enregistrer) (?:ces|les) (?:preparations|brouillons|relances) dans le dossier (.+?)[\s.!?]*", text,
+            )
+            dossier_id = preview.get("dossier_id") if single else None
+            if single and environment.get("work_dossier_id") not in (None, dossier_id):
+                raise HTTPException(409, "Le dossier affiché a changé. Préparez de nouveau la relance dans le dossier voulu.")
+            if target:
+                dossiers = (await self._read(self.readers.dossiers, request))["dossiers"]
+                named = [item for item in dossiers if normalized(item["title"]) == target[1].strip(" «»\"")]
+                dossier_id = named[0]["id"] if len(named) == 1 else None
+            if not dossier_id:
+                return {"state": "NEEDS_CLARIFICATION", "executed": False, "persisted": False,
+                        "answer": "Pour une facture préparée dans son dossier, dites « Enregistre ce brouillon ». "
+                                  "Pour un lot, indiquez « Enregistre ces préparations dans le dossier titre exact ». "
+                                  "Seules les factures déjà suivies dans ce dossier pourront être retenues. "
+                                  "Une confirmation distincte sera demandée ; aucun envoi."}
+            result = await self.recordings.stage(uid, session, dossier_id, request)
+        await self.db.sirius_work_contexts.update_one(
+            {"user_id": uid, "session_id": session},
+            {"$set": {"preview_pending": True, "recording_pending": True, "recording_id": result["id"],
+                      "expires_at": (datetime.now(timezone.utc) + CONTEXT_TTL).isoformat()}},
+            upsert=True,
+        )
+        return {"state": result["state"], "executed": False, "persisted": True,
+                "work_recording": result, "answer": recording_report(result),
+                "work_sources": [item["source"] for item in result["items"]]}
 
     async def _answer(self, req, user: dict, request: Request, intent: str) -> dict:
         readers = self.readers
@@ -183,18 +295,22 @@ class WorkConversation:
                     "state": "READ_ONLY", "executed": False, "verified_at": now.isoformat(), "work_context": None,
                     "work_context_cleared": True, "work_sources": [], "work_suggestions": []}
         if intent == "preview_reply":
+            cancelled = bool(re.match(r"^(?:non|annule|laisse tomber)\b", normalized(req.text)))
+            pending = await self.db.sirius_work_contexts.find_one({"user_id": uid, "session_id": session})
             await self.db.sirius_work_contexts.update_one(
                 {"user_id": uid, "session_id": session},
-                {"$unset": {"preview_pending": ""}},
+                {"$unset": {"preview_pending": "", **({"recording_preview": "", "recording_id": ""} if cancelled else {})}},
             )
-            cancelled = bool(re.match(r"^(?:non|annule|laisse tomber)\b", normalized(req.text)))
             return {
-                "answer": "Prévisualisation abandonnée. Aucun brouillon enregistré ni message envoyé."
+                "answer": "Prévisualisation temporaire abandonnée. Aucun nouvel enregistrement ni message envoyé. "
+                          "Les brouillons et demandes d'enregistrement déjà persistés sont conservés."
                 if cancelled else "Cette prévisualisation n'autorise aucun envoi ni enregistrement. "
-                                 "Utilisez le parcours Brouillon du dossier pour relire et enregistrer une proposition. "
+                                 "Pour préparer un enregistrement, dites « Enregistre ce brouillon » ; "
+                                 "pour une demande déjà préparée, utilisez « Confirme l'enregistrement » avec sa référence exacte. "
                                  "Aucun message envoyé ; aucune action métier exécutée.",
                 "state": "READ_ONLY" if cancelled else "NOT_EXECUTED",
                 "executed": False, "persisted": False, "work_context": None,
+                "work_recording_pending": bool((pending or {}).get("recording_pending")),
                 "verified_at": now.isoformat(), "work_sources": [], "work_suggestions": [],
             }
         zone_name = environment.get("timezone") or "Europe/Paris"
@@ -229,7 +345,10 @@ class WorkConversation:
             await self.db.sirius_work_contexts.update_one(
                 {"user_id": uid, "session_id": session},
                 {"$set": {"preview_pending": True,
-                          "expires_at": (now + CONTEXT_TTL).isoformat()}},
+                          "expires_at": (now + CONTEXT_TTL).isoformat(),
+                          "recording_preview": {"verified_at": batch["verified_at"],
+                                                "items": [item for item in batch["items"] if item["state"] == "prepared"]}},
+                 "$unset": {"recording_pending": "", "recording_id": ""}},
                 upsert=True,
             )
             return {
@@ -306,7 +425,7 @@ class WorkConversation:
                    "expires_at": (now + CONTEXT_TTL).isoformat()}
         await self.db.sirius_work_contexts.update_one(
             {"user_id": uid, "session_id": session},
-            {"$set": context, "$unset": {"preview_pending": ""}}, upsert=True,
+            {"$set": context, "$unset": {"preview_pending": "", "recording_preview": "", "recording_pending": "", "recording_id": ""}}, upsert=True,
         )
         base["work_context"] = context
         action_request = bool(re.search(r"\b(?:prepare|preparer|envoie|envoyer|supprime|supprimer|cree|creer|transforme|surveille|planifie|relance)\b", text))
@@ -355,12 +474,16 @@ class WorkConversation:
                 f"Objet : {content['subject']}\n\n{content['message']}\n\n"
                 f"À vérifier : {missing}.\n"
                 "Brouillon temporaire non enregistré. Aucun message envoyé. "
-                "Relisez les paiements récents, le destinataire et le texte avant d'utiliser le parcours Brouillon du dossier ; "
+                "Relisez les paiements récents, le destinataire et le texte. Dites « Enregistre ce brouillon » "
+                "pour préparer son enregistrement, puis confirmez avec la référence affichée ; "
                 "la validation dans le dossier n'effectue pas d'envoi."
             )
             base.update(state="PREPARED", work_preview=preview, persisted=False)
             await self.db.sirius_work_contexts.update_one(
-                {"user_id": uid, "session_id": session}, {"$set": {"preview_pending": True}},
+                {"user_id": uid, "session_id": session},
+                {"$set": {"preview_pending": True, "recording_preview": {
+                    "dossier_id": selected_id, "verified_at": preview["verified_at"], "items": [preview],
+                }}},
             )
         elif action_request:
             answer = (

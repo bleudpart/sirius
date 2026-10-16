@@ -329,6 +329,48 @@ test.each(["PREPARED", "READ_ONLY"])("a batch preview remains non-executing, inc
   expect(global.fetch.mock.calls.some(([url]) => /\/intent$|\/drafts$|\/send$|outlook.*execute/.test(String(url)))).toBe(false);
 });
 
+test("recording a batch keeps its server session, asks a distinct confirmation and never sends", async () => {
+  const reference = "1234567890abcdef1234567890abcdef";
+  mockConversationStream([{ type: "done", answer: "Lot à relire. Aucun message envoyé.",
+    work_state: "PREPARED", work_batch: { scope: "own_account" } }]);
+  await mount();
+  await send("Prépare les relances de mes factures en retard de plus de 15 jours");
+  mockConversationStream([{ type: "done", answer: "Demande préparée : confirmez son enregistrement.",
+    work_state: "AWAITING_CONFIRMATION",
+    work_recording: { id: reference, recorded: 0, total: 2, approved: false } }]);
+  await send("Enregistre ces préparations dans le dossier Client Martin");
+  let streams = global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/chat/stream"));
+  expect(JSON.parse(streams[1][1].body).environment.work_context_clear).toBeUndefined();
+  mockConversationStream([{ type: "done", answer: "Un oui seul n'autorise aucun enregistrement.",
+    work_state: "NOT_EXECUTED", work_recording_pending: true }]);
+  await send("Oui");
+  streams = global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/chat/stream"));
+  expect(JSON.parse(streams[2][1].body).text).toBe("Confirme la prévisualisation de relance");
+  mockConversationStream([{ type: "done", answer: "2 brouillons enregistrés, non envoyés.",
+    work_state: "RECORDED", persisted: true, executed: false,
+    work_recording: { id: reference, recorded: 2, total: 2, approved: true } }]);
+  await send("Confirme l'enregistrement des brouillons");
+  streams = global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/chat/stream"));
+  expect(JSON.parse(streams[3][1].body).text).toBe("Confirme l'enregistrement des brouillons");
+  expect(JSON.parse(streams[3][1].body).environment.work_context_clear).toBeUndefined();
+  expect(global.fetch.mock.calls.some(([url]) => /\/intent$|\/send$|outlook.*execute/.test(String(url)))).toBe(false);
+});
+
+test("a blocked recording explains source problems instead of blaming access keys", async () => {
+  global.fetch.mockImplementation((url) => String(url).endsWith("/chat/stream")
+    ? Promise.resolve({ ok: false, status: 409, json: async () => ({ detail: {
+      message: "Aucune préparation ne peut être enregistrée dans ce dossier.",
+      blocked: [{ reason: "La source a changé ; préparez de nouveau la relance." }],
+    } }) })
+    : Promise.resolve({ ok: true, json: async () => ({ items: [], tasks: [] }) }));
+  await mount();
+  await send("Enregistre ce brouillon");
+  const spoken = speakFr.mock.calls.map(([text]) => text).join(" ");
+  expect(spoken).toContain("La source a changé");
+  expect(spoken).not.toContain("Services et clés");
+  expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/chat"))).toHaveLength(0);
+});
+
 test("a dossier question opens the visible conversation and transfers its screen context", async () => {
   mockConversationStream([{ type: "done", answer: "Dossier vérifié.", work_context: {
     dossier_id: "server-dossier", expires_at: new Date(Date.now() + 1800000).toISOString(),
