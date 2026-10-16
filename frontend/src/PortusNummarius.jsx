@@ -5,6 +5,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import { speakAsCharacter } from "@/voice";
 import { API_BASE_URL } from "@/lib/api";
 import { personalMarketHeaders } from "@/apiKeyStorage";
+import NummariusAnalytics from "./NummariusAnalytics";
 
 const API = API_BASE_URL;
 const RANGES = [["1s", "1 SEM"], ["1m", "1 MOIS"], ["3m", "3 MOIS"], ["max", "MAX"]];
@@ -27,6 +28,7 @@ function Spark({ data, up }) {
 }
 
 export default function PortusNummarius({ onClose }) {
+  const [workspace, setWorkspace] = useState("market");
   const [assets, setAssets] = useState(null);
   const [errs, setErrs] = useState([]);
   const [sel, setSel] = useState(null);
@@ -111,7 +113,11 @@ export default function PortusNummarius({ onClose }) {
           <button className="setup-close zeus-close" onClick={onClose} data-testid="nummarius-close-btn">✕</button>
         </div>
       </header>
-      <div className="gcal-body numm-body">
+      <nav className="numm-workspace-tabs" aria-label="Espace boursier">
+        <button type="button" aria-pressed={workspace === "market"} onClick={() => setWorkspace("market")}>Marchés & alertes de prix</button>
+        <button type="button" aria-pressed={workspace === "technical"} onClick={() => setWorkspace("technical")}>Analyse technique & comparateur</button>
+      </nav>
+      {workspace === "technical" ? <NummariusAnalytics /> : <div className="gcal-body numm-body">
         <aside className="numm-side">
           <img src="/holo/nummarius.jpg" alt="Portus Nummarius" className="numm-avatar" data-testid="nummarius-avatar" draggable={false} />
           <div className="numm-avatar-caption font-divine">GARDIEN DES MARCHÉS</div>
@@ -185,7 +191,7 @@ export default function PortusNummarius({ onClose }) {
             </>
           )}
         </section>
-      </div>
+      </div>}
     </div>
   );
 }

@@ -681,6 +681,56 @@ Guide détaillé : [INSTALL-SIRIUS.md](./INSTALL-SIRIUS.md)
 
 Pour le déploiement en petite entreprise : [GUIDE-ENTREPRISE.md](./GUIDE-ENTREPRISE.md)
 
+### PORTUS NUMMARIUS : premier espace d'analyse technique
+
+Le module conserve sa vue Marchés et ses alertes de prix existantes. L'onglet
+**Analyse technique & comparateur** ajoute des tableaux responsive et un moteur
+de calcul déterministe, sans appel IA pour les chiffres ni passage d'ordre.
+Ce jalon ne constitue pas encore toute la feuille de route financière.
+
+- Catalogue technique initial : AAPL, MSFT, NVDA, TSLA. Les cryptos restent dans
+  la vue Marchés ; aucun indicateur journalier n'est extrapolé de leur courbe.
+- `GET /api/nummarius/analysis/{symbol}?period=1m|3m|1y|5y` :
+  historique quotidien Yahoo Finance sur cinq ans au maximum, métadonnées de
+  source/devise/place/fuseau, date de dernière séance et heure de récupération.
+  Les séances en cours sont écartées si leur clôture n'est pas établie.
+- `GET /api/nummarius/compare?symbols=AAPL,MSFT,NVDA,TSLA&period=1y` :
+  une à quatre actions distinctes, lectures indépendantes parallèles et
+  indisponibilités par actif visibles. Les deux routes exigent une session.
+- MM20/50/100/200, RSI14 (Wilder), MACD12/26 et signal9 (EMA initialisée par
+  moyenne simple), Bollinger20 ± 2 écarts-types de population, ATR14 (Wilder),
+  volumes et leur moyenne20. L'échauffement est calculé sur tout l'historique
+  reçu avant le découpage de la période affichée.
+- Volatilité sur vingt rendements logarithmiques, écart-type échantillonnal,
+  annualisation √252 ; baisse maximale sur tout l'historique reçu ; extrema
+  sur la période affichée et simples supports/résistances par extrema20.
+- Performances de prix à 1, 5, 21, 252 et 1260 séances. Ce sont des conventions
+  en séances et non des anniversaires calendaires. Une période insuffisante
+  donne « Historique insuffisant », pas zéro.
+- Courbe et moyennes, chandeliers OHLC (120 dernières séances de la période
+  au maximum), volumes, lecture des valeurs au survol/clic/clavier ; comparateur
+  avec cours, performances, RSI, volatilité et position face à la MM200.
+
+Les prix sont différés, pas des cours temps réel. Le cache public dure quinze
+minutes ; une panne ne réutilise pas silencieusement un ancien jeu de données.
+Les dates et le cache restent visibles et un historique vieux de plus de sept
+jours déclenche un avertissement. Les observations OHLC invalides sont comptées
+et exclues ; les séances dupliquées invalident la source.
+
+Les ajustements sont ceux du fournisseur ; les fractionnements reçus sont
+signalés, pas recalculés. Aucune promesse de rendement total : pas de
+réinvestissement des dividendes, frais ni conversions de devises. Seuls les
+symboles publics sont envoyés à Yahoo, aucune position, conversation ni clé
+personnelle. La nouvelle analyse n'utilise pas Alpha Vantage ; la gestion des
+clés de la vue Marchés existante est préservée.
+
+Les explications sont descriptives et rattachées aux valeurs calculées, pas des
+recommandations d'achat. Fondamentaux, actualités, calendrier, portefeuille
+manuel/CSV, listes de suivi personnalisées, modèles de comparaison enregistrés,
+alertes techniques et conversation financière restent des étapes suivantes.
+Les alertes de prix existantes sont évaluées lors de leur consultation : ce
+jalon n'ajoute pas de moteur de surveillance en arrière-plan.
+
 ### Conversation de travail : lectures et prévisualisation de relance
 
 Les routes chat HTTP et SSE reconnaissent directement les demandes courantes

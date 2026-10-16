@@ -1,0 +1,50 @@
+.numm-tech { width: min(1400px, calc(100% - 32px)); margin: 20px auto 60px; color: #dce6ee; font-size: 14px; line-height: 1.5; }
+.numm-tech * { box-sizing: border-box; }
+.numm-tech-hero { display: flex; justify-content: space-between; gap: 20px; align-items: center; padding: 26px; border: 1px solid #33505d; background: linear-gradient(115deg, #122832, #101723); border-radius: 18px; margin-bottom: 18px; }
+.numm-tech-hero h2 { margin: 4px 0; color: #f5dfaf; font-size: clamp(22px, 3vw, 34px); }
+.numm-tech-hero p { margin: 4px 0; }
+.numm-tech button, .numm-tech select { background: #152b38; color: #e1edf4; border: 1px solid #43606f; border-radius: 8px; padding: 9px 12px; cursor: pointer; font: inherit; }
+.numm-tech button[aria-pressed="true"] { color: #101d25; background: #e2ca95; border-color: #e2ca95; }
+.numm-tech button:focus-visible, .numm-tech select:focus-visible, .numm-tech svg g:focus-visible { outline: 2px solid #81e6d9; outline-offset: 3px; }
+.numm-tech-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 16px 0; }
+.numm-tech-toolbar [role="group"] { display: flex; gap: 6px; flex-wrap: wrap; }
+.numm-tech-toolbar select { margin-left: 10px; }
+.numm-tech-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }
+.numm-tech-card { min-width: 0; padding: 18px; border: 1px solid #304957; border-radius: 14px; background: #0d1b27; margin-bottom: 14px; }
+.numm-tech-metrics .numm-tech-card { margin: 0; }
+.numm-tech h3 { margin: 0 0 8px; color: #b9cbd8; font-size: 13px; letter-spacing: .04em; }
+.numm-tech-card strong { display: block; font-size: clamp(18px, 2vw, 26px); color: #8ee5d9; overflow-wrap: anywhere; }
+.numm-tech small { display: block; color: #a7bdcc; margin-top: 6px; }
+.numm-tech-summary { border-left: 3px solid #e2ca95; }
+.numm-tech details { color: #adc4d2; overflow-wrap: anywhere; }
+.numm-tech summary { cursor: pointer; color: #e2ca95; }
+.numm-tech a { color: #8ee5d9; text-decoration: underline; }
+.numm-tech-provenance { color: #b7ccd8; font-size: 12px; overflow-wrap: anywhere; }
+.numm-tech-chart { border: 1px solid #304957; border-radius: 14px; background: #0a1722; padding: 16px; margin: 16px 0; }
+.numm-tech-chart svg { display: block; width: 100%; min-height: 190px; }
+.numm-tech-chart svg text { fill: #abc1cf; font-size: 11px; }
+.numm-tech-readout { min-height: 44px; font-variant-numeric: tabular-nums; color: #e7d6b0; }
+.numm-tech-table-wrap { overflow-x: auto; max-width: 100%; border: 1px solid #304957; border-radius: 12px; margin-bottom: 18px; }
+.numm-tech-table { width: 100%; border-collapse: collapse; text-align: left; font-variant-numeric: tabular-nums; background: #0b1924; }
+.numm-tech-table caption { padding: 14px; color: #c8d9e5; text-align: left; background: #142633; }
+.numm-tech-table th, .numm-tech-table td { padding: 12px 14px; border-bottom: 1px solid #263c4a; vertical-align: top; }
+.numm-tech-table th { color: #e2ca95; font-weight: 500; }
+.numm-tech-table thead { background: #142633; }
+.numm-tech-table tbody tr:hover { background: #162b37; }
+.numm-tech-table td { min-width: 110px; }
+.numm-tech-choices { display: flex; gap: 14px; flex-wrap: wrap; border: 0; padding: 10px 0; }
+.numm-tech-choices label { display: flex; gap: 7px; align-items: center; }
+.numm-tech-choices input { accent-color: #81e6d9; }
+.numm-tech-error, .numm-tech [role="alert"] { color: #ffb2a5; border-left: 3px solid #ffb2a5; padding: 12px; }
+.numm-tech-disclaimer { color: #b0c2cf; font-size: 12px; padding: 12px 0; }
+.numm-workspace-tabs { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; padding: 12px 16px; }
+.numm-workspace-tabs button { border: 1px solid #43606f; background: #102330; color: #dfc690; padding: 10px 20px; border-radius: 10px; }
+.numm-workspace-tabs button[aria-pressed="true"] { background: #dfc690; color: #122330; }
+@media (max-width: 760px) {
+  .numm-tech { width: calc(100% - 20px); }
+  .numm-tech-hero { flex-direction: column; align-items: flex-start; padding: 18px; }
+  .numm-tech-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .numm-tech-card { padding: 12px; }
+  .numm-tech-chart { padding: 8px; }
+}
+@media (max-width: 380px) { .numm-tech-metrics { grid-template-columns: 1fr; } }

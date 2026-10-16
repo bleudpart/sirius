@@ -6,6 +6,9 @@ import uuid
 import httpx
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
+from typing import Literal
+
+from nummarius_market_data import compare_assets, technical_analysis
 
 STOCKS = [("AAPL", "APPLE"), ("MSFT", "MICROSOFT"), ("NVDA", "NVIDIA"), ("TSLA", "TESLA")]
 CRYPTOS = [("bitcoin", "BITCOIN"), ("ethereum", "ETHEREUM"), ("solana", "SOLANA")]
@@ -104,6 +107,23 @@ def make_nummarius_router(db):
     async def _uid(request: Request):
         from auth_api import require_user
         return (await require_user(request, db))["user_id"]
+
+    @r.get("/analysis/{asset_id}")
+    async def analysis(asset_id: str, request: Request, period: Literal["1m", "3m", "1y", "5y"] = "1y"):
+        await _uid(request)
+        stock = dict(STOCKS).get(asset_id)
+        if stock is None:
+            raise HTTPException(422, "Analyse technique disponible pour les quatre actions du catalogue uniquement.")
+        return await technical_analysis(asset_id, stock, period)
+
+    @r.get("/compare")
+    async def compare(request: Request, symbols: str = "AAPL,MSFT,NVDA,TSLA",
+                      period: Literal["1m", "3m", "1y", "5y"] = "1y"):
+        await _uid(request)
+        selected = symbols.split(",")
+        if not 1 <= len(selected) <= 4 or len(set(selected)) != len(selected) or any(s not in dict(STOCKS) for s in selected):
+            raise HTTPException(422, "Choisissez une à quatre actions distinctes du catalogue.")
+        return await compare_assets([(symbol, dict(STOCKS)[symbol]) for symbol in selected], period)
 
     @r.get("/market")
     async def market(request: Request, av_key: str = ""):
