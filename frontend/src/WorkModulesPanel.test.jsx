@@ -36,6 +36,7 @@ async function importFile(file) {
 test("requires confirmation before deleting and allows cancellation", async () => {
   localStorage.setItem(key, JSON.stringify({ ...emptyWorkData(), dossiers: [item] }));
   await render();
+  expect(host.textContent).toContain("Cette sauvegarde concerne les listes manuelles");
   await click(host.querySelector('[aria-label="Supprimer Martin"]'));
   expect(JSON.parse(localStorage.getItem(key)).dossiers).toEqual([item]);
   await click(button("Annuler la suppression"));

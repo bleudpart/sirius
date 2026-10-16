@@ -65,6 +65,8 @@ export default function ArianeMarketRuns({ auditOnly = false }) {
     <p>Lectures PORTUS en parallèle → règles déterministes → synthèse. Chaque étape terminée est conservée ;
       une reprise ne relit que les étapes manquantes.</p>
     <p>Analyse des actions choisies, pas d'un portefeuille personnel. Aucune alerte, notification, récurrence ou opération boursière créée.</p>
+    <p>Ce suivi et ses preuves sont enregistrés dans le service SIRIUS connecté, pour votre compte, séparément des listes manuelles
+      locales et de leur sauvegarde. Utilisez l'export des preuves pour conserver les résultats du parcours.</p>
     {!auditOnly && <fieldset disabled={busy || !!pending} className="numm-tech-choices">
       <legend>Préparer une analyse en lecture seule</legend>
       {["AAPL", "MSFT", "NVDA", "TSLA"].map((symbol) => <label key={symbol}><input type="checkbox"

@@ -129,7 +129,7 @@ function WorkModulesWorkspace({ storageKey, initialModule, onClose, onOpenExisti
           {notice && <p className="work-notice" role="status">{notice}</p>}
           {active === "planning" && <ChronosAgenda />}
           <div className="work-backup">
-            <p className="work-hint">{loaded.error ? "Stockage local indisponible" : "Données conservées sur cet appareil uniquement, pour le compte actuel. Aucune synchronisation automatique."}</p>
+            <p className="work-hint">{loaded.error ? "Stockage local indisponible" : "Cette sauvegarde concerne les listes manuelles et le journal local de cet appareil, pour le compte actuel. Aucune synchronisation automatique de ces listes."}</p>
             <button type="button" disabled={!!loaded.error} onClick={exportBackup}>Sauvegarder les six modules</button>
             <label>Restaurer une sauvegarde (5 Mo max.)<input type="file" accept=".json,application/json" disabled={!!loaded.error || importing} onChange={readBackup} /></label>
             {importing && <p role="status">Lecture de la sauvegarde…</p>}

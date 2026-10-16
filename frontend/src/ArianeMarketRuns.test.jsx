@@ -46,6 +46,7 @@ test("launches an explicit read-only run and exposes source, rules, trace and mi
   expect(host.textContent).toContain("nummarius-daily-v1");
   expect(host.textContent).toContain("Journal NÉMÉSIS");
   expect(host.textContent).toContain("pas d'un portefeuille");
+  expect(host.textContent).toContain("séparément des listes manuelles");
   expect(global.fetch.mock.calls.every(([url]) => !String(url).includes("/alerts") && !String(url).includes("/send"))).toBe(true);
 });
 
