@@ -234,6 +234,10 @@ def test_cache_limits_audio_memory(monkeypatch):
     ("  ΣIRIUS\nlit mes e-mails : café, 12,50 €.\t", "Sirius lit mes courriels : café, 12,50 €."),
     ("cafe\u0301\u00a0et\u202fœufs", "café et œufs"),
     ("email@example.test et prénom.mail@example.test", "email@example.test et prénom.mail@example.test"),
+    ("20:45 (CET), 21:00 CEST.", "20:45 (heure d'Europe centrale), 21:00 heure d'été d'Europe centrale."),
+    ("cet horaire, cette rencontre, CETTE", "cet horaire, cette rencontre, CETTE"),
+    ("Knicks vs Raptors. Ruud versus Jodar. A VS. B.", "Knicks contre Raptors. Ruud contre Jodar. A contre B."),
+    ("VS Code, https://example.test/vs/file", "VS Code, https://example.test/vs/file"),
 ])
 def test_shared_french_text_is_idempotent_and_preserves_words(text, expected):
     assert voice_io._speakable(text) == expected

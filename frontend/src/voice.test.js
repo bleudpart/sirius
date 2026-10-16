@@ -331,6 +331,46 @@ test("Android local narration and characters bypass remote TTS and keep their pr
   expect(global.fetch).not.toHaveBeenCalled();
 });
 
+test.each(["web", "android"])("%s pronounces time zones without spelling their letters", async (platform) => {
+  Capacitor.getPlatform.mockReturnValue(platform);
+  localStorage.setItem("sirius_voice", JSON.stringify({ name: "browser" }));
+  const previous = window.speechSynthesis;
+  const previousUtterance = window.SpeechSynthesisUtterance;
+  window.speechSynthesis = {
+    cancel: jest.fn(), resume: jest.fn(), speak: jest.fn(),
+    getVoices: () => [{ lang: "fr-FR", name: "Paul", localService: true }],
+  };
+  window.SpeechSynthesisUtterance = function (text) { this.text = text; };
+  const original = "Début 20:45 (CET), 21:00 (CEST), cet horaire et cette rencontre.";
+  try {
+    speakFr(original);
+    await flush();
+    const spoken = platform === "android"
+      ? speakNative.mock.calls[0][0]
+      : window.speechSynthesis.speak.mock.calls[0][0].text;
+    expect(spoken).toContain("20:45 heure d'Europe centrale");
+    expect(spoken).toContain("21:00 heure d'été d'Europe centrale");
+    expect(spoken).toContain("cet horaire et cette rencontre");
+    expect(spoken).not.toMatch(/\bCEST?\b/);
+    expect(cleanTextForDisplay(original)).toBe(original);
+  } finally {
+    window.speechSynthesis = previous;
+    window.SpeechSynthesisUtterance = previousUtterance;
+  }
+});
+
+test("sports opponents are spoken with contre, without changing VS Code or the Display", async () => {
+  localStorage.setItem("sirius_voice", JSON.stringify({ name: "browser" }));
+  const text = "Knicks vs Raptors. Ruud versus Jodar. A VS. B. VS Code.";
+  speakFr(text);
+  await flush();
+  expect(speakNative).toHaveBeenCalledWith(
+    "Knicks contre Raptors. Ruud contre Jodar. A contre B. VS Code.",
+    expect.any(Object),
+  );
+  expect(cleanTextForDisplay(text)).toBe(text);
+});
+
 test("browser waits for French voices, uses their language, and bounds discovery", () => {
   jest.useFakeTimers();
   Capacitor.getPlatform.mockReturnValue("web");

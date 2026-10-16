@@ -10,7 +10,7 @@ import re
 import unicodedata
 
 SPEECH_LANGUAGE = "fr-FR"
-SPEECH_TEXT_VERSION = 1
+SPEECH_TEXT_VERSION = 2
 _SIGMA_NAME = re.compile(r"Σ\s?IRIUS", re.IGNORECASE)
 _MAIL_WORD = re.compile(
     r"(?<![\w@.+-])(?:e[-\u2010\u2011 ]?)?mail(s?)(?![\w@+-]|\.[^\W\d_])",
@@ -23,4 +23,7 @@ def speakable_text(text: str) -> str:
     text = unicodedata.normalize("NFC", text or "")
     text = _SIGMA_NAME.sub("Sirius", text)
     text = _MAIL_WORD.sub(lambda match: "courriel" + match.group(1).lower(), text)
+    text = re.sub(r"\bCEST\b", "heure d'été d'Europe centrale", text)
+    text = re.sub(r"\bCET\b", "heure d'Europe centrale", text)
+    text = re.sub(r"\b(?:versus|vs\.?)(?!\s+Code\b)(?=\s|$|[,:;!?])", "contre", text, flags=re.I)
     return re.sub(r"\s+", " ", text).strip()

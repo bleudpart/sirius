@@ -23,7 +23,10 @@ date explicite ISO, numérique française ou en toutes lettres sont pris en char
 Une période non couverte est signalée, sans la remplacer silencieusement par
 aujourd'hui. Scores terminés, rencontres en cours et programmes à venir sont
 distingués ; une absence de score reste non vérifiée. Les flux ont une couverture
-partielle, sans garantie de disponibilité ; les pannes sont signalées et
+partielle. Les horaires sont donnés en heure de Paris, annoncée une seule fois
+pour la liste ; la synthèse développe les sigles CET/CEST plutôt que de les épeler.
+Les adversaires sont annoncés avec « contre », pas « vs » ou « versus ».
+Les sources n'offrent pas de garantie de disponibilité ; les pannes sont signalées et
 journalisées, et les réponses sont mises en cache pendant 60 secondes.
 
 ### Diagnostic des microphones PyAudio sur PC

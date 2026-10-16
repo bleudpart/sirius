@@ -229,6 +229,9 @@ def test_sports_sources_reach_every_answer_path_without_weather_context(monkeypa
     system_prompt = completions.payload["messages"][0]["content"]
     assert sources in system_prompt
     assert "France ET à l'international" in system_prompt
+    assert "horaires en heure de Paris" in system_prompt
+    assert "une seule fois pour la liste" in system_prompt
+    assert "« contre », jamais « vs » ni « versus »" in system_prompt
     assert "N'invente aucun score" in system_prompt
     follow_up.assert_not_awaited()
     deep.assert_not_awaited()
