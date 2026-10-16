@@ -1,3 +1,3 @@
 export const APP_NAME = "ΣIRIUS";
-export const APP_VERSION = "1.0.48";
+export const APP_VERSION = "1.0.49";
 export const APP_RELEASE = `${APP_NAME} ${APP_VERSION}`;

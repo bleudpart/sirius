@@ -1,11 +1,21 @@
 from pathlib import Path
 import os
+import sys
 
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 
 backend_dir = Path(SPECPATH)
 project_dir = backend_dir.parent
+binaries = []
+if sys.platform == "win32":
+    runtime_dir = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32"
+    required_runtimes = ("msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll")
+    if any(not (runtime_dir / name).is_file() for name in required_runtimes):
+        raise SystemExit("Installer le redistribuable Microsoft Visual C++ x64 recent avant le build.")
+    # Priorite au meme runtime systeme, pas aux vieilles copies livrees par certaines dependances.
+    for pattern in ("msvcp140*.dll", "vcruntime140*.dll"):
+        binaries.extend((str(path), ".") for path in sorted(runtime_dir.glob(pattern)))
 hiddenimports = []
 for package in ("media", "productivite", "providers", "routers", "routes"):
     hiddenimports.extend(collect_submodules(package))
@@ -52,7 +62,7 @@ for entry in sorted(playwright_cache.glob("chromium-*")) if playwright_cache.exi
 analysis = Analysis(
     [str(backend_dir / "desktop_backend.py")],
     pathex=[str(backend_dir)],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
