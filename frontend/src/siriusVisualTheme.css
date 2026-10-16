@@ -466,7 +466,7 @@ html[data-sirius-visual-theme="classic"] .public-popular { border-radius: 0 20px
   }
   html[data-sirius-visual-theme="classic"] .sirius-command-area .voice-session-controls { order: -1; }
   html[data-sirius-visual-theme="classic"] .sirius-root .top-bar {
-    padding-inline: clamp(20px, 3vw, 44px);
+    padding-inline: clamp(20px, 3vw, 44px) 300px;
     border-bottom: 1px solid rgba(145, 230, 242, .12);
     background: rgba(3, 17, 29, .95);
   }

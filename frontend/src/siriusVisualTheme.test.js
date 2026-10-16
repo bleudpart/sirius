@@ -136,6 +136,11 @@ test("desktop account space survives theme overrides and narrow window layouts",
   expect(desktopRules[".top-bar .conn-status|flex-wrap"]).toBe("wrap");
   expect(desktopRules[".top-bar .conn-status|min-width"]).toBe("0");
   expect(desktopRules[".sirius-root|grid-template-rows"]).toBe("minmax(56px, auto) minmax(0, 1fr) auto");
+  const themePadding = [];
+  root.walkRules('html[data-sirius-visual-theme="classic"] .sirius-root .top-bar', (rule) => {
+    rule.walkDecls("padding-inline", (decl) => themePadding.push(decl.value));
+  });
+  expect(themePadding).toEqual(["clamp(20px, 3vw, 44px) 300px"]);
 });
 
 test("presentation layout is enabled without requiring reduced motion", () => {
