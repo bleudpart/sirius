@@ -404,6 +404,32 @@ async def ui_intent(req: IntentRequest, request: Request):
 class ResetRequest(BaseModel):
     session_id: str = "default"
 
+from work_conversation import WorkConversation
+
+work_conversation = WorkConversation(db)
+
+
+async def _work_chat_response(req, user, request, session_id, history):
+    result = await work_conversation.handle(req, user, request)
+    if result is None:
+        return None
+    answer = result["answer"]
+    await db.sirius_chats.update_one(
+        {"session_id": session_id},
+        {"$set": {"session_id": session_id, "user_id": user["user_id"],
+                  "history": (history + [
+                      {"role": "user", "content": req.text},
+                      {"role": "assistant", "content": answer},
+                  ])[-16:], "updated_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True,
+    )
+    return {
+        **result, "answer": answer, "response": answer, "text": answer,
+        "memories": [], "popups": [], "action": None, "used_search": False,
+        "work_state": result["state"], "key_source": "authorized_work_data",
+    }
+
+
 async def _chronos_chat_response(req, user, session_id, history):
     from chronos_assistant import handle_chronos_chat
     import sqlite3
@@ -444,6 +470,9 @@ async def chat(req: ChatRequest, request: Request):
     session_id = f"{uid}:{req.session_id or 'default'}"
     doc = await db.sirius_chats.find_one({"session_id": session_id}, {"_id": 0, "history": 1})
     history = (doc or {}).get("history", [])
+    work = await _work_chat_response(req, user, request, session_id, history)
+    if work is not None:
+        return work
     chronos = await _chronos_chat_response(req, user, session_id, history)
     if chronos is not None:
         return chronos
@@ -550,6 +579,15 @@ async def chat_stream(req: ChatRequest, request: Request):
     session_id = f"{uid}:{req.session_id or 'default'}"
     doc = await db.sirius_chats.find_one({"session_id": session_id}, {"_id": 0, "history": 1})
     history = (doc or {}).get("history", [])
+    work = await _work_chat_response(req, user, request, session_id, history)
+    if work is not None:
+        async def work_events():
+            yield "data: " + json.dumps({"type": "delta", "text": work["answer"]}, ensure_ascii=False) + "\n\n"
+            yield "data: " + json.dumps({"type": "done", **work}, ensure_ascii=False) + "\n\n"
+        return StreamingResponse(
+            work_events(), media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
     chronos = await _chronos_chat_response(req, user, session_id, history)
     if chronos is not None:
         async def chronos_events():
@@ -2488,7 +2526,7 @@ async def setup_test_chat(body: SetupTestChatIn, request: Request):
 
 api_router.include_router(make_hephaistos_router(db))
 api_router.include_router(make_feedback_router())
-api_router.include_router(make_work_dossiers_router(db, require_user))
+api_router.include_router(make_work_dossiers_router(db, require_user, conversation=work_conversation))
 from routes.chronos import make_chronos_router  # noqa: E402
 api_router.include_router(make_chronos_router(require_user, db))
 

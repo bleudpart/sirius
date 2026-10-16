@@ -681,6 +681,37 @@ Guide détaillé : [INSTALL-SIRIUS.md](./INSTALL-SIRIUS.md)
 
 Pour le déploiement en petite entreprise : [GUIDE-ENTREPRISE.md](./GUIDE-ENTREPRISE.md)
 
+### Conversation de travail : premier socle en lecture
+
+Les routes chat HTTP et SSE reconnaissent directement les demandes courantes
+« Qu'ai-je à traiter aujourd'hui ? », « Liste mes dossiers », « Où en est le
+dossier Martin ? », « Résume ce dossier » et « Pourquoi ces propositions ? ».
+Elles réutilisent les mêmes lectures autorisées que les dossiers intelligents,
+sans appel à un fournisseur IA ni relais cloud pour ces demandes. La lecture
+est bornée à 12 secondes ; une indisponibilité n'est pas présentée comme une
+liste vide ou une action réussie. Le test de rapidité vérifie une réponse en
+moins de 2 secondes sur le jeu de données local de test, pas sur tout réseau réel.
+
+Le dossier affiché peut être transmis explicitement par l'interface. Un nom
+unique peut aussi sélectionner un dossier ; plusieurs correspondances ou un
+nom inconnu demandent une précision. La référence temporaire est isolée par
+compte/session et expire après 30 minutes ; les sources et permissions sont
+relues, jamais déduites de l'historique. « Oublie ce dossier » efface ce contexte,
+pas le dossier. Fermer l'écran des dossiers efface son contexte d'interface.
+Les boutons conversationnels ferment cet écran et transfèrent explicitement
+le dossier à la conversation pour que la réponse soit visible.
+Un client, une facture ou un devis ne sont pas choisis implicitement à partir
+du seul dossier.
+
+Le panneau des dossiers propose les boutons « Mes priorités », « Résumer ce
+dossier » et « Pourquoi ces propositions ? ». Cette première étape reste en
+lecture : elle ne crée pas de brouillon, n'envoie pas de message et n'active pas
+de surveillance. Les préparations et validations existantes restent disponibles
+dans les formulaires. Le choix produit est un futur mode hybride, avec autorité
+serveur et copie locale, mais cette étape n'effectue aucune migration et ne
+fournit pas encore de synchronisation métier hors ligne ni d'orchestrateur
+ARIANE général.
+
 ### Sauvegarde des six modules de travail
 
 CHRONOS propose aussi un **agenda quotidien** : rendez-vous avec début/fin,

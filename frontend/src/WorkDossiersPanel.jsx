@@ -701,7 +701,7 @@ function WorkThread({ dossier, revision, disabled, queue, onError, onOpenThemis,
   </section>;
 }
 
-export default function WorkDossiersPanel({ onClose, onOpenThemis, onOpenHaccp, initialDossierId = "" }) {
+export default function WorkDossiersPanel({ onClose, onOpenThemis, onOpenHaccp, initialDossierId = "", onConversationContext, onAsk }) {
   const [dossiers, setDossiers] = useState([]);
   const [proposals, setProposals] = useState([]);
   const [integrations, setIntegrations] = useState([]);
@@ -816,6 +816,10 @@ export default function WorkDossiersPanel({ onClose, onOpenThemis, onOpenHaccp, 
   };
   const selected = dossiers.find((d) => d.id === selectedId);
   useEffect(() => {
+    onConversationContext?.(selected?.id || null);
+    return () => onConversationContext?.(null);
+  }, [selected?.id, onConversationContext]);
+  useEffect(() => {
     if (initialDossierId && appliedInitialId.current !== initialDossierId
       && dossiers.some((d) => d.id === initialDossierId)) {
       appliedInitialId.current = initialDossierId;
@@ -848,6 +852,16 @@ export default function WorkDossiersPanel({ onClose, onOpenThemis, onOpenHaccp, 
       </header>
       <div className="work-dossiers-body">
         <p>Relie ton travail à des signaux réels. ΣIRIUS propose, tu décides : aucune commande ni relance n'est envoyée automatiquement.</p>
+        {onAsk && <section className="work-dossiers-day" aria-label="Conversation de travail">
+          <h2>À traiter avec ΣIRIUS · conversation</h2>
+          <p>{selected ? `Dossier affiché : ${selected.title}. Les questions sur « ce dossier » utilisent cette sélection ; les droits et les sources sont revérifiés.` : "Choisissez un dossier pour les questions contextuelles."}</p>
+          <p>Lecture directe, sans appel IA externe. Les préparations restent dans les parcours de validation ci-dessous.</p>
+          <div className="work-dossiers-actions">
+            <button type="button" onClick={() => onAsk("Qu'ai-je à traiter aujourd'hui ?")}>Mes priorités</button>
+            <button type="button" disabled={!selected} onClick={() => onAsk("Où en est ce dossier ?")}>Résumer ce dossier</button>
+            <button type="button" disabled={!selected} onClick={() => onAsk("Pourquoi ces propositions pour ce dossier ?")}>Pourquoi ces propositions ?</button>
+          </div>
+        </section>}
         {error && <p role="alert" className="work-dossiers-error">{error}</p>}
         {review && <section ref={reviewRef} tabIndex={-1} className="work-dossiers-review" aria-label="Validation avant enregistrement">
           <h2>{review.title}</h2>

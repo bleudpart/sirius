@@ -52,7 +52,8 @@ import { createVoiceSession } from "@/voiceSession";
 import { streamConversation, requestConversation, requestAssistantIntent, requestTranscription, requestNewsBriefing, requestWeatherBulletin } from "@/services/assistantApi";
 import { newsBulletinScope } from "./newsCommandRouting";
 import { isResumeWorkCommand, isWorkBriefingCommand } from "./workBriefing";
-import { chronosConfirmation, isChronosCommand } from "./chronos";
+import { chronosConfirmation } from "./chronos";
+import { isOperationalCommand, isWorkConversationCommand } from "./workConversation";
 import { bulletinFollowUp, createBulletinContext, markSegmentCompleted, markSegmentStarted, releaseBulletinFocus } from "./bulletinDialogue";
 import { buildNewsBulletin, weatherBulletinText } from "./newsBulletin";
 import { fetchWeatherDirect } from "./weatherDirect";
@@ -583,6 +584,15 @@ function App() {
   // handleCommand est redéfini à chaque rendu : la référence évite que processCommand ne fige une version périmée.
   const handleCommandRef = useRef(null);
   const chronosConfirmationRef = useRef(null);
+  const workConversationContextRef = useRef({ work_context_clear: true });
+  const updateWorkConversationContext = useCallback((dossierId, expiresAt, origin = "conversation") => {
+    workConversationContextRef.current = dossierId
+      ? { work_dossier_id: dossierId, origin, ...(expiresAt ? { expires_at: expiresAt } : {}) } : { work_context_clear: true };
+  }, []);
+  const updateWorkScreenContext = useCallback((dossierId) => {
+    if (!dossierId && workConversationContextRef.current.origin !== "screen") return;
+    updateWorkConversationContext(dossierId, null, "screen");
+  }, [updateWorkConversationContext]);
   const [micOn, setMicOn] = useState(false);
   const [captureMicOn, setCaptureMicOn] = useState(false);
   const [interruptMicOn, setInterruptMicOn] = useState(false);
@@ -1007,6 +1017,9 @@ function App() {
   const [showNummarius, setShowNummarius] = useState(false);
   const auth = useAuth() || {};
   const authUser = auth.user;
+  useEffect(() => {
+    updateWorkConversationContext(null);
+  }, [authUser?.user_id, authUser?.id, authUser?.email, updateWorkConversationContext]);
   const voiceProfileUserRef = useRef(authUser);
   voiceProfileUserRef.current = authUser;
   useEffect(() => {
@@ -1577,6 +1590,16 @@ function App() {
       pid = progress.start("Réponse de Sirius", { silent: true });
     }
 
+    const workContext = workConversationContextRef.current;
+    if (workContext.expires_at && Date.parse(workContext.expires_at) <= Date.now()) {
+      updateWorkConversationContext(null);
+    }
+    const contextAtRequest = workConversationContextRef.current;
+    const acceptWorkContext = (data) => {
+      if (workConversationContextRef.current !== contextAtRequest) return;
+      if (data.work_context) updateWorkConversationContext(data.work_context.dossier_id, data.work_context.expires_at);
+      if (data.work_context_cleared) updateWorkConversationContext(null);
+    };
     const payload = JSON.stringify({
       text: command,
       session_id: sessionId.current,
@@ -1594,16 +1617,22 @@ function App() {
         proactive_message: display?.suggestion ? display.contenu : "",
         activity: cmdTimesRef.current?.length >= 3 ? "intense" : "exploration",
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Paris",
+        ...(contextAtRequest.work_dossier_id
+          ? { work_dossier_id: contextAtRequest.work_dossier_id }
+          : { work_context_clear: true }),
       },
     });
     const showServiceDenial = (status, data) => {
-      const message = typeof data?.detail === "string" ? data.detail : status === 401
+      const message = typeof data?.detail === "string" ? data.detail : status >= 500
+        ? "Service indisponible. Aucun résultat ne peut être vérifié ; aucune action n'est annoncée comme effectuée."
+        : status === 401
         ? "Connectez-vous à votre compte SIRIUS."
         : status === 429 ? "La limite d'utilisation est atteinte. Réessayez après sa remise à zéro."
           : "Accès au service refusé. Vérifiez votre essai et vos clés dans Réglages → Services et clés.";
       setText(message);
       setVoiceMessage(message);
       showOnDisplay({ type: "message", titre: "ΣIRIUS — ACCÈS AU SERVICE", contenu: message });
+      if (isWorkConversationCommand(command)) speakOut(message);
       if (pid && progress?.error) progress.error(pid, message);
       return true;
     };
@@ -1630,7 +1659,7 @@ function App() {
 
       const handled = await streamConversation(payload, { signal: externalSignal }, async (resp) => {
         if (externalSignal.aborted) return true;
-        if (isChronosCommand(command) && !resp.ok) {
+        if (isOperationalCommand(command) && !resp.ok) {
           return showServiceDenial(resp.status, await resp.json());
         }
         if ([401, 403, 429].includes(resp.status)) {
@@ -1717,6 +1746,7 @@ function App() {
           if (data) {
             if (externalSignal.aborted) return true;
             chronosConfirmationRef.current = data.chronos_pending || null;
+            acceptWorkContext(data);
             if (data.chronos_changed) window.dispatchEvent(new Event("sirius:chronos-changed"));
             if (data.ignored && !full.trim()) return stayQuiet();
             if (dispatchAutonomousVideoAction(data.action)) {
@@ -1784,7 +1814,7 @@ function App() {
         setVoiceMessage("Le mode profond n'a pas fourni de réponse complète — essai du service rapide.");
       }
       const resp = await requestConversation(JSON.stringify(fallbackRequest), { signal: externalSignal });
-      if (isChronosCommand(command) && !resp.ok) {
+      if (isOperationalCommand(command) && !resp.ok) {
         showServiceDenial(resp.status, resp.data);
         return;
       }
@@ -1797,6 +1827,7 @@ function App() {
         const data = resp.data;
         if (externalSignal.aborted) return;
         chronosConfirmationRef.current = data.chronos_pending || null;
+        acceptWorkContext(data);
         if (data.chronos_changed) window.dispatchEvent(new Event("sirius:chronos-changed"));
         if (data?.ignored) {
           stayQuiet();
@@ -1820,8 +1851,10 @@ function App() {
     // Idem : si l'annulation externe a eu lieu pendant NIVEAU 2, pas de repli local non plus.
     if (externalSignal?.aborted) return;
 
-    if (isChronosCommand(command)) {
-      const message = "CHRONOS — résultat non vérifiable : le backend ne répond pas. Actualisez l’agenda avant de recommencer pour vérifier si une opération a été enregistrée.";
+    if (isOperationalCommand(command)) {
+      const message = isWorkConversationCommand(command)
+        ? "Lecture métier indisponible : le backend ne répond pas. Aucun résultat à jour ne peut être vérifié ; aucune action métier n'est annoncée comme effectuée."
+        : "CHRONOS — résultat non vérifiable : le backend ne répond pas. Actualisez l’agenda avant de recommencer pour vérifier si une opération a été enregistrée.";
       setText(message);
       setVoiceMessage(message);
       streamOnDisplay(message, true);
@@ -1843,7 +1876,7 @@ function App() {
     speakOut(fallback);
     streamOnDisplay(fallback, true, "ΣIRIUS — RÉPONSE LOCALE");
 
-  }, [speakOut, keys, profile, computeMood, showOnDisplay, streamOnDisplay, beginDisplayResponse, sysMode, tasks, displayOpen, display.contenu, display?.suggestion, renderVoiceSignal]);
+  }, [speakOut, keys, profile, computeMood, showOnDisplay, streamOnDisplay, beginDisplayResponse, sysMode, tasks, displayOpen, display.contenu, display?.suggestion, renderVoiceSignal, updateWorkConversationContext]);
 
   // ---- Interruption naturelle : le micro écoute PENDANT que Sirius parle ----
   const stopInterruptListener = useCallback(() => {
@@ -4084,7 +4117,7 @@ function App() {
     const maybeUiCommand = /\b(?:ouvre|ouvrir|affiche|afficher|lance|lancer|ferme|fermer|reduit|reduis|minimise|range|connecte|deconnecte|arrete|coupe|relance|active|desactive)\b/.test(normalized);
 
     try {
-      if (isChronosCommand(command)) {
+      if (isOperationalCommand(command)) {
         await cloudAnswer(command, { signal: sessionSignal });
         return;
       }
@@ -4200,7 +4233,7 @@ function App() {
       return;
     }
     chronosConfirmationRef.current = null;
-    if (isChronosCommand(command)) {
+    if (isOperationalCommand(command)) {
       releaseBulletinFocus(lastBulletinRef.current);
       void resolveIntent(command);
       return;
@@ -4544,7 +4577,7 @@ function App() {
 
     // 00) Normalisation UNE SEULE FOIS pour tout le pipeline
     const low = (typeof command === "string" ? command : command?.text || "").toLowerCase().trim();
-    if (isChronosCommand(low)) {
+    if (isOperationalCommand(low)) {
       await resolveIntent(typeof command === "string" ? command : command.text);
       return;
     }
@@ -7145,7 +7178,14 @@ function App() {
         if (id === "plans") setShowPlans(true);
         setActiveWorkModule(null);
       }} />}
-      {showWorkDossiers && <WorkDossiersPanel initialDossierId={liveDossierId} onClose={() => { setShowWorkDossiers(false); setLiveDossierId(""); }}
+      {showWorkDossiers && <WorkDossiersPanel key={authUser?.user_id || authUser?.id || authUser?.email || "none"} initialDossierId={liveDossierId} onConversationContext={updateWorkScreenContext}
+        onAsk={(command) => {
+          const context = workConversationContextRef.current;
+          updateWorkConversationContext(context.work_dossier_id, context.expires_at);
+          setShowWorkDossiers(false);
+          processCommand(command, true);
+        }}
+        onClose={() => { setShowWorkDossiers(false); setLiveDossierId(""); }}
         onOpenThemis={(source) => { setThemisSource(source || null); setShowWorkDossiers(false); setShowThemis(true); }}
         onOpenHaccp={(source) => { setHaccpSource(source || null); setShowWorkDossiers(false); setHaccp({ sujet: "", auto: false }); }} />}
       {showSportCoach && <SportCoachPanel key={authUser?.id || authUser?._id || authUser?.email || "local"} user={authUser} onClose={() => setShowSportCoach(false)} />}

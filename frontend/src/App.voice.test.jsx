@@ -36,7 +36,18 @@ jest.mock("./lazyModules", () => new Proxy({}, { get: (_, key) => {
   if (key === "Odysseia") return ({ open, onClose }) => open ? (
     <div data-testid="workspace-Odysseia"><button onClick={onClose}>Fermer</button></div>
   ) : null;
-  if (["VoiceProfilePanel", "WorkDossiersPanel"].includes(key)) return ({ onClose }) => (
+  if (key === "WorkDossiersPanel") return function WorkDossiersPreview({ onClose, onAsk, onConversationContext }) {
+    const React = require("react");
+    React.useEffect(() => {
+      onConversationContext?.("screen-dossier");
+      return () => onConversationContext?.(null);
+    }, [onConversationContext]);
+    return <div data-testid="workspace-WorkDossiersPanel">
+      <button onClick={onClose}>Fermer</button>
+      <button data-testid="work-preview-ask" onClick={() => onAsk("Où en est ce dossier ?")}>Résumer ce dossier</button>
+    </div>;
+  };
+  if (key === "VoiceProfilePanel") return ({ onClose }) => (
     <div data-testid={`workspace-${key}`}><button onClick={onClose}>Fermer</button></div>
   );
   if (key === "SiriusDisplay") return ({ item, history, onSelect, onRead }) => <div data-testid="sirius-display">
@@ -197,6 +208,7 @@ test("Chronos appointment requests bypass Outlook and confirm only the issued pr
     }
     return original(url, options);
   });
+
   const changed = jest.fn();
   window.addEventListener("sirius:chronos-changed", changed);
   try {
@@ -209,6 +221,103 @@ test("Chronos appointment requests bypass Outlook and confirm only the issued pr
     expect(JSON.parse(requests[1][1].body).text).toBe("confirme agenda abcdef123456");
     expect(changed).toHaveBeenCalledTimes(1);
   } finally { window.removeEventListener("sirius:chronos-changed", changed); }
+});
+
+test("work conversation bypasses intent parsing and carries a bounded dossier context", async () => {
+  const original = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation((url, options) => {
+    if (String(url).endsWith("/chat/stream")) {
+      return Promise.resolve({ ok: true, headers: { get: () => "application/json" } });
+    }
+    if (String(url).endsWith("/chat")) {
+      const text = JSON.parse(options.body).text;
+      return Promise.resolve({ ok: true, json: async () => ({
+        answer: "Dossier Martin : sources vérifiées, aucune action exécutée.",
+        work_state: "READ_ONLY", executed: false,
+        ...(text.startsWith("Oublie") ? { work_context_cleared: true } : {
+          work_context: { dossier_id: "martin", expires_at: new Date(Date.now() + 1800000).toISOString() },
+        }),
+      }) });
+    }
+    return original(url, options);
+  });
+  await mount();
+  await send("Où en est le dossier Martin ?");
+  await send("Pourquoi ces propositions pour ce dossier ?");
+  let requests = global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/chat"));
+  expect(requests).toHaveLength(2);
+  expect(JSON.parse(requests[1][1].body).environment.work_dossier_id).toBe("martin");
+  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/intent"))).toBe(false);
+  jest.setSystemTime(Date.now() + 31 * 60 * 1000);
+  await send("Résume ce dossier");
+  requests = global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/chat"));
+  expect(JSON.parse(requests[2][1].body).environment.work_context_clear).toBe(true);
+  expect(JSON.parse(requests[2][1].body).environment.work_dossier_id).toBeUndefined();
+  await send("Oublie ce dossier");
+  await send("Résume ce dossier");
+  requests = global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/chat"));
+  expect(JSON.parse(requests[4][1].body).environment.work_context_clear).toBe(true);
+  expect(JSON.parse(requests[4][1].body).environment.work_dossier_id).toBeUndefined();
+});
+
+test("work conversation accepts SSE context without an extra HTTP request", async () => {
+  mockConversationStream([
+    { type: "delta", text: "Dossier Martin vérifié." },
+    { type: "done", answer: "Dossier Martin vérifié.", work_state: "READ_ONLY",
+      work_context: { dossier_id: "martin", expires_at: new Date(Date.now() + 1800000).toISOString() } },
+  ]);
+  await mount();
+  await send("Résume le dossier Martin");
+  mockConversationStream([
+    { type: "done", answer: "Propositions vérifiées.", work_state: "READ_ONLY" },
+  ]);
+  await send("Pourquoi ces propositions ?");
+  const streams = global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/chat/stream"));
+  expect(JSON.parse(streams[1][1].body).environment.work_dossier_id).toBe("martin");
+  expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/chat"))).toHaveLength(0);
+});
+
+test("an unavailable work service is reported aloud without a local success fallback", async () => {
+  const original = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation((url, options) => String(url).endsWith("/chat/stream")
+    ? Promise.resolve({ ok: false, status: 503, json: async () => ({}) })
+    : original(url, options));
+  await mount();
+  await send("Où en est ce dossier ?");
+  expect(speakFr).toHaveBeenCalledWith(expect.stringContaining("Service indisponible"), expect.anything());
+  expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/chat"))).toHaveLength(0);
+  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/intent"))).toBe(false);
+});
+
+test("a dossier question opens the visible conversation and transfers its screen context", async () => {
+  mockConversationStream([{ type: "done", answer: "Dossier vérifié.", work_context: {
+    dossier_id: "server-dossier", expires_at: new Date(Date.now() + 1800000).toISOString(),
+  } }]);
+  await mount();
+  const button = [...host.querySelector('[data-testid="workspace-navigation"]').querySelectorAll("button")]
+    .find((item) => item.textContent === "Mes dossiers");
+  await act(async () => button.click());
+  await act(async () => host.querySelector('[data-testid="work-preview-ask"]').click());
+  expect(host.querySelector('[data-testid="workspace-WorkDossiersPanel"]')).toBeNull();
+  expect(host.querySelector('[data-testid="sirius-display"]')).not.toBeNull();
+  let requests = global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/chat/stream"));
+  expect(JSON.parse(requests[0][1].body).environment.work_dossier_id).toBe("screen-dossier");
+  mockConversationStream([{ type: "done", answer: "Suivi vérifié." }]);
+  await send("Résume ce dossier");
+  requests = global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/chat/stream"));
+  expect(JSON.parse(requests[1][1].body).environment.work_dossier_id).toBe("server-dossier");
+});
+
+test("closing the dossier screen without a conversation clears its selection", async () => {
+  mockConversationStream([{ type: "done", answer: "Précisez le dossier." }]);
+  await mount();
+  const button = [...host.querySelector('[data-testid="workspace-navigation"]').querySelectorAll("button")]
+    .find((item) => item.textContent === "Mes dossiers");
+  await act(async () => button.click());
+  await act(async () => host.querySelector('[data-testid="workspace-WorkDossiersPanel"] button').click());
+  await send("Résume ce dossier");
+  const requests = global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/chat/stream"));
+  expect(JSON.parse(requests[0][1].body).environment.work_context_clear).toBe(true);
 });
 
 test("the HUD no longer mounts the next-actions pill", async () => {

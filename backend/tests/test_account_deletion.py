@@ -116,6 +116,7 @@ def test_finalize_erases_personal_files_memory_and_tokens_but_not_other_user(rev
         asyncio.run(db.files.insert_one({"user_id": uid, "storage_path": f"documents/{uid}/file.txt", "size": 5}))
         asyncio.run(db.sirius_work_entries.insert_one({"user_id": uid, "text": uid}))
         asyncio.run(db.sirius_work_live_states.insert_one({"user_id": uid, "latest": {"text": uid}}))
+        asyncio.run(db.sirius_work_contexts.insert_one({"user_id": uid, "session": "work", "dossier_id": uid}))
         asyncio.run(db.microsoft_oauth.insert_one({"_id": uid, "token": uid}))
         asyncio.run(db.oauth_states.insert_one({"_id": f"state-{uid}", "uid": uid}))
     with sqlite3.connect(local_memory.DB_PATH) as con:
@@ -134,6 +135,7 @@ def test_finalize_erases_personal_files_memory_and_tokens_but_not_other_user(rev
     for name, query in (
         ("sirius_work_entries", {"user_id": "client"}),
         ("sirius_work_live_states", {"user_id": "client"}),
+        ("sirius_work_contexts", {"user_id": "client"}),
         ("microsoft_oauth", {"_id": "client"}),
         ("oauth_states", {"uid": "client"}),
         ("account_deletion_requests", {"user_id": "client"}),
@@ -142,6 +144,7 @@ def test_finalize_erases_personal_files_memory_and_tokens_but_not_other_user(rev
     assert asyncio.run(db.users.count_documents({})) == 1
     assert asyncio.run(db.sirius_work_entries.count_documents({"user_id": "other"})) == 1
     assert asyncio.run(db.sirius_work_live_states.count_documents({"user_id": "other"})) == 1
+    assert asyncio.run(db.sirius_work_contexts.count_documents({"user_id": "other"})) == 1
     with sqlite3.connect(local_memory.DB_PATH) as con:
         for table in ("facts", "episodes", "fact_vectors"):
             assert con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] == 1

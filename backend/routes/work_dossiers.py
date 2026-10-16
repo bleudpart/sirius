@@ -409,7 +409,7 @@ async def _proposals(db, uid, haccp_scope):
     return result
 
 
-def make_work_dossiers_router(db, require_user):
+def make_work_dossiers_router(db, require_user, *, conversation=None):
     router = APIRouter(prefix="/work-dossiers", tags=["work-dossiers"])
 
     async def context(request):
@@ -1498,4 +1498,7 @@ def make_work_dossiers_router(db, require_user):
         return {"source": snapshot["source"], "fingerprint": snapshot["fingerprint"],
                 "assumptions": assumptions, "result": result, "persisted": False, "executed": False}
 
+    if conversation is not None:
+        from work_conversation import WorkReaders
+        conversation.readers = WorkReaders(day_view, list_dossiers, thread, review_queue)
     return router

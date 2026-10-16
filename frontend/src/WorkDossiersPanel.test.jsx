@@ -73,7 +73,7 @@ const invoice = { source: { kind: "facture", id: "invoice-1", module: "themis" }
 const haccp = { source: { kind: "haccp_nonconformity", id: "nc-1", module: "haccp" },
   data: { type: "Température", description: "Frigo hors plage" }, fingerprint: "nc-v1" };
 
-async function workspace({ entries = [], sources = [stock, invoice, haccp], failWrite = false, suggestions, unavailableSources = 0, proposals = [], day, dayFailure = false, preparationResponse, reviewQueue = [], clientTimeline, initialDossierId = "" } = {}) {
+async function workspace({ entries = [], sources = [stock, invoice, haccp], failWrite = false, suggestions, unavailableSources = 0, proposals = [], day, dayFailure = false, preparationResponse, reviewQueue = [], clientTimeline, initialDossierId = "", onAsk, onConversationContext } = {}) {
   const originalFetch = global.fetch;
   const dossiers = [{ id: "d1", title: "Boutique", category: "commerce", notes: [], sources: sources.map((item) => item.source) },
     { id: "d2", title: "Chantier", category: "chantier", notes: [], sources: [] }];
@@ -120,7 +120,7 @@ async function workspace({ entries = [], sources = [stock, invoice, haccp], fail
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
-  await act(async () => root.render(<WorkDossiersPanel onClose={() => {}} onOpenThemis={openThemis} onOpenHaccp={openHaccp} initialDossierId={initialDossierId} />));
+  await act(async () => root.render(<WorkDossiersPanel onClose={() => {}} onOpenThemis={openThemis} onOpenHaccp={openHaccp} initialDossierId={initialDossierId} onAsk={onAsk} onConversationContext={onConversationContext} />));
   const button = (label) => [...container.querySelectorAll("button")].find((node) => node.textContent === label);
   const field = (label) => [...container.querySelectorAll("label")].find((node) => node.firstChild.textContent === label)?.querySelector("input,select,textarea");
   const change = async (node, value) => {
@@ -142,6 +142,27 @@ async function workspace({ entries = [], sources = [stock, invoice, haccp], fail
   return { container, writes, button, field, change, click, submit, openThemis, openHaccp,
     cleanup: () => { act(() => root.unmount()); container.remove(); global.fetch = originalFetch; } };
 }
+
+test("contextual work conversation uses the displayed dossier and clears it on close", async () => {
+  const onAsk = jest.fn();
+  const onConversationContext = jest.fn();
+  const view = await workspace({ onAsk, onConversationContext });
+  try {
+    expect(onConversationContext).toHaveBeenLastCalledWith("d1");
+    await view.click("Résumer ce dossier");
+    expect(onAsk).toHaveBeenLastCalledWith("Où en est ce dossier ?");
+    await view.click("Mes priorités");
+    expect(onAsk).toHaveBeenLastCalledWith("Qu'ai-je à traiter aujourd'hui ?");
+    await view.click("Pourquoi ces propositions ?");
+    expect(onAsk).toHaveBeenLastCalledWith("Pourquoi ces propositions pour ce dossier ?");
+    expect(view.writes).toEqual([]);
+    await view.click("Chantier · Chantier");
+    expect(onConversationContext).toHaveBeenLastCalledWith("d2");
+  } finally {
+    view.cleanup();
+  }
+  expect(onConversationContext).toHaveBeenLastCalledWith(null);
+});
 
 const explainedProposal = {
     id: "stock-proposal", title: "Vérifier le papier", reason: "Stock sous le seuil configuré",
