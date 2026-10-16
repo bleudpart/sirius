@@ -12,6 +12,7 @@ import httpx
 from openai import AsyncOpenAI, BadRequestError, DefaultAsyncHttpxClient, RateLimitError
 from media_intent import parse_media_intent
 from motorsport_results import is_motorsport_question, motorsport_context
+from sports_results import is_sports_results_question, sports_question, sports_results_context
 from productivite.intent_productivite import parse_productivity_intent
 from provider_access import provider_key, personal_key
 
@@ -847,7 +848,7 @@ async def _google_news_results(question: str, *, timeout: float = 5.0, now=None)
             continue
         if source and title.endswith(f" - {source}"):
             title = title[: -len(source) - 3].strip()
-        results.append({"title": title, "source": source, "published": published})
+        results.append({"title": title, "source": source, "published": published, "url": item.findtext("link") or ""})
     results.sort(key=lambda item: item["published"], reverse=True)
     return results[:8]
 
@@ -858,14 +859,17 @@ def _format_news_results(results) -> str:
     for item in results:
         moment = item["published"].astimezone(paris)
         when = f"{_JOURS_FR[moment.weekday()]} {moment.day} {_MOIS_FR[moment.month - 1]} {moment.year} à {moment:%H:%M}"
-        lines.append(f"- {item['title']} | {item['source']}\n  Article publié le {when}.")
+        link = str(item.get("url") or "")
+        citation = f" ({link})" if link.startswith("https://") else ""
+        lines.append(f"- {item['title']} | {item['source']}{citation}\n  Article publié le {when}.")
     return "\n".join(lines)
 
 
 async def _research_current_prices(prompt: str, serp_key: str = "", *, timeout: float = 5.5) -> str:
-    question = str(prompt or "").split("CONTEXTE DU DERNIER BRIEFING :", 1)[0].strip()
+    question = sports_question(prompt)
     motorsport = is_motorsport_question(question)
-    live_event = (is_live_event_question(question) or motorsport) and not is_current_price_question(question)
+    sports = is_sports_results_question(question)
+    live_event = (is_live_event_question(question) or motorsport or sports) and not is_current_price_question(question)
     if not is_targeted_factual_question(prompt) and not live_event:
         return ""
 
@@ -882,23 +886,37 @@ async def _research_current_prices(prompt: str, serp_key: str = "", *, timeout: 
         )
 
     async def news():
-        return await _google_news_results(question, timeout=timeout) if live_event else []
+        query = f"site:lequipe.fr {question}" if sports else question
+        return await _google_news_results(query, timeout=timeout) if live_event else []
 
     async def official_motorsport():
-        return await motorsport_context(question, timeout=timeout) if motorsport else ""
+        if motorsport:
+            return await motorsport_context(question, timeout=timeout)
+        if sports and not re.search(
+            r"\b(?:foot(?:ball)?|rugby|tennis|basket(?:ball)?|nba|wnba|ligue|liga|bundesliga|atp|wta|"
+            r"handball|volley(?:ball)?|athl[ée]tisme|cyclisme|natation|hockey)\b",
+            question, re.I,
+        ):
+            return await motorsport_context("résultats F1 MotoGP", timeout=timeout)
+        return ""
 
-    web_results, news_results, official = await asyncio.gather(
+    async def scoreboards():
+        return await sports_results_context(question, timeout=timeout) if sports else ""
+
+    web_results, news_results, official, scores = await asyncio.gather(
         asyncio.wait_for(web(), timeout=timeout), asyncio.wait_for(news(), timeout=timeout),
         asyncio.wait_for(official_motorsport(), timeout=timeout),
+        asyncio.wait_for(scoreboards(), timeout=timeout + 0.5),
         return_exceptions=True,
     )
-    for label, outcome in (("web", web_results), ("actualités", news_results), ("sport auto", official)):
+    for label, outcome in (("web", web_results), ("actualités", news_results), ("sport auto", official), ("scores", scores)):
         if isinstance(outcome, BaseException):
             logger.warning("[ΣIRIUS:RECHERCHE] %s indisponible : %r", label, outcome)
     official_text = official if isinstance(official, str) else ""
     news_text = _format_news_results(news_results) if isinstance(news_results, list) else ""
     web_text = _format_price_sources(web_results, question) if isinstance(web_results, list) else ""
-    return "\n".join(part for part in (official_text, news_text, web_text) if part)
+    scores_text = scores if isinstance(scores, str) else ""
+    return "\n".join(part for part in (scores_text, official_text, news_text, web_text) if part)
 
 
 def _is_news_request(prompt: str) -> bool:
@@ -935,13 +953,30 @@ def needs_targeted_guidance(prompt: str) -> bool:
     return (
         is_targeted_factual_question(prompt)
         or is_live_event_question(prompt)
-        or is_motorsport_question(str(prompt or "").split("CONTEXTE DU DERNIER BRIEFING :", 1)[0])
+        or is_sports_results_question(prompt)
+        or is_motorsport_question(sports_question(prompt))
     )
 
 
 def _targeted_answer_guidance(sources: str, prompt: str = "") -> str:
     today = time.strftime("%d/%m/%Y")
-    question = str(prompt or "").split("CONTEXTE DU DERNIER BRIEFING :", 1)[0]
+    question = sports_question(prompt)
+    if is_sports_results_question(question):
+        return (
+            "\n\nRÉSULTATS SPORTIFS : réponds à la demande sportive elle-même, sans la limiter à la météo, "
+            "à la ville du profil ou au bulletin précédent. Sans précision, présente les principaux résultats "
+            "du jour en France ET à l'international, par sport, au-delà de la limite de quatre phrases. "
+            "Donne compétition, participants, score, date et source. Sépare terminés, en cours et à venir ; "
+            "un match programmé n'a pas encore de résultat. Priorité aux scores structurés, puis aux articles "
+            "datés de L'Équipe et aux autres sources vérifiées. Ne confonds jamais date de publication et "
+            "date du match. Les résultats plus anciens (dont F1/MotoGP) doivent porter leur date et ne sont "
+            "pas ceux d'aujourd'hui. N'invente aucun score et n'utilise pas tes connaissances d'entraînement. "
+            "Annonce la couverture partielle : un flux vide ne prouve pas qu'aucun match n'a eu lieu. "
+            "Pour un sport non renseigné, dis que ses résultats n'ont pas pu être vérifiés, sans inventer "
+            "une absence d'événement. Fais un résumé lisible, pas un inventaire des appels techniques.\n"
+            + ("SOURCES ET SCORES VÉRIFIÉS :\n" + sources if sources else
+               "Aucune source disponible : dis que les résultats ne peuvent pas être vérifiés actuellement.")
+        )
     live_event = (is_live_event_question(prompt) or is_motorsport_question(question)) and not is_current_price_question(prompt)
     freshness = (
         "ÉVÉNEMENT RÉCENT : base-toi uniquement sur les articles les plus récents ci-dessous (leur date de "
@@ -1159,9 +1194,10 @@ _FOLLOW_UP_RE = re.compile(
 def _with_follow_up_topic(prompt, history):
     """Une relance courte (« le résultat complet ») hérite du sujet sport auto de la question précédente."""
     text = str(prompt or "")
-    question = text.split("CONTEXTE DU DERNIER BRIEFING :", 1)[0].strip()
+    question = sports_question(text)
     if (
         is_motorsport_question(question)
+        or is_sports_results_question(question)
         or len(question.split()) > 20
         or not _FOLLOW_UP_RE.search(question)
     ):
@@ -1179,15 +1215,17 @@ def _with_follow_up_topic(prompt, history):
 
 
 async def _answer_context(prompt, mode, serp_key):
-    question = str(prompt or "").split("CONTEXTE DU DERNIER BRIEFING :", 1)[0]
+    question = sports_question(prompt)
+    sports = is_sports_results_question(question)
     deep_search = (
         (mode or "normal").lower() == "profond"
+        and not sports
         and not is_targeted_factual_question(question)
         and (_is_news_request(question) or _DEEP_WEB_RESEARCH_RE.search(question))
         and "CONTEXTE DU DERNIER BRIEFING :" not in str(prompt or "")
     )
     follow_up, targeted, deep = await asyncio.gather(
-        _research_briefing_follow_up(prompt, serp_key),
+        _research_briefing_follow_up(prompt, serp_key) if not sports else asyncio.sleep(0, result=""),
         _research_current_prices(
             prompt, serp_key, timeout=4.5 if (mode or "normal").lower() == "turbo" else 7.0,
         ),

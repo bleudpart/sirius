@@ -206,6 +206,35 @@ def _install_fake_llm(monkeypatch, answer="Le faux-filet coûte environ 34,90 �
 
 
 @pytest.mark.parametrize("mode", ["turbo", "normal", "profond"])
+@pytest.mark.parametrize("stream", [False, True])
+def test_sports_sources_reach_every_answer_path_without_weather_context(monkeypatch, mode, stream):
+    import sirius_brain as brain
+
+    completions = _install_fake_llm(monkeypatch)
+    sources = "SCORES STRUCTURÉS TEST : Ligue 1, Domicile 2 – 1 Visiteurs, terminé le 16/10/2026."
+    monkeypatch.setattr(brain, "_research_current_prices", AsyncMock(return_value=sources))
+    follow_up = AsyncMock(return_value="MÉTÉO À NE PAS RECHERCHER")
+    deep = AsyncMock(return_value="ANCIEN BULLETIN")
+    monkeypatch.setattr(brain, "_research_briefing_follow_up", follow_up)
+    monkeypatch.setattr(brain, "_research_deep_sources", deep)
+    question = "les résultats\nCONTEXTE — BULLETIN ΣIRIUS DÉJÀ ANNONCÉ À L'UTILISATEUR :\nMétéo Rosny"
+
+    async def run():
+        keys = {"groq_key": "test-key"}
+        if stream:
+            return "".join([part async for part in ask_sirius_stream(question, mode=mode, keys=keys)])
+        return await ask_sirius(question, mode=mode, keys=keys)
+
+    assert asyncio.run(run())
+    system_prompt = completions.payload["messages"][0]["content"]
+    assert sources in system_prompt
+    assert "France ET à l'international" in system_prompt
+    assert "N'invente aucun score" in system_prompt
+    follow_up.assert_not_awaited()
+    deep.assert_not_awaited()
+
+
+@pytest.mark.parametrize("mode", ["turbo", "normal", "profond"])
 def test_answer_modes_receive_research_sources_and_mark_search_used(monkeypatch, mode):
     completions = _install_fake_llm(monkeypatch)
 

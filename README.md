@@ -4,6 +4,28 @@
 Assistant vocal personnel avec HUD futuriste style « Iron Man ».
 Frontend **React** + Backend **FastAPI** (Python), packagé en application Windows autonome via **Electron**.
 
+### Résultats sportifs : France et international
+
+Une demande générale de résultats sportifs consulte une sélection de compétitions
+françaises et internationales, sans reprendre la météo ni la ville du bulletin.
+Les scores structurés proviennent des flux publics ESPN : Ligue 1, Premier League,
+Liga, Bundesliga, Serie A, Ligue des champions, Top 14, Premiership, NBA, WNBA,
+ATP et WTA. Une compétition ou un sport précisé restreint cette sélection.
+Les API F1/MotoGP existantes complètent les demandes générales, avec la date de
+leur dernière course : celle-ci n'est pas nécessairement celle du jour.
+
+Les titres publics datés de L'Équipe sont recherchés via Google Actualités en
+complément ; il ne s'agit pas d'une API officielle L'Équipe, dont l'accès direct
+a renvoyé HTTP 403. Aucun abonnement ni contrôle d'accès n'est contourné.
+
+La date par défaut est le jour courant en Europe/Paris. Hier, avant-hier et une
+date explicite ISO, numérique française ou en toutes lettres sont pris en charge.
+Une période non couverte est signalée, sans la remplacer silencieusement par
+aujourd'hui. Scores terminés, rencontres en cours et programmes à venir sont
+distingués ; une absence de score reste non vérifiée. Les flux ont une couverture
+partielle, sans garantie de disponibilité ; les pannes sont signalées et
+journalisées, et les réponses sont mises en cache pendant 60 secondes.
+
 ### Diagnostic des microphones PyAudio sur PC
 
 Depuis la racine du dépôt :

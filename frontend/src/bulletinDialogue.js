@@ -102,6 +102,10 @@ export function bulletinFollowUp(command, bulletin, now = Date.now()) {
   if (GENERIC_REPEAT.test(text)) {
     return recall(bulletin, bulletin.segments[bulletin.activeIndex], "Je n'ai encore rien annoncé de ce bulletin.");
   }
+  if (/\b(?:resultats?|scores?|matchs?|matches|classements?)\b/.test(text)
+      && /\b(?:sports?|sportifs?|foot(?:ball)?|rugby|tennis|basket|nba|f1|motogp|grand prix)\b/.test(text)) {
+    return null;
+  }
   if (text.length > 200 || !(QUESTION.test(text) || /\?\s*$/.test(String(command)))) return null;
   const spoken = normalize(announced(bulletin).map((segment) => segment.text).join(" "));
   const referential = DEICTIC.test(text.replace(IMPERSONAL, " "))

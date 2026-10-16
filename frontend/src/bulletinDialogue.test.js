@@ -78,6 +78,12 @@ test("an analytic question before any spoken news is not contextualised", () => 
   expect(bulletinFollowUp("Pourquoi il a fait ça ?", createBulletinContext({ segments: segments() }))).toBeNull();
 });
 
+test.each(["affiche le résultat du sport en France ?", "Quels sont les résultats sportifs aujourd'hui ?",
+  "Donne-moi les scores du tennis"])("sports results do not inherit the weather bulletin: %s", (command) => {
+  expect(bulletinFollowUp(command, heard(1))).toBeNull();
+  expect(bulletinFollowUp(command, heard(3))).toBeNull();
+});
+
 test.each(["quel temps fait-il à Bordeaux", "quelle heure est-il ?", "ouvre la galerie", "explique la photosynthèse"])(
   "does not capture unrelated requests while a bulletin is focused: %s", (command) => {
     expect(bulletinFollowUp(command, heard(3))).toBeNull();
