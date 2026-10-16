@@ -48,20 +48,6 @@
 .mg-detail-module { font-family: "Orbitron", sans-serif; font-size: 12px; letter-spacing: 3px; color: rgba(255, 255, 255, 0.78); }
 .mg-detail-name { font-family: "Cinzel", serif; font-size: 30px; margin: 4px 0 10px; letter-spacing: 1px; }
 .mg-detail-role { margin: 0 0 12px; font-size: 13px; color: #ffffff; }
-.mg-speak {
-  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
-  background: transparent; border: 1px solid var(--c); color: var(--c);
-  border-radius: 4px; padding: 4px 12px; font-size: 10px; letter-spacing: 1.5px;
-  font-family: inherit; transition: background-color 0.2s;
-}
-.mg-speak:hover { background: rgba(255, 255, 255, 0.06); }
-.mg-open {
-  display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
-  background: transparent; border: 1px solid; border-radius: 4px; padding: 5px 16px;
-  font-size: 11px; letter-spacing: 1.5px; font-family: "Orbitron", sans-serif;
-  transition: background-color 0.2s, box-shadow 0.2s;
-}
-.mg-open:hover { background: rgba(255, 255, 255, 0.07); box-shadow: 0 0 16px currentColor; }
 .mg-detail-intro { margin: 12px 0; font-size: 15px; font-style: italic; color: #ffffff; }
 .mg-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 12px; }
 .mg-tab {

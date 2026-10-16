@@ -1,5 +1,6 @@
 import asyncio
 from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -608,6 +609,76 @@ def test_day_only_authorized_confirmed_commitments_and_live_sources(app_client):
     assert client.get("/api/work-dossiers/day", headers=OTHER).json()["commitments"] == []
     asyncio.run(db.themis_items.update_one({"id": "paper"}, {"$set": {"user_id": "u2"}}))
     assert [item["text"] for item in client.get("/api/work-dossiers/day", headers=OWNER).json()["commitments"]] == ["Appeler"]
+
+
+def test_work_briefing_has_real_private_tasks_no_finished_work_and_no_writes(app_client):
+    client, db = app_client
+    seed_work_sources(db)
+    base = work_thread(client)
+    today = datetime.now(ZoneInfo("Europe/Paris")).date()
+    for text, due, confirmed in [
+        ("Appeler le fournisseur", today - timedelta(days=1), True),
+        ("Terminer le devis", today, True),
+        ("Vérifier demain", today + timedelta(days=1), True),
+        ("Brouillon non validé", today, False),
+        ("Déjà terminé", today, True),
+    ]:
+        entry = client.post(base + "/commitments", headers=OWNER, json={
+            "text": text, "owner": "Daniel", "due_date": due.isoformat(),
+            "source": {"kind": "stock", "id": "paper"},
+        }).json()["entry"]
+        if confirmed:
+            client.post(base + f"/entries/{entry['id']}/confirm", headers=OWNER, json={"confirmed": True})
+        if text == "Déjà terminé":
+            client.patch(base + f"/entries/{entry['id']}", headers=OWNER, json={"status": "completed"})
+    before = client.get(base + "/thread", headers=OWNER).json()["entries"]
+    assert client.get("/api/work-dossiers/briefing").status_code == 401
+    response = client.get("/api/work-dossiers/briefing", headers=OWNER)
+    assert response.status_code == 200
+    report = response.json()
+    assert report["read_only"] is True and report["executed"] is False and report["kind"] == "work"
+    assert report["on"] == today.isoformat()
+    assert {item["text"] for item in report["commitments"]} == {
+        "Appeler le fournisseur", "Terminer le devis", "Vérifier demain",
+    }
+    text = report["briefing"]
+    assert "Engagements en retard" in text and "À terminer aujourd'hui" in text and "Prochaines échéances" in text
+    assert "Fil intelligent" in text and "Terminer le devis" in text
+    assert "Déjà terminé" not in text and "Brouillon non validé" not in text
+    assert "pas des tâches déjà approuvées" in text
+    assert "aucune action métier exécutée" in text
+    assert client.get(base + "/thread", headers=OWNER).json()["entries"] == before
+    other = client.get("/api/work-dossiers/briefing", headers=OTHER).json()
+    assert not other["commitments"] and not other["dossiers"]
+    assert "Terminer le devis" not in other["briefing"]
+    asyncio.run(db.themis_items.update_one({"id": "paper"}, {"$set": {"user_id": "u2"}}))
+    assert client.get("/api/work-dossiers/briefing", headers=OWNER).json()["commitments"] == []
+
+
+def test_empty_work_briefing_never_invents_pending_tasks(app_client):
+    client, _ = app_client
+    report = client.get("/api/work-dossiers/briefing", headers=OWNER).json()
+    assert "Aucun dossier de travail enregistré" in report["briefing"]
+    assert "Aucun engagement confirmé restant" in report["briefing"]
+    assert "Aucun signal métier" in report["briefing"]
+
+
+def test_work_briefing_excludes_finished_or_cancelled_meeting_tasks(app_client):
+    client, db = app_client
+    base = work_thread(client)
+    meeting = client.post(base + "/meetings", headers=OWNER, json={
+        "title": "Point", "notes": "Saisie manuelle",
+        "tasks": [{"text": text, "owner": "Moi"} for text in ["À faire", "Terminé", "Annulé"]],
+    }).json()["entry"]
+    client.post(base + f"/entries/{meeting['id']}/confirm", headers=OWNER, json={"confirmed": True})
+    entry = asyncio.run(db.sirius_work_entries.find_one({"id": meeting["id"]}))
+    tasks = entry["content"]["tasks"]
+    tasks[1]["status"], tasks[2]["status"] = "completed", "cancelled"
+    asyncio.run(db.sirius_work_entries.update_one(
+        {"id": meeting["id"]}, {"$set": {"content": {**entry["content"], "tasks": tasks}}},
+    ))
+    report = client.get("/api/work-dossiers/briefing", headers=OWNER).json()
+    assert [task["text"] for task in report["commitments"]] == ["À faire"]
 
 
 def test_architect_journal_declared_impacts_and_source_change(app_client):

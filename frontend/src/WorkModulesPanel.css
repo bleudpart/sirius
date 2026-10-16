@@ -1,4 +1,4 @@
-.work-modules { color: #ffffff; }
+.work-modules { color: #ffffff; container-type: inline-size; }
 .work-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .work-header .oracle-title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-family: "Cinzel", serif; color: #d8b875; }
 .work-header small { color: #ffffff; font: 500 12px "Rajdhani", sans-serif; }
@@ -58,4 +58,14 @@
   .work-portrait img { width: 96px; height: 120px; max-height: none; }
   .work-form { grid-template-columns: 1fr; }
   .work-audit li { display: grid; gap: 2px; }
+}
+@container (max-width: 700px) {
+  .work-layout, .work-layout.with-portrait { grid-template-columns: minmax(0, 1fr); }
+  .work-nav { flex-direction: row; overflow-x: auto; padding: 8px; border-right: 0; border-bottom: 1px solid rgba(145, 230, 242, .18); }
+  .work-nav button { flex: 0 0 auto; min-height: 48px; }
+  .work-nav small { display: none; }
+  .work-portrait { position: static; flex-direction: row; padding: 14px 16px 0; }
+  .work-portrait img { width: 96px; height: 120px; max-height: none; }
+  .work-content { padding-inline: 16px; }
+  .work-form { grid-template-columns: minmax(0, 1fr); }
 }

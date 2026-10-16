@@ -8,13 +8,6 @@
   border: 1px solid rgba(217, 165, 60, 0.55);
   filter: drop-shadow(0 0 22px var(--mythos-color, #ffffff55));
 }
-.argus-body {
-  max-width: 1020px;
-  margin: 18px auto 0;
-  padding: 0 22px;
-  position: relative;
-  z-index: 2;
-}
 .argus-wide { margin-top: 14px; }
 .argus-rescan { margin-left: auto; }
 .argus-spin { animation: argusSpin 1s linear infinite; }

@@ -51,6 +51,8 @@ import GettingStarted, { gettingStartedKey } from "@/components/GettingStarted";
 import { createVoiceSession } from "@/voiceSession";
 import { streamConversation, requestConversation, requestAssistantIntent, requestTranscription, requestNewsBriefing, requestWeatherBulletin } from "@/services/assistantApi";
 import { newsBulletinScope } from "./newsCommandRouting";
+import { isResumeWorkCommand, isWorkBriefingCommand } from "./workBriefing";
+import { chronosConfirmation, isChronosCommand } from "./chronos";
 import { bulletinFollowUp, createBulletinContext, markSegmentCompleted, markSegmentStarted, releaseBulletinFocus } from "./bulletinDialogue";
 import { buildNewsBulletin, weatherBulletinText } from "./newsBulletin";
 import { fetchWeatherDirect } from "./weatherDirect";
@@ -121,7 +123,6 @@ const progressMap = {};
 
 const BACKEND_BASE = BACKEND_BASE_URL;
 const API = BACKEND_BASE + "/api";
-const DAILY_BRIEFING_CACHE_MS = 30 * 60 * 1000;
 const BRIEFING_CONTEXT_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 
 const dispatchAutonomousVideoAction = (action) => {
@@ -176,7 +177,6 @@ const signaturePreviewText = (user) => {
 };
 const todayStr = () => getLocalDateKey();
 
-const DAILY_BRIEFING_COMMAND = /^\s*(?:(?:affiche(?:r)?|montre(?:r)?|lis|lire|lit|relis)(?:[-\s]+moi)?(?:\s+et\s+(?:affiche(?:r)?|montre(?:r)?|lis|lire|lit|relis)(?:[-\s]+moi)?)?\s+)?(?:(?:mon|le|les)\s+)?(?:brieff?ing(?:\s+(?:quotidien|du jour|matinal|du soir|de ce soir|soir))?|infos?(?:\s+du\s+jour)?|actualit[ée]s?\s+internationales?|actualit[ée]s?|br[èe]ves\s+internationales?|r[ée]sum[ée](?:[-\s]+moi)?(?:\s+(?:la|ma|du)\s+)?journ[ée]e?|fais[-\s]+moi\s+le\s+point(?:\s+sur\s+(?:ma\s+)?journ[ée]e?)?|qu'est[-\s]ce\s+qui\s+m'attend(?:\s+aujourd'hui)?|(?:mes\s+)?priorit[ée]s\s+du\s+jour|quoi\s+de\s+neuf\s+aujourd'hui)\s*[?.!]*\s*$/i;
 
 // Verbe exprimant une demande de liaison de compte, quelle que soit la tournure employée.
 const CONNECT_VERB = /\b(?:connect\w*|connexion|reconnect\w*|relie|relier|associe|associer|autorise|autoriser|lie|lier|branche|brancher)\b/i;
@@ -314,7 +314,8 @@ function App() {
     if (act === "vision_look") { setVisionAuto(true); setShowVision(true); confirm(d.say || "Un instant, j'observe ce que tu me montres."); return true; }
     if (act === "web_agent" && target) { launchWebAgent(d.target.trim()); return true; }
     if (act === "daily_briefing") {
-      confirm(d.say || "Je prépare ton résumé du jour.");
+      setStatus("thinking");
+      setText("Je consulte tes dossiers de travail.");
       if (runBriefingRef.current) runBriefingRef.current(true);
       return true;
     }
@@ -560,7 +561,7 @@ function App() {
   // Garde-fou : une seule tentative de renouvellement de jeton par cycle de connexion.
   const wsRefreshedRef = useRef(false);
   const spotifyRequestRef = useRef(false);
-  const briefingInFlightRef = useRef(false);
+  const briefingInFlightRef = useRef(null);
   const recognitionRef = useRef(null);
   const phraseSilenceTimerRef = useRef(null);
   const serverRecorderRef = useRef(null);
@@ -581,6 +582,7 @@ function App() {
   const isBusy = useRef(false); // ⚡ Verrou anti-surchauffe / anti-doublon (partagé entre resolveIntent et handleCommand)
   // handleCommand est redéfini à chaque rendu : la référence évite que processCommand ne fige une version périmée.
   const handleCommandRef = useRef(null);
+  const chronosConfirmationRef = useRef(null);
   const [micOn, setMicOn] = useState(false);
   const [captureMicOn, setCaptureMicOn] = useState(false);
   const [interruptMicOn, setInterruptMicOn] = useState(false);
@@ -1628,6 +1630,9 @@ function App() {
 
       const handled = await streamConversation(payload, { signal: externalSignal }, async (resp) => {
         if (externalSignal.aborted) return true;
+        if (isChronosCommand(command) && !resp.ok) {
+          return showServiceDenial(resp.status, await resp.json());
+        }
         if ([401, 403, 429].includes(resp.status)) {
           return showServiceDenial(resp.status, await resp.json());
         }
@@ -1711,6 +1716,8 @@ function App() {
 
           if (data) {
             if (externalSignal.aborted) return true;
+            chronosConfirmationRef.current = data.chronos_pending || null;
+            if (data.chronos_changed) window.dispatchEvent(new Event("sirius:chronos-changed"));
             if (data.ignored && !full.trim()) return stayQuiet();
             if (dispatchAutonomousVideoAction(data.action)) {
               cancelSpeech();
@@ -1777,6 +1784,10 @@ function App() {
         setVoiceMessage("Le mode profond n'a pas fourni de réponse complète — essai du service rapide.");
       }
       const resp = await requestConversation(JSON.stringify(fallbackRequest), { signal: externalSignal });
+      if (isChronosCommand(command) && !resp.ok) {
+        showServiceDenial(resp.status, resp.data);
+        return;
+      }
       if ([401, 403, 429].includes(resp.status)) {
         showServiceDenial(resp.status, resp.data);
         return;
@@ -1785,6 +1796,8 @@ function App() {
       if (resp.ok) {
         const data = resp.data;
         if (externalSignal.aborted) return;
+        chronosConfirmationRef.current = data.chronos_pending || null;
+        if (data.chronos_changed) window.dispatchEvent(new Event("sirius:chronos-changed"));
         if (data?.ignored) {
           stayQuiet();
           return;
@@ -1806,6 +1819,16 @@ function App() {
 
     // Idem : si l'annulation externe a eu lieu pendant NIVEAU 2, pas de repli local non plus.
     if (externalSignal?.aborted) return;
+
+    if (isChronosCommand(command)) {
+      const message = "CHRONOS — résultat non vérifiable : le backend ne répond pas. Actualisez l’agenda avant de recommencer pour vérifier si une opération a été enregistrée.";
+      setText(message);
+      setVoiceMessage(message);
+      streamOnDisplay(message, true);
+      speakOut(message);
+      if (pid && progress?.error) progress.error(pid, message);
+      return;
+    }
 
     // -------------------------------------------------------------
     // NIVEAU 3 : RÉPONSE LOCALE (Mode Secours si le serveur est hors-ligne)
@@ -2064,7 +2087,7 @@ function App() {
     }
   }, [cloudAnswer]);
 
-  // Les sujets d'actualité partent en recherche approfondie ; le briefing général garde son parcours dédié.
+  // Les sujets d'actualité partent en recherche approfondie ; le journal général utilise les flux datés.
   const launchNews = useCallback(async (topic) => {
     if (topic) {
       await cloudAnswer(
@@ -4049,7 +4072,7 @@ function App() {
     isBusy.current = true;
     const normalized = command.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     const localIntent = (() => {
-      if (DAILY_BRIEFING_COMMAND.test(command)) return { action: "daily_briefing", say: "Je prépare les infos du jour." };
+      if (isWorkBriefingCommand(command)) return { action: "daily_briefing", say: "Je prépare ton briefing de travail." };
       if (/\b(?:silence|tais[- ]toi|arrete\s+(?:de\s+)?(?:parler|lire|lecture))\b/.test(normalized)) return { action: "stop_reading" };
       if (/\b(?:range|reduis|minimise)\b.*\b(?:tout|fenetres?|modules?)\b/.test(normalized)) return { action: "minimize_all" };
       if (/\b(?:coupe|arrete)\b.*\b(?:musique|ambiance)\b/.test(normalized)) return { action: "stop_music" };
@@ -4061,6 +4084,10 @@ function App() {
     const maybeUiCommand = /\b(?:ouvre|ouvrir|affiche|afficher|lance|lancer|ferme|fermer|reduit|reduis|minimise|range|connecte|deconnecte|arrete|coupe|relance|active|desactive)\b/.test(normalized);
 
     try {
+      if (isChronosCommand(command)) {
+        await cloudAnswer(command, { signal: sessionSignal });
+        return;
+      }
       if (localIntent && executeIntent(localIntent)) {
         setMetrics((m) => ({ ...m, nlu: { intent: `local · ${localIntent.action}`, count: m.nlu.count } }));
         return;
@@ -4166,6 +4193,18 @@ function App() {
     let enrichedCommand = command;
     const low = command.toLowerCase();
     const closeCommand = low.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    const agendaReply = chronosConfirmation(command, chronosConfirmationRef.current);
+    if (agendaReply) {
+      chronosConfirmationRef.current = null;
+      void resolveIntent(agendaReply);
+      return;
+    }
+    chronosConfirmationRef.current = null;
+    if (isChronosCommand(command)) {
+      releaseBulletinFocus(lastBulletinRef.current);
+      void resolveIntent(command);
+      return;
+    }
     if (/(?:qu.est.ce qui ne va pas|qu.est.ce qui va pas|pourquoi|explique|erreurs?|problemes?).*(?:presentation|demarrage)|(?:presentation|demarrage).*(?:erreurs?|problemes?|ne va pas)|^qu.est.ce qui ne va pas[ ?.!]*$/.test(closeCommand)) {
       const message = explainStartupDiagnostic(window.__siriusStartupDiagnostic);
       showOnDisplay({ type: "message", titre: "CONTRÔLES DU DÉMARRAGE", contenu: message });
@@ -4179,6 +4218,18 @@ function App() {
       setText(message);
       setStatus("speaking");
       speakOut(message);
+      return;
+    }
+
+    if (isWorkBriefingCommand(command) && runBriefingRef.current) {
+      releaseBulletinFocus(lastBulletinRef.current);
+      if (isResumeWorkCommand(command)) setShowWorkDossiers(true);
+      setMetrics((m) => ({
+        ...m,
+        nlu: { intent: "briefing · travail", count: m.nlu.count + 1 },
+        ctx: { exchanges: m.ctx.exchanges + 1 },
+      }));
+      void runBriefingRef.current();
       return;
     }
 
@@ -4203,16 +4254,6 @@ function App() {
     const newsScope = newsBulletinScope(command);
     if (newsScope) {
       void launchNewsBulletin(newsScope);
-      return;
-    }
-
-    if (DAILY_BRIEFING_COMMAND.test(low) && runBriefingRef.current) {
-      setMetrics((m) => ({
-        ...m,
-        nlu: { intent: "briefing · demande", count: m.nlu.count + 1 },
-        ctx: { exchanges: m.ctx.exchanges + 1 },
-      }));
-      runBriefingRef.current(true);
       return;
     }
 
@@ -4503,6 +4544,10 @@ function App() {
 
     // 00) Normalisation UNE SEULE FOIS pour tout le pipeline
     const low = (typeof command === "string" ? command : command?.text || "").toLowerCase().trim();
+    if (isChronosCommand(low)) {
+      await resolveIntent(typeof command === "string" ? command : command.text);
+      return;
+    }
 
     // Suivi analytique : intention détectée + compteur d'échanges (partagé dans tout le pipeline)
     const mark = (intentLabel) => {
@@ -5214,14 +5259,6 @@ function App() {
         setText(m); speakOut(m);
         return;
       }
-    }
-    // 0briefing) Briefing à la demande : « refais-moi le briefing », « résumé du jour »
-    if (/(refais|relance|redonne|repasse|refait)[- ]?(moi )?(le |mon )?(briefing|r[ée]sum[ée])|briefing du jour|(mon |le )?r[ée]sum[ée] du jour|donne[- ]moi (le |mon )?briefing|fais[- ]moi le point|qu'est[- ]ce qui m'attend|priorit[ée]s du jour|quoi de neuf aujourd'hui/.test(low)) {
-      mark("briefing · demande");
-      const m = "D’accord, je te prépare le point clair sur ta journée.";
-      setStatus("thinking"); setText(m); speakOut(m);
-      if (runBriefingRef.current) runBriefingRef.current(true);
-      return;
     }
     // 0webagent) ΣIRIUS Web Agent : « cherche X sur le web/google », « recherche web X et montre-moi »
     const webAgentM = low.match(/(?:cherche|recherche|trouve)(?:[- ]moi)?\s+(.+?)\s+sur\s+(?:le\s+)?(?:web|internet|google|duckduckgo)\b/) ||
@@ -6552,204 +6589,59 @@ function App() {
 
   const briefingSpeakRef = useRef(speakOut);
   briefingSpeakRef.current = speakOut;
-  // Briefing matinal parlé et affiché dans ΣIRIUS Display.
+  // Le briefing de travail relit les données autorisées à chaque demande, sans cache d'actualités.
   const briefingDoneRef = useRef(false);
-  const runBriefingDisplay = useCallback(async (force = false) => {
-    if (briefingInFlightRef.current) return;
+  const runBriefingDisplay = useCallback(async () => {
     const signal = voiceSessionRef.current.signal;
-    briefingInFlightRef.current = true;
-    const pid = progress.start("Infos du jour", { silent: true });
-    progress.log(pid, "Collecte des actualités et de la veille…", 25);
+    if (briefingInFlightRef.current === signal) return;
+    briefingInFlightRef.current = signal;
+    const pid = progress.start("Briefing de travail", { silent: true });
+    progress.log(pid, "Lecture des dossiers, engagements et échéances…", 25);
+    setStatus("thinking");
+    setVoicePhase("thinking");
+    setText("Je consulte tes dossiers de travail.");
     try {
-      try {
-        const cached = JSON.parse(localStorage.getItem("sirius_daily_briefing_cache") || "null");
-        if (!force && cached?.version === 2 && cached?.date === todayStr() && Date.now() - (cached.saved_at || 0) < DAILY_BRIEFING_CACHE_MS && cached.msg) {
-          localStorage.setItem("sirius_last_briefing", todayStr());
-          localStorage.setItem("sirius_last_briefing_context", JSON.stringify({ saved_at: cached.saved_at, text: cached.msg.slice(-12000) }));
-          beginDisplayResponse();
-          streamOnDisplay(cached.displayMsg || cached.msg, true, "INFOS DU JOUR");
-          setStatus("speaking");
-          setText(cached.msg);
-          if (!signal.aborted) briefingSpeakRef.current(cached.msg);
-          progress.done(pid, "Briefing délivré depuis le cache");
-          return;
-        }
-      } catch (e) { /* cache briefing illisible — recalcul normal */ }
-      const r = await fetch(`${API}/oracle/overview`, {
-        method: "POST", credentials: "include", signal,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keys: loadApiKeys() }),
+      const r = await fetch(`${API}/work-dossiers/briefing`, {
+        credentials: "include", signal,
       });
-      if (!r.ok) throw new Error("Briefing indisponible.");
+      if (!r.ok) throw new Error("Les dossiers de travail ne sont pas accessibles pour le moment.");
       const d = await r.json();
       if (signal.aborted) return;
-      if (d.briefing) {
-        progress.log(pid, "Briefing synthétisé, lecture vocale…", 80);
-        localStorage.setItem("sirius_last_briefing", todayStr());
-          const salut = greetByPhase(userName);
-          // Météo Atlas détaillée de la ville du profil
-          let meteoAtlas = "";
-          const ville = (profile?.city || "").trim();
-          if (ville) {
-            try {
-              const rw = await fetch(`${API}/weather/current?city=${encodeURIComponent(ville)}`, { credentials: "include" });
-              const w = await rw.json();
-              if (rw.ok && w.ville) {
-                meteoAtlas = ` Atlas annonce à ${w.ville} : ${w.description ? w.description.toLowerCase() + ", " : ""}${w.temp} degrés, ressenti ${w.ressenti}, vent ${w.vent} kilomètres heure, humidité ${w.humidite} pour cent.`;
-              }
-            } catch (e) { /* météo indisponible — briefing sans Atlas */ }
-          }
-          // Objectif mensuel HERMÈS AGORA# dans le briefing
-          let objAgora = "";
-          try {
-            const ro = await fetch(`${API}/agora/objectif`, { credentials: "include" });
-            const o = await ro.json();
-            if (ro.ok && o.montant > 0) {
-              objAgora = ` Hermès Agora signale : objectif mensuel atteint à ${Math.round(o.progression_pct)} pour cent, ${Math.round(o.gagne_mois)} euros gagnés sur ${Math.round(o.montant)}.`;
-            }
-          } catch (e) { /* objectif indisponible — briefing sans Agora */ }
-          // Résumé Quotidien : agenda du jour, rappels d'échéances et tendances des marchés
-          let agendaTxt = "", rappelsTxt = "", bourseTxt = "", haccpTxt = "", mailTxt = "", planTxt = "", planCards = "";
-          let actionPlanQueue = [];
-          await Promise.all([
-            (async () => {
-              try {
-                const ra = await fetch(`${API}/calendar/events?max_results=8`, { credentials: "include" });
-                if (!ra.ok) return;
-                const a = await ra.json();
-                const todayIso = todayStr();
-                const evts = (a.events || []).filter((e) => (e.start || "").slice(0, 10) === todayIso);
-                if (evts.length) {
-                  const fmt = (e) => {
-                    if (e.allDay) return e.title;
-                    const dt = new Date(e.start);
-                    const h = dt.getHours(), mn = dt.getMinutes();
-                    return `${e.title} à ${h} heure${h > 1 ? "s" : ""}${mn ? ` ${mn}` : ""}`;
-                  };
-                  agendaTxt = ` À ton agenda aujourd'hui : ${evts.slice(0, 4).map(fmt).join(", puis ")}.`;
-                } else {
-                  agendaTxt = " Aucun rendez-vous à ton agenda aujourd'hui.";
-                }
-              } catch (e) { /* agenda non connecté — briefing sans agenda */ }
-            })(),
-            (async () => {
-              try {
-                const rt = await fetch(`${API}/themis/bilan`, { credentials: "include" });
-                if (!rt.ok) return;
-                const t = await rt.json();
-                const ech = t.echeances || [];
-                const retards = ech.filter((e) => e.days < 0);
-                const proches = ech.filter((e) => e.days >= 0 && e.days <= 7);
-                const bits = [];
-                if (retards.length) bits.push(`${retards.length} facture${retards.length > 1 ? "s" : ""} en retard de paiement`);
-                if (proches.length) bits.push(`${proches.length} échéance${proches.length > 1 ? "s" : ""} sous 7 jours`);
-                if (bits.length) rappelsTxt = ` Rappels Thémis : ${bits.join(" et ")}.`;
-              } catch (e) { /* rappels indisponibles — briefing sans Thémis */ }
-            })(),
-            (async () => {
-              try {
-                const rb = await fetch(`${API}/nummarius/market`, { credentials: "include" });
-                if (!rb.ok) return;
-                const b = await rb.json();
-                const assets = (b.assets || []).filter((x) => typeof x.change === "number");
-                if (!assets.length) return;
-                const up = [...assets].sort((x, y) => y.change - x.change)[0];
-                const down = [...assets].sort((x, y) => x.change - y.change)[0];
-                const dir = (v) => `${v >= 0 ? "plus" : "moins"} ${Math.abs(v).toFixed(1)} pour cent`;
-                let s = ` Tendances Portus Nummarius : ${up.label} en tête à ${dir(up.change)}`;
-                if (down.id !== up.id) s += `, ${down.label} en repli à ${dir(down.change)}`;
-                bourseTxt = `${s}.`;
-              } catch (e) { /* marchés indisponibles — briefing sans bourse */ }
-            })(),
-            (async () => {
-              try {
-                const rh = await fetch(`${API}/haccp/overview`, { credentials: "include" });
-                if (!rh.ok) return;
-                const h = await rh.json();
-                const bits = [];
-                if (h.dlc_alertes > 0) bits.push(`${h.dlc_alertes} DLC à surveiller`);
-                if (h.nc_ouvertes > 0) bits.push(`${h.nc_ouvertes} non-conformité${h.nc_ouvertes > 1 ? "s" : ""} ouverte${h.nc_ouvertes > 1 ? "s" : ""}`);
-                if (h.docs_alertes > 0) bits.push(`${h.docs_alertes} document${h.docs_alertes > 1 ? "s" : ""} à renouveler`);
-                if (h.temp_non_conformes_jour > 0) bits.push(`${h.temp_non_conformes_jour} relevé${h.temp_non_conformes_jour > 1 ? "s" : ""} de température non conforme${h.temp_non_conformes_jour > 1 ? "s" : ""} aujourd'hui`);
-                if (bits.length) haccpTxt = ` Alertes HACCP : ${bits.join(", ")}.`;
-              } catch (e) { /* HACCP indisponible — briefing sans alertes HACCP */ }
-            })(),
-            (async () => {
-              try {
-                const rm = await msFetch(`/microsoft/mail/briefing?top=25&mark_seen=false`);
-                if (!rm.ok) return;
-                const mm = await rm.json();
-                const urgences = mm.urgences || [];
-                if (urgences.length) {
-                  mailTxt = ` Emails urgents : ${urgences.length} message${urgences.length > 1 ? "s" : ""}, le plus récent de ${urgences[0].de || "expéditeur inconnu"}, sujet ${urgences[0].sujet || "sans objet"}.`;
-                }
-              } catch (e) { /* Outlook non connecté — briefing sans emails urgents */ }
-            })(),
-            (async () => {
-              try {
-                const rp = await msFetch(`/microsoft/mail/action-plans?top=25&max_plans=3`);
-                if (!rp.ok) return;
-                const pp = await rp.json();
-                const plans = pp.plans || [];
-                if (plans.length) {
-                  planTxt = ` Anticipation : ${plans.length} plan${plans.length > 1 ? "s" : ""} d'action préparé${plans.length > 1 ? "s" : ""} pour tes e-mails les plus importants.`;
-                  planCards = plans.map((p) => (
-                    `• ${p.sujet} (de ${p.de || "expéditeur inconnu"})\n  Plan : ${p.plan}` +
-                    (p.brouillon_reponse ? `\n  Brouillon de réponse : ${p.brouillon_reponse}` : "")
-                  )).join("\n\n");
-                  actionPlanQueue = plans.filter((p) => p.brouillon_reponse);
-                }
-              } catch (e) { /* anticipation cognitive indisponible — briefing sans plans d'action */ }
-            })(),
-          ]);
-          const alertParts = [rappelsTxt, haccpTxt, mailTxt, agendaTxt, planTxt].filter(Boolean);
-          const contextParts = [meteoAtlas, bourseTxt, objAgora, ` ${d.briefing}`].filter(Boolean);
-          const daySeed = Number(todayStr().replace(/-/g, "")) || 0;
-          const rotation = daySeed % contextParts.length;
-          const rotatedContext = contextParts.length
-            ? contextParts.slice(rotation).concat(contextParts.slice(0, rotation))
-            : [];
-          const msg = `${salut}${alertParts.join("")}${rotatedContext.join("")}`;
-          const displayMsg = planCards ? `${msg}\n\n— Plans d'action proposés —\n${planCards}` : msg;
-          const savedAt = Date.now();
-          localStorage.setItem("sirius_last_briefing_context", JSON.stringify({ saved_at: savedAt, text: msg.slice(-12000) }));
-          localStorage.setItem("sirius_daily_briefing_cache", JSON.stringify({ version: 2, date: todayStr(), saved_at: savedAt, msg, displayMsg }));
-          if (signal.aborted) return;
-          beginDisplayResponse();
-          streamOnDisplay(displayMsg, true, "INFOS DU JOUR");
-          setStatus("speaking");
-          setText(msg);
-          briefingSpeakRef.current(msg);
-          progress.done(pid, "Briefing délivré");
-          // Anticipation cognitive : propose ensuite, un par un et à voix haute, les brouillons
-          // de réponse — rien n'est jamais envoyé sans un « vas-y, envoie » explicite.
-          if (actionPlanQueue.length) {
-            setTimeout(() => presentNextActionPlan(actionPlanQueue), 4000);
-          }
-        } else {
-          progress.done(pid, "Aucun briefing disponible");
-        }
-      } catch (e) {
-        if (signal.aborted) return;
-        console.error("Lecture du briefing :", e);
-        setVoiceMessage(e.message || "Briefing indisponible.");
-        setStatus("idle");
-        progress.error(pid, "Briefing indisponible");
+      if (d.kind !== "work" || d.read_only !== true || typeof d.briefing !== "string" || !d.briefing.trim()) {
+        throw new Error("Le rapport de travail reçu est incomplet.");
       }
-      finally { briefingInFlightRef.current = false; }
-  }, [streamOnDisplay, beginDisplayResponse, userName, profile, msFetch, presentNextActionPlan]);
+      beginDisplayResponse();
+      streamOnDisplay(d.briefing, true, "BRIEFING DE TRAVAIL");
+      setStatus("speaking");
+      setText(d.briefing);
+      briefingSpeakRef.current(d.briefing);
+      progress.done(pid, "Briefing de travail délivré");
+    } catch (e) {
+      if (signal.aborted) return;
+      console.error("Briefing de travail :", e);
+      const message = e.message || "Le briefing de travail est indisponible.";
+      setVoiceMessage(message);
+      setText(message);
+      beginDisplayResponse();
+      streamOnDisplay(message, true, "BRIEFING DE TRAVAIL");
+      briefingSpeakRef.current(message);
+      progress.error(pid, message);
+    } finally {
+      if (briefingInFlightRef.current === signal) briefingInFlightRef.current = null;
+      if (signal.aborted) progress.error(pid, "Briefing interrompu");
+    }
+  }, [streamOnDisplay, beginDisplayResponse]);
   useEffect(() => { runBriefingRef.current = runBriefingDisplay; }, [runBriefingDisplay]);
   useEffect(() => {
     // Briefing uniquement sur demande : activable via sirius_briefing_auto = "1".
     if (booting || showSetup || briefingDoneRef.current) return;
     if (localStorage.getItem("sirius_briefing_auto") !== "1") return;
-    if (localStorage.getItem("sirius_last_briefing") === todayStr()) return;
     briefingDoneRef.current = true;
     const id = setTimeout(() => runBriefingDisplay(), 1800);
     return () => clearTimeout(id);
   }, [booting, showSetup, runBriefingDisplay]);
 
-  // Réveil matinal : à l'heure choisie, salut vocal puis briefing (météo incluse) puis lecture des mails
+  // Réveil matinal : salut vocal, briefing de travail, puis lecture des mails configurée.
   useEffect(() => {
     let cancelSequence = () => {};
     const tick = () => {

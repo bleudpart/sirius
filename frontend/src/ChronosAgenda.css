@@ -1,0 +1,23 @@
+.chronos-agenda { min-width: 0; padding-bottom: 24px; border-bottom: 1px solid rgba(216, 184, 117, .3); }
+.chronos-agenda h2, .chronos-agenda h3 { color: #d8b875; }
+.chronos-day { display: grid; gap: 8px; margin: 16px 0; }
+.chronos-day input { width: min(100%, 240px); min-height: 44px; color: white; background: #071923; border: 1px solid #648e96; padding: 8px; }
+.chronos-agenda .work-form { display: block; }
+.chronos-agenda fieldset > div { min-width: 0; }
+.chronos-agenda select { max-width: 100%; min-height: 44px; color: white; background: #071923; border: 1px solid #648e96; }
+.chronos-agenda fieldset { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 0; border: 0; min-width: 0; }
+.chronos-agenda .chronos-accept { display: flex; align-items: center; grid-column: 1 / -1; }
+.chronos-agenda .chronos-accept input { width: 22px; height: 22px; flex: 0 0 auto; }
+.chronos-actions { display: flex; flex-wrap: wrap; gap: 10px; grid-column: 1 / -1; margin-top: 10px; }
+.chronos-agenda button { min-height: 44px; padding: 8px 12px; color: #f4dfac; background: #152b34; border: 1px solid #9a8456; border-radius: 4px; cursor: pointer; }
+.chronos-agenda button:focus-visible { outline: 2px solid #91e6f2; outline-offset: 2px; }
+.chronos-events { display: grid; gap: 12px; list-style: none; margin: 0; padding: 0; }
+.chronos-events li { overflow-wrap: anywhere; min-width: 0; }
+@media (max-width: 700px) {
+  .chronos-agenda fieldset { grid-template-columns: minmax(0, 1fr); }
+  .chronos-agenda .work-section-head { flex-wrap: wrap; }
+}
+@container (max-width: 700px) {
+  .chronos-agenda fieldset { grid-template-columns: minmax(0, 1fr); }
+  .chronos-agenda .work-section-head { flex-wrap: wrap; }
+}

@@ -23,6 +23,7 @@ function ConfidenceRing({ value }) {
 
 export default function SiriusPrime({ onClose }) {
   const [data, setData] = useState(null);
+  const [error, setError] = useState("");
   const [editId, setEditId] = useState(null);
   const [editText, setEditText] = useState("");
   const hoursRef = useRef(null);
@@ -64,10 +65,14 @@ export default function SiriusPrime({ onClose }) {
   }, []);
 
   const load = useCallback(async () => {
+    setError("");
     try {
       const r = await fetch(`${API}/prime/overview`);
+      if (!r.ok) throw new Error(`Impossible de charger la mémoire (HTTP ${r.status}).`);
       setData(await r.json());
-    } catch {}
+    } catch (e) {
+      setError(e.message || "La mémoire est inaccessible pour le moment.");
+    }
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -121,7 +126,8 @@ export default function SiriusPrime({ onClose }) {
         <div className="prime-title font-divine"><Sparkles size={20} /> ΣIRIUS PRIME</div>
         <button className="setup-close zeus-close" onClick={onClose} data-testid="prime-close-btn"><X size={18} /></button>
       </header>
-      <div className="prime-sub">MOTEUR DE MÉMOIRE &amp; D'APPRENTISSAGE — {data ? `${data.totals.events} COMMANDES · ${data.totals.facts} SOUVENIRS · ${data.totals.days} JOURS D'OBSERVATION` : "CHARGEMENT..."}</div>
+      <div className="prime-sub">MOTEUR DE MÉMOIRE &amp; D'APPRENTISSAGE — {data ? `${data.totals.events} COMMANDES · ${data.totals.facts} SOUVENIRS · ${data.totals.days} JOURS D'OBSERVATION` : error ? "MÉMOIRE INDISPONIBLE" : "CHARGEMENT..."}</div>
+      {error && <div className="prime-load-error" role="alert">{error}<button className="dev-action-btn" onClick={load}>Réessayer</button></div>}
 
       <div className="prime-grid">
         {/* Journal d'apprentissage */}

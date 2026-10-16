@@ -373,13 +373,17 @@ BRIEFING_PROMPT = (
 
 _briefing_cache = {"t": 0.0, "key": "", "txt": ""}
 _BRIEFING_INTENT_PATTERN = re.compile(
-    r"^\s*(?:(?:mon|le)\s+)?(?:"
-    r"brieff?ing(?:\s+(?:quotidien|du jour|matinal|du soir|de ce soir|soir))?|"
-    r"r[ée]sum[ée](?:[-\s]+moi)?(?:\s+(?:la|ma|du)\s+)?journ[ée]e?|"
-    r"fais[-\s]+moi\s+le\s+point(?:\s+sur\s+(?:ma\s+)?journ[ée]e?)?|"
+    r"^\s*(?:(?:affiche(?:r)?|montre(?:r)?|lis|lire|lit|relis|donne|fais|refais|relance|redonne|repasse|refait)"
+    r"(?:[-\s]+moi)?(?:\s+et\s+(?:affiche(?:r)?|montre(?:r)?|lis|lire|lit|relis))?\s+)?"
+    r"(?:(?:mon|le|un)\s+)?(?:"
+    r"brieff?ing(?:\s+(?:de travail|professionnel|quotidien|du jour|matinal|du soir|de ce soir|soir))?|"
+    r"rapport de travail|point sur (?:mon|le) travail|"
+    r"r[ée]sum[ée](?:[-\s]+moi)?(?:\s+(?:la|ma|du|de ma|de la)\s+)?jour(?:n[ée]e)?|"
+    r"fais[-\s]+moi\s+le\s+point(?:\s+sur\s+(?:(?:ma\s+)?journ[ée]e?|mon travail))?|"
     r"qu'est[-\s]ce\s+qui\s+m'attend(?:\s+aujourd'hui)?|"
     r"(?:mes\s+)?priorit[ée]s\s+du\s+jour|"
-    r"quoi\s+de\s+neuf\s+aujourd'hui)\s*[?.!]*\s*$",
+    r"(?:(?:on|nous)\s+)?(?:reprend|reprends|reprenons|reprendre|continue|continuer|continuons)"
+    r"(?:\s+(?:mon|le|notre))?\s+travail)\s*[?.!]*\s*$",
     re.IGNORECASE,
 )
 
@@ -425,7 +429,7 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans markdown, correspondant à l
 - Couper la musique d'ambiance : {"action": "stop_music", "say": "<confirmation courte>"}
 - Relancer la musique d'ambiance : {"action": "play_music", "say": "<confirmation courte>"}
 - Ouvrir Spotify : {"action": "spotify", "say": "<confirmation courte>"}
-- Briefing du jour : {"action": "daily_briefing", "say": "<confirmation courte>"}
+- Briefing de travail (dossiers, engagements et échéances, jamais le journal d'actualités) : {"action": "daily_briefing", "say": "<confirmation courte>"}
 - Aucune action d'interface, simple question/conversation : {"action": "general", "query": "<texte original>"}
 
 <id> est l'identifiant du module en minuscules sans accent, par exemple : themis, atlas, oracle, nummarius,
@@ -449,7 +453,7 @@ async def parse_intent(prompt: str):
     if _BRIEFING_INTENT_PATTERN.fullmatch(prompt_lower):
         return {
             "action": "daily_briefing",
-            "say": "Je prépare le briefing quotidien.",
+            "say": "Je prépare ton briefing de travail à partir de tes dossiers.",
         }
 
     productivity_intent = parse_productivity_intent(prompt)
@@ -923,7 +927,7 @@ async def _research_current_prices(prompt: str, serp_key: str = "", *, timeout: 
 
 def _is_news_request(prompt: str) -> bool:
     question = str(prompt or "").split("CONTEXTE DU DERNIER BRIEFING :", 1)[0]
-    return bool(re.search(r"\b(?:actualit[ée]s?|actu|infos? du jour|briefing)\b", question, re.I)) or (
+    return bool(re.search(r"\b(?:actualit[ée]s?|actu|infos? du jour)\b", question, re.I)) or (
         "CONTEXTE DU DERNIER BRIEFING :" in str(prompt or "")
         and bool(re.search(r"\b(?:explique|d[ée]taille|approfondis|pourquoi|cons[ée]quences?|pr[ée]cise)\b", question, re.I))
     )

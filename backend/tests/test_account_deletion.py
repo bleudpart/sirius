@@ -14,6 +14,11 @@ from local_docstore import LocalDocStore
 from test_account_inactivity import request_for
 
 
+@pytest.fixture(autouse=True)
+def isolated_chronos_runtime(tmp_path, monkeypatch):
+    monkeypatch.setenv("SIRIUS_DATA_DIR", str(tmp_path))
+
+
 def test_request_keeps_account_and_owned_shared_and_payment_data(tmp_path):
     db = LocalDocStore(tmp_path / "deletion.db")
     asyncio.run(db.users.insert_one({"user_id": "client", "role": "user"}))
@@ -84,6 +89,22 @@ def reviewed_account(tmp_path, monkeypatch):
 
 def approved():
     return DeletionReview(confirm_user_id="client", external_review_complete=True, activity_stopped=True)
+
+
+def test_finalize_erases_chronos_events_actions_and_idempotency(reviewed_account, tmp_path):
+    from chronos_store import ChronosStore
+    store = ChronosStore(tmp_path / "chronos.sqlite3")
+    event = {"title": "Client privé", "start": "2026-10-17T14:00:00+02:00",
+             "end": "2026-10-17T15:00:00+02:00", "timezone": "Europe/Paris", "notes": "Confidentiel"}
+    for uid in ("client", "other"):
+        store.create_event(uid, event, idempotency_key="7c3e2c50-9c7b-4eb9-8e6a-cf637457b725")
+        asyncio.run(reviewed_account.chronos_actions.insert_one({"user_id": uid, "summary": uid}))
+    assert asyncio.run(deletion_plan(reviewed_account, "client"))["collections"]["chronos_events"] == 1
+    assert asyncio.run(finalize_account_deletion(reviewed_account, user_id="client", review=approved()))["account_deleted"]
+    assert store.count_user_events("client") == 0
+    assert store.count_user_events("other") == 1
+    assert asyncio.run(reviewed_account.chronos_actions.count_documents({"user_id": "client"})) == 0
+    assert asyncio.run(reviewed_account.chronos_actions.count_documents({"user_id": "other"})) == 1
 
 
 def test_finalize_erases_personal_files_memory_and_tokens_but_not_other_user(reviewed_account):

@@ -2,8 +2,9 @@
 import { useEffect, useRef, useState } from "react";
 import { X, Folder, FolderOpen, ArrowLeft, Film, RotateCw, Library, Link2 } from "lucide-react";
 import useWindowGesture, { isPrimaryGesture } from "./windowGesture";
+import { API_BASE_URL } from "@/lib/api";
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = API_BASE_URL;
 
 let zCounter = 85;
 const fold = (s) => (s || "").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
@@ -15,13 +16,18 @@ export default function ArchiveGallery({ nav, onClose, onOpen, onSpeak }) {
   const [z, setZ] = useState(() => ++zCounter);
   const [files, setFiles] = useState([]);
   const [folder, setFolder] = useState(null);
+  const [loadError, setLoadError] = useState("");
   const bringFront = () => setZ(++zCounter);
 
   const load = async () => {
+    setLoadError("");
     try {
       const r = await fetch(`${API}/archive/list`);
-      if (r.ok) setFiles(await r.json());
-    } catch (e) {}
+      if (!r.ok) throw new Error("Impossible de charger les archives. Réessayez avec le bouton Actualiser.");
+      setFiles(await r.json());
+    } catch (e) {
+      setLoadError(e.message || "La médiathèque est inaccessible pour le moment.");
+    }
   };
   useEffect(() => { load(); }, []);
 
@@ -117,9 +123,10 @@ export default function ArchiveGallery({ nav, onClose, onOpen, onSpeak }) {
         </button>
       </div>
 
+      {loadError && <div className="ag-empty" role="alert">{loadError}</div>}
       {!folder ? (
         <div className="ag-folders" data-testid="archive-gallery-folders">
-          {names.length === 0 && <div className="ag-empty">Aucune archive pour l'instant. Demandez-moi une création : elle sera archivée ici.</div>}
+          {!loadError && names.length === 0 && <div className="ag-empty">Aucune archive pour l'instant. Demandez-moi une création : elle sera archivée ici.</div>}
           {names.map((n) => (
             <button key={n} className="ag-folder" onClick={() => setFolder(n)} data-testid={`archive-folder-${n}`}>
               <Folder size={26} />

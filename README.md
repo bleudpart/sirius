@@ -123,12 +123,33 @@ dégradés repeignait les surfaces même au repos. Les autres plateformes conser
 leurs animations. Ce changement réduit le travail de rendu ; il ne constitue
 pas une garantie d'absence de tous les ralentissements.
 
-Le briefing vocal utilise `POST /api/oracle/overview` pour transmettre les clés
-personnelles au moteur d'enrichissement, sans les placer dans l'URL ni dans la
-réponse. La consultation GET existante reste disponible. Les anciens briefings
-mis en cache sur l'appareil sont recalculés. Les marchés sans cours réel sont
-signalés indisponibles : aucune variation aléatoire ni actualité de démonstration
-n'est présentée comme une donnée réelle.
+Les modules conservent leurs marges internes lorsqu'un portrait est affiché :
+la grille ne doit pas réinitialiser le padding de leurs formulaires ou listes.
+Le corps partagé et les boutons de consultation sont définis dans le style
+commun chargé au démarrage, pas dans une galerie ouverte ultérieurement.
+Sur mobile, les onglets et actions se replient, les métriques AGORA se mettent
+en grille et les lignes de document THÉMIS séparent la désignation des montants.
+Les boutons de quantité des stocks gardent leur espacement dans les cartes mobiles.
+Les nouvelles fenêtres Windows en cascade restent entièrement dans l'écran ;
+les positions enregistrées et le déplacement manuel sont conservés.
+
+« Mon briefing », « Lis le briefing » ou « Fais-moi le point » produisent un
+**briefing de travail**, distinct des actualités et de la météo. Le client relit
+`GET /api/work-dossiers/briefing` à chaque demande, sans ancien cache mixte :
+dossiers privés à reprendre, engagements confirmés en retard, du jour ou à venir,
+engagements sans date et propositions métier explicitement non approuvées.
+Les droits d'accès aux dossiers et aux sources sont revérifiés. Les données
+manquantes ou tronquées sont signalées ; aucune action n'est exécutée, aucun
+document n'est envoyé et aucune tâche n'est terminée automatiquement.
+« On reprend le travail » ouvre aussi Mes dossiers. Le réveil configuré utilise
+ce même rapport ; « actualités » et « quoi de neuf aujourd'hui » gardent le journal.
+Le frontend doit être mis à jour avec le backend pour ce nouveau routage.
+
+Le tableau de bord ORACLE garde `POST /api/oracle/overview` pour transmettre les
+clés personnelles au moteur d'enrichissement sans les placer dans l'URL ni dans
+la réponse ; sa consultation GET reste disponible. Les marchés sans cours réel
+sont signalés indisponibles : aucune variation aléatoire ni actualité de
+démonstration n'est présentée comme une donnée réelle.
 
 Les réponses d'actualité reçoivent des consignes de contexte et d'approfondissement
 ainsi qu'un budget de sortie adapté, hors mode turbo. Les recherches de suivi
@@ -661,6 +682,37 @@ Guide détaillé : [INSTALL-SIRIUS.md](./INSTALL-SIRIUS.md)
 Pour le déploiement en petite entreprise : [GUIDE-ENTREPRISE.md](./GUIDE-ENTREPRISE.md)
 
 ### Sauvegarde des six modules de travail
+
+CHRONOS propose aussi un **agenda quotidien** : rendez-vous avec début/fin,
+notes, modification et suppression confirmée. Cet agenda est distinct des anciennes
+échéances locales, qui restent conservées et sauvegardées comme avant.
+Les rendez-vous sont enregistrés dans `chronos.sqlite3` via `runtime_paths.data_file`,
+sur le backend utilisé, avec isolation par compte. Windows utilise son backend local ;
+Android utilise le serveur configuré. Deux backends différents ne synchronisent pas
+automatiquement leurs agendas. La sauvegarde des six modules ci-dessous ne couvre
+pas cette base d'agenda.
+L'effacement de compte après examen supprime aussi ses rendez-vous, les résultats
+de création conservés pour l'idempotence et ses propositions d'actions CHRONOS.
+
+API authentifiée : `GET/POST /api/chronos/events`, `PUT/DELETE /api/chronos/events/{id}`.
+La consultation reçoit `on=YYYY-MM-DD` et `timezone=Europe/Paris`. Les écritures
+vérifient horaires, fuseaux, chevauchements et version du rendez-vous ; une modification
+concurrente exige une relecture. Un chevauchement nécessite une acceptation explicite.
+
+Chat et voix partagent cet agenda via les fonctions `chronos_list`, `chronos_create`,
+`chronos_update`, `chronos_delete`. Exemple : « Ajoute un rendez-vous client demain
+de 14 h à 15 h ». L'interprétation utilise le fournisseur de conversation configuré ;
+la saisie manuelle reste disponible sans clé IA. Toute écriture proposée est bloquée
+sur `WAITING_CONFIRMATION` avec un récapitulatif. Une réponse « oui, je confirme »
+valide uniquement la proposition en cours ; un jeton explicite peut aussi être saisi.
+La confirmation expire après cinq minutes et ne peut être exécutée qu'une fois.
+Les nouvelles créations manuelles portent une clé d'idempotence pour qu'une reprise
+réseau identique ne crée pas de doublon. Les heures répétées au passage à l'heure
+d'hiver demandent le choix de l'occurrence ; l'instant d'un rendez-vous existant
+est préservé lors d'une simple modification de titre ou de notes.
+Les demandes ambiguës doivent être précisées. Les agendas Outlook/Google restent
+séparés lorsqu'ils sont explicitement demandés. Aucun rappel automatique, événement
+récurrent, envoi de mail ou connecteur CRM n'est ajouté par cette extension.
 
 Les modules ARIANE, PLUTOS, MNÉMOSYNE, NÉMÉSIS, THOT et CHRONOS conservent
 leurs données dans le stockage local de l'application, séparément pour chaque

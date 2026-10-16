@@ -124,6 +124,9 @@ beforeEach(() => {
   sessionStorage.setItem("sirius_autodiag", "1");
   global.fetch = jest.fn((url, options) => {
     if (String(url).endsWith("/chat/stream")) return Promise.resolve({ ok: false });
+    if (String(url).endsWith("/work-dossiers/briefing")) return Promise.resolve({
+      ok: true, json: async () => ({ kind: "work", read_only: true, briefing: "Aucun dossier de travail enregistré." }),
+    });
     if (String(url).endsWith("/chat")) {
       chatSignal = options.signal;
       return new Promise((resolve) => {
@@ -178,6 +181,35 @@ async function send(command) {
   });
   await act(async () => host.querySelector('[data-testid="sirius-cmd-form"]').dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
 }
+
+test("Chronos appointment requests bypass Outlook and confirm only the issued proposal", async () => {
+  const original = global.fetch.getMockImplementation();
+  let chats = 0;
+  global.fetch.mockImplementation((url, options) => {
+    if (String(url).endsWith("/chat/stream")) {
+      return Promise.resolve({ ok: true, headers: { get: () => "application/json" } });
+    }
+    if (String(url).endsWith("/chat")) {
+      chats += 1;
+      return Promise.resolve({ ok: true, json: async () => chats === 1
+        ? { answer: "CHRONOS : proposition à confirmer.", chronos_pending: "abcdef123456", chronos_state: "WAITING_CONFIRMATION" }
+        : { answer: "CHRONOS : rendez-vous enregistré.", chronos_changed: true } });
+    }
+    return original(url, options);
+  });
+  const changed = jest.fn();
+  window.addEventListener("sirius:chronos-changed", changed);
+  try {
+    await mount();
+    await send("Ajoute un rendez-vous client demain de 14 h à 15 h");
+    expect(chats).toBe(1);
+    expect(global.fetch.mock.calls.some(([url]) => /outlook.*(?:execute|event)/.test(String(url)))).toBe(false);
+    await send("Oui, je confirme !");
+    const requests = global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/chat"));
+    expect(JSON.parse(requests[1][1].body).text).toBe("confirme agenda abcdef123456");
+    expect(changed).toHaveBeenCalledTimes(1);
+  } finally { window.removeEventListener("sirius:chronos-changed", changed); }
+});
 
 test("the HUD no longer mounts the next-actions pill", async () => {
   await mount();
@@ -611,10 +643,11 @@ test("Android manual dictation routes the evening briefing when preceded by the 
   await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
   expect(nativeCalls).toHaveLength(1);
   await act(async () => nativeCalls[0].resolve("Sirius, brieffing du soir"));
-  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/oracle/overview"))).toBe(true);
-  const [, briefingOptions] = global.fetch.mock.calls.find(([url]) => String(url).endsWith("/oracle/overview"));
-  expect(briefingOptions.method).toBe("POST");
-  expect(JSON.parse(briefingOptions.body)).toEqual({ keys: expect.any(Object) });
+  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/work-dossiers/briefing"))).toBe(true);
+  const [, briefingOptions] = global.fetch.mock.calls.find(([url]) => String(url).endsWith("/work-dossiers/briefing"));
+  expect(briefingOptions.credentials).toBe("include");
+  expect(briefingOptions.body).toBeUndefined();
+  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/oracle/overview"))).toBe(false);
   expect(global.fetch.mock.calls.some(([url]) => /\/(?:intent|chat)(?:\/stream)?$/.test(String(url)))).toBe(false);
   expect(webSpeech).not.toHaveBeenCalled();
 });
@@ -626,14 +659,76 @@ test.each([
   "lire et afficher mon briefing du jour",
 ])("%s displays and speaks the briefing rather than only opening a panel", async (command) => {
   const fallback = global.fetch.getMockImplementation();
-  global.fetch.mockImplementation((url, options) => String(url).endsWith("/oracle/overview")
-    ? Promise.resolve({ ok: true, json: async () => ({ briefing: "Voici les nouvelles de votre journée." }) })
+  global.fetch.mockImplementation((url, options) => String(url).endsWith("/work-dossiers/briefing")
+    ? Promise.resolve({ ok: true, json: async () => ({ kind: "work", read_only: true, briefing: "Dossier Boutique : terminer le devis." }) })
     : fallback(url, options));
   await mount();
   await send(command);
   expect(host.querySelector('[data-testid="sirius-display"]')).not.toBeNull();
-  expect(speakFr.mock.calls.some(([message]) => message.includes("Voici les nouvelles de votre journée."))).toBe(true);
+  expect(speakFr.mock.calls.some(([message]) => message.includes("Dossier Boutique : terminer le devis."))).toBe(true);
+  expect(global.fetch.mock.calls.some(([url]) => /\/(?:oracle\/overview|news\/briefing|weather\/current|nummarius\/market|microsoft\/mail\/action-plans)/.test(String(url)))).toBe(false);
   expect(global.fetch.mock.calls.some(([url]) => /\/(?:intent|chat)(?:\/stream)?$/.test(String(url)))).toBe(false);
+});
+
+test("work briefing ignores the old mixed cache and refreshes after each request", async () => {
+  localStorage.setItem("sirius_daily_briefing_cache", JSON.stringify({
+    version: 2, date: new Date().toISOString().slice(0, 10), saved_at: Date.now(), msg: "Ancien journal météo.",
+  }));
+  const fallback = global.fetch.getMockImplementation();
+  let calls = 0;
+  global.fetch.mockImplementation((url, options) => {
+    if (String(url).endsWith("/work-dossiers/briefing")) {
+      calls += 1;
+      return Promise.resolve({ ok: true, json: async () => ({
+        kind: "work", read_only: true, briefing: `Dossier Boutique : ${calls === 1 ? "terminer le devis" : "aucun engagement restant"}.`,
+      }) });
+    }
+    return fallback(url, options);
+  });
+  await mount();
+  await send("mon briefing");
+  await send("refais-moi le briefing");
+  expect(calls).toBe(2);
+  expect(speakFr.mock.calls.some(([message]) => message.includes("aucun engagement restant"))).toBe(true);
+  expect(speakFr.mock.calls.some(([message]) => message.includes("Ancien journal météo"))).toBe(false);
+  expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/work-dossiers/briefing"))
+    .every(([, options]) => !options.method || options.method === "GET")).toBe(true);
+});
+
+test.each([
+  { ok: false, json: async () => ({ detail: "indisponible" }) },
+  { ok: true, json: async () => ({ briefing: "Un faux succès sans rapport de travail." }) },
+])("work briefing failure is explicit and does not fall back to news", async (response) => {
+  const fallback = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation((url, options) => String(url).endsWith("/work-dossiers/briefing")
+    ? Promise.resolve(response) : fallback(url, options));
+  await mount();
+  await send("mon briefing");
+  expect(speakFr.mock.calls.some(([message]) => /pas accessibles|incomplet/.test(message))).toBe(true);
+  expect(global.fetch.mock.calls.some(([url]) => /\/(?:oracle\/overview|news\/briefing)/.test(String(url)))).toBe(false);
+});
+
+test("a new briefing is not blocked by the previous interrupted request", async () => {
+  const fallback = global.fetch.getMockImplementation();
+  let finishPrevious;
+  let calls = 0;
+  global.fetch.mockImplementation((url, options) => {
+    if (!String(url).endsWith("/work-dossiers/briefing")) return fallback(url, options);
+    calls += 1;
+    if (calls === 1) return new Promise((resolve) => { finishPrevious = resolve; });
+    return Promise.resolve({ ok: true, json: async () => ({
+      kind: "work", read_only: true, briefing: "Rapport actualisé : reprendre le dossier Boutique.",
+    }) });
+  });
+  await mount();
+  await send("mon briefing");
+  await send("refais-moi le briefing");
+  expect(calls).toBe(2);
+  await act(async () => finishPrevious({ ok: true, json: async () => ({
+    kind: "work", read_only: true, briefing: "Ancien rapport interrompu.",
+  }) }));
+  expect(speakFr.mock.calls.some(([message]) => message.includes("Rapport actualisé"))).toBe(true);
+  expect(speakFr.mock.calls.some(([message]) => message.includes("Ancien rapport interrompu"))).toBe(false);
 });
 
 test.each(["les infos", "les actualités", "Donne-moi toutes les infos du jour"])("%s uses dated France and international sources without a model call", async (command) => {
@@ -883,11 +978,11 @@ test("a topic-specific news request uses deep research instead of headlines", as
   expect(speakFr.mock.calls.some(([message]) => message.includes("Analyse approfondie terminée."))).toBe(true);
 });
 
-test("Display reads the complete briefing before visual typing finishes", async () => {
-  const longBriefing = `${"Une nouvelle importante pour cette journée. ".repeat(100)}Fin du briefing.`;
+test("Display reads the complete work briefing before visual typing finishes", async () => {
+  const longBriefing = `${"Un engagement de travail confirmé. ".repeat(100)}Fin du briefing.`;
   const fallback = global.fetch.getMockImplementation();
-  global.fetch.mockImplementation((url, options) => String(url).endsWith("/oracle/overview")
-    ? Promise.resolve({ ok: true, json: async () => ({ briefing: longBriefing }) })
+  global.fetch.mockImplementation((url, options) => String(url).endsWith("/work-dossiers/briefing")
+    ? Promise.resolve({ ok: true, json: async () => ({ kind: "work", read_only: true, briefing: longBriefing }) })
     : fallback(url, options));
   await mount();
   await send("afficher et lire le briefing");
@@ -900,8 +995,8 @@ test("Display reads the complete briefing before visual typing finishes", async 
 
 test("Display reserves the actual microphone controls and updates on viewport resize", async () => {
   const fallback = global.fetch.getMockImplementation();
-  global.fetch.mockImplementation((url, options) => String(url).endsWith("/oracle/overview")
-    ? Promise.resolve({ ok: true, json: async () => ({ briefing: "Les informations du jour." }) })
+  global.fetch.mockImplementation((url, options) => String(url).endsWith("/work-dossiers/briefing")
+    ? Promise.resolve({ ok: true, json: async () => ({ kind: "work", read_only: true, briefing: "Le point sur vos dossiers." }) })
     : fallback(url, options));
   await mount();
   const area = host.querySelector(".sirius-command-area");

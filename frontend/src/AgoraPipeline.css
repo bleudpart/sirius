@@ -288,5 +288,14 @@
 .ag-tx-status.pending { color: #d8b875; border-color: rgba(216, 184, 117, 0.45); }
 .ag-tx-status.failed, .ag-tx-status.expired, .ag-tx-status.refunded { color: #f43f5e; border-color: rgba(244, 63, 94, 0.5); }
 
-/* Couvertures Calliope */
-.cal-cover { width: 46px; height: 62px; object-fit: cover; border-radius: 6px; border: 1px solid rgba(216, 184, 117, 0.35); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5); flex: 0 0 auto; }
+@media (max-width: 1023px) {
+  .ag-views { flex-wrap: wrap; padding-inline: 12px; }
+  .ag-views > * { max-width: 100%; white-space: normal; min-height: 42px; }
+  .ag-export { margin-left: 0; }
+  .ag-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr)); padding-inline: 12px; }
+  .ag-stat { min-width: 0; padding: 10px; overflow-wrap: anywhere; }
+  .ag-stat.obj { min-width: 0; grid-column: 1 / -1; }
+  .agora-screen :is(.ag-coach, .ag-form, .ag-err, .ag-board, .ag-payments) { padding-inline: 12px; }
+  .agora-screen :is(.ag-coach-input input, .ag-coach-bar select, .ag-form input, .ag-date, .ag-payments) { min-width: 0; max-width: 100%; }
+  .ag-board { flex: none; min-height: 280px; }
+}

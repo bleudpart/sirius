@@ -79,7 +79,7 @@
   :is(.holo-win.holo-win, .prime-screen, .zeus-screen, .eu-screen, .setup-screen,
       .atlas-panel, .kr-panel, .p3d-overlay, .esp-panel, .about-panel,
       .media-hud-window, .productivity-screen, .connections-screen, .fp-overlay,
-      .vision-card, .keys-panel, .sp-journal, .getting-started) {
+      .vision-card, .keys-panel, .sp-journal, .getting-started, .archive-gallery) {
     /* Même cadre que les roues (ModulesMenu.css) : carte arrondie posée au-dessus
        de la navigation, liseré or tournant peint dans la bordure. */
     position: fixed !important;
@@ -117,7 +117,7 @@
 
   :is(.holo-win.holo-win, .prime-screen, .eu-screen, .setup-screen, .atlas-panel, .kr-panel,
       .esp-panel, .about-panel, .productivity-screen, .connections-screen,
-      .vision-card, .keys-panel, .sp-journal, .getting-started) {
+      .vision-card, .keys-panel, .sp-journal, .getting-started, .archive-gallery) {
     overflow-y: auto !important;
     overflow-x: hidden !important;
   }
@@ -294,6 +294,45 @@
     line-height: 1.6;
     letter-spacing: 1px;
   }
+
+  .prime-screen .argus-body {
+    padding-inline: 12px;
+    padding-bottom: 12px;
+    overflow-wrap: anywhere;
+  }
+
+  .prime-screen .cal-tabs { flex-wrap: wrap; padding-inline: 12px; }
+  .prime-screen .cal-tab { max-width: 100%; white-space: normal; min-height: 42px; }
+  .prime-screen .cal-body { min-width: 0; padding-inline: 12px; overflow-wrap: anywhere; }
+  .prime-screen .cal-search-row { flex-wrap: wrap; }
+  .prime-screen .cal-input { min-width: 0; flex-basis: 100%; }
+  .prime-screen .cal-select { min-width: 0; max-width: 100%; }
+  .prime-screen .cal-book-main { min-width: 0; flex-basis: 140px; }
+  .prime-screen .cal-player { flex-wrap: wrap; }
+  .prime-screen .cal-player audio { width: 100%; min-width: 0; }
+  .prime-screen .cal-track-name { max-width: 100%; }
+  .prime-screen :is(.mg-open, .mg-speak) { min-height: 42px; }
+  .eu-screen .eu-input { min-width: 0; }
+  .eu-screen .eu-search { flex-wrap: wrap; }
+  .eu-screen .eu-btn { min-height: 42px; }
+  .zeus-screen .zeus-cmd { box-sizing: border-box; min-width: 0; max-width: 100%; }
+  .zeus-screen .zeus-bottom { left: 12px; right: 12px; width: auto; transform: none; }
+  .spectator-head { flex-wrap: wrap; }
+  .spectator-head .spectator-title { flex-basis: 100%; min-width: 0; overflow-wrap: anywhere; }
+  .archive-gallery { z-index: 1200 !important; }
+  .archive-gallery > .ww-bar {
+    position: sticky;
+    top: 0;
+    z-index: 25;
+    min-height: 56px;
+    padding: 6px 112px 6px 14px;
+    flex-wrap: wrap;
+    touch-action: pan-y;
+  }
+  .archive-gallery .ww-titles { min-width: 0; flex: 1 1 calc(100% - 24px); }
+  .archive-gallery .ww-title { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .archive-gallery .ww-bar > button:not(.mobile-window-min):not(.mobile-window-close) { min-width: 36px; min-height: 36px; }
+  .archive-gallery .ww-resize { display: none; }
 
   .prime-screen .setup-close {
     flex: 0 0 44px;

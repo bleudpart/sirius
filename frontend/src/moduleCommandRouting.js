@@ -43,7 +43,7 @@ export const MODULE_ALIASES = {
   analytics: "statistiques tableaux bord",
   productivity: "travail productivite documents code notes",
   photo3d: "photographie objet modele trois dimensions",
-  reveil: "alarme briefing matin",
+  reveil: "alarme reveil matin",
   packager: "installateur package livrable",
 };
 

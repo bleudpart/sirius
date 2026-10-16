@@ -43,6 +43,7 @@ import uuid
 from datetime import date, datetime, timezone
 from typing import Annotated, Literal
 from urllib.parse import quote
+from zoneinfo import ZoneInfo
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
@@ -51,6 +52,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, StringConstraints
 from enterprise import effective_permissions
 from haccp import doc_status, trace_status
 from live_work import AI_INTERVAL_SECONDS, MAX_SOURCES, compare_sources, explain_changes, factual_summary, fingerprint, now_iso, work_lock
+from work_briefing import work_briefing_text
 
 
 class DossierIn(BaseModel):
@@ -634,7 +636,7 @@ def make_work_dossiers_router(db, require_user):
         return {"review": decision, "executed": False}
 
     @router.get("/day")
-    async def day_view(request: Request, on: date | None = None):
+    async def day_view(request: Request, on: date | None = None, include_upcoming: bool = False):
         uid, scope, reason = await context(request)
         selected = on or date.today()
         dossiers = await db.sirius_work_dossiers.find({"user_id": uid}, {"_id": 0}).to_list(201)
@@ -649,8 +651,10 @@ def make_work_dossiers_router(db, require_user):
                 continue
             tasks = entry["content"]["tasks"] if entry["kind"] == "meeting" else [entry["content"]]
             for task in tasks:
+                if entry["kind"] == "meeting" and task.get("status") != "confirmed":
+                    continue
                 due = _date(task.get("due_date"))
-                if due is not None and due > selected:
+                if not include_upcoming and due is not None and due > selected:
                     continue
                 commitments.append({
                     "dossier_id": entry["dossier_id"], "entry_id": entry["id"],
@@ -658,6 +662,7 @@ def make_work_dossiers_router(db, require_user):
                     "due_date": task.get("due_date"), "status": "confirmed",
                     "why_suggested": _explanation(
                         {"kind": "commitment", "id": entry["id"], "module": "work-dossiers"},
+                        "Engagement confirmé restant à terminer." if include_upcoming else
                         "Engagement confirmé, échéance absente ou <= journée choisie.",
                         task.get("due_date"), selected.isoformat(),
                         ["due_date"] if due is None else [],
@@ -665,6 +670,7 @@ def make_work_dossiers_router(db, require_user):
                 })
         return {
             "on": selected.isoformat(), "verified_at": _now(),
+            "dossiers": [{"id": dossier["id"], "title": dossier["title"]} for dossier in dossiers[:200]],
             "proposals": await unmuted_proposals(uid, scope), "commitments": commitments,
             "proposal_date_basis": "live_today", "read_only": True, "executed": False,
             "truncated": len(entries) > 500 or len(dossiers) > 200,
@@ -673,6 +679,12 @@ def make_work_dossiers_router(db, require_user):
                 "La vue ne garantit pas l'exhaustivité des registres au-delà des limites.",
             ],
         }
+
+    @router.get("/briefing")
+    async def work_briefing(request: Request):
+        today = datetime.now(ZoneInfo("Europe/Paris")).date()
+        day = await day_view(request, on=today, include_upcoming=True)
+        return {**day, "briefing": work_briefing_text(day), "kind": "work"}
 
     @router.post("/{dossier_id}/proposals/{proposal_id}")
     async def attach_proposal(dossier_id: str, proposal_id: str, request: Request):

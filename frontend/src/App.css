@@ -4026,6 +4026,32 @@ body.hud-minimal .medallion-halo { display: none; }
 }
 
 /* ===================== ΣIRIUS PRIME ===================== */
+.argus-body {
+  max-width: 1020px;
+  min-width: 0;
+  margin: 18px auto 0;
+  padding: 0 22px;
+  position: relative;
+  z-index: 2;
+  box-sizing: border-box;
+}
+.mg-speak {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  background: transparent; border: 1px solid var(--c); color: var(--c);
+  border-radius: 4px; padding: 4px 12px; font-size: 10px; letter-spacing: 1.5px;
+  font-family: inherit; transition: background-color 0.2s;
+}
+.mg-speak:hover { background: rgba(255, 255, 255, 0.06); }
+.mg-open {
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  background: transparent; border: 1px solid; border-radius: 4px; padding: 5px 16px;
+  font-size: 11px; letter-spacing: 1.5px; font-family: "Orbitron", sans-serif;
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+.mg-open:hover { background: rgba(255, 255, 255, 0.07); box-shadow: 0 0 16px currentColor; }
+.mg-open, .mg-speak { max-width: 100%; min-width: 0; box-sizing: border-box; white-space: normal; }
+.mg-open svg, .mg-speak svg { flex-shrink: 0; }
+.prime-load-error { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 12px 22px; color: #ffb4a2; }
 .prime-screen {
   position: fixed;
   inset: 0;
@@ -8569,14 +8595,9 @@ footer.sirius-footer {
   pointer-events: none;
 }
 
-/* Portrait lateral des modules du Pantheon, sur le modele de PROMETHEE :
-   l'image sort du flux, le contenu se decale pour lui laisser sa colonne. */
+/* Le portrait utilise la colonne de grille, sans effacer les marges du contenu. */
 .prime-screen:has(> .mythos-avatar),
 .atlas-panel:has(> .mythos-avatar) { position: relative; }
-
-.prime-screen:has(> .mythos-avatar) > *:not(header):not(.mythos-avatar):not(.mythos-backdrop):not(.prime-stars):not(.read-aloud-bar):not(.holo-win-resize):not(.holo-win-bar) {
-  padding-left: 206px;
-}
 
 @media (max-width: 900px) {
   .mythos-avatar {
@@ -8584,9 +8605,6 @@ footer.sirius-footer {
     margin: 10px auto 0;
     width: 132px;
     max-height: 18vh;
-  }
-  .prime-screen:has(> .mythos-avatar) > *:not(header):not(.mythos-avatar):not(.mythos-backdrop):not(.prime-stars):not(.read-aloud-bar):not(.holo-win-resize):not(.holo-win-bar) {
-    padding-left: 0;
   }
 }
 
@@ -8609,7 +8627,6 @@ footer.sirius-footer {
 .prime-screen:has(> img.mythos-avatar) > *:not(header):not(img.mythos-avatar):not(.mythos-backdrop):not(.prime-stars):not(.read-aloud-bar):not(.holo-win-resize):not(.holo-win-bar),
 .atlas-panel:has(> img.mythos-avatar) > *:not(header):not(img.mythos-avatar):not(.mythos-backdrop):not(.prime-stars):not(.read-aloud-bar):not(.holo-win-resize):not(.holo-win-bar) {
   grid-column: 2;
-  padding-left: 0;
   margin-left: 0;
   max-width: none;
 }

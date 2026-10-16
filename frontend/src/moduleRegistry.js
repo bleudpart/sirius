@@ -97,7 +97,7 @@ export function createModuleRegistry({ icons, actions, state, user, platform = "
     { id: "keys", group: "SYSTÈME", label: "Statut des clés API", Icon: icons.KeyRound, run: openKeys },
     { id: "gcal", group: "OUTILS", label: "AGENDA — Google Calendar", Icon: icons.Calendar, run: openCalendar },
     { id: "faceid", group: "SYSTÈME", label: "FACE ID — reconnaissance faciale locale", Icon: icons.Fingerprint, run: openFaceId },
-    { id: "reveil", group: "SYSTÈME", label: "RÉVEIL MATINAL — briefing & mails à l'heure choisie", Icon: icons.AlarmClock, run: openReveil },
+    { id: "reveil", group: "SYSTÈME", label: "RÉVEIL MATINAL — briefing de travail & mails à l'heure choisie", Icon: icons.AlarmClock, run: openReveil },
     { id: "keraunos", group: "PANTHÉON", label: "KERAUNOS — domotique", Icon: icons.HomeIcon, run: openKeraunos },
     { id: "espace", group: "MÉDIAS", label: "ESPACE — système solaire 3D", Icon: icons.Globe2, run: openEspace },
     { id: "about", group: "SYSTÈME", label: "À propos / Informations légales", Icon: icons.BadgeInfo, run: openAbout },

@@ -1,4 +1,5 @@
 /* © 2026 Daniel Partel – ΣIRIUS Assistant. CALLIOPE# — bibliothèque audio */
+.cal-cover { width: 46px; height: 62px; object-fit: cover; border-radius: 6px; border: 1px solid rgba(216, 184, 117, 0.35); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5); flex: 0 0 auto; }
 .mythos-avatar {
   width: 170px;
   max-height: 24vh;

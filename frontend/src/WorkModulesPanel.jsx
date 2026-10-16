@@ -5,6 +5,7 @@ import { WORK_MODULES, workModuleName as displayName } from "@/workModules";
 import { resolveBackendUrl } from "@/lib/api";
 import { downloadWorkJson, emptyWorkData, loadWorkData, mergeWorkBackup, newWorkId, parseWorkBackup, serializeWorkBackup, WORK_BACKUP_MAX_BYTES } from "@/workModuleBackup";
 import "./WorkModulesPanel.css";
+import ChronosAgenda from "./ChronosAgenda";
 
 const ICONS = { CalendarDays, FileText, FolderOpen, ScrollText, Tags, Workflow };
 const FIELDS = {
@@ -125,6 +126,7 @@ function WorkModulesWorkspace({ storageKey, initialModule, onClose, onOpenExisti
           {error && <p className="work-error" role="alert">{error}</p>}
           {loaded.error && <p className="work-error" role="alert">{loaded.error}</p>}
           {notice && <p className="work-notice" role="status">{notice}</p>}
+          {active === "planning" && <ChronosAgenda />}
           <div className="work-backup">
             <p className="work-hint">{loaded.error ? "Stockage local indisponible" : "Données conservées sur cet appareil uniquement, pour le compte actuel. Aucune synchronisation automatique."}</p>
             <button type="button" disabled={!!loaded.error} onClick={exportBackup}>Sauvegarder les six modules</button>

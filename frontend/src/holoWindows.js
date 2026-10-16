@@ -4,7 +4,7 @@
 import { trackWindowGesture, isPrimaryGesture } from "./windowGesture";
 
 const SEL = ".prime-screen, .zeus-screen, .eu-screen, .setup-screen, .iw-panel";
-const MOBILE_SEL = ".atlas-panel, .kr-panel, .p3d-overlay, .esp-panel, .about-panel, .media-hud-window, .productivity-screen, .connections-screen, .fp-overlay, .vision-card, .keys-panel, .sp-journal, .getting-started";
+const MOBILE_SEL = ".atlas-panel, .kr-panel, .p3d-overlay, .esp-panel, .about-panel, .media-hud-window, .productivity-screen, .connections-screen, .fp-overlay, .vision-card, .keys-panel, .sp-journal, .getting-started, .archive-gallery";
 const mobilePage = () => window.matchMedia("(max-width: 1023px)").matches;
 let zTop = 1000;
 let mobileZTop = 1200;
@@ -202,7 +202,7 @@ function dock() {
 }
 
 function titleOf(el) {
-  const t = el.querySelector(".zeus-title, .eu-title, .gcal-title, .setup-title, .fp-title, .p3d-title, .keys-title, .vision-title, .sp-title, .atlas-title, .kr-title, .esp-title, h1, h2");
+  const t = el.querySelector(".zeus-title, .eu-title, .gcal-title, .setup-title, .fp-title, .p3d-title, .keys-title, .vision-title, .sp-title, .atlas-title, .kr-title, .esp-title, .ww-title, h1, h2");
   const txt = (t && t.textContent.trim()) || (el.getAttribute("data-testid") || "fenêtre").replace(/-/g, " ");
   return txt.replace(/\s+/g, " ").slice(0, 30).toUpperCase();
 }
@@ -301,7 +301,11 @@ function decorate(el) {
   let g = geom[k];
   if (!g || !g.w || g.w > window.innerWidth + 40 || g.h > window.innerHeight + 40) {
     const off = (cascade++ % 6) * 36;
-    g = { x: (window.innerWidth - W) / 2 + off, y: Math.max(8, (window.innerHeight - H) / 2 - 6) + off * 0.7, w: W, h: H };
+    g = {
+      x: clamp((window.innerWidth - W) / 2 + off, 8, Math.max(8, window.innerWidth - W - 8)),
+      y: clamp(Math.max(8, (window.innerHeight - H) / 2 - 6) + off * 0.7, 8, Math.max(8, window.innerHeight - H - 8)),
+      w: W, h: H,
+    };
   }
   g = { ...g, x: clamp(g.x, -g.w + 140, window.innerWidth - 140), y: clamp(g.y, 0, window.innerHeight - 52) };
   el.__geo = g;

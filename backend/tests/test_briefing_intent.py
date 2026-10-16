@@ -6,7 +6,11 @@ import pytest
 import sirius_brain
 
 
-@pytest.mark.parametrize("prompt", ["briefing", "briefing du soir", "brieffing du soir"])
+@pytest.mark.parametrize("prompt", [
+    "briefing", "briefing du soir", "brieffing du soir", "mon briefing de travail",
+    "afficher et lire le briefing", "donne-moi mon briefing", "refais-moi le briefing",
+    "fais-moi le point", "on reprend le travail", "continue le travail",
+])
 def test_briefing_intent_bypasses_the_general_or_llm_fallback(monkeypatch, prompt):
     class UnexpectedClient:
         @property
@@ -18,7 +22,14 @@ def test_briefing_intent_bypasses_the_general_or_llm_fallback(monkeypatch, promp
     result = asyncio.run(sirius_brain.parse_intent(prompt))
 
     assert result["action"] == "daily_briefing"
-    assert result["say"]
+    assert "travail" in result["say"]
+    assert not sirius_brain._is_news_request(prompt)
+
+
+@pytest.mark.parametrize("prompt", ["les actualités", "les infos du jour", "quoi de neuf aujourd'hui",
+                                  "explique le briefing", "termine ma facture"])
+def test_news_and_questions_are_not_reclassified_as_work_commands(prompt):
+    assert not sirius_brain._BRIEFING_INTENT_PATTERN.fullmatch(prompt)
 
 
 def test_briefing_enrichment_uses_the_dedicated_prompt(monkeypatch):

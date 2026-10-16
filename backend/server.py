@@ -404,6 +404,32 @@ async def ui_intent(req: IntentRequest, request: Request):
 class ResetRequest(BaseModel):
     session_id: str = "default"
 
+async def _chronos_chat_response(req, user, session_id, history):
+    from chronos_assistant import handle_chronos_chat
+    import sqlite3
+    try:
+        result = await handle_chronos_chat(req, user, db, history)
+    except sqlite3.Error as exc:
+        logger.error("CHRONOS : stockage indisponible (%s)", type(exc).__name__)
+        raise HTTPException(503, "CHRONOS : stockage indisponible. Relisez l'agenda avant de réessayer.") from exc
+    if result is None:
+        return None
+    answer = result["answer"]
+    await db.sirius_chats.update_one(
+        {"session_id": session_id},
+        {"$set": {"session_id": session_id, "user_id": user["user_id"], "history": (history + [
+            {"role": "user", "content": req.text},
+            {"role": "assistant", "content": answer},
+        ])[-16:], "updated_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True,
+    )
+    return {"answer": answer, "response": answer, "text": answer, "memories": [],
+            "popups": [], "action": None, "used_search": False,
+            "chronos_changed": result.get("changed", False),
+            "chronos_pending": result.get("pending_token"),
+            "chronos_state": result.get("state", "COMPLETED" if result.get("changed") else "READ_ONLY"),
+            "key_source": k3_source()}
+
 @api_router.post("/chat")
 async def chat(req: ChatRequest, request: Request):
     """Reçoit une commande, génère une réponse intelligente et garde l'historique."""
@@ -418,6 +444,9 @@ async def chat(req: ChatRequest, request: Request):
     session_id = f"{uid}:{req.session_id or 'default'}"
     doc = await db.sirius_chats.find_one({"session_id": session_id}, {"_id": 0, "history": 1})
     history = (doc or {}).get("history", [])
+    chronos = await _chronos_chat_response(req, user, session_id, history)
+    if chronos is not None:
+        return chronos
     await _with_themis_context(req, uid, history)
     if cloud_link.should_relay_chat(req.keys):
         return await cloud_link.relay_json("/api/chat", req.model_dump())
@@ -521,6 +550,15 @@ async def chat_stream(req: ChatRequest, request: Request):
     session_id = f"{uid}:{req.session_id or 'default'}"
     doc = await db.sirius_chats.find_one({"session_id": session_id}, {"_id": 0, "history": 1})
     history = (doc or {}).get("history", [])
+    chronos = await _chronos_chat_response(req, user, session_id, history)
+    if chronos is not None:
+        async def chronos_events():
+            yield "data: " + json.dumps({"type": "delta", "text": chronos["answer"]}, ensure_ascii=False) + "\n\n"
+            yield "data: " + json.dumps({"type": "done", **chronos}, ensure_ascii=False) + "\n\n"
+        return StreamingResponse(
+            chronos_events(), media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
     await _with_themis_context(req, uid, history)
     if cloud_link.should_relay_chat(req.keys):
         return StreamingResponse(
@@ -2451,6 +2489,8 @@ async def setup_test_chat(body: SetupTestChatIn, request: Request):
 api_router.include_router(make_hephaistos_router(db))
 api_router.include_router(make_feedback_router())
 api_router.include_router(make_work_dossiers_router(db, require_user))
+from routes.chronos import make_chronos_router  # noqa: E402
+api_router.include_router(make_chronos_router(require_user, db))
 
 # ---- Veille push proactive : Sirius prévient des actus tout seul ----
 async def _push_watch_loop():

@@ -51,14 +51,13 @@
 .th-split > .th-list { overflow-x: auto; }
 .th-row > .th-input, .th-line > .th-input { min-width: 0; }
 @media (max-width: 900px) { .th-split { grid-template-columns: minmax(0, 1fr); } }
-@media (max-width: 480px) { .th-input.th-qty { width: 64px; } }
 .th-form-card {
   padding: 14px; border: 1px solid rgba(216, 184, 117, 0.35); border-radius: 12px;
   background: rgba(9, 16, 24, 0.8); display: flex; flex-direction: column; gap: 8px;
 }
 .th-row { display: flex; gap: 8px; }
 .th-input {
-  width: 100%; padding: 8px 10px; font-size: 13px; color: #ffffff;
+  width: 100%; min-width: 0; box-sizing: border-box; padding: 8px 10px; font-size: 13px; color: #ffffff;
   background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(216, 184, 117, 0.3);
   border-radius: 7px; font-family: "Rajdhani", sans-serif;
 }
@@ -99,10 +98,19 @@ select.th-input option { background: #0a1420; }
 .th-cyan { color: #ffffff; }
 .th-actions { display: flex; gap: 6px; }
 @media (max-width: 480px) {
+  .themis-screen .th-tabs { padding-inline: 12px; }
+  .themis-screen .th-error { margin-inline: 12px; }
+  .th-tab { max-width: 100%; white-space: normal; }
+  .th-line { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 36px; }
+  .th-line > .th-input:first-child { grid-column: 1 / -1; }
+  .th-line .th-input.th-qty { width: 100%; }
+  .th-line .th-icon-btn { justify-content: center; min-height: 36px; }
+  .th-input.th-qty { width: 64px; }
   .th-table, .th-table tbody { display: block; }
-  .th-table tr { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 10px 0; border-bottom: 1px solid rgba(216, 184, 117, 0.14); }
-  .th-table td { display: block; padding: 0; border-bottom: 0; }
+  .th-table tr { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 10px; padding: 12px; border: 1px solid rgba(216, 184, 117, 0.2); border-radius: 12px; }
+  .th-table td { display: block; min-width: 0; max-width: 100%; overflow-wrap: anywhere; padding: 0; border-bottom: 0; }
   .th-table td:first-child { flex: 1 0 100%; }
+  .th-table td.th-stock-cell { display: flex; }
   .th-table td.th-actions { display: flex; flex: 1 0 100%; flex-wrap: wrap; }
   .th-table .th-icon-btn { display: inline-grid; place-items: center; min-width: 36px; min-height: 36px; }
 }
@@ -126,7 +134,7 @@ select.th-input option { background: #0a1420; }
 .th-red { color: #f08c8c; }
 .th-compta { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: rgba(255, 255, 255, 0.78); }
 
-.th-templates { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.th-templates { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 16px; }
 .th-template {
   border: 1px solid; border-radius: 12px; padding: 14px;
   background: rgba(9, 16, 24, 0.8); display: flex; flex-direction: column; gap: 8px;
@@ -202,12 +210,12 @@ a.th-icon-btn { text-decoration: none; }
 
 /* Modale d'envoi e-mail */
 .th-modal-back {
-  position: fixed; inset: 0; z-index: 60;
+  position: fixed; inset: 0; z-index: 3000;
   display: flex; align-items: center; justify-content: center;
   background: rgba(2, 6, 12, 0.72); backdrop-filter: blur(6px);
 }
 .th-modal {
-  width: min(520px, 92vw); padding: 18px;
+  width: min(520px, 92vw); max-height: calc(100dvh - 32px); overflow-y: auto; box-sizing: border-box; padding: 18px;
   display: flex; flex-direction: column; gap: 9px;
   border-radius: 14px;
   /* Matériau aligné sur le verre holographique cyan du HUD (.shud-panel). */
@@ -224,3 +232,4 @@ a.th-icon-btn { text-decoration: none; }
 textarea.th-input { resize: vertical; min-height: 96px; font-family: "Rajdhani", sans-serif; }
 .th-dash-actions { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
 .th-dash-actions .th-btn { display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 10px; padding: 8px 14px; }
+.th-chart-legend { flex-wrap: wrap; }

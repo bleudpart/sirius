@@ -2,6 +2,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { X, FileCode2, ScanSearch, Download, Trash2, Loader2, ShieldAlert, History } from "lucide-react";
 import { progress } from "@/SiriusProgress";
+import "./Argus.css";
+import "./InstallWizard.css";
+import "./MemoryManager.css";
 
 const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
 const RISK_LABEL = { auto: "AUTO", severe: "SÉVÈRE", critical: "CRITIQUE" };

@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, StrictBool
 
 import local_memory
 import storage
+from runtime_paths import data_file
 
 CONTACT = "danielsirius.pro2026@gmail.com"
 logger = logging.getLogger(__name__)
@@ -17,7 +18,7 @@ PERSONAL_COLLECTIONS = (
     "sirius_chats", "local_memory", "episodic_memory",
     "sirius_work_dossiers", "sirius_work_entries", "sirius_work_snapshots", "sirius_work_live_states",
     "sirius_work_proposal_mutes", "agora_deals", "agora_settings",
-    "agora_coach_history", "nummarius_alerts",
+    "agora_coach_history",     "nummarius_alerts", "chronos_actions",
 )
 REVIEW_COLLECTIONS = (
     "themis_docs", "themis_clients", "themis_items", "themis_stock_movements",
@@ -36,6 +37,14 @@ class DeletionReview(BaseModel):
     confirm_user_id: str
     external_review_complete: StrictBool = False
     activity_stopped: StrictBool = False
+
+
+def _chronos_store_if_present():
+    path = data_file("chronos.sqlite3")
+    if not path.exists():
+        return None
+    from chronos_store import ChronosStore
+    return ChronosStore(path)
 
 
 async def deletion_plan(db, user_id: str) -> dict:
@@ -61,6 +70,12 @@ async def deletion_plan(db, user_id: str) -> dict:
     if await db.enterprise_companies.count_documents({"owner_user_id": user_id}):
         blockers.append("Propriété d’entreprise à transférer séparément.")
     counts = {}
+    try:
+        agenda = _chronos_store_if_present()
+        counts["chronos_events"] = agenda.count_user_events(user_id) if agenda else 0
+    except sqlite3.Error as exc:
+        logger.exception("Account deletion: CHRONOS cannot be inspected")
+        raise HTTPException(503, "L’agenda CHRONOS ne peut pas être vérifié avant effacement.") from exc
     for name in PERSONAL_COLLECTIONS + FILE_COLLECTIONS:
         counts[name] = await getattr(db, name).count_documents({"user_id": user_id})
     paths = set()
@@ -126,6 +141,9 @@ async def finalize_account_deletion(db, *, user_id: str, review: DeletionReview)
             storage._safe_local_path(path).unlink(missing_ok=True)
         if local_memory.DB_PATH.exists():
             local_memory.delete_user_data(user_id)
+        agenda = _chronos_store_if_present()
+        if agenda:
+            agenda.delete_user_data(user_id)
         for name in PERSONAL_COLLECTIONS + FILE_COLLECTIONS:
             await getattr(db, name).delete_many({"user_id": user_id})
         for name in ID_COLLECTIONS:

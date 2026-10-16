@@ -1,4 +1,4 @@
-import { initHoloWindows } from "./holoWindows";
+import { initHoloWindows, resetHoloWindowLayout } from "./holoWindows";
 
 let observer;
 const originalMatchMedia = window.matchMedia;
@@ -20,7 +20,7 @@ afterEach(() => {
   global.MutationObserver = originalObserver;
 });
 
-test.each(["prime-screen", "fp-overlay", "p3d-overlay", "vision-card", "keys-panel", "sp-journal", "getting-started", "media-hud-window", "productivity-screen"])(
+test.each(["prime-screen", "fp-overlay", "p3d-overlay", "vision-card", "keys-panel", "sp-journal", "getting-started", "media-hud-window", "productivity-screen", "archive-gallery"])(
   "%s has matching controls and restores its content from the dock", (className) => {
     const panel = document.createElement("section");
     panel.className = className;
@@ -70,4 +70,23 @@ test("an extra mobile panel is left unchanged on desktop", () => {
   document.body.innerHTML = '<section class="keys-panel"><header><button aria-label="Fermer">×</button></header></section>';
   initHoloWindows();
   expect(document.querySelector(".mobile-window-min")).toBeNull();
+});
+
+test("new cascaded desktop modules remain fully inside the viewport", () => {
+  window.matchMedia.mockReturnValue({ matches: false });
+  resetHoloWindowLayout();
+  initHoloWindows();
+  for (let i = 0; i < 6; i += 1) {
+    const panel = document.createElement("section");
+    panel.className = "prime-screen";
+    panel.dataset.testid = `cascade-fixture-${i}`;
+    panel.innerHTML = '<header class="zeus-head"><button aria-label="Fermer">×</button></header>';
+    document.body.appendChild(panel);
+    observer([{ addedNodes: [panel], removedNodes: [] }]);
+    const left = parseFloat(panel.style.left), top = parseFloat(panel.style.top);
+    expect(left).toBeGreaterThanOrEqual(8);
+    expect(top).toBeGreaterThanOrEqual(8);
+    expect(left + parseFloat(panel.style.width)).toBeLessThanOrEqual(window.innerWidth - 8);
+    expect(top + parseFloat(panel.style.height)).toBeLessThanOrEqual(window.innerHeight - 8);
+  }
 });
