@@ -304,7 +304,7 @@ class LocalDocStore:
 
     def __init__(self, path=None):
         self._path = str(path or _DB_PATH)
-        with self._conn() as con:
+        with closing(self._conn()) as con, con:
             con.execute(
                 "CREATE TABLE IF NOT EXISTS documents ("
                 "pk INTEGER PRIMARY KEY AUTOINCREMENT, "
@@ -334,7 +334,7 @@ class LocalDocStore:
         return con
 
     def _backfill_indexed_columns(self, limit: int = 1000):
-        with _lock, self._conn() as con:
+        with _lock, closing(self._conn()) as con, con:
             rows = con.execute(
                 "SELECT pk, collection, doc FROM documents "
                 "WHERE user_id IS NULL AND session_id IS NULL AND created_at IS NULL AND updated_at IS NULL "
@@ -409,7 +409,7 @@ class LocalDocStore:
     def _insert(self, collection: str, document: dict) -> int:
         document.pop("_id", None)
         values = _indexed_values(document)
-        with _lock, self._conn() as con:
+        with _lock, closing(self._conn()) as con, con:
             cur = con.execute(
                 "INSERT INTO documents (collection, doc, user_id, session_id, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, ?, ?)",
@@ -419,7 +419,7 @@ class LocalDocStore:
 
     def _replace_pk(self, collection: str, pk: int, document: dict):
         values = _indexed_values(document)
-        with _lock, self._conn() as con:
+        with _lock, closing(self._conn()) as con, con:
             con.execute(
                 "UPDATE documents SET doc = ?, user_id = ?, session_id = ?, created_at = ?, updated_at = ? "
                 "WHERE pk = ? AND collection = ?",
@@ -447,7 +447,7 @@ class LocalDocStore:
             return document, True
 
     def _delete_pk(self, collection: str, pk: int):
-        with _lock, self._conn() as con:
+        with _lock, closing(self._conn()) as con, con:
             con.execute("DELETE FROM documents WHERE pk = ? AND collection = ?", (pk, collection))
 
     def _upsert_seed(self, query: dict, update: dict) -> dict:

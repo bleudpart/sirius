@@ -10,6 +10,7 @@ let root;
 let host;
 
 beforeEach(() => {
+  jest.spyOn(global, "fetch").mockResolvedValue({ ok: true, json: async () => ({ items: [], events: [] }) });
   localStorage.clear();
   host = document.createElement("div");
   document.body.appendChild(host);

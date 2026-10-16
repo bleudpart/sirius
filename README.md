@@ -681,6 +681,56 @@ Guide détaillé : [INSTALL-SIRIUS.md](./INSTALL-SIRIUS.md)
 
 Pour le déploiement en petite entreprise : [GUIDE-ENTREPRISE.md](./GUIDE-ENTREPRISE.md)
 
+### ARIANE → PORTUS : premier parcours réellement exécuté
+
+Dans ARIANE, le bloc « Parcours financier exécutable » lance une analyse en
+lecture seule d'une à quatre actions du catalogue PORTUS. Ce n'est **pas une
+analyse du portefeuille personnel** : aucune position n'est déduite des actions
+choisies. Les listes d'étapes locales historiques restent des listes manuelles,
+pas des parcours arbitraires rendus exécutables.
+
+Le contrat est borné à un modèle `portus_market_review_v1` :
+
+1. Lectures et calculs PORTUS indépendants lancés en parallèle (25 secondes
+   maximum par lecture ; pas de repli sur des chiffres inventés).
+2. Condition déterministe : si la volatilité historique annualisée est
+   **strictement supérieure** au seuil choisi, ajouter un constat au bilan.
+   Une donnée absente ou ancienne produit une réserve, pas une absence de risque.
+3. Synthèse descriptive, uniquement après la réussite de toutes les lectures
+   et de l'évaluation des règles. Un parcours incomplet reste bloqué.
+
+API authentifiée : `POST /api/ariane/market-runs` reçoit `request_id` UUID,
+`symbols`, `period`, `volatility_threshold_pct`. `GET` sur cette route retrouve
+les vingt dernières références ; `GET /{id}` relit l'état et les preuves ;
+`POST /{id}/resume` reprend seulement les étapes manquantes. La même référence
+avec d'autres paramètres est refusée (409). Les états sont `PENDING`,
+`RUNNING`, `COMPLETED`, `BLOCKED`, `INTERRUPTED` (étape inactive depuis 90 s)
+et `EXPIRED` (reprise limitée à 24 h).
+
+Les opérations, résultats d'étapes et événements sont isolés par compte dans
+`sirius_ariane_runs`, `sirius_ariane_steps`, `sirius_ariane_events`, inclus dans
+l'effacement de compte. Les identités stables et insertions atomiques SQLite /
+Mongo évitent les doublons de résultats après coupure ou réponse perdue. Des
+lectures publiques peuvent être répétées lors d'appels concurrents ; elles ne
+créent ni ordres ni alertes. Les étapes terminées ne sont pas recalculées :
+la reprise utilise leurs captures d'origine, qui peuvent donc avoir des dates
+différentes. Une nouvelle analyse complète nécessite une nouvelle référence.
+
+NÉMÉSIS expose le même suivi en consultation, sans commandes d'exécution.
+L'export JSON contient les résultats, les OHLC utilisés, leur empreinte SHA256,
+la version `nummarius-daily-v1`, les paramètres des formules, la devise, les
+dates de source et de récupération. Les événements décrivent les tentatives
+de lecture ; les résultats d'étapes font foi même si la réponse ou l'écriture
+du dernier événement a été interrompue. Le journal affiché est limité aux cent
+derniers événements, avec indication de troncature.
+
+**Pas encore raccordés** : portefeuille réel/importé, création confirmée
+d'alertes techniques, tâches programmées/récurrentes CHRONOS, notifications,
+orchestration de mutations externes, conversation vocale financière et
+synchronisation hors ligne. Aucune confirmation d'ordre n'est proposée, car
+ce modèle ne sait pas passer d'ordre. Ajouter une action sensible exigera son
+propre aperçu et accord explicite ; un calcul réussi ne l'autorisera pas.
+
 ### PORTUS NUMMARIUS : premier espace d'analyse technique
 
 Le module conserve sa vue Marchés et ses alertes de prix existantes. L'onglet

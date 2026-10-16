@@ -2250,6 +2250,8 @@ from microsoft_graph import make_microsoft_router
 api_router.include_router(make_microsoft_router(db))
 from nummarius_api import make_nummarius_router
 api_router.include_router(make_nummarius_router(db))
+from ariane_market_runs import make_ariane_market_router
+api_router.include_router(make_ariane_market_router(db, require_user))
 
 from themis_api import make_themis_router
 api_router.include_router(make_themis_router(db))

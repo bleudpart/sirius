@@ -1,6 +1,8 @@
 """Public daily OHLC connector; no account holdings or API keys leave SIRIUS."""
 
 import asyncio
+import hashlib
+import json
 import logging
 import math
 import time
@@ -120,6 +122,14 @@ async def technical_analysis(symbol, label, period):
     source = {key: value for key, value in data.items() if key != "bars"}
     return {
         **source, **calculated, "series": visible, "symbol": symbol, "label": label,
+        "data_version": hashlib.sha256(json.dumps(all_bars, sort_keys=True, allow_nan=False).encode()).hexdigest(),
+        "calculation_inputs": {"daily_bars": all_bars},
+        "calculation_version": "nummarius-daily-v1",
+        "calculation_parameters": {
+            "sma": [20, 50, 100, 200], "rsi_wilder": 14, "macd_ema": [12, 26, 9],
+            "bollinger_population": [20, 2], "atr_wilder": 14,
+            "volatility_log_returns_sample": 20, "annualization_sessions": 252,
+        },
         "period": period, "available_sessions": len(all_bars), "visible_sessions": len(visible),
         "history_start": all_bars[0]["date"], "as_of": last["date"], "performance_pct": performance,
         "age_calendar_days": (datetime.now(timezone.utc).date() - datetime.fromisoformat(last["date"]).date()).days,
@@ -138,7 +148,9 @@ async def technical_analysis(symbol, label, period):
 async def compare_assets(stocks, period):
     async def one(symbol, label):
         try:
-            return {"symbol": symbol, "status": "available", "analysis": await technical_analysis(symbol, label, period)}
+            analysis = await technical_analysis(symbol, label, period)
+            return {"symbol": symbol, "status": "available",
+                    "analysis": {key: value for key, value in analysis.items() if key not in ("series", "calculation_inputs")}}
         except HTTPException as exc:
             if exc.status_code != 503:
                 raise

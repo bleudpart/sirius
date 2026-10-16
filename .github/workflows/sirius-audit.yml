@@ -43,6 +43,8 @@ jobs:
           python -m py_compile work_conversation.py work_invoice_batch.py work_draft_recordings.py
           python -m py_compile nummarius_api.py nummarius_market_data.py nummarius_indicators.py
           python -m pytest tests/test_nummarius_analytics.py -q
+          python -m py_compile ariane_market_runs.py
+          python -m pytest tests/test_ariane_market_runs.py -q
           python -m pytest tests/test_work_conversation.py tests/test_work_invoice_batch.py tests/test_work_draft_recordings.py -q
           python -m pytest tests/test_chronos.py tests/test_chronos_assistant.py -q
           python -m pytest tests/test_document_scans.py tests/test_email_signature.py -q

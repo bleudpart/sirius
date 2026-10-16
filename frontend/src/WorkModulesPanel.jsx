@@ -6,6 +6,7 @@ import { resolveBackendUrl } from "@/lib/api";
 import { downloadWorkJson, emptyWorkData, loadWorkData, mergeWorkBackup, newWorkId, parseWorkBackup, serializeWorkBackup, WORK_BACKUP_MAX_BYTES } from "@/workModuleBackup";
 import "./WorkModulesPanel.css";
 import ChronosAgenda from "./ChronosAgenda";
+import ArianeMarketRuns from "./ArianeMarketRuns";
 
 const ICONS = { CalendarDays, FileText, FolderOpen, ScrollText, Tags, Workflow };
 const FIELDS = {
@@ -144,6 +145,7 @@ function WorkModulesWorkspace({ storageKey, initialModule, onClose, onOpenExisti
             <button type="button" onClick={() => setPendingDelete(null)}>Annuler la suppression</button>
           </div>}
           <fieldset className="work-editable" disabled={!!loaded.error}>
+          {(active === "workflows" || active === "audit") && <ArianeMarketRuns key={`${storageKey}-${active}`} auditOnly={active === "audit"} />}
           {active === "audit" ? (
             <>
               <div className="work-section-head"><h2>Journal local</h2><button type="button" onClick={() => {

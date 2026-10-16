@@ -118,6 +118,8 @@ def test_finalize_erases_personal_files_memory_and_tokens_but_not_other_user(rev
         asyncio.run(db.sirius_work_live_states.insert_one({"user_id": uid, "latest": {"text": uid}}))
         asyncio.run(db.sirius_work_contexts.insert_one({"user_id": uid, "session": "work", "dossier_id": uid}))
         asyncio.run(db.sirius_work_recordings.insert_one({"user_id": uid, "id": f"recording-{uid}"}))
+        for collection in ("sirius_ariane_runs", "sirius_ariane_steps", "sirius_ariane_events"):
+            asyncio.run(db[collection].insert_one({"user_id": uid, "id": f"run-{uid}"}))
         asyncio.run(db.microsoft_oauth.insert_one({"_id": uid, "token": uid}))
         asyncio.run(db.oauth_states.insert_one({"_id": f"state-{uid}", "uid": uid}))
     with sqlite3.connect(local_memory.DB_PATH) as con:
@@ -138,6 +140,9 @@ def test_finalize_erases_personal_files_memory_and_tokens_but_not_other_user(rev
         ("sirius_work_live_states", {"user_id": "client"}),
         ("sirius_work_contexts", {"user_id": "client"}),
         ("sirius_work_recordings", {"user_id": "client"}),
+        ("sirius_ariane_runs", {"user_id": "client"}),
+        ("sirius_ariane_steps", {"user_id": "client"}),
+        ("sirius_ariane_events", {"user_id": "client"}),
         ("microsoft_oauth", {"_id": "client"}),
         ("oauth_states", {"uid": "client"}),
         ("account_deletion_requests", {"user_id": "client"}),

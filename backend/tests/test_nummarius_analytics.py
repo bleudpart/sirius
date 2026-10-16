@@ -148,6 +148,13 @@ def test_requested_period_changes_view_not_indicator_warmup(monkeypatch):
     assert result["performance_pct"]["1m"] == pytest.approx((379 / 358 - 1) * 100, abs=0.00001)
     assert result["performance_pct"]["5y"] is None
     assert result["source"] == "Yahoo Finance chart"
+    assert result["calculation_version"] == "nummarius-daily-v1"
+    assert result["calculation_parameters"]["rsi_wilder"] == 14
+    assert result["calculation_inputs"]["daily_bars"] == source()["bars"]
+    assert len(result["data_version"]) == 64
+    other_period = asyncio.run(market.technical_analysis("AAPL", "APPLE", "1y"))
+    assert other_period["data_version"] == result["data_version"]
+    assert other_period["calculation_inputs"] == result["calculation_inputs"]
 
 
 def test_connector_cache_and_unavailability_never_return_a_fake_empty_success(monkeypatch):
@@ -197,6 +204,10 @@ def test_analytics_api_requires_auth_and_valid_catalogue_period(client):
     result = client.get("/api/nummarius/compare", headers=headers)
     assert result.status_code == 200
     assert len(result.json()["items"]) == 4
+    for item in result.json()["items"]:
+        assert "series" not in item["analysis"]
+        assert "calculation_inputs" not in item["analysis"]
+        assert len(item["analysis"]["data_version"]) == 64
 
 
 def test_comparison_preserves_partial_provider_failures(client, monkeypatch):

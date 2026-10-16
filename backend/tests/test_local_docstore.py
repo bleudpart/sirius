@@ -1,5 +1,6 @@
 """Tests du docstore SQLite local (compatibilité motor/MongoDB)."""
 import asyncio
+import multiprocessing
 import sqlite3
 from concurrent.futures import ProcessPoolExecutor
 
@@ -30,11 +31,31 @@ def _process_insert_once(args):
 def test_insert_once_is_atomic_between_processes(tmp_path):
     path = str(tmp_path / "processes.db")
     store = LocalDocStore(path)
-    with ProcessPoolExecutor(max_workers=2) as workers:
+    # Independent processes must not inherit SQLite handles from a threaded parent.
+    with ProcessPoolExecutor(max_workers=2, mp_context=multiprocessing.get_context("spawn")) as workers:
         results = list(workers.map(_process_insert_once, [(path, index) for index in range(8)]))
     assert sum(created for _, created in results) == 1
     assert len({document["index"] for document, _ in results}) == 1
     assert run(store.once.count_documents({})) == 1
+
+
+def test_connection_lifetimes_end_after_transactions_and_reads(tmp_path, monkeypatch):
+    connections = []
+    original = LocalDocStore._conn
+    def tracked(self):
+        connection = original(self)
+        connections.append(connection)
+        return connection
+    monkeypatch.setattr(LocalDocStore, "_conn", tracked)
+    store = LocalDocStore(tmp_path / "connections.db")
+    run(store.items.insert_one({"id": "one", "user_id": "u1"}))
+    run(store.items.update_one({"id": "one"}, {"$set": {"value": 2}}))
+    assert run(store.items.find_one({"id": "one"}))["value"] == 2
+    run(store.items.delete_one({"id": "one"}))
+    assert connections
+    for connection in connections:
+        with pytest.raises(sqlite3.ProgrammingError, match="closed"):
+            connection.execute("SELECT 1")
 
 
 def test_insert_once_validates_identity_and_keeps_accounts_independent(store):
