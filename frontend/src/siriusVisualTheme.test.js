@@ -123,6 +123,21 @@ test("the fixed account pill has its own reserved space in the top bar", () => {
   expect(appCss).toContain("max-width: 260px");
 });
 
+test("desktop account space survives theme overrides and narrow window layouts", () => {
+  const desktopRules = {};
+  appRoot.walkAtRules("media", (media) => {
+    if (media.params !== "(min-width: 1024px)") return;
+    media.walkRules((rule) => rule.walkDecls((decl) => {
+      desktopRules[`${rule.selector.replace(/\s+/g, " ")}|${decl.prop}`] = decl.value;
+    }));
+  });
+  expect(desktopRules['.top-bar, html[data-sirius-visual-theme="classic"] .sirius-root .top-bar|padding-right'])
+    .toBe("300px");
+  expect(desktopRules[".top-bar .conn-status|flex-wrap"]).toBe("wrap");
+  expect(desktopRules[".top-bar .conn-status|min-width"]).toBe("0");
+  expect(desktopRules[".sirius-root|grid-template-rows"]).toBe("minmax(56px, auto) minmax(0, 1fr) auto");
+});
+
 test("presentation layout is enabled without requiring reduced motion", () => {
   const layouts = [];
   root.walkRules((rule) => {

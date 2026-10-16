@@ -8367,6 +8367,31 @@ footer.sirius-footer {
 .fp-plan-host svg { width: 100%; height: 100%; }
 
 /* ===== Navigation adaptative Android : téléphone, tablette et fenêtres redimensionnées ===== */
+@media (min-width: 1024px) {
+  .sirius-root {
+    grid-template-rows: minmax(56px, auto) minmax(0, 1fr) auto;
+  }
+
+  .top-bar {
+    min-height: 56px;
+    box-sizing: border-box;
+  }
+
+  .top-bar .conn-status {
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .top-bar .brand-tag { flex-shrink: 0; }
+  .top-bar .sys-indicators { min-width: 0; }
+
+  .top-bar,
+  html[data-sirius-visual-theme="classic"] .sirius-root .top-bar {
+    padding-right: 300px;
+  }
+}
+
 @media (max-width: 1023px) {
   .sirius-root {
     padding-top: env(safe-area-inset-top, 0px);
