@@ -312,6 +312,23 @@ test("an invoice preview is shown and spoken as a preparation, never as an exter
   expect(global.fetch.mock.calls.some(([url]) => /\/intent$|\/drafts$|\/send$|outlook.*execute/.test(String(url)))).toBe(false);
 });
 
+test.each(["PREPARED", "READ_ONLY"])("a batch preview remains non-executing, including a blocked batch (%s)", async (workState) => {
+  const command = "Prépare les relances de mes factures en retard de plus de 15 jours";
+  const answer = "Lot du compte entier : 1 facture bloquée. Aucun message envoyé.";
+  mockConversationStream([{ type: "done", answer, work_state: workState, persisted: false,
+    executed: false, work_batch: { scope: "own_account", counts: { prepared: 0, blocked: 1, skipped: 0 } } }]);
+  await mount();
+  await send(command);
+  for (let i = 0; i < 10; i += 1) await act(async () => jest.advanceTimersByTime(5000));
+  expect(host.querySelector('[data-testid="sirius-display-body"]').textContent).toContain("1 facture bloquée");
+  mockConversationStream([{ type: "done", answer: "Cette prévisualisation n'autorise aucun envoi.", work_state: "NOT_EXECUTED" }]);
+  await send("Oui, je confirme !");
+  const streams = global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/chat/stream"));
+  expect(JSON.parse(streams[0][1].body).text).toBe(command);
+  expect(JSON.parse(streams[1][1].body).text).toBe("Confirme la prévisualisation de relance");
+  expect(global.fetch.mock.calls.some(([url]) => /\/intent$|\/drafts$|\/send$|outlook.*execute/.test(String(url)))).toBe(false);
+});
+
 test("a dossier question opens the visible conversation and transfers its screen context", async () => {
   mockConversationStream([{ type: "done", answer: "Dossier vérifié.", work_context: {
     dossier_id: "server-dossier", expires_at: new Date(Date.now() + 1800000).toISOString(),

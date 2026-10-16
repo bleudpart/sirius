@@ -113,6 +113,11 @@ class DraftIn(WorkInput):
     quantity: int | None = Field(default=None, ge=1, le=1000000)
 
 
+class InvoiceFollowupsIn(WorkInput):
+    minimum_overdue_days: int = Field(default=15, ge=0, le=3650, strict=True)
+    timezone: str = Field(default="Europe/Paris", min_length=1, max_length=100)
+
+
 class ConfirmIn(WorkInput):
     confirmed: StrictBool
 
@@ -1059,9 +1064,10 @@ def make_work_dossiers_router(db, require_user, *, conversation=None):
             [_source_ref(source) for source in body.sources],
         )}
 
-    async def draft_content(body: DraftIn, uid, scope):
+    async def draft_content(body: DraftIn, uid, scope, *, snapshot=None):
         source = _source_ref(body.source)
-        snapshot = await required_capture(source, uid, scope)
+        if snapshot is None:
+            snapshot = await required_capture(source, uid, scope)
         data = snapshot["data"]
         if body.source.kind == "facture":
             if body.quantity is not None:
@@ -1114,6 +1120,86 @@ def make_work_dossiers_router(db, require_user, *, conversation=None):
                 "checks": ["Effectuer le contrôle réel et renseigner le résultat dans HACCP."],
             }
         return snapshot, content
+
+    @router.post("/invoice-followups/preview")
+    async def invoice_followups_preview(body: InvoiceFollowupsIn, request: Request):
+        uid, scope, _ = await context(request)
+        try:
+            zone = ZoneInfo(body.timezone)
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(422, "Fuseau horaire invalide pour les relances.") from exc
+        today = datetime.now(timezone.utc).astimezone(zone).date()
+        limit = 100
+        invoices = await db.themis_docs.find(
+            {"user_id": uid, "kind": "facture"}, {"_id": 0, "id": 1},
+        ).sort("id", 1).to_list(limit + 1)
+        rows = []
+        seen = set()
+        for invoice in invoices[:limit]:
+            source_id = invoice.get("id")
+            if not isinstance(source_id, str) or not source_id.strip() or len(source_id) > 120:
+                rows.append({"source": None, "state": "blocked",
+                             "reason": "Référence de facture absente ou invalide ; corrigez-la dans THÉMIS."})
+                continue
+            if source_id in seen:
+                continue
+            seen.add(source_id)
+            source = {"kind": "facture", "id": source_id, "module": "themis"}
+            row = {"source": source}
+            if sum(item.get("id") == source_id for item in invoices) > 1:
+                rows.append({**row, "state": "blocked",
+                             "reason": "Référence de facture dupliquée ; rapprochez les doublons dans THÉMIS."})
+                continue
+            snapshot = await capture(source, uid, scope)
+            if snapshot is None:
+                rows.append({**row, "state": "blocked",
+                             "reason": "Source devenue indisponible ou non autorisée ; aucune donnée restituée."})
+                continue
+            data = snapshot["data"]
+            due = _date(data["due_date"])
+            total, paid = _number(data["total_ttc"]), _number(data["paid"])
+            if total is None or paid is None or total < 0 or paid < 0:
+                rows.append({**row, "state": "blocked",
+                             "reason": "Montant ou paiement invalide ; vérifiez les données dans THÉMIS."})
+                continue
+            if round(total - paid, 2) <= 0 or data["status"] in ("payé", "refusé", "brouillon"):
+                rows.append({**row, "state": "skipped",
+                             "reason": "Facture soldée, refusée ou encore en brouillon ; aucune relance préparée."})
+                continue
+            if data["status"] != "envoyé":
+                rows.append({**row, "state": "blocked",
+                             "reason": "Statut d'émission non reconnu ; vérifiez la facture dans THÉMIS."})
+                continue
+            if due is None:
+                rows.append({**row, "state": "blocked",
+                             "reason": "Échéance absente ou invalide ; le retard ne peut pas être vérifié."})
+                continue
+            overdue_days = (today - due).days
+            if overdue_days <= body.minimum_overdue_days:
+                rows.append({**row, "state": "skipped",
+                             "reason": "Retard insuffisant selon le seuil strict demandé.", "overdue_days": overdue_days})
+                continue
+            # Reuse the exact same captured values for eligibility and message generation.
+            snapshot, content = await draft_content(
+                DraftIn(source=SourceIn(kind="facture", id=source_id)), uid, scope, snapshot=snapshot,
+            )
+            recipient = content["to"]
+            recipient_present = isinstance(recipient, str) and bool(recipient.strip())
+            rows.append({
+                **row, "state": "prepared" if recipient_present else "blocked",
+                "reason": "Texte préparé pour relecture humaine, paiement et adresse à vérifier."
+                if recipient_present else "Destinataire manquant ; complétez les coordonnées du client avant tout envoi.",
+                "overdue_days": overdue_days, "fingerprint": snapshot["fingerprint"], "content": content,
+            })
+        counts = {state: sum(item["state"] == state for item in rows) for state in ("prepared", "blocked", "skipped")}
+        return {
+            "scope": "own_account", "on": today.isoformat(), "timezone": body.timezone,
+            "minimum_overdue_days": body.minimum_overdue_days, "comparison": "strictly_greater",
+            "items": rows, "counts": counts, "examined": min(len(invoices), limit),
+            "truncated": len(invoices) > limit, "limit": limit,
+            "verified_at": _now(), "persisted": False, "executed": False,
+            "confirmation_required": True, "execution": "manual_only",
+        }
 
     @router.post("/{dossier_id}/draft-preview")
     async def draft_preview(dossier_id: str, body: DraftIn, request: Request):
@@ -1527,4 +1613,11 @@ def make_work_dossiers_router(db, require_user, *, conversation=None):
             )
 
         conversation.preview_invoice = preview_invoice
+
+        async def preview_invoice_batch(days, zone, request):
+            return await invoice_followups_preview(
+                InvoiceFollowupsIn(minimum_overdue_days=days, timezone=zone), request,
+            )
+
+        conversation.preview_invoice_batch = preview_invoice_batch
     return router

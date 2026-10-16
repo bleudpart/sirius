@@ -858,6 +858,7 @@ export default function WorkDossiersPanel({ onClose, onOpenThemis, onOpenHaccp, 
           <p>Lecture et prévisualisation de relance, sans appel IA externe. Aucun brouillon enregistré ni envoyé depuis cette conversation.</p>
           <div className="work-dossiers-actions">
             <button type="button" onClick={() => onAsk("Qu'ai-je à traiter aujourd'hui ?")}>Mes priorités</button>
+            <button type="button" onClick={() => onAsk("Prépare les relances de mes factures en retard de plus de 15 jours")}>Relances de mon compte · plus de 15 jours</button>
             <button type="button" disabled={!selected} onClick={() => onAsk("Où en est ce dossier ?")}>Résumer ce dossier</button>
             <button type="button" disabled={!selected} onClick={() => onAsk("Pourquoi ces propositions pour ce dossier ?")}>Pourquoi ces propositions ?</button>
           </div>

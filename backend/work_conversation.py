@@ -13,12 +13,13 @@ from fastapi import HTTPException, Request
 
 from local_docstore import DatabaseRouter, LocalDocStore
 from work_briefing import work_briefing_text
+from work_invoice_batch import batch_days, batch_report
 
 logger = logging.getLogger(__name__)
 Reader = Callable[..., Awaitable[dict]]
 CONTEXT_TTL = timedelta(minutes=30)
 READ_TIMEOUT = 12
-PREVIEW_REPLY = re.compile(r"^(?:oui(?:[, ]+je confirme)?|je confirme|confirme|vas-y|envoie(?:-la)?|non|annule|laisse tomber)[\s.!?]*$")
+PREVIEW_REPLY = re.compile(r"^(?:oui(?:[, ]+je confirme)?|je confirme|confirme|vas-y|envoie(?:-la|-les| tout| les relances)?|non|annule|laisse tomber)[\s.!?]*$")
 
 
 def normalized(text: str) -> str:
@@ -36,6 +37,8 @@ def work_intent(text: str) -> str | None:
         return "clear"
     if re.search(r"\b(?:ouvre|ouvrir|ferme|fermer)\b", value):
         return None
+    if re.search(r"\b(?:prepare|preparer)\b.*\brelances\b.*\bfactures\b", value):
+        return "invoice_batch"
     if re.search(r"\b(?:prepare|preparer)\s+(?:la|une)\s+relance\b", value):
         return "dossier"
     if re.search(r"\b(?:ou en (?:est|sont)|resume|resumer|compare|comparer|fais le point|prepare|preparer|retrouve|rechercher|cherche|explique|pourquoi|envoie|envoyer|supprime|supprimer|cree|creer|transforme|surveille|planifie|relance)\b.*\b(?:dossiers?|clients?|factures?|devis|propositions?)\b", value):
@@ -114,6 +117,7 @@ class WorkConversation:
         self.db = db
         self.readers: WorkReaders | None = None
         self.preview_invoice: Reader | None = None
+        self.preview_invoice_batch: Reader | None = None
         self._indexes_ready = False
         self._index_lock = asyncio.Lock()
 
@@ -209,6 +213,32 @@ class WorkConversation:
             return {**base, "state": "NEEDS_CLARIFICATION", "answer": message,
                     "work_context_cleared": True, "work_suggestions": ["Liste mes dossiers"]}
 
+        if intent == "invoice_batch":
+            days = batch_days(normalized(req.text))
+            if days is None:
+                return await clarify(
+                    "Précisez un lot de votre compte et un seuil en jours, par exemple : "
+                    "« Prépare les relances de mes factures en retard de plus de 15 jours ». "
+                    "Les filtres par client ou dossier et les autres conditions ne sont pas encore pris en charge pour les lots. "
+                    "Aucun brouillon enregistré ni envoyé."
+                )
+            if self.preview_invoice_batch is None:
+                logger.error("Work invoice batch preview is not configured")
+                raise HTTPException(503, "La préparation des relances en lot est indisponible. Aucun message envoyé.")
+            batch = await self._read(self.preview_invoice_batch, days, zone_name, request)
+            await self.db.sirius_work_contexts.update_one(
+                {"user_id": uid, "session_id": session},
+                {"$set": {"preview_pending": True,
+                          "expires_at": (now + CONTEXT_TTL).isoformat()}},
+                upsert=True,
+            )
+            return {
+                **base, "state": "PREPARED" if batch["counts"]["prepared"] else "READ_ONLY",
+                "answer": batch_report(batch), "persisted": False,
+                "work_batch": batch,
+                "work_sources": [item["source"] for item in batch["items"] if item["source"]],
+            }
+
         if intent == "day":
             day, queue = await asyncio.gather(
                 self._read(readers.day, request, on=today), self._read(readers.queue, request),
@@ -261,7 +291,7 @@ class WorkConversation:
                 "user_id": uid, "session_id": session, "expires_at": {"$gt": now.isoformat()},
             })
             if saved:
-                selected_id = saved["dossier_id"]
+                selected_id = saved.get("dossier_id")
         if not selected_id:
             return await clarify("De quel dossier parlez-vous ? Sélectionnez-le dans Mes dossiers ou indiquez son nom. Je ne déduis pas « ce client » ou « le dernier devis » sans référence vérifiée.")
 

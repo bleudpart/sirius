@@ -1601,7 +1601,7 @@ function App() {
       if (workConversationContextRef.current !== contextAtRequest) return;
       if (data.work_context) updateWorkConversationContext(data.work_context.dossier_id, data.work_context.expires_at);
       if (data.work_context_cleared) updateWorkConversationContext(null);
-      workPreviewPendingRef.current = data.work_state === "PREPARED" && !!data.work_preview;
+      workPreviewPendingRef.current = !!(data.work_preview || data.work_batch);
     };
     const payload = JSON.stringify({
       text: command,

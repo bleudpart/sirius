@@ -40,8 +40,8 @@ jobs:
           python -m py_compile server.py sirius_brain.py proactive.py enterprise.py account_deletion.py auth_api.py local_memory.py live_work.py routers/files.py routes/pantheon_oracle.py routes/work_dossiers.py
           python -m py_compile document_scan_pdf.py routes/document_scans.py
           python -m py_compile chronos_store.py chronos_assistant.py routes/chronos.py
-          python -m py_compile work_conversation.py
-          python -m pytest tests/test_work_conversation.py -q
+          python -m py_compile work_conversation.py work_invoice_batch.py
+          python -m pytest tests/test_work_conversation.py tests/test_work_invoice_batch.py -q
           python -m pytest tests/test_chronos.py tests/test_chronos_assistant.py -q
           python -m pytest tests/test_document_scans.py tests/test_email_signature.py -q
           python -m pytest tests/test_microphone_selection.py -q

@@ -8,6 +8,9 @@ test.each([
   "Qu'est-ce qui a changé depuis ma dernière visite ?",
   "Envoie la facture du dossier Martin", "Surveille le dossier Martin",
   "Prépare la relance FAC-42",
+  "Prépare les relances de mes factures en retard de plus de 15 jours",
+  "Préparer toutes les relances de toutes les factures ayant plus de 30 jours de retard",
+  "Prépare les relances de mes factures en retard de plus de 15 jours sauf le client Martin",
   "Confirme la prévisualisation de relance", "Annule la prévisualisation de relance",
 ])("route directement la conversation métier : %s", (text) => {
   expect(isWorkConversationCommand(text)).toBe(true);
@@ -26,6 +29,9 @@ test("préserve les commandes agenda dans le parcours opérationnel", () => {
 test("une réponse à la prévisualisation n'autorise jamais un envoi implicite", () => {
   expect(workPreviewFollowup("Oui, je confirme !", true)).toBe("Confirme la prévisualisation de relance");
   expect(workPreviewFollowup("envoie-la", true)).toBe("Confirme la prévisualisation de relance");
+  expect(workPreviewFollowup("envoie-les", true)).toBe("Confirme la prévisualisation de relance");
+  expect(workPreviewFollowup("envoie tout", true)).toBe("Confirme la prévisualisation de relance");
+  expect(workPreviewFollowup("envoie les relances", true)).toBe("Confirme la prévisualisation de relance");
   expect(workPreviewFollowup("Non.", true)).toBe("Annule la prévisualisation de relance");
   expect(workPreviewFollowup("Oui", false)).toBeNull();
   expect(workPreviewFollowup("La météo demain", true)).toBeNull();

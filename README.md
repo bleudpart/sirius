@@ -710,8 +710,8 @@ des relances pour les factures suivies (dix premières factures affichées).
 déterministe depuis la facture et les coordonnées client relues. Une référence
 exacte de facture (numéro unique ou identifiant) est obligatoire : « cette
 facture » ne choisit pas silencieusement la seule facture du dossier. Une
-demande portant sur plusieurs factures ou comportant une condition supplémentaire
-demande une précision ; elle n'est pas réduite à une facture arbitraire.
+demande portant sur plusieurs références particulières ou comportant une condition
+non prise en charge demande une précision ; elle n'est pas réduite à une facture arbitraire.
 
 `POST /api/work-dossiers/{id}/draft-preview` expose la même préparation sans
 enregistrement et exige une source suivie et autorisée. Le contenu est produit
@@ -723,6 +723,43 @@ soldée bloque la préparation. La conversation ne crée aucun brouillon persist
 n'envoie aucun message et n'active aucune surveillance. Les préparations
 enregistrées et validations restent dans les formulaires du dossier. Un « oui »
 ne déclenche pas d'envoi depuis cette prévisualisation.
+
+#### Relances en lot, sans envoi
+
+« Prépare les relances de mes factures en retard de plus de 15 jours » prépare
+un lot sur les factures THÉMIS privées du **compte entier**, même si un dossier
+est affiché. Le bouton « Relances de mon compte · plus de 15 jours » utilise
+cette même commande. Un seuil entier de 0 à 3650 jours est accepté ; quinze
+jours est aussi reconnu en lettres. Les filtres par dossier/client, exceptions,
+dates relatives et demandes d'envoi ne sont pas exécutés implicitement.
+
+`POST /api/work-dossiers/invoice-followups/preview` expose ce lecteur authentifié
+avec `minimum_overdue_days` (15 par défaut) et `timezone` (`Europe/Paris` par
+défaut). L'échéance est comparée à la date du jour dans ce fuseau :
+**15 jours exactement sont exclus**, 16 jours sont inclus pour un seuil de 15.
+Les soldes sont ceux enregistrés dans THÉMIS, pas un rapprochement bancaire.
+Les factures soldées/refusées, encore en brouillon ou hors seuil sont ignorées ;
+un statut d'émission non reconnu bloque la préparation. Une échéance ou un
+montant invalide, un destinataire absent, une référence dupliquée ou une source
+devenue inaccessible bloque la préparation correspondante. Un destinataire
+renseigné reste à vérifier : cela ne certifie ni sa validité ni la délivrabilité.
+
+Le chat HTTP/SSE renvoie `work_batch` : portée, date, fuseau, seuil strict,
+compteurs `prepared`/`blocked`/`skipped`, résultats par source et empreinte/contenu
+pour les textes préparés. Le même générateur est utilisé pour le lot et le
+brouillon unitaire, à partir de la même capture autorisée pour le seuil et le
+texte. Aucune facture n'est modifiée, aucun brouillon métier enregistré, aucun
+message envoyé. L'historique de conversation et son contexte temporaire restent
+enregistrés comme pour les autres demandes de travail.
+
+La lecture examine au maximum 100 factures triées par identifiant, avec un
+indicateur `truncated` explicite si d'autres factures existent : un lot tronqué
+ne prétend pas couvrir tout le compte. Le texte détaille au maximum dix
+préparations/anomalies ; les autres restent dans le résultat structuré.
+Les incidents de stockage ne deviennent pas un lot vide réussi. Un « oui »,
+« envoie-la » ou « annule » après le lot reste non exécutant, y compris lorsque
+toutes les factures sont bloquées. Cette étape est une prévisualisation,
+pas encore un orchestrateur d'envoi ou de reprise persistante.
 
 Le choix produit est un futur mode hybride, avec autorité
 serveur et copie locale, mais cette étape n'effectue aucune migration et ne

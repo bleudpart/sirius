@@ -18,7 +18,7 @@ export function workPreviewFollowup(command, pending) {
   if (!pending) return null;
   const text = String(command || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .replace(/’/g, "'").toLowerCase().trim();
-  if (/^(?:oui(?:[, ]+je confirme)?|je confirme|confirme|vas-y|envoie(?:-la)?)[\s.!?]*$/.test(text)) {
+  if (/^(?:oui(?:[, ]+je confirme)?|je confirme|confirme|vas-y|envoie(?:-la|-les| tout| les relances)?)[\s.!?]*$/.test(text)) {
     return "Confirme la prévisualisation de relance";
   }
   if (/^(?:non|annule|laisse tomber)[\s.!?]*$/.test(text)) return "Annule la prévisualisation de relance";
