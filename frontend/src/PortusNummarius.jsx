@@ -6,6 +6,7 @@ import { speakAsCharacter } from "@/voice";
 import { API_BASE_URL } from "@/lib/api";
 import { personalMarketHeaders } from "@/apiKeyStorage";
 import NummariusAnalytics from "./NummariusAnalytics";
+import FinanceWorkspace from "./FinanceWorkspace";
 
 const API = API_BASE_URL;
 const RANGES = [["1s", "1 SEM"], ["1m", "1 MOIS"], ["3m", "3 MOIS"], ["max", "MAX"]];
@@ -39,6 +40,9 @@ export default function PortusNummarius({ onClose }) {
   const [alerts, setAlerts] = useState([]);
   const [alertType, setAlertType] = useState("price_above");
   const [alertThreshold, setAlertThreshold] = useState("");
+  const [pendingLegacy, setPendingLegacy] = useState(null);
+  const [legacyBusy, setLegacyBusy] = useState(false);
+  const legacyMutation = useRef(false);
   const triggeredRef = useRef(new Set());
 
   const loadMarket = async () => {
@@ -68,23 +72,30 @@ export default function PortusNummarius({ onClose }) {
     } catch (e) { setErr(e.message); }
   };
 
-  const addAlert = async () => {
-    if (!sel || !alertThreshold) return;
+  const addAlert = async (payload) => {
+    if (legacyMutation.current) return;
+    legacyMutation.current = true; setLegacyBusy(true);
     try {
-      const response = await fetch(`${API}/nummarius/alerts`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ asset_id: sel.id, alert_type: alertType, threshold: Number(alertThreshold) }) });
+      const response = await fetch(`${API}/nummarius/alerts`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || "Création impossible");
       setAlertThreshold("");
+      setPendingLegacy(null);
       await loadAlerts();
     } catch (e) { setErr(e.message); }
+    finally { legacyMutation.current = false; setLegacyBusy(false); }
   };
 
   const deleteAlert = async (id) => {
+    if (legacyMutation.current) return;
+    legacyMutation.current = true; setLegacyBusy(true);
     try {
       const response = await fetch(`${API}/nummarius/alerts/${id}`, { method: "DELETE", credentials: "include" });
       if (!response.ok) throw new Error("Suppression impossible");
       setAlerts((items) => items.filter((item) => item.id !== id));
+      setPendingLegacy(null);
     } catch (e) { setErr(e.message); }
+    finally { legacyMutation.current = false; setLegacyBusy(false); }
   };
 
   useEffect(() => { loadMarket(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -116,8 +127,9 @@ export default function PortusNummarius({ onClose }) {
       <nav className="numm-workspace-tabs" aria-label="Espace boursier">
         <button type="button" aria-pressed={workspace === "market"} onClick={() => setWorkspace("market")}>Marchés & alertes de prix</button>
         <button type="button" aria-pressed={workspace === "technical"} onClick={() => setWorkspace("technical")}>Analyse technique & comparateur</button>
+        <button type="button" aria-pressed={workspace === "finance"} onClick={() => setWorkspace("finance")}>Portefeuille & routines confirmées</button>
       </nav>
-      {workspace === "technical" ? <NummariusAnalytics /> : <div className="gcal-body numm-body">
+      {workspace === "finance" ? <FinanceWorkspace /> : workspace === "technical" ? <NummariusAnalytics /> : <div className="gcal-body numm-body">
         <aside className="numm-side">
           <img src="/holo/nummarius.jpg" alt="Portus Nummarius" className="numm-avatar" data-testid="nummarius-avatar" draggable={false} />
           <div className="numm-avatar-caption font-divine">GARDIEN DES MARCHÉS</div>
@@ -140,14 +152,23 @@ export default function PortusNummarius({ onClose }) {
           </div>
           <div className="numm-alerts" data-testid="nummarius-alerts">
             <div className="numm-chart-title"><Bell size={13} /> ALERTES</div>
+            <p>Anciennes alertes : évaluées uniquement à la consultation. Pour surveiller en arrière-plan les actions, utilisez « Portefeuille & routines confirmées ».</p>
             <div className="numm-alert-form">
               <select value={alertType} onChange={(e) => setAlertType(e.target.value)} aria-label="Type d'alerte">
                 <option value="price_above">Prix au-dessus</option><option value="price_below">Prix en-dessous</option><option value="variation">Variation % au-dessus</option>
               </select>
               <input type="number" min="0.01" step="0.01" value={alertThreshold} onChange={(e) => setAlertThreshold(e.target.value)} placeholder={alertType === "variation" ? "%" : "$"} aria-label="Seuil" />
-              <button className="file-btn" onClick={addAlert} disabled={!sel || !alertThreshold} title="Ajouter l'alerte"><Plus size={13} /></button>
+              <button className="file-btn" onClick={() => setPendingLegacy({ kind: "create", asset_id: sel.id, alert_type: alertType, threshold: Number(alertThreshold) })}
+                disabled={legacyBusy || !sel || !(Number(alertThreshold) > 0)} title="Ajouter l'alerte"><Plus size={13} /></button>
             </div>
-            {alerts.map((alert) => <div className={`numm-alert ${alert.triggered ? "triggered" : ""}`} key={alert.id}><span>{alert.asset_id} · {alert.alert_type === "variation" ? `${alert.threshold}%` : `${alert.threshold}$`}{alert.triggered ? " · DÉCLENCHÉE" : ""}</span><button className="file-btn" onClick={() => deleteAlert(alert.id)} title="Supprimer l'alerte"><Trash2 size={11} /></button></div>)}
+            {pendingLegacy && <div role="group" aria-label="Confirmer une ancienne alerte">
+              <p>{pendingLegacy.kind === "create" ? `Créer ${pendingLegacy.asset_id} · ${pendingLegacy.alert_type} · seuil ${pendingLegacy.threshold}` : `Supprimer l'alerte ${pendingLegacy.id}`} ?</p>
+              <button type="button" disabled={legacyBusy} onClick={() => pendingLegacy.kind === "create"
+                ? addAlert({ asset_id: pendingLegacy.asset_id, alert_type: pendingLegacy.alert_type, threshold: pendingLegacy.threshold })
+                : deleteAlert(pendingLegacy.id)}>Confirmer cette alerte</button>
+              <button type="button" disabled={legacyBusy} onClick={() => setPendingLegacy(null)}>Annuler cette alerte</button>
+            </div>}
+            {alerts.map((alert) => <div className={`numm-alert ${alert.triggered ? "triggered" : ""}`} key={alert.id}><span>{alert.asset_id} · {alert.alert_type === "variation" ? `${alert.threshold}%` : `${alert.threshold}$`}{alert.triggered ? " · DÉCLENCHÉE" : ""}</span><button className="file-btn" disabled={legacyBusy} onClick={() => setPendingLegacy({ kind: "delete", id: alert.id })} title="Supprimer l'alerte"><Trash2 size={11} /></button></div>)}
           </div>
         </aside>
         <section className="numm-main">

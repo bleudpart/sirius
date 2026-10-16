@@ -1,6 +1,18 @@
 import { isChronosCommand } from "./chronos";
 
+export function isFinanceConversationCommand(command) {
+  const text = String(command || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/’/g, "'").toLowerCase().trim();
+  if (/^(?:confirme finance|suivi financier|reprends analyse) [a-f0-9]{32}[.!? ]*$/.test(text)) return true;
+  const namedAsset = /\b(?:apple|microsoft|nvidia|tesla)\b/.test(text)
+    && /\b(?:analys\w*|compare|cours|action|bourse|alerte|surveille|previens|avertis|pourquoi|achete|vends|vaut|prix|dettes?|benefices?|dividendes?|resultats|rentable|capitalisation|fondamentaux)\b/.test(text);
+  const referencedAsset = /\b(?:compare|pourquoi|cours)\b.*\b(?:cette action|ces (?:trois )?actions)\b/.test(text);
+  return !/\b(?:ouvre|ouvrir|ferme|fermer)\b/.test(text)
+    && (/\b(?:portus|nummarius|portefeuille|financieres?|boursieres?|boursier|aapl|msft|nvda|tsla)\b/.test(text) || namedAsset || referencedAsset);
+}
+
 export function isWorkConversationCommand(command) {
+  if (isFinanceConversationCommand(command)) return true;
   const text = String(command || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .replace(/’/g, "'").toLowerCase().trim();
   if (/\b(?:liste|montre|affiche)\b.*\benregistrements\b.*\bbrouillons\b/.test(text)) return true;

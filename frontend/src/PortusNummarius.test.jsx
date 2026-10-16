@@ -34,6 +34,7 @@ test("market, history and alerts use the unlocked personal key in headers, and r
       expect(call[1]).toEqual({
         credentials: "include", headers: { "X-Sirius-Alphavantage-Key": "personal-market-test-key" },
       });
+
     }
     lockApiKeys();
     global.fetch.mockClear();
@@ -42,4 +43,31 @@ test("market, history and alerts use the unlocked personal key in headers, and r
   } finally {
     act(() => root.unmount()); setKeyAccount(""); global.fetch = originalFetch;
   }
+});
+
+test("legacy alert writes require a visible confirmation and double clicks do not duplicate a pending request", async () => {
+  const originalFetch = global.fetch;
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  let finish;
+  global.fetch = jest.fn((url, options) => options.method === "POST" ? new Promise((resolve) => { finish = resolve; })
+    : Promise.resolve({ ok: true, json: async () => String(url).includes("/history/")
+      ? { type: "stock", points: [] } : String(url).endsWith("/alerts") ? { alerts: [] }
+        : { assets: [{ id: "AAPL", label: "Apple", type: "stock", price: 100, change: 1 }], errors: [] } }));
+  try {
+    await act(async () => root.render(<PortusNummarius onClose={() => {}} />));
+    const input = container.querySelector('[aria-label="Seuil"]');
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, "200");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => container.querySelector('[title="Ajouter l\'alerte"]').click());
+    expect(global.fetch.mock.calls.filter(([, options]) => options.method === "POST")).toHaveLength(0);
+    const confirm = [...container.querySelectorAll("button")].find((item) => item.textContent === "Confirmer cette alerte");
+    expect(container.textContent).toContain("Créer AAPL");
+    await act(async () => { confirm.click(); confirm.click(); });
+    expect(global.fetch.mock.calls.filter(([, options]) => options.method === "POST")).toHaveLength(1);
+    expect(confirm.disabled).toBe(true);
+    await act(async () => finish({ ok: true, json: async () => ({ ok: true }) }));
+  } finally { act(() => root.unmount()); global.fetch = originalFetch; }
 });

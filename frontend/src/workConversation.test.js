@@ -1,4 +1,17 @@
-import { isOperationalCommand, isWorkConversationCommand, workPreviewFollowup } from "./workConversation";
+import { isFinanceConversationCommand, isOperationalCommand, isWorkConversationCommand, workPreviewFollowup } from "./workConversation";
+
+test.each(["Compare Apple et Microsoft sur cinq ans", "Quels sont les risques de mon portefeuille ?",
+  "Alerte-moi si AAPL dépasse 200 dollars", "Chaque matin à 9 h analyse AAPL",
+  "Confirme finance 1234567890abcdef1234567890abcdef", "Suivi financier 1234567890abcdef1234567890abcdef",
+  "Reprends analyse 1234567890abcdef1234567890abcdef",
+  "Pourquoi cette action a-t-elle baissé ?", "Montre mes alertes financières", "Quels dividendes pour Apple ?"])("raccorde la finance à la conversation sans raccourci local : %s", (text) => {
+  expect(isFinanceConversationCommand(text)).toBe(true);
+  expect(isOperationalCommand(text)).toBe(true);
+});
+
+test.each(["Ouvre Portus", "Connecte Microsoft", "Quelles actions dans ce dossier client", "Oui", "Supprime ce rendez-vous"])(
+  "ne détourne pas une autre commande en finance : %s", (text) => expect(isFinanceConversationCommand(text)).toBe(false),
+);
 
 test.each([
   "Qu'ai-je à traiter aujourd'hui ?", "Qu'est-ce que je dois traiter aujourd'hui ?",

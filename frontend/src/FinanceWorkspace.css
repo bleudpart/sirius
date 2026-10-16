@@ -1,0 +1,16 @@
+.finance-workspace { overflow-wrap: anywhere; }
+.finance-workspace fieldset { display: flex; flex-wrap: wrap; gap: 12px; min-width: 0; border: 1px solid #304957; border-radius: 10px; padding: 16px; margin: 18px 0; }
+.finance-workspace legend { color: #e2ca95; padding: 0 6px; }
+.finance-workspace fieldset > p, .finance-workspace fieldset > div { flex-basis: 100%; }
+.finance-workspace label { display: inline-flex; flex-direction: column; gap: 6px; max-width: 100%; margin: 6px; }
+.finance-workspace input, .finance-workspace textarea { max-width: 100%; background: #152b38; color: #e1edf4; border: 1px solid #43606f; border-radius: 8px; padding: 9px; font: inherit; }
+.finance-workspace textarea { width: 480px; min-height: 100px; }
+.finance-workspace svg { display: block; width: 100%; max-height: 220px; color: #8ee5d9; margin: 16px 0; }
+.finance-workspace li { margin: 10px 0; }
+.finance-workspace button { margin: 4px; }
+.finance-workspace button:disabled { opacity: .55; cursor: not-allowed; }
+.finance-workspace [role="group"] { border: 1px solid #e2ca95; border-radius: 10px; padding: 14px; margin: 16px 0; }
+@media (max-width: 600px) {
+  .finance-workspace fieldset { padding: 10px; }
+  .finance-workspace label { width: 100%; }
+}

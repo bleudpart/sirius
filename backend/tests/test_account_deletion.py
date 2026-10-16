@@ -91,6 +91,19 @@ def approved():
     return DeletionReview(confirm_user_id="client", external_review_complete=True, activity_stopped=True)
 
 
+def test_finalize_erases_financial_snapshots_approvals_schedules_and_notifications(reviewed_account):
+    from account_deletion import PERSONAL_COLLECTIONS
+    names = [name for name in PERSONAL_COLLECTIONS if name.startswith("sirius_finance_")]
+    assert len(names) == 9
+    for name in names:
+        for uid in ("client", "other"):
+            asyncio.run(reviewed_account[name].insert_one({"id": "private", "user_id": uid}))
+    assert asyncio.run(finalize_account_deletion(reviewed_account, user_id="client", review=approved()))["account_deleted"]
+    for name in names:
+        assert asyncio.run(reviewed_account[name].count_documents({"user_id": "client"})) == 0
+        assert asyncio.run(reviewed_account[name].count_documents({"user_id": "other"})) == 1
+
+
 def test_finalize_erases_chronos_events_actions_and_idempotency(reviewed_account, tmp_path):
     from chronos_store import ChronosStore
     store = ChronosStore(tmp_path / "chronos.sqlite3")

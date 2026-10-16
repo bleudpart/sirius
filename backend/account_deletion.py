@@ -21,6 +21,9 @@ PERSONAL_COLLECTIONS = (
     "agora_coach_history",     "nummarius_alerts", "chronos_actions",
     "sirius_work_contexts", "sirius_work_recordings",
     "sirius_ariane_runs", "sirius_ariane_steps", "sirius_ariane_events",
+    "sirius_finance_portfolios", "sirius_finance_previews", "sirius_finance_alerts", "sirius_finance_routines",
+    "sirius_finance_disabled", "sirius_finance_occurrences", "sirius_finance_attempts",
+    "sirius_finance_notifications", "sirius_finance_events",
 )
 REVIEW_COLLECTIONS = (
     "themis_docs", "themis_clients", "themis_items", "themis_stock_movements",

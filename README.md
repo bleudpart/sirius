@@ -724,12 +724,98 @@ de lecture ; les résultats d'étapes font foi même si la réponse ou l'écritu
 du dernier événement a été interrompue. Le journal affiché est limité aux cent
 derniers événements, avec indication de troncature.
 
-**Pas encore raccordés** : portefeuille réel/importé, création confirmée
-d'alertes techniques, tâches programmées/récurrentes CHRONOS, notifications,
-orchestration de mutations externes, conversation vocale financière et
-synchronisation hors ligne. Aucune confirmation d'ordre n'est proposée, car
-ce modèle ne sait pas passer d'ordre. Ajouter une action sensible exigera son
-propre aperçu et accord explicite ; un calcul réussi ne l'autorisera pas.
+Le portefeuille déclaré/importé, les surveillances confirmées, les routines
+financières CHRONOS et la conversation sont raccordés par le service décrit
+ci-dessous. Le parcours d'analyse de titres ci-dessus ne déduit toujours pas
+des positions personnelles. Pas de courtier, d'ordre, de notification push
+externe, de fondamentaux, d'actualités financières ni de synchronisation hors ligne.
+
+### Raccordements financiers : portefeuille, validations, CHRONOS et conversation
+
+Dans PORTUS, **Portefeuille & routines confirmées** permet de déclarer des
+positions manuelles ou d'importer un CSV. Catalogue initial : AAPL, MSFT,
+NVDA et TSLA, devise USD uniquement. Le CSV utilise exactement :
+
+```csv
+symbol,quantity,average_cost,currency
+AAPL,2,100,USD
+MSFT,1,200,USD
+```
+
+Quatre lignes distinctes maximum, quantités strictement positives, coûts moyens
+positifs ou nuls (frais inclus par l'utilisateur). Tout le fichier est rejeté
+en cas d'erreur ; pas d'import partiel. Un fichier contenant seulement l'en-tête
+prépare l'effacement des positions déclarées, jamais leur vente.
+
+L'import **remplace** les positions : aperçu complet `WAITING_CONFIRMATION`,
+puis accord explicite sur sa référence, valable trente minutes. Le portefeuille
+reste intact avant confirmation. Une révision concurrente invalide un ancien
+aperçu ; les réponses perdues se rejouent sans second remplacement.
+
+Les clôtures sont lues en parallèle et sourcées : valeur, gain latent et poids
+de chaque ligne. Une concentration supérieure à 35 % est signalée, sans conseil
+d'achat/vente. Si une source est absente, aucun total ni poids global n'est
+annoncé. La volatilité (20 rendements logarithmiques, écart-type échantillonnal,
+annualisation 252 séances) et le drawdown sont **théoriques**, calculés à quantités
+actuelles constantes sur les dates communes. Ce n'est pas la performance réelle
+des transactions passées. Pas de gains réalisés, secteurs, bêta, change ou
+dividendes réinvestis. L'export contient les positions et les résultats sourcés.
+
+Surveillances confirmées : clôture au-dessus/au-dessous d'un seuil en USD,
+variation journalière positive au-dessus d'un seuil en %, franchissement MM200
+à la hausse ou à la baisse sur les deux dernières séances. Les prix utilisent
+`>=` / `<=`, les croisements un passage strict de l'autre côté de la MM200.
+Les historiques insuffisants ou vieux de plus de sept jours bloquent l'évaluation.
+L'évaluation tourne environ toutes les quinze minutes **sur le serveur connecté
+allumé**, indépendamment de l'ouverture de PORTUS. Une notification maximum par
+règle et séance décrit valeur, condition, dates, source, version et paramètres.
+Il s'agit de notifications persistantes consultables dans PORTUS/CHRONOS, **pas
+de notifications push Windows/Android ni de courriels**. Les anciennes alertes
+de la vue Marchés restent séparées et évaluées à la consultation ; leurs
+écritures disposent désormais aussi d'un aperçu explicite dans l'interface.
+
+Dans CHRONOS et PORTUS, les routines financières choisissent explicitement les
+actions, une date initiale future, une période et un seuil de volatilité. Après
+confirmation, elles lancent ARIANE une fois, toutes les 24 h ou tous les 7 jours
+en **intervalles UTC fixes** : l'heure locale peut décaler au changement d'heure.
+Les heures initiales locales ambiguës/inexistantes sont refusées. Ce ne sont
+pas des événements récurrents de l'agenda et elles ne modifient pas les rendez-vous.
+Après coupure, seule la dernière échéance est exécutée, pas tout l'historique.
+Chaque échéance réutilise la même référence ARIANE en cas de reprise ; les
+étapes déjà réussies sont conservées. Au plus trois tentatives espacées d'au
+moins 90 s par échéance (ou fenêtre de surveillance), puis un résultat bloqué
+visible. Quatre configurations au maximum sont traitées en parallèle ; chaque
+parcours peut lire ses quatre actions en parallèle. Une suspension exige
+également un aperçu et une confirmation ; une lecture déjà commencée peut finir.
+
+La voix et le chat HTTP/SSE utilisent le même service, avant tout appel au
+modèle de langage :
+
+- « Compare Apple et Microsoft sur cinq ans. »
+- « Quels sont les risques de mon portefeuille ? »
+- « Alerte-moi si AAPL dépasse 200 dollars. »
+- « Surveille AAPL MM200 à la hausse. »
+- « Chaque matin à 9 h analyse AAPL et MSFT. »
+- « Tous les vendredis à 9 h analyse AAPL. »
+- « Confirme finance référence » / « Suivi financier référence » /
+  « Reprends analyse référence ».
+
+Les mutations ne partent pas sur un « oui » seul. Les tableaux de chiffres et
+les sources distinguent faits, calculs et interprétation ; graphiques et
+preuves détaillées restent consultables dans PORTUS/ARIANE. Sans symbole
+explicite, l'assistant demande une précision. Il n'invente pas de cause
+d'actualité, de comptes financiers ou de positions depuis une liste de suivi.
+
+API authentifiée : `GET /api/nummarius/portfolio`, `GET /api/nummarius/workspace`,
+`POST /api/nummarius/actions/preview` (`request_id` UUID, `action.kind` :
+`portfolio`, `alert`, `routine`, `disable`), `POST /api/nummarius/portfolio/csv/preview`
+(`request_id`, `text`), `GET /api/nummarius/actions/{id}`,
+`POST /api/nummarius/actions/{id}/confirm`, `GET /api/chronos/market-routines`.
+Les aperçus/configurations/révisions/tentatives/occurrences/notifications sont
+isolés par compte dans les collections `sirius_finance_*`, avec identités
+atomiques SQLite/Mongo. NÉMÉSIS affiche leurs cent derniers événements ; aucune
+mutation financière n'est disponible depuis sa vue de consultation. L'effacement
+de compte inclut toutes ces collections, après arrêt de son activité.
 
 ### PORTUS NUMMARIUS : premier espace d'analyse technique
 

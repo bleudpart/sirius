@@ -7,6 +7,7 @@ import { downloadWorkJson, emptyWorkData, loadWorkData, mergeWorkBackup, newWork
 import "./WorkModulesPanel.css";
 import ChronosAgenda from "./ChronosAgenda";
 import ArianeMarketRuns from "./ArianeMarketRuns";
+import FinanceWorkspace from "./FinanceWorkspace";
 
 const ICONS = { CalendarDays, FileText, FolderOpen, ScrollText, Tags, Workflow };
 const FIELDS = {
@@ -127,7 +128,7 @@ function WorkModulesWorkspace({ storageKey, initialModule, onClose, onOpenExisti
           {error && <p className="work-error" role="alert">{error}</p>}
           {loaded.error && <p className="work-error" role="alert">{loaded.error}</p>}
           {notice && <p className="work-notice" role="status">{notice}</p>}
-          {active === "planning" && <ChronosAgenda />}
+          {active === "planning" && <><ChronosAgenda /><FinanceWorkspace key={`${storageKey}-finance-routines`} routinesOnly /></>}
           <div className="work-backup">
             <p className="work-hint">{loaded.error ? "Stockage local indisponible" : "Cette sauvegarde concerne les listes manuelles et le journal local de cet appareil, pour le compte actuel. Aucune synchronisation automatique de ces listes."}</p>
             <button type="button" disabled={!!loaded.error} onClick={exportBackup}>Sauvegarder les six modules</button>
@@ -146,6 +147,7 @@ function WorkModulesWorkspace({ storageKey, initialModule, onClose, onOpenExisti
           </div>}
           <fieldset className="work-editable" disabled={!!loaded.error}>
           {(active === "workflows" || active === "audit") && <ArianeMarketRuns key={`${storageKey}-${active}`} auditOnly={active === "audit"} />}
+          {active === "audit" && <FinanceWorkspace key={`${storageKey}-finance-audit`} auditOnly />}
           {active === "audit" ? (
             <>
               <div className="work-section-head"><h2>Journal local</h2><button type="button" onClick={() => {

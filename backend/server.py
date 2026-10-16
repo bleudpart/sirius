@@ -208,13 +208,14 @@ async def _lifespan(_app):
     _vector_task = asyncio.create_task(_delayed_background_loop(6.0, _run_vector_warmup_loop_delayed))
     from sirius_brain import warm_cerebras_connection, close_cerebras_connections
     _connection_task = asyncio.create_task(warm_cerebras_connection())
+    finance_task = asyncio.create_task(finance_workspace.loop())
     # (Stockage 100% local — plus d'initialisation cloud à faire ici.)
     try:
         yield
     finally:
         # --- Arrêt ---
         tasks = []
-        for task in (_watch_task, _omega_task, _episodic_task, _vector_task, _connection_task):
+        for task in (_watch_task, _omega_task, _episodic_task, _vector_task, _connection_task, finance_task):
             if task:
                 task.cancel()
                 tasks.append(task)
@@ -407,10 +408,17 @@ class ResetRequest(BaseModel):
 from work_conversation import WorkConversation
 
 work_conversation = WorkConversation(db)
+from finance_workspace import FinanceWorkspace, make_finance_router
+from finance_conversation import FinanceConversation
+
+finance_workspace = FinanceWorkspace(db)
+finance_conversation = FinanceConversation(finance_workspace)
 
 
 async def _work_chat_response(req, user, request, session_id, history):
-    result = await work_conversation.handle(req, user, request)
+    result = await finance_conversation.handle(req, user)
+    if result is None:
+        result = await work_conversation.handle(req, user, request)
     if result is None:
         return None
     answer = result["answer"]
@@ -2252,6 +2260,7 @@ from nummarius_api import make_nummarius_router
 api_router.include_router(make_nummarius_router(db))
 from ariane_market_runs import make_ariane_market_router
 api_router.include_router(make_ariane_market_router(db, require_user))
+api_router.include_router(make_finance_router(finance_workspace, require_user))
 
 from themis_api import make_themis_router
 api_router.include_router(make_themis_router(db))
