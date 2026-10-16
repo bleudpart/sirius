@@ -53,7 +53,7 @@ import { streamConversation, requestConversation, requestAssistantIntent, reques
 import { newsBulletinScope } from "./newsCommandRouting";
 import { isResumeWorkCommand, isWorkBriefingCommand } from "./workBriefing";
 import { chronosConfirmation } from "./chronos";
-import { isOperationalCommand, isWorkConversationCommand } from "./workConversation";
+import { isOperationalCommand, isWorkConversationCommand, workPreviewFollowup } from "./workConversation";
 import { bulletinFollowUp, createBulletinContext, markSegmentCompleted, markSegmentStarted, releaseBulletinFocus } from "./bulletinDialogue";
 import { buildNewsBulletin, weatherBulletinText } from "./newsBulletin";
 import { fetchWeatherDirect } from "./weatherDirect";
@@ -584,8 +584,10 @@ function App() {
   // handleCommand est redéfini à chaque rendu : la référence évite que processCommand ne fige une version périmée.
   const handleCommandRef = useRef(null);
   const chronosConfirmationRef = useRef(null);
+  const workPreviewPendingRef = useRef(false);
   const workConversationContextRef = useRef({ work_context_clear: true });
   const updateWorkConversationContext = useCallback((dossierId, expiresAt, origin = "conversation") => {
+    workPreviewPendingRef.current = false;
     workConversationContextRef.current = dossierId
       ? { work_dossier_id: dossierId, origin, ...(expiresAt ? { expires_at: expiresAt } : {}) } : { work_context_clear: true };
   }, []);
@@ -1599,6 +1601,7 @@ function App() {
       if (workConversationContextRef.current !== contextAtRequest) return;
       if (data.work_context) updateWorkConversationContext(data.work_context.dossier_id, data.work_context.expires_at);
       if (data.work_context_cleared) updateWorkConversationContext(null);
+      workPreviewPendingRef.current = data.work_state === "PREPARED" && !!data.work_preview;
     };
     const payload = JSON.stringify({
       text: command,
@@ -4229,10 +4232,17 @@ function App() {
     const agendaReply = chronosConfirmation(command, chronosConfirmationRef.current);
     if (agendaReply) {
       chronosConfirmationRef.current = null;
+      workPreviewPendingRef.current = false;
       void resolveIntent(agendaReply);
       return;
     }
     chronosConfirmationRef.current = null;
+    const previewReply = workPreviewFollowup(command, workPreviewPendingRef.current);
+    workPreviewPendingRef.current = false;
+    if (previewReply) {
+      void resolveIntent(previewReply);
+      return;
+    }
     if (isOperationalCommand(command)) {
       releaseBulletinFocus(lastBulletinRef.current);
       void resolveIntent(command);

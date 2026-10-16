@@ -289,6 +289,29 @@ test("an unavailable work service is reported aloud without a local success fall
   expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/intent"))).toBe(false);
 });
 
+test("an invoice preview is shown and spoken as a preparation, never as an external action", async () => {
+  const answer = "Prévisualisation de relance FAC-42. Solde enregistré : 100.00 €. Brouillon temporaire non enregistré. Aucun message envoyé.";
+  mockConversationStream([
+    { type: "delta", text: answer },
+    { type: "done", answer, work_state: "PREPARED", persisted: false, executed: false,
+      work_preview: { source: { kind: "facture", id: "invoice-42" }, content: { to: "martin@example.test" } } },
+  ]);
+  await mount();
+  await send("Prépare la relance FAC-42");
+  for (let i = 0; i < 10; i += 1) await act(async () => jest.advanceTimersByTime(5000));
+  const streams = global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/chat/stream"));
+  expect(streams).toHaveLength(1);
+  expect(JSON.parse(streams[0][1].body).text).toBe("Prépare la relance FAC-42");
+  expect(speakSeries.mock.calls.map(([text]) => text).join(" ")).toContain("Aucun message envoyé");
+  expect(host.querySelector('[data-testid="sirius-display-body"]').textContent).toContain("Brouillon temporaire non enregistré");
+  expect(global.fetch.mock.calls.some(([url]) => /\/intent$|\/drafts$|\/send$|outlook.*execute/.test(String(url)))).toBe(false);
+  mockConversationStream([{ type: "done", answer: "Cette prévisualisation n'autorise aucun envoi.", work_state: "NOT_EXECUTED" }]);
+  await send("Oui, je confirme !");
+  const after = global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/chat/stream"));
+  expect(JSON.parse(after[1][1].body).text).toBe("Confirme la prévisualisation de relance");
+  expect(global.fetch.mock.calls.some(([url]) => /\/intent$|\/drafts$|\/send$|outlook.*execute/.test(String(url)))).toBe(false);
+});
+
 test("a dossier question opens the visible conversation and transfers its screen context", async () => {
   mockConversationStream([{ type: "done", answer: "Dossier vérifié.", work_context: {
     dossier_id: "server-dossier", expires_at: new Date(Date.now() + 1800000).toISOString(),

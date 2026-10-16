@@ -11,13 +11,14 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import HTTPException, Request
 
-from local_docstore import LocalDocStore
+from local_docstore import DatabaseRouter, LocalDocStore
 from work_briefing import work_briefing_text
 
 logger = logging.getLogger(__name__)
 Reader = Callable[..., Awaitable[dict]]
 CONTEXT_TTL = timedelta(minutes=30)
 READ_TIMEOUT = 12
+PREVIEW_REPLY = re.compile(r"^(?:oui(?:[, ]+je confirme)?|je confirme|confirme|vas-y|envoie(?:-la)?|non|annule|laisse tomber)[\s.!?]*$")
 
 
 def normalized(text: str) -> str:
@@ -29,10 +30,14 @@ def normalized(text: str) -> str:
 
 def work_intent(text: str) -> str | None:
     value = normalized(text)
+    if re.fullmatch(r"(?:confirme|annule) la previsualisation de relance[\s.!?]*", value):
+        return "preview_reply"
     if re.fullmatch(r"(?:oublie|efface) (?:le contexte de |le contexte du )?(?:ce dossier|dossier courant)[.!?]*", value):
         return "clear"
     if re.search(r"\b(?:ouvre|ouvrir|ferme|fermer)\b", value):
         return None
+    if re.search(r"\b(?:prepare|preparer)\s+(?:la|une)\s+relance\b", value):
+        return "dossier"
     if re.search(r"\b(?:ou en (?:est|sont)|resume|resumer|compare|comparer|fais le point|prepare|preparer|retrouve|rechercher|cherche|explique|pourquoi|envoie|envoyer|supprime|supprimer|cree|creer|transforme|surveille|planifie|relance)\b.*\b(?:dossiers?|clients?|factures?|devis|propositions?)\b", value):
         return "dossier"
     if re.search(r"\b(?:qu'est[- ]ce qui|ce qui|quels changements|montre les changements)\b.*\b(?:change|visite|dossier)\b", value):
@@ -108,6 +113,7 @@ class WorkConversation:
     def __init__(self, db):
         self.db = db
         self.readers: WorkReaders | None = None
+        self.preview_invoice: Reader | None = None
         self._indexes_ready = False
         self._index_lock = asyncio.Lock()
 
@@ -123,7 +129,9 @@ class WorkConversation:
                 self._indexes_ready = True
 
     async def _read(self, reader: Reader, *args, **kwargs) -> dict:
-        if isinstance(self.db, LocalDocStore):
+        if isinstance(self.db, LocalDocStore) or (
+            isinstance(self.db, DatabaseRouter) and self.db.backend_name == "sqlite"
+        ):
             def local_read():
                 return asyncio.run(reader(*args, **kwargs))
             return await asyncio.to_thread(local_read)
@@ -131,7 +139,8 @@ class WorkConversation:
 
     async def handle(self, req, user: dict, request: Request) -> dict | None:
         intent = work_intent(req.text)
-        if intent is None:
+        possible_reply = PREVIEW_REPLY.fullmatch(normalized(req.text))
+        if intent is None and not possible_reply:
             return None
         if self.readers is None:
             logger.error("Work conversation readers are not configured")
@@ -139,6 +148,14 @@ class WorkConversation:
         try:
             async with asyncio.timeout(READ_TIMEOUT):
                 await self._ensure_indexes()
+                if intent is None:
+                    pending = await self.db.sirius_work_contexts.find_one({
+                        "user_id": user["user_id"], "session_id": req.session_id or "default",
+                        "preview_pending": True, "expires_at": {"$gt": datetime.now(timezone.utc).isoformat()},
+                    })
+                    if not pending or (req.environment or {}).get("work_context_clear"):
+                        return None
+                    intent = "preview_reply"
                 return await self._answer(req, user, request, intent)
         except TimeoutError as exc:
             logger.warning("Work conversation authorized read timed out")
@@ -161,6 +178,21 @@ class WorkConversation:
             return {"answer": "Le contexte temporaire du dossier est effacé. Le dossier et ses données sont conservés.",
                     "state": "READ_ONLY", "executed": False, "verified_at": now.isoformat(), "work_context": None,
                     "work_context_cleared": True, "work_sources": [], "work_suggestions": []}
+        if intent == "preview_reply":
+            await self.db.sirius_work_contexts.update_one(
+                {"user_id": uid, "session_id": session},
+                {"$unset": {"preview_pending": ""}},
+            )
+            cancelled = bool(re.match(r"^(?:non|annule|laisse tomber)\b", normalized(req.text)))
+            return {
+                "answer": "Prévisualisation abandonnée. Aucun brouillon enregistré ni message envoyé."
+                if cancelled else "Cette prévisualisation n'autorise aucun envoi ni enregistrement. "
+                                 "Utilisez le parcours Brouillon du dossier pour relire et enregistrer une proposition. "
+                                 "Aucun message envoyé ; aucune action métier exécutée.",
+                "state": "READ_ONLY" if cancelled else "NOT_EXECUTED",
+                "executed": False, "persisted": False, "work_context": None,
+                "verified_at": now.isoformat(), "work_sources": [], "work_suggestions": [],
+            }
         zone_name = environment.get("timezone") or "Europe/Paris"
         try:
             today = now.astimezone(ZoneInfo(zone_name)).date()
@@ -240,8 +272,67 @@ class WorkConversation:
             if exc.status_code == 404:
                 await self.db.sirius_work_contexts.delete_many({"user_id": uid, "session_id": session})
             raise
+        context = {"dossier_id": selected_id, "title": thread["dossier"]["title"],
+                   "expires_at": (now + CONTEXT_TTL).isoformat()}
+        await self.db.sirius_work_contexts.update_one(
+            {"user_id": uid, "session_id": session},
+            {"$set": context, "$unset": {"preview_pending": ""}}, upsert=True,
+        )
+        base["work_context"] = context
         action_request = bool(re.search(r"\b(?:prepare|preparer|envoie|envoyer|supprime|supprimer|cree|creer|transforme|surveille|planifie|relance)\b", text))
-        if action_request:
+        prepare_followup = (
+            re.search(r"\b(?:prepare|preparer)\b", text) and re.search(r"\brelance\b", text)
+            and not re.search(r"\b(?:envoie|envoyer|supprime|supprimer|cree|creer|transforme|surveille|planifie)\b", text)
+        )
+        if prepare_followup:
+            candidates = [item for item in thread["sources"] if item["source"]["kind"] == "facture"]
+            named_invoices = [item for item in candidates if any(
+                re.search(r"\b(?:facture|reference|relance)\s+[«\"#]?"
+                          + re.escape(normalized(str(reference))) + r"(?!\w)", text)
+                for reference in (item["source"]["id"], item["data"].get("number")) if reference
+            )]
+            bulk_or_condition = re.search(
+                r"\b(?:tous|toutes|chaque|factures|jours?|semaines?|mois|si|sauf|uniquement|seulement|plus de|moins de|et|puis)\b", text,
+            )
+            if len(named_invoices) != 1 or bulk_or_condition:
+                labels = "; ".join(
+                    f"{item['data'].get('number') or 'sans numéro'} (référence {item['source']['id']})"
+                    for item in candidates[:10]
+                )
+                return {**base, "state": "NEEDS_CLARIFICATION",
+                        "answer": "Cette préparation traite une facture explicitement référencée, sans lot ni condition supplémentaire. "
+                                  "Précisez sa référence et retirez les conditions non prises en charge. Aucun brouillon enregistré ni envoyé."
+                                  + (f"\nFactures suivies accessibles : {labels}." if labels else "\nAucune facture suivie accessible dans ce dossier."),
+                        "work_suggestions": ["Où en est ce dossier ?"]}
+            if self.preview_invoice is None:
+                logger.error("Work invoice preview is not configured")
+                raise HTTPException(503, "La préparation de relance n'est pas configurée. Aucun brouillon enregistré ni envoyé.")
+            preview = await self._read(
+                self.preview_invoice, selected_id, named_invoices[0]["source"]["id"], request,
+            )
+            content = preview["content"]
+            missing_labels = {
+                "number": "numéro de facture", "due_date": "échéance",
+                "total_ttc": "montant total", "paid": "montant déjà réglé",
+                "recipient": "adresse du destinataire", "valid_due_date": "échéance valide",
+                "payment_evidence_not_available_in_source": "preuve de règlement récente non disponible dans la source",
+            }
+            missing = ", ".join(missing_labels.get(key, key) for key in content["missing_info"])
+            answer = (
+                f"Prévisualisation de relance — dossier « {thread['dossier']['title']} ».\n"
+                f"Facture : {preview['source']['id']}. Solde enregistré : {content['remaining']:.2f} €.\n"
+                f"Destinataire à vérifier : {content['to'] or 'non renseigné — envoi impossible sans adresse vérifiée'}.\n"
+                f"Objet : {content['subject']}\n\n{content['message']}\n\n"
+                f"À vérifier : {missing}.\n"
+                "Brouillon temporaire non enregistré. Aucun message envoyé. "
+                "Relisez les paiements récents, le destinataire et le texte avant d'utiliser le parcours Brouillon du dossier ; "
+                "la validation dans le dossier n'effectue pas d'envoi."
+            )
+            base.update(state="PREPARED", work_preview=preview, persisted=False)
+            await self.db.sirius_work_contexts.update_one(
+                {"user_id": uid, "session_id": session}, {"$set": {"preview_pending": True}},
+            )
+        elif action_request:
             answer = (
                 f"Dossier identifié : « {thread['dossier']['title']} ». "
                 "Cette première interface conversationnelle peut lire le dossier et ses sources, mais pas encore exécuter ce parcours. "
@@ -260,13 +351,6 @@ class WorkConversation:
                 answer += "\nAucune proposition disponible à expliquer."
         if "dernier devis" in text or "ce devis" in text or "ce client" in text or "cette facture" in text:
             answer += "\nLa sélection du dossier ne désigne pas à elle seule un client, une facture ou un devis : précisez la référence exacte avant une action."
-        context = {"dossier_id": selected_id, "title": thread["dossier"]["title"],
-                   "expires_at": (now + CONTEXT_TTL).isoformat()}
-        await self.db.sirius_work_contexts.update_one(
-            {"user_id": uid, "session_id": session},
-            {"$set": context},
-            upsert=True,
-        )
         return {
             **base, "answer": answer, "work_context": context,
             "work_sources": [item["source"] for item in thread["sources"]],

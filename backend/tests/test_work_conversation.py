@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 import server
 import work_conversation as conversation_module
-from local_docstore import LocalDocStore
+from local_docstore import DatabaseRouter, LocalDocStore
 from routes.work_dossiers import make_work_dossiers_router
 from work_conversation import WorkConversation, WorkReaders, work_intent
 
@@ -75,6 +75,7 @@ def ask(client, text, *, uid="u1", session="main", environment=None, endpoint="/
     "Compare les dossiers Martin et Dupont", "Résume mes dossiers",
     "Qu'est-ce qui a changé depuis ma dernière visite ?",
     "Envoie la facture du dossier Martin", "Surveille le dossier Martin",
+    "Prépare la relance FAC-42",
 ])
 def test_work_routing(text):
     assert work_intent(text)
@@ -154,12 +155,150 @@ def test_longer_title_and_sensitive_requests_are_not_fake_success(harness):
     chat, work, db, _ = harness
     dossier(work, "Martin")
     did = dossier(work, "Martin chantier")
-    result = ask(chat, "Prépare la relance pour le dossier Martin chantier")
+    result = ask(chat, "Envoie la relance pour le dossier Martin chantier")
     assert result["work_context"]["dossier_id"] == did
     assert result["work_state"] == "NOT_EXECUTED"
     assert "aucune surveillance activée" in result["answer"]
     assert run(db.sirius_work_entries.count_documents({})) == 0
     assert "référence exacte" in ask(chat, "Retrouve le dernier devis de ce client")["answer"]
+
+
+def seed_invoice(db, did, *, source_id="invoice-42", number="FAC-42", uid="u1"):
+    run(db.themis_clients.insert_one({"id": f"client-{source_id}", "user_id": uid,
+                                     "name": "Martin", "email": "martin@example.test"}))
+    run(db.themis_docs.insert_one({
+        "id": source_id, "kind": "facture", "user_id": uid, "number": number,
+        "client_id": f"client-{source_id}", "client_name": "Martin", "total_ttc": 120,
+        "paid": 20, "due_date": "2026-10-01", "status": "envoyé",
+    }))
+    run(db.sirius_work_dossiers.update_one({"id": did}, {
+        "$addToSet": {"sources": {"kind": "facture", "id": source_id, "module": "themis"}},
+    }))
+
+
+@pytest.mark.parametrize("endpoint", ["/api/chat", "/api/chat/stream"])
+def test_invoice_preview_is_real_shared_and_never_persisted_or_sent(harness, endpoint):
+    chat, work, db, _ = harness
+    did = dossier(work)
+    seed_invoice(db, did)
+    before = run(db.themis_docs.find_one({"id": "invoice-42"}))
+    result = ask(chat, "Prépare la relance de la facture FAC-42 du dossier Client Martin", endpoint=endpoint)
+    assert result["work_state"] == "PREPARED"
+    assert result["persisted"] is False
+    assert result["executed"] is False
+    preview = result["work_preview"]
+    assert preview["source"] == {"kind": "facture", "id": "invoice-42", "module": "themis"}
+    assert preview["content"]["remaining"] == 100
+    assert preview["content"]["to"] == "martin@example.test"
+    assert "100.00" in preview["content"]["message"]
+    assert "Brouillon temporaire non enregistré" in result["answer"]
+    assert "preuve de règlement récente" in result["answer"]
+    assert preview["fingerprint"]
+    manual = work.post(f"/api/work-dossiers/{did}/draft-preview", headers={"x-test-user": "u1"},
+                       json={"source": {"kind": "facture", "id": "invoice-42"}})
+    assert manual.status_code == 200
+    assert manual.json()["content"] == preview["content"]
+    assert manual.json()["fingerprint"] == preview["fingerprint"]
+    assert run(db.sirius_work_entries.count_documents({})) == 0
+    assert run(db.themis_docs.find_one({"id": "invoice-42"})) == before
+    # Existing manual saving uses the same builder, not a second implementation.
+    saved = work.post(f"/api/work-dossiers/{did}/drafts", headers={"x-test-user": "u1"},
+                      json={"source": {"kind": "facture", "id": "invoice-42"}})
+    assert saved.status_code == 201
+    assert saved.json()["entry"]["content"] == preview["content"]
+
+
+def test_invoice_reference_is_required_and_remains_contextual(harness):
+    chat, work, db, _ = harness
+    did = dossier(work)
+    seed_invoice(db, did)
+    for text in (
+        "Prépare la relance de cette facture du dossier Client Martin",
+        "Prépare la relance FAC-INCONNUE",
+        "Prépare la relance de toutes les factures",
+        "Prépare la relance FAC-42 si elle a plus de 15 jours de retard",
+    ):
+        result = ask(chat, text)
+        assert result["work_state"] == "NEEDS_CLARIFICATION"
+        assert result["work_context"]["dossier_id"] == did
+        assert "work_preview" not in result
+    assert ask(chat, "Prépare la relance FAC-42")["work_state"] == "PREPARED"
+    assert run(db.sirius_work_entries.count_documents({})) == 0
+    seed_invoice(db, did, source_id="second", number="FAC-43")
+    assert ask(chat, "Prépare la relance FAC-42 et FAC-43")["work_state"] == "NEEDS_CLARIFICATION"
+
+
+def test_dossier_title_is_not_used_as_an_invoice_reference(harness):
+    chat, work, db, _ = harness
+    did = dossier(work, "FAC-42")
+    seed_invoice(db, did)
+    result = ask(chat, "Prépare la relance pour le dossier FAC-42")
+    assert result["work_state"] == "NEEDS_CLARIFICATION"
+    assert "work_preview" not in result
+
+
+def test_invoice_preview_rechecks_recipient_payment_and_permissions(harness):
+    chat, work, db, _ = harness
+    did = dossier(work)
+    seed_invoice(db, did)
+    ask(chat, "Résume le dossier Client Martin")
+    run(db.themis_clients.update_one({"id": "client-invoice-42"}, {"$set": {"email": "nouveau@example.test"}}))
+    assert ask(chat, "Prépare la relance FAC-42")["work_preview"]["content"]["to"] == "nouveau@example.test"
+    run(db.themis_clients.update_one({"id": "client-invoice-42"}, {"$set": {"user_id": "u2"}}))
+    missing = ask(chat, "Prépare la relance FAC-42")
+    assert not missing["work_preview"]["content"]["to"]
+    assert "adresse du destinataire" in missing["answer"]
+    assert "nouveau@example.test" not in missing["answer"]
+    run(db.themis_docs.update_one({"id": "invoice-42"}, {"$set": {"paid": 120}}))
+    response = chat.post("/api/chat", headers={"x-test-user": "u1"}, json={
+        "text": "Prépare la relance FAC-42", "session_id": "main",
+    })
+    assert response.status_code == 409
+    run(db.themis_docs.update_one({"id": "invoice-42"}, {"$set": {"user_id": "u2"}}))
+    result = ask(chat, "Prépare la relance FAC-42")
+    assert result["work_state"] == "NEEDS_CLARIFICATION"
+    assert "martin@example.test" not in result["answer"]
+    assert run(db.sirius_work_entries.count_documents({})) == 0
+
+
+def test_invoice_preview_denies_unlinked_and_foreign_sources(harness):
+    _, work, db, _ = harness
+    did = dossier(work)
+    foreign = dossier(work, uid="u2")
+    seed_invoice(db, foreign, uid="u2")
+    path = f"/api/work-dossiers/{did}/draft-preview"
+    body = {"source": {"kind": "facture", "id": "invoice-42"}}
+    assert work.post(path, headers={"x-test-user": "u1"}, json=body).status_code == 404
+    assert work.post(path, headers={"x-test-user": "u2"}, json=body).status_code == 404
+    assert work.post(path, json=body).status_code == 401
+    run(db.sirius_work_dossiers.update_one({"id": did}, {"$set": {"sources": [body["source"]]}}))
+    assert work.post(path, headers={"x-test-user": "u1"}, json=body).status_code == 404
+
+
+def test_invoice_send_is_not_executed_even_after_preview(harness):
+    chat, work, db, _ = harness
+    did = dossier(work)
+    seed_invoice(db, did)
+    ask(chat, "Prépare la relance FAC-42 du dossier Client Martin")
+    result = ask(chat, "Prépare et envoie la relance de la facture FAC-42")
+    assert result["work_state"] == "NOT_EXECUTED"
+    assert "work_preview" not in result
+    assert run(db.sirius_work_entries.count_documents({})) == 0
+
+
+@pytest.mark.parametrize("reply", ["Oui, je confirme !", "Envoie-la", "Annule", "Non."])
+def test_short_preview_followups_never_call_ai_or_send(harness, reply):
+    chat, work, db, _ = harness
+    did = dossier(work)
+    seed_invoice(db, did)
+    ask(chat, "Prépare la relance FAC-42 du dossier Client Martin")
+    result = ask(chat, reply)
+    assert result["work_state"] in ("READ_ONLY", "NOT_EXECUTED")
+    assert result["executed"] is False
+    assert "work_preview" not in result
+    assert run(db.sirius_work_entries.count_documents({})) == 0
+    saved = run(db.sirius_work_contexts.find_one({"user_id": "u1", "session_id": "main"}))
+    assert not saved.get("preview_pending")
 
 
 def test_revoked_sources_are_not_disclosed(harness):
@@ -198,6 +337,7 @@ def test_blocking_sqlite_reader_does_not_prevent_timeout_or_save_late_context(ha
     chat, work, db, service = harness
     did = dossier(work)
     original = service.readers
+    service.db = DatabaseRouter(db)
 
     async def blocking_thread(*args, **kwargs):
         time.sleep(0.1)

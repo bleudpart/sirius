@@ -155,9 +155,12 @@ test("contextual work conversation uses the displayed dossier and clears it on c
     expect(onAsk).toHaveBeenLastCalledWith("Qu'ai-je à traiter aujourd'hui ?");
     await view.click("Pourquoi ces propositions ?");
     expect(onAsk).toHaveBeenLastCalledWith("Pourquoi ces propositions pour ce dossier ?");
+    await view.click("Prévisualiser la relance : FAC-1");
+    expect(onAsk).toHaveBeenLastCalledWith("Prépare la relance de la facture invoice-1");
     expect(view.writes).toEqual([]);
     await view.click("Chantier · Chantier");
     expect(onConversationContext).toHaveBeenLastCalledWith("d2");
+    expect(view.button("Prévisualiser la relance : FAC-1")).toBeUndefined();
   } finally {
     view.cleanup();
   }

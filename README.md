@@ -681,7 +681,7 @@ Guide détaillé : [INSTALL-SIRIUS.md](./INSTALL-SIRIUS.md)
 
 Pour le déploiement en petite entreprise : [GUIDE-ENTREPRISE.md](./GUIDE-ENTREPRISE.md)
 
-### Conversation de travail : premier socle en lecture
+### Conversation de travail : lectures et prévisualisation de relance
 
 Les routes chat HTTP et SSE reconnaissent directement les demandes courantes
 « Qu'ai-je à traiter aujourd'hui ? », « Liste mes dossiers », « Où en est le
@@ -704,10 +704,27 @@ Un client, une facture ou un devis ne sont pas choisis implicitement à partir
 du seul dossier.
 
 Le panneau des dossiers propose les boutons « Mes priorités », « Résumer ce
-dossier » et « Pourquoi ces propositions ? ». Cette première étape reste en
-lecture : elle ne crée pas de brouillon, n'envoie pas de message et n'active pas
-de surveillance. Les préparations et validations existantes restent disponibles
-dans les formulaires. Le choix produit est un futur mode hybride, avec autorité
+dossier » et « Pourquoi ces propositions ? », ainsi que la prévisualisation
+des relances pour les factures suivies (dix premières factures affichées).
+« Prépare la relance de la facture FAC-42 du dossier Martin » produit un texte
+déterministe depuis la facture et les coordonnées client relues. Une référence
+exacte de facture (numéro unique ou identifiant) est obligatoire : « cette
+facture » ne choisit pas silencieusement la seule facture du dossier. Une
+demande portant sur plusieurs factures ou comportant une condition supplémentaire
+demande une précision ; elle n'est pas réduite à une facture arbitraire.
+
+`POST /api/work-dossiers/{id}/draft-preview` expose la même préparation sans
+enregistrement et exige une source suivie et autorisée. Le contenu est produit
+par le même générateur que le formulaire existant d'enregistrement de brouillon.
+Le chat renvoie `work_state=PREPARED`, `persisted=false`, `executed=false` et
+`work_preview` avec source, empreinte, date de vérification et contenu. Les
+paiements récents et le destinataire restent à vérifier ; une facture déjà
+soldée bloque la préparation. La conversation ne crée aucun brouillon persistant,
+n'envoie aucun message et n'active aucune surveillance. Les préparations
+enregistrées et validations restent dans les formulaires du dossier. Un « oui »
+ne déclenche pas d'envoi depuis cette prévisualisation.
+
+Le choix produit est un futur mode hybride, avec autorité
 serveur et copie locale, mais cette étape n'effectue aucune migration et ne
 fournit pas encore de synchronisation métier hors ligne ni d'orchestrateur
 ARIANE général.

@@ -855,12 +855,19 @@ export default function WorkDossiersPanel({ onClose, onOpenThemis, onOpenHaccp, 
         {onAsk && <section className="work-dossiers-day" aria-label="Conversation de travail">
           <h2>À traiter avec ΣIRIUS · conversation</h2>
           <p>{selected ? `Dossier affiché : ${selected.title}. Les questions sur « ce dossier » utilisent cette sélection ; les droits et les sources sont revérifiés.` : "Choisissez un dossier pour les questions contextuelles."}</p>
-          <p>Lecture directe, sans appel IA externe. Les préparations restent dans les parcours de validation ci-dessous.</p>
+          <p>Lecture et prévisualisation de relance, sans appel IA externe. Aucun brouillon enregistré ni envoyé depuis cette conversation.</p>
           <div className="work-dossiers-actions">
             <button type="button" onClick={() => onAsk("Qu'ai-je à traiter aujourd'hui ?")}>Mes priorités</button>
             <button type="button" disabled={!selected} onClick={() => onAsk("Où en est ce dossier ?")}>Résumer ce dossier</button>
             <button type="button" disabled={!selected} onClick={() => onAsk("Pourquoi ces propositions pour ce dossier ?")}>Pourquoi ces propositions ?</button>
           </div>
+          {dailyThread?.dossier?.id === selectedId && <div className="work-dossiers-actions">
+            {dailyThread.sources.filter((item) => item.source.kind === "facture").slice(0, 10).map((item) =>
+              <button key={sourceKey(item.source)} type="button" disabled={busy || !!review}
+                onClick={() => onAsk(`Prépare la relance de la facture ${item.source.id}`)}>
+                Prévisualiser la relance : {sourceLabel(item)}
+              </button>)}
+          </div>}
         </section>}
         {error && <p role="alert" className="work-dossiers-error">{error}</p>}
         {review && <section ref={reviewRef} tabIndex={-1} className="work-dossiers-review" aria-label="Validation avant enregistrement">

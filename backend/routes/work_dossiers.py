@@ -1059,10 +1059,7 @@ def make_work_dossiers_router(db, require_user, *, conversation=None):
             [_source_ref(source) for source in body.sources],
         )}
 
-    @router.post("/{dossier_id}/drafts", status_code=201)
-    async def create_draft(dossier_id: str, body: DraftIn, request: Request):
-        uid, scope, _ = await context(request)
-        await dossier_for(dossier_id, uid)
+    async def draft_content(body: DraftIn, uid, scope):
         source = _source_ref(body.source)
         snapshot = await required_capture(source, uid, scope)
         data = snapshot["data"]
@@ -1116,6 +1113,28 @@ def make_work_dossiers_router(db, require_user, *, conversation=None):
                 "action_corrective": "",
                 "checks": ["Effectuer le contrôle réel et renseigner le résultat dans HACCP."],
             }
+        return snapshot, content
+
+    @router.post("/{dossier_id}/draft-preview")
+    async def draft_preview(dossier_id: str, body: DraftIn, request: Request):
+        uid, scope, _ = await context(request)
+        dossier = await dossier_for(dossier_id, uid)
+        if not any(item["kind"] == body.source.kind and item["id"] == body.source.id
+                   for item in dossier.get("sources", [])):
+            raise HTTPException(404, "Cette source n'est pas suivie dans ce dossier.")
+        snapshot, content = await draft_content(body, uid, scope)
+        return {
+            "dossier_id": dossier_id, "source": snapshot["source"],
+            "fingerprint": snapshot["fingerprint"], "content": content,
+            "verified_at": _now(), "persisted": False, "executed": False,
+            "confirmation_required": True, "execution": "manual_only",
+        }
+
+    @router.post("/{dossier_id}/drafts", status_code=201)
+    async def create_draft(dossier_id: str, body: DraftIn, request: Request):
+        uid, scope, _ = await context(request)
+        await dossier_for(dossier_id, uid)
+        snapshot, content = await draft_content(body, uid, scope)
         entry = await save_entry(dossier_id, uid, scope, "draft", content, snapshots=[snapshot])
         return {"entry": entry}
 
@@ -1501,4 +1520,11 @@ def make_work_dossiers_router(db, require_user, *, conversation=None):
     if conversation is not None:
         from work_conversation import WorkReaders
         conversation.readers = WorkReaders(day_view, list_dossiers, thread, review_queue)
+
+        async def preview_invoice(dossier_id, source_id, request):
+            return await draft_preview(
+                dossier_id, DraftIn(source=SourceIn(kind="facture", id=source_id)), request,
+            )
+
+        conversation.preview_invoice = preview_invoice
     return router
