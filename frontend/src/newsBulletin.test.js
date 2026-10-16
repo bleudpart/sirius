@@ -104,3 +104,16 @@ test("invalid briefing payloads are rejected rather than read", () => {
   expect(() => buildNewsBulletin({ scope: "france", sections: [{ id: "monde", label: "International", articles: [] }], now: NOW })).toThrow();
   expect(() => buildNewsBulletin({ scope: "all", sections: [{ id: "france", label: "France", articles: "x" }], now: NOW })).toThrow();
 });
+
+test("the general bulletin includes international stock market news and its source links", () => {
+  const all = [...sections(), { id: "bourse", label: "Bourse internationale", status: "ok",
+    articles: [article("Wall Street en hausse", 3600000, {
+      source: "Journal financier", url: "https://news.google.com/rss/articles/example",
+    })] }];
+  const bulletin = buildNewsBulletin({ sections: all, now: NOW });
+  expect(bulletin.spokenText).toContain("Bourse internationale : Wall Street en hausse.");
+  expect(bulletin.spokenText).toContain("Source : Journal financier.");
+  expect(bulletin.displayText).toContain("https://news.google.com/rss/articles/example");
+  expect(buildNewsBulletin({ scope: "france", sections: all, now: NOW }).spokenText)
+    .not.toContain("Bourse internationale");
+});

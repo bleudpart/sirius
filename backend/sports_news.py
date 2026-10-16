@@ -17,7 +17,11 @@ SPORTS_FEED_URL = "https://www.franceinfo.fr/sports.rss"
 _cache = {"t": 0.0, "articles": []}
 
 
-def parse_news_feed(content: bytes, now: datetime, source: str, max_age_hours=None) -> list[dict]:
+def parse_news_feed(
+    content: bytes, now: datetime, source: str, max_age_hours=None, *,
+    allowed_hosts: tuple[str, ...] = ("www.franceinfo.fr", "www.francetvinfo.fr"),
+    use_item_source: bool = False,
+) -> list[dict]:
     if len(content) > 2 * 1024 * 1024 or b"<!DOCTYPE" in content.upper() or b"<!ENTITY" in content.upper():
         raise ValueError("Invalid sports RSS payload")
     try:
@@ -44,13 +48,21 @@ def parse_news_feed(content: bytes, now: datetime, source: str, max_age_hours=No
         if max_age_hours is not None and (now - published).total_seconds() > max_age_hours * 3600:
             continue
         parsed_url = urlparse(url)
-        if not title or parsed_url.scheme != "https" or parsed_url.hostname not in {"www.franceinfo.fr", "www.francetvinfo.fr"}:
+        if not title or parsed_url.scheme != "https" or parsed_url.hostname not in allowed_hosts:
             continue
         if url in seen:
             continue
         seen.add(url)
         description = " ".join(unescape(re.sub(r"<[^>]*>", " ", item.findtext("description") or "")).split())
-        articles.append({"titre": title, "source": source, "url": url, "date": published.isoformat(),
+        publisher = " ".join((item.findtext("source") or "").split()) if use_item_source else ""
+        if publisher:
+            title = title.removesuffix(f" - {publisher}")
+            if title.casefold() in seen:
+                continue
+            seen.add(title.casefold())
+            if description == f"{title} {publisher}":
+                description = ""
+        articles.append({"titre": title, "source": publisher or source, "url": url, "date": published.isoformat(),
                          "description": description[:300]})
     return sorted(articles, key=lambda article: datetime.fromisoformat(article["date"]), reverse=True)
 

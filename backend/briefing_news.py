@@ -4,6 +4,7 @@ import asyncio
 import logging
 import time
 from datetime import datetime, timezone
+from urllib.parse import urlencode
 
 import httpx
 
@@ -15,12 +16,17 @@ NEWS_SECTIONS = (
     ("monde", "International", "monde"),
     ("politique", "Politique", "politique"),
     ("economie", "Économie", "economie"),
+    ("bourse", "Bourse internationale", "bourse"),
     ("sport", "Sport", "sports"),
     ("sante", "Santé", "sante"),
     ("sciences", "Sciences et technologies", "sciences"),
     ("environnement", "Environnement", "monde/environnement"),
     ("culture", "Culture", "culture"),
 )
+MARKET_NEWS_URL = "https://news.google.com/rss/search?" + urlencode({
+    "q": '(bourse OR "marchés boursiers") ("Wall Street" OR Nasdaq OR "S&P 500" OR Nikkei OR "Hang Seng" OR "Euro Stoxx") when:2d',
+    "hl": "fr", "gl": "FR", "ceid": "FR:fr",
+})
 _cache = {"t": 0.0, "date": "", "sections": []}
 _lock = asyncio.Lock()
 
@@ -33,10 +39,16 @@ async def fetch_briefing_news() -> dict:
             return {"sections": _cache["sections"]}
         async with httpx.AsyncClient(timeout=8, follow_redirects=True) as client:
             async def fetch_section(section_id, label, path):
+                market = section_id == "bourse"
                 try:
-                    response = await client.get(f"https://www.franceinfo.fr/{path}.rss")
+                    response = await client.get(MARKET_NEWS_URL if market else f"https://www.franceinfo.fr/{path}.rss")
                     response.raise_for_status()
-                    articles = parse_news_feed(response.content, now, "Franceinfo", max_age_hours=48)[:2]
+                    articles = (
+                        parse_news_feed(
+                            response.content, now, "Google Actualités", max_age_hours=48,
+                            allowed_hosts=("news.google.com",), use_item_source=True,
+                        ) if market else parse_news_feed(response.content, now, "Franceinfo", max_age_hours=48)
+                    )[:2]
                 except (httpx.HTTPError, ValueError) as error:
                     logger.warning("[BRIEFING NEWS] %s unavailable (%s)", section_id, type(error).__name__)
                     return {"id": section_id, "label": label, "status": "unavailable", "articles": []}

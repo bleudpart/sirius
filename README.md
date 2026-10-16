@@ -171,9 +171,14 @@ par compte/adresse email ; une reprise après résiliation démarre à 32 EUR.
 d'activation initiale : passer à 15 jours prolonge également les essais existants
 jusqu'à cette nouvelle échéance, sans remettre leur compteur à zéro.
 
-Le briefing ORACLE récupère sans clé API neuf rubriques RSS Franceinfo : France,
-international, politique, économie, sport, santé, sciences et technologies,
-environnement et culture. Les publications datées des dernières 48 heures sont
+Le briefing ORACLE récupère sans clé API dix rubriques : France,
+international, politique, économie, bourse internationale, sport, santé, sciences
+et technologies, environnement et culture. Neuf utilisent les RSS Franceinfo ;
+la bourse internationale utilise une recherche RSS Google Actualités sur les marchés
+américains, européens et asiatiques (Wall Street, Nasdaq, S&P 500, Euro Stoxx,
+Nikkei et Hang Seng), avec le nom du média et son lien via Google Actualités.
+Il s'agit d'actualités boursières, pas de cotations en temps réel ni d'une couverture
+exhaustive des places financières. Les publications datées des dernières 48 heures sont
 présentées avec source et lien dans l'interface ; un flux indisponible est signalé,
 pas remplacé par une actualité inventée. La rédaction vocale vise un journal original
 de 650 à 750 mots (environ 5 minutes selon le débit), sans remplissage si les données

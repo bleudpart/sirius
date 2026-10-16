@@ -56,7 +56,7 @@ def test_briefing_enrichment_uses_the_dedicated_prompt(monkeypatch):
     assert captured["max_tokens"] == 2600
     for section in ("MÉTÉO", "MARCHÉS ET CRYPTO", "ACTUALITÉS", "CIEL", "VOTRE JOURNÉE", "SYNTHÈSE"):
         assert section in sirius_brain.BRIEFING_PROMPT
-    for section in ("France", "International", "Politique", "Économie", "Sport", "Santé",
+    for section in ("France", "International", "Politique", "Économie", "Bourse internationale", "Sport", "Santé",
                     "Sciences et technologies", "Environnement", "Culture"):
         assert section in sirius_brain.BRIEFING_PROMPT
     assert "650 à 750 mots" in sirius_brain.BRIEFING_PROMPT
