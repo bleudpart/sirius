@@ -170,10 +170,10 @@ export default function KeraunosPanel({ onClose }) {
       <div className="kr-bar">
         <Home size={14} />
         <span className="kr-title" data-module-name="KERAUNOS">KERAUNOS <span className="module-function">— DOMOTIQUE</span></span>
-        {config?.configured && !showConfig && <span className="kr-count" data-testid="keraunos-count">{nbOn} actif{nbOn > 1 ? "s" : ""} / {entities.length}</span>}
-        {config?.configured && (
+        {config?.configured && <div className="sirius-window-tools" role="group" aria-label="Options de domotique">
+          {!showConfig && <span className="kr-count" data-testid="keraunos-count">{nbOn} actif{nbOn > 1 ? "s" : ""} / {entities.length}</span>}
           <button className="kr-icon-btn" onClick={() => setShowConfig((s) => !s)} title="Configuration" data-testid="keraunos-settings-btn"><Settings2 size={13} /></button>
-        )}
+        </div>}
         <button className="kr-icon-btn" onClick={onClose} data-testid="keraunos-close-btn"><X size={14} /></button>
       </div>
 

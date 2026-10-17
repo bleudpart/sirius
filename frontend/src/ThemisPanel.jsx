@@ -93,6 +93,10 @@ export default function ThemisPanel({ onClose, initialSource }) {
       });
   }, []);
   const [tab, setTab] = useState("dash");
+  const tabBar = useRef(null);
+  useEffect(() => {
+    tabBar.current?.querySelector('[aria-current="page"]')?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [tab]);
   useEffect(() => {
     if (initialSource?.kind === "stock") setTab("stock");
     else if (initialSource?.kind === "facture") setTab("docs");
@@ -330,15 +334,15 @@ export default function ThemisPanel({ onClose, initialSource }) {
           className="mythos-avatar"
         />
       )}
-      <div className="prime-sub">DEVIS · FACTURES · COMMANDES · CLIENTS · COMPTABILITÉ · PIÈCES PDF · STOCKS · MODÈLES · BYOK</div>
+      <div className="prime-sub th-sub">Vos documents, paiements et stocks dans un même espace.</div>
 
-      <div className="th-tabs">
+      <nav ref={tabBar} className="th-tabs" aria-label="Rubriques de gestion">
         {TABS.map(([id, label, Icon]) => (
-          <button key={id} className={`th-tab ${tab === id ? "active" : ""}`} onClick={() => setTab(id)} data-testid={`themis-tab-${id}`}>
+          <button type="button" key={id} aria-current={tab === id ? "page" : undefined} className={`th-tab ${tab === id ? "active" : ""}`} onClick={() => setTab(id)} data-testid={`themis-tab-${id}`}>
             <Icon size={13} /> {label}
           </button>
         ))}
-      </div>
+      </nav>
 
       {err && (
         <div className="th-error" data-testid="themis-error">
@@ -421,10 +425,11 @@ export default function ThemisPanel({ onClose, initialSource }) {
               }}>CRÉER</button>
             </div>
             <div className="th-list">
-              <table className="th-table" data-testid="themis-docs-table"><tbody>
+              <table className="th-table" aria-label="Devis et factures" data-testid="themis-docs-table">
+                <thead><tr><th scope="col">Document</th><th scope="col">Client</th><th scope="col">Montant TTC</th><th scope="col">Statut</th><th scope="col">Actions</th></tr></thead><tbody>
                 {docs.map((d) => (
                   <tr key={d.id} id={`themis-source-${d.id}`} className={initialSource?.kind === "facture" && initialSource.id === d.id ? "th-source-focus" : ""}>
-                    <td>
+                    <td data-label="Document">
                       <b className={d.kind === "facture" ? "th-gold" : "th-cyan"}>{d.number}</b>
                       {lastMail(d) && (
                         <><br /><span className="th-mailtrace" data-testid={`themis-mails-${d.number}`} title={(d.emails || []).map((m) => `${m.type === "relance" ? "Relance" : "Envoi"} le ${isoToFr(m.date.slice(0, 10))} → ${m.to}`).join("\n")}>
@@ -432,14 +437,14 @@ export default function ThemisPanel({ onClose, initialSource }) {
                         </span></>
                       )}
                     </td>
-                    <td>{d.client_name || clientName(d.client_id)}</td>
-                    <td>{EUR(d.total_ttc)}{d.kind === "facture" && d.paid > 0 && <small> ({EUR(d.paid)} reçu)</small>}</td>
-                    <td>
-                      <select className="th-input th-status" value={d.status} onChange={(e) => post(`docs/${d.id}/status`, { status: e.target.value }, "PUT")} data-testid={`themis-doc-status-${d.number}`}>
+                    <td data-label="Client">{d.client_name || clientName(d.client_id)}</td>
+                    <td data-label="Montant TTC">{EUR(d.total_ttc)}{d.kind === "facture" && d.paid > 0 && <small> ({EUR(d.paid)} reçu)</small>}</td>
+                    <td data-label="Statut">
+                      <select className="th-input th-status" aria-label={`Statut de ${d.number}`} value={d.status} onChange={(e) => post(`docs/${d.id}/status`, { status: e.target.value }, "PUT")} data-testid={`themis-doc-status-${d.number}`}>
                         {DOC_STATUSES.map((s) => <option key={s}>{s}</option>)}
                       </select>
                     </td>
-                    <td className="th-actions">
+                    <td className="th-actions" data-label="Actions">
                       <a className="th-icon-btn" href={pdfUrl(d)} target="_blank" rel="noreferrer" title="Télécharger le PDF" data-testid={`themis-pdf-${d.number}`}><FileDown size={12} /></a>
                       <button className="th-icon-btn" title="Envoyer par e-mail" onClick={() => openEmail(d)} data-testid={`themis-email-${d.number}`}><Mail size={12} /></button>
                       {isLate(d) && <button className="th-icon-btn th-late-btn" title="Relancer le client (facture en retard)" onClick={() => openEmail(d, true)} data-testid={`themis-relance-${d.number}`}><Bell size={12} /></button>}
@@ -654,17 +659,18 @@ export default function ThemisPanel({ onClose, initialSource }) {
               }}>AJOUTER</button>
             </div>
             <div className="th-list">
-              <table className="th-table" data-testid="themis-items-table"><tbody>
+              <table className="th-table" aria-label="Articles et stocks" data-testid="themis-items-table">
+                <thead><tr><th scope="col">Article</th><th scope="col">Prix</th><th scope="col">Quantité</th><th scope="col">Alerte</th><th scope="col">Actions</th></tr></thead><tbody>
                 {items.map((i) => (
                   <tr key={i.id} id={`themis-source-${i.id}`} className={`${i.stock <= i.alert ? "th-low" : ""} ${initialSource?.kind === "stock" && initialSource.id === i.id ? "th-source-focus" : ""}`}>
-                    <td><b className="th-gold">{i.name}</b> <small>{i.ref}</small></td><td>{EUR(i.price)}</td>
-                    <td className="th-stock-cell">
-                      <button className="th-icon-btn" onClick={() => post(`items/${i.id}/stock`, { delta: -1, reason: stockReason }, "PUT")} data-testid={`themis-stock-minus-${i.name}`}><Minus size={11} /></button>
+                    <td data-label="Article"><b className="th-gold">{i.name}</b> <small>{i.ref}</small></td><td data-label="Prix">{EUR(i.price)}</td>
+                    <td className="th-stock-cell" data-label="Quantité">
+                      <button className="th-icon-btn" aria-label={`Retirer une unité : ${i.name}`} onClick={() => post(`items/${i.id}/stock`, { delta: -1, reason: stockReason }, "PUT")} data-testid={`themis-stock-minus-${i.name}`}><Minus size={11} /></button>
                       <b>{i.stock}</b>
-                      <button className="th-icon-btn" onClick={() => post(`items/${i.id}/stock`, { delta: 1, reason: stockReason }, "PUT")} data-testid={`themis-stock-plus-${i.name}`}><Plus size={11} /></button>
+                      <button className="th-icon-btn" aria-label={`Ajouter une unité : ${i.name}`} onClick={() => post(`items/${i.id}/stock`, { delta: 1, reason: stockReason }, "PUT")} data-testid={`themis-stock-plus-${i.name}`}><Plus size={11} /></button>
                     </td>
-                    <td>{i.stock <= i.alert && <span className="th-badge s-refusé">STOCK BAS</span>}</td>
-                    <td><button className="th-icon-btn" onClick={() => showMovements(i)} title="Historique des mouvements"><History size={12} /></button><ConfirmButton className="th-icon-btn" onConfirm={() => post(`items/${i.id}`, null, "DELETE")} testId={`themis-item-del-${i.name}`}><Trash2 size={12} /></ConfirmButton></td>
+                    <td data-label="Alerte">{i.stock <= i.alert && <span className="th-badge s-refusé">STOCK BAS</span>}</td>
+                    <td className="th-actions" data-label="Actions"><button className="th-icon-btn" onClick={() => showMovements(i)} title="Historique des mouvements"><History size={12} /></button><ConfirmButton className="th-icon-btn" onConfirm={() => post(`items/${i.id}`, null, "DELETE")} testId={`themis-item-del-${i.name}`}><Trash2 size={12} /></ConfirmButton></td>
                   </tr>
                 ))}
               </tbody></table>

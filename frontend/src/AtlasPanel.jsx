@@ -254,6 +254,7 @@ export default function AtlasPanel({ onClose, onSpeak, keys, onSaveKeys, initial
       <div className="atlas-bar">
         <MapIcon size={14} />
         <span className="atlas-title" data-module-name="ATLAS">ATLAS <span className="module-function">— CARTE &amp; NAVIGATION</span></span>
+        {(route || gmapsKey) && <div className="sirius-window-tools" role="group" aria-label="Options de la carte">
         {route && !showKey && (
           <span className="atlas-chip" data-testid="atlas-route-stats">
             {String(route.distance_km).replace(".", ",")} km · {route.duration_text}
@@ -265,6 +266,7 @@ export default function AtlasPanel({ onClose, onSpeak, keys, onSaveKeys, initial
         {gmapsKey && (
           <button className="atlas-icon-btn" onClick={() => setShowKey((s) => !s)} title="Clé API" data-testid="atlas-settings-btn"><Settings2 size={13} /></button>
         )}
+        </div>}
         <button className="atlas-icon-btn" onClick={onClose} data-testid="atlas-close-btn"><X size={14} /></button>
       </div>
 

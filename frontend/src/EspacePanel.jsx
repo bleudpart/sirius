@@ -164,13 +164,16 @@ export default function EspacePanel({ onClose }) {
     <div className="esp-panel" data-testid="espace-panel">
       <div className="esp-bar">
         <Globe2 size={14} />
-        <span className="esp-title">ESPACE — SYSTÈME SOLAIRE HOLOGRAPHIQUE</span>
-        <button className="esp-btn" onClick={() => { paused.current = !paused.current; setIsPaused(paused.current); }} data-testid="espace-pause-btn">
-          {isPaused ? <Play size={12} /> : <Pause size={12} />} {isPaused ? "REPRENDRE" : "PAUSE"}
-        </button>
-        <button className="esp-btn" onClick={() => { ctrl.current = { ...CAM_HOME }; }} title="Recentrer la caméra" data-testid="espace-recenter-btn">
-          <Crosshair size={12} /> RECENTRER
-        </button>
+        <span className="esp-title">ESPACE</span>
+        <div className="sirius-window-tools" role="group" aria-label="Commandes du système solaire">
+          <span className="esp-description">Système solaire</span>
+          <button type="button" className="esp-btn" onClick={() => { paused.current = !paused.current; setIsPaused(paused.current); }} data-testid="espace-pause-btn">
+            {isPaused ? <Play size={12} /> : <Pause size={12} />} {isPaused ? "REPRENDRE" : "PAUSE"}
+          </button>
+          <button type="button" className="esp-btn" onClick={() => { ctrl.current = { ...CAM_HOME }; }} title="Recentrer la caméra" data-testid="espace-recenter-btn">
+            <Crosshair size={12} /> RECENTRER
+          </button>
+        </div>
         <button className="esp-btn" onClick={onClose} data-testid="espace-close-btn"><X size={14} /></button>
       </div>
       <div className="esp-canvas" data-testid="espace-canvas">

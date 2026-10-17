@@ -180,8 +180,10 @@ export default function SiriusProgress({ journalOnly = false }) {
           <div className="sp-bar">
             <History size={13} />
             <span className="sp-title">JOURNAL DES TÂCHES ΣIRIUS</span>
-            <span className="sp-count">{journal.length} ENTRÉE{journal.length > 1 ? "S" : ""}</span>
-            <button className="sp-close" title="Vider le journal" onClick={() => { writeJournal([]); setJournal([]); }} data-testid="sirius-journal-clear-btn"><Trash2 size={13} /></button>
+            <div className="sirius-window-tools" role="group" aria-label="Actions du journal">
+              <span className="sp-count">{journal.length} ENTRÉE{journal.length > 1 ? "S" : ""}</span>
+              <button type="button" className="sp-close" title="Vider le journal" onClick={() => { writeJournal([]); setJournal([]); }} data-testid="sirius-journal-clear-btn"><Trash2 size={13} /></button>
+            </div>
             <button className="sp-close" aria-label="Fermer le journal" onClick={() => setShowJournal(false)} data-testid="sirius-journal-close-btn"><X size={13} /></button>
           </div>
           <div className="sp-journal-list" data-testid="sirius-journal-list">

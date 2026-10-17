@@ -226,7 +226,7 @@ export default function FloorPlanPanel({ keys, initialPrompt, onClose, onSpeak }
       <div className="fp-panel">
         <header className="fp-header">
           <div className="fp-title" data-module-name="PLANS"><Ruler size={16} /> PLANS <span className="module-function">— PLANS 2D/3D &amp; GÉOMÉTRIE</span></div>
-          <div className="fp-view-toggle" data-testid="floorplan-view-toggle">
+          <div className="fp-view-toggle sirius-window-tools" role="group" aria-label="Affichage du plan" data-testid="floorplan-view-toggle">
             <button className={view === "2d" ? "active" : ""} onClick={() => switchView("2d")}>COULEUR</button>
             <button className={view === "pro" ? "active" : ""} onClick={() => switchView("pro")}>PRO</button>
             <button className={view === "3d" ? "active" : ""} onClick={() => switchView("3d")}>3D</button>

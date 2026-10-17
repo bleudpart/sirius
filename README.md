@@ -393,6 +393,35 @@ restent inchangés. Le style commun est chargé aussi dans les fenêtres Electro
 multimédia et la boutique ; les installateurs Windows/portable et l'APK Android
 doivent être reconstruits pour intégrer ces changements.
 
+### Disposition commune des fenêtres
+
+Le cadre partagé conserve le bleu nuit, le doré et l'identité ΣIRIUS. Les fenêtres
+prises en charge par le gestionnaire utilisent le même en-tête et des commandes
+de 44 px : réduire, agrandir/restaurer sur PC, fermer à droite. L'agrandissement
+ne réinitialise pas le formulaire ni la taille mémorisée. Sur mobile, la fenêtre
+occupe déjà l'espace disponible : seules réduction et fermeture sont proposées.
+Les fenêtres se recalent lors d'un changement de taille d'écran ou du zoom HUD.
+Les panneaux spécialisés gardent leur géométrie et leurs commandes métier.
+
+Les portraits des modules de travail deviennent des vignettes sur PC et sont
+masqués sur téléphone pour laisser la place aux contenus. Les champs partagent
+un fond sombre lisible et les sélecteurs de date respectent ce contraste.
+Les rubriques THÉMIS défilent horizontalement sur mobile, avec l'onglet actif
+ramené dans la zone visible. THÉMIS dispose de tableaux avec en-têtes explicites,
+libellés sur les petites cartes mobiles et boutons de stock nommés. Ces changements
+de disposition n'autorisent aucune nouvelle action automatique : les confirmations
+de suppression et la vérification du courriel avant envoi restent inchangées.
+Ce socle ne vaut pas certification de tous les parcours de tous les modules.
+
+Les panneaux spécialisés ATLAS, KERAUNOS, ESPACE, PLANS, statut des clés et
+journal séparent leurs options métier des commandes de fenêtre. Les options
+restent accessibles sur une ligne qui se replie, au lieu de comprimer le titre.
+PHOTO3D utilise toute la hauteur disponible, avec un corps défilant et un pied
+d'actions conservé. Sur mobile, KERAUNOS privilégie les appareils plutôt que son
+portrait ; les noms et curseurs se répartissent sans se chevaucher. Le dépôt de
+fichiers de la médiathèque passe sur plusieurs lignes. Les panneaux spécialisés
+restent au-dessus de la navigation mobile, y compris en paysage.
+
 L'écran de présentation au démarrage reprend ces cadres : accueil personnalisé
 et cœur animé au centre, catalogue de modules à gauche sur grand écran, état réel
 du chargement à droite. Sur téléphone, l'accueil et le chargement s'empilent.

@@ -52,7 +52,7 @@ export default function KeysStatus({ onClose }) {
       <div className="keys-bar">
         <KeyRound size={14} />
         <span className="keys-title">STATUT DES CLÉS API</span>
-        <span className="keys-count">{nb}/{keys.length}</span>
+        <div className="sirius-window-tools"><span className="keys-count">{nb}/{keys.length} services configurés</span></div>
         <button className="keys-close" onClick={onClose} data-testid="keys-status-close-btn"><X size={14} /></button>
       </div>
       <div className="keys-list">
