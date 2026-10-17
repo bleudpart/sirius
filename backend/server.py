@@ -209,13 +209,14 @@ async def _lifespan(_app):
     from sirius_brain import warm_cerebras_connection, close_cerebras_connections
     _connection_task = asyncio.create_task(warm_cerebras_connection())
     finance_task = asyncio.create_task(finance_workspace.loop())
+    work_reminders_task = asyncio.create_task(operational_work.loop())
     # (Stockage 100% local — plus d'initialisation cloud à faire ici.)
     try:
         yield
     finally:
         # --- Arrêt ---
         tasks = []
-        for task in (_watch_task, _omega_task, _episodic_task, _vector_task, _connection_task, finance_task):
+        for task in (_watch_task, _omega_task, _episodic_task, _vector_task, _connection_task, finance_task, work_reminders_task):
             if task:
                 task.cancel()
                 tasks.append(task)
@@ -416,10 +417,16 @@ from finance_actions import make_finance_actions
 finance_workspace = FinanceWorkspace(db)
 finance_conversation = FinanceConversation(finance_workspace)
 action_runs = ActionRuns(db, make_finance_actions(finance_workspace))
+from operational_work import OperationalWork, make_operational_router
+
+operational_work = OperationalWork(db, action_runs, work_conversation)
+operational_work.register()
 
 
 async def _work_chat_response(req, user, request, session_id, history):
-    result = await finance_conversation.handle(req, user)
+    result = await operational_work.handle(req, user)
+    if result is None:
+        result = await finance_conversation.handle(req, user)
     if result is None:
         result = await work_conversation.handle(req, user, request)
     if result is None:
@@ -2265,6 +2272,7 @@ from ariane_market_runs import make_ariane_market_router
 api_router.include_router(make_ariane_market_router(db, require_user))
 api_router.include_router(make_finance_router(finance_workspace, require_user))
 api_router.include_router(make_action_router(action_runs, require_user))
+api_router.include_router(make_operational_router(operational_work, require_user))
 
 from themis_api import make_themis_router
 api_router.include_router(make_themis_router(db))

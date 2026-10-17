@@ -122,9 +122,15 @@ def _pkce():
     return verifier, challenge
 
 
+async def microsoft_connection(db, user_id: str):
+    legacy = await db.microsoft_oauth.find_one({"_id": user_id})
+    return legacy or await db.microsoft_oauth.find_one({"user_id": user_id})
+
+
 async def _save_tokens(db, user_id: str, token: dict, email: str):
     now = datetime.now(timezone.utc)
     doc = {
+        "user_id": user_id,
         "access_token": _enc(token["ac" + "cess_" + "token"]),
         "expires_at": (now + timedelta(seconds=int(token.get("expires_in", 3600)))).isoformat(),
         "email": email,
@@ -132,11 +138,13 @@ async def _save_tokens(db, user_id: str, token: dict, email: str):
     }
     if token.get("refresh_token"):
         doc["refresh_token"] = _enc(token["refresh_token"])
-    await db.microsoft_oauth.update_one({"_id": user_id}, {"$set": doc}, upsert=True)
+    existing = await microsoft_connection(db, user_id)
+    identity = {"_id": user_id} if existing and not existing.get("user_id") else {"user_id": user_id}
+    await db.microsoft_oauth.update_one(identity, {"$set": doc}, upsert=True)
 
 
 async def _access_token(db, user_id: str) -> str:
-    doc = await db.microsoft_oauth.find_one({"_id": user_id})
+    doc = await microsoft_connection(db, user_id)
     if not doc:
         raise HTTPException(status_code=409, detail="Compte Microsoft non connecté.")
     now = datetime.now(timezone.utc)
@@ -154,6 +162,7 @@ async def _access_token(db, user_id: str) -> str:
     if r.is_error or "access_token" not in data:
         if data.get("error") == "invalid_grant":
             await db.microsoft_oauth.delete_one({"_id": user_id})
+            await db.microsoft_oauth.delete_one({"user_id": user_id})
         logger.error("[MICROSOFT] refresh échoué: %s", data.get("error"))
         raise HTTPException(status_code=401, detail="Jeton Microsoft expiré — reconnecte ton compte.")
     await _save_tokens(db, user_id, data, doc.get("email", ""))
@@ -747,7 +756,7 @@ def make_microsoft_router(db):
             if not is_direct_local_request(request):
                 return {"connected": False}
             uid = LEGACY_UID
-        doc = await db.microsoft_oauth.find_one({"_id": uid})
+        doc = await microsoft_connection(db, uid)
         if not doc or not doc.get("access_token"):
             return {"connected": False}
         now = datetime.now(timezone.utc)
@@ -826,7 +835,7 @@ def make_microsoft_router(db):
     @router.get("/microsoft/status")
     async def microsoft_status(request: Request):
         user = await require_user(request, db)
-        doc = await db.microsoft_oauth.find_one({"_id": user["user_id"]})
+        doc = await microsoft_connection(db, user["user_id"])
         return {"connected": bool(doc), "email": (doc or {}).get("email", "")} 
 
     @router.get("/microsoft/mail")
@@ -1031,6 +1040,7 @@ def make_microsoft_router(db):
     async def microsoft_disconnect(request: Request):
         user = await require_user(request, db)
         await db.microsoft_oauth.delete_one({"_id": user["user_id"]})
+        await db.microsoft_oauth.delete_one({"user_id": user["user_id"]})
         return {"ok": True}
 
     return router

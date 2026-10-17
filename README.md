@@ -681,7 +681,94 @@ Guide détaillé : [INSTALL-SIRIUS.md](./INSTALL-SIRIUS.md)
 
 Pour le déploiement en petite entreprise : [GUIDE-ENTREPRISE.md](./GUIDE-ENTREPRISE.md)
 
-### ARIANE : couche commune d'actions (premier raccordement financier)
+### À traiter avec SIRIUS : parcours Outlook, rappels et résultats
+
+La boîte **À traiter avec SIRIUS** est accessible dans les dossiers,
+ARIANE et CHRONOS. Elle rassemble les signaux métier sourcés, engagements,
+éléments à relire, validations des parcours communs, blocages, rappels et
+notifications internes. Les anciennes listes manuelles restent distinctes.
+
+**Relance complète, sans envoi automatique implicite :**
+
+1. Sélectionner un dossier et une facture THÉMIS suivie dans ce dossier.
+   La facture doit être envoyée, échue, avec un solde positif et un client
+   disposant d'une adresse valide ; Outlook/Microsoft 365 doit être connecté.
+2. Choisir une date future de suivi, puis préparer. L'aperçu montre le compte
+   expéditeur, le destinataire, le message signé exact, les sources et le suivi.
+3. Valider l'étape par son empreinte. Le serveur relit facture, client et
+   connexion Outlook ; un changement impose une nouvelle préparation.
+   L'aperçu d'envoi expire après 30 minutes.
+4. Microsoft Graph accepte la demande (`202`) ou l'étape reste bloquée.
+   **Accepté n'est pas livré** : aucune confirmation de livraison ni de
+   règlement n'est inventée. La preuve d'acceptation est enregistrée,
+   un événement apparaît dans le dossier et le suivi est créé.
+5. À l'échéance, le serveur vérifie le solde enregistré dans THÉMIS.
+   Une facture soldée ne déclenche pas de relance suggérée ; un solde positif
+   ou une donnée devenue inaccessible produit une notification explicative.
+   Les paiements extérieurs à THÉMIS ne sont pas connus.
+
+L'envoi n'est jamais retenté automatiquement après une réponse réseau perdue,
+un `5xx` ou une tentative engagée sans preuve persistée : vérifier les éléments
+envoyés dans Outlook. Reprendre le même parcours répare un suivi manquant
+après acceptation persistée, **sans envoyer une seconde fois**. Un message ou
+une source modifiés constituent une autre préparation : vérifier les anciennes
+tentatives avant de la confirmer. Une relance identique conserve le rappel
+initial ; demander une autre date ne le déplace pas silencieusement. Le parcours
+signale cet écart et propose de créer un rappel distinct.
+Arrêter un parcours ne retire pas un courriel
+engagé et ne suspend pas un rappel déjà créé ; celui-ci possède sa propre
+suspension confirmée. Pas de compensation automatique.
+
+**Conversation et rappels :** la conversation HTTP et SSE appelle le même
+moteur, sans modèle externe pour ces commandes :
+
+- `Rappelle-moi dans 3 jours de vérifier le règlement` prépare un rappel
+  unique avec sa date exacte ; une confirmation distincte reste obligatoire ;
+- `Mes parcours à traiter`, `Mes rappels Sirius`,
+  `Montre mes résultats de travail` lisent les états persistés ;
+- dans le contexte d'un dossier :
+  `Prépare la relance de cette facture avec un suivi dans trois jours`
+  (seulement si le dossier contient une facture unique), ou
+  `Prépare la relance de la facture INV-A avec un suivi dans 3 jours` ;
+- pour une date fixe dans le contexte d'un dossier :
+  `Prépare le parcours de relance de la facture INV-A suivi le 2026-11-02T09:00:00+01:00` ;
+- les réponses donnent les commandes précises de confirmation, de suivi,
+  de reprise et d'arrêt. Un simple « oui » n'autorise jamais cet envoi.
+  Les demandes de rappel imprécises réclament une clarification.
+
+**Continuité explicite :** même compte **et même service connecté** sur PC
+et téléphone donnent accès aux mêmes parcours, rappels et notifications.
+L'identifiant de cet espace est affiché. La boucle serveur vérifie les échéances
+toutes les 30 secondes et rattrape les rappels après redémarrage. Les rappels
+sont uniques, pas récurrents. Le serveur doit fonctionner ; les notifications
+sont internes à la boîte, **pas des push natifs lorsque l'application est fermée**.
+Il n'y a ni synchronisation automatique entre deux serveurs distincts, ni
+migration des anciennes listes locales, ni surveillance des réponses Outlook.
+
+**Mesures réelles :** demandes communes examinées/réalisées, taux d'aboutissement,
+attentes, blocages, annulations, expirations, validations humaines enregistrées,
+étapes abouties après plusieurs tentatives, étapes réutilisant une tentative
+d'envoi sans réenvoi, durée des étapes réalisées et
+acceptations/incertitudes du fournisseur. Le périmètre est affiché :
+les 100 derniers parcours communs, avec signalement de troncature ;
+les compteurs fournisseur sont historiques. Le temps économisé et la
+livraison restent « non mesurés », et non des estimations présentées comme faits.
+
+API authentifiée : `GET /api/work-hub`,
+`POST /api/work-hub/invoice-followup` (UUID `request_id`, `dossier_id`,
+`invoice_id`, `followup_at` avec fuseau), `POST /api/work-hub/reminders`
+(UUID, `text`, `due_at` avec fuseau),
+`POST /api/work-hub/reminders/{id}/cancel-preview`.
+La confirmation/reprise/lecture utilise l'API commune ARIANE ci-dessous.
+Toutes les données opérationnelles et connexions Microsoft sont incluses
+dans l'effacement de compte.
+
+Les nouvelles connexions Microsoft stockent aussi leur `user_id`, compatible
+Mongo et SQLite local. Les anciennes connexions Mongo sont relues puis migrées.
+Un ancien enregistrement SQLite ayant déjà perdu son identité ne peut pas
+être réattribué sûrement : reconnecter Outlook, sans migration par supposition.
+
+### ARIANE : couche commune d'actions
 
 Le bloc **Actions communes** propose trois parcours guidés : analyse et règles
 de volatilité, préparation d'une surveillance de prix, lecture du portefeuille
@@ -693,7 +780,7 @@ Le registre serveur fermé décrit chaque action : module, version, schémas
 Pydantic d'entrée/sortie, lecture/préparation/modification, risque, confirmation,
 délai maximal, tentatives et absence de compensation automatique. Aucun nom
 de fonction Python, code, URL arbitraire ou nouvelle action n'est accepté
-depuis le client. Premier catalogue :
+depuis le client. Catalogue :
 
 - `portus.analysis` : lecture de marché et calculs PORTUS déterministes ;
 - `portus.volatility_rules` : constats et réserves, aucune alerte créée ;
@@ -701,6 +788,10 @@ depuis le client. Premier catalogue :
 - `finance.overview` : règles, routines, notifications internes et traces ;
 - `finance.prepare` : aperçu financier, sans appliquer la modification ;
 - `finance.confirm` : application de l'aperçu authentifié exact, **après accord**.
+- `work.invoice_preview` : préparation sourcée de la relance Outlook ;
+- `work.invoice_send` : envoi exact et suivi, **après accord** ;
+- `work.reminder` : création d'un rappel unique, **après accord** ;
+- `work.reminder_cancel` : suspension d'un rappel, **après accord**.
 
 API authentifiée : `GET /api/ariane/actions`, `POST/GET /api/ariane/runs`,
 `GET /api/ariane/runs/{id}`, `POST /{id}/resume`, `POST /{id}/cancel`,

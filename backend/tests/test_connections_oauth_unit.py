@@ -17,6 +17,13 @@ class Collection:
     async def insert_one(self, document):
         self.documents.append(dict(document))
 
+    async def update_one(self, query, update):
+        for document in self.documents:
+            if all(document.get(key) == value for key, value in query.items()):
+                document.update(update["$set"])
+                return
+        raise AssertionError("OAuth fixture update did not match a user")
+
     async def find_one(self, query, *args, **kwargs):
         for document in self.documents:
             if all(document.get(key) == value for key, value in query.items()):

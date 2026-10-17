@@ -53,6 +53,22 @@ class _FakeDB:
         self.microsoft_oauth = _FakeCollection()
 
 
+def test_legacy_mongo_connection_keeps_identity_when_tokens_are_refreshed(monkeypatch):
+    import asyncio
+    from cryptography.fernet import Fernet
+    monkeypatch.setenv("MS_TOKEN_KEY", Fernet.generate_key().decode())
+    db = _FakeDB()
+    async def scenario():
+        await db.microsoft_oauth.insert_one({"_id": "legacy", "email": "legacy@example.test"})
+        await microsoft_graph._save_tokens(db, "legacy", {"access_token": "new", "refresh_token": "r"}, "legacy@example.test")
+        assert len(db.microsoft_oauth._docs) == 1
+        doc = await microsoft_graph.microsoft_connection(db, "legacy")
+        assert doc["_id"] == "legacy" and doc["user_id"] == "legacy"
+        assert await microsoft_graph._access_token(db, "legacy") == "new"
+        assert await microsoft_graph.microsoft_connection(db, "another-user") is None
+    asyncio.run(scenario())
+
+
 def test_conf_allows_pkce_public_client(monkeypatch):
     monkeypatch.setenv("MICROSOFT_CLIENT_ID", "client-id")
     monkeypatch.setenv("MICROSOFT_CLIENT_SECRET", "******")
@@ -240,7 +256,7 @@ def test_callback_links_local_login_to_legacy_user_and_notifies_opener(monkeypat
         assert '"type": "microsoft-auth"' in body or '"type":"microsoft-auth"' in body
         assert '"ok": true' in body or '"ok":true' in body
 
-        doc = await db.microsoft_oauth.find_one({"_id": LEGACY_UID})
+        doc = await microsoft_graph.microsoft_connection(db, LEGACY_UID)
         assert doc is not None, "le jeton Microsoft doit être enregistré sous LEGACY_UID"
         user = await db.users.find_one({"user_id": LEGACY_UID})
         assert user is not None

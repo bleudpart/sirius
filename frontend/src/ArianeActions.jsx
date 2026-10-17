@@ -121,7 +121,8 @@ export default function ArianeActions({ auditOnly = false }) {
     <h2>{auditOnly ? "NÉMÉSIS · preuves des actions communes" : "ARIANE · actions communes"}</h2>
     <p>Un objectif, des étapes reliées, un résultat vérifiable. Seules les actions du catalogue serveur peuvent être exécutées.
       Les listes manuelles ci-dessous et les anciens parcours financiers restent séparés.</p>
-    <p>Chaque modification attend votre accord sur ses entrées exactes. Aucun ordre boursier ni envoi de courriel.
+    <p>Chaque modification attend votre accord sur ses entrées exactes. Aucun ordre boursier.
+      Une relance Outlook exige la validation de son message et de son suivi dans la boîte À traiter.
       Les données, aperçus et preuves sont conservés pour votre compte dans le service connecté.</p>
     <details><summary>Catalogue et règles d'autonomie · {catalog.length} actions</summary>
       {catalog.map((action) => <details key={action.name}><summary>{action.title} · {action.module} · {action.name}</summary>

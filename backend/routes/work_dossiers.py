@@ -1659,4 +1659,25 @@ def make_work_dossiers_router(db, require_user, *, conversation=None):
 
         conversation.preview_invoice_batch = preview_invoice_batch
         conversation.recordings = recordings
+
+        async def operational_invoice_preview(uid, dossier_id, source_id):
+            dossier = await dossier_for(dossier_id, uid)
+            if not any(item["kind"] == "facture" and item["id"] == source_id
+                       for item in dossier.get("sources", [])):
+                raise HTTPException(404, "Cette facture n'est pas suivie dans ce dossier.")
+            if await db.themis_docs.count_documents({"user_id": uid, "id": source_id, "kind": "facture"}) != 1:
+                raise HTTPException(409, "Référence de facture absente ou dupliquée ; vérifiez THÉMIS.")
+            snapshot, content = await draft_content(
+                DraftIn(source=SourceIn(kind="facture", id=source_id)), uid, None,
+            )
+            if snapshot["data"]["status"] != "envoyé":
+                raise HTTPException(409, "La facture n'est pas au statut envoyé ; vérifiez THÉMIS.")
+            due = _date(snapshot["data"]["due_date"])
+            if due is None or due >= datetime.now(timezone.utc).astimezone(ZoneInfo("Europe/Paris")).date():
+                raise HTTPException(409, "Facture sans échéance valide ou pas encore échue ; vérifiez THÉMIS.")
+            content = {**content, "checks": ["Vérifier paiement, destinataire, message signé et suivi avant accord d'envoi Outlook."]}
+            return {"dossier_id": dossier_id, "source": snapshot["source"],
+                    "fingerprint": snapshot["fingerprint"], "data": snapshot["data"], "content": content}
+
+        conversation.operational_invoice_preview = operational_invoice_preview
     return router

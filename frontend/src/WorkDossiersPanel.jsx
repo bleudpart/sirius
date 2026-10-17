@@ -5,6 +5,7 @@ import { formatDocumentDate } from "./dateTime";
 import "./WorkDossiersPanel.css";
 import LiveWorkSettings from "./LiveWorkSettings";
 import ScannedDocuments from "./ScannedDocuments";
+import WorkInbox from "./WorkInbox";
 
 const BASE = `${API_BASE_URL}/work-dossiers`;
 const CATEGORIES = [
@@ -13,7 +14,7 @@ const CATEGORIES = [
 ];
 const OUTCOMES = { accepted: "Retenue", rejected: "Écartée", deferred: "Reportée" };
 const STATUSES = { proposed: "À valider", confirmed: "Validé dans le dossier", completed: "Terminé", cancelled: "Annulé" };
-const KINDS = { decision: "Décision", architect_decision: "Décision architecte", writing_revision: "Révision rédactionnelle", client_event: "Événement client saisi", commitment: "Engagement", meeting: "Réunion", draft: "Brouillon", handoff: "Proposition inter-métiers" };
+const KINDS = { decision: "Décision", architect_decision: "Décision architecte", writing_revision: "Révision rédactionnelle", client_event: "Événement client saisi", invoice_dispatch: "Relance acceptée par Outlook", commitment: "Engagement", meeting: "Réunion", draft: "Brouillon", handoff: "Proposition inter-métiers" };
 const CLIENT_EVENTS = { sale: "Vente", exchange: "Échange", quote_pending: "Devis en attente", callback_promised: "Rappel promis", question_pending: "Question sans réponse" };
 const SUGGESTIONS = {
   record_decision: "Préciser l'objectif et la prochaine étape",
@@ -332,6 +333,7 @@ function entrySummary(entry) {
   if (["decision", "architect_decision"].includes(entry.kind)) return `${OUTCOMES[content.outcome]}\nPourquoi : ${content.rationale}\nQui : ${decisionActor(entry)}\nSuite : ${content.next_step || "À préciser"}${entry.kind === "architect_decision" ? `\nAlternatives : ${evidenceText(content.alternatives)}\nContraintes : ${evidenceText(content.constraints)}\nRéférences déclarées : ${evidenceText(content.document_links)}\nImpacts déclarés, non déduits : ${evidenceText(content.declared_impacts)}` : ""}`;
   if (entry.kind === "writing_revision" || content.type === "customer_followup") return `Faits sourcés : ${evidenceText(content.sourced_facts)}\nSuggestion : ${content.suggested_prose}\nManquant : ${evidenceText(content.missing_facts)}\n${evidenceText(content.checks)}`;
   if (entry.kind === "client_event") return `${CLIENT_EVENTS[content.kind]} · ${formatDocumentDate(content.occurred_on)}\n${content.note}\nSuivi déclaré : ${content.follow_up_on ? formatDocumentDate(content.follow_up_on) : "Aucune date"}\nContact manuel et consentement à vérifier.`;
+  if (entry.kind === "invoice_dispatch") return `${content.subject}\n${content.text}\nDestinataire : ${content.recipient}\nPreuve Microsoft : ${content.request_id || "indisponible"}. Livraison non attestée.`;
   if (entry.kind === "commitment") return `${content.text}\nResponsable : ${content.owner}\nÉchéance : ${content.due_date ? formatDocumentDate(content.due_date) : "À préciser"}`;
   if (entry.kind === "meeting") return `${content.title}\n${content.notes}\nTâches proposées :\n${content.tasks.map((task) => `${task.text} — ${task.owner}`).join("\n")}`;
   if (entry.kind === "handoff") return `${content.objective}\nDestination : ${content.target} · transmission manuelle`;
@@ -534,6 +536,7 @@ function WorkThread({ dossier, revision, disabled, queue, onError, onOpenThemis,
         <p>Informations manquantes : {evidenceText(content.missing_info)}</p>
       </>}
       {entry.kind === "client_event" && <p className="work-dossiers-preserve">{entrySummary(entry)} · Saisie volontaire, aucune sollicitation automatique.</p>}
+      {entry.kind === "invoice_dispatch" && <p className="work-dossiers-preserve">{entrySummary(entry)}</p>}
       {(entry.kind === "writing_revision" || content.type === "customer_followup") && <>
         <h4>Faits sourcés</h4><p className="work-dossiers-preserve">{evidenceText(content.sourced_facts)}</p>
         <h4>Suggestion · faits non vérifiés par la rédaction</h4><p className="work-dossiers-preserve">{content.suggested_prose}</p>
@@ -852,10 +855,16 @@ export default function WorkDossiersPanel({ onClose, onOpenThemis, onOpenHaccp, 
       </header>
       <div className="work-dossiers-body">
         <p>Relie ton travail à des signaux réels. ΣIRIUS propose, tu décides : aucune commande ni relance n'est envoyée automatiquement.</p>
+        <WorkInbox key={`work-inbox-${selectedId || "none"}`} dossierId={selectedId || ""}
+          onSelectDossier={setSelectedId}
+          invoices={dailyThread?.dossier?.id === selectedId
+            ? dailyThread.sources.filter((item) => item.source.kind === "facture")
+              .map((item) => ({ id: item.source.id, label: sourceLabel(item) })) : []} />
         {onAsk && <section className="work-dossiers-day" aria-label="Conversation de travail">
           <h2>À traiter avec ΣIRIUS · conversation</h2>
           <p>{selected ? `Dossier affiché : ${selected.title}. Les questions sur « ce dossier » utilisent cette sélection ; les droits et les sources sont revérifiés.` : "Choisissez un dossier pour les questions contextuelles."}</p>
-          <p>Lecture et prévisualisation de relance, sans appel IA externe. Aucun brouillon enregistré ni envoyé depuis cette conversation.</p>
+          <p>Ces raccourcis historiques lisent et préparent, sans appel IA externe ni envoi.
+            Le parcours Outlook de la boîte À traiter utilise une confirmation distincte avant envoi et suivi.</p>
           <div className="work-dossiers-actions">
             <button type="button" onClick={() => onAsk("Qu'ai-je à traiter aujourd'hui ?")}>Mes priorités</button>
             <button type="button" onClick={() => onAsk("Prépare les relances de mes factures en retard de plus de 15 jours")}>Relances de mon compte · plus de 15 jours</button>

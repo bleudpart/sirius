@@ -128,6 +128,7 @@ class WorkConversation:
         self.preview_invoice: Reader | None = None
         self.preview_invoice_batch: Reader | None = None
         self.recordings: DraftRecordings | None = None
+        self.operational_invoice_preview: Reader | None = None
         self._indexes_ready = False
         self._index_lock = asyncio.Lock()
 

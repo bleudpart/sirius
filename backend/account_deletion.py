@@ -26,6 +26,10 @@ PERSONAL_COLLECTIONS = (
     "sirius_finance_notifications", "sirius_finance_events",
     "sirius_action_runs", "sirius_action_steps", "sirius_action_controls",
     "sirius_action_attempts", "sirius_action_events",
+    "sirius_work_dispatches", "sirius_work_receipts", "sirius_work_reminders",
+    "sirius_work_reminder_controls", "sirius_work_reminder_outcomes",
+    "sirius_work_notifications", "sirius_work_hubs",
+    "microsoft_oauth",
 )
 REVIEW_COLLECTIONS = (
     "themis_docs", "themis_clients", "themis_items", "themis_stock_movements",

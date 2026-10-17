@@ -32,6 +32,12 @@ test.each([
   "Préparer toutes les relances de toutes les factures ayant plus de 30 jours de retard",
   "Prépare les relances de mes factures en retard de plus de 15 jours sauf le client Martin",
   "Confirme la prévisualisation de relance", "Annule la prévisualisation de relance",
+  "Prépare le parcours de relance de la facture INV-A suivi le 2026-11-02T09:00:00+01:00",
+  "Suivi parcours 1234567890abcdef1234567890abcdef",
+  "Reprends parcours 1234567890abcdef1234567890abcdef",
+  "Arrête parcours 1234567890abcdef1234567890abcdef",
+  "Montre mes résultats de travail", "Mes rappels Sirius",
+  "Rappelle-moi dans 3 jours de vérifier ce dossier",
 ])("route directement la conversation métier : %s", (text) => {
   expect(isWorkConversationCommand(text)).toBe(true);
   expect(isOperationalCommand(text)).toBe(true);

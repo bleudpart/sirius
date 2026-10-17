@@ -2,6 +2,8 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import WorkDossiersPanel from "./WorkDossiersPanel";
 
+jest.mock("./WorkInbox", () => function MockWorkInbox() { return <section aria-label="À traiter avec SIRIUS" />; });
+
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 test("shows sourced proposals and never performs the proposed business action automatically", async () => {

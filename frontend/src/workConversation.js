@@ -15,6 +15,9 @@ export function isWorkConversationCommand(command) {
   if (isFinanceConversationCommand(command)) return true;
   const text = String(command || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .replace(/’/g, "'").toLowerCase().trim();
+  if (/^(?:(?:suivi|reprends|arrete|confirme) parcours\b|prepare le parcours de relance\b)/.test(text)
+    || /^rappelle[- ]moi\b/.test(text)
+    || /^(?:montre |affiche )?(?:mes resultats de travail|mes parcours a traiter|mes rappels sirius)[.!?]*$/.test(text)) return true;
   if (/\b(?:liste|montre|affiche)\b.*\benregistrements\b.*\bbrouillons\b/.test(text)) return true;
   if (/\b(?:enregistre|enregistrer)\b.*\b(?:brouillons?|preparations?|relances?)\b/.test(text)) return true;
   if (/\b(?:confirme|reprends|reprendre|etat|suivi)\b.*\benregistrement\b/.test(text)) return true;

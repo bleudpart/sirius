@@ -7192,7 +7192,9 @@ function App() {
       {showAgora && <AgoraPipeline onClose={() => setShowAgora(false)} onOpenThemis={() => { setShowAgora(false); setShowThemis(true); }} />}
       {showSolon && <ConsultPanel module="SOLON#" onClose={() => setShowSolon(false)} />}
       {showPromethee && <PrometheePanel onClose={() => setShowPromethee(false)} />}
-      {activeWorkModule && <WorkModulesPanel key={`${authUser?.id || authUser?._id || authUser?.email || "local"}-${activeWorkModule}`} initialModule={activeWorkModule} user={authUser} onClose={() => setActiveWorkModule(null)} onOpenExisting={(id) => {
+      {activeWorkModule && <WorkModulesPanel key={`${authUser?.user_id || authUser?.id || authUser?._id || authUser?.email || "local"}-${activeWorkModule}`} initialModule={activeWorkModule} user={authUser} onClose={() => setActiveWorkModule(null)}
+        onOpenDossier={(id) => { setLiveDossierId(id); setShowWorkDossiers(true); setActiveWorkModule(null); }}
+        onOpenExisting={(id) => {
         if (id === "promethee") setShowPromethee(true);
         if (id === "themis") setShowThemis(true);
         if (id === "plans") setShowPlans(true);

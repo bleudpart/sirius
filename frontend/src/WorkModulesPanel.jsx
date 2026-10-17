@@ -8,6 +8,7 @@ import "./WorkModulesPanel.css";
 import ChronosAgenda from "./ChronosAgenda";
 import ArianeMarketRuns from "./ArianeMarketRuns";
 import ArianeActions from "./ArianeActions";
+import WorkInbox from "./WorkInbox";
 import FinanceWorkspace from "./FinanceWorkspace";
 
 const ICONS = { CalendarDays, FileText, FolderOpen, ScrollText, Tags, Workflow };
@@ -19,12 +20,12 @@ const FIELDS = {
   planning: [{ key: "title", label: "Tâche", required: true }, { key: "due", label: "Échéance", type: "date", required: true }, { key: "dossier", label: "Dossier associé" }],
 };
 
-export default function WorkModulesPanel({ initialModule, user, onClose, onOpenExisting }) {
+export default function WorkModulesPanel({ initialModule, user, onClose, onOpenExisting, onOpenDossier }) {
   const storageKey = `sirius_work_modules_v1_${user?.id || user?._id || user?.email || "local"}`;
-  return <WorkModulesWorkspace key={storageKey} storageKey={storageKey} initialModule={initialModule} onClose={onClose} onOpenExisting={onOpenExisting} />;
+  return <WorkModulesWorkspace key={storageKey} storageKey={storageKey} initialModule={initialModule} onClose={onClose} onOpenExisting={onOpenExisting} onOpenDossier={onOpenDossier} />;
 }
 
-function WorkModulesWorkspace({ storageKey, initialModule, onClose, onOpenExisting }) {
+function WorkModulesWorkspace({ storageKey, initialModule, onClose, onOpenExisting, onOpenDossier }) {
   const [loaded] = useState(() => {
     try { return { data: loadWorkData(storageKey), error: "" }; }
     catch { return { data: emptyWorkData(), error: "Lecture du stockage local impossible ou données invalides. Vos données ne seront pas écrasées. Fermez ce module et vérifiez le stockage avant de continuer." }; }
@@ -130,6 +131,7 @@ function WorkModulesWorkspace({ storageKey, initialModule, onClose, onOpenExisti
           {loaded.error && <p className="work-error" role="alert">{loaded.error}</p>}
           {notice && <p className="work-notice" role="status">{notice}</p>}
           {active === "planning" && <><ChronosAgenda /><FinanceWorkspace key={`${storageKey}-finance-routines`} routinesOnly /></>}
+          {(active === "planning" || active === "workflows") && <WorkInbox key={`${storageKey}-${active}-inbox`} onSelectDossier={onOpenDossier} />}
           <div className="work-backup">
             <p className="work-hint">{loaded.error ? "Stockage local indisponible" : "Cette sauvegarde concerne les listes manuelles et le journal local de cet appareil, pour le compte actuel. Aucune synchronisation automatique de ces listes."}</p>
             <button type="button" disabled={!!loaded.error} onClick={exportBackup}>Sauvegarder les six modules</button>

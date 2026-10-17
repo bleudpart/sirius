@@ -1,0 +1,7 @@
+.work-inbox { min-width: 0; padding: 16px; margin: 12px 0; border: 1px solid #bda15b55; border-radius: 14px; overflow-wrap: anywhere; }
+.work-inbox article { border: 1px solid #bda15b33; border-radius: 10px; padding: 12px; margin: 10px 0; min-width: 0; }
+.work-inbox fieldset { min-width: 0; display: grid; gap: 10px; margin: 12px 0; }
+.work-inbox label { display: grid; gap: 5px; min-width: 0; margin: 8px 0; }
+.work-inbox input, .work-inbox select { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+.work-inbox pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow: auto; }
+.work-inbox button { max-width: 100%; white-space: normal; margin: 4px; }
