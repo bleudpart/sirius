@@ -11,7 +11,7 @@ let host;
 
 beforeEach(() => {
   jest.spyOn(global, "fetch").mockImplementation(async (url) => ({ ok: true, json: async () =>
-    String(url).endsWith("/workspace")
+    String(url).endsWith("/actions") ? { actions: [] } : String(url).endsWith("/workspace")
       ? { alerts: { items: [] }, routines: { items: [] }, notifications: [], events: [] }
       : { items: [], events: [] } }));
   localStorage.clear();

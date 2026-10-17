@@ -1,0 +1,9 @@
+.ariane-actions { min-width: 0; overflow-wrap: anywhere; }
+.ariane-actions fieldset { min-width: 0; display: grid; gap: 10px; margin: 12px 0; }
+.ariane-actions label { display: grid; gap: 4px; min-width: 0; }
+.ariane-actions input, .ariane-actions select, .ariane-actions textarea { width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }
+.ariane-actions textarea { font-family: monospace; }
+.ariane-actions pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 350px; overflow: auto; max-width: 100%; }
+.ariane-actions details { margin: 8px 0; min-width: 0; }
+.ariane-actions button { white-space: normal; max-width: 100%; margin: 4px; }
+.ariane-actions li { margin-bottom: 12px; }

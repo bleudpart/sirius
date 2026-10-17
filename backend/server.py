@@ -410,9 +410,12 @@ from work_conversation import WorkConversation
 work_conversation = WorkConversation(db)
 from finance_workspace import FinanceWorkspace, make_finance_router
 from finance_conversation import FinanceConversation
+from action_runs import ActionRuns, make_action_router
+from finance_actions import make_finance_actions
 
 finance_workspace = FinanceWorkspace(db)
 finance_conversation = FinanceConversation(finance_workspace)
+action_runs = ActionRuns(db, make_finance_actions(finance_workspace))
 
 
 async def _work_chat_response(req, user, request, session_id, history):
@@ -2261,6 +2264,7 @@ api_router.include_router(make_nummarius_router(db))
 from ariane_market_runs import make_ariane_market_router
 api_router.include_router(make_ariane_market_router(db, require_user))
 api_router.include_router(make_finance_router(finance_workspace, require_user))
+api_router.include_router(make_action_router(action_runs, require_user))
 
 from themis_api import make_themis_router
 api_router.include_router(make_themis_router(db))

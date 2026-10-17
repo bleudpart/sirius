@@ -7,6 +7,7 @@ import { downloadWorkJson, emptyWorkData, loadWorkData, mergeWorkBackup, newWork
 import "./WorkModulesPanel.css";
 import ChronosAgenda from "./ChronosAgenda";
 import ArianeMarketRuns from "./ArianeMarketRuns";
+import ArianeActions from "./ArianeActions";
 import FinanceWorkspace from "./FinanceWorkspace";
 
 const ICONS = { CalendarDays, FileText, FolderOpen, ScrollText, Tags, Workflow };
@@ -145,6 +146,7 @@ function WorkModulesWorkspace({ storageKey, initialModule, onClose, onOpenExisti
             <button type="button" onClick={remove}>Confirmer la suppression</button>
             <button type="button" onClick={() => setPendingDelete(null)}>Annuler la suppression</button>
           </div>}
+          {(active === "workflows" || active === "audit") && <ArianeActions key={`${storageKey}-${active}-actions`} auditOnly={active === "audit"} />}
           <fieldset className="work-editable" disabled={!!loaded.error}>
           {(active === "workflows" || active === "audit") && <ArianeMarketRuns key={`${storageKey}-${active}`} auditOnly={active === "audit"} />}
           {active === "audit" && <FinanceWorkspace key={`${storageKey}-finance-audit`} auditOnly />}

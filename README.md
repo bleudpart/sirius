@@ -681,6 +681,101 @@ Guide détaillé : [INSTALL-SIRIUS.md](./INSTALL-SIRIUS.md)
 
 Pour le déploiement en petite entreprise : [GUIDE-ENTREPRISE.md](./GUIDE-ENTREPRISE.md)
 
+### ARIANE : couche commune d'actions (premier raccordement financier)
+
+Le bloc **Actions communes** propose trois parcours guidés : analyse et règles
+de volatilité, préparation d'une surveillance de prix, lecture du portefeuille
+et des surveillances en parallèle. Les paramètres et étapes JSON peuvent être
+consultés/modifiés avant lancement. Les anciennes listes manuelles et l'API
+`market-runs` sont conservées ; elles ne sont pas migrées automatiquement.
+
+Le registre serveur fermé décrit chaque action : module, version, schémas
+Pydantic d'entrée/sortie, lecture/préparation/modification, risque, confirmation,
+délai maximal, tentatives et absence de compensation automatique. Aucun nom
+de fonction Python, code, URL arbitraire ou nouvelle action n'est accepté
+depuis le client. Premier catalogue :
+
+- `portus.analysis` : lecture de marché et calculs PORTUS déterministes ;
+- `portus.volatility_rules` : constats et réserves, aucune alerte créée ;
+- `finance.portfolio` : valorisation du portefeuille déclaré ;
+- `finance.overview` : règles, routines, notifications internes et traces ;
+- `finance.prepare` : aperçu financier, sans appliquer la modification ;
+- `finance.confirm` : application de l'aperçu authentifié exact, **après accord**.
+
+API authentifiée : `GET /api/ariane/actions`, `POST/GET /api/ariane/runs`,
+`GET /api/ariane/runs/{id}`, `POST /{id}/resume`, `POST /{id}/cancel`,
+`POST /{id}/steps/{step}/confirm`. La création reçoit un UUID `request_id`,
+un `objective` et une à douze `steps`. Exemple :
+
+```json
+{
+  "request_id": "fe9cadb1-69a8-4d98-88d9-87baa025af88",
+  "objective": "Analyser AAPL et vérifier sa volatilité",
+  "steps": [
+    {"id": "analyse", "action": "portus.analysis", "inputs": {"symbol": "AAPL", "period": "1y"}},
+    {"id": "regles", "action": "portus.volatility_rules", "depends_on": ["analyse"],
+     "bindings": {"analysis": {"step": "analyse", "path": ["analysis"]}},
+     "inputs": {"volatility_threshold_pct": 30}}
+  ]
+}
+```
+
+Le moteur valide les identifiants, dépendances, cycles et contrats. `bindings`
+relie une entrée de premier niveau au chemin d'un résultat d'une dépendance
+explicite, jamais à un autre compte. Les règles financières exigent une analyse
+issue de `portus.analysis` et la confirmation un aperçu issu de `finance.prepare` :
+les remplacer par des valeurs littérales ou une autre action est refusé.
+Une condition optionnelle `when` contient
+`source: {"step": "...", "path": ["..."]}`, `operator: "eq" | "gt" | "lt"`
+et `value`. `eq` compare le type et la valeur ; `gt`/`lt` exigent des nombres
+finis. Une condition fausse ignore l'étape et ses descendants ; une source
+absente/invalide bloque sans inventer une valeur.
+
+Les étapes prêtes sont exécutées par groupes de quatre, au maximum trente
+secondes et trois tentatives chacune. Un appel ne démarre plus de groupe après
+soixante secondes de traitement ; le dernier groupe engagé peut finir
+(trente secondes de plus, hors attente du stockage). Le suivi peut alors
+nécessiter une reprise explicite pour les étapes restantes.
+Les reprises sont explicites, pas des
+boucles de réessai immédiates. Une tentative sans résultat vérifiable garde un
+bail de soixante secondes avant reprise ; un bogue inattendu est journalisé et
+remonté, jamais maquillé en réussite. Tous les adaptateurs doivent garantir un
+rejeu idempotent. Une reprise relit uniquement les étapes manquantes, conserve
+les captures terminées, et est limitée à vingt-quatre heures. Un changement de
+contrat bloque la reprise et impose un nouveau plan.
+
+Chaque étape sensible reste `WAITING_CONFIRMATION` avec les **entrées résolues
+complètes**, l'aperçu financier authentifié et une empreinte SHA256 liée au
+parcours, à l'étape, au contrat et aux entrées. La confirmation envoie
+`{"confirm": true, "fingerprint": "..."}` ; elle ne vaut pas pour les étapes
+sensibles suivantes. L'aperçu financier conserve sa propre expiration de
+trente minutes et ses gardes de révision/concurrence. Aucun « oui » général ne
+donne une autorisation globale.
+
+L'arrêt empêche les prochaines étapes, mais une action déjà engagée peut finir.
+Il ne prétend pas annuler ou compenser les actions terminées. L'écran distingue
+réalisé, ignoré, bloqué, en cours et accord attendu ; NÉMÉSIS expose le même
+parcours **en consultation uniquement**, avec export JSON des preuves. Une
+coupure après modification peut laisser un résultat partiel : consulter et
+reprendre la même référence, pas en créer une seconde.
+
+Les résultats d'action indiquent explicitement `completion: COMPLETE | PARTIAL`
+et leurs réserves. Une valorisation partielle garde ses lignes disponibles
+comme preuve de tentative, mais l'étape reste **bloquée** : aucun total inventé
+ni déclenchement des étapes dépendantes. Les reprises restent bornées.
+
+Les cinq collections `sirius_action_runs`, `sirius_action_steps`,
+`sirius_action_controls`, `sirius_action_attempts`, `sirius_action_events`
+utilisent l'isolation par compte et les insertions atomiques SQLite/Mongo ;
+elles sont incluses dans l'effacement du compte. Les résultats terminés font
+foi même si le dernier événement manque. Historique : vingt parcours ;
+journal affiché : cent événements, troncature signalée.
+
+Ce socle est progressif : seuls les adaptateurs financiers ci-dessus sont
+exécutables. Pas encore de planification conversationnelle générale, de
+permissions d'autonomie personnalisables, d'actions THÉMIS/courriel/HACCP,
+de compensation ni de moteur universel de déclencheurs. Aucun passage d'ordre.
+
 ### ARIANE → PORTUS : premier parcours réellement exécuté
 
 Dans ARIANE, le bloc « Parcours financier exécutable » lance une analyse en
