@@ -77,7 +77,7 @@ if [[ -n "$FRONTEND_ARCHIVE" ]]; then
   mv -Tf "$WEB_DIR/current.next" "$WEB_DIR/current"
   install -m 0644 "$APP_DIR/deploy/hetzner/Caddyfile" /etc/caddy/Caddyfile
   systemctl reload caddy
-  if [[ "$(curl -fsS --max-time 10 -H 'Host: sirius-assistant.fr' http://127.0.0.1:8080/deploy-sha.txt)" != "$EXPECTED_SHA" ]]; then
+  if [[ "$(curl -fsS --max-time 10 http://127.0.0.1:8080/deploy-sha.txt)" != "$EXPECTED_SHA" ]]; then
     echo "Echec de verification du site publie." >&2
     exit 1
   fi

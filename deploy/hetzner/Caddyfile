@@ -20,8 +20,6 @@ api.sirius-assistant.fr {
 	root * /var/www/sirius/current
 	encode zstd gzip
 	header X-Content-Type-Options nosniff
-	header /index.html Cache-Control "no-cache"
-	header /deploy-sha.txt Cache-Control "no-store"
 
 	handle /static/* {
 		root * /var/www/sirius/assets
