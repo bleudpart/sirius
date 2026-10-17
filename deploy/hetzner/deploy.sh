@@ -5,6 +5,9 @@ APP_DIR="${SIRIUS_APP_DIR:-/opt/sirius}"
 BACKEND_DIR="$APP_DIR/backend"
 VENV_DIR="$APP_DIR/.venv"
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-$APP_DIR/.cache/ms-playwright}"
+FRONTEND_ARCHIVE="${1:-}"
+EXPECTED_SHA="${2:-}"
+WEB_DIR="/var/www/sirius"
 
 if [[ "${EUID}" -ne 0 ]]; then
   exec sudo "$0" "$@"
@@ -16,6 +19,12 @@ if [[ ! -d "$APP_DIR/.git" ]]; then
 fi
 
 cd "$APP_DIR"
+if [[ -n "$FRONTEND_ARCHIVE" ]]; then
+  if [[ ! "$EXPECTED_SHA" =~ ^[a-f0-9]{40}$ || "$FRONTEND_ARCHIVE" != "/tmp/sirius-frontend-$EXPECTED_SHA/frontend-web.tar.gz" || ! -f "$FRONTEND_ARCHIVE" ]]; then
+    echo "Archive frontend ou revision invalide." >&2
+    exit 1
+  fi
+fi
 BEFORE_REQUIREMENTS=""
 if [[ -f "$BACKEND_DIR/requirements.txt" ]]; then
   BEFORE_REQUIREMENTS="$(sha256sum "$BACKEND_DIR/requirements.txt" | awk '{print $1}')"
@@ -23,6 +32,10 @@ fi
 
 echo "==> Mise à jour du dépôt"
 sudo -u sirius git fetch --prune origin master
+if [[ -n "$EXPECTED_SHA" && "$(sudo -u sirius git rev-parse origin/master)" != "$EXPECTED_SHA" ]]; then
+  echo "Le commit a ete remplace sur master ; ce deploiement est abandonne." >&2
+  exit 1
+fi
 sudo -u sirius git reset --hard origin/master
 chown -R sirius:sirius "$APP_DIR"
 
@@ -44,6 +57,32 @@ fi
 if grep -Eq '^playwright([<=>=~! ]|$)' "$BACKEND_DIR/requirements.txt"; then
   install -d -o sirius -g sirius -m 0755 "$PLAYWRIGHT_BROWSERS_PATH"
   sudo -u sirius env PLAYWRIGHT_BROWSERS_PATH="$PLAYWRIGHT_BROWSERS_PATH" "$VENV_DIR/bin/python" -m playwright install chromium
+fi
+
+if [[ -n "$FRONTEND_ARCHIVE" ]]; then
+  echo "==> Publication du site statique"
+  install -d -m 0755 "$WEB_DIR/releases" "$WEB_DIR/assets/static"
+  STAGING_DIR="$(mktemp -d "$WEB_DIR/releases/.incoming.XXXXXX")"
+  tar --no-same-owner --no-same-permissions -xzf "$FRONTEND_ARCHIVE" -C "$STAGING_DIR"
+  if [[ ! -s "$STAGING_DIR/index.html" || ! -d "$STAGING_DIR/static" || "$(cat "$STAGING_DIR/deploy-sha.txt")" != "$EXPECTED_SHA" ]]; then
+    echo "Le build frontend ne correspond pas au commit attendu." >&2
+    exit 1
+  fi
+  chmod -R a+rX "$STAGING_DIR"
+  cp -a "$STAGING_DIR/static/." "$WEB_DIR/assets/static/"
+  RELEASE_DIR="$WEB_DIR/releases/$EXPECTED_SHA-${STAGING_DIR##*.}"
+  mv "$STAGING_DIR" "$RELEASE_DIR"
+  caddy validate --config "$APP_DIR/deploy/hetzner/Caddyfile" --adapter caddyfile
+  ln -sfn "$RELEASE_DIR" "$WEB_DIR/current.next"
+  mv -Tf "$WEB_DIR/current.next" "$WEB_DIR/current"
+  install -m 0644 "$APP_DIR/deploy/hetzner/Caddyfile" /etc/caddy/Caddyfile
+  systemctl reload caddy
+  if [[ "$(curl -fsS --max-time 10 -H 'Host: sirius-assistant.fr' http://127.0.0.1:8080/deploy-sha.txt)" != "$EXPECTED_SHA" ]]; then
+    echo "Echec de verification du site publie." >&2
+    exit 1
+  fi
+  rm -f -- "$FRONTEND_ARCHIVE"
+  rmdir -- "$(dirname "$FRONTEND_ARCHIVE")"
 fi
 
 echo "==> Redémarrage du service"

@@ -6,6 +6,7 @@ on:
     branches: [master]
     paths:
       - "backend/**"
+      - "frontend/**"
       - "deploy/**"
       - ".github/workflows/deploy-hetzner.yml"
 
@@ -39,6 +40,29 @@ jobs:
     if: ${{ needs.check-hetzner-secret.outputs.has_host == 'true' }}
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build website for Hetzner
+        working-directory: frontend
+        env:
+          REACT_APP_BACKEND_URL: https://api.sirius-assistant.fr
+        run: |
+          npm ci --legacy-peer-deps
+          npm run build
+          printf '%s\n' "$GITHUB_SHA" > build/deploy-sha.txt
+          tar -czf ../frontend-web.tar.gz -C build .
+      - name: Transfer website
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_USER }}
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          source: frontend-web.tar.gz
+          target: /tmp/sirius-frontend-${{ github.sha }}
       - name: Deploy on Hetzner VPS
         uses: appleboy/ssh-action@v1.2.2
         with:
@@ -46,6 +70,6 @@ jobs:
           username: ${{ secrets.HETZNER_USER }}
           key: ${{ secrets.HETZNER_SSH_KEY }}
           command_timeout: 20m
-          script_stop: true
           script: |
-            sudo /opt/sirius/deploy/hetzner/deploy.sh
+            set -eu
+            sudo /opt/sirius/deploy/hetzner/deploy.sh /tmp/sirius-frontend-${{ github.sha }}/frontend-web.tar.gz "${{ github.sha }}"

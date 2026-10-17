@@ -9,8 +9,37 @@ api.sirius-assistant.fr {
 			read_timeout 0s
 			write_timeout 0s
 		}
+
 		header_up X-Forwarded-Proto {scheme}
 		header_up X-Forwarded-Host {host}
 		header_up X-Real-IP {remote_host}
 	}
+}
+
+(sirius_website) {
+	root * /var/www/sirius/current
+	encode zstd gzip
+	header X-Content-Type-Options nosniff
+	header /index.html Cache-Control "no-cache"
+	header /deploy-sha.txt Cache-Control "no-store"
+
+	handle /static/* {
+		root * /var/www/sirius/assets
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+	handle {
+		try_files {path} /index.html
+		header Cache-Control "no-cache"
+		file_server
+	}
+}
+
+sirius-assistant.fr, www.sirius-assistant.fr {
+	import sirius_website
+}
+
+http://127.0.0.1:8080 {
+	bind 127.0.0.1
+	import sirius_website
 }

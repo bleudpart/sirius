@@ -1,6 +1,8 @@
-# Déploiement Hetzner de l’API SIRIUS
+# Déploiement Hetzner du site et de l’API SIRIUS
 
 Kit prévu pour un VPS Hetzner Cloud CX22 sous Ubuntu 24.04, avec Caddy en HTTPS automatique devant FastAPI/Uvicorn sur `127.0.0.1:8001`.
+Le site React est servi directement par Caddy, sans lancer Node sur le VPS.
+Sa compilation se fait dans GitHub Actions, pas dans Render ni sur le VPS.
 
 ## 1. Préparer la clé SSH Windows
 
@@ -80,6 +82,17 @@ Dans la zone DNS de `sirius-assistant.fr`, pointez `api.sirius-assistant.fr` ver
 
 Caddy obtiendra automatiquement le certificat Let’s Encrypt quand le domaine pointera vers le VPS.
 
+Pour héberger aussi le site, après publication et vérification locale du build :
+
+- remplacer le `A @` par l’IPv4 Hetzner ;
+- remplacer le `CNAME www` par `sirius-assistant.fr` ;
+- retirer les anciens `A`/`AAAA` de ces deux noms qui pointent ailleurs, sans
+  toucher aux enregistrements de messagerie, de vérification ou à `api`.
+
+Conserver Render pendant la propagation. Le fichier Caddy fourni cible les
+trois noms `api.sirius-assistant.fr`, `sirius-assistant.fr` et `www.sirius-assistant.fr` :
+adapter ces noms avant installation pour un autre domaine.
+
 ## 7. Déploiement GitHub Actions
 
 Ajoutez les secrets GitHub :
@@ -95,6 +108,22 @@ Pour l’utilisateur non-root `deploy`, `setup.sh` crée la règle sudoers limit
 ```
 
 Le workflow `.github/workflows/deploy-hetzner.yml` ne fait rien si `HETZNER_HOST` est vide.
+Il se déclenche aussi sur les changements frontend. Il compile avec
+`REACT_APP_BACKEND_URL=https://api.sirius-assistant.fr`, transfère le build par SSH,
+puis publie le commit exact. Les limites et la facturation GitHub Actions
+restent applicables ; aucune minute de compilation Render n’est consommée.
+
+Les versions du site restent dans `/var/www/sirius/releases`. Le lien `current`
+est remplacé atomiquement après validation du build et de la configuration Caddy.
+Les ressources hachées restent dans `/var/www/sirius/assets/static` pour les
+onglets déjà ouverts. Ces versions et ressources sont conservées : surveiller
+l’espace disque et nettoyer uniquement les versions identifiées comme inutiles.
+`/deploy-sha.txt` permet de vérifier le commit réellement servi.
+Le port de contrôle `8080` écoute uniquement sur `127.0.0.1`.
+
+Lors de la première migration d’un ancien déploiement API seul, mettre à jour
+le script `deploy.sh` sur le serveur avec la version committée avant le premier
+workflow incluant le site. Aucun accès sudo supplémentaire n’est nécessaire.
 
 ## 8. Déployer manuellement
 
@@ -103,7 +132,13 @@ sudo /opt/sirius/deploy/hetzner/deploy.sh
 ```
 
 Le script fait `git fetch/reset origin/master`, réinstalle les dépendances si `backend/requirements.txt` change, redémarre `sirius` et vérifie `/api/health`.
+Sans argument, il ne remplace pas le site. Pour publier le site, utiliser le
+workflow GitHub Actions : il fournit l’archive et le SHA attendus, puis vérifie
+le site sur la boucle locale avant le contrôle de santé API.
 
 ## 9. Rollback
 
 Plan de retour rapide : remettez les enregistrements DNS `A/AAAA` de `api.sirius-assistant.fr` vers Render. Tant que le TTL est bas, le retour est rapide. Gardez Render actif jusqu’à validation complète du VPS.
+Pour le site seulement, restaurer les anciennes entrées `@` et `www` vers Render,
+sans modifier `api`. Une version locale antérieure peut aussi être réactivée en
+remplaçant le lien `/var/www/sirius/current` par la version choisie.
