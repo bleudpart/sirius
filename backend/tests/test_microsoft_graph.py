@@ -4,6 +4,33 @@ from fastapi import HTTPException
 import microsoft_graph
 
 
+@pytest.mark.parametrize("failed_source", [None, "contacts", "emails", "evenements"])
+def test_unified_search_reports_partial_failures_without_discarding_results(monkeypatch, failed_source):
+    from unittest.mock import AsyncMock
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    monkeypatch.setattr(microsoft_graph, "require_user", AsyncMock(return_value={"user_id": "search-user"}))
+    calls = {}
+    for source, function in (("contacts", "ms_contacts"), ("emails", "ms_search_mail"), ("evenements", "ms_search_events")):
+        mock = AsyncMock(side_effect=HTTPException(403, "private internal failure")) if source == failed_source else AsyncMock(return_value=[{"id": source}])
+        monkeypatch.setattr(microsoft_graph, function, mock)
+        calls[source] = mock
+    app = FastAPI()
+    app.include_router(microsoft_graph.make_microsoft_router(_FakeDB()))
+    with TestClient(app) as client:
+        response = client.get("/microsoft/search", params={"query": "Client", "top": 8})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == (2 if failed_source else 3)
+    assert "private internal failure" not in response.text
+    for source in calls:
+        assert data["sources"][source]["status"] == ("unavailable" if source == failed_source else "available")
+        assert data[source] == ([] if source == failed_source else [{"id": source}])
+        calls[source].assert_awaited_once()
+    if failed_source:
+        assert data["sources"][failed_source]["http_status"] == 403
+
+
 class _FakeCollection:
     """Mini-remplaçant en mémoire d'une collection Motor, pour tester le routeur Microsoft
     sans dépendre du client Mongo global de server.py (qui, lié à une boucle asyncio précise,

@@ -80,13 +80,25 @@ des API vocales. Un verdict ne s'affiche qu'après le résultat réel ; ce parco
 prend environ 2,8 secondes lorsque les réponses sont immédiates, sans retarder
 les requêtes réseau. Ces contrôles ne testent pas les fournisseurs IA ni les
 permissions du microphone.
-Le texte final et la narration partagent le même script :
-« Connexion établie. Bonjour Daniel. Je suis ΣIRIUS. Je suis prêt à vous accompagner. »
+La narration lit tout le panneau de vérification : titre, quatre verdicts réels,
+puis accueil personnalisé « Connexion établie. Bonjour Daniel. Je suis ΣIRIUS.
+Je suis prêt à vous accompagner. » Elle ne se limite plus à cette dernière phrase.
+Le texte du panneau reste doré avec une police de lecture sans empattement,
+y compris son titre ; les échecs conservent leur couleur d'alerte.
+La progression RGB mesure 2 px, sans halo épais.
 Le prénom est adapté au compte, et le nom se prononce « Sirius », sans lire le sigma.
-Le texte commence avec la voix : sa progression suit la position de lecture audio
+L'accueil écrit commence lorsque sa partie du script est atteinte, après la lecture
+des contrôles : sa progression suit la position de lecture audio
 ou les événements de mots de la synthèse locale. Sans ces événements, le rythme est
 estimé uniquement pendant la parole ; la fin de lecture complète le texte.
 Un échec de connexion ou de configuration remplace l'annonce de réussite.
+La voix du boot utilise un débit légèrement relevé (0,96 au lieu de 0,85 pour la
+synthèse locale/Google), sans abaissement artificiel de la hauteur. La lecture
+audio Android distante est accélérée de 6 % en préservant sa hauteur.
+Les autres narrations cinématiques gardent leurs réglages. La diction effective
+dépend toujours de la voix installée ou du fournisseur utilisé.
+Le délai de sécurité s'adapte à la longueur du script pour ne pas couper la
+lecture complète après vingt secondes.
 Le délai de première réponse reste tributaire de la connexion et du fournisseur ;
 le flux ou l'affichage progressif ne garantissent pas un délai de génération fixe.
 
@@ -94,7 +106,8 @@ le flux ou l'affichage progressif ne garantissent pas un délai de génération 
 
 Le démarrage affiche les verdicts au fil des réponses réelles dans un journal
 compact façon Display. Il n'attend plus une présentation générée par l'IA et
-ne récite plus les services : l'accueil vocal est personnalisé et bref.
+ne récite pas le catalogue des services : la voix lit le panneau des quatre
+contrôles puis l'accueil personnalisé.
 Les limites et configurations restent dans « Détail des vérifications » ;
 l'ouverture de ce détail suspend la fermeture automatique. Un serveur
 injoignable reste annoncé comme tel, avec possibilité de réessayer.
@@ -687,6 +700,55 @@ La boîte **À traiter avec SIRIUS** est accessible dans les dossiers,
 ARIANE et CHRONOS. Elle rassemble les signaux métier sourcés, engagements,
 éléments à relire, validations des parcours communs, blocages, rappels et
 notifications internes. Les anciennes listes manuelles restent distinctes.
+Le guide de démarrage présente ces usages depuis « Que voulez-vous faire
+avec ΣIRIUS ? ». Dans le HUD, Réglages est séparé des outils audio/photo,
+près du logo en début de barre supérieure, y compris sur mobile.
+
+### Accueil guidé, recherche et confidentialité — sources non reconstruites
+
+L'objectif **Préparer ma journée** du guide propose une première action complète :
+explication en trois étapes, lecture du bilan réel des dossiers et échéances,
+puis choix de la suite dans les dossiers. Ce parcours est en lecture seule,
+sans clé IA ni connexion Outlook obligatoires. Il nécessite le service connecté ;
+il n'invente aucune tâche lorsqu'il n'y a pas de données. Une erreur ou un délai
+dépassé expose sa conséquence et une reprise explicite, sans répétition infinie.
+La préparation est interruptible et conserve son dernier bilan reçu.
+
+**Rechercher dans ΣIRIUS**, accessible en barre supérieure, dans le guide,
+dans Modules et par « cherche partout Dupont », réunit les fonctions/réglages,
+les dossiers du compte et les contacts, courriels et rendez-vous Microsoft.
+Les lectures distantes partent en parallèle, avec un délai de douze secondes par
+source ; chaque résultat apparaît sans attendre les autres. Arrêter conserve les
+résultats reçus. Une panne Microsoft, y compris celle d'une seule catégorie,
+ne devient plus une fausse absence de résultat. Un ancien serveur sans état de
+source est explicitement signalé comme non confirmé.
+Les dossiers peuvent être ouverts directement ; un contact permet de préparer,
+jamais envoyer implicitement, un message. Les mots-clés sont transmis au service
+et à Microsoft ; aucune requête distante ne part à la simple ouverture vide.
+La recherche de fonctions accepte accents et synonymes du registre existant,
+sans correction approximative des noms de clients. Les pièces, factures,
+anciennes conversations et listes locales ne sont pas encore indexées.
+La recherche Microsoft est bornée à huit éléments par catégorie et l'agenda aux
+trente prochains jours ; un résultat vide n'est donc pas une recherche exhaustive.
+
+**Réglages → Confidentialité et données**, également accessible depuis Modules,
+explique les différences entre appareil, serveur et fournisseur extérieur.
+La page indique le service connecté et le type de voix choisi, sans prétendre
+identifier le fournisseur effectivement utilisé pour chaque réponse.
+Elle raccorde les écrans existants de mémoire, de connexions et de compte
+(export et demande de suppression). L'export du profil n'est pas une sauvegarde
+complète ; ni une durée unique de conservation, ni une conversation privée,
+ni un effacement universel des sauvegardes ne sont promis.
+Un échec d'export du compte est désormais affiché au lieu de rester silencieux.
+
+**Réglages → HUD** ajoute une taille XL (125 %), le contraste renforcé et
+la réduction des mouvements. Ces préférences sont immédiates et persistées sur
+l'appareil, compatibles avec les anciens réglages ; un échec de stockage est
+signalé sans appliquer une préférence prétendument enregistrée.
+La préférence système de mouvement réduit est respectée et les effets du cœur
+passent en mode économique. Les nouveaux contrôles restent utilisables au clavier ;
+la recherche gère Échap, la boucle de focus et le retour au contrôle d'origine.
+Ces ajouts ne constituent pas une certification d'accessibilité de tous les modules.
 
 **Relance complète, sans envoi automatique implicite :**
 

@@ -27,7 +27,11 @@ test("waits for boot and setup, then explains optional connections, voice and al
   await render({ ready: false });
   expect(host.textContent).toBe("");
   await render({ ready: true });
-  expect(host.textContent).toContain("Par où commencer");
+  expect(host.textContent).toContain("Que voulez-vous faire avec ΣIRIUS");
+  expect(host.textContent).not.toContain("SIRIUS");
+  expect(host.textContent).toContain("Voir ce qui est à traiter");
+  expect(host.textContent).toContain("même compte et même service");
+  expect(host.textContent).toContain("pas des notifications push");
   expect(host.textContent).toContain("Cette étape est facultative");
   expect(host.textContent).toContain("sans annuler une action déjà envoyée");
   expect(host.textContent).toContain("Découvrir ODYSSEIA");
@@ -40,8 +44,9 @@ test("waits for boot and setup, then explains optional connections, voice and al
 });
 
 test.each([
-  ["Poser une question", null],
-  ["Organiser mon travail", "dossiers"],
+  ["Parler à ΣIRIUS", null],
+  ["Retrouver mes dossiers", "dossiers"],
+  ["Voir ce qui est à traiter", "workflows"],
   ["Connecter mes comptes", "connections"],
   ["Découvrir ODYSSEIA", "odysseia"],
 ])("shortcut %s uses the existing action and persists dismissal", async (label, id) => {
@@ -59,9 +64,9 @@ test("can be reopened and a different account sees its own first-use guide", asy
   await render();
   expect(host.textContent).toBe("");
   await render({ requested: true });
-  expect(host.textContent).toContain("Par où commencer");
+  expect(host.textContent).toContain("Que voulez-vous faire avec ΣIRIUS");
   await render({ requested: false, storageKey: gettingStartedKey({ email: "b@example.test" }) });
-  expect(host.textContent).toContain("Par où commencer");
+  expect(host.textContent).toContain("Que voulez-vous faire avec ΣIRIUS");
   expect(localStorage.getItem(gettingStartedKey({ id: "a" }))).toBe("done");
 });
 

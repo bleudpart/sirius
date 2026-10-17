@@ -174,7 +174,7 @@ export async function playAudio(base64, { volume = 1, onstart, onend } = {}) {
   }
 }
 
-async function speakRemote(message, { voice, rate, pitch, volume = 1, onstart, onend, onprogress, timeoutMs }, seq) {
+async function speakRemote(message, { voice, rate, pitch, volume = 1, onstart, onend, onprogress, timeoutMs, playbackRate = 1 }, seq) {
   const gemini = Capacitor.getPlatform() === "android";
   if (Date.now() < (gemini ? geminiDownUntil : googleDownUntil)) return false;
   const controller = new AbortController();
@@ -219,6 +219,8 @@ async function speakRemote(message, { voice, rate, pitch, volume = 1, onstart, o
       stopChannels();
       const audio = new Audio(`data:${gemini ? "audio/wav" : "audio/mp3"};base64,` + audioBase64);
       audio.volume = Math.max(0.2, Math.min(1, volume));
+      audio.playbackRate = playbackRate;
+      audio.preservesPitch = true;
       currentAudio = audio;
       let started = false;
       let finished = false;
@@ -448,37 +450,40 @@ export function speakSeries(sentence, opts = {}) {
   return seriesChain;
 }
 
-// Présentation au démarrage : voix grave et posée, style bande-annonce de film
-export function speakCinematic(message, { onstart, onend, onprogress } = {}) {
+// Le boot peut conserver un timbre naturel sans changer les autres présentations.
+export function speakCinematic(message, { onstart, onend, onprogress, natural = false } = {}) {
   if (!message) { (onend || (() => {}))(); return; }
   message = cleanTextForSpeech(message);
   if (!message) { (onend || (() => {}))(); return; }
   const cfg = loadVoiceConfig();
+  const rate = natural ? 0.96 : 0.85;
+  const browserPitch = natural ? 1 : 0.95;
   const seq = ++speakSeq; utterances += 1; lastUtteranceAt = Date.now();
   stopChannels();
   ({ onstart, onend } = speechCallbacks(seq, onstart, onend));
   if (isBrowserVoice(cfg.name)) {
-    speakBrowser(message, { rate: 0.85, pitch: 0.95, gender: getBrowserGender(cfg.name), onstart, onend, onprogress });
+    speakBrowser(message, { rate, pitch: browserPitch, gender: getBrowserGender(cfg.name), onstart, onend, onprogress });
     return;
   }
   if (Capacitor.getPlatform() === "android") {
     speakRemote(message, {
       voice: "fr-FR-Neural2-G",
-      rate: 0.85,
-      pitch: -3,
+      rate,
+      pitch: natural ? 0 : -3,
+      playbackRate: natural ? 1.06 : 1,
       onstart,
       onend,
       onprogress,
       timeoutMs: 6000,
     }, seq).then((ok) => {
       if (!ok && seq === speakSeq) {
-        speakBrowser(message, { rate: 0.85, pitch: 0.95, gender: FEMALE.test(cfg.name) ? "female" : "male", onstart, onend, onprogress });
+        speakBrowser(message, { rate, pitch: browserPitch, gender: FEMALE.test(cfg.name) ? "female" : "male", onstart, onend, onprogress });
       }
     });
     return;
   }
-  speakRemote(message, { voice: cfg.name, rate: 0.85, pitch: Math.max(-10, cfg.pitch - 3), onstart, onend, onprogress }, seq).then((ok) => {
-    if (!ok && seq === speakSeq) speakBrowser(message, { rate: 0.85, pitch: 0.62, onstart, onend, onprogress });
+  speakRemote(message, { voice: cfg.name, rate, pitch: natural ? cfg.pitch : Math.max(-10, cfg.pitch - 3), onstart, onend, onprogress }, seq).then((ok) => {
+    if (!ok && seq === speakSeq) speakBrowser(message, { rate, pitch: natural ? 1 : 0.62, onstart, onend, onprogress });
   });
 }
 

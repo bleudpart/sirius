@@ -63,10 +63,14 @@ export function createModuleRegistry({ icons, actions, state, user, platform = "
     openSportCoach,
     openVoiceProfile,
     openGettingStarted,
+    openWorkspaceSearch,
+    openPrivacy,
   } = actions;
 
   return [
     { id: "getting-started", group: "OUTILS", label: "Guide de démarrage", Icon: icons.BadgeInfo, run: openGettingStarted },
+    { id: "workspace-search", group: "OUTILS", label: "Rechercher — dossiers, Microsoft et fonctions", Icon: icons.FolderOpen, run: openWorkspaceSearch },
+    { id: "privacy", group: "SYSTÈME", label: "Confidentialité et données", Icon: icons.ShieldCheck, run: openPrivacy },
     { id: "voice-profile", group: "SYSTÈME", label: "Ma voix et ma diction", Icon: icons.Mic, run: openVoiceProfile },
     { id: "reload", group: "SYSTÈME", label: "Recharger ΣIRIUS", Icon: icons.RotateCcw, run: reload },
     { id: "display", group: "MÉDIAS", label: "ΣIRIUS DISPLAY", Icon: icons.Monitor, active: state.displayOpen, run: toggleDisplay },

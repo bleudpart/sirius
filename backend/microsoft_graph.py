@@ -1009,6 +1009,13 @@ def make_microsoft_router(db):
             ms_search_events(db, user["user_id"], query, top=top),
             return_exceptions=True,
         )
+        sources = {}
+        for name, result in (("contacts", contacts), ("emails", mails), ("evenements", events)):
+            available = isinstance(result, list)
+            sources[name] = {"status": "available" if available else "unavailable"}
+            if not available:
+                logger.warning("Microsoft search source unavailable: %s (%s)", name, type(result).__name__)
+                sources[name]["http_status"] = result.status_code if isinstance(result, HTTPException) else None
         contacts = contacts if isinstance(contacts, list) else []
         mails = mails if isinstance(mails, list) else []
         events = events if isinstance(events, list) else []
@@ -1018,6 +1025,7 @@ def make_microsoft_router(db):
             "emails": mails,
             "evenements": events,
             "total": len(contacts) + len(mails) + len(events),
+            "sources": sources,
         }
 
     @router.get("/microsoft/calendar/today")

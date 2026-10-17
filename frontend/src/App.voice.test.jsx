@@ -30,8 +30,15 @@ jest.mock("./lazyModules", () => new Proxy({}, { get: (_, key) => {
   if (key === "MediaModulesPanel") return ({ onClose }) => (
     <div data-testid="media-modules-panel"><button onClick={onClose}>Fermer le catalogue</button></div>
   );
-  if (key === "SiriusSetup") return ({ onCancel }) => (
-    <div data-testid="workspace-SiriusSetup"><button onClick={onCancel}>Fermer</button></div>
+  if (key === "SiriusSetup") return ({ onCancel, initialTab }) => (
+    <div data-testid="workspace-SiriusSetup" data-tab={initialTab}><button onClick={onCancel}>Fermer</button></div>
+  );
+  if (key === "WorkspaceSearch") return ({ initialQuery, onClose, onDossier }) => (
+    <div data-testid="workspace-WorkspaceSearch" data-query={initialQuery}><button onClick={onClose}>Fermer la recherche</button>
+      <button onClick={() => { onClose(); onDossier("search-dossier"); }}>Ouvrir ce dossier</button></div>
+  );
+  if (key === "WorkModulesPanel") return ({ initialModule, onClose }) => (
+    <div data-testid="workspace-WorkModulesPanel" data-module={initialModule}><button onClick={onClose}>Fermer</button></div>
   );
   if (key === "Odysseia") return ({ open, onClose }) => open ? (
     <div data-testid="workspace-Odysseia"><button onClick={onClose}>Fermer</button></div>
@@ -444,6 +451,17 @@ test("the desktop workspace connects to existing wheels, settings, dossiers and 
   await clickEntry("Assistant");
   await act(async () => jest.advanceTimersByTime(0));
   expect(document.activeElement).toBe(host.querySelector('[data-testid="sirius-cmd-input"]'));
+});
+
+test("settings starts the header beside the brand, outside microphone and capture tools", async () => {
+  await mount();
+  const settings = host.querySelector('[data-testid="sirius-profile-btn"]');
+  expect(host.querySelectorAll('[data-testid="sirius-profile-btn"]')).toHaveLength(1);
+  expect(settings.closest(".top-bar-start").querySelector('[data-testid="sirius-brand-tag"]')).not.toBeNull();
+  expect(settings.closest(".conn-status")).toBeNull();
+  expect(settings.getAttribute("aria-label")).toBe("Réglages");
+  await act(async () => settings.click());
+  expect(host.querySelector('[data-testid="workspace-SiriusSetup"]')).not.toBeNull();
 });
 
 test("une initiative rejoint le Display et le contexte de la reponse suivante", async () => {
@@ -1460,7 +1478,7 @@ test("native unavailability explicitly falls back to server capture", async () =
 test("first-use guide focuses the written chat and can be reopened from the module registry", async () => {
   await mount();
   expect(host.querySelector('[data-testid="getting-started"]')).not.toBeNull();
-  const question = [...host.querySelectorAll(".getting-started-actions button")].find((button) => button.textContent.includes("Poser une question"));
+  const question = [...host.querySelectorAll(".getting-started-actions button")].find((button) => button.textContent.includes("Parler à ΣIRIUS"));
   await act(async () => question.click());
   await act(async () => jest.advanceTimersByTime(1));
   expect(host.querySelector('[data-testid="getting-started"]')).toBeNull();
@@ -1472,6 +1490,30 @@ test("first-use guide focuses the written chat and can be reopened from the modu
   await act(async () => document.querySelector('[data-testid="modules-menu-item-getting-started"]').click());
   expect(host.querySelector('[data-testid="getting-started"]')).not.toBeNull();
   expect(document.querySelector('[data-testid="modules-menu"]')).toBeNull();
+  const inbox = [...host.querySelectorAll(".getting-started-actions button")].find((button) => button.textContent.includes("Voir ce qui est à traiter"));
+  await act(async () => inbox.click());
+  expect(host.querySelector('[data-testid="getting-started"]')).toBeNull();
+  expect(host.querySelector('[data-testid="workspace-WorkModulesPanel"]').getAttribute("data-module")).toBe("workflows");
+});
+
+test("search is accessible from the header and conversation and opens a real dossier surface", async () => {
+  await mount();
+  await act(async () => host.querySelector(".getting-started-dismiss").click());
+  await act(async () => host.querySelector('[aria-label="Rechercher dans ΣIRIUS"]').click());
+  expect(host.querySelector('[data-testid="workspace-WorkspaceSearch"]').getAttribute("data-query")).toBe("");
+  await act(async () => [...host.querySelectorAll("button")].find((button) => button.textContent === "Fermer la recherche").click());
+  await send("cherche partout Dupont");
+  expect(host.querySelector('[data-testid="workspace-WorkspaceSearch"]').getAttribute("data-query")).toBe("dupont");
+  await act(async () => [...host.querySelectorAll("button")].find((button) => button.textContent === "Ouvrir ce dossier").click());
+  expect(host.querySelector('[data-testid="workspace-WorkspaceSearch"]')).toBeNull();
+  expect(host.querySelector('[data-testid="workspace-WorkDossiersPanel"]')).not.toBeNull();
+});
+
+test("privacy module opens its real settings tab rather than the technical API tab", async () => {
+  await mount();
+  await act(async () => host.querySelector(".getting-started-dismiss").click());
+  await send("ouvre confidentialité et données");
+  expect(host.querySelector('[data-testid="workspace-SiriusSetup"]').getAttribute("data-tab")).toBe("confidentialite");
 });
 
 test("pointer Stop discards the buffered phrase before the global push-to-talk release", async () => {

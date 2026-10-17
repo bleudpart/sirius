@@ -625,7 +625,13 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
   const [readyTextLength, setReadyTextLength] = useState(0);
   const voiceWarnings = checks.filter(({ state, label }) =>
     state === false && label === "Interface vocale").map(() => "L'interface vocale est indisponible.");
-  const introSpeech = [readyMessage, ...voiceWarnings].join(" ");
+  const narrationPrefix = [
+    "Initialisation de votre espace.",
+    ...checks.map(({ label, state, success }) => `${label} : ${state === null ? "en cours" : state ? success : "indisponible"}.`),
+  ].join(" ");
+  const welcomeSpeech = [readyMessage, ...voiceWarnings].join(" ");
+  const introSpeech = `${narrationPrefix} ${welcomeSpeech}`;
+  const welcomeOffset = narrationPrefix.length + 1;
   introSpeechRef.current = introSpeech;
   const readyTextComplete = readyTextLength >= introSpeech.length;
   useEffect(() => {
@@ -645,6 +651,7 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
       }
     } catch (e) {}
     speakCinematic(introSpeech, {
+      natural: true,
       onstart: () => {
         speechStartedRef.current = true;
         setSpeechPlaying(true);
@@ -702,10 +709,7 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
 
   useEffect(() => {
     if (!narrationReady) return undefined;
-    // Présentation vocale : voix française grave et posée, style bande-annonce
-    // (équivalents français des mots de l'acronyme : mêmes initiales S.I.R.I.U.S,
-    //  la voix française butait sur les mots anglais comme « Responsive »)
-    // Garde anti-écho : une seule présentation vocale par chargement de page
+    // Même script que la fenêtre de vérification, une seule fois par chargement.
     if (!window.__siriusBootSpoken) {
       window.__siriusBootSpoken = true;
       playIntroSpeech();
@@ -741,7 +745,7 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
       setSpeechPlaying(false);
       setSpeechDone(true);
       finishText();
-    }, 20000);
+    }, Math.max(30000, Math.min(90000, introSpeech.length * 100 + 10000)));
     return () => { clearTimeout(hardStop); stopPad(); };
   }, [lines.length, onDone, narrationReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -863,7 +867,7 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
           ))}
           {loaded && <p className={`boot-ready ${readyTextComplete ? "boot-ready-complete" : ""}`}
             data-testid="boot-ready" aria-live="off">
-            {introSpeech.slice(0, readyTextLength)}
+            {welcomeSpeech.slice(0, Math.max(0, readyTextLength - welcomeOffset))}
           </p>}
         </div>
         <div className="boot-bar" role="progressbar" aria-label="Chargement de ΣIRIUS"

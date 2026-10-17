@@ -198,19 +198,24 @@ test("the real welcome message appears progressively at a readable pace", async 
   await render(<BootScreen connected onDone={jest.fn()} />);
   const ready = container.querySelector('[data-testid="boot-ready"]');
   const fullMessage = "Connexion établie. Bonjour. Je suis ΣIRIUS. Je suis prêt à vous accompagner.";
+  const narrated = speakCinematic.mock.calls[0][0];
+  const offset = narrated.length - fullMessage.length;
   expect(ready.textContent).toBe("");
   await flush(1000);
   expect(ready.textContent).toBe("");
   act(() => speakCinematic.mock.calls[0][1].onstart());
   await flush(320);
-  expect(ready.textContent.length).toBeGreaterThan(0);
-  expect(ready.textContent.length).toBeLessThan(fullMessage.length);
+  expect(ready.textContent).toBe("");
   act(() => speakCinematic.mock.calls[0][1].onprogress(0.5));
-  expect(ready.textContent).toBe(fullMessage.slice(0, Math.floor(fullMessage.length / 2)));
+  expect(ready.textContent).toBe("");
+  const fraction = (offset + Math.floor(fullMessage.length / 2)) / narrated.length;
+  act(() => speakCinematic.mock.calls[0][1].onprogress(fraction));
+  const revealed = fullMessage.slice(0, Math.floor(narrated.length * fraction) - offset);
+  expect(ready.textContent).toBe(revealed);
   await flush(1000);
-  expect(ready.textContent).toBe(fullMessage.slice(0, Math.floor(fullMessage.length / 2)));
+  expect(ready.textContent).toBe(revealed);
   act(() => speakCinematic.mock.calls[0][1].onprogress(0.2));
-  expect(ready.textContent).toBe(fullMessage.slice(0, Math.floor(fullMessage.length / 2)));
+  expect(ready.textContent).toBe(revealed);
   act(() => speakCinematic.mock.calls[0][1].onend());
   expect(ready.textContent).toBe(fullMessage);
 });
@@ -221,14 +226,17 @@ test("missing microphone API is reported in both displayed and spoken final scri
   const [message, callbacks] = speakCinematic.mock.calls[0];
   expect(message).toContain("L'interface vocale est indisponible.");
   act(() => callbacks.onend());
-  expect(container.querySelector('[data-testid="boot-ready"]').textContent).toBe(message);
+  expect(message.endsWith(container.querySelector('[data-testid="boot-ready"]').textContent)).toBe(true);
+  expect(container.querySelector('[data-testid="boot-ready"]').textContent).toContain("L'interface vocale est indisponible.");
 });
 
 test("a voice error reveals the current personalized script rather than the initial checking message", async () => {
   await render(<BootScreen userName="Daniel" onDone={jest.fn()} />);
   const [message] = speakCinematic.mock.calls[0];
   act(() => window.dispatchEvent(new CustomEvent("sirius-voice-error")));
-  expect(container.querySelector('[data-testid="boot-ready"]').textContent).toBe(message);
+  const displayed = container.querySelector('[data-testid="boot-ready"]').textContent;
+  expect(message.endsWith(displayed)).toBe(true);
+  expect(displayed).toContain("Bonjour Daniel.");
 });
 
 test("a failed service check is a completed failure, never a successful service", async () => {
@@ -312,20 +320,22 @@ test("an offline screen does not label completed speech as a stuck reader", asyn
   }
 });
 
-test("announces a short personalized welcome without reading every service or generating an AI introduction", async () => {
+test("reads the complete status window in order with a natural voice, without an AI introduction", async () => {
   const onDone = jest.fn();
   await render(<BootScreen connected userName="Daniel" onDone={onDone} />);
   const [message, callbacks] = speakCinematic.mock.calls[0];
-  expect(message).toBe("Connexion établie. Bonjour Daniel. Je suis ΣIRIUS. Je suis prêt à vous accompagner.");
+  expect(message).toBe("Initialisation de votre espace. Interface ΣIRIUS : Initialisée. Connexion au serveur : Connexion établie. Configuration des services : Reçue. Interface vocale : API disponibles. Connexion établie. Bonjour Daniel. Je suis ΣIRIUS. Je suis prêt à vous accompagner.");
+  expect(callbacks.natural).toBe(true);
   expect(message).not.toContain("fournisseur non testé");
   expect(message).not.toContain("Interface Sirius.");
-  expect(message.split(/\s+/).length).toBeLessThanOrEqual(30);
+  expect(message.indexOf("Interface ΣIRIUS")).toBeLessThan(message.indexOf("Bonjour Daniel"));
   expect(generateBootPresentation).not.toHaveBeenCalled();
   act(() => callbacks.onstart());
-  act(() => jest.advanceTimersByTime(5000));
+  act(() => jest.advanceTimersByTime(21000));
   tap();
   expect(onDone).not.toHaveBeenCalled();
   expect(cancelSpeech).not.toHaveBeenCalled();
+  expect(container.textContent).not.toContain("voix indisponible");
   expect(container.textContent).toContain("Bienvenue, Daniel.");
   act(() => callbacks.onend());
   act(() => jest.advanceTimersByTime(500));

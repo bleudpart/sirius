@@ -2191,10 +2191,10 @@ body.hud-minimal .medallion-halo { display: none; }
 }
 .boot-bar {
   width: 100%;
-  height: 6px;
+  height: 2px;
   margin-top: 22px;
   background: rgba(255, 255, 255, 0.08);
-  border-radius: 3px;
+  border-radius: 1px;
   overflow: hidden;
 }
 .boot-bar-fill {
@@ -5398,7 +5398,38 @@ body.hud-minimal .medallion-halo { display: none; }
 .tool-strip::-webkit-scrollbar-thumb { background: rgba(145,230,242,0.5); border-radius: 4px; }
 .tool-strip::-webkit-scrollbar-track { background: transparent; }
 .tool-strip .profile-btn { flex: 0 0 auto; }
-.profile-btn-pinned { flex: 0 0 auto; }
+.top-bar-start {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 10px;
+}
+.top-settings {
+  display: flex;
+  padding-left: 10px;
+  border-left: 1px solid rgba(216, 184, 117, 0.35);
+}
+.top-bar .top-settings-btn {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  color: var(--gold-light, #f2d99a);
+  border-color: rgba(216, 184, 117, 0.55);
+}
+.top-settings-label { display: none; }
+.top-bar .top-settings-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+@media (min-width: 1440px) {
+  .top-bar .top-settings-btn { width: auto; padding: 0 12px; gap: 8px; }
+  .top-settings-label { display: inline; }
+}
+@media (max-width: 1023px) {
+  .top-bar-start { gap: 4px; }
+  .top-settings { padding-left: 4px; }
+}
 /* ===== MODULE HACCP ===== */
 .haccp-body {
   position: relative;
@@ -8492,11 +8523,6 @@ footer.sirius-footer {
   [data-testid="sirius-info-btn"],
   [data-testid="sirius-capture-btn"] {
     display: none;
-  }
-
-  .conn-status .profile-btn-pinned {
-    color: #fcd34d;
-    border-color: rgba(251, 191, 36, 0.55);
   }
 
   .sirius-root.mobile-section-info .sirius-dashboard {

@@ -331,6 +331,32 @@ test("Android local narration and characters bypass remote TTS and keep their pr
   expect(global.fetch).not.toHaveBeenCalled();
 });
 
+test("natural boot narration slightly increases local pace without artificially lowering pitch", () => {
+  localStorage.setItem("sirius_voice", JSON.stringify({ name: "browser-female" }));
+  speakCinematic("Initialisation de votre espace. Bonjour.", { natural: true });
+  expect(speakNative).toHaveBeenLastCalledWith(expect.any(String), expect.objectContaining({
+    rate: 0.96, pitch: 1, gender: "female",
+  }));
+  expect(global.fetch).not.toHaveBeenCalled();
+});
+
+test("natural Android boot audio is six percent faster while preserving pitch", async () => {
+  const previousAudio = global.Audio;
+  const audio = { play: jest.fn().mockResolvedValue(), pause: jest.fn() };
+  global.Audio = jest.fn(() => audio);
+  global.fetch.mockResolvedValue({ ok: true, json: async () => ({ audio_base64: "wav-data" }) });
+  try {
+    speakCinematic("Initialisation de votre espace. Bonjour.", { natural: true });
+    await flush();
+    expect(audio.playbackRate).toBe(1.06);
+    expect(audio.preservesPitch).toBe(true);
+    expect(audio.play).toHaveBeenCalledTimes(1);
+  } finally {
+    cancelSpeech();
+    global.Audio = previousAudio;
+  }
+});
+
 test.each(["web", "android"])("%s pronounces time zones without spelling their letters", async (platform) => {
   Capacitor.getPlatform.mockReturnValue(platform);
   localStorage.setItem("sirius_voice", JSON.stringify({ name: "browser" }));

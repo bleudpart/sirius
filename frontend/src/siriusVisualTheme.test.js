@@ -7,6 +7,22 @@ const root = postcss.parse(css);
 const appCss = fs.readFileSync(path.join(__dirname, "App.css"), "utf8");
 const appRoot = postcss.parse(appCss);
 
+test("accessible preferences reduce motion and the enlarged guide uses its zoomed containing width", () => {
+  const guide = fs.readFileSync(path.join(__dirname, "components", "GettingStarted.css"), "utf8");
+  const search = fs.readFileSync(path.join(__dirname, "WorkspaceSearch.css"), "utf8");
+  expect(guide).toContain("width: min(680px, calc(100% - 24px))");
+  expect(search).toContain("width: min(760px, calc(100% - 24px))");
+  expect(css).toContain("body.hud-reduced-motion");
+  expect(css).toContain("body.hud-high-contrast :focus-visible");
+  expect(css).toContain("animation-iteration-count: 1 !important");
+  const luminance = (hex) => {
+    const linear = hex.match(/\w\w/g).map((pair) => parseInt(pair, 16) / 255)
+      .map((value) => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4);
+    return linear[0] * .2126 + linear[1] * .7152 + linear[2] * .0722;
+  };
+  expect((luminance("ffffff") + .05) / (luminance("071725") + .05)).toBeGreaterThanOrEqual(7);
+});
+
 test("the shared window skin changes surfaces without overriding saved geometry or alert colours", () => {
   const surfaceRules = [];
   root.walkRules((rule) => {

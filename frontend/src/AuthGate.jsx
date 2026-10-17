@@ -308,12 +308,18 @@ export function ProfilePanel({ user, onClose, onUpdate, onLogout }) {
     }
   };
   const exportData = async () => {
-    const response = await fetch(`${API}/api/auth/privacy/export`);
-    if (!response.ok) return;
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a"); link.href = url; link.download = "sirius-personal-data.zip"; link.click();
-    URL.revokeObjectURL(url);
+    setSaveError("");
+    try {
+      const response = await fetch(`${API}/api/auth/privacy/export`);
+      if (!response.ok) throw new Error(`Export indisponible (HTTP ${response.status}).`);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a"); link.href = url; link.download = "sirius-personal-data.zip"; link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Export des données du compte :", error);
+      setSaveError("L'export n'a pas abouti : aucun fichier complet n'est confirmé. Vérifiez votre connexion et votre session, puis réessayez. " + error.message);
+    }
   };
   const deleteAccount = async () => {
     if (user.role === "admin" || !window.confirm("Demander la suppression de votre compte et de vos données personnelles ? Un examen manuel est nécessaire avant leur effacement.")) return;

@@ -49,6 +49,8 @@ export default class FdeErrorBoundary extends Component {
         <div className="fde-module-error" role="alert">
           <AlertTriangle size={16} />
           <span>MODULE ISOLÉ PAR FDE_OMEGA</span>
+          <p>Ce module n'a pas pu s'afficher. Son contenu n'est pas disponible ; cela ne signifie pas que vos données ont été supprimées.</p>
+          <p>Réessayer recharge l'interface. Enregistrez d'abord votre travail dans les autres fenêtres si elles restent accessibles.</p>
           <button type="button" disabled={this.state.retrying} onClick={this.retry}>
             <RotateCcw size={13} /> {this.state.retrying ? "VÉRIFICATION…" : "RÉESSAYER"}
           </button>

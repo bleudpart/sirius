@@ -10,7 +10,7 @@ import {
   AtlasPanel, HeraclesPanel, HephaistosPanel, MythosGallery, Odysseia, ConsultPanel, PrometheePanel, CalliopePanel, CalendarPanel,
   FaceIdPanel, PythagorePanel, PackagerPanel, TrailerGallery, SiriusSetup, FirstRunWizard, PromoPanel, ThemisPanel,
   AdminPanel, EnterprisePanel, PortusNummarius, AgoraPipeline, NewsPanel, ReveilPanel, SpotifyPanel, MediaHUD, ProductivityPanel,
-  FloorPlanPanel, Photo3DPanel, ConnectionsPanel, WorkModulesPanel, WorkDossiersPanel, SportCoachPanel, MediaModulesPanel, VoiceProfilePanel,
+  FloorPlanPanel, Photo3DPanel, ConnectionsPanel, WorkModulesPanel, WorkDossiersPanel, SportCoachPanel, MediaModulesPanel, VoiceProfilePanel, WorkspaceSearch,
 } from "@/lazyModules";
 import { pushStats, setStatsOffline } from "@/liveStats";
 import { formatLocalDate, formatLocalTime, getLocalDateKey } from "@/dateTime";
@@ -600,6 +600,14 @@ function App() {
   const [interruptMicOn, setInterruptMicOn] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [ecoMode, setEcoMode] = useState(() => localStorage.getItem("sirius_eco") === "1");
+  const [reduceVisualEffects, setReduceVisualEffects] = useState(() => loadHud().reducedMotion || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches || false);
+  useEffect(() => {
+    const media = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    const sync = () => setReduceVisualEffects(!!loadHud().reducedMotion || !!media?.matches);
+    window.addEventListener("sirius-hud-preferences", sync);
+    media?.addEventListener?.("change", sync);
+    return () => { window.removeEventListener("sirius-hud-preferences", sync); media?.removeEventListener?.("change", sync); };
+  }, []);
   useEffect(() => { localStorage.setItem("sirius_eco", ecoMode ? "1" : "0"); }, [ecoMode]);
   const [windowHidden, setWindowHidden] = useState(() => document.hidden);
   useEffect(() => {
@@ -1010,6 +1018,7 @@ function App() {
   const [showInfoWheel, setShowInfoWheel] = useState(false);
   const [showMediaModules, setShowMediaModules] = useState(false);
   const [showGettingStarted, setShowGettingStarted] = useState(false);
+  const [workspaceSearch, setWorkspaceSearch] = useState(null);
   const [showKeysStatus, setShowKeysStatus] = useState(false);
   const [showKeraunos, setShowKeraunos] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
@@ -3169,7 +3178,7 @@ function App() {
     }
   }, [openTask, pushStep, finishTask, failTask, speakOut, showOnDisplay, composeToContact]);
 
-  // Recherche unifiée : contacts + emails + rendez-vous correspondant au mot-clé en un seul appel
+  // La conversation et le HUD partagent les mêmes sources et résultats partiels.
   const launchUnifiedSearch = useCallback(async (query) => {
     const cleanQuery = (query || "").trim();
     if (!cleanQuery) {
@@ -3178,44 +3187,11 @@ function App() {
       setText(m); speakOut(m);
       return;
     }
-    const id = openTask(`RECHERCHE — ${cleanQuery}`, "outlook");
-    pushStep(id, "Recherche dans contacts, e-mails et agenda");
-    try {
-      const r = await msFetch(`/microsoft/search?query=${encodeURIComponent(cleanQuery)}&top=8`);
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        const message = r.status === 401 || r.status === 409
-          ? "Ton compte Outlook doit être connecté pour cette recherche."
-          : (d.detail || "Recherche impossible.");
-        failTask(id, message);
-        setStatus("speaking"); setText(message); speakOut(message);
-        return;
-      }
-      const { contacts = [], emails = [], evenements = [] } = d;
-      const blocs = [];
-      if (contacts.length) blocs.push(`CONTACTS (${contacts.length})\n` + contacts.map((c) => [c.nom, c.email, c.telephone].filter(Boolean).join(" · ")).join("\n"));
-      if (emails.length) blocs.push(`E-MAILS (${emails.length})\n` + emails.map((m) => `${m.de} — ${m.sujet}`).join("\n"));
-      if (evenements.length) blocs.push(`RENDEZ-VOUS (${evenements.length})\n` + evenements.map((e) => `${e.titre} — ${e.debut}`).join("\n"));
-      const texte = blocs.join("\n\n") || "Aucun résultat.";
-      finishTask(id, { kind: "text", texte, legende: `Recherche · ${d.total || 0} résultat(s)` });
-      showOnDisplay({
-        type: "contacts",
-        titre: `RECHERCHE — ${cleanQuery}`,
-        contacts,
-        onPickContact: (contact) => composeToContact(contact),
-      });
-      setStatus("speaking");
-      const spoken = d.total > 0
-        ? `${contacts.length} contact${contacts.length > 1 ? "s" : ""}, ${emails.length} e-mail${emails.length > 1 ? "s" : ""} et ${evenements.length} rendez-vous trouvés pour ${cleanQuery}.`
-        : `Aucun résultat pour ${cleanQuery}.`;
-      setText(spoken); speakOut(spoken);
-    } catch (e) {
-      failTask(id, "Recherche injoignable");
-      setStatus("speaking");
-      const m = "Je n'arrive pas à effectuer la recherche pour le moment.";
-      setText(m); speakOut(m);
-    }
-  }, [openTask, pushStep, finishTask, failTask, speakOut, msFetch, showOnDisplay, composeToContact]);
+    setWorkspaceSearch({ query: cleanQuery });
+    setStatus("speaking");
+    const message = `Je recherche ${cleanQuery}. Les résultats et les sources indisponibles apparaissent dans la fenêtre de recherche.`;
+    setText(message); speakOut(message);
+  }, [speakOut]);
 
   const launchOutlookAgenda = useCallback(async () => {
     const id = openTask("OUTLOOK — AGENDA (14 JOURS)", "outlook");
@@ -6949,6 +6925,8 @@ function App() {
       }, openEnterprise: () => setShowEnterprise(true),
       openWorkModule: setActiveWorkModule,
       openGettingStarted: () => setShowGettingStarted(true),
+      openWorkspaceSearch: () => setWorkspaceSearch({ query: "" }),
+      openPrivacy: () => { setSetupInitialTab("confidentialite"); setShowSetup(true); },
       openWorkDossiers: () => setShowWorkDossiers(true),
       openSportCoach: () => setShowSportCoach(true),
       openVoiceProfile: () => setShowVoiceProfile(true),
@@ -6989,7 +6967,7 @@ function App() {
 
   return (
     <div
-      className={`sirius-root workspace-mode mobile-section-${mobileDestination} ${booting ? "is-booting" : ""} ${ecoMode ? "eco" : ""} ${windowHidden ? "backgrounded" : ""} mode-${sysMode}`}
+      className={`sirius-root workspace-mode mobile-section-${mobileDestination} ${booting ? "is-booting" : ""} ${ecoMode || reduceVisualEffects ? "eco" : ""} ${windowHidden ? "backgrounded" : ""} mode-${sysMode}`}
       style={{ ...getHUDStyleVariables(), "--accent": accentColor, "--glow": glowColor, "--hud-scale": hudScale }}
       data-core-active={hudTheme.core.active}
       data-guardian-active={hudTheme.guardian.visible}
@@ -7002,12 +6980,19 @@ function App() {
         requested={showGettingStarted}
         onClose={() => setShowGettingStarted(false)}
         onAssistant={() => navigateMobile("assistant")}
+        onSearch={() => setWorkspaceSearch({ query: "" })}
         onModule={(id) => {
           if (id === "connections") moduleActionsRef.current.openConnections();
+          else if (id === "dossiers") moduleActionsRef.current.openWorkDossiers();
           else if (id === "odysseia") moduleActionsRef.current.openOdysseia();
           else moduleActionsRef.current.openWorkModule(id);
         }}
       />
+      {workspaceSearch && <WorkspaceSearch key={workspaceSearch.query} initialQuery={workspaceSearch.query} modules={moduleItems}
+        microsoftFetch={msFetch} onClose={() => setWorkspaceSearch(null)}
+        onContact={composeToContact}
+        onConnections={() => setShowConnections(true)}
+        onDossier={(id) => { setLiveDossierId(id); setShowWorkDossiers(true); }} />}
       <div className="grid-bg" />
       <SiriusProgress journalOnly />
       {showMediaModules && <MediaModulesPanel onClose={() => setShowMediaModules(false)} />}
@@ -7067,6 +7052,8 @@ function App() {
           initialTab={setupInitialTab}
           onComplete={handleSetupComplete}
           onCancel={() => setShowSetup(false)}
+          onMemory={() => { setShowSetup(false); setShowMemoryMgr(true); }}
+          onConnections={() => { setShowSetup(false); setShowConnections(true); }}
           onOpenAccount={auth.openProfile ? () => {
             setShowSetup(false);
             auth.openProfile();
@@ -7310,8 +7297,28 @@ function App() {
 
       {/* Barre supérieure */}
       <header className="top-bar">
-        <div className="brand-tag" data-testid="sirius-brand-tag">
-          ΣIRIUS
+        <div className="top-bar-start">
+          <div className="brand-tag" data-testid="sirius-brand-tag">
+            ΣIRIUS
+          </div>
+          <div className="top-settings">
+            <button type="button" className="profile-btn top-settings-btn" aria-label="Rechercher dans ΣIRIUS"
+              title="Rechercher : dossiers, Microsoft et fonctions" onClick={() => setWorkspaceSearch({ query: "" })}>
+              <FolderOpen size={18} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="profile-btn top-settings-btn"
+              onClick={() => { setSetupInitialTab("profil"); setShowSetup(true); }}
+              data-testid="sirius-profile-btn"
+              title="Réglages : profil et services"
+              aria-label="Réglages"
+              aria-haspopup="dialog"
+            >
+              <UserCog size={18} aria-hidden="true" />
+              <span className="top-settings-label">Réglages</span>
+            </button>
+          </div>
         </div>
         <div className="sys-indicators" data-testid="sirius-indicators">
           <span className="ind"><i className="ind-dot orange" />IA</span>
@@ -7422,15 +7429,6 @@ function App() {
               <Radio size={15} /> Test micro
             </button>
           )}
-          <button
-            className="profile-btn profile-btn-pinned"
-            onClick={() => setShowSetup(true)}
-            data-testid="sirius-profile-btn"
-            title="Réglages : profil et clés API"
-            aria-label="Réglages"
-          >
-            <UserCog size={15} />
-          </button>
           {isLocalDevServer && (
             <ConfirmButton
               className={`profile-btn sirius-shutdown-btn ${isShuttingDown ? "is-shutting-down" : ""}`}
@@ -7608,7 +7606,7 @@ function App() {
                   ))}
                 </div>
               </div>
-              <ReactorCore status={status} volume={0.35} color="#91e6f2" eco={ecoMode} />
+              <ReactorCore status={status} volume={0.35} color="#91e6f2" eco={ecoMode || reduceVisualEffects} />
             </div>
             <Waveform status={status} color={accentColor} />
             {activeCard && (

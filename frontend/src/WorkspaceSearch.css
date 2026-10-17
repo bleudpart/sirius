@@ -1,0 +1,30 @@
+.workspace-search-backdrop { position: fixed; inset: 0; z-index: 9800; background: rgba(0, 5, 14, .55); }
+.workspace-search {
+  box-sizing: border-box;
+  position: fixed;
+  z-index: 9800;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(760px, calc(100% - 24px));
+  max-height: calc(100% - 100px);
+  overflow: auto;
+  padding: 20px;
+  border: 1px solid #d8b875;
+  border-radius: 12px;
+  background: #071725;
+  color: #fff;
+  font: 400 16px/1.5 "Segoe UI", sans-serif;
+}
+.workspace-search header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.workspace-search h2, .workspace-search h3 { color: #d8b875; margin: 8px 0; }
+.workspace-search button, .workspace-search input {
+  box-sizing: border-box; min-height: 44px; padding: 8px 12px; font: inherit;
+  color: inherit; border: 1px solid #91e6f2; background: #102838; border-radius: 6px;
+}
+.workspace-search button { cursor: pointer; margin: 4px; }
+.workspace-search input { width: 100%; }
+.workspace-search :focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+.workspace-search article { border-top: 1px solid #607887; padding: 12px 0; overflow-wrap: anywhere; }
+.workspace-search .action-feedback { padding: 12px; border-left: 3px solid #ffb199; }
+.workspace-search button:disabled { cursor: default; opacity: .65; }

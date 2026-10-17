@@ -9,6 +9,7 @@ import { exportAccountProfile, importAccountProfile, validatePersonalService } f
 import { assertSecureKeyTransport, loadApiKeys } from "@/apiKeyStorage";
 import AccountServices from "@/AccountServices";
 import VaultControls, { persistPersonalKeys } from "@/VaultControls";
+import PrivacyData from "@/PrivacyData";
 
 const TABS = [
   { id: "profil", label: "PROFIL", Icon: User },
@@ -16,6 +17,7 @@ const TABS = [
   { id: "ia", label: "IA", Icon: Brain },
   { id: "hud", label: "HUD", Icon: Monitor },
   { id: "stockage", label: "STOCKAGE", Icon: HardDrive },
+  { id: "confidentialite", label: "CONFIDENTIALITÉ ET DONNÉES", Icon: HardDrive },
   { id: "api", label: "CLÉS API ET SERVICES", Icon: KeyRound },
 ];
 const MAIN_KEYS = ["cerebras", "groq_key"];
@@ -98,7 +100,7 @@ function KeyField({ k, value, status, onChange, onTest }) {
 }
 
 // Écran de configuration — les réglages techniques restent réservés à l'administrateur.
-export default function SiriusSetup({ initialProfile, initialKeys, initialTab = "profil", onComplete, onCancel, onOpenAccount, showAdvanced = false }) {
+export default function SiriusSetup({ initialProfile, initialKeys, initialTab = "profil", onComplete, onCancel, onOpenAccount, onMemory, onConnections, showAdvanced = false }) {
   const [tab, setTab] = useState(initialTab);
   const [savingKeys, setSavingKeys] = useState(false);
   const visibleTabs = TABS;
@@ -178,7 +180,12 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
   const [hud, setHud] = useState(loadHud);
   const [readAloudOn, setReadAloudOn] = useState(localStorage.getItem("sirius_read_aloud") !== "off");
   const [actionConfirmOn, setActionConfirmOn] = useState(localStorage.getItem("sirius_action_confirm") !== "off");
-  const updateHud = (patch) => setHud((h) => { const nh = { ...h, ...patch }; saveHud(nh); return nh; });
+  const [hudError, setHudError] = useState("");
+  const updateHud = (patch) => {
+    const next = { ...hud, ...patch };
+    try { saveHud(next); setHud(next); setHudError(""); }
+    catch (error) { console.error("Réglages d'affichage :", error); setHudError("Les réglages n'ont pas été enregistrés. Votre affichage précédent est conservé. Libérez le stockage du navigateur puis réessayez."); }
+  };
   const [nas, setNas] = useState(() => {
     try { return JSON.parse(localStorage.getItem("sirius_nas")) || { path: "", enabled: false }; } catch (e) { return { path: "", enabled: false }; }
   });
@@ -570,6 +577,8 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
           </section>
         )}
 
+        {tab === "confidentialite" && <PrivacyData onOpenAccount={onOpenAccount} onMemory={onMemory} onConnections={onConnections} />}
+
         {tab === "hud" && (
           <section className="setup-section setup-single" data-testid="setup-panel-hud">
             <label className="setup-label">Transparence des panneaux <span className="setup-tag opt">{Math.round(hud.alpha * 100)} %</span></label>
@@ -577,10 +586,20 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
               onChange={(e) => updateHud({ alpha: parseFloat(e.target.value) })} data-testid="setup-hud-alpha" />
             <label className="setup-label">Taille du texte</label>
             <div className="setup-sizes">
-              {[["S", 0.9], ["M", 1], ["L", 1.1]].map(([l, z]) => (
+              {[["S", 0.9], ["M", 1], ["L", 1.1], ["XL", 1.25]].map(([l, z]) => (
                 <button key={l} type="button" className={`setup-size ${hud.zoom === z ? "active" : ""}`} onClick={() => updateHud({ zoom: z })} data-testid={`setup-hud-size-${l}`}>{l}</button>
               ))}
             </div>
+            <label className="setup-label">
+              <input type="checkbox" checked={!!hud.reducedMotion} onChange={(event) => updateHud({ reducedMotion: event.target.checked })} data-testid="setup-reduced-motion" />
+              {" "}Réduire les animations et effets coûteux
+            </label>
+            <p className="setup-note">Le réglage de réduction des mouvements du système reste respecté. Ce choix réduit aussi les effets du cœur sans modifier les données ou les fonctions métier.</p>
+            <label className="setup-label">
+              <input type="checkbox" checked={!!hud.highContrast} onChange={(event) => updateHud({ highContrast: event.target.checked })} data-testid="setup-high-contrast" />
+              {" "}Renforcer le contraste des textes et contrôles
+            </label>
+            {hudError && <p role="alert">{hudError}</p>}
             <label className="setup-label">Mode d'affichage</label>
             <div className="setup-modes">
               <button type="button" className={`setup-mode ${hud.minimal ? "active" : ""}`} onClick={() => updateHud({ minimal: true })} data-testid="setup-hud-minimal">
@@ -627,7 +646,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
             </div>
             <div className="setup-actions">
               <ConfirmButton className="setup-reset" label="CONFIRMER ?" title="Réinitialiser le HUD" testId="setup-reset-hud"
-                onConfirm={() => { saveHud({ ...HUD_DEFAULTS }); setHud({ ...HUD_DEFAULTS }); }}>
+                onConfirm={() => updateHud({ ...HUD_DEFAULTS })}>
                 <RotateCcw size={13} /> RÉINITIALISER
               </ConfirmButton>
             </div>

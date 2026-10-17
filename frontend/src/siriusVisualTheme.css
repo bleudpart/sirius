@@ -1,4 +1,31 @@
 /* Shared by the HUD, lazy modules, portals, Store and standalone Electron windows. */
+body.hud-reduced-motion *, body.hud-reduced-motion *::before, body.hud-reduced-motion *::after {
+  animation-duration: .001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: .001ms !important;
+  scroll-behavior: auto !important;
+}
+body.hud-high-contrast {
+  --workspace-text: #fff;
+  --workspace-gold: #ffe09c;
+  --workspace-line: #b4ebf4;
+}
+body.hud-high-contrast :is(p, label, summary, dt, dd, li) { color: #fff !important; }
+body.hud-high-contrast :is(button, input, select, textarea) {
+  color: #fff !important;
+  background-color: #071725 !important;
+  border-color: #b4ebf4 !important;
+}
+body.hud-high-contrast :focus-visible { outline: 3px solid #fff !important; outline-offset: 3px; }
+body.hud-high-contrast :is(.setup-note, .getting-started-voice) { opacity: 1; color: #fff !important; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 html[data-sirius-visual-theme="classic"] {
   --workspace-cyan: #91e6f2;
   --workspace-gold: #d8b875;
@@ -637,9 +664,9 @@ html[data-sirius-visual-theme="classic"] .public-popular { border-radius: 0 20px
     html[data-sirius-visual-theme="classic"] .boot-screen :is(.boot-modules, .boot-status) { animation: none; }
   }
   html[data-sirius-visual-theme="classic"] .boot-status { position: relative; z-index: 2; max-height: 100%; overflow-y: auto; min-width: 0; box-sizing: border-box; width: calc(100% - 16px); margin-right: 16px; justify-self: end; height: min(100%, var(--boot-side-height)); }
-  html[data-sirius-visual-theme="classic"] .boot-status h2 { font-size: 23px; }
+  html[data-sirius-visual-theme="classic"] .boot-status h2 { font: 400 23px/1.4 var(--boot-status-font); }
   html[data-sirius-visual-theme="classic"] .boot-status { --boot-status-font: "Bahnschrift", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
-  html[data-sirius-visual-theme="classic"] :is(.boot-check-details, .boot-check-note) { color: #ffffff; font: 400 12px/1.6 var(--boot-status-font); letter-spacing: .02em; }
+  html[data-sirius-visual-theme="classic"] .boot-status :is(.workspace-kicker, .boot-check-details, .boot-check-note) { color: var(--workspace-gold); font: 400 12px/1.6 var(--boot-status-font); letter-spacing: .02em; }
   html[data-sirius-visual-theme="classic"] .boot-check-details summary { cursor: pointer; }
   html[data-sirius-visual-theme="classic"] .boot-check-details li { margin: 8px 0; }
   html[data-sirius-visual-theme="classic"] .boot-check-details span { display: block; }
@@ -650,7 +677,11 @@ html[data-sirius-visual-theme="classic"] .public-popular { border-radius: 0 20px
   html[data-sirius-visual-theme="classic"] .boot-line-state { flex: none; font-size: 11px; letter-spacing: .08em; }
   html[data-sirius-visual-theme="classic"] .boot-line-pending .boot-line-state { opacity: .7; }
   html[data-sirius-visual-theme="classic"] .boot-line-fail .boot-line-state { color: #ffb4a4; }
-  html[data-sirius-visual-theme="classic"] .boot-ready { margin: 12px 0 0; color: var(--workspace-gold); font-weight: 600; }
+  html[data-sirius-visual-theme="classic"] .boot-ready { margin: 12px 0 0; color: var(--workspace-gold); font-weight: 400; }
+  html[data-sirius-visual-theme="classic"] .boot-screen .boot-bar-fill {
+    background: var(--workspace-rgb);
+    box-shadow: none;
+  }
   html[data-sirius-visual-theme="classic"] .boot-screen .boot-pct { color: var(--workspace-gold); font: 400 12px/1.6 var(--boot-status-font); letter-spacing: .02em; }
   html[data-sirius-visual-theme="classic"] .boot-screen .boot-copyright { position: relative; z-index: 2; grid-column: 1 / -1; text-align: center; margin: 0; color: var(--workspace-gold); font: 400 10px/1.6 var(--workspace-font); }
   @media (max-width: 1100px) {
