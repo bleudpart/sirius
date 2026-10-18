@@ -297,8 +297,8 @@ export default function PublicStore() {
       <section className="public-trial" id="essayer" aria-labelledby="public-trial-title">
         <h2 id="public-trial-title" className="public-section-title">Commencez gratuitement pendant 15 jours</h2>
         <p>Aucune connaissance de l'IA nécessaire. Téléchargez ΣIRIUS, ouvrez l'application, puis créez votre compte.</p>
-        <a className="public-primary-cta" href="https://github.com/bleudpart/sirius/releases/download/v1.0.45/sirius-setup-1.0.45.exe">Télécharger pour Windows <ArrowRight size={17} /></a>
-        <p className="public-function-note">Version publique Windows 1.0.45. Les captures présentent une version plus récente de l'interface. Aucun téléphone demandé sur cette page pour l'essai.</p>
+        <a className="public-primary-cta" href="https://github.com/bleudpart/sirius/releases/download/v1.0.52/sirius-setup-1.0.52.exe">Télécharger pour Windows <ArrowRight size={17} /></a>
+        <p className="public-function-note">Version publique Windows 1.0.52. Aucun téléphone demandé sur cette page pour l'essai.</p>
         <p><strong>Sans engagement ni paiement automatique à la fin de l'essai.</strong> Sans carte bancaire, aucun abonnement à annuler.</p>
         <details><summary>Comment fonctionne l'essai ?</summary>
           <p>L'essai commence à votre première connexion activant votre compte. Les services IA autorisés utilisent les clés de SIRIUS, dans la limite des quotas quotidiens.</p>
