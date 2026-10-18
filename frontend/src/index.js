@@ -12,6 +12,7 @@ import { initFdeOmega } from "@/fdeOmega";
 import PublicStore from "@/PublicStore";
 import "./siriusVisualTheme.css";
 import "./moduleWindowLayout.css";
+import "./pantheonTheme.css";
 
 document.documentElement.dataset.siriusVisualTheme = "classic";
 document.documentElement.dataset.siriusPlatform = Capacitor.getPlatform();

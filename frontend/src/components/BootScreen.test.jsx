@@ -56,6 +56,17 @@ afterEach(() => {
   else window.SpeechRecognition = originalRecognition;
 });
 
+test.each([true, false])("boot greets only the first name when the server responds: %s", async connected => {
+  await render(<BootScreen userName="  daniel partel  " onDone={jest.fn()}
+    probeBrain={() => Promise.resolve(connected)} />);
+  if (!connected) {
+    for (let i = 0; i < 12; i += 1) await flush(2000);
+  }
+  expect(container.querySelector("h1").textContent).toBe("Bienvenue, Daniel.");
+  expect(speakCinematic.mock.calls[0][0]).toContain("Bonjour Daniel");
+  expect(speakCinematic.mock.calls[0][0]).not.toMatch(/partel/i);
+});
+
 test("opens the HUD when loading and narration both finish", async () => {
   const onDone = jest.fn();
   await render(<BootScreen connected onDone={onDone} />);
@@ -78,6 +89,26 @@ test("a narration that never starts reports the unavailable voice and releases t
   act(() => jest.advanceTimersByTime(10000));
   expect(container.textContent).toContain("voix indisponible");
   act(() => jest.advanceTimersByTime(500));
+  expect(onDone).toHaveBeenCalledTimes(1);
+});
+
+test("the expanded module catalogue holds the boot until it is collapsed", async () => {
+  const onDone = jest.fn();
+  await render(<BootScreen onDone={onDone} />);
+  const catalogue = container.querySelector('[data-testid="boot-modules"]');
+  await act(async () => {
+    catalogue.open = true;
+    catalogue.dispatchEvent(new Event("toggle"));
+  });
+  act(() => speakCinematic.mock.calls[0][1].onstart());
+  act(() => speakCinematic.mock.calls[0][1].onend());
+  act(() => jest.advanceTimersByTime(1000));
+  expect(onDone).not.toHaveBeenCalled();
+  await act(async () => {
+    catalogue.open = false;
+    catalogue.dispatchEvent(new Event("toggle"));
+  });
+  act(() => jest.advanceTimersByTime(1000));
   expect(onDone).toHaveBeenCalledTimes(1);
 });
 
@@ -165,7 +196,8 @@ test("presentation welcomes the user and exposes real loading progress in its de
   expect(container.textContent).not.toContain("Une intelligence à votre écoute");
   expect(container.querySelectorAll(".boot-acro-item")).toHaveLength(6);
   const catalogue = container.querySelector('[data-testid="boot-modules"]');
-  expect(catalogue.querySelector("h2").textContent).toBe("L’univers de ΣIRIUS");
+  expect(catalogue.tagName).toBe("DETAILS");
+  expect(catalogue.querySelector("summary").textContent).toBe("L’univers de ΣIRIUS");
   expect(catalogue.querySelector(".workspace-kicker")).toBeNull();
   const progress = container.querySelector('[role="progressbar"]');
   expect(progress.getAttribute("aria-valuenow")).toBe("100");

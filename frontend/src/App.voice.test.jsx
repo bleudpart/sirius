@@ -384,7 +384,7 @@ test("a dossier question opens the visible conversation and transfers its screen
   } }]);
   await mount();
   const button = [...host.querySelector('[data-testid="workspace-navigation"]').querySelectorAll("button")]
-    .find((item) => item.textContent === "Mes dossiers");
+    .find((item) => item.getAttribute("aria-label") === "Mes dossiers");
   await act(async () => button.click());
   await act(async () => host.querySelector('[data-testid="work-preview-ask"]').click());
   expect(host.querySelector('[data-testid="workspace-WorkDossiersPanel"]')).toBeNull();
@@ -401,7 +401,7 @@ test("closing the dossier screen without a conversation clears its selection", a
   mockConversationStream([{ type: "done", answer: "Précisez le dossier." }]);
   await mount();
   const button = [...host.querySelector('[data-testid="workspace-navigation"]').querySelectorAll("button")]
-    .find((item) => item.textContent === "Mes dossiers");
+    .find((item) => item.getAttribute("aria-label") === "Mes dossiers");
   await act(async () => button.click());
   await act(async () => host.querySelector('[data-testid="workspace-WorkDossiersPanel"] button').click());
   await send("Résume ce dossier");
@@ -415,25 +415,27 @@ test("the HUD no longer mounts the next-actions pill", async () => {
   expect(host.querySelector(".shud-next")).toBeNull();
 });
 
-test("the HUD places the colleague subtitle before the Sigma-branded tagline", async () => {
+test("the HUD keeps the validated greeting and a single readable prompt", async () => {
+  localStorage.setItem("sirius_profile", JSON.stringify({ name: "daniel partel" }));
   await mount();
   const welcome = host.querySelector(".workspace-welcome");
   const colleague = host.querySelector(".sirius-colleague");
   const tagline = host.querySelector(".sirius-tagline");
-  expect(welcome.nextElementSibling).toBe(colleague);
-  expect(colleague.textContent).toBe("LE COLLÈGUE SUR QUI VOUS POUVEZ COMPTER");
-  expect(colleague.nextElementSibling).toBe(tagline);
-  expect(tagline.textContent).toBe("Parlez-lui simplement. ΣIRIUS vous répond.");
+  expect(colleague).toBeNull();
+  expect(host.textContent).not.toContain("UN PEU PLUS SIMPLE, CHAQUE JOUR");
+  expect(welcome.textContent).toMatch(/^(Bonjour|Bonsoir), Daniel$/);
+  expect(welcome.nextElementSibling).toBe(tagline);
+  expect(tagline.textContent).toBe("Qu’aimeriez-vous faire avancer aujourd’hui ?");
 });
 
 test("the desktop workspace connects to existing wheels, settings, dossiers and personal voice", async () => {
   await mount();
   const nav = host.querySelector('[data-testid="workspace-navigation"]');
   const clickEntry = async (label) => {
-    const button = [...nav.querySelectorAll("button")].find((entry) => entry.textContent === label);
+    const button = [...nav.querySelectorAll("button")].find((entry) => (entry.getAttribute("aria-label") || entry.textContent) === label);
     await act(async () => button.click());
   };
-  await clickEntry("Modules");
+  await clickEntry("Mes modules");
   expect(document.querySelector('[data-testid="modules-menu"]')).not.toBeNull();
   await act(async () => document.querySelector('[data-testid="modules-menu-close"]').click());
   await clickEntry("Informations");

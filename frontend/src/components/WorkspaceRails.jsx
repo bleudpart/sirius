@@ -1,58 +1,65 @@
-import { BookOpen, FolderOpen, Info, LayoutGrid, MessageCircle, Mic, SlidersHorizontal } from "lucide-react";
+import { useState } from "react";
+import { BookOpen, FolderOpen, Info, LayoutGrid, MessageCircle, Mic, Search, SlidersHorizontal } from "lucide-react";
 import { LiveDate, LiveTime } from "../liveStats";
 
-export function WorkspaceNavigation({ active, onAssistant, onModules, onInfo, onSettings, onOdysseia, onDossiers, onVoice }) {
+export function WorkspaceNavigation({ active, connected, onAssistant, onModules, onInfo, onSettings, onOdysseia, onDossiers, onVoice, onSearch }) {
   const entries = [
-    { id: "assistant", label: "Assistant", Icon: MessageCircle, run: onAssistant },
-    { id: "modules", label: "Modules", Icon: LayoutGrid, run: onModules },
-    { id: "odysseia", label: "ODYSSEIA", Icon: BookOpen, run: onOdysseia },
-    { id: "info", label: "Informations", Icon: Info, run: onInfo },
-    { id: "settings", label: "Configuration", Icon: SlidersHorizontal, run: onSettings },
+    { id: "modules", label: "Mes modules", description: "Les outils de votre quotidien", Icon: LayoutGrid, run: onModules },
+    { id: "dossiers", label: "Mes dossiers", description: "Projets, notes et documents", Icon: FolderOpen, run: onDossiers },
+    { id: "odysseia", label: "ODYSSEIA", description: "Explorer et découvrir", Icon: BookOpen, run: onOdysseia },
+    { id: "search", label: "Rechercher", description: "Retrouver une information", Icon: Search, run: onSearch },
   ];
   return (
     <nav className="workspace-navigation workspace-surface" aria-label="Espace ΣIRIUS" data-testid="workspace-navigation">
       <span className="workspace-kicker">VOTRE ESPACE</span>
-      <h2>Le Panthéon</h2>
       <div className="workspace-links">
-        {entries.map(({ id, label, Icon, run }) => (
-          <button key={id} type="button" onClick={run} aria-current={active === id ? "page" : undefined}>
-            <Icon size={18} aria-hidden="true" /><span>{label}</span>
+        {entries.map(({ id, label, description, Icon, run }) => (
+          <button key={id} type="button" data-destination={id} onClick={run} aria-label={label}
+            aria-describedby={`workspace-nav-${id}`} aria-current={active === id ? "page" : undefined}>
+            <Icon size={18} aria-hidden="true" /><span>{label}<small id={`workspace-nav-${id}`}>{description}</small></span>
           </button>
         ))}
       </div>
       <div className="workspace-divider" />
-      <span className="workspace-kicker">ACCÈS RAPIDE</span>
-      <div className="workspace-links">
-        <button type="button" onClick={onDossiers}><FolderOpen size={18} aria-hidden="true" /><span>Mes dossiers</span></button>
+      <details className="workspace-secondary">
+        <summary>Mon espace personnel</summary>
+        <div className="workspace-links">
+        <button type="button" onClick={onAssistant}><MessageCircle size={18} aria-hidden="true" /><span>Assistant</span></button>
+        <button type="button" onClick={onInfo}><Info size={18} aria-hidden="true" /><span>Informations</span></button>
+        <button type="button" onClick={onSettings}><SlidersHorizontal size={18} aria-hidden="true" /><span>Configuration</span></button>
         <button type="button" onClick={onVoice}><Mic size={18} aria-hidden="true" /><span>Ma voix et ma diction</span></button>
-      </div>
+        </div>
+      </details>
+      <p className="workspace-connection"><i className={connected ? "is-online" : ""} aria-hidden="true" />
+        {connected ? "Serveur connecté" : "Serveur indisponible"}
+      </p>
     </nav>
   );
 }
 
-export function WorkspaceSummary({ connected, onDossiers, onVoice, onOdysseia }) {
+export function WorkspaceClock() {
+  return <div className="workspace-header-clock"><strong><LiveTime /></strong><span><LiveDate /></span></div>;
+}
+
+export function WorkspaceSummary({ connected }) {
+  const [note, setNote] = useState("");
   return (
     <aside className="workspace-summary" aria-label="Votre espace personnel" data-testid="workspace-summary">
       <section className="workspace-surface">
-        <span className="workspace-kicker">L’INSTANT PRÉSENT</span>
-        <div className="workspace-clock"><LiveTime /></div>
-        <p className="workspace-subtitle"><LiveDate /></p>
+        <span className="workspace-kicker">VOTRE ESPACE</span>
+        <h2>À vos côtés</h2>
         <p className="workspace-connection"><i className={connected ? "is-online" : ""} aria-hidden="true" />
           {connected ? "Serveur connecté" : "Serveur indisponible"}
         </p>
         <div className="workspace-divider" />
-        <button type="button" className="workspace-summary-link" onClick={onDossiers}>
-          <FolderOpen size={18} aria-hidden="true" /><span><strong>Vos dossiers</strong><small>Retrouvez vos projets et leurs suivis.</small></span>
-        </button>
-        <button type="button" className="workspace-summary-link" onClick={onVoice}>
-          <Mic size={18} aria-hidden="true" /><span><strong>Votre voix</strong><small>Vos expressions, à votre rythme.</small></span>
-        </button>
+        <p className="workspace-subtitle">Vous demandez. Vous vérifiez les propositions. Vous gardez la main.</p>
       </section>
       <section className="workspace-surface">
-        <span className="workspace-kicker">ODYSSEIA</span>
-        <h2>Une fenêtre sur le savoir</h2>
-        <p className="workspace-subtitle">Explorez les mythes et leur histoire.</p>
-        <button type="button" className="workspace-explore" onClick={onOdysseia}><BookOpen size={18} aria-hidden="true" /> Ouvrir ODYSSEIA</button>
+        <label className="workspace-kicker" htmlFor="workspace-quick-note">NOTES RAPIDES</label>
+        <h2>Une idée à garder</h2>
+        <textarea id="workspace-quick-note" value={note} onChange={(event) => setNote(event.target.value)}
+          placeholder="Une question, une idée, un point à retenir…" aria-describedby="workspace-note-help" />
+        <p id="workspace-note-help" className="workspace-subtitle">Note temporaire, non enregistrée : elle disparaît au rechargement.</p>
       </section>
     </aside>
   );

@@ -4,6 +4,55 @@
 Assistant vocal personnel avec HUD futuriste style « Iron Man ».
 Frontend **React** + Backend **FastAPI** (Python), packagé en application Windows autonome via **Electron**.
 
+### Habillage Panthéon
+
+Le thème commun `frontend/src/pantheonTheme.css` est chargé après les contrats de
+fenêtres : bleu nuit, or patiné, coins architecturaux et titres lapidaires avec
+une police locale (aucune police distante requise). Il couvre l'accueil, le boot,
+les modules différés, dialogues, portails, fenêtres multimédias et surfaces publiques,
+sans modifier les positions enregistrées, les commandes ni les couleurs d'alerte.
+Les cadres restent discrets au repos. Pendant une activité réelle de l'assistant,
+leur éclairage suit un cycle de 9 secondes, dont 6,3 secondes de retombée douce.
+L'animation est désactivée en mode éco, en arrière-plan, sur Android/tactile et
+lorsqu'une réduction des animations est demandée.
+
+L'accueil regroupe l'état vocal et la saisie sans retirer le bouton d'arrêt.
+Les suggestions préparent une demande sans l'envoyer. ODYSSEIA est doré ; les
+autres destinations gardent leur couleur de lecture. L'horloge réelle passe dans
+la barre supérieure et les notes rapides sont temporaires, non enregistrées.
+Le boot conserve ses véritables contrôles et erreurs, sa narration et ses reprises ;
+le catalogue des modules est dépliable et la progression utilise une ligne de 2 px.
+Le catalogue ouvert reste dans le flux du boot, sans recouvrir le copyright.
+Les commandes de fermeture et de réduction des roues, ainsi que la fermeture de
+la recherche, disposent de cibles d'au moins 44 × 44 px sur PC comme sur mobile.
+Les actions textuelles des modules adaptent leur largeur au libellé, sans hériter
+du format compact de la flèche d'envoi de l'accueil.
+La navigation mensuelle du centre d'information reste dans sa section calendrier,
+sans chevaucher les commandes de la fenêtre.
+L'accueil salue par le prénom, en couleur miel comme le bouton Envoyer. Les boutons
+de la barre haute utilisent tous le format 44 × 44 px des réglages. Le lexique vocal
+guide « Panthéon » vers la lecture française « pantéon », sans découpage des syllabes.
+Dans Configuration > Voix, les voix locales de Sirius (féminine, masculine et
+AÈDES) disposent aussi du curseur « Hauteur — grave / aiguë », enregistré
+automatiquement et utilisable avec « Tester la voix ».
+Un égaliseur vocal trois bandes (250 Hz, 1,2 kHz, 4 kHz, de -12 à +12 dB)
+traite les voix audio premium avec Web Audio. Ses réglages persistent localement
+et s'appliquent aussi aux personnages utilisant une voix premium. La synthèse
+locale Windows/navigateur/Android ne fournit pas de flux filtrable : les curseurs
+d'égalisation y sont désactivés explicitement, sans modifier le réglage de hauteur.
+Les amplifications réservent une marge de volume pour éviter la saturation.
+Le préréglage « Gemini — voix naturelle PC et téléphone » sélectionne le même
+service `/api/tts/gemini` sur PC et Android, y compris au démarrage. Il conserve
+l'égaliseur et signale explicitement un éventuel repli vers la synthèse locale.
+Le timbre et la diction Gemini sont pilotés par le service, pas par les curseurs Google.
+Ce service partagé peut fournir Chirp3-HD selon la configuration du serveur,
+comme sur Android ; le choix du service ne garantit pas le moteur génératif Gemini.
+Les accents arc-en-ciel des cadres, en-têtes et roues sont remplacés par un liseré
+miel de 1 px. Les alertes et les couleurs originales des images sont conservées.
+Les portraits de modules utilisent un cadre commun de 128 × 160 px sur PC et
+96 × 120 px sur mobile, avec l'image entière sans déformation ; les galeries,
+logos et documents conservent leurs formats spécifiques.
+
 ### Résultats sportifs : France et international
 
 Une demande générale de résultats sportifs consulte une sélection de compétitions
@@ -172,6 +221,17 @@ Le développement dépend des extraits disponibles ; aucune longueur artificiell
 n'est imposée quand les sources manquent.
 
 ### Tarifs du Store et configuration du paiement
+
+La boutique présente d'abord une promesse courte, trois demandes concrètes et
+une vidéo enregistrée avec des données fictives (sans envoi réel), puis les
+usages, le contrôle des données et les formules. Le bouton d'essai mène à la
+section de téléchargement Windows, distincte du formulaire d'achat replié.
+Le lien pointe vers la version publique 1.0.45 ; les captures peuvent montrer
+une version locale plus récente. Mettre à jour ce lien à la publication
+d'une nouvelle version, sans confondre le build local et une release publique.
+Les détails des quotas, clés personnelles, frais fournisseurs et renouvellement
+restent consultables avant l'achat. Le thème partagé `publicPantheon.css`
+harmonise Store et pages légales (bleu nuit, miel, cadres 1 px, portraits entiers).
 
 Les nouvelles offres sont Standard **69 EUR**, Pro **135 EUR**, Lifetime
 **269 EUR**, en paiement unique. La quatrième carte propose la location :
@@ -394,6 +454,11 @@ multimédia et la boutique ; les installateurs Windows/portable et l'APK Android
 doivent être reconstruits pour intégrer ces changements.
 
 ### Disposition commune des fenêtres
+
+Sur PC, les boutons de la barre supérieure sont alignés sur une seule ligne,
+avec une hauteur commune de 44 px et un espacement régulier. Si la largeur ou
+le zoom ne permet pas de tout afficher, cette barre défile horizontalement,
+sans recouvrir la pastille du compte. La disposition mobile reste distincte.
 
 Le cadre partagé conserve le bleu nuit, le doré et l'identité ΣIRIUS. Les fenêtres
 prises en charge par le gestionnaire utilisent le même en-tête et des commandes

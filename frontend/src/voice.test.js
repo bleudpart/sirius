@@ -1,6 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { AEDES_VOICE, speakCinematic, speakFr, speakAsCharacter, cancelSpeech, cleanTextForDisplay } from "./voice";
 import { speakNative, stopNativeSpeech } from "./nativeVoice";
+import { KEY_STORAGE_EVENT } from "./apiKeyStorage";
 
 jest.mock("@capacitor/core", () => ({
   Capacitor: { getPlatform: jest.fn(() => "android") },
@@ -80,11 +81,23 @@ test("Android answers and character voices share the native fallback", async () 
   expect(speakNative).toHaveBeenCalled();
 });
 
+test.each(["answer", "boot"])("desktop Gemini %s uses the same endpoint as Android", async kind => {
+  Capacitor.getPlatform.mockReturnValue("web");
+  localStorage.setItem("sirius_voice", JSON.stringify({ name: "gemini", rate: 1, pitch: 0 }));
+  if (kind === "boot") speakCinematic("Bonjour Daniel.");
+  else speakFr("Bonjour Daniel.");
+  await flush();
+  expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/tts/gemini"), expect.objectContaining({
+    body: JSON.stringify({ text: "Bonjour Daniel.", keys: {} }),
+  }));
+  expect(global.fetch.mock.calls.some(([url]) => String(url).includes("/tts/google"))).toBe(false);
+});
+
 test("Android reads the assistant name without pronouncing the Greek sigma", async () => {
   speakFr("ΣIRIUS a ouvert Panthéon.");
   await flush();
   expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/tts/gemini"), expect.objectContaining({
-    body: JSON.stringify({ text: "Siriusse a ouvert Panthéon.", keys: {} }),
+    body: JSON.stringify({ text: "Siriusse a ouvert pantéon.", keys: {} }),
   }));
 });
 
@@ -181,7 +194,9 @@ test.each(["answer", "character", "presentation"])("%s speech removes decorative
   expect(cleanTextForDisplay(text)).toContain("★");
 });
 
-test("Gemini WAV plays once and ends once without native fallback", async () => {
+test.each(["android", "web"])("%s Gemini WAV plays once and ends once without native fallback", async platform => {
+  Capacitor.getPlatform.mockReturnValue(platform);
+  localStorage.setItem("sirius_voice", JSON.stringify({ name: "gemini", rate: 1, pitch: 0 }));
   const audio = { play: jest.fn().mockResolvedValue(), pause: jest.fn() };
   global.Audio = jest.fn(() => audio);
   global.fetch.mockResolvedValue({ ok: true, json: async () => ({ audio_base64: "wav-data" }) });
@@ -198,6 +213,21 @@ test("Gemini WAV plays once and ends once without native fallback", async () => 
   expect(onstart).toHaveBeenCalledTimes(1);
   expect(onend).toHaveBeenCalledTimes(1);
   expect(speakNative).not.toHaveBeenCalled();
+});
+
+test("desktop Google and character profiles remain distinct from Gemini", async () => {
+  Capacitor.getPlatform.mockReturnValue("web");
+  speakFr("Bonjour");
+  await flush();
+  expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/tts/google"), expect.any(Object));
+  global.fetch.mockClear();
+  window.dispatchEvent(new Event(KEY_STORAGE_EVENT));
+  localStorage.setItem("sirius_voice", JSON.stringify({ name: "gemini", rate: 1, pitch: 0 }));
+  speakAsCharacter("Bonjour", { module: "ARGUS#" });
+  await flush();
+  expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/tts/google"), expect.objectContaining({
+    body: expect.stringContaining('"voice":"fr-FR-Neural2-G"'),
+  }));
 });
 
 test("boot narration reports real audio progress only during current playback", async () => {

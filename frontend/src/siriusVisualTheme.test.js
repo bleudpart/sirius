@@ -147,9 +147,14 @@ test("desktop account space survives theme overrides and narrow window layouts",
       desktopRules[`${rule.selector.replace(/\s+/g, " ")}|${decl.prop}`] = decl.value;
     }));
   });
-  expect(desktopRules['.top-bar, html[data-sirius-visual-theme="classic"] .sirius-root .top-bar|padding-right'])
+  expect(desktopRules['.top-bar, html[data-sirius-visual-theme="classic"] .sirius-root .top-bar|margin-right'])
     .toBe("300px");
-  expect(desktopRules[".top-bar .conn-status|flex-wrap"]).toBe("wrap");
+  expect(desktopRules[".top-bar .conn-status|flex-wrap"]).toBe("nowrap");
+  expect(desktopRules['.top-bar, html[data-sirius-visual-theme="classic"] .sirius-root .top-bar|overflow-x']).toBe("auto");
+  expect(desktopRules[".top-bar .profile-btn|height"]).toBe("44px");
+  expect(desktopRules[".top-bar .profile-btn|min-width"]).toBe("44px");
+  expect(desktopRules[".top-bar .profile-btn|margin"]).toBe("0");
+  expect(desktopRules[".top-bar .top-settings|gap"]).toBe("8px");
   expect(desktopRules[".top-bar .conn-status|min-width"]).toBe("0");
   expect(desktopRules[".sirius-root|grid-template-rows"]).toBe("minmax(56px, auto) minmax(0, 1fr) auto");
   const themePadding = [];

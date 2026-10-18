@@ -1,4 +1,5 @@
 import "./PublicLegal.css";
+import "./publicPantheon.css";
 import privacyPolicy from "./privacyPolicy.json";
 
 const CONTACT_EMAIL = "danielsirius.pro2026@gmail.com";

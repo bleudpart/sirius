@@ -494,6 +494,8 @@ export function CentralCard({ card, weather, onClose }) {
 }
 
 export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeBrainOnce, probeServices = readAccountSetup }) {
+  const firstName = (userName || "").trim().split(/\s+/)[0];
+  const welcomeName = firstName.charAt(0).toLocaleUpperCase("fr-FR") + firstName.slice(1);
   // État du cerveau (serveur) : null = recherche en cours, true = joint, false = injoignable.
   const [brain, setBrain] = useState(null);
   const [services, setServices] = useState(null);
@@ -579,6 +581,7 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
   const progress = Math.round(verifiedCount / checks.length * 100);
   const [closing, setClosing] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [catalogueOpen, setCatalogueOpen] = useState(false);
   const loaded = verifiedCount === checks.length && checks.every(({ state }) => state !== null);
   const [speechDone, setSpeechDone] = useState(false);
   const [speechUnavailable, setSpeechUnavailable] = useState(false);
@@ -618,8 +621,8 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
   }, [brain, checks]);
   const padRef = useRef(null);
   const readyMessage = brain === true && services !== null
-    ? `Connexion établie. Bonjour${userName ? ` ${userName}` : ""}. Je suis ΣIRIUS. Je suis prêt à vous accompagner.`
-    : `Bonjour${userName ? ` ${userName}` : ""}, ${brain === false
+    ? `Connexion établie. Bonjour${welcomeName ? ` ${welcomeName}` : ""}. Je suis ΣIRIUS. Je suis prêt à vous accompagner.`
+    : `Bonjour${welcomeName ? ` ${welcomeName}` : ""}, ${brain === false
       ? "le serveur ne répond pas encore. Vous pouvez réessayer la connexion."
       : "la configuration des services n'a pas pu être vérifiée."}`;
   const [readyTextLength, setReadyTextLength] = useState(0);
@@ -763,8 +766,8 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
     return () => clearTimeout(t);
   }, [loaded, speechDone]);
   useEffect(() => {
-    if (loaded && readyTextComplete && speechDone && brain !== false && !detailsOpen) closeBoot();
-  }, [loaded, readyTextComplete, speechDone, brain, detailsOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (loaded && readyTextComplete && speechDone && brain !== false && !detailsOpen && !catalogueOpen) closeBoot();
+  }, [loaded, readyTextComplete, speechDone, brain, detailsOpen, catalogueOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
 
     <div className={`boot-screen ${closing ? "closing" : ""}`} data-testid="boot-screen" onClick={() => {
@@ -774,8 +777,9 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
     }}>
       <div className="boot-grid" />
       <div className="boot-scan" />
-      <div className="boot-modules workspace-surface" data-testid="boot-modules">
-        <h2 className="boot-modules-title">L’univers de ΣIRIUS</h2>
+      <details className="boot-modules workspace-surface" data-testid="boot-modules" onClick={(event) => event.stopPropagation()}
+        onToggle={(event) => setCatalogueOpen(event.currentTarget.open)}>
+        <summary className="boot-modules-title">L’univers de ΣIRIUS</summary>
         {[
           ["argus", "ARGUS", "Surveillance & réparation"],
           ["atlas", "ATLAS", "Carte & navigation"],
@@ -817,9 +821,9 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
             <span className="boot-module-role">{role}</span>
           </div>
         ))}
-      </div>
+      </details>
       <div className="boot-center">
-        <h1 className="boot-welcome">Bienvenue{userName ? `, ${userName}` : ""}.</h1>
+        <h1 className="boot-welcome">Bienvenue{welcomeName ? `, ${welcomeName}` : ""}.</h1>
         <div className="boot-reactor" data-testid="boot-reactor">
           <CoreRings />
           <ReactorCore status="thinking" volume={0.35} color="#91e6f2" eco={false} />

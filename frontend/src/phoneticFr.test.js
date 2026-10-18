@@ -2,6 +2,10 @@ import { applyFrenchPhonetics, normalizeFrenchElisions } from "./phoneticFr";
 
 beforeEach(() => localStorage.clear());
 
+test.each(["Panthéon", "PANTHÉON", "Pantheon"])("guide %s vers le pan nasal français sans découpage", (name) => {
+  expect(applyFrenchPhonetics(`Le ${name} est prêt.`)).toBe("Le pantéon est prêt.");
+});
+
 test("an invisible separator between words does not concatenate them", () => {
   expect(normalizeFrenchElisions("deux\u200bmots")).toBe("deux mots");
 });

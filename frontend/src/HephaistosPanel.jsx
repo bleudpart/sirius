@@ -153,7 +153,6 @@ export default function HephaistosPanel({ onClose, onSpeak }) {
     <div className="prime-screen" data-testid="hephaistos-panel" ref={dragRef}>
       <MythosBackdrop module="HÉPHAÏSTOS#" state={running ? "busy" : error ? "alert" : "idle"} />
       <header className="zeus-head">
-        {char && <img className="heph-avatar" src={char.image} alt={char.character} draggable={false} />}
         <div className="heph-head-copy">
           <div className="oracle-title font-divine" data-module-name="HÉPHAÏSTOS"><Hammer size={20} /> HÉPHAÏSTOS <span className="module-function">— AUTO-MAINTENANCE</span></div>
           <span className="heph-head-sub">DIAGNOSTIC RÉEL · FORGE SYSTÈME</span>
@@ -161,6 +160,7 @@ export default function HephaistosPanel({ onClose, onSpeak }) {
         {s && <div className="heph-head-metrics"><span><b>{s.rate}%</b> SANTÉ</span><span><b>{s.total}</b> TESTS</span><span><b>{s.duration_ms}</b> ms</span></div>}
         <button className="setup-close zeus-close" onClick={onClose} data-testid="hephaistos-close-btn"><X size={18} /></button>
       </header>
+      {char && <img className="mythos-avatar" src={char.image} alt={char.character} draggable={false} />}
       <div className="prime-sub heph-subline">MODULES · SERVICES · INTÉGRATIONS · RAPPORT TÉLÉCHARGEABLE</div>
 
       <div className="heph-body">

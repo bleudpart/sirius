@@ -1,0 +1,263 @@
+:is(.public-store, .public-legal-page) {
+  --store-gold: #c5a059;
+  --store-gold-strong: #c5a059;
+  --store-lime: #c5a059;
+  --store-line: rgba(197, 160, 89, .34);
+  --store-paper: #06101b;
+  --store-panel: #102637;
+  --store-text: #edf4fc;
+  --store-muted: #b0c2d8;
+  --store-heading: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+  --store-surface: linear-gradient(145deg, #102637, #081522);
+  color: var(--store-text);
+  background: radial-gradient(ellipse at 50% 25%, #16455448, transparent 55%),
+    linear-gradient(#5e91b409 1px, transparent 1px) 0 0 / 48px 48px,
+    linear-gradient(90deg, #5e91b409 1px, transparent 1px) 0 0 / 48px 48px, #06101b;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  overflow-wrap: anywhere;
+}
+
+.public-store :is(
+  .public-hud-preview, .public-core-window, .public-plan, .public-checkout,
+  .public-workflow, .public-why, .public-trial, .public-matrix, .public-purchase,
+  .public-workflow-steps li, .public-core-preview, .public-order-summary,
+  .public-matrix-actions li, .public-situations figure, .public-odysseia-card,
+  .public-odysseia-dialog, .public-subscription-success
+),
+.public-legal-page .public-legal-content {
+  border: 1px solid var(--store-line);
+  border-radius: 8px;
+  background: var(--store-surface);
+  box-shadow: 0 14px 32px #0005, inset 0 0 8px #c5a0590d;
+  min-width: 0;
+}
+
+.public-store :is(
+  .public-hud-hero, .public-metrics, .public-core-preview, .public-matrix-actions li,
+  .public-plan, .public-checkout, .public-testimonial, .public-why-grid article,
+  .public-subscription-success, .public-situations figure,
+  .public-odysseia-card, .public-odysseia-dialog
+)::before {
+  background: none;
+  animation: none;
+  filter: none;
+}
+
+.public-store .public-demo video {
+  display: block;
+  width: 100%;
+  max-height: 65vh;
+  border: 1px solid var(--store-line);
+  border-radius: 8px;
+  background: #06101b;
+}
+
+.public-store .public-request-examples {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+  color: var(--store-text);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.public-store .public-demo-text-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--store-gold);
+  text-underline-offset: 4px;
+}
+
+.public-store .public-hero h1 {
+  max-width: 22ch;
+  font-size: clamp(30px, 3.4vw, 48px);
+  line-height: 1.18;
+}
+
+.public-store :is(.public-plan-details, .public-purchase) {
+  max-width: var(--store-content, 1180px);
+  margin: 32px auto 64px;
+}
+
+.public-store .public-purchase { padding: 24px; }
+.public-store .public-purchase .public-checkout {
+  margin: 24px 0 0;
+  max-width: none;
+}
+
+.public-store summary {
+  min-height: 44px;
+  padding: 12px 0;
+  box-sizing: border-box;
+  color: var(--store-gold);
+  cursor: pointer;
+}
+
+.public-store summary:focus-visible {
+  outline: 2px solid var(--store-gold);
+  outline-offset: 3px;
+}
+
+.public-store .public-comparison-scroll { overflow-x: auto; }
+.public-store .public-comparison-scroll table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.public-store .public-comparison-scroll :is(th, td) {
+  padding: 12px;
+  border-bottom: 1px solid var(--store-line);
+  vertical-align: top;
+}
+.public-store .public-comparison-scroll th { color: var(--store-gold); }
+.public-store .public-form-row { flex-wrap: wrap; }
+.public-store .public-order-summary { min-width: 0; flex-shrink: 1; }
+.public-store .public-nav-links { flex-wrap: wrap; }
+.public-store .public-odysseia-card { margin-top: 64px; }
+
+.public-store :is(.public-workflow, .public-why, .public-matrix),
+.public-legal-page .public-legal-content {
+  padding: clamp(18px, 3vw, 32px);
+}
+
+.public-store :is(
+  h1, h2, h3, .public-brand, .public-plan-name, .public-window-bar,
+  .public-section-title, .public-slogan, .public-nav, .public-platforms,
+  .public-core-preview strong, .public-matrix-actions strong,
+  .public-situations figcaption strong, .public-order-summary > span
+),
+.public-legal-page :is(h1, h2, .public-legal-nav a:first-child) {
+  font-family: var(--store-heading);
+  color: var(--store-gold);
+}
+
+.public-store :is(.public-lead, .public-preview-caption, .public-legal, .public-features, .public-footer),
+.public-legal-page p {
+  color: var(--store-muted);
+}
+
+.public-store :is(button, input, select, textarea, .public-features, .public-checkout, .public-price small),
+.public-legal-page .public-legal-nav {
+  font-family: inherit;
+}
+
+.public-store :is(button, input:not([type="checkbox"]), select, .public-primary-cta, .public-secondary-cta, .public-nav-cta, .public-demo-link),
+.public-legal-page .public-legal-nav a {
+  min-height: 44px;
+  box-sizing: border-box;
+}
+
+.public-store :is(.public-primary-cta, .public-nav-cta, .public-form-row button) {
+  background: var(--store-gold);
+  color: #0b131f;
+  border: 1px solid var(--store-gold);
+  border-radius: 8px;
+}
+
+.public-store :is(.public-secondary-cta, .public-demo-link, .public-odysseia-close) {
+  background: #081522;
+  color: var(--store-gold);
+  border: 1px solid var(--store-line);
+  border-radius: 8px;
+}
+
+.public-store .public-plan:is(:hover, .selected) {
+  transform: none;
+  border-color: var(--store-gold);
+  box-shadow: 0 14px 32px #0005, inset 0 0 0 1px var(--store-gold);
+}
+
+.public-store .public-form-row input {
+  background: #06101b;
+  border: 1px solid var(--store-line);
+  border-radius: 8px;
+  color: var(--store-text);
+}
+
+.public-store :is(button, a, input, select, textarea):focus-visible,
+.public-legal-page a:focus-visible {
+  outline: 2px solid var(--store-gold);
+  outline-offset: 3px;
+}
+
+.public-store .public-odysseia-dialog {
+  max-height: calc(100dvh - 48px);
+}
+
+.public-store .public-odysseia-heading {
+  border-bottom: 1px solid var(--store-line);
+}
+
+.public-store .public-odysseia-close {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+}
+
+.public-store .public-odysseia-content {
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+
+.public-store :is(.public-odysseia-card img, .public-odysseia-content > img) {
+  width: 128px;
+  height: 160px;
+  max-height: none;
+  aspect-ratio: auto;
+  object-fit: contain;
+  border: 1px solid var(--store-line);
+  border-radius: 8px;
+  filter: none;
+}
+
+.public-store .public-odysseia-card {
+  grid-template-columns: 128px minmax(0, 1fr);
+}
+
+.public-store .public-odysseia-note {
+  border-left: 1px solid var(--store-gold);
+  background: #c5a0590d;
+}
+
+.public-legal-page .public-legal-nav {
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  border-color: var(--store-line);
+}
+
+.public-legal-page .public-legal-nav a {
+  display: inline-flex;
+  align-items: center;
+}
+
+.public-legal-page .public-legal-content section {
+  border-color: var(--store-line);
+}
+
+@media (max-width: 700px) {
+  .public-store .public-odysseia-card {
+    grid-template-columns: 96px minmax(0, 1fr);
+  }
+  .public-store :is(.public-odysseia-card img, .public-odysseia-content > img) {
+    width: 96px;
+    height: 120px;
+  }
+  .public-store .public-odysseia-content > img {
+    float: none;
+    margin: 0 auto 16px;
+  }
+  .public-store .public-odysseia-dialog {
+    max-height: calc(100dvh - 20px);
+  }
+}
+
+@media (max-width: 380px) {
+  .public-store .public-odysseia-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

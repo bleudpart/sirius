@@ -34,7 +34,7 @@ import { startWakeSequence } from "@/wakeSequence";
 import CommandPalette from "@/CommandPalette";
 import ModulesMenu from "@/ModulesMenu";
 import MobileNavigation from "@/MobileNavigation";
-import { WorkspaceNavigation, WorkspaceSummary } from "@/components/WorkspaceRails";
+import { WorkspaceClock, WorkspaceNavigation, WorkspaceSummary } from "@/components/WorkspaceRails";
 import { useAuth } from "@/AuthGate";
 import useMailCache from "@/hooks/useMailCache";
 import { App as CapacitorApp } from "@capacitor/app";
@@ -537,6 +537,8 @@ function App() {
     return resp;
   }, []);
   const userName = (profile?.name || "").trim();
+  const welcomeFirstName = userName.split(/\s+/)[0];
+  const welcomeName = welcomeFirstName.charAt(0).toLocaleUpperCase("fr-FR") + welcomeFirstName.slice(1);
   const [status, setStatus] = useState("idle");
   const [booting, setBooting] = useState(true);
   const finishBoot = useCallback(() => setBooting(false), []);
@@ -6970,6 +6972,7 @@ function App() {
       className={`sirius-root workspace-mode mobile-section-${mobileDestination} ${booting ? "is-booting" : ""} ${ecoMode || reduceVisualEffects ? "eco" : ""} ${windowHidden ? "backgrounded" : ""} mode-${sysMode}`}
       style={{ ...getHUDStyleVariables(), "--accent": accentColor, "--glow": glowColor, "--hud-scale": hudScale }}
       data-core-active={hudTheme.core.active}
+      data-pantheon-active={booting || status !== "idle" || voicePhase !== "idle"}
       data-guardian-active={hudTheme.guardian.visible}
       data-testid="sirius-hud"
     >
@@ -7326,6 +7329,7 @@ function App() {
           <span className="ind"><i className={`ind-dot ${keys.groq || envGroq ? "green" : "grey"}`} />CERVEAU</span>
         </div>
         <div className="conn-status" data-testid="sirius-connection">
+          <WorkspaceClock />
           <span className={`conn-led ${connected ? "on" : "off"}`} />
           <span className="conn-label">IA CLOUD</span>
           <MicrophoneIndicator active={autoMic || captureMicOn || interruptMicOn || ["ready", "speech", "paused", "transcribing", "processing"].includes(handsFreePhase)} showLabel />
@@ -7569,6 +7573,8 @@ function App() {
       {/* Tableau de bord principal ΣIRIUS — noyau central + fenêtre d'info unique */}
       <main className="sirius-dashboard sirius-dashboard--hub">
         <WorkspaceNavigation
+          connected={connected}
+          onSearch={() => setWorkspaceSearch({ query: "" })}
           active={showModulesMenu ? "modules" : showOdysseia ? "odysseia" : showInfoWheel ? "info" : showSetup ? "settings" : "assistant"}
           onAssistant={() => navigateMobile("assistant")}
           onModules={() => navigateMobile("modules")}
@@ -7614,14 +7620,12 @@ function App() {
             )}
           </div>
           <div className="sirius-identity">
-            <span className="workspace-kicker">L’INTELLIGENCE À VOTRE SERVICE</span>
             <h1 className="sirius-title" data-testid="sirius-title">
               <span className="sirius-title-label">
                 <span className="sirius-wordmark workspace-welcome">
-                  {["dusk", "night"].includes(phaseOfDay()) ? "Bonsoir" : "Bonjour"}{userName ? `, ${userName}` : ""}.
+                  {["dusk", "night"].includes(phaseOfDay()) ? "Bonsoir" : "Bonjour"}{welcomeName ? `, ${welcomeName}` : ""}
                 </span>
-                <span className="sirius-colleague">LE COLLÈGUE SUR QUI VOUS POUVEZ COMPTER</span>
-                <span className="sirius-tagline">Parlez-lui simplement. ΣIRIUS vous répond.</span>
+                <span className="sirius-tagline">Qu’aimeriez-vous faire avancer aujourd’hui ?</span>
               </span>
             </h1>
           </div>
@@ -7639,6 +7643,10 @@ function App() {
           </div>
         )}
 
+        <div className="pantheon-composer">
+        <VoiceSessionControls phase={voicePhase} message={voiceMessage} onStop={stopVoice}
+          androidRecognition={Capacitor.getPlatform() === "android" ? androidRecognition : null}
+          onRecognitionChange={changeAndroidRecognition} />
         <form className="cmd-bar" onSubmit={sendCommand} data-testid="sirius-cmd-form">
           <span className="cmd-prompt">ΣIRIUS&gt;</span>
           <input
@@ -7652,6 +7660,7 @@ function App() {
           <input
             ref={commandInputRef}
             className="cmd-input"
+            aria-label="Votre demande à ΣIRIUS"
             type="text"
             value={cmd}
             onChange={(e) => setCmd(e.target.value)}
@@ -7661,13 +7670,11 @@ function App() {
           <PushToTalkButton active={pttActive} ready={captureMicOn} onStart={pttDown} onStop={pttUp} />
           <button type="submit" className="cmd-send" data-testid="sirius-cmd-send" aria-label="Envoyer la commande" title="Envoyer la commande">→</button>
         </form>
-        <VoiceSessionControls phase={voicePhase} message={voiceMessage} onStop={stopVoice}
-          androidRecognition={Capacitor.getPlatform() === "android" ? androidRecognition : null}
-          onRecognitionChange={changeAndroidRecognition} />
-        <div className="workspace-shortcuts" role="group" aria-label="Raccourcis de votre espace">
-          <button type="button" onClick={() => navigateMobile("modules")}>Ouvrir mes modules</button>
-          <button type="button" onClick={() => moduleActionsRef.current.openOdysseia()}>Explorer ODYSSEIA</button>
-          <button type="button" onClick={() => moduleActionsRef.current.openWorkDossiers()}>Mes dossiers</button>
+        </div>
+        <div className="workspace-shortcuts" role="group" aria-label="Suggestions de demandes">
+          {["Préparer ma journée de demain", "Faire le point sur mon activité", "Organiser une idée de projet"].map((suggestion) => (
+            <button key={suggestion} type="button" onClick={() => { setCmd(suggestion); commandInputRef.current?.focus(); }}>{suggestion}</button>
+          ))}
         </div>
         {handsFreeAvailable && (
           <details data-testid="native-audio-diagnostics">
@@ -7729,10 +7736,7 @@ function App() {
         </footer>
       </div>
         </section>
-        <WorkspaceSummary connected={connected}
-          onDossiers={() => moduleActionsRef.current.openWorkDossiers()}
-          onVoice={() => moduleActionsRef.current.openVoiceProfile()}
-          onOdysseia={() => moduleActionsRef.current.openOdysseia()} />
+        <WorkspaceSummary connected={connected} />
       </main>
 
       <MobileNavigation active={showModulesMenu ? "modules" : mobileDestination} onNavigate={navigateMobile} />

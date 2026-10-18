@@ -3,6 +3,7 @@
 // automatique sur la synthèse du navigateur si la clé est absente ou l'API indisponible.
 import { Capacitor } from "@capacitor/core";
 import { applyFrenchPhonetics, normalizeFrenchElisions } from "./phoneticFr";
+import { connectVoiceEqualizer } from "./voiceEqualizer";
 import { speakNative, stopNativeSpeech } from "./nativeVoice";
 import { API_BASE_URL } from "./lib/api";
 import { KEY_STORAGE_EVENT, loadApiKeys } from "./apiKeyStorage";
@@ -128,13 +129,14 @@ function stopChannels() {
 function reportGeminiFailure(reason) {
   console.warn("Gemini TTS indisponible :", reason);
   window.dispatchEvent(new CustomEvent("sirius-voice-degraded", {
-    detail: "Voix Gemini indisponible ; utilisation de la voix Android de secours.",
+    detail: "Voix Gemini indisponible ; utilisation de la voix locale de secours.",
   }));
 }
 
 // Préférences de voix (écran Profil) : voix, débit, gravité
 export const DEFAULT_VOICE = { name: "browser-female", rate: 1.0, pitch: 1.08 };
 export const AEDES_VOICE = { name: "browser-aedes", rate: 0.9, pitch: 0.94 };
+export const GEMINI_VOICE = { name: "gemini", rate: 1, pitch: 0 };
 const LEGACY_DEFAULT_VOICE = { name: "fr-FR-Neural2-G", rate: 1.05, pitch: -2 };
 const isBrowserVoice = (name) => name === "browser" || name === "browser-female" || name === AEDES_VOICE.name;
 const getBrowserGender = (name) => name === "browser-female" ? "female" : "male";
@@ -159,14 +161,16 @@ export async function playAudio(base64, { volume = 1, onstart, onend } = {}) {
   if (!base64) return false;
   try {
     const audio = new Audio("data:audio/mp3;base64," + base64);
+    const disconnect = await connectVoiceEqualizer(audio);
     audio.volume = Math.max(0.2, Math.min(1, volume));
     if (onstart) audio.onplay = onstart;
-    if (onend) audio.onended = onend;
+    audio.onended = () => { disconnect(); if (onend) onend(); };
     audio.onerror = () => {
+      disconnect();
       if (onend) onend();
       return false;
     };
-    await audio.play();
+    try { await audio.play(); } catch (error) { disconnect(); throw error; }
     return true;
   } catch (e) {
     console.error(e);
@@ -175,7 +179,7 @@ export async function playAudio(base64, { volume = 1, onstart, onend } = {}) {
 }
 
 async function speakRemote(message, { voice, rate, pitch, volume = 1, onstart, onend, onprogress, timeoutMs, playbackRate = 1 }, seq) {
-  const gemini = Capacitor.getPlatform() === "android";
+  const gemini = voice === GEMINI_VOICE.name || Capacitor.getPlatform() === "android";
   if (Date.now() < (gemini ? geminiDownUntil : googleDownUntil)) return false;
   const controller = new AbortController();
   currentRequest = controller;
@@ -215,9 +219,11 @@ async function speakRemote(message, { voice, rate, pitch, volume = 1, onstart, o
     // Une voix plus récente a pris la parole pendant le chargement → on se tait (pas d'écho)
     if (seq !== undefined && seq !== speakSeq) return true;
     if (currentRequest === controller) currentRequest = null;
+    const audio = new Audio(`data:${gemini ? "audio/wav" : "audio/mp3"};base64,` + audioBase64);
+    const disconnect = await connectVoiceEqualizer(audio);
+    if (seq !== speakSeq) { disconnect(); return true; }
     return await new Promise((resolve) => {
       stopChannels();
-      const audio = new Audio(`data:${gemini ? "audio/wav" : "audio/mp3"};base64,` + audioBase64);
       audio.volume = Math.max(0.2, Math.min(1, volume));
       audio.playbackRate = playbackRate;
       audio.preservesPitch = true;
@@ -227,6 +233,7 @@ async function speakRemote(message, { voice, rate, pitch, volume = 1, onstart, o
       const finish = (ok) => {
         if (finished) return;
         finished = true;
+        disconnect();
         audio.onplay = null;
         audio.onended = null;
         audio.onerror = null;
@@ -264,6 +271,7 @@ async function speakRemote(message, { voice, rate, pitch, volume = 1, onstart, o
     });
   } catch (e) {
     if (seq !== speakSeq) return true;
+    console.warn("Synthèse vocale distante : lecture indisponible.", e);
     if (gemini) reportGeminiFailure(e.name);
     return false;
   } finally {
@@ -382,9 +390,9 @@ export function speakFr(message, { onpending, onstart, onend } = {}) {
     speakBrowser(message, { rate, pitch: bPitch, volume, gender: getBrowserGender(cfg.name), onstart, onend });
     return;
   }
-  if (Capacitor.getPlatform() === "android") {
+  if (Capacitor.getPlatform() === "android" || cfg.name === GEMINI_VOICE.name) {
     speakRemote(message, {
-      voice: "fr-FR-Neural2-G",
+      voice: cfg.name === GEMINI_VOICE.name ? GEMINI_VOICE.name : "fr-FR-Neural2-G",
       rate,
       pitch: night ? -4.5 : -3,
       volume,
@@ -465,9 +473,9 @@ export function speakCinematic(message, { onstart, onend, onprogress, natural = 
     speakBrowser(message, { rate, pitch: browserPitch, gender: getBrowserGender(cfg.name), onstart, onend, onprogress });
     return;
   }
-  if (Capacitor.getPlatform() === "android") {
+  if (Capacitor.getPlatform() === "android" || cfg.name === GEMINI_VOICE.name) {
     speakRemote(message, {
-      voice: "fr-FR-Neural2-G",
+      voice: cfg.name === GEMINI_VOICE.name ? GEMINI_VOICE.name : "fr-FR-Neural2-G",
       rate,
       pitch: natural ? 0 : -3,
       playbackRate: natural ? 1.06 : 1,

@@ -3,6 +3,8 @@ import { useState, useRef, useEffect } from "react";
 import { User, KeyRound, Sparkles, ExternalLink, X, Download, Upload, Music, Volume2, Brain, Monitor, RotateCcw, CheckCircle2, XCircle, Loader2, Zap, Layers, Rocket, HardDrive } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { speakFr, speakAsCharacter, CHAR_PROFILES, MYTHOS_VOICES, loadCharOverrides, DEFAULT_VOICE, AEDES_VOICE, loadVoiceConfig } from "@/voice";
+import VoiceEqualizerPanel from "./VoiceEqualizerPanel";
+import { GEMINI_VOICE } from "./voice";
 import { HUD_DEFAULTS, loadHud, saveHud } from "@/hudPrefs";
 import { ConfirmButton } from "@/ConfirmButton";
 import { exportAccountProfile, importAccountProfile, validatePersonalService } from "@/accountSetup";
@@ -160,8 +162,14 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
 
   // Voix
   const [voiceCfg, setVoiceCfg] = useState(loadVoiceConfig);
+  const localVoice = voiceCfg.name.startsWith("browser");
   const updateVoice = (patch) => setVoiceCfg((v) => {
     const nv = { ...v, ...patch };
+    if (patch.name && patch.pitch === undefined && patch.name.startsWith("browser") !== v.name.startsWith("browser")) {
+      nv.pitch = patch.name.startsWith("browser")
+        ? Math.max(0.5, Math.min(2, 2 ** (v.pitch / 12)))
+        : Math.max(-10, Math.min(4, 12 * Math.log2(v.pitch)));
+    }
     localStorage.setItem("sirius_voice", JSON.stringify(nv));
     return nv;
   });
@@ -433,6 +441,12 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
         {tab === "voix" && (
           <section className="setup-section setup-single" data-testid="setup-panel-voix">
             <label className="setup-label">Préréglage <span className="setup-tag opt">1 clic</span></label>
+            <button type="button" className={`setup-voice-preset ${voiceCfg.name === "gemini" ? "active" : ""}`}
+              onClick={() => updateVoice({ ...GEMINI_VOICE })} data-testid="setup-voice-preset-gemini">
+              <b>Gemini — voix naturelle PC et téléphone</b>
+              <span>Même service vocal que sur Android · Connexion et service Gemini requis · Égaliseur disponible</span>
+              {voiceCfg.name === "gemini" && <i className="setup-preset-check">ACTIVE</i>}
+            </button>
             <button
               type="button"
               className={`setup-voice-preset ${voiceCfg.name === "browser-female" ? "active" : ""}`}
@@ -475,7 +489,8 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
               {voiceCfg.name === AEDES_VOICE.name && <i className="setup-preset-check">ACTIVE</i>}
             </button>
             <label className="setup-label">Voix</label>
-            <select className="setup-input" value={voiceCfg.name} onChange={(e) => updateVoice(e.target.value === AEDES_VOICE.name ? { ...AEDES_VOICE } : { name: e.target.value })} data-testid="setup-voice-name">
+            <select className="setup-input" value={voiceCfg.name} onChange={(e) => updateVoice(e.target.value === GEMINI_VOICE.name ? { ...GEMINI_VOICE } : e.target.value === AEDES_VOICE.name ? { ...AEDES_VOICE } : { name: e.target.value })} data-testid="setup-voice-name">
+              <option value="gemini">Gemini — voix naturelle PC et téléphone</option>
               <option value="browser-female">Féminine synthétique — locale (recommandée)</option>
               <option value="fr-FR-Neural2-G">Neural2-G — neurale premium (recommandée)</option>
               <option value="fr-FR-Neural2-F">Neural2-F — féminine premium (claire & dynamique)</option>
@@ -483,10 +498,20 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
               <option value="browser">Masculine synthétique — locale</option>
               <option value="browser-aedes">Voix des AÈDES — ODYSSEIA (conteur local)</option>
             </select>
+            {voiceCfg.name !== GEMINI_VOICE.name && <>
             <label className="setup-label">Débit <span className="setup-tag opt">{voiceCfg.rate.toFixed(2)}×</span></label>
             <input className="setup-range" type="range" min="0.7" max="1.4" step="0.05" value={voiceCfg.rate}
               onChange={(e) => updateVoice({ rate: parseFloat(e.target.value) })} data-testid="setup-voice-rate" />
-            {!voiceCfg.name.startsWith("browser") && (
+            </>}
+            {voiceCfg.name === "gemini" ? (
+              <p className="setup-note">Le timbre et la diction Gemini sont pilotés par le service vocal. Pour modifier les graves et les aigus du son, utilisez l'égaliseur ci-dessous.</p>
+            ) : localVoice ? (
+              <>
+                <label className="setup-label" htmlFor="setup-local-voice-pitch">Hauteur — grave / aiguë <span className="setup-tag opt">{voiceCfg.pitch < 0.8 ? "très grave" : voiceCfg.pitch < 1 ? "grave" : voiceCfg.pitch > 1.2 ? "aiguë" : "naturelle"} ({voiceCfg.pitch.toFixed(2)}×)</span></label>
+                <input id="setup-local-voice-pitch" className="setup-range" type="range" min="0.5" max="2" step="0.01" value={voiceCfg.pitch}
+                  onChange={(e) => updateVoice({ pitch: parseFloat(e.target.value) })} data-testid="setup-voice-pitch" />
+              </>
+            ) : (
               <>
                 <label className="setup-label">Gravité <span className="setup-tag opt">{voiceCfg.pitch <= -6 ? "très grave" : voiceCfg.pitch <= -2 ? "grave" : voiceCfg.pitch >= 2 ? "claire" : "naturelle"} ({voiceCfg.pitch > 0 ? `+${voiceCfg.pitch}` : voiceCfg.pitch})</span></label>
                 <input className="setup-range" type="range" min="-10" max="4" step="0.5" value={voiceCfg.pitch}
@@ -503,6 +528,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
               </ConfirmButton>
             </div>
 
+            <VoiceEqualizerPanel localVoice={localVoice} />
             <label className="setup-label" style={{ marginTop: "12px" }}>Voix des personnages Mythos <span className="setup-tag opt">par dieu</span></label>
             <select className="setup-input" value={charSel} onChange={(e) => setCharSel(e.target.value)} data-testid="setup-char-select">
               {Object.keys(CHAR_PROFILES).map((m) => (

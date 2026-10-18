@@ -8436,7 +8436,7 @@ footer.sirius-footer {
 
   .top-bar .conn-status {
     min-width: 0;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     justify-content: flex-end;
   }
 
@@ -8445,7 +8445,50 @@ footer.sirius-footer {
 
   .top-bar,
   html[data-sirius-visual-theme="classic"] .sirius-root .top-bar {
-    padding-right: 300px;
+    margin-right: 300px;
+    padding: 4px 12px 4px 20px;
+    gap: 16px;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--gold-soft) transparent;
+  }
+
+  .top-bar > * {
+    flex: 0 0 auto;
+  }
+
+  .top-bar .conn-status {
+    margin-left: auto;
+    gap: 8px;
+  }
+
+  .top-bar .top-settings {
+    align-items: center;
+    gap: 8px;
+  }
+
+  .top-bar .profile-btn {
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    height: 44px;
+    min-width: 44px;
+    margin: 0;
+  }
+
+  .top-bar .sys-indicators {
+    margin-left: 0;
+  }
+
+  .top-bar::-webkit-scrollbar { height: 4px; }
+  .top-bar::-webkit-scrollbar-thumb { background: var(--gold-soft); border-radius: 4px; }
+}
+
+@media (min-width: 1024px) and (max-width: 1599px) {
+  .top-bar .sys-indicators,
+  .top-bar .conn-label {
+    display: none;
   }
 }
 

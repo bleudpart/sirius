@@ -44,47 +44,47 @@ test.each([["standard", "69"], ["pro", "135"], ["lifetime", "269"]])(
 );
 
 test("store displays the requested headline and description while preserving the footer slogan", () => {
-  expect(container.querySelector(".public-hero .public-eyebrow").textContent).toBe("ΣIRIUS, conçue pour vous");
-  expect(container.querySelector(".public-hero h1").textContent).toBe("ΣIRIUS, sans prompts compliqués : parlez-lui, Il s'occupe de vos tâches.");
-  expect(container.querySelector(".public-value").textContent).toBe("Conçu pour tous ceux qui ne sont pas à l'aise avec l'IA, ΣIRIUS vous aide : vous écoute, vous répond, exécute vos demandes et surveille vos tâches. Parlez-lui naturellement, sans avoir à rédiger de prompts compliqués.");
+  expect(container.querySelector(".public-hero .public-eyebrow").textContent).toBe("Votre assistant de travail");
+  expect(container.querySelector(".public-hero h1").textContent).toBe("Parlez à ΣIRIUS.Il prépare votre travail.");
+  expect(container.querySelector(".public-value").textContent).toContain("prépare les prochaines étapes avec vous");
   expect(container.querySelector(".public-slogan").textContent).toBe("ΣIRIUS travaille pour vous.");
 });
 
-test("store explains why Sirius was designed with the requested text", () => {
-  const section = container.querySelector(".public-why");
-  expect(section.getAttribute("aria-labelledby")).toBe("public-why-title");
-  expect(section.querySelector(".public-why-grid")).toBeNull();
-  expect(section.querySelectorAll("article")).toHaveLength(0);
-  expect(section.querySelector("h2").textContent).toBe("Pourquoi ΣIRIUS a-t-il été conçu ?");
-  expect(section.querySelector(":scope > p").textContent).toBe("ΣIRIUS a été conçu pour aider les particuliers, les commerçants, les artisans, les indépendants et les entreprises à mieux organiser leur activité au quotidien. Il permet de centraliser les documents, notes, factures, informations comptables, tâches, rendez-vous et projets dans un espace unique. Grâce à ses capacités de classement, de recherche et de synthèse, ΣIRIUS facilite le suivi administratif, l'organisation du travail et la prise de décision.");
+test("three concrete requests lead to the trial instead of checkout", () => {
+  expect(container.querySelectorAll(".public-request-examples li")).toHaveLength(3);
+  const actions = container.querySelectorAll(".public-hero .public-primary-cta");
+  expect(actions).toHaveLength(1);
+  expect(actions[0].getAttribute("href")).toBe("#essayer");
+  expect(container.querySelector(".public-demo-text-link").getAttribute("href")).toBe("#demonstration");
+  expect(container.querySelector(".public-purchase").open).toBe(false);
+  expect(container.querySelector("#public-phone").required).toBe(false);
+  expect(container.querySelector("#essayer a").getAttribute("href")).toContain("releases/download/v1.0.45/");
+  expect(container.querySelector("#essayer").textContent).toContain("1.0.45");
 });
 
 test("business context and workflow precede functions and offers without removing existing sections", () => {
   const sections = [...container.querySelectorAll("main > section")].map((section) => section.className);
-  const workflow = container.querySelector("#public-workflow-title").parentElement;
+  const workflow = container.querySelector("#public-advantage-title").parentElement;
   const workflowIndex = [...container.querySelectorAll("main > section")].indexOf(workflow);
-  expect(sections.indexOf("public-why")).toBeLessThan(workflowIndex);
+  expect(sections.indexOf("public-demo public-workflow")).toBeLessThan(workflowIndex);
   expect(workflowIndex).toBeLessThan(sections.indexOf("public-situations"));
   expect(sections.indexOf("public-situations")).toBeLessThan(sections.indexOf("public-matrix"));
   expect(sections.indexOf("public-matrix")).toBeLessThan(sections.indexOf("public-plans"));
   expect(sections.indexOf("public-plans")).toBeLessThan(sections.indexOf("public-odysseia-card"));
   const steps = workflow.querySelectorAll(".public-workflow-steps li");
   expect(steps).toHaveLength(3);
-  expect(steps[1].textContent).toContain("Relisez les champs");
-  expect(steps[2].textContent).toContain("brouillon de facture non émis");
-  expect(workflow.textContent).toContain("Du document reçu au résultat conservé");
-  expect(container.querySelector(".public-matrix-actions li strong").textContent).toBe("Organiser ses dossiers");
+  expect(steps[1].textContent).toContain("rassemble");
+  expect(steps[2].textContent).toContain("Vous vérifiez et validez");
+  expect(container.querySelector(".public-matrix-actions li strong").textContent).toBe("Retrouvez rapidement vos dossiers");
 });
 test("store leads with accessible assistance, speed and continuity without promising unlimited autonomy", () => {
-  expect(container.querySelector(".public-eyebrow").textContent).toBe("ΣIRIUS, conçue pour vous");
-  expect(container.querySelector(".public-hero").textContent).toContain("Parlez-lui naturellement");
+  expect(container.querySelector(".public-eyebrow").textContent).toBe("Votre assistant de travail");
+  expect(container.querySelector(".public-hero").textContent).toContain("Décrivez simplement");
   const advantages = container.querySelector("#public-advantage-title").parentElement;
   expect(advantages.querySelectorAll("li")).toHaveLength(3);
-  expect(advantages.textContent).toContain("rappels configurés");
-  expect(advantages.querySelector("p > strong").textContent).toBe("Essayez ΣIRIUS gratuitement.");
-  expect(advantages.textContent).toContain("Parlez-lui simplement. Vous l'adopterez.");
+  expect(advantages.textContent).toContain("Vous gardez le dernier mot");
   expect(advantages.textContent).not.toContain("Demandez-lui de rédiger un message");
-  expect(advantages.textContent).toContain("Claude, ChatGPT et d'autres outils peuvent intervenir à certaines étapes. Mais avec ΣIRIUS, vous avez un interlocuteur unique : vous lui parlez et, hop ! Il rassemble vos demandes, vos dossiers et vos outils, puis vous accompagne tout au long de votre travail.");
+  expect(advantages.textContent).toContain("pas besoin d'apprendre à rédiger des prompts");
   expect(container.textContent).not.toContain("Tout se fait automatiquement");
 });
 test("trial explains activation, limits and personal keys without automatic payment", () => {
@@ -130,7 +130,11 @@ test("the core rotates transparent rings rather than the square emblem", () => {
 });
 
 test("store describes real prerequisites without fabricated evidence or empty video", () => {
-  expect(container.querySelector("video")).toBeNull();
+  const video = container.querySelector("video");
+  expect(video.controls).toBe(true);
+  expect(video.autoplay).toBe(false);
+  expect(video.querySelector("source").getAttribute("src")).toBe("/demo/sirius-demo-store.mp4");
+  expect(video.querySelector("track").getAttribute("src")).toBe("/demo/sirius-demo-store.vtt");
   expect(container.querySelector("blockquote")).toBeNull();
   expect(container.querySelector(".public-metrics")).toBeNull();
   for (const claim of ["+12 000", "24h/24", "Instantané", "Ils utilisent", "256 bits", "Voir une démo", "aucun débit réel"]) {
@@ -138,11 +142,11 @@ test("store describes real prerequisites without fabricated evidence or empty vi
   }
   expect(container.querySelector(".hud-preview img").getAttribute("src")).toBe("/hud-preview.png");
   expect(container.querySelectorAll(".public-matrix-actions li")).toHaveLength(6);
-  expect(container.querySelector(".public-matrix h2").textContent).toBe("Découvrez les fonctionnalités de ΣIRIUS");
-  expect(container.querySelector(".public-matrix-actions").textContent).toContain("Rédaction de documents");
-  expect(container.querySelector(".public-matrix-actions").textContent).toContain("Analyse assistée par IA");
+  expect(container.querySelector(".public-matrix h2").textContent).toBe("Ce que vous pouvez lui confier");
+  expect(container.querySelector(".public-matrix-actions").textContent).toContain("Préparez vos documents");
+  expect(container.querySelector(".public-matrix-actions").textContent).toContain("Analysez les informations importantes");
   expect(container.textContent).toContain("pas une démonstration en direct");
-  expect(container.textContent).toContain("équipements compatibles");
+  expect(container.querySelector(".public-control").textContent).toContain("microphone est facultatif");
   expect(container.textContent).toContain("leur délai de réponse peut varier");
   expect(container.textContent).toContain("ne garantit pas que le prestataire est en mode test");
   expect(container.querySelector(".public-demo-link").textContent).toContain("Voir les fonctions");

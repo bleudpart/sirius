@@ -1,24 +1,25 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, ShieldCheck, ArrowRight, Mic, FolderOpen, Mail, UserRound, Zap, Star, Home, Search, ChartNoAxesCombined, FileText } from "lucide-react";
+import { Check, ShieldCheck, ArrowRight, Mic, FolderOpen, Mail, UserRound, Zap, Star, Search, ChartNoAxesCombined, FileText } from "lucide-react";
 import PublicLegal from "./PublicLegal";
 import "./PublicStore.css";
+import "./publicPantheon.css";
 
 const API = `${process.env.REACT_APP_BACKEND_URL || "https://api.sirius-assistant.fr"}/api`;
 
 const PLANS = [
   { id: "monthly", cardClass: "card-entreprise", name: "Location", icon: Zap, tagline: "Essayez sans carte, puis choisissez votre abonnement.", price: "10", suffix: " le premier mois", features: ["15 jours gratuits sans carte à la première connexion", "Première location : 10 € le premier mois", "Puis 32 €/mois, renouvellement automatique", "Résiliation depuis le portail Stripe", "Après l'essai, clés IA personnelles nécessaires"] },
-  { id: "standard", cardClass: "card-standard", name: "Standard", icon: UserRound, tagline: "L'essentiel pour automatiser votre quotidien.", price: "69", suffix: " unique", features: ["Assistant conversationnel", "Emails et documents", "HUD ΣIRIUS", "Windows et mobile"] },
-  { id: "pro", cardClass: "card-pro", name: "Pro", icon: Zap, tagline: "La puissance métier sans friction.", price: "135", suffix: " unique", featured: true, badge: "RECOMMANDÉ", features: ["Tout Standard", "Automatisations métier", "HACCP et productivité", "Commandes vocales", "Support prioritaire"] },
-  { id: "lifetime", cardClass: "card-lifetime", name: "Lifetime", icon: Star, tagline: "L'accès complet, pour longtemps.", price: "269", suffix: " unique", badge: "MEILLEURE VALEUR", features: ["Tout Pro", "Mises à jour incluses", "Futurs modules inclus", "Licence à vie"] },
+  { id: "standard", cardClass: "card-standard", name: "Standard", icon: UserRound, tagline: "Pour organiser votre quotidien personnel.", price: "69", suffix: " paiement unique", features: ["Assistant conversationnel", "Emails et documents", "HUD ΣIRIUS", "Windows et mobile"] },
+  { id: "pro", cardClass: "card-pro", name: "Pro", icon: Zap, tagline: "Pour les indépendants et les activités métier.", price: "135", suffix: " paiement unique", featured: true, badge: "RECOMMANDÉ", features: ["Tout Standard", "Automatisations métier", "HACCP et productivité", "Commandes vocales", "Support prioritaire"] },
+  { id: "lifetime", cardClass: "card-lifetime", name: "Lifetime", icon: Star, tagline: "Pour un usage durable avec les évolutions incluses.", price: "269", suffix: " paiement unique", badge: "MEILLEURE VALEUR", features: ["Tout Pro", "Mises à jour incluses", "Futurs modules inclus", "Licence à vie"] },
 ];
 
 const MATRIX_ACTIONS = [
-  { icon: FolderOpen, text: "Organiser ses dossiers", detail: "Les six modules métier locaux proposent une sauvegarde JSON et une restauration par fusion." },
-  { icon: FileText, text: "Rédaction de documents", detail: "L'IA vous aide à préparer des textes et des brouillons. Relisez et validez le contenu avant de l'utiliser." },
-  { icon: Search, text: "Analyse assistée par IA", detail: "Obtenez une synthèse ou une explication des informations fournies. Vérifiez les conclusions ; un service IA configuré et une connexion réseau sont nécessaires." },
-  { icon: Mail, text: "Préparer un email", detail: "Les fonctions email nécessitent un compte connecté et les autorisations du fournisseur." },
-  { icon: Mic, text: "Dicter une demande", detail: "Le microphone nécessite votre autorisation. La transcription Android envoie un extrait audio au serveur." },
-  { icon: Home, text: "Piloter des équipements", detail: "La domotique nécessite une connexion configurée et des équipements compatibles." },
+  { icon: FolderOpen, text: "Retrouvez rapidement vos dossiers", detail: "Réunissez documents et notes dans un dossier pour retrouver le contexte enregistré." },
+  { icon: FileText, text: "Préparez vos documents", detail: "Obtenez un texte ou un brouillon à relire avant de l'utiliser." },
+  { icon: Mail, text: "Organisez vos rendez-vous et échéances", detail: "Les agendas et courriels nécessitent un compte connecté et ses autorisations." },
+  { icon: Search, text: "Analysez les informations importantes", detail: "Demandez une synthèse des informations fournies. Vérifiez les conclusions ; un service IA configuré et une connexion réseau sont nécessaires." },
+  { icon: Mic, text: "Travaillez à la voix ou par écrit", detail: "Le microphone reste facultatif. Sur Android, la transcription envoie un extrait audio au serveur." },
+  { icon: ShieldCheck, text: "Gardez vos actions sous contrôle", detail: "Relisez les propositions et confirmez les actions importantes, notamment l'envoi d'un courriel." },
 ];
 
 export default function PublicStore() {
@@ -162,19 +163,23 @@ export default function PublicStore() {
       <header className="public-nav">
         <a className="public-brand" href="/"><span className="public-brand-gold">ΣIRIUS</span><span>.</span></a>
         <nav className="public-nav-links" aria-label="Navigation de la boutique">
-          <a href="#matrice-demo">L'interface</a>
+          <a href="#demonstration">Comment ça marche</a>
           <a href="#offres">Les offres</a>
-          <a className="public-nav-cta" href="#commencer">Choisir ma licence <ArrowRight size={15} /></a>
+          <a href="#essayer">Essai gratuit</a>
         </nav>
       </header>
       <div className="public-showcase">
       <section className="public-hero">
-        <p className="public-eyebrow">ΣIRIUS, conçue pour vous</p>
-        <h1>ΣIRIUS, sans prompts compliqués : <em>parlez-lui, Il s'occupe de vos tâches.</em></h1>
-        <p className="public-value">Conçu pour tous ceux qui ne sont pas à l'aise avec l'IA, ΣIRIUS vous aide : vous écoute, vous répond, exécute vos demandes et surveille vos tâches. Parlez-lui naturellement, sans avoir à rédiger de prompts compliqués.</p>
-        <p className="public-trial-highlight">15 jours d'essai gratuit des services IA dès votre première connexion.</p>
-        <div className="public-benefits"><span>Demandes naturelles</span><span>Réponses rapides</span><span>Plusieurs tâches, un espace</span><span>Suivi des dossiers</span></div>
-        <div className="public-hero-actions"><a className="public-primary-cta" href="#offres">Découvrir les offres <ArrowRight size={17} /></a><a className="public-secondary-cta" href="#matrice-demo">Explorer l'interface <ArrowRight size={17} /></a></div>
+        <p className="public-eyebrow">Votre assistant de travail</p>
+        <h1>Parlez à ΣIRIUS.<br />Il prépare votre travail.</h1>
+        <p className="public-value">Décrivez simplement ce que vous voulez faire. ΣIRIUS retrouve vos informations, rassemble vos dossiers et prépare les prochaines étapes avec vous.</p>
+        <ul className="public-request-examples" aria-label="Exemples de demandes">
+          <li>« Prépare ma journée. »</li>
+          <li>« Retrouve le dossier de ce client. »</li>
+          <li>« Rappelle-moi de relancer ce devis vendredi. »</li>
+        </ul>
+        <p className="public-trial-highlight">15 jours d'essai gratuit des services IA · Sans carte bancaire</p>
+        <div className="public-hero-actions"><a className="public-primary-cta" href="#essayer">Essayer gratuitement pendant 15 jours <ArrowRight size={17} /></a><a className="public-demo-text-link" href="#demonstration">Voir comment ΣIRIUS fonctionne</a></div>
       </section>
       <section className="public-hud-preview public-hud-hero" aria-label="Capture d'écran du HUD ΣIRIUS">
         <div className="public-window-bar"><span className="public-window-dot" /> ΣIRIUS · L'espace de travail</div>
@@ -182,31 +187,22 @@ export default function PublicStore() {
         <p className="public-preview-caption">Une interface pour vos commandes, vos outils et vos modules.</p>
       </section>
       </div>
+      <section className="public-demo public-workflow" id="demonstration" aria-labelledby="public-demo-title">
+        <h2 id="public-demo-title" className="public-section-title">Voyez ΣIRIUS en situation</h2>
+        <video controls preload="none" poster="/demo/sirius-dossiers.png" aria-label="Démonstration de ΣIRIUS avec des données fictives">
+          <source src="/demo/sirius-demo-store.mp4" type="video/mp4" />
+          <track kind="subtitles" src="/demo/sirius-demo-store.vtt" srcLang="fr" label="Français" default />
+          Votre navigateur ne lit pas cette vidéo. <a href="/demo/sirius-demo-store.mp4">Télécharger la démonstration</a>
+        </video>
+        <p className="public-function-note">Une minute de démonstration enregistrée : suivi d'activité, factures et préparation d'un courriel. Données fictives, aucun envoi réel. Ce n'est pas une réponse IA en direct ; l'apparence peut différer de la version téléchargée.</p>
+      </section>
       <section className="public-workflow" aria-labelledby="public-advantage-title">
-        <h2 id="public-advantage-title" className="public-section-title">Moins de temps à expliquer. Plus de temps à avancer.</h2>
-        <p>Vous n'avez pas à devenir expert en IA. ΣIRIUS a été conçu pour réunir l'assistance et l'organisation de votre activité, sans reconstruire votre façon de travailler à chaque demande.</p>
+        <h2 id="public-advantage-title" className="public-section-title">Comment ça fonctionne ?</h2>
         <ol className="public-workflow-steps">
-          <li><strong>La simplicité, dès la première demande</strong><p>Dites ce dont vous avez besoin, à la voix ou au clavier. Pas de formule technique à apprendre ni de prompt compliqué à préparer.</p></li>
-          <li><strong>La rapidité, sans multiplier les manipulations</strong><p>Préparez un document, retrouvez une information et organisez une tâche dans le même espace. Passez d'une demande à l'autre sans disperser votre travail entre plusieurs interfaces.</p></li>
-          <li><strong>La continuité, dossier après dossier</strong><p>Conservez vos documents et vos notes, retrouvez le contexte enregistré et associez vos échéances à vos dossiers. Les rappels configurés vous aident à garder le fil des prochaines actions.</p></li>
+          <li><strong>Vous parlez naturellement</strong><p>À la voix ou au clavier, pas besoin d'apprendre à rédiger des prompts.</p></li>
+          <li><strong>ΣIRIUS rassemble ce qu'il vous faut</strong><p>Dossiers, notes, échéances et informations accessibles restent réunis.</p></li>
+          <li><strong>Vous gardez le dernier mot</strong><p>Vous vérifiez et validez avant les actions importantes.</p></li>
         </ol>
-        <p>Claude, ChatGPT et d'autres outils peuvent intervenir à certaines étapes. Mais avec ΣIRIUS, vous avez un interlocuteur unique : vous lui parlez et, hop ! Il rassemble vos demandes, vos dossiers et vos outils, puis vous accompagne tout au long de votre travail.</p>
-        <p><strong>Essayez ΣIRIUS gratuitement.</strong><br />Parlez-lui simplement. Vous l'adopterez.</p>
-        <a className="public-primary-cta" href="#commencer">Découvrir ΣIRIUS <ArrowRight size={17} /></a>
-      </section>
-      <section className="public-why" aria-labelledby="public-why-title">
-        <h2 id="public-why-title" className="public-section-title">Pourquoi ΣIRIUS a-t-il été conçu ?</h2>
-        <p>ΣIRIUS a été conçu pour aider les particuliers, les commerçants, les artisans, les indépendants et les entreprises à mieux organiser leur activité au quotidien. Il permet de centraliser les documents, notes, factures, informations comptables, tâches, rendez-vous et projets dans un espace unique. Grâce à ses capacités de classement, de recherche et de synthèse, ΣIRIUS facilite le suivi administratif, l'organisation du travail et la prise de décision.</p>
-      </section>
-      <section className="public-workflow" aria-labelledby="public-workflow-title">
-        <h2 id="public-workflow-title" className="public-section-title">De vos documents au travail préparé</h2>
-        <p>Pour un commerçant ou un indépendant, la valeur n'est pas seulement d'obtenir une réponse IA : c'est de retrouver les pièces, préparer le travail et conserver un résultat relu dans le bon dossier.</p>
-        <ol className="public-workflow-steps">
-          <li><strong>Rassembler dans un dossier</strong><p>Photographiez un ticket ou choisissez une image. La lecture du texte se fait sur l'appareil ; la photo originale est conservée sur le serveur SIRIUS après confirmation.</p></li>
-          <li><strong>Préparer et vérifier</strong><p>Relisez les champs proposés et comparez les identifiants fiscaux signalés avec la photo. Une information non identifiée reste à compléter, elle n'est pas inventée.</p></li>
-          <li><strong>Conserver un résultat utilisable</strong><p>Classez le justificatif et téléchargez sa fiche de dépense en PDF A4. Une vente reste un brouillon de facture non émis ; vous gardez la main sur sa validation.</p></li>
-        </ol>
-        <p className="public-function-note">Du document reçu au résultat conservé, ΣIRIUS réunit la capture, la relecture, le classement et le document préparé dans un même parcours.</p>
       </section>
       <section className="public-situations" aria-labelledby="public-situations-title">
         <h2 id="public-situations-title" className="public-section-title">ΣIRIUS en situation</h2>
@@ -216,26 +212,27 @@ export default function PublicStore() {
             <a href="/demo/sirius-dossiers.png" target="_blank" rel="noopener noreferrer" aria-label="Agrandir la capture des dossiers">
               <img src="/demo/sirius-dossiers.png" alt="MNÉMOSYNE : dossier Atelier Horizon avec un client fictif" width="1440" height="1000" loading="lazy" />
             </a>
-            <figcaption><strong>MNÉMOSYNE — Dossiers et archives</strong><span>Un dossier, son contact et sa description. Données de démonstration.</span></figcaption>
+            <figcaption><strong>Retrouvez le dossier d'un client</strong><span>Son contact et ses informations réunis. Données de démonstration.</span></figcaption>
           </figure>
           <figure>
             <a href="/demo/sirius-planning.png" target="_blank" rel="noopener noreferrer" aria-label="Agrandir la capture du planning">
               <img src="/demo/sirius-planning.png" alt="CHRONOS : échéance de relecture associée au dossier fictif Atelier Horizon" width="1440" height="1000" loading="lazy" />
             </a>
-            <figcaption><strong>CHRONOS — Planning et échéances</strong><span>Une tâche datée associée à un dossier. Données de démonstration.</span></figcaption>
+            <figcaption><strong>Gardez vos échéances en vue</strong><span>Une tâche datée associée à un dossier. Données de démonstration.</span></figcaption>
           </figure>
         </div>
       </section>
-      <section className="public-trial" aria-labelledby="public-trial-title">
-        <h2 id="public-trial-title" className="public-section-title">15 jours pour découvrir les services IA</h2>
-        <p>L'essai commence à votre première connexion activant votre compte. Pendant 15 jours, les services IA autorisés utilisent les clés de SIRIUS, dans la limite des quotas quotidiens.</p>
-        <p><strong>Sans engagement ni paiement automatique à la fin de l'essai.</strong> Vous pouvez arrêter d'utiliser l'essai à tout moment : aucun abonnement à annuler.</p>
-        <p>Ensuite, l'assistant de configuration vous guide pour ajouter vos propres clés API qui restent chiffrées sur votre appareil. Les outils et dossiers locaux restent accessibles ; les fournisseurs peuvent facturer l'utilisation de vos clés.</p>
-        <p>Sans carte bancaire pour l'essai. Pour continuer en location, souscrivez volontairement : 10 € le premier mois pour une première location, puis 32 €/mois. Le renouvellement est automatique après souscription, pas après l'essai gratuit.</p>
-        <small>L'essai des services IA est distinct de l'achat d'une licence présenté ci-dessous. Une déconnexion ou une réinstallation ne relance pas les 15 jours. Souscrire avant la fin de l'essai déclenche le premier paiement immédiatement, sans nouvel essai Stripe.</small>
+      <section className="public-control public-workflow" aria-labelledby="public-control-title">
+        <h2 id="public-control-title" className="public-section-title">Vos données. Vos décisions.</h2>
+        <p>Le microphone est facultatif. Vous choisissez les comptes à connecter et vous confirmez les actions importantes.</p>
+        <details><summary>Confidentialité et limites à connaître</summary>
+          <p>Les dossiers et outils locaux restent accessibles sans service IA. Une demande adressée à un fournisseur connecté peut lui transmettre les informations nécessaires à son traitement. Sur Android, la transcription vocale envoie un extrait audio au serveur.</p>
+          <p>Les résultats peuvent contenir des erreurs : vérifiez-les avant utilisation. Les fonctions de gestion ne remplacent ni un expert-comptable ni un conseil juridique.</p>
+          <a href="/confidentialite.html">Lire la politique de confidentialité</a>
+        </details>
       </section>
       <section className="public-matrix" id="matrice-demo" aria-label="La matrice de ΣIRIUS">
-        <div className="public-section-intro"><span className="public-section-icon"><ChartNoAxesCombined size={21} /></span><div><h2 className="public-section-title">Découvrez les fonctionnalités de ΣIRIUS</h2><p>Une présentation des usages et de leurs prérequis, pas une démonstration en direct.</p></div></div>
+        <div className="public-section-intro"><span className="public-section-icon"><ChartNoAxesCombined size={21} /></span><div><h2 className="public-section-title">Ce que vous pouvez lui confier</h2><p>Des outils pour préparer votre travail, à votre rythme.</p></div></div>
         <div className="public-matrix-layout">
         <div className="public-core-preview">
           <div className="public-core-window" aria-label="Noyau ΣIRIUS" role="img">
@@ -250,11 +247,11 @@ export default function PublicStore() {
         </div>
         <ul className="public-matrix-actions">
           {MATRIX_ACTIONS.map(({ icon: Icon, text, detail }) => (
-            <li key={text}><Icon size={16} /> <span><strong>{text}</strong><small>{detail}</small></span></li>
+            <li key={text}><Icon size={16} /> <span><strong>{text}</strong><details><summary>En pratique</summary><small>{detail}</small></details></span></li>
           ))}
         </ul>
         </div>
-        <p className="public-function-note">La capture d'écran ci-dessus présente le HUD. L'animation du noyau illustre son apparence, sans exécuter de commande. Les fonctions IA et les services connectés nécessitent une connexion réseau ; leur délai de réponse peut varier.</p>
+        <p className="public-function-note">L'animation illustre le noyau, sans exécuter de commande : pas une démonstration en direct. Les services connectés nécessitent le réseau et leur délai de réponse peut varier.</p>
       </section>
       <section className="public-plans" id="offres" aria-label="Offres ΣIRIUS">
         <h2 className="public-section-title">Choisissez votre formule</h2>
@@ -273,11 +270,45 @@ export default function PublicStore() {
           );
         })}
       </section>
-      <form className="public-checkout" id="commencer" onSubmit={checkout}>
+      <section className="public-plan-details public-workflow" aria-labelledby="public-comparison-title">
+        <h2 id="public-comparison-title" className="public-section-title">Les différences en un coup d'œil</h2>
+        <div className="public-comparison-scroll" tabIndex={0} role="region" aria-label="Comparatif des formules">
+          <table>
+            <thead><tr><th scope="col">Formule</th><th scope="col">Pour qui ?</th><th scope="col">Paiement</th><th scope="col">L'essentiel</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Location</th><td>Découvrir en s'abonnant</td><td>10 € le premier mois*, puis 32 €/mois</td><td>Renouvellement automatique, résiliation via Stripe</td></tr>
+              <tr><th scope="row">Standard</th><td>Usage personnel</td><td>69 € une fois</td><td>Assistant, emails et documents</td></tr>
+              <tr><th scope="row">Pro</th><td>Indépendants et métier</td><td>135 € une fois</td><td>Standard + métier, HACCP, productivité et support prioritaire</td></tr>
+              <tr><th scope="row">Lifetime</th><td>Usage durable</td><td>269 € une fois</td><td>Pro + mises à jour et futurs modules inclus</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p className="public-function-note">* Première location uniquement ; sinon 32 €/mois dès la souscription. Aucun paiement annuel proposé ici.</p>
+        <details><summary>Après l'essai : clés, frais extérieurs et licence à vie</summary>
+          <p>Pour toutes les formules, après les 15 jours, les services IA demandent vos propres clés API. Les fournisseurs peuvent facturer leur utilisation ; ces frais ne sont pas inclus dans la licence. Les outils et dossiers locaux restent accessibles.</p>
+          <p>Lifetime désigne la licence du logiciel à paiement unique, avec les mises à jour et futurs modules annoncés inclus. Ce n'est pas un abonnement à vie aux fournisseurs IA ni une garantie de disponibilité perpétuelle des services externes. Consultez les conditions générales avant l'achat.</p>
+          <a href="/conditions-generales">Consulter les conditions générales</a>
+        </details>
+      </section>
+      <section className="public-trial" id="essayer" aria-labelledby="public-trial-title">
+        <h2 id="public-trial-title" className="public-section-title">Commencez gratuitement pendant 15 jours</h2>
+        <p>Aucune connaissance de l'IA nécessaire. Téléchargez ΣIRIUS, ouvrez l'application, puis créez votre compte.</p>
+        <a className="public-primary-cta" href="https://github.com/bleudpart/sirius/releases/download/v1.0.45/sirius-setup-1.0.45.exe">Télécharger pour Windows <ArrowRight size={17} /></a>
+        <p className="public-function-note">Version publique Windows 1.0.45. Les captures présentent une version plus récente de l'interface. Aucun téléphone demandé sur cette page pour l'essai.</p>
+        <p><strong>Sans engagement ni paiement automatique à la fin de l'essai.</strong> Sans carte bancaire, aucun abonnement à annuler.</p>
+        <details><summary>Comment fonctionne l'essai ?</summary>
+          <p>L'essai commence à votre première connexion activant votre compte. Les services IA autorisés utilisent les clés de SIRIUS, dans la limite des quotas quotidiens.</p>
+          <p>Ensuite, la configuration vous guide pour ajouter vos propres clés API chiffrées sur votre appareil. Les fournisseurs peuvent facturer leur utilisation.</p>
+          <p>L'essai est distinct de l'achat d'une licence. Une déconnexion ou une réinstallation ne relance pas les 15 jours. Toute souscription volontaire déclenche un paiement immédiat, sans nouvel essai Stripe.</p>
+        </details>
+      </section>
+      <details className="public-purchase" id="commencer">
+      <summary>Vous avez déjà choisi votre formule ? Continuer vers l'achat</summary>
+      <form className="public-checkout" onSubmit={checkout}>
         <div className="public-checkout-heading">
         <div>
         <p className="public-eyebrow">Votre licence</p>
-        <h2 className="public-section-title">Commencer avec ΣIRIUS</h2>
+        <h2 className="public-section-title">Acheter une licence — paiement immédiat</h2>
         </div>
         <p className="public-order-summary" aria-live="polite"><span>{selectedPlan.name}</span><strong>{selectedPlan.price} €</strong><small>{selected === "monthly" ? "Premier mois d'une première location, puis 32 €/mois" : "Paiement unique"}</small></p>
         </div>
@@ -304,6 +335,7 @@ export default function PublicStore() {
         <p className="public-legal">Le paiement s'ouvre chez Stripe ou PayPal selon votre choix. Vérifiez le montant et les conditions sur la page du prestataire avant de confirmer.</p>
         <small className="public-checkout-note">Consultez les conditions générales avant l'achat. Cette page ne garantit pas que le prestataire est en mode test.</small>
       </form>
+      </details>
       {paypalStatus && (
         <p className={paypalStatus.ok ? "public-checkout-note" : "public-error"} role={paypalStatus.ok ? undefined : "alert"}>
           {paypalStatus.ok ? `Paiement PayPal confirmé — licence ${paypalStatus.tier} activée.` : paypalStatus.message}
@@ -317,7 +349,7 @@ export default function PublicStore() {
       <section className="public-odysseia-card" aria-labelledby="public-odysseia-card-title">
         <img src="/Designer%20(16).png" alt="Athéna, illustration de la bibliothèque ODYSSEIA" loading="lazy" />
         <div>
-          <p className="public-eyebrow">ODYSSEIA · Mythes et histoire</p>
+          <p className="public-eyebrow">L'univers de ΣIRIUS</p>
           <h2 id="public-odysseia-card-title" className="public-section-title">L’ère mythologique grecque</h2>
           <p>Des récits du Cosmos aux héros de Troie : découvrez ce que racontent les mythes et ce que l’histoire peut réellement établir.</p>
           <button

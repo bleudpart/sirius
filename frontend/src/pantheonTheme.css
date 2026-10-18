@@ -1,0 +1,308 @@
+/* Loaded after the layout contract. Geometry, semantic alerts and module colours stay local. */
+html[data-sirius-visual-theme="classic"][data-sirius-platform] {
+  --workspace-gold: #c5a059;
+  --workspace-rgb: linear-gradient(90deg, #c5a059, #c5a059);
+  --workspace-frame-colours: #c5a059;
+  --pantheon-portrait-width: 128px;
+  --pantheon-portrait-height: 160px;
+  --workspace-cyan: #91e6f2;
+  --workspace-text: #edf4fc;
+  --workspace-muted: #b0c2d8;
+  --workspace-line: rgba(197, 160, 89, .34);
+  --workspace-font: "Segoe UI", system-ui, sans-serif;
+  --pantheon-heading: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+  --workspace-surface: linear-gradient(145deg, #102637, #081522);
+  --workspace-shadow: 0 14px 32px #0005, inset 0 0 8px #c5a0590d;
+  --pantheon-corners:
+    linear-gradient(#c5a05999, #c5a05999) left 7px top 7px / 17px 1px no-repeat,
+    linear-gradient(#c5a05999, #c5a05999) left 7px top 7px / 1px 17px no-repeat,
+    linear-gradient(#c5a05999, #c5a05999) right 7px top 7px / 17px 1px no-repeat,
+    linear-gradient(#c5a05999, #c5a05999) right 7px top 7px / 1px 17px no-repeat,
+    linear-gradient(#c5a05999, #c5a05999) left 7px bottom 7px / 17px 1px no-repeat,
+    linear-gradient(#c5a05999, #c5a05999) left 7px bottom 7px / 1px 17px no-repeat,
+    linear-gradient(#c5a05999, #c5a05999) right 7px bottom 7px / 17px 1px no-repeat,
+    linear-gradient(#c5a05999, #c5a05999) right 7px bottom 7px / 1px 17px no-repeat;
+  --pantheon-surface: var(--pantheon-corners),
+    radial-gradient(ellipse, #d8f8f844, #91e6f233 18%, #c5a05922 35%, transparent 72%) 32% top / 92px 2px no-repeat,
+    radial-gradient(ellipse, #d8f8f844, #91e6f233 18%, #c5a05922 35%, transparent 72%) 68% bottom / 92px 2px no-repeat,
+    repeating-radial-gradient(circle at 50% 40%, transparent 0 39px, #c5a05908 40px, transparent 41px 70px),
+    var(--workspace-surface);
+}
+
+html[data-sirius-visual-theme="classic"][data-sirius-platform] :is(
+  .sirius-root, .boot-screen, .auth-screen, .spectator-view
+) {
+  background: radial-gradient(ellipse at 50% 40%, #16455448, transparent 55%),
+    linear-gradient(#5e91b409 1px, transparent 1px) 0 0 / 48px 48px,
+    linear-gradient(90deg, #5e91b409 1px, transparent 1px) 0 0 / 48px 48px, #06101b !important;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-root > :is(.city-backdrop, .vignette) { display: none; }
+
+html[data-sirius-visual-theme="classic"][data-sirius-platform] :is(
+  .sirius-module-window, .prime-screen, .zeus-screen, .eu-screen, .setup-screen, .holo-win,
+  .iw-panel, .atlas-panel, .kr-panel, .esp-panel, .about-panel, .media-hud-window,
+  .productivity-screen, .connections-screen, .vision-card, .keys-panel, .sp-journal,
+  .getting-started, .modwheel, .hud-panel, .shud-hub, .web-window, .sirius-display,
+  .fv-window, .p3d-panel, .fp-panel, .an3d-overlay, .cmdp-box, .voice-capture-panel,
+  .auth-card, .auth-checking, .overlay-bar, .overlay-answer, .shud-panel, .float-card,
+  .central-card, .holo-popup, .workspace-surface, .pantheon-composer, .archive-gallery,
+  .av-frame, .setup-card, .fde-module-loading, .fde-error, .workspace-search, .document-scanner,
+  .th-modal, .shud-next-pop, .atlas-keyscreen, .media-hud-standalone, [role="dialog"]
+) {
+  border: 1px solid var(--workspace-line) !important;
+  border-radius: 8px !important;
+  background: var(--pantheon-surface) !important;
+  box-shadow: var(--workspace-shadow) !important;
+  animation: none !important;
+  font-family: var(--workspace-font);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Disable the previous rotating spectrum without repurposing pseudo-elements used by controls. */
+html[data-sirius-visual-theme="classic"][data-sirius-platform] :is(.holo-win, .modwheel)::before,
+html[data-sirius-visual-theme="classic"][data-sirius-platform] :is(.sirius-display, .web-window, .shud-panel)::after {
+  animation: none !important;
+  background: none !important;
+  box-shadow: none !important;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .modwheel-dial::before {
+  background: var(--workspace-gold) !important; animation: none !important;
+  filter: none !important; opacity: .65;
+  -webkit-mask: radial-gradient(circle, transparent calc(70.5% - 1px), #000 calc(70.5% - 1px), #000 70.5%, transparent 70.5%);
+  mask: radial-gradient(circle, transparent calc(70.5% - 1px), #000 calc(70.5% - 1px), #000 70.5%, transparent 70.5%);
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .shud-panel::before {
+  height: 1px; background: var(--workspace-gold) !important;
+  animation: none !important; box-shadow: none !important;
+}
+
+@keyframes pantheonAfterglow {
+  0%, 100% { box-shadow: 0 14px 32px #0005, 0 0 18px #65dbe309, inset 0 0 10px #65dbe309, inset 0 0 7px #c5a0590d; }
+  30% { box-shadow: 0 14px 32px #0005, 0 0 18px #65dbe32b, inset 0 0 10px #65dbe32b, inset 0 0 7px #c5a05928; }
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] body:has(.sirius-root[data-pantheon-active="true"])
+  :is(.sirius-module-window, .workspace-surface, .pantheon-composer, .modwheel, .sirius-display, .web-window, .shud-panel) {
+  animation: pantheonAfterglow 9s cubic-bezier(.4, 0, .2, 1) infinite !important;
+}
+
+html[data-sirius-visual-theme="classic"][data-sirius-platform] :is(
+  .sirius-window-header, .zeus-head, .eu-head, .setup-head, .gcal-head, .iw-head, .atlas-bar,
+  .kr-bar, .esp-bar, .p3d-bar, .an3d-bar, .ww-bar, .sd-bar, .fv-bar, .shud-head, .media-hud-header, .spectator-head,
+  .modwheel-heading, .productivity-header, .fp-header, .connections-header, .keys-bar, .sp-bar, .vision-head, .getting-started > header
+) {
+  background: linear-gradient(90deg, transparent, #c5a05922, transparent) 0 100% / 100% 1px no-repeat, #081522 !important;
+  border-bottom-color: var(--workspace-line) !important;
+  border-image: none !important;
+  border-bottom-width: 1px !important;
+  animation: none !important;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-module-window:is(
+  .prime-screen, .atlas-panel, .kr-panel, .work-modules, .holo-win
+) :is(img.mythos-avatar, .consult-portrait > img, .work-portrait > img, .kr-character > img, img.numm-avatar) {
+  display: block !important; position: static !important;
+  box-sizing: border-box; flex: 0 0 auto;
+  width: var(--pantheon-portrait-width) !important; height: var(--pantheon-portrait-height) !important;
+  min-width: 0; max-width: 100% !important; max-height: none !important;
+  object-fit: contain !important; object-position: center !important;
+  border: 1px solid var(--workspace-line); border-radius: 8px !important;
+  background: #081522; box-shadow: none !important; filter: none !important;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-module-window.kr-panel {
+  grid-template-columns: 160px minmax(0, 1fr);
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-module-window .kr-character {
+  padding: 12px;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-module-window :is(.mg-thumb-img img, .mg-detail-img) {
+  object-fit: contain; mix-blend-mode: normal;
+}
+@media (min-width: 1024px) {
+  html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-module-window .work-layout.with-portrait {
+    grid-template-columns: 200px 164px minmax(0, 1fr);
+  }
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] :is(
+  .sirius-window-title, .oracle-title, .prime-title, .zeus-title, .setup-title, .eu-title,
+  .architect-title, .atlas-title, .kr-title, .esp-title, .fp-title, .p3d-title, .keys-title,
+  .modwheel-heading, .modwheel-title b, .work-header h1, .work-dossiers-head h1,
+  .sirius-window-header h1, .sirius-window-header h2, .workspace-surface h2,
+  .boot-welcome, .boot-status h2, .boot-modules-title, .auth-title, .spectator-title
+) {
+  font-family: var(--pantheon-heading) !important;
+  color: #e2c78f;
+  letter-spacing: .075em !important;
+  text-shadow: none !important;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] :is(
+  .prime-sub, .zeus-sub, .setup-sub, .eu-sub, .atlas-sub, .kr-sub, .oracle-sub,
+  .architect-sub, .th-sub, .mg-thumb-name, .mg-detail-role, .modwheel-title span,
+  .modmenu-label small, .shud-muted, .voice-profile-intro, .work-description, .work-subtitle,
+  .auth-sub, .zcx-sub, .zcx-h2sub, .heph-head-sub, .heph-subline, .an3d-hint,
+  .pkg-intro p, .subtitle-text, .sd-caption, .sd-sub, .workspace-subtitle, .boot-module-role
+) { color: var(--workspace-muted) !important; }
+html[data-sirius-visual-theme="classic"][data-sirius-platform] :is(
+  .prime-card, .zeus-card, .th-card, .th-form-card, .np-card, .media-module-card,
+  .work-item, .prime-sugg, .oracle-day, .mm-row, .pantheon-tile, .connection-item,
+  .file-card, .kr-row, .mg-thumb, .mg-detail, .modmenu-item, .shud-hub-section,
+  .zcx-cell, .voice-profile-actions, .voice-profile-draft, .voice-profile-sample,
+  .work-dossiers-entry, .work-dossiers-proposal, .work-dossiers-integrations p
+) {
+  border-radius: 8px !important;
+  background: linear-gradient(145deg, #102637, #081522) !important;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] :is(.sirius-module-window, .modwheel, .auth-card, .workspace-summary)
+  :is(input, select, textarea):focus-visible {
+  outline: 2px solid #e2c78f;
+  outline-offset: 3px;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .workspace-kicker { color: #e2c78f; font-family: var(--pantheon-heading); }
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .modwheel :is(.modwheel-close, .modwheel-min) {
+  width: 44px; height: 44px; min-width: 44px; min-height: 44px;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .modwheel .modwheel-min { right: 64px; }
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .modwheel .modwheel-search { margin-right: 104px; }
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .workspace-search > header > button {
+  flex: 0 0 44px; min-width: 44px; min-height: 44px;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-module-window .cmd-send:not(.cmd-bar > .cmd-send) {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  flex: 0 1 auto; width: auto; height: auto; max-width: 100%; min-height: 44px;
+  padding: 10px 14px; line-height: 1.4; white-space: normal; overflow-wrap: normal;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-module-window .cmd-send > svg { flex-shrink: 0; }
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-display .sd-bar {
+  height: auto; min-height: 56px; flex-wrap: wrap; gap: 6px;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-display .sd-bar > button {
+  flex: 0 0 auto; min-width: 44px; min-height: 44px; width: auto; height: auto;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .infowheel .shud-cal-nav {
+  position: static; justify-content: flex-end; margin-bottom: 8px;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .infowheel .shud-cal-nav > button {
+  width: 44px; height: 44px; min-width: 44px; min-height: 44px; font-size: 20px;
+}
+.workspace-links button small { display: block; color: var(--workspace-muted); font-size: 12px; line-height: 1.5; margin-top: 3px; }
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .workspace-links button[data-destination="odysseia"] > span { color: #e2c78f; font-family: var(--pantheon-heading); }
+.workspace-secondary summary { cursor: pointer; color: var(--workspace-muted); font-size: 12px; min-height: 44px; display: list-item; align-content: center; }
+.workspace-summary textarea { width: 100%; min-height: 110px; resize: vertical; padding: 12px; background: #06101b99; color: var(--workspace-text); border: 1px solid var(--workspace-line); border-radius: 8px; font: 14px/1.6 var(--workspace-font); }
+.workspace-summary textarea::placeholder { color: var(--workspace-muted); opacity: 1; }
+.workspace-header-clock { display: grid; flex: 0 0 auto; text-align: right; color: var(--workspace-muted); font-size: 11px; line-height: 1.4; }
+.workspace-header-clock strong { color: var(--workspace-text); font-size: 17px; font-weight: 600; }
+html[data-sirius-visual-theme="classic"][data-sirius-platform] :is(.infowheel, .shud-hub, .shud-clock) .hud-time {
+  color: var(--workspace-gold);
+  -webkit-text-fill-color: var(--workspace-gold);
+}
+
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-center .sirius-wordmark {
+  font-family: var(--pantheon-heading); color: var(--workspace-gold); -webkit-text-fill-color: var(--workspace-gold); letter-spacing: .075em; text-transform: none;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .top-bar .profile-btn {
+  box-sizing: border-box; flex: 0 0 44px; width: 44px !important; height: 44px !important;
+  min-width: 44px !important; min-height: 44px !important; max-width: 44px; max-height: 44px;
+  padding: 0 !important; align-items: center; justify-content: center; gap: 2px;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-center .sirius-tagline {
+  font: 400 15px/1.6 var(--workspace-font) !important;
+  color: var(--workspace-muted) !important; -webkit-text-fill-color: var(--workspace-muted) !important;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-root .sirius-center { justify-content: safe center; gap: 12px; }
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-center .sirius-stage { height: clamp(210px, 28vh, 280px); min-height: 0; }
+html[data-sirius-visual-theme="classic"][data-sirius-platform] :is(.sirius-stage .reactor-wrap, .boot-screen .boot-reactor) {
+  width: clamp(140px, 17.6vh, 188px); height: clamp(140px, 17.6vh, 188px);
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .pantheon-composer {
+  width: min(680px, 100%); padding: 10px 14px; box-sizing: border-box;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .pantheon-composer :is(.cmd-bar, .voice-session-controls) {
+  width: 100%; min-width: 0; border: 0 !important; background: none !important; box-shadow: none !important;
+  animation: none !important; margin: 0; border-radius: 0; padding: 4px 0;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .voice-session-controls .voice-session-caption { display: none; }
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .voice-session-controls :is(.voice-session-label, .voice-session-detail) { color: var(--workspace-muted); }
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .cmd-bar .cmd-send { color: #0b131f; background: var(--workspace-gold); }
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .cmd-bar .cmd-send:disabled { opacity: .55; }
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .pantheon-composer:focus-within { border-color: #c5a059 !important; }
+.workspace-shortcuts { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.voice-equalizer {
+  margin: 20px 0; padding: 18px; min-width: 0; border: 1px solid var(--workspace-line);
+  border-radius: 8px; background: linear-gradient(145deg, #102637, #081522);
+}
+.voice-equalizer legend { color: var(--workspace-gold); padding: 0 8px; font-family: var(--pantheon-heading); }
+.voice-equalizer p { color: var(--workspace-muted); font: 13px/1.6 var(--workspace-font); }
+.voice-equalizer-bands { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 18px 0; }
+.voice-equalizer-band { display: grid; gap: 14px; min-width: 0; text-align: center; color: var(--workspace-text); }
+.voice-equalizer-band small { display: block; color: var(--workspace-muted); margin-top: 4px; }
+.voice-equalizer-band input { width: 100%; min-width: 0; min-height: 44px; accent-color: var(--workspace-gold); cursor: pointer; }
+.voice-equalizer-band input:disabled { opacity: .45; cursor: not-allowed; }
+.voice-equalizer-band output { color: var(--workspace-gold); font-variant-numeric: tabular-nums; }
+@media (max-width: 480px) {
+  .voice-equalizer-bands { grid-template-columns: minmax(0, 1fr); }
+}
+
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen {
+  display: grid; grid-template-columns: minmax(0, 660px); grid-template-rows: repeat(4, max-content);
+  align-content: start; justify-content: center; gap: 20px; padding: max(24px, env(safe-area-inset-top)) 24px 24px;
+  overflow-y: auto;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen .boot-center { grid-row: 1; width: 100%; transform: none; }
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen .boot-status {
+  grid-row: 2; width: 100%; height: auto; max-height: none; margin: 0; overflow: visible; padding: 22px 26px;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen .boot-modules {
+  display: block; grid-row: 3; width: 100%; max-height: 320px; height: auto; margin: 0; overflow-y: auto;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen .boot-modules-title {
+  font-size: 16px; cursor: pointer; min-height: 44px; align-content: center; margin: 0;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen .boot-reactor { margin: 30px auto; transform: none; }
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen :is(.boot-acronym, .boot-signature, .sirius-colleague, .boot-scan) { display: none; }
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen .boot-tagline {
+  font: 400 14px/1.6 var(--workspace-font) !important; color: var(--workspace-muted) !important;
+  -webkit-text-fill-color: var(--workspace-muted) !important;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen .boot-check-details { display: block; }
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen .boot-bar { height: 2px; }
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen .boot-bar-fill {
+  background: linear-gradient(90deg, #c5a059, #91d9db); transition: width .6s ease;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen .boot-copyright { grid-row: 4; }
+
+/* Shared public and standalone surfaces use the palette without changing product or warning colours. */
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .public-store :is(
+  .public-hud-hero, .public-metrics, .public-core-preview, .public-plan, .public-checkout,
+  .public-testimonial, .public-why-grid article, .public-subscription-success,
+  .public-situations figure, .public-odysseia-card, .public-odysseia-dialog, .public-trial
+) { background: var(--pantheon-surface); border-radius: 8px; }
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .public-store :is(
+  .public-hud-hero, .public-metrics, .public-core-preview, .public-matrix-actions li,
+  .public-plan, .public-checkout, .public-testimonial, .public-why-grid article,
+  .public-subscription-success, .public-situations figure, .public-odysseia-card, .public-odysseia-dialog
+)::before { animation: none; background: linear-gradient(90deg, transparent, #c5a05988, transparent); }
+
+@media (max-width: 1023px) {
+  html[data-sirius-visual-theme="classic"][data-sirius-platform] {
+    --pantheon-portrait-width: 96px; --pantheon-portrait-height: 120px;
+  }
+  html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-module-window.kr-panel { grid-template-columns: minmax(0, 1fr); }
+  .workspace-header-clock { display: none; }
+  html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-center .sirius-stage { height: clamp(150px, 24vh, 220px); }
+}
+@media (max-height: 500px) {
+  html[data-sirius-visual-theme="classic"][data-sirius-platform] :is(.sirius-stage .reactor-wrap, .boot-screen .boot-reactor) { width: 80px; height: 80px; }
+  html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-center .sirius-stage { height: 112px; }
+}
+@media (prefers-reduced-motion: reduce), (max-width: 1023px) and (pointer: coarse) {
+  html[data-sirius-visual-theme="classic"][data-sirius-platform] body:has(.sirius-root[data-pantheon-active="true"]) :is(
+    .sirius-module-window, .workspace-surface, .pantheon-composer, .modwheel, .sirius-display, .web-window, .shud-panel
+  ) { animation: none !important; }
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] :is(body.hud-reduced-motion, body:has(.sirius-root.eco), body:has(.sirius-root.backgrounded))
+  :is(.sirius-module-window, .workspace-surface, .pantheon-composer, .modwheel, .sirius-display, .web-window, .shud-panel) { animation: none !important; }
+html[data-sirius-visual-theme="classic"][data-sirius-platform="android"] body:has(.sirius-root[data-pantheon-active="true"]) :is(
+  .sirius-module-window, .workspace-surface, .pantheon-composer, .modwheel, .sirius-display, .web-window, .shud-panel
+) { animation: none !important; }
+html[data-sirius-visual-theme="classic"][data-sirius-platform] body.hud-high-contrast {
+  --workspace-text: #fff; --workspace-muted: #fff; --workspace-line: #b4ebf4;
+}

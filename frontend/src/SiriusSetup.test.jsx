@@ -40,6 +40,49 @@ test("la configuration propose AÈDES et conserve son préréglage conteur", asy
   }
 });
 
+test("le préréglage Gemini est explicite, sauvegardé et ne propose pas la hauteur Google", async () => {
+  const host = document.createElement("div");
+  const root = createRoot(host);
+  const saved = localStorage.getItem("sirius_voice");
+  try {
+    await act(async () => root.render(<SiriusSetup initialTab="voix" onComplete={jest.fn()} onCancel={jest.fn()} />));
+    await act(async () => host.querySelector('[data-testid="setup-voice-preset-gemini"]').click());
+    expect(JSON.parse(localStorage.getItem("sirius_voice"))).toEqual({ name: "gemini", rate: 1, pitch: 0 });
+    expect(host.querySelector('[data-testid="setup-voice-pitch"]')).toBeNull();
+    expect(host.querySelector('[data-testid="setup-voice-rate"]')).toBeNull();
+    expect(host.querySelector('[data-testid="setup-voice-name"]').value).toBe("gemini");
+  } finally {
+    await act(async () => root.unmount());
+    if (saved === null) localStorage.removeItem("sirius_voice");
+    else localStorage.setItem("sirius_voice", saved);
+  }
+});
+
+test.each(["browser-female", "browser", "browser-aedes"])("la hauteur grave ou aiguë de %s est réglable et sauvegardée", async (name) => {
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  const saved = localStorage.getItem("sirius_voice");
+  localStorage.setItem("sirius_voice", JSON.stringify({ name, rate: 1, pitch: 1 }));
+  try {
+    await act(async () => root.render(<SiriusSetup initialTab="voix" initialProfile={{ name: "Local" }}
+      onComplete={jest.fn()} onCancel={jest.fn()} />));
+    const slider = container.querySelector('[data-testid="setup-voice-pitch"]');
+    expect(slider.min).toBe("0.5");
+    expect(slider.max).toBe("2");
+    for (const pitch of ["0.65", "1.65"]) {
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(slider, pitch);
+        slider.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      expect(JSON.parse(localStorage.getItem("sirius_voice")).pitch).toBe(Number(pitch));
+    }
+  } finally {
+    await act(async () => root.unmount());
+    if (saved === null) localStorage.removeItem("sirius_voice");
+    else localStorage.setItem("sirius_voice", saved);
+  }
+});
+
 test("la configuration distingue Cerebras rapide, Groq vocal et Kimi réflexion", async () => {
   const originalFetch = global.fetch;
   global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ services: [] }) });
