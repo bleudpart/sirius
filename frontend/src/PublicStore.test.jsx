@@ -62,6 +62,15 @@ test("three concrete requests lead to the trial instead of checkout", () => {
   expect(container.querySelector("#essayer").textContent).toContain("1.0.45");
 });
 
+test("the creator introduces Sirius immediately after the demonstration and before the workflow", () => {
+  const founder = container.querySelector(".public-founder");
+  expect(founder.getAttribute("aria-labelledby")).toBe("public-founder-title");
+  expect(founder.querySelector("h2").textContent).toBe("Daniel Partel vous présente ΣIRIUS");
+  expect(founder.querySelector("p").textContent).toBe("J'ai créé ΣIRIUS pour celles et ceux qui souhaitent profiter des outils numériques sans avoir à maîtriser l'intelligence artificielle. Vous lui parlez naturellement : il rassemble vos demandes, vos dossiers et vos outils pour vous accompagner dans votre travail.");
+  expect(container.querySelector("#demonstration").nextElementSibling).toBe(founder);
+  expect(founder.nextElementSibling.querySelector("h2").id).toBe("public-advantage-title");
+});
+
 test("business context and workflow precede functions and offers without removing existing sections", () => {
   const sections = [...container.querySelectorAll("main > section")].map((section) => section.className);
   const workflow = container.querySelector("#public-advantage-title").parentElement;

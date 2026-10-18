@@ -196,6 +196,10 @@ export default function PublicStore() {
         </video>
         <p className="public-function-note">Une minute de démonstration enregistrée : suivi d'activité, factures et préparation d'un courriel. Données fictives, aucun envoi réel. Ce n'est pas une réponse IA en direct ; l'apparence peut différer de la version téléchargée.</p>
       </section>
+      <section className="public-founder public-workflow" aria-labelledby="public-founder-title">
+        <h2 id="public-founder-title" className="public-section-title">Daniel Partel vous présente ΣIRIUS</h2>
+        <p>J'ai créé ΣIRIUS pour celles et ceux qui souhaitent profiter des outils numériques sans avoir à maîtriser l'intelligence artificielle. Vous lui parlez naturellement : il rassemble vos demandes, vos dossiers et vos outils pour vous accompagner dans votre travail.</p>
+      </section>
       <section className="public-workflow" aria-labelledby="public-advantage-title">
         <h2 id="public-advantage-title" className="public-section-title">Comment ça fonctionne ?</h2>
         <ol className="public-workflow-steps">
