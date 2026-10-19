@@ -34,7 +34,7 @@ test("préserve les adresses et les mots contenant mail", () => {
 
 test("épelle les sigles que le moteur lirait comme un mot", () => {
   expect(applyFrenchPhonetics("Le plan HACCP est prêt")).toBe("Le plan ache a cé cé pé est prêt");
-  expect(applyFrenchPhonetics("Export PDF")).toBe("Export pé dé èf");
+  expect(applyFrenchPhonetics("Export PDF")).toBe("Export pé dé effe");
   expect(applyFrenchPhonetics("ouvre le HUD")).toBe("ouvre le ache u dé");
 });
 
