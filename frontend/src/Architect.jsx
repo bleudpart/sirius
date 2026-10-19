@@ -131,7 +131,7 @@ export function ArchitectPanel({ keys, initialPrompt, onClose, onSpeak }) {
       try { chanRef.current && chanRef.current.postMessage(data); } catch (e) {}
       if (onSpeak) onSpeak(`Architecture ${data.titre || ""} générée, avec ${(data.noeuds || []).length} composants.`);
     } catch (e) {
-      setError(e.message || "Sirius n'a pas pu dessiner ce diagramme. Vérifiez votre clé Kimi K3.");
+      setError(e.message || "Sirius n'a pas pu dessiner ce diagramme. Vérifiez votre clé Groq.");
     }
     setLoading(false);
   };

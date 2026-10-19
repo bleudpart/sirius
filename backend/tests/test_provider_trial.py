@@ -628,7 +628,10 @@ def test_setup_test_chat_expired_unrelated_or_anonymous_never_call_owner(server_
 
 
 def test_setup_test_chat_trial_uses_owner_with_quota_and_admin_exemption(server_api, db, monkeypatch):
+    import sirius_brain
     client, user, server = server_api
+    monkeypatch.setattr(sirius_brain, "ENV_CEREBRAS_KEY", "")
+    monkeypatch.delenv("CEREBRAS_API_KEY", raising=False)
     monkeypatch.setenv("GROQ_KEY", "owner-private")
     monkeypatch.setenv("SIRIUS_QUOTA_CHAT", "1")
     calls = []
@@ -707,7 +710,10 @@ def test_active_trial_personal_groq_with_owner_kimi_is_charged_and_exhausted_quo
 
 
 def test_setup_test_chat_active_trial_with_unrelated_keys_uses_owner_chat(server_api, db, monkeypatch):
+    import sirius_brain
     client, user, server = server_api
+    monkeypatch.setattr(sirius_brain, "ENV_CEREBRAS_KEY", "")
+    monkeypatch.delenv("CEREBRAS_API_KEY", raising=False)
     monkeypatch.setenv("GROQ_KEY", "owner-private")
     monkeypatch.setenv("SIRIUS_QUOTA_CHAT", "1")
     calls = []
@@ -1046,11 +1052,21 @@ def test_trial_active_partial_vault_keeps_owner_for_other_providers_and_charges_
         FakeLLM.content = '{"reponse": "Coach OK"}'
 
 
-def test_ocr_route_has_no_provider_path():
-    import inspect
-    import sirius_brain
-    source = inspect.getsource(sirius_brain.ocr_screen)
-    assert source.strip() == "async def ocr_screen(img): return {}"
+def test_ocr_route_requires_personal_key_after_trial_and_uses_it(modules):
+    import base64
+    client, _, _, _ = modules
+    png = base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"\x00" * 32).decode()
+    FakeLLM.content = "Bonjour\nRésumé : un écran."
+    try:
+        denied = client.post("/api/pantheon/ocr", json={"image": png, "keys": {}})
+        assert denied.status_code == 403 and FakeLLM.calls == []
+        ok = client.post("/api/pantheon/ocr", json={"image": png, "keys": {"groq_key": "personal-groq"}})
+        assert ok.status_code == 200 and ok.json()["result"].startswith("Bonjour")
+        assert FakeLLM.calls == ["personal-groq"]
+        bad = client.post("/api/pantheon/ocr", json={"image": "pas-une-image", "keys": {"groq_key": "personal-groq"}})
+        assert bad.status_code == 400
+    finally:
+        FakeLLM.content = '{"reponse": "Coach OK"}'
 
 
 def test_expired_nummarius_uses_personal_alpha_or_free_source_never_owner(modules):

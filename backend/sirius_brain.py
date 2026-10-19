@@ -1842,15 +1842,281 @@ async def generate_answer_stream(prompt, history=None, profile=None, memory=None
         "popups": res.get("popups", [])
     }
 
-async def web_report(query):
-    return ""
+# --- Modules IA annexes : diagrammes, vision, analyse de fichiers, compagnon dev, rapport web ---
+_THINK_RE = re.compile(r"<think>.*?</think>", re.S)
+_IMAGE_SIGNATURES = (
+    (b"\x89PNG\r\n\x1a\n", "png"),
+    (b"\xff\xd8\xff", "jpeg"),
+    (b"GIF87a", "gif"),
+    (b"GIF89a", "gif"),
+)
+VISION_MAX_BYTES = 4 * 1024 * 1024
 
-async def generate_diagram(data): return {}
-async def dev_companion(code): return {}
-async def ocr_screen(img): return {}
-async def analyze_upload(file): return {}
-async def display_ask(prompt): return {}
-async def vision_look(img): return {}
+
+def _module_key(keys=None) -> str:
+    from provider_access import require_key
+    key = require_key("groq", ENV_GROQ_LLM_KEY, keys)
+    if not key:
+        raise ValueError("Clé Groq absente : ajoutez votre clé dans les réglages.")
+    return key
+
+
+def _json_object(raw: str) -> dict:
+    raw = (raw or "").strip()
+    for candidate in (raw, raw[raw.find("{"):raw.rfind("}") + 1] if "{" in raw else ""):
+        if not candidate:
+            continue
+        try:
+            data = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(data, dict):
+            return data
+    raise RuntimeError("Réponse IA sans JSON exploitable.")
+
+
+async def _module_llm(messages, keys=None, *, json_mode=False, vision=False, max_tokens=1500,
+                      temperature=0.3, timeout=45.0):
+    """Appel Groq des modules annexes : JSON strict puis souple, ou modèle principal puis secours."""
+    key = _module_key(keys)
+    if vision:
+        from floorplan import VISION_MODEL
+        models = (VISION_MODEL, VISION_MODEL)
+    else:
+        models = (GROQ_LLM_PRIMARY, GROQ_LLM_PRIMARY if json_mode else GROQ_LLM_FALLBACK)
+    llm = AsyncOpenAI(api_key=key, base_url=GROQ_LLM_ENDPOINT, max_retries=0, timeout=timeout)
+    last_error = None
+    for attempt, model in enumerate(models):
+        try:
+            extra = {"response_format": {"type": "json_object"}} if json_mode and attempt == 0 else {}
+            resp = await llm.chat.completions.create(model=model, messages=messages, max_tokens=max_tokens,
+                                                     temperature=temperature, **extra)
+            text = _THINK_RE.sub("", resp.choices[0].message.content or "").strip()
+            if json_mode:
+                return _json_object(text)
+            if not text:
+                raise RuntimeError("Réponse IA vide.")
+            return text
+        except Exception as error:
+            last_error = error
+            logger.warning("[ΣIRIUS:MODULES] tentative %d échouée : %r", attempt + 1, error)
+    raise last_error
+
+
+def _vision_data_url(b64: str) -> str:
+    """Base64 brut ou data URL -> data URL JPEG/PNG/WebP de 4 Mo maximum pour le modèle de vision."""
+    import base64
+    import binascii
+    source = (b64 or "").strip()
+    if source.startswith("data:"):
+        source = source.split(",", 1)[-1]
+    source = re.sub(r"\s+", "", source)
+    try:
+        data = base64.b64decode(source, validate=True)
+    except (binascii.Error, ValueError):
+        raise ValueError("Image invalide : encodage incorrect.")
+    if not data:
+        raise ValueError("Image vide.")
+    kind = next((name for magic, name in _IMAGE_SIGNATURES if data.startswith(magic)), "")
+    if not kind and data.startswith(b"RIFF") and data[8:12] == b"WEBP":
+        kind = "webp"
+    if not kind:
+        raise ValueError("Image invalide : utilisez une image JPEG, PNG ou WebP.")
+    if kind == "gif" or len(data) > VISION_MAX_BYTES:
+        try:
+            from io import BytesIO
+            from PIL import Image
+            with Image.open(BytesIO(data)) as img:
+                img = img.convert("RGB")
+                img.thumbnail((2000, 2000))
+                out = BytesIO()
+                img.save(out, "JPEG", quality=82)
+            data, kind = out.getvalue(), "jpeg"
+        except Exception:
+            raise ValueError("Image trop lourde ou illisible (4 Mo maximum).")
+        if len(data) > VISION_MAX_BYTES:
+            raise ValueError("Image trop lourde (4 Mo maximum).")
+        source = base64.b64encode(data).decode()
+    return f"data:image/{kind};base64,{source}"
+
+
+def _clip(value, limit):
+    return re.sub(r"\s+", " ", str(value or "")).strip()[:limit]
+
+
+DIAGRAM_TYPES = {"user", "ui", "service", "database", "external"}
+DIAGRAM_PROMPT = """Tu es l'Architecte visuel de ΣIRIUS. Transforme la description en diagramme d'architecture.
+Réponds UNIQUEMENT en JSON :
+{"titre": "titre court", "noeuds": [{"id": "id_court", "label": "Nom affiché", "type": "user|ui|service|database|external"}],
+ "liens": [{"de": "id_source", "vers": "id_cible", "label": "verbe court"}]}
+Règles : 3 à 12 nœuds, ids uniques en minuscules sans espace, labels en français de 24 caractères maximum,
+chaque lien relie deux ids existants, au moins un acteur (user) quand des personnes interviennent."""
+
+
+def _normalize_diagram(data: dict) -> dict:
+    nodes, ids = [], set()
+    for raw in data.get("noeuds") or []:
+        if not isinstance(raw, dict):
+            continue
+        node_id = re.sub(r"[^a-z0-9_]+", "_", str(raw.get("id") or raw.get("label") or "").lower()).strip("_")[:32]
+        if not node_id or node_id in ids:
+            continue
+        ids.add(node_id)
+        node_type = str(raw.get("type") or "").lower()
+        nodes.append({"id": node_id, "label": _clip(raw.get("label") or node_id, 40),
+                      "type": node_type if node_type in DIAGRAM_TYPES else "service"})
+        if len(nodes) >= 12:
+            break
+    if not nodes:
+        raise RuntimeError("Diagramme vide.")
+    links = []
+    for raw in data.get("liens") or []:
+        if not isinstance(raw, dict):
+            continue
+        start = re.sub(r"[^a-z0-9_]+", "_", str(raw.get("de") or "").lower()).strip("_")
+        end = re.sub(r"[^a-z0-9_]+", "_", str(raw.get("vers") or "").lower()).strip("_")
+        if start in ids and end in ids and start != end:
+            links.append({"de": start, "vers": end, "label": _clip(raw.get("label"), 30)})
+    return {"titre": _clip(data.get("titre") or "Architecture", 80), "noeuds": nodes, "liens": links[:30]}
+
+
+async def generate_diagram(description: str, keys: dict = None) -> dict:
+    description = (description or "").strip()
+    if not description:
+        raise ValueError("Description vide.")
+    data = await _module_llm([
+        {"role": "system", "content": DIAGRAM_PROMPT},
+        {"role": "user", "content": description[:3000]},
+    ], keys, json_mode=True, max_tokens=2000, temperature=0.2)
+    return _normalize_diagram(data)
+
+
+DEV_PROMPTS = {
+    "review": ("Tu es un relecteur de code senior. Fais une revue en français : bugs, failles de sécurité, "
+               "performances, lisibilité. Classe par gravité, cite les lignes concernées et propose le correctif "
+               "en code. Termine par une version corrigée si elle est courte."),
+    "commit": ("Rédige un message de commit Git en anglais au format Conventional Commits (type(scope): résumé "
+               "de 72 caractères maximum), puis une ligne vide et une liste à puces des changements. "
+               "Réponds uniquement avec le message."),
+    "logs": ("Analyse ces logs en français : identifie l'erreur racine, la cause probable, puis donne les étapes "
+             "de correction concrètes et les commandes utiles. Ignore le bruit."),
+}
+
+
+async def dev_companion(code: str, action: str = "review", keys: dict = None) -> str:
+    code = (code or "").strip()
+    if not code:
+        raise ValueError("Code vide.")
+    prompt = DEV_PROMPTS.get((action or "review").strip().lower())
+    if not prompt:
+        raise ValueError("Action inconnue : review, commit ou logs.")
+    return await _module_llm([
+        {"role": "system", "content": prompt},
+        {"role": "user", "content": code[:24000]},
+    ], keys, max_tokens=3000, temperature=0.2, timeout=60.0)
+
+
+ANALYZE_IMAGE_PROMPT = """Analyse cette image pour l'utilisateur, en français.
+Réponds UNIQUEMENT en JSON : {"description": "description claire en 2 à 5 phrases (contenu, contexte, éléments utiles)",
+"texte": "tout le texte lisible, fidèlement, ou \\"Aucun texte visible\\""}"""
+ANALYZE_DOCUMENT_PROMPT = """Analyse ce document pour l'utilisateur, en français.
+Réponds UNIQUEMENT en JSON : {"description": "résumé clair en 3 à 6 phrases : nature du document, idées clés, montants,
+dates et actions à retenir", "points": ["point clé", "..."]}"""
+
+
+async def analyze_upload(kind: str, payload: str, keys: dict = None) -> dict:
+    if kind == "image":
+        data = await _module_llm([{"role": "user", "content": [
+            {"type": "text", "text": ANALYZE_IMAGE_PROMPT},
+            {"type": "image_url", "image_url": {"url": _vision_data_url(payload)}},
+        ]}], keys, json_mode=True, vision=True, max_tokens=2000, timeout=60.0)
+        return {"type": "image", "description": _clip(data.get("description"), 2000),
+                "texte": str(data.get("texte") or "Aucun texte visible").strip()[:6000]}
+    if kind == "document":
+        text = (payload or "").strip()
+        if not text:
+            raise ValueError("Document vide.")
+        data = await _module_llm([
+            {"role": "system", "content": ANALYZE_DOCUMENT_PROMPT},
+            {"role": "user", "content": text[:30000]},
+        ], keys, json_mode=True, max_tokens=1500, timeout=60.0)
+        points = [_clip(p, 300) for p in (data.get("points") or []) if isinstance(p, str) and p.strip()][:8]
+        return {"type": "document", "description": _clip(data.get("description"), 2000), "points": points,
+                "texte": text[:1500]}
+    raise ValueError("Type d'analyse inconnu.")
+
+
+async def display_ask(question: str, context: dict = None, keys: dict = None, history: list = None) -> str:
+    question = (question or "").strip()
+    if not question:
+        raise ValueError("Question vide.")
+    context = context if isinstance(context, dict) else {}
+    parts = [f"Fichier affiché : {_clip(context.get('name') or 'sans nom', 200)} ({_clip(context.get('kind'), 20) or 'inconnu'})."]
+    if context.get("analysis"):
+        parts.append("Analyse du fichier :\n" + str(context["analysis"])[:4000])
+    if context.get("text"):
+        parts.append("Contenu du fichier :\n" + str(context["text"])[:12000])
+    messages = [{"role": "system", "content": (
+        "Tu es ΣIRIUS. Réponds en français à la question sur le fichier affiché à l'écran, uniquement à partir "
+        "des informations ci-dessous. Réponse orale : phrases simples, sans Markdown, 4 phrases maximum. "
+        "Si l'information manque, dis-le clairement.\n\n" + "\n\n".join(parts))}]
+    for item in (history or [])[-8:]:
+        if isinstance(item, dict) and item.get("role") in ("user", "assistant") and item.get("content"):
+            messages.append({"role": item["role"], "content": str(item["content"])[:2000]})
+    messages.append({"role": "user", "content": question[:2000]})
+    return await _module_llm(messages, keys, max_tokens=700, temperature=0.3)
+
+
+VISION_PROMPT = """Tu es la vision de ΣIRIUS. Analyse cette image de caméra, en français.
+Réponds UNIQUEMENT en JSON : {"description": "description précise de la scène", "texte_extrait": "texte lisible,
+ou chaîne vide", "synthese": "une ou deux phrases naturelles à dire à voix haute"}"""
+
+
+async def vision_look(b64: str, question: str = "", keys: dict = None) -> dict:
+    prompt = VISION_PROMPT + (f"\nQuestion de l'utilisateur : {question[:500]}\nRéponds-y dans la synthèse." if question else "")
+    data = await _module_llm([{"role": "user", "content": [
+        {"type": "text", "text": prompt},
+        {"type": "image_url", "image_url": {"url": _vision_data_url(b64)}},
+    ]}], keys, json_mode=True, vision=True, max_tokens=1500, timeout=60.0)
+    description = _clip(data.get("description"), 2000)
+    synthese = _clip(data.get("synthese"), 500) or description[:300]
+    return {"description": description, "texte_extrait": str(data.get("texte_extrait") or "").strip()[:6000],
+            "synthese": synthese, "responseText": synthese}
+
+
+async def ocr_screen(image: str, keys: dict = None) -> str:
+    return await _module_llm([{"role": "user", "content": [
+        {"type": "text", "text": (
+            "Capture d'écran. Recopie fidèlement tout le texte lisible, en conservant l'ordre. Ajoute ensuite "
+            "« Résumé : » avec une ou deux phrases en français sur ce que montre l'écran.")},
+        {"type": "image_url", "image_url": {"url": _vision_data_url(image)}},
+    ]}], keys, vision=True, max_tokens=3000, temperature=0.1, timeout=60.0)
+
+
+def _local_web_report(page: dict) -> str:
+    lines = [f"{page.get('titre') or page.get('url')}", f"Adresse : {page.get('url', '')}"]
+    if page.get("description"):
+        lines.append(f"Résumé : {page['description']}")
+    if page.get("sections"):
+        lines.append("Sections : " + " · ".join(page["sections"][:8]))
+    if page.get("liens"):
+        lines.append("Liens : " + " · ".join(link.get("texte", "") for link in page["liens"][:6] if isinstance(link, dict)))
+    return "\n".join(lines)
+
+
+async def web_report(page: dict, keys: dict = None) -> str:
+    """Rapport court sur une page ouverte ; repli local si l'IA est indisponible."""
+    page = page if isinstance(page, dict) else {"titre": str(page or "")}
+    try:
+        return await _module_llm([
+            {"role": "system", "content": (
+                "Tu es ΣIRIUS. Rédige en français un rapport bref (8 lignes maximum, sans Markdown) sur cette page "
+                "web : de quoi elle parle, les informations clés, et à quoi elle peut servir.")},
+            {"role": "user", "content": json.dumps(page, ensure_ascii=False)[:6000]},
+        ], keys, max_tokens=600, temperature=0.3, timeout=30.0)
+    except Exception as error:
+        logger.info("[WEBBROWSER] rapport local (%r)", error)
+        return _local_web_report(page)
 
 def k3_source():
     return "Kimi K3"

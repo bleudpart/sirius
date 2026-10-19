@@ -616,7 +616,7 @@ export default function ThemisPanel({ onClose, initialSource }) {
                 ? <span className="th-drop-busy">LECTURE DE LA PIÈCE EN COURS — extraction IA de la date, du fournisseur et des montants…</span>
                 : <span>Déposez ici une facture PDF ou un document scanné (PNG, JPG) — Thémis lit automatiquement la date, le fournisseur, le HT, la TVA et le TTC.</span>}
             </div>
-            {!groqKey() && <p className="th-note">Astuce : renseignez votre clé Kimi K3 dans les réglages de Sirius pour activer la lecture automatique (OCR) des pièces.</p>}
+            {!groqKey() && <p className="th-note">Astuce : renseignez votre clé Groq dans les réglages de Sirius pour activer la lecture automatique (OCR) des pièces.</p>}
             <table className="th-table" data-testid="themis-pieces-table"><tbody>
               {pieces.map((p) => (
                 <tr key={p.id} className={p.status === "à_payer" ? "" : "th-paid"}>

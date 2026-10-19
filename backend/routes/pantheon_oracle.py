@@ -358,13 +358,15 @@ def make_pantheon_oracle_router(db, rate_ok, require_user):
             result = await ocr_screen(req.image, keys=req.keys or {})
             log_service("OCR", "Analyse de capture d'écran", "OK")
             return {"result": result}
+        except HTTPException:
+            raise
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
             logger.error(f"[OCR] {e}")
             log_service("OCR", "Analyse de capture d'écran", "ERREUR")
             if "invalid_api_key" in str(e).lower() or "401" in str(e):
-                raise HTTPException(status_code=400, detail="Clé Kimi K3 invalide — vérifiez vos réglages.")
+                raise HTTPException(status_code=400, detail="Clé Groq invalide — vérifiez vos réglages.")
             raise HTTPException(status_code=500, detail="Analyse impossible, réessayez.")
 
     @router.get("/pantheon/history")

@@ -1,3 +1,4 @@
+from collections import OrderedDict
 """Tests de la mémoire épisodique et du rappel sémantique."""
 import asyncio
 from datetime import datetime, timezone, timedelta
@@ -142,7 +143,7 @@ def test_rerank_sans_cle_est_transparent(memory_db, monkeypatch):
 
 def test_rerank_reordonne_par_similarite(memory_db, monkeypatch):
     monkeypatch.setattr(semantic_vectors, "_EMBED_API_KEY", "fake-key")
-    monkeypatch.setattr(semantic_vectors, "_query_cache", {})
+    monkeypatch.setattr(semantic_vectors, "_query_cache", OrderedDict())
 
     vectors = {
         "question": [1.0, 0.0],
@@ -168,7 +169,7 @@ def test_rerank_reordonne_par_similarite(memory_db, monkeypatch):
 
 def test_rerank_survit_a_une_panne_embeddings(memory_db, monkeypatch):
     monkeypatch.setattr(semantic_vectors, "_EMBED_API_KEY", "fake-key")
-    monkeypatch.setattr(semantic_vectors, "_query_cache", {})
+    monkeypatch.setattr(semantic_vectors, "_query_cache", OrderedDict())
 
     async def broken_embed(texts):
         raise ConnectionError("api morte")
@@ -184,7 +185,7 @@ def test_rerank_survit_a_une_panne_embeddings(memory_db, monkeypatch):
 def test_recall_vectoriel_trouve_sans_mot_commun(memory_db, monkeypatch):
     """Un souvenir sans AUCUN mot commun avec la question est retrouvé par le sens."""
     monkeypatch.setattr(semantic_vectors, "_EMBED_API_KEY", "fake-key")
-    monkeypatch.setattr(semantic_vectors, "_query_cache", {})
+    monkeypatch.setattr(semantic_vectors, "_query_cache", OrderedDict())
     semantic_vectors._user_index.clear()
 
     vectors = {
@@ -220,7 +221,7 @@ def test_recall_vectoriel_sans_cle_est_transparent(memory_db, monkeypatch):
 
 def test_recall_vectoriel_survit_a_une_panne(memory_db, monkeypatch):
     monkeypatch.setattr(semantic_vectors, "_EMBED_API_KEY", "fake-key")
-    monkeypatch.setattr(semantic_vectors, "_query_cache", {})
+    monkeypatch.setattr(semantic_vectors, "_query_cache", OrderedDict())
 
     async def broken_embed(texts):
         raise ConnectionError("api morte")
@@ -241,7 +242,7 @@ class _FakeLocalModel:
 def test_bascule_embeddings_locaux(monkeypatch):
     monkeypatch.setattr(semantic_vectors, "_local_model_instance", None)
     monkeypatch.setattr(semantic_vectors, "EMBED_MODEL", semantic_vectors.EMBED_MODEL)
-    monkeypatch.setattr(semantic_vectors, "_query_cache", {"vieux": [1.0]})
+    monkeypatch.setattr(semantic_vectors, "_query_cache", OrderedDict({"vieux": [1.0]}))
 
     assert not semantic_vectors.local_embeddings_ready()
     semantic_vectors._activate_local_model(_FakeLocalModel())

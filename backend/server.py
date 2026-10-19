@@ -51,7 +51,13 @@ from sirius_brain import (
     detect_urgency,
     technical_video_comment,
     ModelResponseIncompleteError,
+    generate_diagram,
+    analyze_upload,
+    display_ask,
+    vision_look,
+    dev_companion,
 )
+import subprocess
 
 # 2. Configuration des logs
 logging.basicConfig(
@@ -788,6 +794,8 @@ async def patch_code(request: Request):
             
         return {"status": "success", "message": f"{file_path} mis à jour et validé ! Uvicorn va recharger."}
         
+    except HTTPException:
+        raise
     except Exception as e:
         # En cas de crash inattendu, on remet l'original
         if os.path.exists(backup_path):
@@ -1019,6 +1027,8 @@ async def diagram(req: DiagramRequest, request: Request):
         raise HTTPException(status_code=429, detail="Trop de requêtes, patientez un instant.")
     try:
         return await generate_diagram(desc, keys=req.keys or {})
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -1209,6 +1219,8 @@ async def display_ask_endpoint(req: DisplayAskIn):
         raise HTTPException(status_code=400, detail="Question vide.")
     try:
         answer = await display_ask(q, req.context or {}, keys=req.keys or {}, history=req.history or [])
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -1239,6 +1251,8 @@ async def vision_analyze(req: VisionAnalyzeIn, request: Request):
         raise HTTPException(status_code=400, detail="Image invalide : encodage base64 incorrect, monsieur.")
     try:
         return await vision_look(b64, (req.question or "").strip(), req.keys)
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -2189,12 +2203,14 @@ async def dev_review(req: DevRequest, request: Request):
     try:
         result = await dev_companion(code, req.action or "review", keys=req.keys or {})
         return {"result": result}
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"[DEV] Erreur: {e}")
         if "invalid_api_key" in str(e).lower() or "401" in str(e):
-            raise HTTPException(status_code=400, detail="Clé Kimi K3 invalide — vérifiez votre clé dans les réglages (icône profil).")
+            raise HTTPException(status_code=400, detail="Clé Groq invalide — vérifiez votre clé dans les réglages (icône profil).")
         raise HTTPException(status_code=500, detail="Sirius n'a pas pu analyser ce code, réessayez.")
 
 # Add your routes to the router instead of directly to app

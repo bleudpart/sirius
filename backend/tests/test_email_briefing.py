@@ -73,6 +73,8 @@ class _FakeDB:
     def __init__(self):
         self.oauth_states = _FakeCollection()
         self.users = _FakeCollection()
+        # require_user vérifie désormais que le compte existe en base.
+        self.users._docs.append({"user_id": "daniel@sirius.local", "email": "daniel@sirius.local", "role": "admin"})
         self.microsoft_oauth = _FakeCollection()
         self.email_prefs = _FakeCollection()
         self.email_seen = _FakeCollection()

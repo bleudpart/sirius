@@ -36,7 +36,7 @@ def test_health_identifies_sirius_backend():
     assert body["service"] == "sirius-backend"
     assert body["status"] in {"ok", "degraded"}
     assert "checks" in body and "mongo" in body["checks"]
-    assert "keys" in body
+    assert "keys" not in body  # l'état des clés n'est plus exposé publiquement
 
 
 def test_packaged_frontend_javascript_is_served_from_static_route():
