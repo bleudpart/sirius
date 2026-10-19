@@ -166,6 +166,7 @@ export default function PublicStore() {
           <a href="#demonstration">Comment ça marche</a>
           <a href="#offres">Les offres</a>
           <a href="#essayer">Essai gratuit</a>
+          <a href="/aide-emails.html">Aide</a>
         </nav>
       </header>
       <div className="public-showcase">
@@ -380,7 +381,7 @@ export default function PublicStore() {
       <footer className="public-footer">
         <p className="public-slogan">ΣIRIUS travaille pour vous.</p>
         <p className="public-footer-secure"><ShieldCheck size={13} /> Paiement via Stripe ou PayPal</p>
-        © 2026 ΣIRIUS par Daniel Partel · <a href="/mentions-legales">Mentions légales</a> · <a href="/conditions-generales">Conditions générales</a> · <a href="/confidentialite.html">Confidentialité</a> · <a href="/suppression-compte.html">Suppression du compte</a>
+        © 2026 ΣIRIUS par Daniel Partel · <a href="/mentions-legales">Mentions légales</a> · <a href="/conditions-generales">Conditions générales</a> · <a href="/confidentialite.html">Confidentialité</a>         · <a href="/suppression-compte.html">Suppression du compte</a> · <a href="/aide-emails.html">Aide : envoi d'e-mails</a>
       </footer>
       {mythWindowOpen && (
         <div

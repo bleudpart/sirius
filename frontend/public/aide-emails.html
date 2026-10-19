@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Configurer l’envoi d’e-mails dans ΣIRIUS : Gmail, Orange, Outlook, Free, SFR, La Poste, Yahoo et iCloud.">
+<title>Aide : envoyer vos e-mails depuis ΣIRIUS</title>
+<style>
+body{margin:0;background:#051320;color:#e7eff5;font:17px/1.65 system-ui,sans-serif}
+main{max-width:820px;margin:auto;padding:32px 24px 64px}
+a{color:#eecb6d}h1{font-size:clamp(28px,5vw,42px);line-height:1.2;color:#eecb6d}
+h2{font-size:22px;color:#eecb6d}h3{font-size:18px;color:#f3dc9b;margin-bottom:4px}
+section{padding:16px 0;border-top:1px solid #284252}
+p,li,td{overflow-wrap:anywhere}footer{margin-top:28px;color:#aec2cf}
+table{width:100%;border-collapse:collapse;margin:10px 0;font-size:16px}
+th,td{text-align:left;padding:8px 10px;border:1px solid #284252;vertical-align:top}
+th{background:#0b2233;color:#eecb6d}
+code{background:#0b2233;color:#f3dc9b;padding:2px 6px;border-radius:4px}
+.note{background:#0b2233;border-left:4px solid #eecb6d;padding:10px 14px;border-radius:4px}
+.scroll{overflow-x:auto}
+</style>
+</head>
+<body><main>
+<nav><a href="/">ΣIRIUS — Retour au site</a> · <a href="#gmail">Gmail</a> · <a href="#orange">Orange</a> · <a href="#outlook">Outlook</a> · <a href="#autres">Autres</a> · <a href="#probleme">En cas de problème</a></nav>
+<h1>Envoyer vos e-mails depuis ΣIRIUS</h1>
+<p>ΣIRIUS peut envoyer vos factures, devis, relances et comptes rendus directement depuis votre propre adresse e-mail. Le réglage se fait une seule fois et prend environ 5 minutes.</p>
+
+<section><h2>Où faire le réglage</h2>
+<ol>
+<li>Ouvrez <strong>THÉMIS</strong>.</li>
+<li>Cliquez sur l’onglet <strong>CLÉS API</strong>.</li>
+<li>Descendez jusqu’à <strong>ENVOI D’E-MAILS — VOTRE SERVEUR SMTP</strong>.</li>
+<li>Remplissez les champs en suivant la fiche de votre messagerie ci-dessous.</li>
+<li>Cliquez sur <strong>SCELLER LES CLÉS</strong>.</li>
+</ol>
+<p class="note">Vos identifiants restent enregistrés sur votre appareil. Ils ne passent par le serveur ΣIRIUS qu’au moment d’un envoi et n’y sont jamais conservés.</p>
+</section>
+
+<section id="gmail"><h2>Gmail (adresses @gmail.com)</h2>
+<p>Google n’accepte pas votre mot de passe habituel. Il faut créer un <strong>mot de passe d’application</strong> : un code de 16 lettres réservé à ΣIRIUS.</p>
+<h3>Étape 1 : activer la validation en deux étapes (si ce n’est pas déjà fait)</h3>
+<ol><li>Allez sur <a href="https://myaccount.google.com/security" target="_blank" rel="noopener noreferrer">myaccount.google.com/security</a>.</li>
+<li>Cliquez sur <strong>Validation en deux étapes</strong> et suivez les instructions (un code par SMS suffit).</li></ol>
+<h3>Étape 2 : créer le mot de passe d’application</h3>
+<ol><li>Allez sur <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer">myaccount.google.com/apppasswords</a>.</li>
+<li>Tapez <strong>SIRIUS</strong> comme nom d’application, puis cliquez sur <strong>Créer</strong>.</li>
+<li>Google affiche un code de 16 lettres : copiez-le (les espaces n’ont pas d’importance).</li></ol>
+<h3>Étape 3 : remplir ΣIRIUS</h3>
+<div class="scroll"><table>
+<tr><th>Champ</th><th>À saisir</th></tr>
+<tr><td>Serveur SMTP</td><td><code>smtp.gmail.com</code></td></tr>
+<tr><td>Port</td><td><code>587</code></td></tr>
+<tr><td>Identifiant / adresse e-mail</td><td>votre adresse Gmail complète</td></tr>
+<tr><td>Mot de passe</td><td>le code de 16 lettres (pas votre mot de passe Gmail)</td></tr>
+<tr><td>Adresse expéditeur</td><td>laissez vide</td></tr>
+<tr><td>Nom d’expéditeur</td><td>le nom de votre entreprise</td></tr>
+</table></div>
+</section>
+
+<section id="orange"><h2>Orange (adresses @orange.fr et @wanadoo.fr)</h2>
+<div class="scroll"><table>
+<tr><th>Champ</th><th>À saisir</th></tr>
+<tr><td>Serveur SMTP</td><td><code>smtp.orange.fr</code></td></tr>
+<tr><td>Port</td><td><code>465</code></td></tr>
+<tr><td>Identifiant / adresse e-mail</td><td>votre adresse Orange complète</td></tr>
+<tr><td>Mot de passe</td><td>le mot de passe de votre messagerie Orange</td></tr>
+<tr><td>Adresse expéditeur</td><td>laissez vide</td></tr>
+<tr><td>Nom d’expéditeur</td><td>le nom de votre entreprise</td></tr>
+</table></div>
+<p>Si l’envoi est refusé, connectez-vous une fois sur <a href="https://messagerie.orange.fr" target="_blank" rel="noopener noreferrer">messagerie.orange.fr</a> pour vérifier votre mot de passe, puis réessayez.</p>
+</section>
+
+<section id="outlook"><h2>Outlook, Hotmail, Live (adresses @outlook.fr, @hotmail.fr, @live.fr)</h2>
+<div class="scroll"><table>
+<tr><th>Champ</th><th>À saisir</th></tr>
+<tr><td>Serveur SMTP</td><td><code>smtp-mail.outlook.com</code></td></tr>
+<tr><td>Port</td><td><code>587</code></td></tr>
+<tr><td>Identifiant / adresse e-mail</td><td>votre adresse Outlook complète</td></tr>
+<tr><td>Mot de passe</td><td>votre mot de passe Microsoft, ou un mot de passe d’application si la validation en deux étapes est activée</td></tr>
+<tr><td>Adresse expéditeur</td><td>laissez vide</td></tr>
+<tr><td>Nom d’expéditeur</td><td>le nom de votre entreprise</td></tr>
+</table></div>
+<p>Pour créer un mot de passe d’application Microsoft : <a href="https://account.live.com/proofs/manage/additional" target="_blank" rel="noopener noreferrer">account.live.com</a>, rubrique <strong>Mots de passe d’application</strong>.</p>
+<p class="note"><strong>Important :</strong> Microsoft limite de plus en plus l’envoi depuis les logiciels extérieurs avec un simple mot de passe. Si l’envoi est refusé malgré un mot de passe correct, utilisez plutôt une adresse Gmail ou Orange pour vos envois.</p>
+</section>
+
+<section id="autres"><h2>Autres messageries</h2>
+<div class="scroll"><table>
+<tr><th>Messagerie</th><th>Serveur SMTP</th><th>Port</th><th>Mot de passe</th></tr>
+<tr><td>Free</td><td><code>smtp.free.fr</code></td><td><code>465</code></td><td>mot de passe de la messagerie Free</td></tr>
+<tr><td>SFR</td><td><code>smtp.sfr.fr</code></td><td><code>465</code></td><td>mot de passe de la messagerie SFR</td></tr>
+<tr><td>La Poste</td><td><code>smtp.laposte.net</code></td><td><code>465</code></td><td>mot de passe de la messagerie La Poste</td></tr>
+<tr><td>Yahoo</td><td><code>smtp.mail.yahoo.com</code></td><td><code>465</code></td><td>mot de passe d’application Yahoo (Sécurité du compte)</td></tr>
+<tr><td>iCloud</td><td><code>smtp.mail.me.com</code></td><td><code>587</code></td><td>mot de passe pour application Apple (appleid.apple.com)</td></tr>
+</table></div>
+<p><strong>Adresse professionnelle</strong> (nom@votre-entreprise.fr) : demandez à votre hébergeur (OVH, Ionos, o2switch…) ou à votre prestataire informatique le <strong>serveur SMTP</strong> et le <strong>port</strong>. L’identifiant est en général votre adresse complète.</p>
+</section>
+
+<section id="probleme"><h2>En cas de problème</h2>
+<div class="scroll"><table>
+<tr><th>Message affiché</th><th>Que faire</th></tr>
+<tr><td>« Authentification SMTP refusée »</td><td>L’identifiant ou le mot de passe est faux. Pour Gmail, utilisez bien le code de 16 lettres, pas votre mot de passe habituel.</td></tr>
+<tr><td>« Serveur SMTP injoignable »</td><td>Vérifiez l’orthographe du serveur et le port (587 ou 465, voir les tableaux ci-dessus).</td></tr>
+<tr><td>« Configurez le serveur SMTP dans l’onglet CLÉS API… »</td><td>Les champs n’ont pas été enregistrés : retournez dans <strong>CLÉS API</strong> et cliquez sur <strong>SCELLER LES CLÉS</strong>.</td></tr>
+</table></div>
+<p class="note"><strong>Conseil :</strong> après le réglage, envoyez un premier devis à votre propre adresse pour vérifier que tout fonctionne.</p>
+</section>
+<footer>Besoin d’aide ? Écrivez à <a href="mailto:danielsirius.pro2026@gmail.com?subject=Aide%20envoi%20e-mails%20SIRIUS">danielsirius.pro2026@gmail.com</a>.</footer>
+</main></body></html>

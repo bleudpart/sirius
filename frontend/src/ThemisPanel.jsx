@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, LayoutDashboard, FileText, Package, Users, Coins, Boxes, LayoutTemplate, KeyRound, Plus, Trash2, ArrowRightLeft, Minus, FileDown, Archive, Upload, Eye, Bell, AlertTriangle, Mail, Download, Calculator, Landmark, History } from "lucide-react";
 import { ConfirmButton } from "@/ConfirmButton";
+import { EMAIL_HELP_URL } from "@/helpLinks";
 import { speakAsCharacter } from "@/voice";
 import "./Themis.css";
 import { formatDocumentDate as isoToFr } from "./dateTime";
@@ -706,7 +707,7 @@ export default function ThemisPanel({ onClose, initialSource }) {
               </div>
             ))}
             <div className="th-section-title" style={{ marginTop: 14 }}>ENVOI D’E-MAILS — VOTRE SERVEUR SMTP</div>
-            <p className="th-note">Ex. Gmail : smtp.gmail.com, port 587, votre adresse + un mot de passe d’application (compte Google → Sécurité).</p>
+            <p className="th-note">Ex. Gmail : smtp.gmail.com, port 587, votre adresse + un mot de passe d’application (compte Google → Sécurité). <a href={EMAIL_HELP_URL} target="_blank" rel="noreferrer" data-testid="themis-email-help">Comment faire ? (Gmail, Orange, Outlook…)</a></p>
             <div className="th-row">
               <input className="th-input" placeholder="Serveur SMTP (smtp.gmail.com)" value={byok.smtp_host || ""} onChange={(e) => setByok({ ...byok, smtp_host: e.target.value })} data-testid="themis-byok-smtp-host" />
               <input className="th-input th-qty" type="number" placeholder="587" title="Port (587 STARTTLS / 465 SSL)" value={byok.smtp_port || ""} onChange={(e) => setByok({ ...byok, smtp_port: e.target.value })} data-testid="themis-byok-smtp-port" />

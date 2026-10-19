@@ -34,7 +34,7 @@ self.addEventListener("fetch", (event) => {
   // Jamais de cache pour les appels API ni les requêtes non-GET
   if (req.method !== "GET" || req.url.includes("/api/")) return;
   // Standalone legal pages must never replace the offline application shell.
-  if (["/confidentialite.html", "/suppression-compte.html"].includes(new URL(req.url).pathname)) return;
+  if (["/confidentialite.html", "/suppression-compte.html", "/aide-emails.html"].includes(new URL(req.url).pathname)) return;
 
   // Navigation : réseau d'abord, sinon shell hors ligne
   if (req.mode === "navigate") {

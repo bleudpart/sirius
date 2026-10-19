@@ -12,6 +12,7 @@ import { assertSecureKeyTransport, loadApiKeys } from "@/apiKeyStorage";
 import AccountServices from "@/AccountServices";
 import VaultControls, { persistPersonalKeys } from "@/VaultControls";
 import PrivacyData from "@/PrivacyData";
+import { EMAIL_HELP_URL } from "@/helpLinks";
 
 const TABS = [
   { id: "profil", label: "PROFIL", Icon: User },
@@ -728,6 +729,12 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
               </ol>
               <p className="setup-note">Gmail et Outlook se connectent dans le Centre des connexions : leurs comptes ne sont pas des clés à coller ici. Les coûts et quotas restent ceux de chaque fournisseur ; aucune gratuité permanente n'est garantie.</p>
             </details>
+            <div className="setup-note" data-testid="setup-email-help">
+              <strong>Envoyer vos devis et factures par e-mail :</strong> le réglage se fait dans THÉMIS, onglet CLÉS API (Gmail, Orange, Outlook…).{" "}
+              <a className="setup-link" href={EMAIL_HELP_URL} target="_blank" rel="noreferrer">
+                Comment faire ? <ExternalLink size={11} />
+              </a>
+            </div>
             <VaultControls validateKeys={validateKeys} onKeys={(next) => { setKeys(next); setKeyStatus({}); setSaveError(""); }}>
               {MAIN_KEYS.map((k) => (
                 <KeyField key={k} k={k} value={keys[k] || ""} status={keyStatus[k]} onChange={setK(k)} onTest={() => testKey(k)} />
