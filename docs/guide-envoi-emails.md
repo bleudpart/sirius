@@ -94,6 +94,6 @@ Pour créer un mot de passe d’application Microsoft : <https://account.live.co
 |---|---|
 | « Authentification SMTP refusée » | L’identifiant ou le mot de passe est faux. Pour Gmail, utilisez bien le code de 16 lettres et non votre mot de passe habituel. |
 | « Serveur SMTP injoignable » | Vérifiez l’orthographe du serveur et le port (587 ou 465, voir les tableaux ci-dessus). |
-| « Configurez d’abord votre serveur SMTP » | Les champs n’ont pas été enregistrés : retournez dans **CLÉS API** et cliquez sur **SCELLER LES CLÉS**. |
+| « Configurez le serveur SMTP dans l’onglet CLÉS API… » | Les champs n’ont pas été enregistrés : retournez dans **CLÉS API** et cliquez sur **SCELLER LES CLÉS**. |
 
 **Conseil :** après le réglage, envoyez un premier devis à votre propre adresse pour vérifier que tout fonctionne.
