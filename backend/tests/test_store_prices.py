@@ -258,6 +258,54 @@ def test_checkout_completion_preserves_subscription_period(monkeypatch):
     assert "expires_at" not in db.user_licenses.update_one.call_args.args[1]["$set"]
 
 
+def _refund_app(monkeypatch, charge, transaction=None, license_doc=None):
+    event = {"id": "evt_refund", "type": "charge.refunded", "data": {"object": charge}}
+    monkeypatch.setattr(payments_api.stripe.Webhook, "construct_event", lambda *args: event)
+    cancel = SimpleNamespace(calls=[])
+    monkeypatch.setattr(payments_api.stripe.Subscription, "cancel", lambda sub_id: cancel.calls.append(sub_id))
+    db = SimpleNamespace(
+        stripe_events=SimpleNamespace(find_one=AsyncMock(return_value=None), insert_one=AsyncMock()),
+        payment_transactions=SimpleNamespace(update_one=AsyncMock(), find_one=AsyncMock(return_value=transaction)),
+        user_licenses=SimpleNamespace(update_one=AsyncMock(), find_one=AsyncMock(return_value=license_doc)),
+    )
+    app = FastAPI()
+    app.include_router(payments_api.make_payments_router(db), prefix="/api")
+    assert TestClient(app).post("/api/stripe/webhook", content="{}").status_code == 200
+    return db, cancel
+
+
+@pytest.mark.parametrize("tier", ["standard", "pro", "lifetime"])
+def test_full_refund_revokes_perpetual_license(monkeypatch, tier):
+    db, cancel = _refund_app(monkeypatch, {"payment_intent": "pi_1", "refunded": True},
+                             transaction={"user_id": "buyer@example.com", "tier": tier})
+    query, update = db.user_licenses.update_one.call_args.args
+    assert query == {"user_id": "buyer@example.com", "tier": tier}
+    assert update["$set"]["status"] == "refunded"
+    assert cancel.calls == []
+
+
+def test_partial_refund_keeps_license(monkeypatch):
+    db, _ = _refund_app(monkeypatch, {"payment_intent": "pi_1", "refunded": False},
+                        transaction={"user_id": "buyer@example.com", "tier": "pro"})
+    db.user_licenses.update_one.assert_not_called()
+
+
+def test_full_refund_of_rental_cancels_subscription(monkeypatch):
+    db, cancel = _refund_app(monkeypatch, {"payment_intent": "pi_2", "refunded": True, "customer": "cus_1"},
+                             license_doc={"user_id": "buyer@example.com", "tier": "monthly",
+                                          "stripe_subscription_id": "sub_1"})
+    assert cancel.calls == ["sub_1"]
+    query, update = db.user_licenses.update_one.call_args.args
+    assert query == {"stripe_customer_id": "cus_1", "tier": "monthly"}
+    assert update["$set"]["status"] == "canceled"
+
+
+def test_refund_without_known_license_changes_nothing(monkeypatch):
+    db, cancel = _refund_app(monkeypatch, {"payment_intent": "pi_3", "refunded": True, "customer": "cus_x"})
+    db.user_licenses.update_one.assert_not_called()
+    assert cancel.calls == []
+
+
 @pytest.mark.parametrize("tier,amount", [("standard", "69.00"), ("pro", "135.00"), ("lifetime", "269.00")])
 def test_paypal_checkout_sends_reduced_amount(monkeypatch, tier, amount):
     monkeypatch.setenv("SIRIUS_PUBLIC_ORIGINS", "https://sirius-assistant.fr")

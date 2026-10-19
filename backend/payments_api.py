@@ -354,7 +354,7 @@ def make_payments_router(db):
             s = await asyncio.to_thread(stripe.checkout.Session.retrieve, record["session_id"])
             if s.payment_status == "paid" or s.status == "complete":
                 await db.payment_transactions.update_one(
-                    {"session_id": record["session_id"], "payment_status": {"$ne": "paid"}},
+                    {"session_id": record["session_id"], "payment_status": {"$nin": ["paid", "refunded"]}},
                     {"$set": {"status": "completed", "payment_status": "paid",
                               "stripe_payment_intent_id": s.payment_intent, "updated_at": now_iso()}})
                 return await db.payment_transactions.find_one({"session_id": record["session_id"]}, {"_id": 0})
@@ -513,8 +513,38 @@ def make_payments_router(db):
             await db.payment_transactions.update_one({"session_id": obj["id"]},
                 {"$set": {"status": "expired", "payment_status": "expired", "updated_at": now_iso()}})
         elif t == "charge.refunded":
-            await db.payment_transactions.update_one({"stripe_payment_intent_id": obj.get("payment_intent")},
-                {"$set": {"status": "refunded", "payment_status": "refunded", "updated_at": now_iso()}})
+            payment_intent = obj.get("payment_intent")
+            if payment_intent:
+                await db.payment_transactions.update_one({"stripe_payment_intent_id": payment_intent},
+                    {"$set": {"status": "refunded", "payment_status": "refunded", "updated_at": now_iso()}})
+            if obj.get("refunded"):
+                await _revoke_refunded_license(obj, payment_intent)
         return {"status": "ok"}
+
+    async def _revoke_refunded_license(charge: dict, payment_intent: str | None):
+        # Only a full refund revokes access; partial refunds are commercial gestures.
+        transaction = await db.payment_transactions.find_one(
+            {"stripe_payment_intent_id": payment_intent, "kind": "license"}, {"_id": 0}) if payment_intent else None
+        if transaction and transaction.get("tier") != "monthly":
+            await db.user_licenses.update_one(
+                {"user_id": transaction["user_id"], "tier": transaction["tier"]},
+                {"$set": {"status": "refunded", "refunded_at": now_iso(), "updated_at": now_iso()}})
+            return
+        customer = charge.get("customer")
+        if not customer:
+            return
+        license_doc = await db.user_licenses.find_one(
+            {"stripe_customer_id": customer, "tier": "monthly"}, {"_id": 0})
+        if not license_doc:
+            return
+        subscription_id = license_doc.get("stripe_subscription_id")
+        if subscription_id:
+            try:
+                await asyncio.to_thread(stripe.Subscription.cancel, subscription_id)
+            except stripe.error.StripeError as error:
+                logger.error("Résiliation après remboursement impossible (%s)", type(error).__name__)
+        await db.user_licenses.update_one(
+            {"stripe_customer_id": customer, "tier": "monthly"},
+            {"$set": {"status": "canceled", "refunded_at": now_iso(), "updated_at": now_iso()}})
 
     return r
