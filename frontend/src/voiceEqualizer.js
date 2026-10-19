@@ -1,5 +1,13 @@
-export const FLAT_EQUALIZER = { bass: 0, mid: 0, treble: 0 };
-const bands = ["bass", "mid", "treble"];
+export const EQUALIZER_BANDS = [
+  { key: "sub", label: "Infra-graves", frequencyLabel: "80 Hz", type: "lowshelf", frequency: 80, q: 0.7 },
+  { key: "bass", label: "Graves", frequencyLabel: "250 Hz", type: "peaking", frequency: 250, q: 1 },
+  { key: "lowMid", label: "Bas-médiums", frequencyLabel: "500 Hz", type: "peaking", frequency: 500, q: 1 },
+  { key: "mid", label: "Médiums", frequencyLabel: "1,2 kHz", type: "peaking", frequency: 1200, q: 1 },
+  { key: "treble", label: "Aigus", frequencyLabel: "4 kHz", type: "peaking", frequency: 4000, q: 1 },
+  { key: "air", label: "Brillance", frequencyLabel: "10 kHz", type: "highshelf", frequency: 10000, q: 0.7 },
+];
+const bands = EQUALIZER_BANDS.map(band => band.key);
+export const FLAT_EQUALIZER = Object.fromEntries(bands.map(key => [key, 0]));
 const activeGraphs = new Set();
 let context;
 
@@ -19,7 +27,10 @@ export function loadVoiceEqualizer() {
 
 function apply(graph, config) {
   bands.forEach((key, index) => graph.filters[index].gain.setTargetAtTime(config[key], context.currentTime, 0.02));
-  const boost = bands.reduce((sum, key) => sum + Math.max(0, config[key]), 0);
+  // Neighbouring bands overlap: estimate the loudest peak as one boost plus half of each neighbour's boost.
+  const boosts = bands.map(key => Math.max(0, config[key]));
+  const boost = Math.max(0, ...boosts.map((gain, index) =>
+    gain + 0.5 * ((boosts[index - 1] || 0) + (boosts[index + 1] || 0))));
   graph.headroom.gain.setTargetAtTime(10 ** (-boost / 20), context.currentTime, 0.02);
 }
 
@@ -45,22 +56,16 @@ export async function connectVoiceEqualizer(audio) {
   await context.resume();
   const source = context.createMediaElementSource(audio);
   const headroom = context.createGain();
-  const filters = [
-    ["lowshelf", 250],
-    ["peaking", 1200],
-    ["highshelf", 4000],
-  ].map(([type, frequency]) => {
+  const filters = EQUALIZER_BANDS.map(({ type, frequency, q }) => {
     const filter = context.createBiquadFilter();
     filter.type = type;
     filter.frequency.value = frequency;
-    filter.Q.value = 0.7;
+    filter.Q.value = q;
     return filter;
   });
   source.connect(headroom);
-  headroom.connect(filters[0]);
-  filters[0].connect(filters[1]);
-  filters[1].connect(filters[2]);
-  filters[2].connect(context.destination);
+  [headroom, ...filters].reduce((previous, next) => { previous.connect(next); return next; })
+    .connect(context.destination);
   const graph = { filters, headroom };
   apply(graph, config);
   activeGraphs.add(graph);

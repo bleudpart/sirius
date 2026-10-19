@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { FLAT_EQUALIZER, loadVoiceEqualizer, saveVoiceEqualizer } from "./voiceEqualizer";
+import { EQUALIZER_BANDS, FLAT_EQUALIZER, loadVoiceEqualizer, saveVoiceEqualizer } from "./voiceEqualizer";
 
 export default function VoiceEqualizerPanel({ localVoice }) {
   const [config, setConfig] = useState(loadVoiceEqualizer);
@@ -10,10 +10,10 @@ export default function VoiceEqualizerPanel({ localVoice }) {
     <legend>Égaliseur vocal — audio premium</legend>
     <p>{localVoice
       ? "La voix locale utilise le réglage de hauteur ci-dessus. Choisissez une voix premium pour appliquer cet égaliseur."
-      : supported ? "Trois bandes audio réelles. Réglages enregistrés automatiquement ; écoutez avec « Tester la voix »."
+      : supported ? "Six bandes audio réelles. Réglages enregistrés automatiquement ; écoutez avec « Tester la voix »."
         : "Égaliseur indisponible : ce navigateur ne prend pas en charge Web Audio."}</p>
     <div className="voice-equalizer-bands">
-      {[["bass", "Graves", "250 Hz"], ["mid", "Médiums", "1,2 kHz"], ["treble", "Aigus", "4 kHz"]].map(([key, label, frequency]) =>
+      {EQUALIZER_BANDS.map(({ key, label, frequencyLabel: frequency }) =>
         <label key={key} className="voice-equalizer-band">
           <span>{label} <small>{frequency}</small></span>
           <input type="range" min="-12" max="12" step="1" value={config[key]} disabled={disabled}

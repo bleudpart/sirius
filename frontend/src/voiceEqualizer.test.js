@@ -18,25 +18,32 @@ beforeEach(() => {
 beforeEach(() => { localStorage.clear(); });
 afterAll(() => { window.AudioContext = originalContext; });
 
-test("persists bounded finite gains and restores a flat response", () => {
-  expect(saveVoiceEqualizer({ bass: 99, mid: NaN, treble: -99 })).toEqual({ bass: 12, mid: 0, treble: -12 });
-  expect(loadVoiceEqualizer()).toEqual({ bass: 12, mid: 0, treble: -12 });
-  expect(saveVoiceEqualizer({ bass: 0, mid: 0, treble: 0 })).toEqual({ bass: 0, mid: 0, treble: 0 });
+const FLAT = { sub: 0, bass: 0, lowMid: 0, mid: 0, treble: 0, air: 0 };
+
+test("persists bounded finite gains, keeps legacy settings and restores a flat response", () => {
+  expect(saveVoiceEqualizer({ bass: 99, mid: NaN, treble: -99 })).toEqual({ ...FLAT, bass: 12, treble: -12 });
+  expect(loadVoiceEqualizer()).toEqual({ ...FLAT, bass: 12, treble: -12 });
+  expect(saveVoiceEqualizer(FLAT)).toEqual(FLAT);
 });
 
-test("routes audio through three actual filters with headroom, live updates and cleanup", async () => {
-  saveVoiceEqualizer({ bass: 6, mid: -3, treble: 2 });
+test("routes audio through six actual filters with headroom, live updates and cleanup", async () => {
+  saveVoiceEqualizer({ sub: 0, bass: 6, lowMid: 0, mid: -3, treble: 2, air: 4 });
   const disconnect = await connectVoiceEqualizer({});
-  const [source, gain, bass, mid, treble] = graphs;
+  const [source, gain, ...filters] = graphs;
+  expect(filters).toHaveLength(6);
   expect(source.connect).toHaveBeenCalledWith(gain);
-  expect(gain.connect).toHaveBeenCalledWith(bass);
-  expect(bass.connect).toHaveBeenCalledWith(mid);
-  expect(mid.connect).toHaveBeenCalledWith(treble);
-  expect([bass.type, mid.type, treble.type]).toEqual(["lowshelf", "peaking", "highshelf"]);
-  expect([bass.frequency.value, mid.frequency.value, treble.frequency.value]).toEqual([250, 1200, 4000]);
-  expect(gain.gain.setTargetAtTime).toHaveBeenLastCalledWith(10 ** (-8 / 20), 0, 0.02);
-  saveVoiceEqualizer({ bass: -4, mid: 0, treble: 0 });
-  expect(bass.gain.setTargetAtTime).toHaveBeenLastCalledWith(-4, 0, 0.02);
+  expect(gain.connect).toHaveBeenCalledWith(filters[0]);
+  filters.slice(0, -1).forEach((filter, index) => expect(filter.connect).toHaveBeenCalledWith(filters[index + 1]));
+  expect(filters[5].connect).toHaveBeenCalledWith(expect.any(Object));
+  expect(filters.map(f => f.type)).toEqual(["lowshelf", "peaking", "peaking", "peaking", "peaking", "highshelf"]);
+  expect(filters.map(f => f.frequency.value)).toEqual([80, 250, 500, 1200, 4000, 10000]);
+  expect(filters[5].gain.setTargetAtTime).toHaveBeenLastCalledWith(4, 0, 0.02);
+  expect(gain.gain.setTargetAtTime).toHaveBeenLastCalledWith(10 ** (-6 / 20), 0, 0.02);
+  saveVoiceEqualizer({ ...FLAT, sub: 6, bass: 6 });
+  expect(filters[0].gain.setTargetAtTime).toHaveBeenLastCalledWith(6, 0, 0.02);
+  expect(gain.gain.setTargetAtTime).toHaveBeenLastCalledWith(10 ** (-9 / 20), 0, 0.02);
+  saveVoiceEqualizer({ ...FLAT, bass: -4 });
+  expect(filters[1].gain.setTargetAtTime).toHaveBeenLastCalledWith(-4, 0, 0.02);
   expect(gain.gain.setTargetAtTime).toHaveBeenLastCalledWith(1, 0, 0.02);
   disconnect();
   graphs.forEach(n => expect(n.disconnect).toHaveBeenCalledTimes(1));
