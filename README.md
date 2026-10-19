@@ -487,6 +487,13 @@ portrait ; les noms et curseurs se répartissent sans se chevaucher. Le dépôt 
 fichiers de la médiathèque passe sur plusieurs lignes. Les panneaux spécialisés
 restent au-dessus de la navigation mobile, y compris en paysage.
 
+Sur mobile, les commandes du haut tiennent sur une ligne compacte en conservant
+le témoin coloré du microphone et une marge avec le décor. « Je suis ΣIRIUS »
+apparaît au-dessus du bonsoir plutôt que dans cette barre. Le panneau micro et
+les boutons du chat sont compacts. Le menu se replie en bas en portrait et sur
+le côté à partir de 600 px : sa poignée permet de l'ouvrir ou de le fermer par
+appui ou glissement, puis il se referme après le choix d'une destination.
+
 L'écran de présentation au démarrage reprend ces cadres : accueil personnalisé
 et cœur animé au centre, catalogue de modules à gauche sur grand écran, état réel
 du chargement à droite. Sur téléphone, l'accueil et le chargement s'empilent.

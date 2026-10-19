@@ -20,10 +20,13 @@ export default function MobileNavigation({ active, onNavigate }) {
   const startDrag = (event) => {
     if (!event.isPrimary || event.button !== 0) return;
     const drawer = drawerRef.current;
-    const handleHeight = event.currentTarget.getBoundingClientRect().height;
-    const safeBottom = parseFloat(getComputedStyle(drawer).paddingBottom) || 0;
-    const travel = Math.max(0, drawer.getBoundingClientRect().height - handleHeight - safeBottom);
-    gesture.current = { id: event.pointerId, y: event.clientY, travel, moved: false };
+    const style = getComputedStyle(drawer);
+    const horizontal = style.getPropertyValue("--mobile-nav-axis").trim() === "x";
+    const dimension = horizontal ? "width" : "height";
+    const handleSize = event.currentTarget.getBoundingClientRect()[dimension];
+    const safeInset = parseFloat(horizontal ? style.paddingLeft : style.paddingBottom) || 0;
+    const travel = Math.max(0, drawer.getBoundingClientRect()[dimension] - handleSize - safeInset);
+    gesture.current = { id: event.pointerId, origin: horizontal ? event.clientX : event.clientY, horizontal, travel, moved: false };
     suppressClick.current = false;
     event.currentTarget.setPointerCapture(event.pointerId);
   };
@@ -31,7 +34,7 @@ export default function MobileNavigation({ active, onNavigate }) {
   const moveDrag = (event) => {
     const current = gesture.current;
     if (!current || event.pointerId !== current.id) return;
-    const delta = event.clientY - current.y;
+    const delta = current.horizontal ? current.origin - event.clientX : event.clientY - current.origin;
     current.moved ||= Math.abs(delta) > 6;
     if (current.moved) {
       setDragOffset(Math.max(0, Math.min(current.travel, (expanded ? 0 : current.travel) + delta)));
@@ -44,7 +47,7 @@ export default function MobileNavigation({ active, onNavigate }) {
     gesture.current = null;
     suppressClick.current = current.moved;
     if (!cancelled && current.moved) {
-      const delta = event.clientY - current.y;
+      const delta = current.horizontal ? current.origin - event.clientX : event.clientY - current.origin;
       if (Math.abs(delta) >= 24) setExpanded(delta < 0);
     }
     setDragOffset(null);

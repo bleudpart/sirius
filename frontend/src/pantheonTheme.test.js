@@ -61,6 +61,79 @@ test("welcome and send share honey and top buttons use the settings dimensions",
   const welcome = root.nodes.find((node) => node.type === "rule" && node.selector.endsWith(".sirius-center .sirius-wordmark"));
   expect(welcome.nodes.find(({ prop }) => prop === "color").value).toBe("var(--workspace-gold)");
   expect(welcome.nodes.find(({ prop }) => prop === "text-transform").value).toBe("none");
+  expect(welcome.nodes.find(({ prop }) => prop === "letter-spacing").value).toBe("normal");
+  expect(welcome.nodes.find(({ prop }) => prop === "word-spacing").value).toBe("normal");
+});
+
+test("mobile header keeps compact controls on a single line", () => {
+  const mobile = root.nodes.find((node) => node.type === "atrule" && node.params === "(max-width: 1023px)"
+    && node.nodes.some((rule) => rule.selector?.endsWith(".top-bar .conn-status")));
+  const header = mobile.nodes.find((node) => node.selector?.endsWith(".top-bar"));
+  expect(header.nodes.find(({ prop }) => prop === "flex-direction").value).toBe("row");
+  expect(header.nodes.find(({ prop }) => prop === "justify-content").value).toBe("center");
+  const connections = mobile.nodes.find((node) => node.selector?.endsWith(".top-bar .conn-status"));
+  expect(connections.nodes.find(({ prop }) => prop === "flex-wrap").value).toBe("nowrap");
+  expect(connections.nodes.find(({ prop }) => prop === "margin-left").value).toBe("0");
+  expect(connections.nodes.find(({ prop }) => prop === "justify-content").value).toBe("flex-start");
+  const buttons = mobile.nodes.find((node) => node.selector?.endsWith(".top-bar .profile-btn"));
+  expect(buttons.nodes.find(({ prop }) => prop === "width").value).toBe("32px");
+  const microphone = mobile.nodes.find((node) => node.selector?.endsWith(".top-bar .mic-status-pill"));
+  expect(microphone.nodes.find(({ prop }) => prop === "display").value).toBe("inline-flex");
+  const landscape = mobile.nodes.find((node) => node.type === "atrule"
+    && node.params === "(max-width: 1023px) and (orientation: landscape)");
+  expect(landscape.nodes[0].nodes.find(({ prop }) => prop === "padding-inline").value).toBe("32px");
+  const app = read("App.js");
+  expect(app).toContain('aria-label="Test micro : conversation continue avec transcription serveur"');
+  expect(app).not.toContain("<Radio size={15} /> Test micro");
+  expect(app).toContain('<span className="sirius-mobile-introduction">Je suis ΣIRIUS</span>');
+  expect(app.indexOf('className="sirius-mobile-introduction"')).toBeLessThan(app.indexOf('className="sirius-wordmark workspace-welcome"'));
+});
+
+test("mobile microphone panel keeps status, engine and stop on one compact row", () => {
+  const mobile = root.nodes.find((node) => node.type === "atrule" && node.params === "(max-width: 1023px)"
+    && node.nodes.some((rule) => rule.selector?.endsWith(".pantheon-composer .voice-session-controls")));
+  const controls = mobile.nodes.find((node) => node.selector?.endsWith(".pantheon-composer .voice-session-controls"));
+  const composer = mobile.nodes.find((node) => node.selector?.endsWith(".pantheon-composer"));
+  expect(composer.nodes.find(({ prop }) => prop === "display").value).toBe("grid");
+  expect(composer.nodes.find(({ prop }) => prop === "gap").value).toBe("6px");
+  expect(composer.nodes.find(({ prop }) => prop === "padding").value).toBe("7px 8px");
+  expect(controls.nodes.find(({ prop }) => prop === "grid-template-columns").value).toBe("24px minmax(0, 1fr) minmax(0, 96px) 32px");
+  const stop = mobile.nodes.find((node) => node.selector?.endsWith(".voice-session-controls button"));
+  expect(stop.nodes.find(({ prop }) => prop === "height").value).toBe("32px");
+  expect(stop.nodes.find(({ prop }) => prop === "grid-column").value).toBe("-2");
+  const engine = mobile.nodes.find((node) => node.selector?.endsWith(".voice-session-controls label"));
+  expect(engine.nodes.find(({ prop }) => prop === "grid-column").value).toBe("3");
+  const chat = mobile.nodes.find((node) => node.selector?.endsWith(".cmd-bar :is(.ptt-btn, .cmd-send)"));
+  for (const prop of ["width", "height", "min-width", "min-height"]) {
+    expect(chat.nodes.find((node) => node.prop === prop).value).toBe("32px");
+  }
+  expect(read("components/VoiceSessionControls.jsx")).toContain('aria-label="Arrêter le microphone et la réponse"');
+});
+
+test("portrait chat insets its controls away from the decorative frame", () => {
+  const portrait = root.nodes.find((node) => node.type === "atrule"
+    && node.params === "(max-width: 1023px) and (orientation: portrait)");
+  const composer = portrait.nodes.find((node) => node.selector?.endsWith(".pantheon-composer"));
+  expect(composer.nodes.find(({ prop }) => prop === "padding-inline").value).toBe("20px");
+  expect(read("App.js")).toContain('placeholder="Écrivez à ΣIRIUS…"');
+  expect(read("App.js")).toContain('aria-label="Votre demande à ΣIRIUS"');
+});
+
+test("portrait reactor is fifteen percent smaller without changing landscape or boot", () => {
+  const portrait = root.nodes.find((node) => node.type === "atrule"
+    && node.params === "(max-width: 1023px) and (orientation: portrait)");
+  const reactor = portrait.nodes.find((node) => node.selector?.endsWith(".sirius-stage .reactor-wrap"));
+  for (const prop of ["width", "height"]) {
+    expect(reactor.nodes.find((node) => node.prop === prop).value).toBe("clamp(119px, 14.96vh, 160px)");
+  }
+  expect(reactor.selector).not.toContain(".boot-reactor");
+});
+
+test("boot keeps the existing orbiting Greek letters visible on mobile", () => {
+  const orbit = root.nodes.find((node) => node.type === "rule"
+    && node.selector.endsWith(".boot-screen .boot-reactor .core-orbit"));
+  expect(orbit.nodes.find(({ prop }) => prop === "display").value).toBe("block");
+  expect(read("components/ReactorVisuals.jsx")).toContain('className="core-orbit"');
 });
 
 test("information centre clock uses honey in both inline and detached panels", () => {

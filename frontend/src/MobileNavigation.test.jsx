@@ -72,6 +72,22 @@ test("cancelled or short drags preserve the original position", () => {
   expect(handle.getAttribute("aria-expanded")).toBe("false");
 });
 
+test("side drawer follows horizontal swipes and retracts to the left", () => {
+  drawer.style.setProperty("--mobile-nav-axis", "x");
+  drawer.getBoundingClientRect = () => ({ width: 116, height: 360 });
+  handle.getBoundingClientRect = () => ({ width: 44, height: 360 });
+  pointer("pointerdown", 100, { clientX: 20 });
+  pointer("pointermove", 100, { clientX: 70 });
+  expect(drawer.style.getPropertyValue("--mobile-nav-offset")).toBe("22px");
+  pointer("pointerup", 100, { clientX: 70 });
+  expect(handle.getAttribute("aria-expanded")).toBe("true");
+  pointer("pointerdown", 100, { clientX: 70 });
+  pointer("pointermove", 100, { clientX: 20 });
+  pointer("pointerup", 100, { clientX: 20 });
+  expect(handle.getAttribute("aria-expanded")).toBe("false");
+  expect(navigate).not.toHaveBeenCalled();
+});
+
 test("all five destinations remain available and selecting one retracts the drawer", () => {
   for (const id of ["home", "info", "assistant", "modules", "profile"]) {
     act(() => handle.click());

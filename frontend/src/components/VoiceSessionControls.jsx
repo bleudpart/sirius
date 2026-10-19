@@ -23,7 +23,7 @@ export default function VoiceSessionControls({ phase, message, onStop, androidRe
       </div>
       {androidRecognition && (
         <label>
-          Micro Android
+          <span className="voice-session-engine-label">Micro Android</span>
           <select aria-label="Moteur de reconnaissance Android" value={androidRecognition}
             onChange={(event) => onRecognitionChange(event.target.value)}>
             <option value="server">Serveur</option>
@@ -38,7 +38,7 @@ export default function VoiceSessionControls({ phase, message, onStop, androidRe
         aria-label="Arrêter le microphone et la réponse"
         title="Interrompre l'écoute et la réponse ; une action déjà envoyée ne sera pas annulée"
       >
-        <Square size={11} aria-hidden="true" /> Arrêter
+        <Square size={11} aria-hidden="true" /><span className="voice-session-stop-label">Arrêter</span>
       </button>
     </div>
   );

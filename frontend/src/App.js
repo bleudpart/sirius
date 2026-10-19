@@ -7428,9 +7428,10 @@ function App() {
           {handsFreeAvailable && (
             <button type="button" className={`profile-btn top-tool-btn ${autoMic ? "on" : ""}`}
               data-testid="sirius-test-mic-btn" aria-pressed={autoMic}
+              aria-label="Test micro : conversation continue avec transcription serveur"
               title="Test micro : conversation continue avec transcription serveur"
               onClick={() => { void toggleConversation(true); }}>
-              <Radio size={15} /> Test micro
+              <Radio size={15} aria-hidden="true" />
             </button>
           )}
           {isLocalDevServer && (
@@ -7622,6 +7623,7 @@ function App() {
           <div className="sirius-identity">
             <h1 className="sirius-title" data-testid="sirius-title">
               <span className="sirius-title-label">
+                <span className="sirius-mobile-introduction">Je suis ΣIRIUS</span>
                 <span className="sirius-wordmark workspace-welcome">
                   {["dusk", "night"].includes(phaseOfDay()) ? "Bonsoir" : "Bonjour"}{welcomeName ? `, ${welcomeName}` : ""}
                 </span>
@@ -7664,7 +7666,7 @@ function App() {
             type="text"
             value={cmd}
             onChange={(e) => setCmd(e.target.value)}
-            placeholder="Écrivez votre demande à ΣIRIUS…"
+            placeholder="Écrivez à ΣIRIUS…"
             data-testid="sirius-cmd-input"
           />
           <PushToTalkButton active={pttActive} ready={captureMicOn} onStart={pttDown} onStop={pttUp} />
