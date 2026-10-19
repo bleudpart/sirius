@@ -8,10 +8,13 @@ et volumes ; l'export DXF s'ouvre dans AutoCAD, LibreCAD, QCAD…
 Convention : x,y = coin haut-gauche en mètres, y vers le bas, nord = haut.
 """
 
+import base64
+import binascii
 import io
 import json
 import logging
 import os
+import re
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
@@ -333,6 +336,61 @@ Règles :
 - hauteur (plafond) uniquement si mentionnée ou déductible, sinon omettre.
 - Si la description est vague, propose un agencement raisonnable et réaliste."""
 
+PLAN_IMAGE_PROMPT = """
+Une IMAGE est jointe : un plan existant (scan, photo, croquis) ou la photo d'un lieu.
+Reproduis fidèlement les pièces, leurs proportions, les cotes lisibles, les portes et les fenêtres.
+Si des cotes sont écrites, utilise-les ; sinon estime des dimensions réalistes. Garde les noms écrits
+sur le plan (traduits en français si besoin). Les consignes texte éventuelles complètent l'image."""
+
+VISION_MODEL = os.getenv("SIRIUS_VISION_MODEL", "qwen/qwen3.8-27b").strip() or "qwen/qwen3.8-27b"
+IMAGE_MAX_BYTES = 4 * 1024 * 1024
+PDF_MAX_BYTES = 12 * 1024 * 1024
+_DATA_URL_RE = re.compile(
+    r"^data:(image/(?:jpeg|jpg|png|webp)|application/pdf);base64,([A-Za-z0-9+/=\s]+)$")
+
+
+def clean_image_input(source: str) -> str:
+    """Valide une image (JPEG, PNG, WebP) ou un PDF en data URL et renvoie une image prête pour la vision.
+
+    Pour un PDF, la première page est rendue en PNG.
+    """
+    source = (source or "").strip()
+    if not source:
+        return ""
+    match = _DATA_URL_RE.match(source)
+    if not match:
+        raise ValueError("Fichier invalide : utilisez une image JPEG, PNG, WebP ou un PDF.")
+    payload = re.sub(r"\s+", "", match.group(2))
+    try:
+        data = base64.b64decode(payload, validate=True)
+    except (binascii.Error, ValueError):
+        raise ValueError("Fichier invalide : encodage incorrect.")
+    if not data:
+        raise ValueError("Fichier vide.")
+    mime = match.group(1)
+    if mime == "application/pdf":
+        if len(data) > PDF_MAX_BYTES or not data.startswith(b"%PDF"):
+            raise ValueError("PDF invalide ou trop lourd (12 Mo maximum).")
+        try:
+            import pymupdf as fitz
+            with fitz.open(stream=data, filetype="pdf") as pdf:
+                if pdf.page_count < 1:
+                    raise ValueError("PDF sans page.")
+                page = pdf[0]
+                zoom = min(2.0, 1600 / max(page.rect.width, page.rect.height, 1))
+                png = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom)).tobytes("png")
+        except ValueError:
+            raise
+        except Exception:
+            raise ValueError("PDF illisible.")
+        if len(png) > IMAGE_MAX_BYTES:
+            raise ValueError("Page PDF trop lourde à analyser.")
+        return "data:image/png;base64," + base64.b64encode(png).decode()
+    if len(data) > IMAGE_MAX_BYTES:
+        raise ValueError("Image trop lourde (4 Mo maximum).")
+    kind = "jpeg" if mime == "image/jpg" else mime.split("/", 1)[1]
+    return f"data:image/{kind};base64,{payload}"
+
 
 def _extract_json(raw: str) -> dict:
     """Parse le JSON du cerveau, même entouré de texte ou de clôtures Markdown."""
@@ -343,19 +401,38 @@ def _extract_json(raw: str) -> dict:
         pass
     start, end = raw.find("{"), raw.rfind("}")
     if start >= 0 and end > start:
-        return json.loads(raw[start:end + 1])
-    raise ValueError("Réponse du cerveau sans JSON exploitable.")
+        try:
+            return json.loads(raw[start:end + 1])
+        except json.JSONDecodeError:
+            pass
+    # RuntimeError : réponse IA illisible = erreur 500 générique, pas une erreur de saisie (400).
+    raise RuntimeError("Réponse du cerveau sans JSON exploitable.")
 
 
-async def generate_floorplan(description: str, keys: dict = None) -> dict:
+async def generate_floorplan(description: str, keys: dict = None, image: str = "") -> dict:
     from openai import AsyncOpenAI
     from sirius_brain import ENV_GROQ_LLM_KEY, GROQ_LLM_ENDPOINT, GROQ_LLM_PRIMARY
 
     from provider_access import require_key
+    image = clean_image_input(image)
     api_key = require_key("groq", ENV_GROQ_LLM_KEY, keys)
     if not api_key:
         raise ValueError("Clé GROQ absente : impossible de générer le plan.")
-    client = AsyncOpenAI(api_key=api_key, base_url=GROQ_LLM_ENDPOINT, max_retries=0, timeout=40.0)
+    if image:
+        model = VISION_MODEL
+        messages = [{"role": "user", "content": [
+            {"type": "text", "text": PLAN_PROMPT + PLAN_IMAGE_PROMPT + "\n\nCONSIGNES :\n"
+             + ((description or "").strip()[:2000] or "Reproduis ce plan.")},
+            {"type": "image_url", "image_url": {"url": image}},
+        ]}]
+    else:
+        model = GROQ_LLM_PRIMARY
+        messages = [
+            {"role": "system", "content": PLAN_PROMPT},
+            {"role": "user", "content": description[:2000]},
+        ]
+    client = AsyncOpenAI(api_key=api_key, base_url=GROQ_LLM_ENDPOINT, max_retries=0,
+                         timeout=60.0 if image else 40.0)
     last_error = None
     for attempt in range(2):
         try:
@@ -363,19 +440,14 @@ async def generate_floorplan(description: str, keys: dict = None) -> dict:
             # l'API échoue parfois à vide), avec extraction manuelle du JSON.
             kwargs = {"response_format": {"type": "json_object"}} if attempt == 0 else {}
             resp = await client.chat.completions.create(
-                model=GROQ_LLM_PRIMARY,
-                messages=[
-                    {"role": "system", "content": PLAN_PROMPT},
-                    {"role": "user", "content": description[:2000]},
-                ],
+                model=model,
+                messages=messages,
                 max_tokens=8000,
                 temperature=0.2 if attempt == 0 else 0.3,
                 **kwargs,
             )
-            raw = (resp.choices[0].message.content or "").strip()
+            raw = re.sub(r"<think>.*?</think>", "", resp.choices[0].message.content or "", flags=re.S).strip()
             return normalize_plan(_extract_json(raw))
-        except ValueError:
-            raise
         except Exception as error:
             last_error = error
             logger.warning("[PLANS] tentative %d échouée : %r", attempt + 1, error)
@@ -482,12 +554,160 @@ def plan_to_dxf(plan: dict) -> bytes:
 # =========================================================
 
 class PlanRequest(BaseModel):
-    description: str
+    description: str = ""
+    image: str = ""
     keys: dict = {}
 
 
 class PlanDxfRequest(BaseModel):
     plan: dict
+
+
+# =========================================================
+# INTÉRIEUR — aménagement pièce par pièce
+# =========================================================
+
+INTERIOR_PROMPT = """Tu es l'architecte d'intérieur de ΣIRIUS. On te donne UNE pièce rectangulaire
+(largeur l = axe x, profondeur p = axe y, en mètres, origine coin haut-gauche, nord en haut),
+ses ouvertures et une ambiance. Propose un aménagement réaliste et élégant.
+Réponds UNIQUEMENT avec un objet JSON valide :
+{"mobilier": [{"nom": "...", "x": 0.1, "y": 0.1, "l": 2.0, "p": 0.9}],
+ "conseils": ["..."], "eclairage": "...",
+ "achats": [{"article": "...", "quantite": 1, "budget_eur": 450}]}
+Règles :
+- Noms en FRANÇAIS. Coordonnées RELATIVES à la pièce (0 ≤ x, x + l ≤ largeur ; 0 ≤ y, y + p ≤ profondeur).
+- Dimensions réelles du mobilier ; laisser 0.9 m de circulation ; ne jamais bloquer une porte ni un passage.
+- 4 à 10 meubles, cohérents avec la fonction de la pièce et l'ambiance demandée.
+- conseils : 3 à 5 phrases courtes et concrètes (couleurs, matières, disposition, rangements).
+- eclairage : une phrase (température de couleur, lampes, scénario).
+- achats : 3 à 8 articles avec un budget indicatif en euros."""
+
+INTERIOR_PHOTO_PROMPT = """
+Une PHOTO est jointe : c'est la pièce actuelle ou une image d'inspiration de l'utilisateur.
+Analyse son style, ses couleurs dominantes et ses matières, et inspire-t'en pour l'aménagement.
+Ajoute au JSON : "style": "nom court du style perçu", "palette": ["#RRGGBB", ...] (3 à 6 couleurs
+dominantes de la photo), "matieres": ["...", ...] (2 à 5 matières), "analyse": "une phrase sur la photo"."""
+
+INTERIOR_MAX_ITEMS = 12
+_HEX_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
+
+
+class InteriorRequest(BaseModel):
+    plan: dict
+    piece: str
+    ambiance: str = ""
+    envies: str = ""
+    photo: str = ""
+    keys: dict = None
+
+
+def _room_openings_summary(plan: dict, room: dict) -> list:
+    return [
+        {"type": op.get("type"), "mur": op.get("mur"), "position": op.get("position"), "largeur": op.get("largeur")}
+        for op in plan.get("ouvertures") or []
+        if (op.get("piece") or "") == room.get("nom")
+    ]
+
+
+def normalize_interior(proposal: dict, room: dict) -> dict:
+    """Borne le mobilier proposé dans la pièce et convertit en coordonnées absolues."""
+    rx, ry = float(room.get("x") or 0), float(room.get("y") or 0)
+    rl, rp = float(room.get("l") or 0), float(room.get("p") or 0)
+    furniture = []
+    for item in (proposal.get("mobilier") or [])[:INTERIOR_MAX_ITEMS]:
+        try:
+            l = min(max(0.2, float(item.get("l") or 0.5)), max(0.2, rl - 0.1))
+            p = min(max(0.2, float(item.get("p") or 0.5)), max(0.2, rp - 0.1))
+            x = min(max(0.05, float(item.get("x") or 0)), max(0.05, rl - l - 0.05))
+            y = min(max(0.05, float(item.get("y") or 0)), max(0.05, rp - p - 0.05))
+        except (TypeError, ValueError):
+            continue
+        name = str(item.get("nom") or "Meuble").strip()[:40] or "Meuble"
+        furniture.append({"nom": name, "x": round(rx + x, 2), "y": round(ry + y, 2), "l": round(l, 2), "p": round(p, 2)})
+    purchases = []
+    for item in (proposal.get("achats") or [])[:10]:
+        if not isinstance(item, dict) or not str(item.get("article") or "").strip():
+            continue
+        try:
+            qty = max(1, int(float(item.get("quantite") or 1)))
+        except (TypeError, ValueError):
+            qty = 1
+        try:
+            budget = max(0, round(float(item.get("budget_eur") or 0)))
+        except (TypeError, ValueError):
+            budget = 0
+        purchases.append({"article": str(item["article"]).strip()[:80], "quantite": qty, "budget_eur": budget})
+    tips = [str(t).strip()[:240] for t in (proposal.get("conseils") or []) if str(t).strip()][:5]
+    result = {
+        "piece": room.get("nom") or "Pièce",
+        "mobilier": furniture,
+        "conseils": tips,
+        "eclairage": str(proposal.get("eclairage") or "").strip()[:240],
+        "achats": purchases,
+    }
+    palette = []
+    for color in proposal.get("palette") or []:
+        color = str(color).strip()
+        if _HEX_RE.match(color) and color.upper() not in palette:
+            palette.append(color.upper())
+    materials = [str(m).strip()[:40] for m in (proposal.get("matieres") or []) if str(m).strip()][:5]
+    style = str(proposal.get("style") or "").strip()[:60]
+    analysis = str(proposal.get("analyse") or "").strip()[:240]
+    if palette or materials or style or analysis:
+        result["inspiration"] = {"style": style, "palette": palette[:6], "matieres": materials, "analyse": analysis}
+    return result
+
+
+async def generate_interior(plan: dict, piece: str, ambiance: str, envies: str, keys: dict = None,
+                            photo: str = "") -> dict:
+    from openai import AsyncOpenAI
+    from sirius_brain import ENV_GROQ_LLM_KEY, GROQ_LLM_ENDPOINT, GROQ_LLM_PRIMARY
+
+    from provider_access import require_key
+    rooms = {(p.get("nom") or "").strip().lower(): p for p in plan.get("pieces") or []}
+    room = rooms.get((piece or "").strip().lower())
+    if not room:
+        raise ValueError("Pièce introuvable dans le plan.")
+    api_key = require_key("groq", ENV_GROQ_LLM_KEY, keys)
+    if not api_key:
+        raise ValueError("Clé GROQ absente : impossible de proposer un aménagement.")
+    brief = {
+        "piece": room.get("nom"), "largeur": room.get("l"), "profondeur": room.get("p"),
+        "hauteur": room.get("hauteur") or 2.5, "ouvertures": _room_openings_summary(plan, room),
+        "ambiance": (ambiance or "contemporaine")[:80], "envies": (envies or "")[:600],
+    }
+    photo = clean_image_input(photo)
+    if photo:
+        model = VISION_MODEL
+        messages = [{"role": "user", "content": [
+            {"type": "text", "text": INTERIOR_PROMPT + INTERIOR_PHOTO_PROMPT + "\n\nPIÈCE :\n"
+             + json.dumps(brief, ensure_ascii=False)},
+            {"type": "image_url", "image_url": {"url": photo}},
+        ]}]
+    else:
+        model = GROQ_LLM_PRIMARY
+        messages = [
+            {"role": "system", "content": INTERIOR_PROMPT},
+            {"role": "user", "content": json.dumps(brief, ensure_ascii=False)},
+        ]
+    client = AsyncOpenAI(api_key=api_key, base_url=GROQ_LLM_ENDPOINT, max_retries=0, timeout=60.0)
+    last_error = None
+    for attempt in range(2):
+        try:
+            kwargs = {"response_format": {"type": "json_object"}} if attempt == 0 else {}
+            resp = await client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_tokens=3000,
+                temperature=0.4 if attempt == 0 else 0.5,
+                **kwargs,
+            )
+            raw = re.sub(r"<think>.*?</think>", "", resp.choices[0].message.content or "", flags=re.S).strip()
+            return normalize_interior(_extract_json(raw), room)
+        except Exception as error:
+            last_error = error
+            logger.warning("[PLANS] intérieur tentative %d échouée : %r", attempt + 1, error)
+    raise last_error
 
 
 def make_floorplan_router(rate_ok) -> APIRouter:
@@ -496,12 +716,12 @@ def make_floorplan_router(rate_ok) -> APIRouter:
     @router.post("")
     async def create_plan(req: PlanRequest, request: Request):
         desc = (req.description or "").strip()
-        if not desc:
+        if not desc and not (req.image or "").strip():
             raise HTTPException(status_code=400, detail="Description vide")
         if not rate_ok(request.client.host if request.client else "?", limit=10):
             raise HTTPException(status_code=429, detail="Trop de requêtes, patientez un instant.")
         try:
-            return await generate_floorplan(desc, keys=req.keys or {})
+            return await generate_floorplan(desc, keys=req.keys or {}, image=req.image)
         except HTTPException:
             raise
         except ValueError as error:
@@ -509,6 +729,22 @@ def make_floorplan_router(rate_ok) -> APIRouter:
         except Exception as error:
             logger.error("[PLANS] génération échouée : %r", error)
             raise HTTPException(status_code=500, detail="Sirius n'a pas pu dessiner ce plan, réessayez.")
+
+    @router.post("/interior")
+    async def propose_interior(req: InteriorRequest, request: Request):
+        if not rate_ok(request.client.host if request.client else "?", limit=10):
+            raise HTTPException(status_code=429, detail="Trop de requêtes, patientez un instant.")
+        try:
+            plan = normalize_plan(req.plan)
+            return await generate_interior(plan, req.piece, req.ambiance, req.envies, keys=req.keys or {},
+                                           photo=req.photo)
+        except HTTPException:
+            raise
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error))
+        except Exception as error:
+            logger.error("[PLANS] aménagement échoué : %r", error)
+            raise HTTPException(status_code=500, detail="Sirius n'a pas pu proposer d'aménagement, réessayez.")
 
     @router.post("/dxf")
     async def export_dxf(req: PlanDxfRequest):

@@ -189,3 +189,160 @@ def test_dxf_relisible_par_ezdxf(tmp_path):
     for expected in ("MURS", "OUVERTURES", "MOBILIER", "COTES", "TEXTE"):
         assert expected in names
     assert len(list(doc.modelspace())) > 5
+
+
+# ---------- Intérieur ----------
+
+def test_normalize_interior_borne_le_mobilier_dans_la_piece():
+    from floorplan import normalize_interior
+    room = {"nom": "Séjour", "x": 2, "y": 1, "l": 5, "p": 4}
+    out = normalize_interior({
+        "mobilier": [
+            {"nom": "Canapé", "x": 4.5, "y": -1, "l": 2.4, "p": 0.95},
+            {"nom": "Table", "x": "abc", "y": 1, "l": 1, "p": 1},
+            {"nom": "Tapis géant", "x": 0, "y": 0, "l": 9, "p": 9},
+        ],
+        "conseils": ["Murs lin", "", "Bois clair"],
+        "eclairage": "2700 K",
+        "achats": [{"article": "Canapé lin", "quantite": "2", "budget_eur": "890.4"}, {"article": ""}],
+    }, room)
+    assert out["piece"] == "Séjour"
+    assert [m["nom"] for m in out["mobilier"]] == ["Canapé", "Tapis géant"]
+    for m in out["mobilier"]:
+        assert room["x"] <= m["x"] and m["x"] + m["l"] <= room["x"] + room["l"]
+        assert room["y"] <= m["y"] and m["y"] + m["p"] <= room["y"] + room["p"]
+    assert out["conseils"] == ["Murs lin", "Bois clair"]
+    assert out["achats"] == [{"article": "Canapé lin", "quantite": 2, "budget_eur": 890}]
+
+
+def test_interior_endpoint_refuse_une_piece_inconnue(monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    import floorplan
+
+    app = FastAPI()
+    app.include_router(floorplan.make_floorplan_router(lambda *a, **k: True), prefix="/api")
+    client = TestClient(app)
+    resp = client.post("/api/floorplan/interior", json={"plan": GARAGE, "piece": "Cuisine"})
+    assert resp.status_code == 400
+    assert "introuvable" in resp.json()["detail"]
+
+
+def _png_data_url():
+    import base64
+    import io as _io
+    from PIL import Image
+    buf = _io.BytesIO()
+    Image.new("RGB", (40, 30), (200, 180, 150)).save(buf, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+
+
+def test_clean_image_input_accepte_image_et_pdf():
+    import base64
+    import pymupdf as fitz
+    from floorplan import clean_image_input
+
+    assert clean_image_input("") == ""
+    png = _png_data_url()
+    assert clean_image_input(png) == png
+    doc = fitz.open()
+    page = doc.new_page(width=200, height=150)
+    page.insert_text((20, 40), "Séjour 5 x 4")
+    pdf_url = "data:application/pdf;base64," + base64.b64encode(doc.tobytes()).decode()
+    out = clean_image_input(pdf_url)
+    assert out.startswith("data:image/png;base64,")
+    assert base64.b64decode(out.split(",", 1)[1]).startswith(b"\x89PNG")
+
+
+@pytest.mark.parametrize("bad", [
+    "data:image/gif;base64,R0lGODlh",
+    "data:image/png;base64,%%%",
+    "data:application/pdf;base64,aGVsbG8=",
+    "https://exemple.fr/plan.png",
+])
+def test_clean_image_input_refuse_les_fichiers_invalides(bad):
+    from floorplan import clean_image_input
+    with pytest.raises(ValueError):
+        clean_image_input(bad)
+
+
+class _FakeCompletions:
+    def __init__(self, content):
+        self.content, self.calls = content, []
+
+    async def create(self, **kwargs):
+        from types import SimpleNamespace
+        self.calls.append(kwargs)
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=self.content))])
+
+
+def _fake_openai(monkeypatch, content):
+    import json as _json
+    from types import SimpleNamespace
+    import openai
+    import provider_access
+
+    completions = _FakeCompletions(_json.dumps(content) if not isinstance(content, str) else content)
+    monkeypatch.setattr(openai, "AsyncOpenAI",
+                        lambda **kw: SimpleNamespace(chat=SimpleNamespace(completions=completions)))
+    monkeypatch.setattr(provider_access, "require_key", lambda *a, **k: "cle-test")
+    return completions
+
+
+def test_plan_depuis_une_image_utilise_le_modele_vision(monkeypatch):
+    import asyncio
+    import floorplan
+
+    completions = _fake_openai(monkeypatch, GARAGE)
+    plan = asyncio.run(floorplan.generate_floorplan("", keys={}, image=_png_data_url()))
+    assert plan["pieces"][0]["nom"] == "Garage"
+    call = completions.calls[0]
+    assert call["model"] == floorplan.VISION_MODEL
+    parts = call["messages"][0]["content"]
+    assert parts[1]["type"] == "image_url" and parts[1]["image_url"]["url"].startswith("data:image/png")
+
+
+def test_amenagement_depuis_une_photo_renvoie_l_inspiration(monkeypatch):
+    import asyncio
+    import floorplan
+
+    completions = _fake_openai(monkeypatch, "<think>analyse</think>" + __import__("json").dumps({
+        "mobilier": [{"nom": "Établi", "x": 0.2, "y": 0.2, "l": 2, "p": 0.6}],
+        "palette": ["#c8a97e", "#C8A97E", "bleu", "#3e4a3d"],
+        "matieres": ["chêne", "lin"], "style": "Japandi", "analyse": "Pièce lumineuse.",
+    }))
+    out = asyncio.run(floorplan.generate_interior(
+        floorplan.normalize_plan(GARAGE), "Garage", "Japandi", "", keys={}, photo=_png_data_url()))
+    assert completions.calls[0]["model"] == floorplan.VISION_MODEL
+    assert out["inspiration"] == {"style": "Japandi", "palette": ["#C8A97E", "#3E4A3D"],
+                                  "matieres": ["chêne", "lin"], "analyse": "Pièce lumineuse."}
+
+
+def test_json_illisible_reessaie_puis_erreur_generique(monkeypatch):
+    import asyncio
+    import floorplan
+
+    completions = _fake_openai(monkeypatch, "{pas du json")
+    with pytest.raises(RuntimeError):
+        asyncio.run(floorplan.generate_floorplan("un garage", keys={}))
+    assert len(completions.calls) == 2
+
+
+def test_plan_endpoint_accepte_une_image_sans_description(monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    import floorplan
+
+    seen = {}
+
+    async def fake_generate(description, keys=None, image=""):
+        seen.update(description=description, image=image)
+        return floorplan.normalize_plan(GARAGE)
+
+    monkeypatch.setattr(floorplan, "generate_floorplan", fake_generate)
+    app = FastAPI()
+    app.include_router(floorplan.make_floorplan_router(lambda *a, **k: True), prefix="/api")
+    client = TestClient(app)
+    assert client.post("/api/floorplan", json={"description": " "}).status_code == 400
+    resp = client.post("/api/floorplan", json={"image": _png_data_url()})
+    assert resp.status_code == 200 and seen["image"].startswith("data:image/png")

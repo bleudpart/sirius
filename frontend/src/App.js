@@ -946,6 +946,7 @@ function App() {
   const [architectPrompt, setArchitectPrompt] = useState("");
   const [showPlans, setShowPlans] = useState(false);
   const [plansPrompt, setPlansPrompt] = useState("");
+  const [plansMode, setPlansMode] = useState("");
   const [showPhoto3D, setShowPhoto3D] = useState(false);
   const [showFiles, setShowFiles] = useState(false);
   // Mains holographiques 3D (couche R3F superposée) + pouls synchronisé avec le réacteur
@@ -5337,11 +5338,24 @@ function App() {
       setText(m); speakOut(m);
       return;
     }
+    // 0quinquies-ter) PLANS# intérieur : « aménage le séjour en style japandi », « décore ma chambre »…
+    if (/(am[ée]nage|d[ée]core|d[ée]corer|am[ée]nager)[- ]?(?:moi|nous)?\s+(?:le|la|les|l'|mon|ma|mes|un|une|notre)?\s*(s[ée]jour|salon|chambre|cuisine|pi[eè]ce|salle|bureau|appartement|maison|logement|entr[ée]e|studio|int[ée]rieur)|architecture\s+d['’ ]\s*int[ée]rieur|(ouvre|lance).{0,12}(mode\s+)?int[ée]rieur/.test(low)) {
+      mark("plans");
+      const direct = /(am[ée]nage|d[ée]core)/.test(low);
+      setPlansMode("interieur");
+      setPlansPrompt(direct ? command : "");
+      setShowPlans(true);
+      setStatus("speaking");
+      const m = direct ? "Je prépare une proposition d'aménagement." : "J'ouvre l'atelier d'intérieur. Choisis une pièce et une ambiance.";
+      setText(m); speakOut(m);
+      return;
+    }
     // 0quinquies-bis) PLANS# : « dessine-moi le plan d'un garage de 6 sur 4… »
     const planMatch = low.match(/(?:dessine|trace|g[éè]n[èe]re|cr[ée]e|fais|montre)[- ]?(?:moi|nous)?\s*(?:le|un|les|des)?\s*plans?\s+(?:de|d'|du|d'une?|pour)\s*(.+)/);
     if (planMatch || /(ouvre|lance).{0,12}(module\s+)?plans?\b/.test(low)) {
       mark("plans");
       const sujet = planMatch && planMatch[1] ? planMatch[1].trim() : "";
+      setPlansMode("structure");
       setPlansPrompt(sujet ? command : "");
       setShowPlans(true);
       setStatus("speaking");
@@ -6906,7 +6920,7 @@ function App() {
       },
       openFiles: () => setShowFiles(true), openInfoHub: () => setShowInfoWheel(true), openConnections: () => setShowConnections(true),
       captureInterface: () => captureSiriusInterface(), captureRegion: captureSiriusRegion, openCaptureFolder,
-      openArchitect: () => { setArchitectPrompt(""); setShowArchitect(true); }, openPlans: () => { setPlansPrompt(""); setShowPlans(true); },
+      openArchitect: () => { setArchitectPrompt(""); setShowArchitect(true); }, openPlans: () => { setPlansPrompt(""); setPlansMode(""); setShowPlans(true); },
       openPhoto3d: () => setShowPhoto3D(true), openPantheon: () => setShowPantheon(true), openCortex: () => setShowCortex(true),
       openNexus: () => setShowNexus(true), openOracle: () => setShowOracle(true), openNummarius: () => setShowNummarius(true),
       openEuropeana: () => setShowEuropeana(true), openHaccp: () => setHaccp({ sujet: "", auto: false }), openPrime: () => setShowPrime(true),
@@ -7095,8 +7109,10 @@ function App() {
 
       {showPlans && (
         <FloorPlanPanel
+          key={`${plansMode}|${plansPrompt}`}
           keys={keys}
           initialPrompt={plansPrompt}
+          initialMode={plansMode || undefined}
           onClose={() => setShowPlans(false)}
           onSpeak={speakOut}
         />

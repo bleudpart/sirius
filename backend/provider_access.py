@@ -256,7 +256,7 @@ class ProviderAccessMiddleware:
     _optional = {
         "/api/diagram", "/api/display/analyze", "/api/display/ask", "/api/vision/analyze", "/api/webagent/run",
         "/api/webbrowser/open", "/api/task/image", "/api/task/video/start", "/api/dev/review", "/api/floorplan",
-        "/api/news/headlines", "/api/weather/current", "/api/country", "/api/technews/bulletin",
+        "/api/floorplan/interior", "/api/news/headlines", "/api/weather/current", "/api/country", "/api/technews/bulletin",
         "/api/documentary", "/api/europeana/search", "/api/oracle/overview", "/api/pantheon/ocr",
         "/api/nummarius/market", "/api/nummarius/alerts", "/api/hephaistos/diagnostic", "/api/agora/coach",
         "/api/work-dossiers/live/evaluate",

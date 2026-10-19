@@ -82,7 +82,7 @@ export function createModuleRegistry({ icons, actions, state, user, platform = "
     { id: "capture-region", group: "OUTILS", label: "Capture d'une zone (souris)", Icon: icons.Camera, mobile: false, run: captureRegion },
     { id: "open-capture-folder", group: "OUTILS", label: "Ouvrir le dossier des captures", Icon: icons.FolderOpen, mobile: false, run: openCaptureFolder },
     { id: "architect", group: "OUTILS", label: "Architecte visuel", Icon: icons.Workflow, run: openArchitect },
-    { id: "plans", group: "OUTILS", label: "Plans 2D (PLANS)", Icon: icons.Ruler, run: openPlans },
+    { id: "plans", group: "OUTILS", label: "Architecture & Intérieur (PLANS)", Icon: icons.Ruler, run: openPlans },
     { id: "photo3d", group: "OUTILS", label: "Photos → Objet 3D (PHOTO3D)", Icon: icons.Boxes, run: openPhoto3d },
     { id: "pantheon", group: "PANTHÉON", label: "PANTHEON SYSTEM", Icon: PantheonLogo, run: openPantheon },
     { id: "cortex", group: "PANTHÉON", label: "ZEUS CORTEX — intelligence centrale", Icon: icons.Zap, run: openCortex },
