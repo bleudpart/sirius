@@ -2949,6 +2949,10 @@ _extra_origins = (
     if _cors_env and _cors_env != '*' else []
 )
 
+from access_gate import AccessGateMiddleware, make_access_router  # noqa: E402
+api_router.include_router(make_access_router(db))
+# Ajouté avant CORS pour rester à l'intérieur : la réponse 402 garde ses en-têtes CORS (Android).
+app.add_middleware(AccessGateMiddleware, db=db)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=list(dict.fromkeys(_DEFAULT_DEV_ORIGINS + _extra_origins)),

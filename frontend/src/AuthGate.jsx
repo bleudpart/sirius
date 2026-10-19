@@ -1,12 +1,13 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 // Porte d'authentification : connexion email/mot de passe + Microsoft, profil et déconnexion.
-import { useEffect, useState, createContext, useContext } from "react";
+import { useCallback, useEffect, useState, createContext, useContext } from "react";
 import { Download, LogIn, LogOut, Trash2, User, Save } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { BACKEND_BASE_URL, resolveBackendUrl } from "@/lib/api";
 import { CoreRings, ReactorCore } from "@/components/ReactorVisuals";
 import { lockApiKeys, setKeyAccount } from "@/apiKeyStorage";
 import { isNativeSession, nativeSessionHeaders, setNativeRefreshToken, setSessionToken } from "@/lib/sessionToken";
+import AccessLock, { accessLabel, fetchAccessStatus } from "@/AccessLock";
 
 const API = BACKEND_BASE_URL;
 const BACKEND_URL_PREFIX = `${BACKEND_BASE_URL.replace(/\/$/, "")}/`;
@@ -16,6 +17,7 @@ export const useAuth = () => useContext(AuthContext);
 
 // Toutes les requêtes vers notre backend portent les cookies de session
 const SIRIUS_FETCH_PATCH_FLAG = "__siriusApiFetchPatched";
+export const ACCESS_BLOCKED_EVENT = "sirius:access-blocked";
 let localSessionBootstrap = null;
 // Fallback Bearer : le cookie SameSite=Strict n'est pas rejoué quand la page
 // (localhost:3000) et l'API (127.0.0.1:8001) sont des sites différents.
@@ -92,6 +94,9 @@ if (!window[SIRIUS_FETCH_PATCH_FLAG]) {
     const retryInput = resolvedInput instanceof Request ? resolvedInput.clone() : resolvedInput;
     const response = await nativeFetch(resolvedInput, requestOptions);
 
+    if (isBackendRequest && response.status === 402) {
+      window.dispatchEvent(new CustomEvent(ACCESS_BLOCKED_EVENT));
+    }
     if (!isBackendRequest || isAuthRequest || response.status !== 401) return response;
 
     const bootstrap = await requestLocalSession();
@@ -262,7 +267,7 @@ function AuthScreen({ onAuth }) {
   );
 }
 
-export function ProfilePanel({ user, onClose, onUpdate, onLogout }) {
+export function ProfilePanel({ user, access = null, onClose, onUpdate, onLogout }) {
   const [name, setName] = useState(user.name || "");
   const [notes, setNotes] = useState((user.preferences || {}).notes || "");
   const [signatureName, setSignatureName] = useState((user.preferences || {}).signature_name || (user.name === "Daniel Partel" ? "M. Daniel Partel" : user.name) || "");
@@ -355,6 +360,7 @@ export function ProfilePanel({ user, onClose, onUpdate, onLogout }) {
       <div className="gcal-body">
         <div className="profile-row"><span>EMAIL</span><b data-testid="profile-email">{user.email}</b></div>
         <div className="profile-row"><span>CONNEXION</span><b>{user.provider === "google" ? "Google" : user.provider === "microsoft" ? "Microsoft" : "Email + mot de passe"}</b></div>
+        {access?.state && access.state !== "unknown" && <div className="profile-row"><span>ACCÈS</span><b data-testid="profile-access">{accessLabel(access)}</b></div>}
         <div className="profile-row"><span>AUTHENTIFICATION RENFORCÉE</span><b>{user.mfa_enabled ? "MFA ACTIVÉ" : "MFA NON ACTIVÉ"}</b></div>
         {!user.mfa_enabled && !mfaSetup && <button className="file-btn" onClick={setupMfa}><User size={13} /> ACTIVER LE MFA</button>}
         {mfaSetup && <div className="mfa-setup"><QRCodeSVG value={mfaSetup.otpauth_url} size={150} /><small>Scannez ce QR avec votre application d'authentification, puis saisissez le code.</small><input className="profile-input" inputMode="numeric" maxLength={6} placeholder="Code à 6 chiffres" value={mfaCode} onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))} /><button className="auth-submit" onClick={enableMfa}>VALIDER LE MFA</button></div>}
@@ -392,6 +398,29 @@ export default function AuthGate({ children }) {
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
   const [showProfile, setShowProfile] = useState(false);
+  const [access, setAccess] = useState(null);
+
+  const userKey = user ? user.user_id || user.email : "";
+  const refreshAccess = useCallback(async (refresh = false) => {
+    const next = await fetchAccessStatus(refresh);
+    setAccess(next);
+    return next;
+  }, []);
+
+  useEffect(() => {
+    if (!userKey) {
+      setAccess(null);
+      return undefined;
+    }
+    void refreshAccess();
+    const onBlocked = () => { void refreshAccess(true); };
+    window.addEventListener(ACCESS_BLOCKED_EVENT, onBlocked);
+    const timer = window.setInterval(() => { void refreshAccess(); }, 30 * 60 * 1000);
+    return () => {
+      window.removeEventListener(ACCESS_BLOCKED_EVENT, onBlocked);
+      window.clearInterval(timer);
+    };
+  }, [userKey, refreshAccess]);
 
   useEffect(() => {
     let cancelled = false;
@@ -459,6 +488,16 @@ export default function AuthGate({ children }) {
     ? "Daniel Partel"
     : user.name || user.email;
 
+  if (access && access.allowed === false) {
+    return (
+      <>
+        <AccessLock status={access} accountEmail={user.email} onRefresh={() => refreshAccess(true)}
+          onLogout={LOCAL_BACKEND ? null : logout} onProfile={() => setShowProfile(true)} />
+        {showProfile && <ProfilePanel user={user} access={access} onClose={() => setShowProfile(false)} onUpdate={setUser} onLogout={logout} />}
+      </>
+    );
+  }
+
   return (
     <AuthContext.Provider value={{ user, setUser, logout, openProfile: () => setShowProfile(true) }}>
       {children}
@@ -467,7 +506,7 @@ export default function AuthGate({ children }) {
         <span>{chipName}</span>
         {user.role === "admin" && <span className="auth-admin-badge" data-testid="auth-admin-badge">ADMIN</span>}
       </button>
-      {showProfile && <ProfilePanel user={user} onClose={() => setShowProfile(false)} onUpdate={setUser} onLogout={logout} />}
+      {showProfile && <ProfilePanel user={user} access={access} onClose={() => setShowProfile(false)} onUpdate={setUser} onLogout={logout} />}
     </AuthContext.Provider>
   );
 }

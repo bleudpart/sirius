@@ -646,6 +646,22 @@ l'essai. La période est enregistrée côté serveur lors de la première
 activation du compte, pas dans une préférence de l'appareil. Les droits
 administrateur sont distincts du coffre et restent ceux du compte authentifié.
 
+#### Accès après l'essai
+
+`backend/access_gate.py` verrouille l'API (réponse `402`, fermeture `4402`
+des websockets) lorsque l'essai est terminé sans licence active
+(`user_licenses`, retrouvée par identifiant ou e-mail d'achat ; location
+mensuelle avec 3 jours de grâce). Les administrateurs ne sont jamais
+verrouillés. Les routes d'authentification, d'accès, de licence, de paiement,
+de boutique publique et Cloud restent ouvertes. `GET /api/access/status`
+renvoie l'état (`admin`, `trial`, `licensed`, `expired`), affiché par
+`frontend/src/AccessLock.jsx`, qui propose les formules, la vérification
+d'achat, le profil (export et suppression) et la déconnexion.
+
+Sur l'application Windows empaquetée, l'état est demandé au compte ΣIRIUS
+Cloud relié (cache de 10 minutes, grâce hors ligne de 3 jours) : un PC non
+relié affiche `unlinked`, un PC sans vérification récente `offline`.
+
 Dans **Configuration → Clés API et services** (ou **Profil → Gérer mes clés API**), choisissez les services utiles,
 créez leurs clés via les liens des fournisseurs, testez-les puis utilisez
 **Protéger et enregistrer**. Le coffre personnel est chiffré par

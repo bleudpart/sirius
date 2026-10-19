@@ -17,7 +17,10 @@ Se déconnecter ou réinstaller l'application ne recommence pas l'essai.
 > utiliser ces services, la configuration de vos propres clés devient
 > obligatoire. Préparez-la avant la fin de l'essai pour éviter une interruption.**
 >
-> Vos dossiers et les outils réellement locaux restent accessibles.
+> Pour continuer à utiliser SIRIUS après l'essai, une licence ou une
+> location active est également nécessaire, achetée avec l'adresse e-mail
+> de votre compte. Sans elle, l'application se verrouille ; vos données
+> restent conservées et peuvent être exportées depuis **Mon profil**.
 > Vous n'avez pas à configurer toutes les clés : seulement celles des
 > services que vous souhaitez continuer à utiliser.
 

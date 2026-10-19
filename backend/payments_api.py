@@ -343,8 +343,10 @@ def make_payments_router(db):
 
     @r.get("/licenses/me")
     async def license_status(request: Request):
-        uid = await _uid(request)
-        license_doc = await db.user_licenses.find_one({"user_id": uid}, {"_id": 0})
+        from auth_api import require_user
+        from access_gate import find_license
+        user = await require_user(request, db)
+        license_doc = await find_license(db, user)
         return {"license": license_doc or {"tier": "free", "status": "inactive"}}
 
     async def _sync_from_stripe(record):

@@ -288,8 +288,9 @@ export default function PublicStore() {
           </table>
         </div>
         <p className="public-function-note">* Première location uniquement ; sinon 32 €/mois dès la souscription. Aucun paiement annuel proposé ici.</p>
-        <details><summary>Après l'essai : clés, frais extérieurs et licence à vie</summary>
-          <p>Pour toutes les formules, après les 15 jours, les services IA demandent vos propres clés API. Les fournisseurs peuvent facturer leur utilisation ; ces frais ne sont pas inclus dans la licence. Les outils et dossiers locaux restent accessibles.</p>
+        <details><summary>Après l'essai : licence obligatoire, clés et frais extérieurs</summary>
+          <p>Après les 15 jours d'essai, ΣIRIUS se verrouille tant qu'aucune licence ou location n'est active. Achetez-la avec l'adresse e-mail de votre compte : l'application se débloque automatiquement. Vos données restent conservées, exportables et supprimables.</p>
+          <p>Pour toutes les formules, après les 15 jours, les services IA demandent vos propres clés API. Les fournisseurs peuvent facturer leur utilisation ; ces frais ne sont pas inclus dans la licence.</p>
           <p>Lifetime désigne la licence du logiciel à paiement unique, avec les mises à jour et futurs modules annoncés inclus. Ce n'est pas un abonnement à vie aux fournisseurs IA ni une garantie de disponibilité perpétuelle des services externes. Consultez les conditions générales avant l'achat.</p>
           <a href="/conditions-generales">Consulter les conditions générales</a>
         </details>
@@ -299,9 +300,17 @@ export default function PublicStore() {
         <p>Aucune connaissance de l'IA nécessaire. Téléchargez ΣIRIUS, ouvrez l'application, puis créez votre compte.</p>
         <a className="public-primary-cta" href="https://github.com/bleudpart/sirius/releases/download/v1.0.52/sirius-setup-1.0.52.exe">Télécharger pour Windows <ArrowRight size={17} /></a>
         <p className="public-function-note">Version publique Windows 1.0.52. Aucun téléphone demandé sur cette page pour l'essai.</p>
+        <details className="public-defender-help" data-testid="public-defender-help"><summary>Windows bloque le téléchargement ou l'installation ?</summary>
+          <p>ΣIRIUS est récent : Windows Defender SmartScreen peut le signaler comme « peu téléchargé ». Le fichier provient directement de notre dépôt officiel.</p>
+          <ol>
+            <li>Dans le navigateur, si le téléchargement est bloqué : ouvrez les téléchargements, cliquez sur <strong>…</strong> à côté de « sirius-setup », puis <strong>Conserver</strong> (puis <strong>Afficher plus</strong> → <strong>Conserver quand même</strong>).</li>
+            <li>Au lancement, si « Windows a protégé votre ordinateur » s'affiche : cliquez sur <strong>Informations complémentaires</strong>, puis <strong>Exécuter quand même</strong>.</li>
+          </ol>
+        </details>
         <p><strong>Sans engagement ni paiement automatique à la fin de l'essai.</strong> Sans carte bancaire, aucun abonnement à annuler.</p>
         <details><summary>Comment fonctionne l'essai ?</summary>
           <p>L'essai commence à votre première connexion activant votre compte. Les services IA autorisés utilisent les clés de SIRIUS, dans la limite des quotas quotidiens.</p>
+          <p>À la fin des 15 jours, l'application se verrouille jusqu'à l'achat d'une licence ou d'une location avec l'adresse e-mail de votre compte. Sur PC, l'application est reliée à votre compte ΣIRIUS pour vérifier cet accès.</p>
           <p>Ensuite, la configuration vous guide pour ajouter vos propres clés API chiffrées sur votre appareil. Les fournisseurs peuvent facturer leur utilisation.</p>
           <p>L'essai est distinct de l'achat d'une licence. Une déconnexion ou une réinstallation ne relance pas les 15 jours. Toute souscription volontaire déclenche un paiement immédiat, sans nouvel essai Stripe.</p>
         </details>
