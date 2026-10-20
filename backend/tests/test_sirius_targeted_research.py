@@ -62,6 +62,82 @@ def test_simple_local_or_personal_requests_do_not_trigger_web_lookup(question):
     assert not is_targeted_factual_question(question)
 
 
+@pytest.mark.parametrize("question,scope", [
+    ("actus du jour", "all"),
+    ("Peux-tu me donner les actualités du jour ?", "all"),
+    ("Recherche approfondie sur l'actualité du jour", "all"),
+    ("Les dernières nouvelles en France", "france"),
+    ("Les infos du jour dans le monde", "international"),
+    ("Les actualités en France et dans le monde", "all"),
+    ("Les actualités économiques en France", None),
+    ("Explique les conséquences des actualités", None),
+    ("Les infos sur l'économie", None),
+    ("Résultats sportifs du jour", None),
+    ("Explique cette actualité\nCONTEXTE DU DERNIER BRIEFING :\nSujet précis", None),
+])
+def test_general_news_scope_preserves_topical_research(question, scope):
+    from sirius_brain import _general_news_scope, _is_news_request, needs_targeted_guidance
+
+    assert _general_news_scope(question) == scope
+    if scope:
+        assert _is_news_request(question)
+        assert needs_targeted_guidance(question)
+
+
+def test_general_retry_inherits_news_but_not_an_unrelated_conversation():
+    from sirius_brain import _with_follow_up_topic, _general_news_scope
+
+    question = "Non, essaye général."
+    history = [{"role": "user", "content": "Recherche approfondie sur les actus du jour"}]
+    assert _general_news_scope(_with_follow_up_topic(question, history)) == "all"
+    assert _with_follow_up_topic(question, [{"role": "user", "content": "Explique mon projet"}]) == question
+    assert _with_follow_up_topic("Les nouvelles économiques", history) == "Les nouvelles économiques"
+
+
+@pytest.mark.parametrize("question,expected,excluded", [
+    ("Peux-tu me donner les actus du jour ?", "Fait France", None),
+    ("Les infos du jour en France", "Fait France", "Fait international"),
+    ("Les nouvelles internationales", "Fait international", "Fait France"),
+])
+def test_general_news_uses_dated_bulletin_instead_of_keyword_search(monkeypatch, question, expected, excluded):
+    import briefing_news
+    import sirius_brain as brain
+    import webagent
+
+    sections = [
+        {"id": section_id, "label": label, "status": "ok", "articles": [{
+            "titre": title, "description": "Fait vérifié.",
+            "date": "2026-10-20T03:00:00+00:00", "source": "Franceinfo",
+            "url": f"https://www.franceinfo.fr/{section_id}/article.html",
+        }]}
+        for section_id, label, title in [
+            ("france", "France", "Fait France"),
+            ("monde", "International", "Fait international"),
+        ]
+    ]
+    fetch = AsyncMock(return_value={"sections": sections})
+    search = AsyncMock(side_effect=AssertionError("Pas de recherche web générique pour le bulletin"))
+    monkeypatch.setattr(briefing_news, "fetch_briefing_news", fetch)
+    monkeypatch.setattr(webagent, "serp_results", search)
+    context = asyncio.run(brain._research_current_prices(question))
+    fetch.assert_awaited_once()
+    search.assert_not_awaited()
+    assert expected in context
+    assert "https://www.franceinfo.fr/" in context
+    assert "2026-10-20T03:00:00+00:00" in context
+    if excluded:
+        assert excluded not in context
+
+
+def test_general_news_reports_timeout_without_inventing_sources(monkeypatch, caplog):
+    import briefing_news
+
+    monkeypatch.setattr(briefing_news, "fetch_briefing_news", AsyncMock(side_effect=asyncio.TimeoutError))
+    context = asyncio.run(_research_current_prices("actus du jour"))
+    assert "aucune actualité vérifiée" in context
+    assert "Bulletin indisponible" in caplog.text
+
+
 def test_food_price_lookup_builds_french_unit_query_and_returns_sources(monkeypatch):
     import webagent
 
@@ -203,6 +279,39 @@ def _install_fake_llm(monkeypatch, answer="Le faux-filet coûte environ 34,90 �
         AsyncMock(return_value="- Boucherie Exemple (https://example.test/faux-filet)\n  34,90 €/kg."),
     )
     return completions
+
+
+@pytest.mark.parametrize("mode", ["turbo", "normal", "profond"])
+@pytest.mark.parametrize("stream", [False, True])
+def test_general_bulletin_reaches_all_chat_answer_paths(monkeypatch, mode, stream):
+    import briefing_news
+    import sirius_brain as brain
+    import webagent
+
+    completions = _install_fake_llm(monkeypatch)
+    monkeypatch.setattr(brain, "_research_current_prices", _research_current_prices)
+    monkeypatch.setattr(briefing_news, "fetch_briefing_news", AsyncMock(return_value={"sections": [
+        {"id": "france", "label": "France", "status": "ok", "articles": [{
+            "titre": "Titre vérifié du bulletin", "description": "Fait sourcé.",
+            "date": "2026-10-20T03:00:00+00:00", "source": "Franceinfo",
+            "url": "https://www.franceinfo.fr/article.html",
+        }]},
+    ]}))
+    search = AsyncMock(side_effect=AssertionError("Le panorama ne doit pas chercher un sujet arbitraire"))
+    monkeypatch.setattr(webagent, "serp_results", search)
+
+    async def run():
+        kwargs = {"mode": mode, "keys": {"groq_key": "test-key"}}
+        if stream:
+            return "".join([part async for part in ask_sirius_stream("les nouvelles", **kwargs)])
+        return await ask_sirius("les nouvelles", **kwargs)
+
+    asyncio.run(run())
+    system_prompt = completions.payload["messages"][0]["content"]
+    assert "Titre vérifié du bulletin" in system_prompt
+    assert "https://www.franceinfo.fr/article.html" in system_prompt
+    assert "ACTUALITÉ À DÉVELOPPER" in system_prompt
+    search.assert_not_awaited()
 
 
 @pytest.mark.parametrize("mode", ["turbo", "normal", "profond"])

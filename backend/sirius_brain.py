@@ -873,6 +873,20 @@ def _format_news_results(results) -> str:
 
 async def _research_current_prices(prompt: str, serp_key: str = "", *, timeout: float = 5.5) -> str:
     question = sports_question(prompt)
+    news_scope = _general_news_scope(prompt)
+    if news_scope:
+        from briefing_news import fetch_briefing_news, news_briefing_text
+
+        try:
+            bulletin = await asyncio.wait_for(fetch_briefing_news(), timeout=timeout)
+        except (httpx.HTTPError, asyncio.TimeoutError, ValueError) as error:
+            logger.warning("[ΣIRIUS:ACTUALITES] Bulletin indisponible : %r", error)
+            return "Bulletin d'actualités : sources temporairement indisponibles, aucune actualité vérifiée."
+        sections = bulletin["sections"]
+        if news_scope != "all":
+            section_id = "france" if news_scope == "france" else "monde"
+            sections = [section for section in sections if section["id"] == section_id]
+        return "BULLETIN D'ACTUALITÉS DATÉES (48 dernières heures) :\n" + news_briefing_text(sections)
     motorsport = is_motorsport_question(question)
     sports = is_sports_results_question(question)
     live_event = (is_live_event_question(question) or motorsport or sports) and not is_current_price_question(question)
@@ -927,10 +941,36 @@ async def _research_current_prices(prompt: str, serp_key: str = "", *, timeout: 
 
 def _is_news_request(prompt: str) -> bool:
     question = str(prompt or "").split("CONTEXTE DU DERNIER BRIEFING :", 1)[0]
-    return bool(re.search(r"\b(?:actualit[ée]s?|actu|infos? du jour)\b", question, re.I)) or (
+    return _general_news_scope(prompt) is not None or bool(re.search(r"\b(?:actualit[ée]s?|actus?|news|infos? du jour)\b", question, re.I)) or (
         "CONTEXTE DU DERNIER BRIEFING :" in str(prompt or "")
         and bool(re.search(r"\b(?:explique|d[ée]taille|approfondis|pourquoi|cons[ée]quences?|pr[ée]cise)\b", question, re.I))
     )
+
+
+def _general_news_scope(prompt: str) -> str | None:
+    if "CONTEXTE DU DERNIER BRIEFING :" in str(prompt or ""):
+        return None
+    words = re.findall(r"[a-z]+", _normalize_search_text(str(prompt or "")))
+    if not set(words).intersection({"actu", "actus", "actualite", "actualites", "infos", "informations", "news", "nouvelles", "bulletin"}):
+        return None
+    general_words = {
+        "sirius", "peux", "pourrais", "tu", "vous", "pouvez", "pouvezvous",
+        "me", "moi", "nous", "donne", "donner", "donnez", "dis", "dire",
+        "montre", "affiche", "lis", "lire", "presente", "resume", "fais", "faire",
+        "recherche", "cherche", "approfondie", "approfondis", "sur", "web", "internet",
+        "quelles", "quels", "sont", "les", "des", "le", "la", "l", "un", "une",
+        "actu", "actus", "actualite", "actualites", "infos", "informations",
+        "news", "nouvelles", "bulletin", "panorama", "general", "generales",
+        "du", "jour", "aujourd", "hui", "d", "de", "ce", "matin", "recentes",
+        "dernieres", "principales", "toutes", "tous", "complet", "completes",
+        "en", "france", "francaise", "francaises", "international", "internationales",
+        "monde", "dans", "a", "et", "stp", "s", "il", "te", "plait",
+    }
+    if any(word not in general_words for word in words):
+        return None
+    france = any(word in words for word in ("france", "francaise", "francaises"))
+    world = any(word in words for word in ("monde", "international", "internationales"))
+    return "france" if france and not world else "international" if world and not france else "all"
 
 
 _DEEP_WEB_RESEARCH_RE = re.compile(
@@ -949,6 +989,9 @@ def _news_answer_guidance(prompt: str) -> str:
         "Pour un sujet, vise 250 à 450 mots si les sources le permettent, en paragraphes naturels : "
         "faits datés, acteurs, contexte, enjeux, conséquences établies, incertitudes et prochaines étapes. "
         "Pour un panorama, développe plusieurs sujets distincts, sans les mélanger. "
+        "Si un bulletin daté par rubrique est fourni, utilise ses rubriques et ses articles, "
+        "pas un seul ancien résultat de recherche. Signale seulement les rubriques indisponibles. "
+        "N'annonce pas l'activation de modules : présente directement les informations vérifiées. "
         "Respecte une demande explicite de résumé court. Ne rallonge pas avec des suppositions. "
         "Si les extraits ne suffisent pas ou si aucune source récente n'est disponible, dis-le clairement ; "
         "ne présente pas tes connaissances anciennes comme des nouvelles vérifiées."
@@ -957,7 +1000,8 @@ def _news_answer_guidance(prompt: str) -> str:
 
 def needs_targeted_guidance(prompt: str) -> bool:
     return (
-        is_targeted_factual_question(prompt)
+        _general_news_scope(prompt) is not None
+        or is_targeted_factual_question(prompt)
         or is_live_event_question(prompt)
         or is_sports_results_question(prompt)
         or is_motorsport_question(sports_question(prompt))
@@ -1205,6 +1249,17 @@ def _with_follow_up_topic(prompt, history):
     """Une relance courte (« le résultat complet ») hérite du sujet sport auto de la question précédente."""
     text = str(prompt or "")
     question = sports_question(text)
+    general_retry = re.fullmatch(
+        r"(?:non[, ]+)?(?:essaie|essaye|reessaie|reessaye|plutot|en)\s+"
+        r"(?:en\s+)?general[.!? ]*",
+        _normalize_search_text(question).strip(),
+    )
+    if general_retry and any(
+        _is_news_request(str(turn.get("content") or ""))
+        for turn in (history or [])[-4:]
+        if isinstance(turn, dict) and turn.get("role") == "user"
+    ):
+        return "Actualités du jour, panorama général France et international."
     if (
         is_motorsport_question(question)
         or is_sports_results_question(question)
@@ -1230,6 +1285,7 @@ async def _answer_context(prompt, mode, serp_key):
     deep_search = (
         (mode or "normal").lower() == "profond"
         and not sports
+        and _general_news_scope(prompt) is None
         and not is_targeted_factual_question(question)
         and (_is_news_request(question) or _DEEP_WEB_RESEARCH_RE.search(question))
         and "CONTEXTE DU DERNIER BRIEFING :" not in str(prompt or "")

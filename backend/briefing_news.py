@@ -73,7 +73,8 @@ def news_briefing_text(sections: list[dict]) -> str:
                 seen.add(article["url"])
                 detail = article.get("description", "")
                 details.append(f"{article['titre']}. {detail} "
-                               f"Source : {article['source']}, publié le {article['date'][:10]}.")
+                               f"Source : {article['source']}, publié le {article['date']}. "
+                               f"URL : {article['url']}")
             parts.append(f"{section['label']} : " + " ".join(details))
         elif section["status"] == "unavailable":
             parts.append(f"{section['label']} : source temporairement indisponible.")

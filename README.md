@@ -288,6 +288,13 @@ demandées ; au plus deux articles par rubrique sont retenus. Les liens restent
 visibles sans être lus. Sans ville renseignée ou sans prévisions vérifiables,
 l'absence de météo est annoncée, sans choisir Paris implicitement.
 
+Les formulations générales envoyées au chat (« peux-tu me donner les actus du
+jour ? », « recherche approfondie sur l'actualité du jour ») reçoivent aussi
+ce bulletin RSS daté comme source de rédaction, avec les dates et liens des
+articles, plutôt qu'une recherche web générique. Les questions sur un sujet
+précis conservent leur recherche ciblée. Après une demande d'actualités,
+« non, essaye général » relance un panorama France et international.
+
 La météo Open-Meteo distingue les conditions relevées et les prévisions
 d'aujourd'hui et de demain : température, ressenti, vent, minimum/maximum et
 probabilité de précipitations. Dates, fuseau, unités et valeurs sont vérifiés.
