@@ -73,6 +73,7 @@ export const MediaHUD = wrap(() => import("@/components/MediaHUD"));
 export const MediaModulesPanel = wrap(() => import("@/MediaModulesPanel"));
 export const ProductivityPanel = wrap(() => import("@/ProductivityPanel"));
 export const ConnectionsPanel = wrap(() => import("@/ConnectionsPanel"));
+export const MessagingPanel = wrap(() => import("@/MessagingPanel"));
 export const WorkModulesPanel = wrap(() => import("@/WorkModulesPanel"));
 export const WorkDossiersPanel = wrap(() => import("@/WorkDossiersPanel"));
 export const SportCoachPanel = wrap(() => import("@/SportCoachPanel"));

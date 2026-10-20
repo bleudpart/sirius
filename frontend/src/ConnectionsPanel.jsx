@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Browser } from "@capacitor/browser";
-import { Check, Loader2, RefreshCw, Unplug, X } from "lucide-react";
+import { Check, Loader2, Mail, RefreshCw, Unplug, X } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api";
 import ProviderLogo from "@/components/ProviderLogo";
 import MailCachePanel from "@/components/MailCachePanel";
@@ -39,7 +39,7 @@ async function openAuthorization(url) {
   window.open(url, "sirius-account-connection", "width=560,height=760");
 }
 
-export default function ConnectionsPanel({ onClose, mailCache, onReadCachedMail }) {
+export default function ConnectionsPanel({ onClose, mailCache, onReadCachedMail, onOpenMessaging }) {
   const [status, setStatus] = useState(initialStatus);
   const [pending, setPending] = useState("");
   const [error, setError] = useState("");
@@ -170,6 +170,7 @@ export default function ConnectionsPanel({ onClose, mailCache, onReadCachedMail 
       </header>
 
       <main className="connections-content">
+        {onOpenMessaging && <button type="button" className="connections-refresh" onClick={onOpenMessaging}><Mail size={16} /> Ouvrir la messagerie</button>}
         <div className="connections-list">
           {Object.entries(PROVIDERS).map(([key, provider]) => {
             const providerStatus = status[key];

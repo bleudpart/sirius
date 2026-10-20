@@ -2,7 +2,7 @@
 
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { Mic, MicOff, Clock, Cpu, Wifi, MapPin, Calendar, X, Leaf, UserCog, Brain, Music, Repeat, RotateCcw, BarChart3, Workflow, Ruler, FolderOpen, Code2, Database, Sparkles, Eye, Landmark, Library, Orbit, Monitor, ShieldCheck, Radar, ShieldAlert, Camera, Crop, ImageDown, Fingerprint, Zap, Package, Clapperboard, Grip, Radio, Wrench, FileCode, History, Maximize, Minimize, KeyRound, Home as HomeIcon, BadgeInfo, Globe2, Hammer, TrendingUp, Newspaper, Scale, Flame, BookOpen, Sigma, AlarmClock, Power, Boxes, Link2, Building2, Activity } from "lucide-react";
+import { Mic, MicOff, Clock, Cpu, Wifi, MapPin, Calendar, X, Leaf, UserCog, Brain, Music, Repeat, RotateCcw, BarChart3, Workflow, Ruler, FolderOpen, Code2, Database, Sparkles, Eye, Landmark, Library, Orbit, Monitor, ShieldCheck, Radar, ShieldAlert, Camera, Crop, ImageDown, Fingerprint, Zap, Package, Clapperboard, Grip, Radio, Wrench, FileCode, History, Maximize, Minimize, KeyRound, Home as HomeIcon, BadgeInfo, Globe2, Hammer, TrendingUp, Newspaper, Scale, Flame, BookOpen, Sigma, AlarmClock, Power, Boxes, Link2, Building2, Activity, Mail } from "lucide-react";
 import {
   ArchitectPanel, SpectatorView, FilesPanel, DevCompanion, ZeusCortex, SiriusPrime, OracleDivin,
   PantheonSystem, NexusCeleste, SiriusDisplay, EuropeanaViewer, HaccpModule, KeysStatus, KeraunosPanel,
@@ -10,7 +10,7 @@ import {
   AtlasPanel, HeraclesPanel, HephaistosPanel, MythosGallery, Odysseia, ConsultPanel, PrometheePanel, CalliopePanel, CalendarPanel,
   FaceIdPanel, PythagorePanel, PackagerPanel, TrailerGallery, SiriusSetup, FirstRunWizard, PromoPanel, ThemisPanel,
   AdminPanel, EnterprisePanel, PortusNummarius, AgoraPipeline, NewsPanel, ReveilPanel, SpotifyPanel, MediaHUD, ProductivityPanel,
-  FloorPlanPanel, Photo3DPanel, ConnectionsPanel, WorkModulesPanel, WorkDossiersPanel, SportCoachPanel, MediaModulesPanel, VoiceProfilePanel, WorkspaceSearch,
+  FloorPlanPanel, Photo3DPanel, ConnectionsPanel, MessagingPanel, WorkModulesPanel, WorkDossiersPanel, SportCoachPanel, MediaModulesPanel, VoiceProfilePanel, WorkspaceSearch,
 } from "@/lazyModules";
 import { pushStats, setStatsOffline } from "@/liveStats";
 import { formatLocalDate, formatLocalTime, getLocalDateKey } from "@/dateTime";
@@ -1008,6 +1008,7 @@ function App() {
   const [showCalliope, setShowCalliope] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [showConnections, setShowConnections] = useState(false);
+  const [showMessaging, setShowMessaging] = useState(false);
   const [showFaceId, setShowFaceId] = useState(false);
   const [showReveil, setShowReveil] = useState(false);
   const [showSpotifyWin, setShowSpotifyWin] = useState(false);
@@ -6924,6 +6925,7 @@ function App() {
         else showOnDisplay({ type: "media", titre: "MODULES MULTIMÉDIA" });
       },
       openFiles: () => setShowFiles(true), openInfoHub: () => setShowInfoWheel(true), openConnections: () => setShowConnections(true),
+      openMessaging: () => setShowMessaging(true),
       captureInterface: () => captureSiriusInterface(), captureRegion: captureSiriusRegion, openCaptureFolder,
       openArchitect: () => { setArchitectPrompt(""); setShowArchitect(true); }, openPlans: () => { setPlansPrompt(""); setPlansMode(""); setShowPlans(true); },
       openPhoto3d: () => setShowPhoto3D(true), openPantheon: () => setShowPantheon(true), openCortex: () => setShowCortex(true),
@@ -6956,7 +6958,7 @@ function App() {
     icons: { Mic, RotateCcw, Monitor, Clapperboard, FolderOpen, BadgeInfo, Link2, Camera, Workflow, Ruler, Boxes,
       PantheonLogo, Zap, Orbit, Eye, Landmark, Library, ShieldCheck, Sparkles, Code2, BarChart3, Brain, Database,
       Radar, History, KeyRound, Calendar, Fingerprint, AlarmClock, HomeIcon, Globe2, Hammer, MythosLogo, Radio, MapPin,
-      ThemisLogo, TrendingUp, Scale, Flame, BookOpen, Sigma, Newspaper, Package, Wrench, FileCode, Music, Building2, Activity },
+      ThemisLogo, TrendingUp, Scale, Flame, BookOpen, Sigma, Newspaper, Package, Wrench, FileCode, Music, Building2, Activity, Mail },
     state: { displayOpen, displayType: display.type, showMediaModules, showVision, showProductivity, showMediaHud, spotify },
     platform: Capacitor.getPlatform(),
     user: authUser,
@@ -7225,7 +7227,11 @@ function App() {
       {showVoiceProfile && <VoiceProfilePanel key={authUser?.user_id || authUser?.id || authUser?._id || authUser?.email || "none"} user={authUser} onBeforeRecord={stopVoice} onClose={() => setShowVoiceProfile(false)} />}
       {showCalliope && <CalliopePanel onClose={() => setShowCalliope(false)} />}
       {showCalendar && <CalendarPanel onClose={() => setShowCalendar(false)} />}
-      {showConnections && <ConnectionsPanel mailCache={mailCache} onReadCachedMail={(message) => { setStatus("speaking"); setText(message); speakOut(message); }} onClose={() => {
+      {showMessaging && <MessagingPanel key={authUser?.user_id || authUser?.id || authUser?._id || authUser?.email || "local"}
+        microsoftFetch={msFetch} onClose={() => setShowMessaging(false)}
+        onConnections={() => { setShowMessaging(false); setShowConnections(true); }}
+        onRead={(message) => { setStatus("speaking"); setText(message); speakOut(message); }} />}
+      {showConnections && <ConnectionsPanel mailCache={mailCache} onOpenMessaging={() => { setShowConnections(false); setShowMessaging(true); }} onReadCachedMail={(message) => { setStatus("speaking"); setText(message); speakOut(message); }} onClose={() => {
         localStorage.setItem("sirius_connections_onboarding_done", "1");
         setShowConnections(false);
       }} />}

@@ -22,6 +22,7 @@ export const MODULE_ALIASES = {
   files: "fichiers documents mediathèque",
   haccp: "hygiene alimentaire securite sanitaire",
   connections: "comptes connectes connexion",
+  messaging: "messagerie boite reception courriels gmail outlook",
   mythos: "galerie personnages dieux pantheon",
   argus: "surveillance systeme moniteur",
   atlas: "cartes navigation itineraire",

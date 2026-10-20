@@ -49,3 +49,12 @@ test.each(["web", "android"])("voice profile is available in the %s module wheel
   item.run();
   expect(open).toHaveBeenCalled();
 });
+
+test.each(["web", "android"])("messaging is available in the %s module wheel", (platform) => {
+  const openMessaging = jest.fn();
+  const item = createModuleRegistry({ platform, icons: {}, actions: { openMessaging }, state: {}, user: { id: "A" } })
+    .find((entry) => entry.id === "messaging");
+  expect(item.label).toContain("Gmail & Outlook");
+  item.run();
+  expect(openMessaging).toHaveBeenCalledTimes(1);
+});

@@ -17,6 +17,14 @@ afterEach(async () => { await act(async () => root.unmount()); host.remove(); gl
 const button = (label) => Array.from(host.querySelectorAll("button")).find((entry) => entry.textContent.includes(label));
 const response = (data) => ({ ok: true, json: async () => data });
 
+test("opens the messaging workspace without reconnecting accounts", async () => {
+  const onOpenMessaging = jest.fn();
+  await act(async () => root.render(<ConnectionsPanel onClose={jest.fn()} onOpenMessaging={onOpenMessaging} />));
+  await act(async () => button("Ouvrir la messagerie").click());
+  expect(onOpenMessaging).toHaveBeenCalledTimes(1);
+  expect(global.fetch.mock.calls.every(([url]) => url.endsWith("/status"))).toBe(true);
+});
+
 test("authorization waiting can be stopped and restarted without disconnecting", async () => {
   const open = jest.spyOn(window, "open").mockImplementation(() => null);
   global.fetch.mockImplementation(async (url) => response(url.includes("external=true")

@@ -616,6 +616,29 @@ flottantes ni badges d'urgence. Le message est conservé dans l'historique du Di
 Les actions, leur explication et la confirmation des actions sensibles restent
 accessibles sous le message. Il ne se ferme pas automatiquement pendant votre choix.
 
+## Messagerie
+
+Le module **Messagerie — Gmail & Outlook** (ou « ouvre la messagerie ») propose
+trois zones : réception avec recherche et filtre non lus, aperçu et rédaction,
+puis suivi des envois de la session. Il est aussi accessible depuis le Centre des
+connexions. La palette actuelle de SIRIUS est conservée ; les colonnes s'empilent
+sur téléphone.
+
+La réception charge au plus 25 aperçus depuis le compte fournisseur connecté.
+Elle n'affiche pas les corps complets ni les pièces jointes et ne marque pas les
+messages comme lus. La recherche et les compteurs portent sur les messages chargés,
+pas sur toute la boîte. Les erreurs sont affichées avec accès aux connexions.
+Chaque fournisseur dispose d'un brouillon en mémoire, sans sauvegarde persistante.
+Un avertissement précède la fermeture si un brouillon n'est pas envoyé.
+
+L'envoi en texte simple demande une vérification puis une confirmation explicite,
+avec la signature serveur existante. CC/CCI et ajout de pièces jointes ne sont
+pas proposés. Le suivi indique uniquement les tentatives de cette session et la
+confirmation du service : ni livraison ni ouverture ne sont attestées. Après une
+erreur réseau ou serveur, vérifier le dossier « Envoyés » chez le fournisseur
+avant de débloquer une nouvelle tentative pour éviter les doublons.
+Les commandes vocales et le cache facultatif existants restent disponibles.
+
 ## Cache mail facultatif
 
 Pendant une connexion Google ou Microsoft, **Vérifier l'état** actualise le statut
