@@ -875,18 +875,7 @@ async def _research_current_prices(prompt: str, serp_key: str = "", *, timeout: 
     question = sports_question(prompt)
     news_scope = _general_news_scope(prompt)
     if news_scope:
-        from briefing_news import fetch_briefing_news, news_briefing_text
-
-        try:
-            bulletin = await asyncio.wait_for(fetch_briefing_news(), timeout=timeout)
-        except (httpx.HTTPError, asyncio.TimeoutError, ValueError) as error:
-            logger.warning("[ΣIRIUS:ACTUALITES] Bulletin indisponible : %r", error)
-            return "Bulletin d'actualités : sources temporairement indisponibles, aucune actualité vérifiée."
-        sections = bulletin["sections"]
-        if news_scope != "all":
-            section_id = "france" if news_scope == "france" else "monde"
-            sections = [section for section in sections if section["id"] == section_id]
-        return "BULLETIN D'ACTUALITÉS DATÉES (48 dernières heures) :\n" + news_briefing_text(sections)
+        return await _general_news_bulletin(news_scope, timeout=timeout)
     motorsport = is_motorsport_question(question)
     sports = is_sports_results_question(question)
     live_event = (is_live_event_question(question) or motorsport or sports) and not is_current_price_question(question)
@@ -971,6 +960,29 @@ def _general_news_scope(prompt: str) -> str | None:
     france = any(word in words for word in ("france", "francaise", "francaises"))
     world = any(word in words for word in ("monde", "international", "internationales"))
     return "france" if france and not world else "international" if world and not france else "all"
+
+
+async def _general_news_bulletin(scope: str, *, timeout: float = 10.0) -> str:
+    from briefing_news import fetch_briefing_news, news_briefing_text
+
+    unavailable = "Bulletin d'actualités : sources temporairement indisponibles, aucune actualité vérifiée."
+    try:
+        bulletin = await asyncio.wait_for(fetch_briefing_news(), timeout=timeout)
+    except (httpx.HTTPError, asyncio.TimeoutError, ValueError) as error:
+        logger.warning("[ΣIRIUS:ACTUALITES] Bulletin indisponible : %r", error)
+        return unavailable
+    sections = bulletin["sections"]
+    if scope != "all":
+        section_id = "france" if scope == "france" else "monde"
+        sections = [section for section in sections if section["id"] == section_id]
+    if not sections:
+        logger.warning("[ΣIRIUS:ACTUALITES] Aucune rubrique disponible pour %s", scope)
+        return unavailable
+    return (
+        f"Bulletin d'actualités au {current_moment_text()}. "
+        "Articles publiés dans les dernières 48 heures ; les dates indiquées sont celles de publication.\n\n"
+        + news_briefing_text(sections)
+    )
 
 
 _DEEP_WEB_RESEARCH_RE = re.compile(
@@ -1596,6 +1608,12 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
     tag = f"[ΣIRIUS:{(mode or 'normal').upper()}]"
 
     research_prompt = _with_follow_up_topic(prompt, history)
+    news_scope = _general_news_scope(research_prompt)
+    if news_scope:
+        return {
+            "reponse": await _general_news_bulletin(news_scope),
+            "memoire": [], "popups": [], "used_search": True,
+        }
     research, targeted_research = await _answer_context(research_prompt, mode, serp_key)
     deep_kimi = (mode or "normal").lower() == "profond" and bool(k3_key)
 
@@ -1733,6 +1751,10 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
         "sauf si explicitement demandé — uniquement le texte de ta réponse, prêt à être lu à voix haute."
     )
     research_prompt = _with_follow_up_topic(prompt, history)
+    news_scope = _general_news_scope(research_prompt)
+    if news_scope:
+        yield await _general_news_bulletin(news_scope)
+        return
     research, targeted_research = await _answer_context(research_prompt, mode, serp_key)
     if not groq_key and not k3_key:
         logger.warning("[ΣIRIUS:STREAM] Aucune clé LLM disponible, retour local.")

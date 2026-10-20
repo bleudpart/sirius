@@ -289,9 +289,12 @@ visibles sans être lus. Sans ville renseignée ou sans prévisions vérifiables
 l'absence de météo est annoncée, sans choisir Paris implicitement.
 
 Les formulations générales envoyées au chat (« peux-tu me donner les actus du
-jour ? », « recherche approfondie sur l'actualité du jour ») reçoivent aussi
-ce bulletin RSS daté comme source de rédaction, avec les dates et liens des
-articles, plutôt qu'une recherche web générique. Les questions sur un sujet
+jour ? », « recherche approfondie sur l'actualité du jour ») restituent aussi
+ce bulletin RSS daté directement, avec les dates et liens des articles, sans
+réécriture par un modèle, même en mode profond. L'historique de conversation
+ne peut donc pas y ajouter de faits ou de chiffres absents du bulletin.
+Une source indisponible est signalée, sans repli vers une actualité générée.
+Les questions sur un sujet
 précis conservent leur recherche ciblée. Après une demande d'actualités,
 « non, essaye général » relance un panorama France et international.
 

@@ -283,13 +283,15 @@ def _install_fake_llm(monkeypatch, answer="Le faux-filet coûte environ 34,90 �
 
 @pytest.mark.parametrize("mode", ["turbo", "normal", "profond"])
 @pytest.mark.parametrize("stream", [False, True])
-def test_general_bulletin_reaches_all_chat_answer_paths(monkeypatch, mode, stream):
+@pytest.mark.parametrize("prompt", ["les nouvelles", "Non, essaye général."])
+def test_general_bulletin_cannot_be_rewritten_or_contaminated_by_history(monkeypatch, mode, stream, prompt):
     import briefing_news
     import sirius_brain as brain
     import webagent
 
-    completions = _install_fake_llm(monkeypatch)
-    monkeypatch.setattr(brain, "_research_current_prices", _research_current_prices)
+    completions = _install_fake_llm(monkeypatch, "Altran ouvre un centre à Rosny. PIB : 0,4 %.")
+    kimi = AsyncMock(side_effect=AssertionError("Le bulletin ne doit pas être réécrit par Kimi"))
+    monkeypatch.setattr(brain, "_kimi_answer", kimi)
     monkeypatch.setattr(briefing_news, "fetch_briefing_news", AsyncMock(return_value={"sections": [
         {"id": "france", "label": "France", "status": "ok", "articles": [{
             "titre": "Titre vérifié du bulletin", "description": "Fait sourcé.",
@@ -301,17 +303,61 @@ def test_general_bulletin_reaches_all_chat_answer_paths(monkeypatch, mode, strea
     monkeypatch.setattr(webagent, "serp_results", search)
 
     async def run():
-        kwargs = {"mode": mode, "keys": {"groq_key": "test-key"}}
+        kwargs = {
+            "mode": mode, "keys": {"groq_key": "test-key", "k3": "fake-kimi-key"},
+            "history": [
+                {"role": "user", "content": "Recherche approfondie sur l'actualité du jour"},
+                {"role": "assistant", "content": "Demain 15 octobre. Altran ouvre un centre à Rosny. PIB : 0,4 %."},
+            ],
+        }
         if stream:
-            return "".join([part async for part in ask_sirius_stream("les nouvelles", **kwargs)])
-        return await ask_sirius("les nouvelles", **kwargs)
+            return "".join([part async for part in ask_sirius_stream(prompt, **kwargs)])
+        result = await ask_sirius(prompt, **kwargs)
+        assert result["memoire"] == []
+        assert result["popups"] == []
+        return result["reponse"]
 
-    asyncio.run(run())
-    system_prompt = completions.payload["messages"][0]["content"]
-    assert "Titre vérifié du bulletin" in system_prompt
-    assert "https://www.franceinfo.fr/article.html" in system_prompt
-    assert "ACTUALITÉ À DÉVELOPPER" in system_prompt
+    answer = asyncio.run(run())
+    assert "Titre vérifié du bulletin" in answer
+    assert "https://www.franceinfo.fr/article.html" in answer
+    assert "2026-10-20T03:00:00+00:00" in answer
+    assert "Altran" not in answer
+    assert "0,4" not in answer
+    assert "demain" not in answer.lower()
+    assert completions.payload is None
+    kimi.assert_not_awaited()
     search.assert_not_awaited()
+
+
+@pytest.mark.parametrize("stream", [False, True])
+@pytest.mark.parametrize("failure", ["timeout", "empty", "partial"])
+def test_general_bulletin_source_failures_never_fall_back_to_generated_news(monkeypatch, stream, failure, caplog):
+    import briefing_news
+
+    completions = _install_fake_llm(monkeypatch, "Une information inventée.")
+    fetch = AsyncMock(side_effect=asyncio.TimeoutError) if failure == "timeout" else AsyncMock(return_value={
+        "sections": [] if failure == "empty" else [
+            {"id": "france", "label": "France", "status": "unavailable", "articles": []},
+            {"id": "monde", "label": "International", "status": "empty", "articles": []},
+        ],
+    })
+    monkeypatch.setattr(briefing_news, "fetch_briefing_news", fetch)
+
+    async def run():
+        if stream:
+            return "".join([part async for part in ask_sirius_stream("actus du jour")])
+        return (await ask_sirius("actus du jour"))["reponse"]
+
+    answer = asyncio.run(run())
+    assert "indisponible" in answer
+    assert "inventée" not in answer
+    assert completions.payload is None
+    if failure == "partial":
+        assert "France : source temporairement indisponible" in answer
+        assert "International : aucune information datée" in answer
+    else:
+        assert "aucune actualité vérifiée" in answer
+        assert caplog.records
 
 
 @pytest.mark.parametrize("mode", ["turbo", "normal", "profond"])
