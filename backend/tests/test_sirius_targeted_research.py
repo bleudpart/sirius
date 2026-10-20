@@ -283,7 +283,11 @@ def _install_fake_llm(monkeypatch, answer="Le faux-filet coûte environ 34,90 �
 
 @pytest.mark.parametrize("mode", ["turbo", "normal", "profond"])
 @pytest.mark.parametrize("stream", [False, True])
-@pytest.mark.parametrize("prompt", ["les nouvelles", "Non, essaye général."])
+@pytest.mark.parametrize("prompt", [
+    "les nouvelles", "Non, essaye général.", "Annonce-moi les brèves du jour",
+    "Affiche le journal international", "Je voudrais entendre le journal",
+    "Raconte-moi ce qui se passe aujourd'hui",
+])
 def test_general_bulletin_cannot_be_rewritten_or_contaminated_by_history(monkeypatch, mode, stream, prompt):
     import briefing_news
     import sirius_brain as brain
@@ -293,7 +297,7 @@ def test_general_bulletin_cannot_be_rewritten_or_contaminated_by_history(monkeyp
     kimi = AsyncMock(side_effect=AssertionError("Le bulletin ne doit pas être réécrit par Kimi"))
     monkeypatch.setattr(brain, "_kimi_answer", kimi)
     monkeypatch.setattr(briefing_news, "fetch_briefing_news", AsyncMock(return_value={"sections": [
-        {"id": "france", "label": "France", "status": "ok", "articles": [{
+        {"id": "monde", "label": "International", "status": "ok", "articles": [{
             "titre": "Titre vérifié du bulletin", "description": "Fait sourcé.",
             "date": "2026-10-20T03:00:00+00:00", "source": "Franceinfo",
             "url": "https://www.franceinfo.fr/article.html",

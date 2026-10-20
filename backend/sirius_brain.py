@@ -939,27 +939,71 @@ def _is_news_request(prompt: str) -> bool:
 def _general_news_scope(prompt: str) -> str | None:
     if "CONTEXTE DU DERNIER BRIEFING :" in str(prompt or ""):
         return None
-    words = re.findall(r"[a-z]+", _normalize_search_text(str(prompt or "")))
-    if not set(words).intersection({"actu", "actus", "actualite", "actualites", "infos", "informations", "news", "nouvelles", "bulletin"}):
+    normalized = _normalize_news_command(prompt)
+    normalized = re.sub(
+        r"\b(?:qu est ce qui se passe|ce qui se passe|que se passe t il|qu est ce qu il se passe|"
+        r"quoi de neuf|quoi de nouveau|comment va le monde|on en est ou dans le monde)\b",
+        "actualites", normalized,
+    )
+    words = normalized.split()
+    if not set(words).intersection({
+        "actu", "actus", "actualite", "actualites", "info", "infos", "information", "informations",
+        "news", "nouvelles", "bulletin", "bulletins", "panorama", "journal", "journaux", "titres", "breves",
+    }):
         return None
-    general_words = {
-        "sirius", "peux", "pourrais", "tu", "vous", "pouvez", "pouvezvous",
-        "me", "moi", "nous", "donne", "donner", "donnez", "dis", "dire",
-        "montre", "affiche", "lis", "lire", "presente", "resume", "fais", "faire",
-        "recherche", "cherche", "approfondie", "approfondis", "sur", "web", "internet",
-        "quelles", "quels", "sont", "les", "des", "le", "la", "l", "un", "une",
-        "actu", "actus", "actualite", "actualites", "infos", "informations",
-        "news", "nouvelles", "bulletin", "panorama", "general", "generales",
-        "du", "jour", "aujourd", "hui", "d", "de", "ce", "matin", "recentes",
-        "dernieres", "principales", "toutes", "tous", "complet", "completes",
-        "en", "france", "francaise", "francaises", "international", "internationales",
-        "monde", "dans", "a", "et", "stp", "s", "il", "te", "plait",
-    }
+    general_words = set((
+        "sirius syrius cirius sirus peux pourrais tu vous pouvez me moi nous donne donner donnez dis dire "
+        "montre montrer affiche afficher annonce annoncer anonce lis lire presente presenter resume resumer fais faire recherche cherche approfondie approfondis sur web internet "
+        "quelles quels sont les des le la l un une info infos information informations actu actus actualite actualites "
+        "news nouvelles bulletin bulletins panorama journal journaux titres breves general generale generales du jour aujourd hui d de ce matin "
+        "recentes derniers dernieres principales toutes tous complet completes en france francaise francaises "
+        "international internationale internationales monde dans a et stp s il te plait "
+        "bonjour salut hey euh bon alors allez vas y ok je j aimerais voudrais veux souhaites souhaite "
+        "pourrais pourriez peut on avoir savoir connaitre entendre ecouter raconte raconter parle parler "
+        "balance envoie lance lancer maintenant peu petit rapide rapidement point tour horizon fait faire "
+        "tenir tiens courant au quoi comme as avez bonjour merci plutot seulement juste uniquement"
+    ).split())
     if any(word not in general_words for word in words):
         return None
+    return _news_scope_from_words(words)
+
+
+def _normalize_news_command(command: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", _normalize_search_text(str(command or ""))).strip()
+
+
+def _news_scope_from_words(words: list[str]) -> str:
     france = any(word in words for word in ("france", "francaise", "francaises"))
-    world = any(word in words for word in ("monde", "international", "internationales"))
+    world = any(word in words for word in ("monde", "international", "internationale", "internationales"))
     return "france" if france and not world else "international" if world and not france else "all"
+
+
+def _news_retry_scope(prompt: str, previous_scope: str) -> str | None:
+    if previous_scope not in {"all", "france", "international"}:
+        return None
+    normalized = re.sub(r"^(?:sirius|syrius|cirius|sirus)\s+", "", _normalize_news_command(prompt))
+    if (
+        re.fullmatch(
+            r"(?:non\s+)?(?:(?:essaie|essaye|reessaie|reessaye|plutot|en|recommence|reprends)\s+)?(?:en\s+)?generale?",
+            normalized,
+        )
+    ):
+        return "all"
+    if re.fullmatch(r"(?:en france|france|international|internationale|a l international|dans le monde)", normalized):
+        return _news_scope_from_words(normalized.split())
+    if re.fullmatch(
+        r"(?:et|mais|plutot|seulement|uniquement)(?: juste)? "
+        r"(?:en france|la france|dans le monde|a l international|l international|en france et dans le monde)",
+        normalized,
+    ):
+        return _news_scope_from_words(normalized.split())
+    if re.fullmatch(
+        r"(?:non\s+)?(?:recommence|reessaie|reessaye|essaie|essaye|refais)"
+        r"(?: (?:encore|le bulletin|les infos|les actus))?(?: stp| s il te plait)?",
+        normalized,
+    ):
+        return previous_scope
+    return None
 
 
 async def _general_news_bulletin(scope: str, *, timeout: float = 10.0) -> str:
@@ -1261,17 +1305,22 @@ def _with_follow_up_topic(prompt, history):
     """Une relance courte (« le résultat complet ») hérite du sujet sport auto de la question précédente."""
     text = str(prompt or "")
     question = sports_question(text)
-    general_retry = re.fullmatch(
-        r"(?:non[, ]+)?(?:essaie|essaye|reessaie|reessaye|plutot|en)\s+"
-        r"(?:en\s+)?general[.!? ]*",
-        _normalize_search_text(question).strip(),
-    )
-    if general_retry and any(
-        _is_news_request(str(turn.get("content") or ""))
-        for turn in (history or [])[-4:]
-        if isinstance(turn, dict) and turn.get("role") == "user"
-    ):
-        return "Actualités du jour, panorama général France et international."
+    previous_scope = None
+    for turn in (history or [])[-16:]:
+        if not isinstance(turn, dict) or turn.get("role") != "user":
+            continue
+        previous_question = str(turn.get("content") or "")
+        explicit_scope = _general_news_scope(previous_question)
+        if explicit_scope:
+            previous_scope = explicit_scope
+        else:
+            retry_scope = _news_retry_scope(previous_question, previous_scope) if previous_scope else None
+            previous_scope = retry_scope or ("all" if _is_news_request(previous_question) else None)
+    if previous_scope:
+        retry_scope = _news_retry_scope(question, previous_scope)
+        if retry_scope:
+            suffix = {"all": "en France et dans le monde", "france": "en France", "international": "dans le monde"}
+            return f"Actualités du jour {suffix[retry_scope]}"
     if (
         is_motorsport_question(question)
         or is_sports_results_question(question)

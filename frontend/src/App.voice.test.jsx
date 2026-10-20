@@ -942,7 +942,11 @@ test("a new briefing is not blocked by the previous interrupted request", async 
   expect(speakFr.mock.calls.some(([message]) => message.includes("Ancien rapport interrompu"))).toBe(false);
 });
 
-test.each(["les infos", "les actualités", "Donne-moi toutes les infos du jour"])("%s uses dated France and international sources without a model call", async (command) => {
+test.each([
+  "les infos", "les actualités", "Donne-moi toutes les infos du jour",
+  "Affiche le journal", "Annonce-moi les brèves du jour", "Peux-tu me donner les bulletins ?",
+  "Raconte-moi ce qui se passe aujourd'hui", "Quoi de neuf ce matin ?",
+])("%s uses dated France and international sources without a model call", async (command) => {
   const fallback = global.fetch.getMockImplementation();
   const date = new Date().toISOString();
   const sections = [
@@ -973,6 +977,8 @@ test.each(["les infos", "les actualités", "Donne-moi toutes les infos du jour"]
 test.each([
   ["Donne-moi les infos du jour en France.", "france", "Information internationale"],
   ["les actualités internationales", "monde", "Information française"],
+  ["Annonce le journal international", "monde", "Information française"],
+  ["Affiche les brèves en France", "france", "Information internationale"],
 ])("%s preserves the requested news scope and rejects stale facts", async (command, id, excluded) => {
   const fallback = global.fetch.getMockImplementation();
   const recent = { source: "Franceinfo", date: new Date().toISOString(), description: "Faits datés." };
@@ -1032,6 +1038,27 @@ function mockBulletinBackend({ weather = parisWeather() } = {}) {
 
 const lastSpoken = () => speakFr.mock.calls.at(-1)?.[0] || "";
 const newsFetches = () => global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/news/briefing")).length;
+
+test("natural scope changes and fresh journal requests keep the dated news path, not contextual chat", async () => {
+  const chatBodies = mockBulletinBackend();
+  await mount();
+  await send("Affiche le journal");
+  expect(newsFetches()).toBe(1);
+  speakSeries.mockClear();
+  await send("internationale");
+  expect(newsFetches()).toBe(2);
+  expect(speakSeries.mock.calls.map(([text]) => text).join(" ")).toContain("Le parlement");
+  expect(speakSeries.mock.calls.map(([text]) => text).join(" ")).not.toContain("Le maire");
+  speakSeries.mockClear();
+  await send("générale");
+  expect(newsFetches()).toBe(3);
+  expect(speakSeries.mock.calls.map(([text]) => text).join(" ")).toContain("Le maire");
+  expect(speakSeries.mock.calls.map(([text]) => text).join(" ")).toContain("Le parlement");
+  await send("Qu'est-ce qui se passe en France ?");
+  expect(newsFetches()).toBe(4);
+  expect(chatBodies).toEqual([]);
+  expect(global.fetch.mock.calls.some(([url]) => /\/chat(?:\/stream)?$/.test(String(url)))).toBe(false);
+});
 
 test("the bulletin dialogue recalls what was really announced, resumes, and contextualises questions", async () => {
   localStorage.setItem("sirius_profile", JSON.stringify({ name: "Validation", city: "Lyon" }));

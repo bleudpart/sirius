@@ -298,6 +298,18 @@ Les questions sur un sujet
 précis conservent leur recherche ciblée. Après une demande d'actualités,
 « non, essaye général » relance un panorama France et international.
 
+La commande accepte notamment « actus », « infos », « journal », « bulletins »,
+« nouvelles », « brèves », « titres » et « panorama », avec « affiche »,
+« donne », « annonce », « lis », « raconte-moi » ou des demandes polies.
+« Quoi de neuf ce matin ? » et « qu'est-ce qui se passe en France ? » suivent
+le même parcours. Pendant un bulletin récent, « internationale », « générale »,
+« et en France ? » ou « recommence » modifient sa portée ou le relancent.
+Ces relances ne récupèrent pas un ancien bulletin après un changement de sujet ;
+les commandes de reprise et de répétition conservent leur comportement.
+Un jeu d'exemples commun aux tests frontend et backend vérifie ces variantes
+et protège les questions thématiques, la météo, les demandes historiques et
+les commandes sans rapport contre une ouverture indue du journal.
+
 La météo Open-Meteo distingue les conditions relevées et les prévisions
 d'aujourd'hui et de demain : température, ressenti, vent, minimum/maximum et
 probabilité de précipitations. Dates, fuseau, unités et valeurs sont vérifiés.

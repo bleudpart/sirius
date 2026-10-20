@@ -1,6 +1,7 @@
 import {
   BULLETIN_CONTEXT_TTL_MS, bulletinFollowUp, createBulletinContext, markSegmentCompleted, markSegmentStarted, releaseBulletinFocus,
 } from "./bulletinDialogue";
+import newsExamples from "./__fixtures__/newsCommands.json";
 
 const segments = () => [
   { kind: "intro", text: "Voici le bulletin d'actualités France et international." },
@@ -19,6 +20,19 @@ function heard(interruptedAt) {
   }
   return bulletin;
 }
+
+test.each(newsExamples.followups.filter(([, , scope]) => scope))(
+  "restarts a fresh focused bulletin with the requested scope: %s", (command, previousScope, scope) => {
+    const bulletin = heard(3);
+    bulletin.scope = previousScope;
+    expect(bulletinFollowUp(command, bulletin)).toEqual({ restartScope: scope });
+    releaseBulletinFocus(bulletin);
+    expect(bulletinFollowUp(command, bulletin)).toBeNull();
+    bulletin.focused = true;
+    bulletin.savedAt = Date.now() - BULLETIN_CONTEXT_TTL_MS - 1000;
+    expect(bulletinFollowUp(command, bulletin)).toBeNull();
+  },
+);
 
 test.each(["quel temps tu a dis ?", "quel temps tu as dit ?", "Répète la météo", "Sirius, c'était quoi la météo ?", "la météo que tu as annoncée"])(
   "recalls the weather actually announced: %s", (command) => {

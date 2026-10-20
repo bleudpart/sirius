@@ -1,4 +1,13 @@
-import { newsBulletinScope } from "./newsCommandRouting";
+import { newsBulletinScope, newsRetryScope } from "./newsCommandRouting";
+import examples from "./__fixtures__/newsCommands.json";
+
+test.each(examples.direct)("shared natural news request: %s", (command, scope) => {
+  expect(newsBulletinScope(command)).toBe(scope);
+});
+
+test.each(examples.followups)("shared news follow-up: %s after %s", (command, previousScope, scope) => {
+  expect(newsRetryScope(command, previousScope)).toBe(scope);
+});
 
 test.each([
   "Donne-moi les infos du jour en France.",

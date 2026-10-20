@@ -97,6 +97,8 @@ export function bulletinFollowUp(command, bulletin, now = Date.now()) {
     return recall(bulletin, currentPassage(bulletin), "Je n'ai pas encore annoncé d'actualité dans ce bulletin.");
   }
   if (!fresh) return null;
+  const restartScope = bulletin.focused && !newsBulletinScope(command) ? newsRetryScope(command, bulletin.scope) : null;
+  if (restartScope) return { restartScope };
   if (GENERIC_RESUME.test(text)) return bulletin.resumable ? { resumeAt: bulletin.completedIndex + 1 } : null;
   if (!bulletin.focused) return null;
   if (GENERIC_REPEAT.test(text)) {
@@ -112,3 +114,4 @@ export function bulletinFollowUp(command, bulletin, now = Date.now()) {
     || significantWords(text).some((word) => spoken.includes(word));
   return referential && announced(bulletin).length ? { analysis: analysisPrompt(String(command).trim(), bulletin) } : null;
 }
+import { newsBulletinScope, newsRetryScope } from "./newsCommandRouting";

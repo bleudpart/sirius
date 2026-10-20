@@ -4265,7 +4265,18 @@ function App() {
       return;
     }
 
+    const newsScope = newsBulletinScope(command);
+    if (newsScope) {
+      releaseBulletinFocus(lastBulletinRef.current);
+      void launchNewsBulletin(newsScope);
+      return;
+    }
+
     const followUp = bulletinFollowUp(command, lastBulletinRef.current);
+    if (followUp?.restartScope) {
+      void launchNewsBulletin(followUp.restartScope);
+      return;
+    }
     if (followUp?.resumeAt !== undefined) {
       void speakBulletin(lastBulletinRef.current, followUp.resumeAt);
       return;
@@ -4282,12 +4293,6 @@ function App() {
       return;
     }
     releaseBulletinFocus(lastBulletinRef.current);
-
-    const newsScope = newsBulletinScope(command);
-    if (newsScope) {
-      void launchNewsBulletin(newsScope);
-      return;
-    }
 
     if (isDisplayReadCommand(command)) {
       void readOwnDisplay();
