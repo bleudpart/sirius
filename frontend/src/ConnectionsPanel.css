@@ -126,6 +126,18 @@
 .connections-wait, .connections-error { margin: 16px 0 0; text-align: center; font-size: 13px; }
 .connections-wait { color: #ffffff; }
 .connections-error { color: #ffb4a2; }
+.connections-hint { margin: 0 0 14px; color: rgba(255, 255, 255, 0.78); font-size: 13px; line-height: 1.45; }
+.personal-mail-form { grid-column: 1 / -1; display: grid; gap: 8px; }
+.personal-mail-form label { color: #ffe6a3; font-size: 13px; font-weight: 700; }
+.personal-mail-form input, .personal-mail-form select { min-width: 0; width: 100%; box-sizing: border-box; min-height: 44px; padding: 10px; color: #ffffff; background: #061321; border: 1px solid rgba(145, 230, 242, 0.5); border-radius: 6px; font-size: 15px; }
+.personal-mail-form small, .personal-mail-advanced p { color: rgba(255, 255, 255, 0.78); font-size: 12px; line-height: 1.45; }
+.personal-mail-found { display: flex; align-items: center; gap: 6px; margin: 0; color: #91e6f2; font-size: 13px; }
+.personal-mail-help { margin: 0; padding: 10px; color: #ffffff; background: rgba(216, 184, 117, 0.12); border-left: 3px solid #d8b875; font-size: 13px; line-height: 1.45; }
+.personal-mail-advanced { display: grid; gap: 8px; }
+.personal-mail-advanced summary { color: #91e6f2; cursor: pointer; }
+.personal-mail-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.personal-mail-actions .connection-action { flex: 1 1 140px; padding: 0 12px; }
+.personal-mail-error { grid-column: 1 / -1; margin: 0; text-align: left; }
 
 @media (max-width: 560px) {
   .connections-header { min-height: 64px; }

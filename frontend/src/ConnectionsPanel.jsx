@@ -4,6 +4,7 @@ import { Check, Loader2, Mail, RefreshCw, Unplug, X } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api";
 import ProviderLogo from "@/components/ProviderLogo";
 import MailCachePanel from "@/components/MailCachePanel";
+import PersonalMailCard from "@/components/PersonalMailCard";
 import { withBackendResponse } from "@/lib/backendRequest";
 import "./ConnectionsPanel.css";
 
@@ -171,6 +172,9 @@ export default function ConnectionsPanel({ onClose, mailCache, onReadCachedMail,
 
       <main className="connections-content">
         {onOpenMessaging && <button type="button" className="connections-refresh" onClick={onOpenMessaging}><Mail size={16} /> Ouvrir la messagerie</button>}
+        <p className="connections-hint" data-testid="connections-hint">
+          Boîte perso Gmail, Hotmail ou Outlook : cliquez sur « Connecter », choisissez votre compte et acceptez. Aucun réglage, aucun mot de passe à saisir dans ΣIRIUS. Orange, Free, SFR, Yahoo, iCloud… : saisissez simplement votre adresse et votre mot de passe dans « Autre boîte mail ».
+        </p>
         <div className="connections-list">
           {Object.entries(PROVIDERS).map(([key, provider]) => {
             const providerStatus = status[key];
@@ -208,6 +212,7 @@ export default function ConnectionsPanel({ onClose, mailCache, onReadCachedMail,
               </article>
             );
           })}
+          <PersonalMailCard />
         </div>
 
         {pending && <p className="connections-wait">Revenez dans ΣIRIUS après avoir validé l’autorisation.</p>}

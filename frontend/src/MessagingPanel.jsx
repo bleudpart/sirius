@@ -9,18 +9,29 @@ import "./MessagingPanel.css";
 const PROVIDERS = {
   google: { label: "Gmail", logo: "gmail", inbox: "/gmail/messages?top=25", send: "/gmail/send" },
   microsoft: { label: "Outlook", logo: "outlook", inbox: "/microsoft/mail?top=25", send: "/microsoft/mail/send" },
+  personal: { label: "Autre boîte", icon: true, inbox: "/personal-mail/messages?top=25", send: "/personal-mail/send" },
 };
 const emptyDraft = () => ({ to: "", subject: "", body: "" });
 const hasContent = (draft) => Object.values(draft).some((value) => value.trim());
+export const MAIL_PROVIDER_KEY = "sirius_mail_provider";
+const savedProvider = () => {
+  try {
+    const value = window.localStorage.getItem(MAIL_PROVIDER_KEY);
+    return PROVIDERS[value] ? value : "google";
+  } catch { return "google"; }
+};
+const rememberProvider = (value) => {
+  try { window.localStorage.setItem(MAIL_PROVIDER_KEY, value); } catch { /* stockage indisponible */ }
+};
 
 export default function MessagingPanel({ onClose, onConnections, onRead, microsoftFetch }) {
-  const [provider, setProvider] = useState("google");
+  const [provider, setProvider] = useState(savedProvider);
   const [attempt, setAttempt] = useState(0);
   const [inbox, setInbox] = useState({ loading: true, mails: [] });
   const [query, setQuery] = useState("");
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
-  const [drafts, setDrafts] = useState({ google: emptyDraft(), microsoft: emptyDraft() });
+  const [drafts, setDrafts] = useState({ google: emptyDraft(), microsoft: emptyDraft(), personal: emptyDraft() });
   const [review, setReview] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState("");
@@ -143,8 +154,8 @@ export default function MessagingPanel({ onClose, onConnections, onRead, microso
     </header>
     <nav className="messaging-providers" aria-label="Compte de messagerie">
       {Object.entries(PROVIDERS).map(([key, item]) => <button type="button" key={key} aria-pressed={provider === key} disabled={sending}
-        onClick={() => { setProvider(key); setQuery(""); setUnreadOnly(false); setReview(false); }}>
-        <ProviderLogo provider={item.logo} size={22} />{item.label}
+        onClick={() => { setProvider(key); rememberProvider(key); setQuery(""); setUnreadOnly(false); setReview(false); }}>
+        {item.icon ? <Mail size={22} /> : <ProviderLogo provider={item.logo} size={22} />}{item.label}
       </button>)}
       <span>Consultation en ligne · aucun envoi automatique</span>
     </nav>

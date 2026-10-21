@@ -639,6 +639,25 @@ erreur réseau ou serveur, vérifier le dossier « Envoyés » chez le fournisse
 avant de débloquer une nouvelle tentative pour éviter les doublons.
 Les commandes vocales et le cache facultatif existants restent disponibles.
 
+### Connexion simplifiée des boîtes clients
+
+- **Gmail / Outlook en un clic** : sur un PC client sans identifiants OAuth dans
+  son `.env`, `backend/mail_relay.py` relaie les routes Gmail/Outlook vers
+  ΣIRIUS Cloud avec le jeton du compte lié. Une installation disposant de ses
+  propres identifiants OAuth n'est pas modifiée ; `SIRIUS_MAIL_RELAY=0` désactive
+  le relais.
+- **Autre boîte mail** (Orange, Free, SFR, La Poste, Bbox, GMX, Yahoo, iCloud…) :
+  carte du Centre des connexions et onglet « Autre boîte » de la Messagerie.
+  `backend/personal_mail.py` reconnaît les serveurs IMAP/SMTP (préréglages puis
+  base Thunderbird, sinon réglages avancés), vérifie IMAP et SMTP avant
+  d'enregistrer, chiffre le mot de passe (Fernet) et lit en lecture seule sans
+  marquer les messages lus. Yahoo et iCloud exigent un mot de passe
+  d'application. Hôtes non publics refusés, ports 143/465/587/993 uniquement,
+  5 essais par 15 minutes. Routes : `/api/personal-mail/{detect,status,connect,disconnect,messages,send}`.
+- Limites : briefing, Oracle et parcours de travail ne lisent pas encore ces
+  boîtes ; pas de pièces jointes ni CC/CCI. Sur Android, la fonction nécessite le
+  déploiement Cloud à jour.
+
 ## Cache mail facultatif
 
 Pendant une connexion Google ou Microsoft, **Vérifier l'état** actualise le statut

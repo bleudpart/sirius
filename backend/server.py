@@ -2282,6 +2282,8 @@ from enterprise import make_enterprise_router
 api_router.include_router(make_enterprise_router(db))
 from microsoft_graph import make_microsoft_router
 api_router.include_router(make_microsoft_router(db))
+from personal_mail import make_personal_mail_router
+api_router.include_router(make_personal_mail_router(db))
 from nummarius_api import make_nummarius_router
 api_router.include_router(make_nummarius_router(db))
 from ariane_market_runs import make_ariane_market_router
@@ -2966,7 +2968,10 @@ _extra_origins = (
 )
 
 from access_gate import AccessGateMiddleware, make_access_router  # noqa: E402
+from mail_relay import MailRelayMiddleware  # noqa: E402
 api_router.include_router(make_access_router(db))
+# À l'intérieur du verrou d'accès : un PC sans licence ne relaie pas sa messagerie.
+app.add_middleware(MailRelayMiddleware, is_direct_local_request=is_direct_local_request)
 # Ajouté avant CORS pour rester à l'intérieur : la réponse 402 garde ses en-têtes CORS (Android).
 app.add_middleware(AccessGateMiddleware, db=db)
 app.add_middleware(

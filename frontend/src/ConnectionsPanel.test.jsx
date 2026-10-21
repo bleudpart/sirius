@@ -25,6 +25,11 @@ test("opens the messaging workspace without reconnecting accounts", async () => 
   expect(global.fetch.mock.calls.every(([url]) => url.endsWith("/status"))).toBe(true);
 });
 
+test("explains the one-click setup for personal mailboxes", async () => {
+  await act(async () => root.render(<ConnectionsPanel onClose={jest.fn()} />));
+  expect(host.querySelector("[data-testid='connections-hint']").textContent).toMatch(/Gmail, Hotmail ou Outlook.*Aucun réglage/);
+});
+
 test("authorization waiting can be stopped and restarted without disconnecting", async () => {
   const open = jest.spyOn(window, "open").mockImplementation(() => null);
   global.fetch.mockImplementation(async (url) => response(url.includes("external=true")

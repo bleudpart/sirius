@@ -32,6 +32,7 @@ const submit = async () => {
   await act(async () => host.querySelector("form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
 };
 beforeEach(() => {
+  window.localStorage.clear();
   host = document.createElement("div");
   document.body.appendChild(host);
   root = createRoot(host);
@@ -184,6 +185,23 @@ test("send in progress disables close, provider change and draft edits", async (
   expect(onClose).not.toHaveBeenCalled();
   await act(async () => resolveSend(response({ ok: true })));
   expect(button("Outlook").disabled).toBe(false);
+});
+
+test("personal mailbox tab reads and sends through the IMAP/SMTP account and is remembered", async () => {
+  await render();
+  await click(button("Autre boîte"));
+  expect(global.fetch.mock.calls[1][0]).toMatch(/\/api\/personal-mail\/messages\?top=25$/);
+  expect(window.localStorage.getItem("sirius_mail_provider")).toBe("personal");
+  await fillDraft();
+  await submit();
+  global.fetch.mockResolvedValueOnce(response({ ok: true }));
+  await click(button("Confirmer et envoyer"));
+  expect(global.fetch.mock.calls[2][0]).toMatch(/\/api\/personal-mail\/send$/);
+  await act(async () => root.unmount());
+  root = createRoot(host);
+  global.fetch.mockClear();
+  await render();
+  expect(global.fetch.mock.calls[0][0]).toMatch(/\/api\/personal-mail\/messages/);
 });
 
 test("closing asks before discarding a draft and restores focus", async () => {
