@@ -107,3 +107,36 @@ def test_stt_stream_disconnect_during_capture_does_not_receive_or_send_again(cap
             assert websocket.receive_json() == {"type": "ready"}
             websocket.send_bytes(b"unfinished-audio")
     assert "Erreur inattendue du flux WebSocket" not in caplog.text
+
+
+def test_stt_stream_client_gone_before_transcript_is_not_an_error(monkeypatch, caplog):
+    """Prod 20/10 : micro relâché avant la réponse -> ConnectionClosedOK, puis 2e envoi et crash ASGI."""
+    from websockets.exceptions import ConnectionClosedOK
+    from websockets.frames import Close
+
+    async def relay_stt(filename, audio, content_type):
+        raise ConnectionClosedOK(Close(1000, ""), Close(1000, ""), True)
+
+    monkeypatch.setattr(voice_io.cloud_link, "should_relay_stt", lambda _key: True)
+    monkeypatch.setattr(voice_io.cloud_link, "relay_stt", relay_stt)
+    with client.websocket_connect("/api/stt/stream") as websocket:
+        websocket.send_json({"action": "start", "groq_key": "configured-key"})
+        assert websocket.receive_json() == {"type": "ready"}
+        websocket.send_bytes(b"audio")
+        websocket.send_json({"action": "finish"})
+    assert "Erreur inattendue du flux WebSocket" not in caplog.text
+
+
+def test_stt_error_is_not_resent_to_a_closed_socket():
+    import asyncio
+    from websockets.exceptions import ConnectionClosedOK
+    from websockets.frames import Close
+
+    class GoneSocket:
+        async def send_json(self, _data):
+            raise ConnectionClosedOK(Close(1000, ""), Close(1000, ""), True)
+
+        async def close(self, code):
+            raise AssertionError("close ne doit pas être appelé")
+
+    asyncio.run(voice_io._send_ws_error(GoneSocket(), "Échec", 1011))

@@ -62,7 +62,7 @@ test("Android narration requests Gemini and falls back explicitly when unconfigu
     expect(onstart).toHaveBeenCalledTimes(1);
     expect(onend).toHaveBeenCalledTimes(1);
     expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/tts/gemini"), expect.objectContaining({
-      body: JSON.stringify({ text: "Bonjour", keys: {} }), credentials: "include",
+      body: JSON.stringify({ text: "Bonjour", keys: {}, voice: "Charon" }), credentials: "include",
     }));
     cancelSpeech();
     expect(stopNativeSpeech).toHaveBeenCalled();
@@ -88,7 +88,7 @@ test.each(["answer", "boot"])("desktop Gemini %s uses the same endpoint as Andro
   else speakFr("Bonjour Daniel.");
   await flush();
   expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/tts/gemini"), expect.objectContaining({
-    body: JSON.stringify({ text: "Bonjour Daniel.", keys: {} }),
+    body: JSON.stringify({ text: "Bonjour Daniel.", keys: {}, voice: "Aoede" }),
   }));
   expect(global.fetch.mock.calls.some(([url]) => String(url).includes("/tts/google"))).toBe(false);
 });
@@ -97,7 +97,7 @@ test("Android reads the assistant name without pronouncing the Greek sigma", asy
   speakFr("ΣIRIUS a ouvert Panthéon.");
   await flush();
   expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/tts/gemini"), expect.objectContaining({
-    body: JSON.stringify({ text: "Siriusse a ouvert pantéon.", keys: {} }),
+    body: JSON.stringify({ text: "Siriusse a ouvert pantéon.", keys: {}, voice: "Charon" }),
   }));
 });
 
@@ -118,7 +118,7 @@ test("Android Gemini TTS receives French letter names for HUD", async () => {
   speakFr("Le HUD est prêt.");
   await flush();
   expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/tts/gemini"), expect.objectContaining({
-    body: JSON.stringify({ text: "Le ache u dé est prêt.", keys: {} }),
+    body: JSON.stringify({ text: "Le ache u dé est prêt.", keys: {}, voice: "Charon" }),
   }));
 });
 
@@ -126,7 +126,7 @@ test("joins French elisions separated by stray spaces before speech synthesis", 
   speakFr("Je l 'ai déjà fait et c ’ est prêt.");
   await flush();
   expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/tts/gemini"), expect.objectContaining({
-    body: JSON.stringify({ text: "Je l'ai déjà fait et c'est prêt.", keys: {} }),
+    body: JSON.stringify({ text: "Je l'ai déjà fait et c'est prêt.", keys: {}, voice: "Charon" }),
   }));
 });
 
@@ -552,4 +552,37 @@ test.each(["web", "android", "remote"])("%s cancellation publishes idle and igno
     window.speechSynthesis = previous;
     window.SpeechSynthesisUtterance = previousUtterance;
   }
+});
+
+const geminiBody = () => JSON.parse(global.fetch.mock.calls.find(([url]) => String(url).includes("/tts/gemini"))[1].body);
+
+test.each([
+  [{ name: "fr-FR-Neural2-G", rate: 1, pitch: -3 }, "Charon"],
+  [{ name: "fr-FR-Neural2-F", rate: 1, pitch: 2 }, "Aoede"],
+  [{ name: "gemini", rate: 1, pitch: 0, geminiVoice: "Orus" }, "Orus"],
+  [{ name: "gemini", rate: 1, pitch: 0, geminiVoice: "Kore" }, "Kore"],
+])("Android envoie le timbre Gemini correspondant à la voix choisie %#", async (cfg, expected) => {
+  localStorage.setItem("sirius_voice", JSON.stringify(cfg));
+  speakFr("Bonjour.");
+  await flush();
+  expect(geminiBody().voice).toBe(expected);
+});
+
+test("un timbre Gemini mémorisé n'écrase pas une voix Google choisie ensuite", async () => {
+  localStorage.setItem("sirius_voice", JSON.stringify({ name: "fr-FR-Neural2-F", rate: 1, pitch: 2, geminiVoice: "Charon" }));
+  speakFr("Bonjour.");
+  await flush();
+  expect(geminiBody().voice).toBe("Aoede");
+});
+
+test("les personnages masculins gardent une voix masculine sur Android", async () => {
+  speakAsCharacter("Bonjour.", { module: "ARGUS#" });
+  await flush();
+  expect(geminiBody().voice).toBe("Charon");
+  global.fetch.mockClear();
+  clock += 600001;
+  Date.now.mockReturnValue(clock);
+  speakAsCharacter("Bonjour.", { module: "ORACLE#" });
+  await flush();
+  expect(geminiBody().voice).toBe("Aoede");
 });

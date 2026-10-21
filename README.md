@@ -265,6 +265,13 @@ par compte/adresse email ; une reprise après résiliation démarre à 32 EUR.
 d'activation initiale : passer à 15 jours prolonge également les essais existants
 jusqu'à cette nouvelle échéance, sans remettre leur compteur à zéro.
 
+Une session Checkout terminée n'est pas nécessairement payée : le suivi ne
+marque le paiement reçu qu'avec `payment_status=paid`. Une licence est activée
+après confirmation du paiement (ou `no_payment_required`) ; les paiements
+différés sont activés par `checkout.session.async_payment_succeeded`.
+Un webhook n'est marqué traité qu'après ses écritures : une erreur de base
+permet ainsi à Stripe de le rejouer.
+
 Le briefing ORACLE récupère sans clé API dix rubriques : France,
 international, politique, économie, bourse internationale, sport, santé, sciences
 et technologies, environnement et culture. Neuf utilisent les RSS Franceinfo ;
@@ -834,6 +841,12 @@ destinée à la fiche Google Play et n'est pas l'icône embarquée dans l'APK.
 > 💾 **Aucun serveur de base de données requis** : sans MongoDB, SIRIUS bascule
 > automatiquement sur une base SQLite locale (conversations, HACCP, fichiers…
 > tout est persisté dans ton dossier utilisateur Windows).
+
+Le docstore local conserve les identifiants `_id` explicites des connexions
+mail et OAuth. Les anciennes connexions ayant déjà perdu cet identifiant
+doivent être reconnectées : leur compte ne peut pas être déduit sûrement.
+L'authentification normalise les dates SQLite (ISO) et MongoDB (UTC sans fuseau)
+avant de vérifier les blocages de connexion et les codes de récupération.
 
 ### Option B — Mode développeur (sans installation)
 

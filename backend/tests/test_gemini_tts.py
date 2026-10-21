@@ -96,6 +96,46 @@ def test_aoede_request_and_valid_wave_response(client, monkeypatch):
     assert len(requests) == 2
 
 
+def test_requested_male_voice_is_used_by_gemini_and_chirp(client, monkeypatch):
+    import json
+
+    monkeypatch.setenv("GEMINI_TTS_VOICE", "Aoede")
+    monkeypatch.setenv("GEMINI_TTS_FALLBACK_VOICE", "fr-FR-Chirp3-HD-Kore")
+    monkeypatch.setenv("GOOGLE_TTS_API_KEY", "mock-google")
+    sent = []
+
+    def handler(request):
+        sent.append(json.loads(request.content))
+        return httpx.Response(200, json={"audioContent": audio_payload()["steps"][0]["content"][0]["data"]})
+
+    mock_upstream(monkeypatch, handler)
+    result = client.post("/api/tts/gemini", json={"text": "Bonjour", "voice": "Charon"}).json()
+    assert result["voice"] == "Charon"
+    assert result["effective_voice"] == "fr-FR-Chirp3-HD-Charon"
+    assert sent[0]["voice"]["name"] == "fr-FR-Chirp3-HD-Charon"
+
+
+def test_requested_voice_is_sent_to_gemini(client, monkeypatch):
+    import json
+
+    monkeypatch.setenv("GEMINI_TTS_PRIMARY", "1")
+    sent = []
+
+    def handler(request):
+        sent.append(json.loads(request.content))
+        return httpx.Response(200, json=audio_payload())
+
+    mock_upstream(monkeypatch, handler)
+    assert client.post("/api/tts/gemini", json={"text": "Salut", "voice": "Orus"}).json()["voice"] == "Orus"
+    assert sent[0]["generation_config"]["speech_config"] == [{"voice": "Orus"}]
+
+
+def test_unknown_requested_voice_is_rejected_without_provider_call(client, monkeypatch):
+    mock_upstream(monkeypatch, lambda request: pytest.fail("Unknown voice must not reach provider"))
+    response = client.post("/api/tts/gemini", json={"text": "Bonjour", "voice": "fr-FR-Neural2-G"})
+    assert response.status_code == 400
+
+
 def test_missing_key_and_invalid_input_never_call_provider(client, monkeypatch):
     def unexpected(request):
         pytest.fail("Invalid requests must not reach Gemini")

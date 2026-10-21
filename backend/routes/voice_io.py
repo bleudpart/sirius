@@ -21,6 +21,22 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from starlette.datastructures import Headers
 
+try:
+    from websockets.exceptions import ConnectionClosed
+except ImportError:  # pragma: no cover - uvicorn peut utiliser wsproto
+    ConnectionClosed = WebSocketDisconnect
+
+# Client parti (micro relâché, appli fermée) : uvicorn lève ConnectionClosed, pas WebSocketDisconnect.
+_WS_GONE = (WebSocketDisconnect, ConnectionClosed)
+
+
+async def _send_ws_error(websocket: WebSocket, detail, code: int) -> None:
+    try:
+        await websocket.send_json({"type": "error", "detail": detail})
+        await websocket.close(code=code)
+    except (*_WS_GONE, RuntimeError):
+        logger.debug("[STT] Client déjà déconnecté, erreur non transmise")
+
 from voice_corrections import normalize_voice_transcript
 from speech_text import SPEECH_LANGUAGE, SPEECH_TEXT_VERSION, speakable_text
 from speech_vocabulary import confirmed_vocabulary, transcription_prompt
@@ -72,6 +88,7 @@ class GoogleTTSRequest(BaseModel):
 class GeminiTTSRequest(BaseModel):
     text: str = Field(min_length=1, max_length=4500)
     keys: dict[str, str] = Field(default_factory=dict)
+    voice: Optional[str] = Field(default=None, max_length=40)
 
 
 GEMINI_TTS_STYLE = (
@@ -93,15 +110,21 @@ GEMINI_TTS_VOICES = frozenset({
 })
 
 
-def _gemini_voice() -> str:
+def _gemini_voice(requested: Optional[str] = None) -> str:
+    if requested:
+        if requested not in GEMINI_TTS_VOICES:
+            raise HTTPException(status_code=400, detail="Voix Gemini inconnue")
+        return requested
     voice = os.environ.get("GEMINI_TTS_VOICE", "Aoede").strip()
     if voice not in GEMINI_TTS_VOICES:
         raise HTTPException(status_code=503, detail="Configuration GEMINI_TTS_VOICE invalide")
     return voice
 
 
-def _chirp_voice(voice: str) -> str:
-    name = os.environ.get("GEMINI_TTS_FALLBACK_VOICE", f"fr-FR-Chirp3-HD-{voice}").strip()
+def _chirp_voice(voice: str, explicit: bool = False) -> str:
+    # Une voix choisie par l'utilisateur garde son timbre (et son genre) en secours Chirp.
+    default = f"fr-FR-Chirp3-HD-{voice}"
+    name = default if explicit else os.environ.get("GEMINI_TTS_FALLBACK_VOICE", default).strip()
     if name not in {f"fr-FR-Chirp3-HD-{item}" for item in GEMINI_TTS_VOICES}:
         raise HTTPException(status_code=503, detail="Configuration GEMINI_TTS_FALLBACK_VOICE invalide : voix fr-FR requise")
     return name
@@ -154,12 +177,12 @@ async def _gemini_request(key: str, payload: dict) -> str:
         raise HTTPException(status_code=502, detail="Réponse Gemini sans audio WAV valide") from error
 
 
-async def _chirp_fallback(text: str, voice: str) -> Optional[dict]:
+async def _chirp_fallback(text: str, voice: str, explicit: bool = False) -> Optional[dict]:
     """Synthétise la voix Chirp3-HD via Google Cloud TTS, en WAV."""
     key = provider_env("google_tts", "GOOGLE_TTS_API_KEY", "GOOGLE_CLOUD_TTS_API_KEY")
     if not key:
         return None
-    name = _chirp_voice(voice)
+    name = _chirp_voice(voice, explicit)
     text = _speakable(text)
     cache_key = ("chirp", SPEECH_TEXT_VERSION, hashlib.sha256(key.encode()).hexdigest(), name, text)
     cached = _cache_get(cache_key)
@@ -224,7 +247,8 @@ def make_voice_io_router(db=None):
         model = os.environ.get("GEMINI_TTS_MODEL", "gemini-3.8-flash-tts").strip()
         if not re.fullmatch(r"gemini-[A-Za-z0-9._-]*tts[A-Za-z0-9._-]*", model):
             raise HTTPException(status_code=503, detail="Configuration GEMINI_TTS_MODEL invalide")
-        voice = _gemini_voice()
+        voice = _gemini_voice(req.voice)
+        explicit = bool(req.voice)
         cache_key = ("gemini", SPEECH_TEXT_VERSION, hashlib.sha256(key.encode()).hexdigest(), model, voice, GEMINI_TTS_STYLE, text)
         chirp_primary = not personal_key("gemini_tts", req.keys) and os.environ.get("GEMINI_TTS_PRIMARY", "").strip() != "1"
         cached = _cache_get(cache_key)
@@ -235,7 +259,7 @@ def make_voice_io_router(db=None):
         # Chirp3-HD d'abord : timbre identique d'une phrase à l'autre et plus rapide. Gemini
         # (génératif, vite saturé en 429) alternait avec Chirp et changeait la voix en cours d'usage.
         if chirp_primary:
-            chirp = await _chirp_fallback(text, voice)
+            chirp = await _chirp_fallback(text, voice, explicit)
             if chirp is not None:
                 return chirp
             if cached:
@@ -260,7 +284,7 @@ def make_voice_io_router(db=None):
             audio = await _gemini_request(key, payload)
         except HTTPException as error:
             # Essayer Chirp avant le secours local si Gemini échoue.
-            fallback = await _chirp_fallback(text, voice)
+            fallback = await _chirp_fallback(text, voice, explicit)
             if fallback is None:
                 raise
             logger.info("[GEMINI TTS] relais Chirp3-HD après échec (%s)", error.detail)
@@ -519,15 +543,14 @@ def make_voice_io_router(db=None):
                 await websocket.send_json({"type": "transcript", "data": payload})
                 await websocket.close(code=1000)
                 return
-        except WebSocketDisconnect:
+        except _WS_GONE:
+            logger.debug("[STT] Client déconnecté pendant la transcription")
             return
         except HTTPException as error:
-            await websocket.send_json({"type": "error", "detail": error.detail})
-            await websocket.close(code=1008 if error.status_code in {401, 403} else 1011)
+            await _send_ws_error(websocket, error.detail, 1008 if error.status_code in {401, 403} else 1011)
         except Exception:
             logger.exception("[STT] Erreur inattendue du flux WebSocket")
-            await websocket.send_json({"type": "error", "detail": "Échec de la transcription vocale."})
-            await websocket.close(code=1011)
+            await _send_ws_error(websocket, "Échec de la transcription vocale.", 1011)
 
     @router.get("/download/{filename}")
     async def download_zip(filename: str):

@@ -484,7 +484,7 @@ def make_auth_router(db):
         identifier = f"login:{email}"
         now = datetime.now(timezone.utc)
         attempt = await db.login_attempts.find_one({"identifier": identifier})
-        if attempt and attempt.get("count", 0) >= 5 and attempt.get("expires_at", now) > now:
+        if attempt and attempt.get("count", 0) >= 5 and _activity_datetime(attempt.get("expires_at", now)) > now:
             raise HTTPException(status_code=429, detail="Trop de tentatives. Réessayez dans 15 minutes.")
         user = await db.users.find_one({"email": email})
         if not user or user.get("disabled") or not _password_valid(data.password, user.get("password_hash") or ""):
@@ -517,7 +517,7 @@ def make_auth_router(db):
         email = _normalize_email(data.email)
         now = datetime.now(timezone.utc)
         existing = await db.password_reset_codes.find_one({"email": email})
-        if existing and existing.get("requested_at", now) > now - timedelta(seconds=60):
+        if existing and _activity_datetime(existing.get("requested_at", now)) > now - timedelta(seconds=60):
             raise HTTPException(status_code=429, detail="Veuillez attendre une minute avant de redemander un code.")
         user = await db.users.find_one({"email": email, "disabled": {"$ne": True}})
         if user:
@@ -543,7 +543,7 @@ def make_auth_router(db):
         password = _validate_new_password(data.password)
         record = await db.password_reset_codes.find_one({"email": email})
         now = datetime.now(timezone.utc)
-        if not record or record.get("expires_at", now) <= now or int(record.get("attempts") or 0) >= 5:
+        if not record or _activity_datetime(record.get("expires_at", now)) <= now or int(record.get("attempts") or 0) >= 5:
             raise HTTPException(status_code=400, detail="Code invalide ou expiré.")
         expected = hmac.new(_AUTH_SECRET, f"{email}:{data.code.strip()}".encode("utf-8"), hashlib.sha256).hexdigest()
         if not hmac.compare_digest(expected, record.get("code_hash") or ""):

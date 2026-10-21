@@ -352,7 +352,7 @@ def make_payments_router(db):
     async def _sync_from_stripe(record):
         try:
             s = await asyncio.to_thread(stripe.checkout.Session.retrieve, record["session_id"])
-            if s.payment_status == "paid" or s.status == "complete":
+            if s.payment_status == "paid":
                 await db.payment_transactions.update_one(
                     {"session_id": record["session_id"], "payment_status": {"$nin": ["paid", "refunded"]}},
                     {"$set": {"status": "completed", "payment_status": "paid",
@@ -454,6 +454,25 @@ def make_payments_router(db):
                                                  {"$set": {"reminded_at": now_iso()}})
         return {"ok": True, "to": to}
 
+    async def _grant_checkout_license(obj):
+        if obj.get("payment_status") not in {"paid", "no_payment_required"}:
+            return
+        transaction = await db.payment_transactions.find_one({"session_id": obj["id"], "kind": "license"}, {"_id": 0})
+        if transaction:
+            tier = transaction["tier"]
+            subscription_id = obj.get("subscription")
+            await db.user_licenses.update_one(
+                {"user_id": transaction["user_id"]},
+                {"$set": {
+                    "user_id": transaction["user_id"], "tier": tier,
+                    "status": "trialing" if tier == "monthly" and obj.get("payment_status") == "no_payment_required" else "active",
+                    "stripe_customer_id": obj.get("customer"), "stripe_subscription_id": subscription_id,
+                    "updated_at": now_iso(),
+                    **({"expires_at": None} if tier != "monthly" else {}),
+                }},
+                upsert=True,
+            )
+
     @r.post("/stripe/webhook")
     async def stripe_webhook(request: Request):
         payload = await request.body()
@@ -465,27 +484,12 @@ def make_payments_router(db):
         obj, t = event["data"]["object"], event["type"]
         if await db.stripe_events.find_one({"event_id": event["id"]}, {"_id": 0}):
             return {"status": "already_processed"}
-        await db.stripe_events.insert_one({"event_id": event["id"], "type": t, "received_at": now_iso()})
         if t == "checkout.session.completed":
             await db.payment_transactions.update_one(
                 {"session_id": obj["id"], "payment_status": {"$ne": "paid"}},
-                {"$set": {"status": "completed", "payment_status": obj.get("payment_status", "paid"),
+                {"$set": {"status": "completed", "payment_status": obj.get("payment_status", "unpaid"),
                           "stripe_payment_intent_id": obj.get("payment_intent"), "updated_at": now_iso()}})
-            transaction = await db.payment_transactions.find_one({"session_id": obj["id"], "kind": "license"}, {"_id": 0})
-            if transaction:
-                tier = transaction["tier"]
-                subscription_id = obj.get("subscription")
-                await db.user_licenses.update_one(
-                    {"user_id": transaction["user_id"]},
-                    {"$set": {
-                        "user_id": transaction["user_id"], "tier": tier,
-                        "status": "trialing" if tier == "monthly" and obj.get("payment_status") == "no_payment_required" else "active",
-                        "stripe_customer_id": obj.get("customer"), "stripe_subscription_id": subscription_id,
-                        "updated_at": now_iso(),
-                        **({"expires_at": None} if tier != "monthly" else {}),
-                    }},
-                    upsert=True,
-                )
+            await _grant_checkout_license(obj)
         elif t in {"customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"}:
             metadata = obj.get("metadata") or {}
             uid, tier = metadata.get("user_id"), metadata.get("tier")
@@ -505,7 +509,8 @@ def make_payments_router(db):
                 )
         elif t == "checkout.session.async_payment_succeeded":
             await db.payment_transactions.update_one({"session_id": obj["id"]},
-                {"$set": {"payment_status": "paid", "updated_at": now_iso()}})
+                {"$set": {"status": "completed", "payment_status": "paid", "updated_at": now_iso()}})
+            await _grant_checkout_license({**obj, "payment_status": "paid"})
         elif t == "checkout.session.async_payment_failed":
             await db.payment_transactions.update_one({"session_id": obj["id"]},
                 {"$set": {"status": "failed", "payment_status": "failed", "updated_at": now_iso()}})
@@ -519,6 +524,7 @@ def make_payments_router(db):
                     {"$set": {"status": "refunded", "payment_status": "refunded", "updated_at": now_iso()}})
             if obj.get("refunded"):
                 await _revoke_refunded_license(obj, payment_intent)
+        await db.stripe_events.insert_one({"event_id": event["id"], "type": t, "received_at": now_iso()})
         return {"status": "ok"}
 
     async def _revoke_refunded_license(charge: dict, payment_intent: str | None):

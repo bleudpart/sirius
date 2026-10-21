@@ -4,7 +4,7 @@ import { User, KeyRound, Sparkles, ExternalLink, X, Download, Upload, Music, Vol
 import { QRCodeSVG } from "qrcode.react";
 import { speakFr, speakAsCharacter, CHAR_PROFILES, MYTHOS_VOICES, loadCharOverrides, DEFAULT_VOICE, AEDES_VOICE, loadVoiceConfig } from "@/voice";
 import VoiceEqualizerPanel from "./VoiceEqualizerPanel";
-import { GEMINI_VOICE } from "./voice";
+import { GEMINI_VOICE, GEMINI_TIMBRES, geminiTimbreFor } from "./voice";
 import { HUD_DEFAULTS, loadHud, saveHud } from "@/hudPrefs";
 import { ConfirmButton } from "@/ConfirmButton";
 import { exportAccountProfile, importAccountProfile, validatePersonalService } from "@/accountSetup";
@@ -505,7 +505,14 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
               onChange={(e) => updateVoice({ rate: parseFloat(e.target.value) })} data-testid="setup-voice-rate" />
             </>}
             {voiceCfg.name === "gemini" ? (
-              <p className="setup-note">Le timbre et la diction Gemini sont pilotés par le service vocal. Pour modifier les graves et les aigus du son, utilisez l'égaliseur ci-dessous.</p>
+              <>
+                <label className="setup-label" htmlFor="setup-gemini-timbre">Timbre Gemini <span className="setup-tag opt">féminin ou masculin</span></label>
+                <select id="setup-gemini-timbre" className="setup-input" value={geminiTimbreFor(voiceCfg)}
+                  onChange={(e) => updateVoice({ geminiVoice: e.target.value })} data-testid="setup-gemini-timbre">
+                  {GEMINI_TIMBRES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+                </select>
+                <p className="setup-note">Le timbre et la diction Gemini sont pilotés par le service vocal. Pour modifier les graves et les aigus du son, utilisez l'égaliseur ci-dessous.</p>
+              </>
             ) : localVoice ? (
               <>
                 <label className="setup-label" htmlFor="setup-local-voice-pitch">Hauteur — grave / aiguë <span className="setup-tag opt">{voiceCfg.pitch < 0.8 ? "très grave" : voiceCfg.pitch < 1 ? "grave" : voiceCfg.pitch > 1.2 ? "aiguë" : "naturelle"} ({voiceCfg.pitch.toFixed(2)}×)</span></label>

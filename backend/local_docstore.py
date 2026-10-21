@@ -407,7 +407,6 @@ class LocalDocStore:
                             return
 
     def _insert(self, collection: str, document: dict) -> int:
-        document.pop("_id", None)
         values = _indexed_values(document)
         with _lock, closing(self._conn()) as con, con:
             cur = con.execute(
@@ -431,7 +430,6 @@ class LocalDocStore:
             raise ValueError("Une identité d'égalité explicite est requise.")
         if not _matches(document, identity):
             raise ValueError("L'identité doit correspondre au document.")
-        document.pop("_id", None)
         where, params = self._where_from_indexed_query(collection, identity)
         with _lock, closing(self._conn()) as con, con:
             con.execute("BEGIN IMMEDIATE")

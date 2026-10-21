@@ -18,3 +18,10 @@ test("local Android selection excludes network voices and accepts French variant
   const voices = [{ lang: "fr-FR", localService: false }, { lang: "fr-CA", localService: true }];
   expect(selectFrenchVoice(voices, { localOnly: true })).toBe(voices[1]);
 });
+
+test("Android Google voices without first names are matched by their code", () => {
+  const voices = ["fr-fr-x-fra-local", "fr-fr-x-frb-local", "fr-fr-x-vlf-local", "fr-fr-x-frd-local"]
+    .map((name) => ({ lang: "fr-FR", name, localService: true }));
+  expect(selectFrenchVoice(voices, { localOnly: true, gender: "male" }).name).toBe("fr-fr-x-frb-local");
+  expect(selectFrenchVoice(voices, { localOnly: true, gender: "female" }).name).toBe("fr-fr-x-fra-local");
+});

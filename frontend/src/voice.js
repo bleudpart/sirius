@@ -137,6 +137,23 @@ function reportGeminiFailure(reason) {
 export const DEFAULT_VOICE = { name: "browser-female", rate: 1.0, pitch: 1.08 };
 export const AEDES_VOICE = { name: "browser-aedes", rate: 0.9, pitch: 0.94 };
 export const GEMINI_VOICE = { name: "gemini", rate: 1, pitch: 0 };
+export const GEMINI_TIMBRES = [
+  { id: "Aoede", label: "Aoede — féminine chaleureuse", gender: "female" },
+  { id: "Kore", label: "Kore — féminine assurée", gender: "female" },
+  { id: "Leda", label: "Leda — féminine jeune", gender: "female" },
+  { id: "Charon", label: "Charon — masculine posée", gender: "male" },
+  { id: "Orus", label: "Orus — masculine ferme", gender: "male" },
+  { id: "Puck", label: "Puck — masculine enjouée", gender: "male" },
+];
+const DEFAULT_GEMINI_TIMBRE = { female: "Aoede", male: "Charon" };
+// Le timbre Gemini suit le genre de la voix choisie, sinon toutes les voix sortaient en Aoede (féminine).
+export const geminiTimbreFor = (cfg, gender) => {
+  if (!gender && cfg?.name === GEMINI_VOICE.name) {
+    return GEMINI_TIMBRES.some((item) => item.id === cfg.geminiVoice) ? cfg.geminiVoice : DEFAULT_GEMINI_TIMBRE.female;
+  }
+  const resolved = gender || (isBrowserVoice(cfg?.name) ? getBrowserGender(cfg.name) : FEMALE.test(cfg?.name || "") ? "female" : "male");
+  return DEFAULT_GEMINI_TIMBRE[resolved];
+};
 const LEGACY_DEFAULT_VOICE = { name: "fr-FR-Neural2-G", rate: 1.05, pitch: -2 };
 const isBrowserVoice = (name) => name === "browser" || name === "browser-female" || name === AEDES_VOICE.name;
 const getBrowserGender = (name) => name === "browser-female" ? "female" : "male";
@@ -178,7 +195,7 @@ export async function playAudio(base64, { volume = 1, onstart, onend } = {}) {
   }
 }
 
-async function speakRemote(message, { voice, rate, pitch, volume = 1, onstart, onend, onprogress, timeoutMs, playbackRate = 1 }, seq) {
+async function speakRemote(message, { voice, geminiVoice, rate, pitch, volume = 1, onstart, onend, onprogress, timeoutMs, playbackRate = 1 }, seq) {
   const gemini = voice === GEMINI_VOICE.name || Capacitor.getPlatform() === "android";
   if (Date.now() < (gemini ? geminiDownUntil : googleDownUntil)) return false;
   const controller = new AbortController();
@@ -193,7 +210,7 @@ async function speakRemote(message, { voice, rate, pitch, volume = 1, onstart, o
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(gemini
-        ? { text: phonetic(message), keys: personalKeys }
+        ? { text: phonetic(message), keys: personalKeys, ...(geminiVoice ? { voice: geminiVoice } : {}) }
         : { text: phonetic(message), voice, rate, pitch, keys: personalKeys }),
       credentials: "include",
       signal: controller.signal,
@@ -393,6 +410,7 @@ export function speakFr(message, { onpending, onstart, onend } = {}) {
   if (Capacitor.getPlatform() === "android" || cfg.name === GEMINI_VOICE.name) {
     speakRemote(message, {
       voice: cfg.name === GEMINI_VOICE.name ? GEMINI_VOICE.name : "fr-FR-Neural2-G",
+      geminiVoice: geminiTimbreFor(cfg),
       rate,
       pitch: night ? -4.5 : -3,
       volume,
@@ -476,6 +494,7 @@ export function speakCinematic(message, { onstart, onend, onprogress, natural = 
   if (Capacitor.getPlatform() === "android" || cfg.name === GEMINI_VOICE.name) {
     speakRemote(message, {
       voice: cfg.name === GEMINI_VOICE.name ? GEMINI_VOICE.name : "fr-FR-Neural2-G",
+      geminiVoice: geminiTimbreFor(cfg),
       rate,
       pitch: natural ? 0 : -3,
       playbackRate: natural ? 1.06 : 1,
@@ -539,7 +558,7 @@ export function speakAsCharacter(message, { profile, module, pitch = 1, rate = 1
     return;
   }
   if (Capacitor.getPlatform() === "android") {
-    speakRemote(safeText, { rate: 1.05, pitch: 0, onstart, onend }, seq).then((ok) => {
+    speakRemote(safeText, { geminiVoice: geminiTimbreFor(cfg, p?.gender), rate: 1.05, pitch: 0, onstart, onend }, seq).then((ok) => {
       if (!ok && seq === speakSeq) {
         const ov = (module && loadCharOverrides()[module]) || {};
         speakBrowser(safeText, {

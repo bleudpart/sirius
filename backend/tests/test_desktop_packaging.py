@@ -10,7 +10,10 @@ import server
 
 def test_desktop_runtime_creates_and_reuses_auth_secret(tmp_path, monkeypatch):
     monkeypatch.setenv("SIRIUS_DATA_DIR", str(tmp_path))
-    monkeypatch.delenv("SIRIUS_AUTH_SECRET", raising=False)
+    # setenv avant delenv : pytest ne restaure pas une variable absente supprimée.
+    for name in ("SIRIUS_PACKAGED", "SIRIUS_AUTH_SECRET", "PLAYWRIGHT_BROWSERS_PATH"):
+        monkeypatch.setenv(name, "")
+        monkeypatch.delenv(name)
 
     desktop_backend._prepare_runtime()
     first_secret = os.environ["SIRIUS_AUTH_SECRET"]

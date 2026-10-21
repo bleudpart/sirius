@@ -50,6 +50,8 @@ def test_briefing_enrichment_uses_the_dedicated_prompt(monkeypatch):
     monkeypatch.setattr(sirius_brain, "AsyncOpenAI", FakeClient)
     monkeypatch.setattr(sirius_brain, "ENV_GROQ_LLM_KEY", "test-groq-key")
     monkeypatch.setattr(sirius_brain, "ENV_K3_KEY", "")
+    monkeypatch.setattr(sirius_brain, "ENV_CEREBRAS_KEY", "")
+    monkeypatch.delenv("CEREBRAS_API_KEY", raising=False)
     monkeypatch.setattr(
         sirius_brain,
         "_briefing_cache",
