@@ -226,7 +226,7 @@ La boutique présente d'abord une promesse courte, trois demandes concrètes et
 une vidéo enregistrée avec des données fictives (sans envoi réel), puis les
 usages, le contrôle des données et les formules. Le bouton d'essai mène à la
 section de téléchargement Windows, distincte du formulaire d'achat replié.
-Le lien pointe vers la version publique Windows 1.0.56. L'APK Android 1.0.56
+Le lien pointe vers la version publique Windows 1.0.57. L'APK Android 1.0.57
 est une version de diagnostic, pas une publication Play Store. Mettre à jour le lien à la publication
 d'une nouvelle version, sans confondre le build local et une release publique.
 Les détails des quotas, clés personnelles, frais fournisseurs et renouvellement
