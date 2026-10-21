@@ -58,8 +58,8 @@ test("three concrete requests lead to the trial instead of checkout", () => {
   expect(container.querySelector(".public-demo-text-link").getAttribute("href")).toBe("#demonstration");
   expect(container.querySelector(".public-purchase").open).toBe(false);
   expect(container.querySelector("#public-phone").required).toBe(false);
-  expect(container.querySelector("#essayer a").getAttribute("href")).toContain("releases/download/v1.0.55/");
-  expect(container.querySelector("#essayer").textContent).toContain("1.0.55");
+  expect(container.querySelector("#essayer a").getAttribute("href")).toContain("releases/download/v1.0.56/");
+  expect(container.querySelector("#essayer").textContent).toContain("1.0.56");
 });
 
 test("the creator introduces Sirius immediately after the demonstration and before the workflow", () => {
