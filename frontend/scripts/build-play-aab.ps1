@@ -35,6 +35,10 @@ try {
   $target = Join-Path $frontend "dist\SIRIUS-$version.aab"
   Copy-Item "android\app\build\outputs\bundle\release\app-release.aab" $target -Force
   Write-Host "`nAAB prêt : $target" -ForegroundColor Green
+  $keytool = Join-Path $env:JAVA_HOME "bin\keytool.exe"
+  $sha1 = & $keytool -list -v -keystore $env:SIRIUS_ANDROID_KEYSTORE -alias $env:SIRIUS_ANDROID_KEY_ALIAS -storepass:env SIRIUS_ANDROID_STORE_PASSWORD 2>$null | Select-String "SHA1:"
+  Write-Host "Empreinte de la clé utilisée -> $($sha1.Line.Trim())"
+  Write-Host "Elle doit être identique à Play Console > Test et publication > Intégrité de l'appli > Certificat de la clé d'importation (SHA-1)."
   Write-Host "Envoyez-le dans Play Console > ΣIRIUS > Tests internes > Créer une release."
 } finally {
   Pop-Location
