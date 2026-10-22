@@ -98,6 +98,8 @@ GEMINI_TTS_STYLE = (
     "Lis exactement le texte fourni, mot pour mot : ne traduis pas, "
     "ne reformule pas, n'ajoute et n'omets aucun mot. "
     "Articule clairement les mots français, sans accent anglais. "
+    "Respecte les élisions françaises : dans l'oiseau, l'homme ou l'actualité, "
+    "lie l'article au mot suivant, sans épeler la lettre l ni dire elle. "
     "Les instructions de style ne font pas partie du texte à prononcer."
 )
 

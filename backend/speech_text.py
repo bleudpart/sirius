@@ -10,7 +10,7 @@ import re
 import unicodedata
 
 SPEECH_LANGUAGE = "fr-FR"
-SPEECH_TEXT_VERSION = 2
+SPEECH_TEXT_VERSION = 3
 _SIGMA_NAME = re.compile(r"Σ\s?IRIUS", re.IGNORECASE)
 _MAIL_WORD = re.compile(
     r"(?<![\w@.+-])(?:e[-\u2010\u2011 ]?)?mail(s?)(?![\w@+-]|\.[^\W\d_])",
@@ -21,6 +21,12 @@ _MAIL_WORD = re.compile(
 def speakable_text(text: str) -> str:
     """Keep French words intact, including « moi »; no phonetic substitutions."""
     text = unicodedata.normalize("NFC", text or "")
+    text = re.sub(
+        r"\b(qu|[cdjlmnst])[\s\u200b\u200c\u200d\u2060\ufeff]*"
+        r"['’‘ʼ＇][\s\u200b\u200c\u200d\u2060\ufeff]*(?=[^\W\d_])",
+        r"\1'", text, flags=re.I,
+    )
+    text = re.sub(r"\bL'(?=[^\W\d_])", "l'", text)
     text = _SIGMA_NAME.sub("Sirius", text)
     text = _MAIL_WORD.sub(lambda match: "courriel" + match.group(1).lower(), text)
     text = re.sub(r"\bCEST\b", "heure d'été d'Europe centrale", text)

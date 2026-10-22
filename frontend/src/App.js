@@ -2156,34 +2156,8 @@ function App() {
       return;
     }
 
-    setStatus("thinking");
-    setText("Je consulte les actualités...");
-    try {
-      const r = await fetch(`${API}/news/headlines?limit=6`);
-      const d = await r.json().catch(() => ({}));
-      if (r.ok && d.articles && d.articles.length) {
-        const top = d.articles.slice(0, 3).map((a) => a.titre).filter(Boolean);
-        showOnDisplay({
-          type: "message",
-          titre: "ACTUALITÉS FRANCE",
-          contenu: d.articles.map((a) => `• ${a.titre}${a.source ? ` (${a.source})` : ""}`).join("\n"),
-        });
-        setStatus("speaking");
-        const m = `Voici les titres : ${top.join(". ")}.`;
-        setText(m); speakOut(m);
-        return;
-      }
-      setStatus("speaking");
-      const m = r.status === 429
-        ? "Le quota d'actualités du jour est atteint."
-        : "Les actualités sont indisponibles pour le moment.";
-      setText(m); speakOut(m);
-    } catch (e) {
-      setStatus("speaking");
-      const m = "Les actualités sont indisponibles pour le moment.";
-      setText(m); speakOut(m);
-    }
-  }, [speakOut, showOnDisplay, cloudAnswer]);
+    await launchNewsBulletin("all");
+  }, [launchNewsBulletin, cloudAnswer]);
 
   // HERMÈS AGORA# — consultation commerciale vocale dans le chat principal (voix Mythos, ajustable)
   const AGORA_VOICE = { module: "HERMÈS AGORA#" };

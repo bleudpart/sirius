@@ -36,10 +36,10 @@ def test_all_ten_news_categories_fetch_without_key_and_report_partial_failure(mo
         async def __aexit__(self, *args):
             pass
 
-        async def get(self, url):
+        async def get(self, url, **kwargs):
             called.append(url)
             await asyncio.sleep(0)
-            if url.endswith("/sante.rss"):
+            if url.endswith("/sante.rss") or "sant%C3%A9" in url:
                 return httpx.Response(503, request=httpx.Request("GET", url))
             date = format_datetime(datetime.now(timezone.utc) - timedelta(minutes=1))
             xml = f"""<rss><channel><item><title>Actualite recente</title>
@@ -49,7 +49,7 @@ def test_all_ten_news_categories_fetch_without_key_and_report_partial_failure(mo
 
     monkeypatch.setattr(briefing_news.httpx, "AsyncClient", Client)
     result = asyncio.run(briefing_news.fetch_briefing_news())
-    assert len(called) == 10
+    assert len(called) == 11
     assert len(result["sections"]) == 10
     assert briefing_news.MARKET_NEWS_URL in called
     market = next(section for section in result["sections"] if section["id"] == "bourse")
@@ -60,7 +60,7 @@ def test_all_ten_news_categories_fetch_without_key_and_report_partial_failure(mo
     assert health["articles"] == []
     assert briefing_news._cache["sections"] == result["sections"]
     assert asyncio.run(briefing_news.fetch_briefing_news()) == result
-    assert len(called) == 10
+    assert len(called) == 11
     text = briefing_news.news_briefing_text(result["sections"])
     for _, label, _ in briefing_news.NEWS_SECTIONS:
         assert f"{label} :" in text
@@ -117,6 +117,47 @@ def test_duplicate_events_and_empty_sections_are_not_invented():
     assert text.count("Fait confirmé") == 1
     assert "Politique : même événement déjà cité" in text
     assert "Sport : aucune information datée" in text
+
+
+def test_sections_recover_from_failed_or_empty_primary_feed(monkeypatch, caplog):
+    monkeypatch.setattr(briefing_news, "_cache", {"t": 0.0, "date": "", "sections": []})
+    real_client = httpx.AsyncClient
+    calls = []
+    date = format_datetime(datetime.now(timezone.utc) - timedelta(minutes=1))
+
+    def handler(request):
+        calls.append(request)
+        if request.url.host != "news.google.com":
+            if request.url.path == "/sante.rss":
+                return httpx.Response(503)
+            return httpx.Response(200, text="<rss><channel/></rss>")
+        return httpx.Response(200, text=f"""<rss><channel><item>
+            <title>Information vérifiée - Journal</title>
+            <link>https://news.google.com/rss/articles/verified</link>
+            <pubDate>{date}</pubDate><source>Journal</source>
+            </item></channel></rss>""")
+
+    monkeypatch.setattr(briefing_news.httpx, "AsyncClient", lambda **kwargs: real_client(
+        transport=httpx.MockTransport(handler), **kwargs,
+    ))
+    sections = asyncio.run(briefing_news.fetch_briefing_news())["sections"]
+    assert len(sections) == 10
+    assert all(section["status"] == "ok" for section in sections)
+    assert all(section["articles"][0]["source"] == "Journal" for section in sections)
+    assert len(calls) == 19
+    assert all(request.extensions["timeout"]["read"] == 4 for request in calls)
+    assert "sante unavailable via www.franceinfo.fr" in caplog.text
+
+
+def test_all_sources_failed_report_unavailable_without_inventing_articles(monkeypatch):
+    monkeypatch.setattr(briefing_news, "_cache", {"t": 0.0, "date": "", "sections": []})
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(briefing_news.httpx, "AsyncClient", lambda **kwargs: real_client(
+        transport=httpx.MockTransport(lambda request: httpx.Response(503)), **kwargs,
+    ))
+    sections = asyncio.run(briefing_news.fetch_briefing_news())["sections"]
+    assert len(sections) == 10
+    assert all(section["status"] == "unavailable" and section["articles"] == [] for section in sections)
 
 
 def test_fallback_develops_two_distinct_available_stories_per_section():

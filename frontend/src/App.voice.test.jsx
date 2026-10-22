@@ -946,6 +946,7 @@ test.each([
   "les infos", "les actualités", "Donne-moi toutes les infos du jour",
   "Affiche le journal", "Annonce-moi les brèves du jour", "Peux-tu me donner les bulletins ?",
   "Raconte-moi ce qui se passe aujourd'hui", "Quoi de neuf ce matin ?",
+  "Tu me donnes les infos",
 ])("%s uses dated France and international sources without a model call", async (command) => {
   const fallback = global.fetch.getMockImplementation();
   const date = new Date().toISOString();

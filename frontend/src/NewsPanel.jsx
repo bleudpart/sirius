@@ -2,9 +2,10 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { X, Newspaper, RefreshCw, Search, Volume2, ExternalLink } from "lucide-react";
 import { speakFr, cancelSpeech } from "@/voice";
+import { API_BASE_URL } from "@/lib/api";
 import "./NewsPanel.css";
 
-const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
+const API = API_BASE_URL;
 
 export default function NewsPanel({ onClose }) {
   const [articles, setArticles] = useState([]);

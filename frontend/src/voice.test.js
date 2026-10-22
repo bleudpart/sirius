@@ -147,6 +147,16 @@ test("joins an elision before a silent h without changing a named letter", async
   expect(JSON.parse(request[1].body).text).toBe("l'histoire de la lettre L.");
 });
 
+test.each(["L'oiseau", "L ’ oiseau", "l\u200b’\u200boiseau"])(
+  "keeps %s attached on remote and native speech paths", async (text) => {
+    speakFr(`${text} chante. La lettre L.`);
+    await flush();
+    const request = global.fetch.mock.calls.find(([url]) => String(url).includes("/tts/gemini"));
+    expect(JSON.parse(request[1].body).text).toBe("l'oiseau chante. La lettre L.");
+    expect(speakNative.mock.calls[0][0]).toBe("l'oiseau chante. La lettre L.");
+  },
+);
+
 test("planning and an uppercase elision remain words on remote and native speech paths", async () => {
   speakFr("Voici le PLANNING. L ’ effet est visible dans le ΣIRIUS DISPLAY.");
   await flush();

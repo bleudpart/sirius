@@ -275,6 +275,9 @@ permet ainsi à Stripe de le rejouer.
 Le briefing ORACLE récupère sans clé API dix rubriques : France,
 international, politique, économie, bourse internationale, sport, santé, sciences
 et technologies, environnement et culture. Neuf utilisent les RSS Franceinfo ;
+si un flux échoue ou ne contient aucun article récent, une recherche RSS
+Google Actualités propre à la rubrique prend le relais, avec le nom du média.
+Chaque tentative dispose de 4 secondes, sans élargir la fenêtre de fraîcheur ;
 la bourse internationale utilise une recherche RSS Google Actualités sur les marchés
 américains, européens et asiatiques (Wall Street, Nasdaq, S&P 500, Euro Stoxx,
 Nikkei et Hang Seng), avec le nom du média et son lien via Google Actualités.
@@ -284,8 +287,8 @@ présentées avec source et lien dans l'interface ; un flux indisponible est sig
 pas remplacé par une actualité inventée. La rédaction vocale vise un journal original
 de 650 à 750 mots (environ 5 minutes selon le débit), sans remplissage si les données
 manquent. Les flux sont chargés en parallèle et un résultat complet est conservé
-5 minutes (1 minute lors d'une panne partielle). Un flux valide mais vide est
-également conservé pour éviter des rechargements inutiles. Les sources RSS ne
+5 minutes (1 minute lors d'une panne partielle ou d'une rubrique vide).
+Les sources RSS ne
 garantissent pas une couverture exhaustive.
 
 Les demandes générales (« les infos », « les actualités en France », « les infos
@@ -294,6 +297,8 @@ rédaction IA. Le bulletin annonce la météo de la ville du profil et les rubri
 demandées ; au plus deux articles par rubrique sont retenus. Les liens restent
 visibles sans être lus. Sans ville renseignée ou sans prévisions vérifiables,
 l'absence de météo est annoncée, sans choisir Paris implicitement.
+Le chemin vocal général de secours utilise le même bulletin, et non plus une
+lecture limitée à trois titres via NewsAPI.
 
 Les formulations générales envoyées au chat (« peux-tu me donner les actus du
 jour ? », « recherche approfondie sur l'actualité du jour ») restituent aussi
@@ -375,8 +380,10 @@ non française. Le catalogue navigateur peut être chargé avec un délai borné
 une absence de voix française est signalée. Le choix local et les réglages
 compatibles sont respectés sur Android. Le découpage protège les élisions et les
 groupes avec pronoms, sans remplacer artificiellement « dis-moi ».
-Les moteurs distants partagent une préparation française du texte ; Gemini reçoit
-une consigne de lecture fidèle, sans reformulation. La voix et la langue effectives
+Les moteurs distants partagent une préparation française du texte : « L ’ oiseau »
+devient « l'oiseau », sans modifier une lettre L isolée. Gemini reçoit une
+consigne de lecture fidèle, sans reformulation, et de liaison sans épellation.
+La voix et la langue effectives
 sont indiquées dans les réponses TTS quand le moteur les fournit. Ces contrôles
 ne garantissent pas la phonétique produite : la diction doit être confirmée à
 l'écoute avec la voix réellement installée ou le fournisseur choisi.
