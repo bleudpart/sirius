@@ -30,7 +30,8 @@ beforeEach(() => {
   originalFetch = global.fetch; originalCrypto = global.crypto;
   global.crypto = { getRandomValues: (bytes) => require("crypto").randomFillSync(bytes) };
   host = document.createElement("div"); document.body.appendChild(host); root = createRoot(host);
-  global.fetch = jest.fn(async (url, options) => response(String(url).endsWith("/initiatives")
+  global.fetch = jest.fn(async (url, options) => String(url).includes("/autonomy/")
+    ? { status: 404 } : response(String(url).endsWith("/initiatives")
     ? { settings: { enabled: false }, items: [] } : String(url).endsWith("/actions")
     ? { actions: [contract] } : options.method || String(url).endsWith(id) ? result
       : { items: [{ id, objective: result.plan.objective }], truncated: true }));
@@ -72,6 +73,7 @@ test("multi-agent form prepares the exact context without any API call or implic
     Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(context, "Contexte volontaire uniquement");
     context.dispatchEvent(new Event("input", { bubbles: true }));
   });
+
   await click("Préparer cette délégation sans appel IA");
   expect(posts()).toHaveLength(0);
   await click("Démarrer la préparation et les lectures");
@@ -82,6 +84,18 @@ test("multi-agent form prepares the exact context without any API call or implic
   } }]);
   expect(posts()).toHaveLength(1);
   expect(host.textContent).toContain("Quatre appels maximum");
+});
+
+test("autonomous preparation only saves a draft and never authorizes execution", async () => {
+  const original = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation(async (url, options) => String(url).endsWith("/autonomy/prepare")
+    ? response({ ...result, state: "PENDING" }) : original(url, options));
+  await mount();
+  await click("Préparer pour autonomie sans exécuter");
+  expect(posts()).toHaveLength(1);
+  expect(posts()[0][0]).toMatch(/\/autonomy\/prepare$/);
+  expect(global.fetch.mock.calls.some(([url]) => /\/start$/.test(url))).toBe(false);
+  expect(host.textContent).toContain("Autoriser ce parcours autonome");
 });
 
 test("lost response locks the request payload, retries same reference and prevents double clicks", async () => {
@@ -98,6 +112,25 @@ test("lost response locks the request payload, retries same reference and preven
   expect(posts()).toHaveLength(2);
   expect(posts()[0][1].body).toBe(posts()[1][1].body);
   expect(missionForm().disabled).toBe(false);
+});
+
+test("a lost autonomous draft response is retried as the same draft, not an executing creation", async () => {
+  let count = 0;
+  const original = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation(async (url, options) => {
+    if (String(url).endsWith("/autonomy/prepare")) {
+      if (++count === 1) throw new Error("Coupure");
+      return response(result);
+    }
+    return original(url, options);
+  });
+  await mount();
+  await click("Préparer pour autonomie sans exécuter");
+  await click("Réessayer la même référence");
+  expect(posts()).toHaveLength(2);
+  expect(posts()[0][0]).toBe(posts()[1][0]);
+  expect(posts()[0][1].body).toBe(posts()[1][1].body);
+  expect(posts()[1][0]).toMatch(/\/autonomy\/prepare$/);
 });
 
 test("NEMESIS is read only even for runs waiting for approval", async () => {

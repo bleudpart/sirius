@@ -608,7 +608,7 @@ def make_auth_router(db):
                                 "sirius_budget_analyses", "sirius_budget_decisions", "sirius_lab_runs", "sirius_shadow_settings",
                                 "sirius_action_runs", "sirius_action_steps", "sirius_action_controls",
                                 "sirius_action_attempts", "sirius_action_events",
-                                "sirius_initiative_settings", "sirius_action_proposals"):
+                                "sirius_initiative_settings", "sirius_action_proposals", "sirius_autonomy_sessions"):
             collection = getattr(db, collection_name, None)
             if collection is not None:
                 export["collections"][collection_name] = await collection.find({"user_id": user_id}, {"_id": 0}).to_list(10000)

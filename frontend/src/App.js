@@ -65,6 +65,8 @@ import { KEY_STORAGE_EVENT, loadApiKeys, saveApiKeys } from "@/apiKeyStorage";
 import { loadHud, applyHud } from "@/hudPrefs";
 import { initUiSounds } from "@/uiSounds";
 import { createModuleRegistry } from "@/moduleRegistry";
+import LocalPredictionMonitor from "./LocalPredictionMonitor";
+import { predictionOwner } from "./localPredictions";
 import { WORK_MODULES } from "@/workModules";
 import { closeForegroundWindow, createWindowController } from "@/windowController";
 import { initHoloFx } from "@/holoFx";
@@ -6988,6 +6990,7 @@ function App() {
           else moduleActionsRef.current.openWorkModule(id);
         }}
       />
+      {authUser && <LocalPredictionMonitor key={predictionOwner(authUser)} owner={predictionOwner(authUser)} />}
       {authUser && (window.siriusNative || showNativeAutomation) && <NativeAutomationHub
         key={authUser.user_id || authUser.id || authUser.email}
         open={showNativeAutomation} onClose={() => setShowNativeAutomation(false)}

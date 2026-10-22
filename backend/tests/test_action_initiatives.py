@@ -194,9 +194,11 @@ def test_routes_strict_settings_auth_and_export(harness):
     async def export():
         response = await endpoint(request_for({"user_id": "one", "role": "admin"}))
         return b"".join([chunk async for chunk in response.body_iterator])
+    run(service.db.sirius_autonomy_sessions.insert_one({"user_id": "one", "id": "session"}))
+    run(service.db.sirius_autonomy_sessions.insert_one({"user_id": "two", "id": "other"}))
     with zipfile.ZipFile(io.BytesIO(run(export()))) as archive:
         data = json.loads(archive.read("sirius-personal-data.json"))
-    for name in ("sirius_action_proposals", "sirius_initiative_settings"):
+    for name in ("sirius_action_proposals", "sirius_initiative_settings", "sirius_autonomy_sessions"):
         assert len(data["collections"][name]) == 1
         assert data["collections"][name][0]["user_id"] == "one"
     handler.assert_not_called()

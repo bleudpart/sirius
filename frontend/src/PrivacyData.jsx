@@ -8,7 +8,9 @@ export default function PrivacyData({ onOpenAccount, onMemory, onConnections }) 
     <p>ΣIRIUS n'est pas entièrement hors ligne. « Local » peut désigner cet appareil ou le serveur connecté : ce ne sont pas nécessairement la même machine.</p>
     <dl>
       <dt><strong>Sur cet appareil</strong></dt>
-      <dd>Préférences d'interface et anciennes listes manuelles des modules de travail. Elles ne sont pas automatiquement synchronisées entre appareils.</dd>
+      <dd>Préférences d'interface et anciennes listes manuelles des modules de travail. Elles ne sont pas automatiquement synchronisées entre appareils.
+        Les préparations prédictives ARIANE, facultatives, gardent seulement les types de modèles, jours et heures sur 28 jours.
+        Désactivation, effacement et export sont dans ARIANE ; l'export serveur ne contient pas ces habitudes de l'appareil.</dd>
       <dt><strong>Dans le service connecté</strong></dt>
       <dd>Dossiers unifiés, parcours, rappels et mémoire du service. L'hébergement dépend de votre installation.
         Service utilisé : <code>{BACKEND_BASE_URL}</code>. Même compte et même service sont nécessaires pour retrouver ces données ailleurs.</dd>

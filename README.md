@@ -899,6 +899,74 @@ propositions non masquées. Routes authentifiées :
 `sirius_initiative_settings` et `sirius_action_proposals` sont isolées par
 compte, incluses dans l'export personnel et l'effacement du compte.
 
+### Autonomie bornée avec rétroaction, sans contrôle libre de l'écran
+
+Dans ARIANE, **Préparer pour autonomie sans exécuter** enregistre le plan
+exact, sans appeler ses actions. Relire ses entrées et autoriser la session
+séparément : 1 à 3 cycles, 15 à 180 secondes maximum (choix UI : 30, 60,
+120 ou 180). La session fonctionne côté serveur, panneau fermé, et propose
+un bouton d'arrêt lorsque le parcours est consulté. Le service connecté
+doit rester allumé ; sur une installation distante, fermer l'application
+ne signifie pas arrêter le serveur.
+
+Le catalogue autonome est une liste serveur fermée de **lectures** :
+`budget.history`, `lab.policy`, `finance.overview`, `finance.portfolio`,
+`portus.analysis`, `portus.volatility_rules`. Les lectures de marché peuvent
+appeler les sources de marché existantes ; ce n'est pas un mode entièrement
+hors ligne. Aucune URL, commande système, mutation, mission IA, écriture
+de code, négociation envoyée, paiement ou démarche déposée n'est autorisée,
+même si un autre parcours disposait déjà d'une confirmation sensible.
+La sélection de quelques actions ne transforme pas SIRIUS en agent général.
+
+À chaque cycle, le contrôleur vérifie le compte, les contrats inchangés,
+l'expiration et les résultats des étapes. Les dépendances déjà terminées
+ne sont pas rejouées. Seulement un échec HTTP 502/503/504 terminé, sans
+résultat partiel, peut entraîner une reprise de lecture après quinze
+secondes, dans les plafonds du contrat et de la session. Cela constitue
+une nouvelle autorisation **explicite et limitée**, distincte du diagnostic
+passif de réflexion décrit ci-dessus. Aucun changement de paramètres,
+fournisseur, quota ou droits n'est inventé. Un refus, un quota épuisé,
+un résultat partiel, un délai incertain ou une limite atteinte bloque
+la session. Une interruption serveur pendant un cycle n'autorise pas
+son replay : la session demeure non confirmée puis expire.
+
+Une session terminée signifie que les résultats respectent leurs contrats,
+pas que leurs faits ont été indépendamment certifiés. L'arrêt bloque les
+prochaines étapes mais ne garantit pas l'annulation d'une lecture déjà partie.
+Les sessions sont uniques par parcours : répéter l'autorisation ne remet
+ni les compteurs ni la durée à zéro. Les routes authentifiées sont
+`POST /api/ariane/autonomy/prepare`, `POST /{id}/start`, `GET /{id}` et
+`POST /{id}/stop` sous `/api/ariane/autonomy`. Les limites, états et raisons
+sont conservés par compte dans `sirius_autonomy_sessions`, inclus dans
+l'export personnel et l'effacement du compte.
+
+### Préparations prédictives sur l'appareil
+
+Dans ARIANE, activer séparément la télémétrie minimale, désactivée par défaut.
+Seuls les types de parcours guidés standard explicitement préparés
+(`analysis`, `review`, `alert`), leur jour et heure locale sont enregistrés.
+Ni objectif saisi, paramètres personnalisés, écran, frappe, fichier, mail
+ni contenu métier ne sont collectés. Aucune transmission au serveur.
+Un même modèle à la même heure ne compte qu'une fois par jour.
+
+Après au moins trois jours distincts antérieurs autour de l'heure actuelle
+(± une heure), un moniteur dans l'application ouverte prépare localement
+une suggestion de modèle chaque minute, sans réseau ni IA. L'historique
+est borné aux 28 derniers jours au prochain contrôle dans l'application ouverte,
+et isolé par identifiant de compte dans
+le stockage du navigateur. Sans compte identifié, l'option est indisponible.
+Ce sont des habitudes possibles, pas une anticipation certaine.
+Une suggestion utilise les paramètres standard, jamais une ancienne saisie :
+**Relire le modèle préparé** remplit seulement le formulaire. Aucune API,
+autorisation ou session autonome n'est déclenchée par la prédiction.
+
+Désactivation effaçante, effacement distinct et export JSON local sont
+disponibles dans ARIANE. Ces données ne sont ni synchronisées ni présentes
+dans l'export serveur ; les effacer aussi sur les autres appareils si besoin.
+L'effacement différé du compte serveur ne peut pas purger à distance
+le stockage des appareils. Une erreur de stockage est signalée, jamais
+convertie en consentement implicite.
+
 ### Hooks natifs Windows, facultatifs et limités à la session
 
 Dans **Automatisations Windows — hooks natifs** (menu des modules),

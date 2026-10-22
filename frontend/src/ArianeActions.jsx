@@ -5,6 +5,9 @@ import { downloadWorkJson } from "./workModuleBackup";
 import { assertSecureKeyTransport, loadApiKeys } from "./apiKeyStorage";
 import AgentMissionForm from "./AgentMissionForm";
 import ActionInitiatives from "./ActionInitiatives";
+import BoundedAutonomy from "./BoundedAutonomy";
+import PredictivePreparation from "./PredictivePreparation";
+import { predictionOwner, refreshPredictions } from "./localPredictions";
 import "./ArianeActions.css";
 
 const ROOT = `${API_BASE_URL}/ariane`;
@@ -41,7 +44,7 @@ function Evidence({ value, title }) {
   </details>;
 }
 
-export default function ArianeActions({ auditOnly = false }) {
+export default function ArianeActions({ auditOnly = false, user }) {
   const [catalog, setCatalog] = useState([]);
   const [runs, setRuns] = useState([]);
   const [truncated, setTruncated] = useState(false);
@@ -52,11 +55,14 @@ export default function ArianeActions({ auditOnly = false }) {
   const [pending, setPending] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [predictionError, setPredictionError] = useState("");
   const [stopPreview, setStopPreview] = useState(false);
   const alive = useRef(true);
   const locked = useRef(false);
   const requests = useRef(new Set());
   const nextRequest = useRef(null);
+  const preparationOnly = useRef(false);
+  const owner = predictionOwner(user);
 
   const fetchData = async (url, options = {}) => {
     const controller = new AbortController();
@@ -109,7 +115,7 @@ export default function ArianeActions({ auditOnly = false }) {
       if (alive.current) setBusy(false);
     }
   };
-  const launch = () => {
+  const launch = (draftOnly = false) => {
     if (locked.current) return;
     try {
       const parsed = JSON.parse(steps);
@@ -117,8 +123,16 @@ export default function ArianeActions({ auditOnly = false }) {
         throw new Error("Un objectif et une à douze étapes sont requis, 100 ko maximum.");
       }
       const body = nextRequest.current || { request_id: newChronosRequestId(), objective: objective.trim(), steps: parsed };
+      if (!nextRequest.current) {
+        preparationOnly.current = draftOnly;
+        if (owner && objective === ACTION_TEMPLATES[template].title && steps === pretty(ACTION_TEMPLATES[template].steps)) {
+          try { refreshPredictions(owner, new Date(), template); setPredictionError(""); }
+          catch { setPredictionError("Usage non enregistré : stockage prédictif local indisponible. Le parcours reste utilisable."); }
+        }
+      }
       nextRequest.current = body; setPending(body);
-      void operation(`${ROOT}/runs`, { method: "POST", headers: { "Content-Type": "application/json" }, body: pretty(body) }, true);
+      void operation(`${ROOT}/${preparationOnly.current ? "autonomy/prepare" : "runs"}`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: pretty(body) }, true);
     } catch (failure) { setError(failure.message); }
   };
   const terminal = current && ["COMPLETED", "EXPIRED", "CANCELLED"].includes(current.state);
@@ -126,6 +140,9 @@ export default function ArianeActions({ auditOnly = false }) {
   return <section className="ariane-actions numm-tech numm-tech-card" data-testid="ariane-actions">
     <h2>{auditOnly ? "NÉMÉSIS · preuves des actions communes" : "ARIANE · actions communes"}</h2>
     <ActionInitiatives auditOnly={auditOnly} onReview={(identity) => operation(`${ROOT}/runs/${identity}`)} />
+    <PredictivePreparation owner={owner} templates={ACTION_TEMPLATES} disabled={busy || !!pending} auditOnly={auditOnly}
+      onPrepare={(key) => { setTemplate(key); setObjective(ACTION_TEMPLATES[key].title); setSteps(pretty(ACTION_TEMPLATES[key].steps)); }} />
+    {predictionError && <p role="alert">{predictionError}</p>}
     <p>Un objectif, des étapes reliées, un résultat vérifiable. Seules les actions du catalogue serveur peuvent être exécutées.
       Les listes manuelles ci-dessous et les anciens parcours financiers restent séparés.</p>
     <p>Chaque modification attend votre accord sur ses entrées exactes. Aucun ordre boursier.
@@ -157,8 +174,10 @@ export default function ArianeActions({ auditOnly = false }) {
           <label>Plan JSON <textarea rows={12} maxLength={100000} value={steps} onChange={(event) => setSteps(event.target.value)} /></label>
         </details>
       </fieldset>
-      <button type="button" disabled={busy || !catalog.length} onClick={launch}>
+      <button type="button" disabled={busy || !catalog.length} onClick={() => launch()}>
         {pending ? "Réessayer la même référence" : "Démarrer la préparation et les lectures"}</button>
+      {!pending && <button type="button" disabled={busy || !catalog.length} onClick={() => launch(true)}>
+        Préparer pour autonomie sans exécuter</button>}
       {pending && <p>Référence de demande à conserver : {pending.request_id}. Paramètres verrouillés tant que son résultat n'est pas retrouvé.</p>}
     </>}
     {busy && <p role="status">Traitement en cours. Les étapes terminées restent sauvegardées ; une modification sensible attendra votre validation.</p>}
@@ -171,6 +190,7 @@ export default function ArianeActions({ auditOnly = false }) {
     {current && <section>
       <h3>{current.plan.objective} · {LABELS[current.state] || current.state}</h3>
       <p>Référence {current.id} · reprise jusqu'au {current.expires_at}. Reprendre conserve les captures déjà terminées, sans les actualiser.</p>
+      <BoundedAutonomy key={current.id} run={current} onRun={setCurrent} auditOnly={auditOnly} />
       <p>{Object.entries(current.summary).map(([name, count]) => `${LABELS[name] || name} : ${count}`).join(" · ")}</p>
       <button type="button" disabled={busy} onClick={() => operation(`${ROOT}/runs/${current.id}`)}>Actualiser cet état</button>
       <button type="button" onClick={() => {

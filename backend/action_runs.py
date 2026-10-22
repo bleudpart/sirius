@@ -120,7 +120,7 @@ class ActionRuns:
             visited |= ready
         return contracts
 
-    async def create(self, uid, body):
+    async def prepare(self, uid, body):
         contracts = self.validate_plan(body)
         plan = body.model_dump(mode="json", exclude={"request_id"})
         if len(str(plan).encode("utf-8")) > 100_000:
@@ -132,6 +132,10 @@ class ActionRuns:
         })
         if saved["plan"] != plan or saved["contracts"] != contracts:
             raise HTTPException(409, "Cette référence correspond à un autre plan ou une autre version d'action.")
+        return await self.status(uid, saved["id"])
+
+    async def create(self, uid, body):
+        saved = await self.prepare(uid, body)
         return await self.execute(uid, saved["id"])
 
     async def owned(self, uid, run_id):

@@ -22,10 +22,10 @@ const FIELDS = {
 
 export default function WorkModulesPanel({ initialModule, user, onClose, onOpenExisting, onOpenDossier }) {
   const storageKey = `sirius_work_modules_v1_${user?.id || user?._id || user?.email || "local"}`;
-  return <WorkModulesWorkspace key={storageKey} storageKey={storageKey} initialModule={initialModule} onClose={onClose} onOpenExisting={onOpenExisting} onOpenDossier={onOpenDossier} />;
+  return <WorkModulesWorkspace key={storageKey} storageKey={storageKey} user={user} initialModule={initialModule} onClose={onClose} onOpenExisting={onOpenExisting} onOpenDossier={onOpenDossier} />;
 }
 
-function WorkModulesWorkspace({ storageKey, initialModule, onClose, onOpenExisting, onOpenDossier }) {
+function WorkModulesWorkspace({ storageKey, user, initialModule, onClose, onOpenExisting, onOpenDossier }) {
   const [loaded] = useState(() => {
     try { return { data: loadWorkData(storageKey), error: "" }; }
     catch { return { data: emptyWorkData(), error: "Lecture du stockage local impossible ou données invalides. Vos données ne seront pas écrasées. Fermez ce module et vérifiez le stockage avant de continuer." }; }
@@ -148,7 +148,7 @@ function WorkModulesWorkspace({ storageKey, initialModule, onClose, onOpenExisti
             <button type="button" onClick={remove}>Confirmer la suppression</button>
             <button type="button" onClick={() => setPendingDelete(null)}>Annuler la suppression</button>
           </div>}
-          {(active === "workflows" || active === "audit") && <ArianeActions key={`${storageKey}-${active}-actions`} auditOnly={active === "audit"} />}
+          {(active === "workflows" || active === "audit") && <ArianeActions key={`${storageKey}-${active}-actions`} user={user} auditOnly={active === "audit"} />}
           <fieldset className="work-editable" disabled={!!loaded.error}>
           {(active === "workflows" || active === "audit") && <ArianeMarketRuns key={`${storageKey}-${active}`} auditOnly={active === "audit"} />}
           {active === "audit" && <FinanceWorkspace key={`${storageKey}-finance-audit`} auditOnly />}
