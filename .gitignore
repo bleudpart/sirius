@@ -112,6 +112,7 @@ android-sdk/frontend/node_modules/electron/dist/electron
 frontend/node_modules/electron/dist/electron
 .env
 .env.*
+!integrations/meeting-bot/.env.example
 *.env
 *.jks
 *.keystore

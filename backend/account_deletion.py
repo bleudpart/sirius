@@ -29,6 +29,7 @@ PERSONAL_COLLECTIONS = (
     "sirius_initiative_settings", "sirius_action_proposals",
     "sirius_autonomy_sessions",
     "sirius_phone_calls", "sirius_phone_settings", "sirius_phone_limits",
+    "sirius_meetings", "sirius_meeting_publications",
     "sirius_action_runs", "sirius_action_steps", "sirius_action_controls",
     "sirius_action_attempts", "sirius_action_events",
     "sirius_work_dispatches", "sirius_work_receipts", "sirius_work_reminders",

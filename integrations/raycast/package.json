@@ -1,0 +1,24 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "sirius-meetings",
+  "title": "SIRIUS",
+  "description": "Consulter les réunions SIRIUS et valider leurs tâches dans vos dossiers privés.",
+  "icon": "extension-icon.png",
+  "author": "bleudpart",
+  "categories": ["Productivity", "Communication"],
+  "platforms": ["macOS", "Windows"],
+  "license": "UNLICENSED",
+  "commands": [
+    { "name": "ask", "title": "Demander à SIRIUS", "description": "Envoyer une question explicite à votre assistant SIRIUS", "mode": "view" },
+    { "name": "meetings", "title": "Réunions SIRIUS", "description": "Synthèses et validation explicite des tâches", "mode": "view" }
+  ],
+  "preferences": [
+    { "name": "apiUrl", "title": "URL API SIRIUS", "description": "HTTPS terminé par /api, ou boucle locale HTTP", "type": "textfield", "required": true, "default": "http://127.0.0.1:8001/api" },
+    { "name": "accessToken", "title": "Session SIRIUS", "description": "access_token personnel ; renouveler après expiration. Jamais le mot de passe.", "type": "password", "required": true },
+    { "name": "cerebrasKey", "title": "Clé Cerebras personnelle (facultatif)", "description": "Uniquement envoyée à votre API SIRIUS pour les demandes IA autorisées.", "type": "password", "required": false }
+  ],
+  "scripts": { "build": "ray build", "typecheck": "tsc --noEmit", "dev": "ray develop" },
+  "dependencies": { "@raycast/api": "2.9.0", "react": "19.2.0" },
+  "devDependencies": { "@types/node": "^22.0.0", "@types/react": "^19.0.0", "typescript": "^5.9.0" },
+  "engines": { "node": ">=22.22.2" }
+}

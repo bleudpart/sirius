@@ -439,6 +439,8 @@ microtool_agents.register()
 from phone_voice import PhoneVoice, make_phone_router
 phone_voice = PhoneVoice(db, action_runs)
 phone_voice.register()
+from meeting_integrations import MeetingIntegrations, make_meeting_router
+meeting_integrations = MeetingIntegrations(db, specialist_agents)
 from action_initiatives import ActionInitiatives, make_initiative_router
 action_initiatives = ActionInitiatives(db, action_runs)
 from bounded_autonomy import BoundedAutonomy, make_autonomy_router
@@ -2315,6 +2317,7 @@ api_router.include_router(make_initiative_router(action_initiatives, require_use
 api_router.include_router(make_autonomy_router(bounded_autonomy, require_user))
 api_router.include_router(make_operational_router(operational_work, require_user))
 api_router.include_router(make_phone_router(phone_voice, require_user))
+api_router.include_router(make_meeting_router(meeting_integrations, require_user))
 
 from themis_api import make_themis_router
 api_router.include_router(make_themis_router(db))

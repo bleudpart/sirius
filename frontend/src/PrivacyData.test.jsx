@@ -23,6 +23,9 @@ test("privacy explains real boundaries and opens existing controls without reque
   expect(host.textContent).toContain("n'est pas une sauvegarde complète");
   expect(host.textContent).toContain("durée unique garantie");
   expect(host.textContent).toContain("ne supprime pas automatiquement");
+  expect(host.textContent).toContain("accord individuel");
+  expect(host.textContent).toContain("sans notification inter-compte");
+  expect(host.textContent).toContain("aucun audio de Huddle");
   expect(global.fetch).not.toHaveBeenCalled();
   await act(async () => [...host.querySelectorAll("button")].forEach((button) => button.click()));
   expect(account).toHaveBeenCalledTimes(1);

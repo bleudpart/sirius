@@ -609,7 +609,9 @@ def make_auth_router(db):
                                 "sirius_action_runs", "sirius_action_steps", "sirius_action_controls",
                                 "sirius_action_attempts", "sirius_action_events",
                                 "sirius_initiative_settings", "sirius_action_proposals", "sirius_autonomy_sessions",
-                                "sirius_phone_calls", "sirius_phone_settings", "sirius_phone_limits"):
+                                "sirius_phone_calls", "sirius_phone_settings", "sirius_phone_limits",
+                                "sirius_meetings", "sirius_meeting_publications",
+                                "sirius_work_dossiers", "sirius_work_entries"):
             collection = getattr(db, collection_name, None)
             if collection is not None:
                 projection = {"_id": 0, "control_url": 0} if collection_name == "sirius_phone_calls" else {"_id": 0}

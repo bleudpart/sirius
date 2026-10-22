@@ -30,6 +30,14 @@ export default function PrivacyData({ onOpenAccount, onMemory, onConnections }) 
         états, coûts rapportés et paramètres des parcours jusqu'à leur effacement.
         L'export et la suppression du compte couvrent ces données serveur, pas les données conservées chez Vapi.
         Désactiver les entrants ou arrêter un parcours ne raccroche pas un appel déjà en cours.</dd>
+      <dt><strong>Raycast et réunions Discord/Slack, facultatifs</strong></dt>
+      <dd>Raycast envoie seulement vos questions explicites et consulte les réunions du compte connecté.
+        Le bot Discord demande l'accord individuel des participants avant toute réception audio.
+        Les fragments audio sont transmis au moteur STT SIRIUS configuré, les transcriptions à Cerebras pour synthèse.
+        SIRIUS conserve texte, participants, accords déclarés et propositions ; aucun fichier audio n'est sauvegardé par le bot.
+        Les tâches doivent être validées et affectées nominativement dans un dossier privé, sans notification inter-compte.
+        Slack reçoit uniquement la synthèse et les tâches validées après confirmation de publication ; aucun audio de Huddle n'est capturé.
+        L'effacement d'une réunion ne supprime pas ses tâches déjà enregistrées ni les publications Slack ou les données des fournisseurs.</dd>
       <dt><strong>Conservation et suppression</strong></dt>
       <dd>Il n'existe pas ici de durée unique garantie pour tous les modules. Les fournisseurs appliquent leurs propres conditions.
         L'effacement du compte ne supprime pas automatiquement vos fichiers exportés, sauvegardes ou toutes les listes présentes sur un autre appareil.</dd>

@@ -1035,6 +1035,11 @@ ou d'exactitude ; relire le résultat avant tout usage conséquent.
 
 ### Téléphonie Vapi encadrée
 
+Pour le lanceur Raycast et les réunions Discord avec publication Slack,
+voir [l'architecture et le guide des intégrations](./integrations/README.md).
+Ces clients sont facultatifs, sans activation automatique ; les tâches
+de réunion nécessitent une validation humaine dans un dossier privé.
+
 Dans **ARIANE → Téléphone**, une ligne Vapi peut passer et recevoir de vrais appels.
 Ce n'est pas une simulation du microphone du HUD :
 
