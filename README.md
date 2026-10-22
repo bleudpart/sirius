@@ -969,6 +969,9 @@ convertie en consentement implicite.
 
 ### Micro-outils dynamiques, langage fermé et trois rôles IA
 
+Voir aussi la [téléphonie Vapi encadrée](#téléphonie-vapi-encadrée) pour les appels réels,
+distincts des micro-outils et de l'autonomie en lecture seule.
+
 Dans ARIANE, **Micro-outils · planifier, compiler, vérifier** accepte un
 objectif, des données JSON et un à cinq exemples `{"input": ..., "expected": ...}`.
 La préparation remplit le formulaire sans appel IA. Démarrer le parcours
@@ -1029,6 +1032,123 @@ les preuves dans les collections ARIANE existantes, isolées par compte,
 couvertes par l'export personnel et la suppression du compte. Réussir quelques
 exemples et obtenir un accord IA n'est pas une preuve générale de correction
 ou d'exactitude ; relire le résultat avant tout usage conséquent.
+
+### Téléphonie Vapi encadrée
+
+Dans **ARIANE → Téléphone**, une ligne Vapi peut passer et recevoir de vrais appels.
+Ce n'est pas une simulation du microphone du HUD :
+
+```text
+Téléphone PSTN ↔ opérateur connecté à Vapi ↔ pipeline audio Vapi temps réel
+                                           ├ STT Deepgram français
+                                           ├ dialogue LLM OpenAI
+                                           └ voix TTS Azure française
+                    événements authentifiés ↓ ↑ POST /call après confirmation
+                               FastAPI SIRIUS → journal ARIANE → React
+```
+
+Vapi prend en charge l'audio bidirectionnel, la transcription en continu, la
+synthèse et la gestion des interruptions. SIRIUS ne relaie pas les paquets audio
+et n'ouvre pas de WebSocket audio public. Le modèle proposé utilise Deepgram
+`nova-3`, `gpt-4o-mini` et `fr-FR-DeniseNeural` ; leur disponibilité, les clés
+fournisseurs, tarifs et réglages d'interruption doivent être vérifiés dans Vapi.
+La latence vocale réelle n'est **pas mesurée ni garantie** par cette intégration.
+
+**Activation opérateur, jamais automatique :**
+
+1. Créer un compte Vapi et connecter un numéro téléphonique ; aucun numéro n'est
+   acheté par SIRIUS. Définir dans l'environnement serveur le compte propriétaire
+   `SIRIUS_VAPI_OWNER_USER_ID`, `VAPI_ORG_ID`, `VAPI_PRIVATE_KEY`,
+   `VAPI_PHONE_NUMBER_ID` et `VAPI_ASSISTANT_ID`.
+   Une seule ligne/organisation et un seul compte SIRIUS sont liés par instance ;
+   aucun locataire ne peut choisir l'identité d'un autre compte via les métadonnées.
+2. Publier en HTTPS `/api/ariane/phone/webhook`, définir son URL complète dans
+   `SIRIUS_VAPI_WEBHOOK_URL` et créer un secret aléatoire distinct d'au moins
+   32 caractères dans `SIRIUS_VAPI_WEBHOOK_SECRET`.
+3. Dans Vapi, créer un **Custom Credential**, authentification Bearer avec le
+   même secret, en-tête `Authorization`, préfixe `Bearer` activé. Renseigner son
+   identifiant dans `VAPI_WEBHOOK_CREDENTIAL_ID`. Les webhooks utilisent ce
+   jeton partagé comparé en temps constant, **pas une signature HMAC**.
+4. Charger la configuration depuis ARIANE (lecture seulement) et enregistrer le
+   modèle d'assistant affiché dans Vapi. Garder exactement le premier message
+   d'annonce IA, la politique système, la durée maximale et l'absence d'outils.
+   La première annonce n'est pas interruptible ; les tours suivants utilisent
+   la gestion des interruptions de Vapi. Les changements de modèle système,
+   outils, hooks et repli LLM sont refusés avant composition/réception.
+5. Configurer **l'assistant sauvegardé ET le numéro sauvegardé** avec
+   `server.url` et `server.credentialId`. Important : Vapi n'attache pas forcément
+   ce credential lorsque l'URL serveur vient directement d'une requête API ;
+   SIRIUS ne fournit donc pas de `server.url` transitoire dans `/call`.
+   Pour le numéro, retirer `assistantId`, squad/workflow, hooks et
+   `fallbackDestination` : l'événement `assistant-request` doit décider de
+   l'admission, sinon l'opt-in SIRIUS et ses limites seraient contournés.
+6. Définir `SIRIUS_VAPI_ALLOWED_NUMBERS` avec les seuls destinataires autorisés
+   au format E.164, séparés par des virgules ; vide interdit tous les sortants.
+   Vérifier préalablement l'accord des destinataires et les règles locales
+   applicables. Régler les restrictions géographiques, crédit/alertes et
+   plafonds disponibles chez Vapi et l'opérateur, puis seulement définir
+   `SIRIUS_VAPI_ENABLED=1` et redémarrer le service.
+7. Les entrants restent désactivés jusqu'au clic **Autoriser les appels entrants
+   payants** ; ce clic vérifie l'assistant et le routage du numéro, sans appeler.
+   Après cela `assistant-request` vérifie le compte, le numéro, l'organisation,
+   l'assistant et la capacité avant de retourner son ID sauvegardé. Sa réponse
+   doit arriver dans la limite Vapi de 7,5 secondes ; une panne refuse l'admission.
+   Ne pas rattacher ensuite un assistant directement au numéro dans Vapi.
+
+**Sortants et conversation :** choisir un numéro autorisé, décrire un objectif
+non sensible, attester l'accord du destinataire, préparer puis démarrer le parcours.
+Il reste en attente de confirmation : seule l'autorisation explicite de l'étape
+`phone.dial` compose. L'objectif est ajouté comme donnée de conversation, pas
+comme politique système. Le dialogue s'adapte aux propos de l'interlocuteur
+mais n'a accès à aucun outil SIRIUS, mail, agenda, paiement ou transfert. Il
+demande l'accord oral avant d'aborder l'objectif, puis clôt en cas de refus.
+Cette politique LLM n'est pas une preuve formelle de conformité juridique.
+
+**Bornes et erreurs :** maximum 120 secondes côté assistant Vapi et cinq
+tentatives par jour UTC, entrants et sortants confondus, réservées atomiquement
+en base avant admission/envoi. Les échecs consomment aussi une tentative.
+Ce sont des limites techniques, **pas un plafond garanti en euros/dollars**
+(opérateur, appels refusés, variations de tarif et autres usages Vapi exclus).
+Une seule tentative ARIANE et aucun retry HTTP de composition.
+Un claim durable avant `POST /call` empêche de rejouer la même opération,
+y compris après redémarrage. Un timeout, une coupure ou une réponse ambiguë
+reste `UNKNOWN`/`SUBMITTING`, jamais « échec donc aucun appel ». Vérifier Vapi ;
+créer une nouvelle mission pourrait produire un doublon.
+Les événements peuvent résoudre une opération incertaine grâce à la référence
+serveur transmise dans le champ Vapi documenté `name` ; un état terminé ne
+revient pas à « en cours » après un webhook tardif.
+L'actualisation du panneau lit la base SIRIUS, pas le fournisseur : si les
+webhooks manquent, consulter Vapi. La fin d'un appel ne certifie pas son objectif.
+
+**Raccrochage :** le bouton dédié envoie `end-call` à l'URL de contrôle Vapi
+de cet appel (`monitorPlan.controlEnabled=true` dans le modèle), uniquement
+HTTPS sur les hôtes de contrôle Vapi autorisés,
+sans redirection ni clé privée. L'URL de capacité ne quitte pas le backend.
+La réponse signifie « demandé », pas « terminé » ; attendre le webhook `ended`
+ou vérifier le tableau de bord. Si l'URL manque ou que Vapi est indisponible,
+le panneau signale explicitement d'utiliser Vapi. Arrêter le parcours ou
+désactiver les entrants ne raccroche pas un appel existant. Pour une coupure
+d'urgence, désactiver aussi le numéro chez l'opérateur/Vapi.
+
+**Données :** audio, conversation et objectif sont transmis à Vapi et aux
+fournisseurs STT/LLM/TTS ; cette chaîne est distincte des clés IA personnelles
+du HUD. Le modèle contrôlé désactive enregistrement audio/vidéo, transcription archivée,
+capture SIP PCAP et journaux d'appel Vapi ; l'écoute distante est désactivée.
+Cela ne constitue pas une garantie de rétention nulle chez tous les fournisseurs :
+leurs politiques restent à configurer/vérifier. SIRIUS ne stocke ni audio, transcription,
+enregistrement, prompt de réponse ou URL d'écoute. Il conserve les paramètres
+ARIANE (objectif et numéro), IDs, direction, dates, états et coûts USD rapportés,
+ainsi que l'URL de contrôle privée. Les trois collections `sirius_phone_calls`,
+`sirius_phone_settings`, `sirius_phone_limits` sont isolées par compte, incluses
+dans l'export (sans URL de contrôle) et la suppression serveur revue du compte.
+Aucune purge temporelle automatique ; la suppression SIRIUS n'efface pas Vapi.
+
+Références officielles : [création d'appel](https://docs.vapi.ai/api-reference/calls/create),
+[événements](https://docs.vapi.ai/server-url/events),
+[authentification serveur](https://docs.vapi.ai/server-url/server-authentication),
+[contrôle d'appel](https://docs.vapi.ai/calls/call-features).
+Les tests sont simulés : aucune activation, dépense ou communication réelle
+n'est effectuée par les tests de développement.
 
 ### Hooks natifs Windows, facultatifs et limités à la session
 

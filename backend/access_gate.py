@@ -160,7 +160,8 @@ async def access_status(db, user: dict, force: bool = False) -> dict:
 
 
 def is_open_path(path: str) -> bool:
-    return not path.startswith("/api/") or path.startswith(OPEN_PREFIXES)
+    return (path == "/api/ariane/phone/webhook"
+            or not path.startswith("/api/") or path.startswith(OPEN_PREFIXES))
 
 
 def make_access_router(db):

@@ -23,6 +23,13 @@ export default function PrivacyData({ onOpenAccount, onMemory, onConnections }) 
         {" "}Les voix et possibilités hors ligne dépendent du système. La transcription du microphone est distincte de la lecture vocale.</dd>
       <dt><strong>Courriels et calendriers</strong></dt>
       <dd>Les comptes connectés donnent accès aux données selon les autorisations accordées. Une recherche Microsoft transmet ses mots-clés à Microsoft. Déconnecter un compte n'efface pas les données déjà enregistrées dans un dossier.</dd>
+      <dt><strong>Téléphone Vapi, facultatif</strong></dt>
+      <dd>Les appels réels transmettent l'audio, l'objectif et la conversation à Vapi et aux fournisseurs vocaux/IA configurés.
+        Les sortants nécessitent votre confirmation ARIANE, les entrants une autorisation distincte.
+        SIRIUS ne conserve ni audio ni transcription téléphonique, mais garde les numéros sortants, références,
+        états, coûts rapportés et paramètres des parcours jusqu'à leur effacement.
+        L'export et la suppression du compte couvrent ces données serveur, pas les données conservées chez Vapi.
+        Désactiver les entrants ou arrêter un parcours ne raccroche pas un appel déjà en cours.</dd>
       <dt><strong>Conservation et suppression</strong></dt>
       <dd>Il n'existe pas ici de durée unique garantie pour tous les modules. Les fournisseurs appliquent leurs propres conditions.
         L'effacement du compte ne supprime pas automatiquement vos fichiers exportés, sauvegardes ou toutes les listes présentes sur un autre appareil.</dd>

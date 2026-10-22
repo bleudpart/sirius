@@ -608,10 +608,12 @@ def make_auth_router(db):
                                 "sirius_budget_analyses", "sirius_budget_decisions", "sirius_lab_runs", "sirius_shadow_settings",
                                 "sirius_action_runs", "sirius_action_steps", "sirius_action_controls",
                                 "sirius_action_attempts", "sirius_action_events",
-                                "sirius_initiative_settings", "sirius_action_proposals", "sirius_autonomy_sessions"):
+                                "sirius_initiative_settings", "sirius_action_proposals", "sirius_autonomy_sessions",
+                                "sirius_phone_calls", "sirius_phone_settings", "sirius_phone_limits"):
             collection = getattr(db, collection_name, None)
             if collection is not None:
-                export["collections"][collection_name] = await collection.find({"user_id": user_id}, {"_id": 0}).to_list(10000)
+                projection = {"_id": 0, "control_url": 0} if collection_name == "sirius_phone_calls" else {"_id": 0}
+                export["collections"][collection_name] = await collection.find({"user_id": user_id}, projection).to_list(10000)
         export["exported_at"] = datetime.now(timezone.utc).isoformat()
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:

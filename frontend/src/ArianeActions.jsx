@@ -5,6 +5,7 @@ import { downloadWorkJson } from "./workModuleBackup";
 import { assertSecureKeyTransport, loadApiKeys } from "./apiKeyStorage";
 import AgentMissionForm from "./AgentMissionForm";
 import MicroToolForm from "./MicroToolForm";
+import PhoneVoice from "./PhoneVoice";
 import ActionInitiatives from "./ActionInitiatives";
 import BoundedAutonomy from "./BoundedAutonomy";
 import PredictivePreparation from "./PredictivePreparation";
@@ -140,6 +141,9 @@ export default function ArianeActions({ auditOnly = false, user }) {
 
   return <section className="ariane-actions numm-tech numm-tech-card" data-testid="ariane-actions">
     <h2>{auditOnly ? "NÉMÉSIS · preuves des actions communes" : "ARIANE · actions communes"}</h2>
+    <PhoneVoice disabled={busy || !!pending} auditOnly={auditOnly} onPrepare={(mission) => {
+      setObjective(mission.title); setSteps(pretty(mission.steps));
+    }} />
     <ActionInitiatives auditOnly={auditOnly} onReview={(identity) => operation(`${ROOT}/runs/${identity}`)} />
     <PredictivePreparation owner={owner} templates={ACTION_TEMPLATES} disabled={busy || !!pending} auditOnly={auditOnly}
       onPrepare={(key) => { setTemplate(key); setObjective(ACTION_TEMPLATES[key].title); setSteps(pretty(ACTION_TEMPLATES[key].steps)); }} />
