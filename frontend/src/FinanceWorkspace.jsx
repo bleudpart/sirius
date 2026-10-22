@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE_URL } from "./lib/api";
 import { localTimeCandidates, newChronosRequestId } from "./chronos";
 import { downloadWorkJson } from "./workModuleBackup";
+import BudgetLabWorkspace from "./BudgetLabWorkspace";
 import "./NummariusAnalytics.css";
 import "./FinanceWorkspace.css";
 
@@ -27,6 +28,7 @@ async function request(path, options = {}) {
 }
 
 export default function FinanceWorkspace({ routinesOnly = false, auditOnly = false }) {
+  const [showBudgetLab, setShowBudgetLab] = useState(false);
   const [overview, setOverview] = useState(null);
   const [valuation, setValuation] = useState(null);
   const [error, setError] = useState("");
@@ -98,6 +100,12 @@ export default function FinanceWorkspace({ routinesOnly = false, auditOnly = fal
 
   return <section className="numm-tech numm-tech-card finance-workspace" data-testid="finance-workspace">
     <h2>{auditOnly ? "NÉMÉSIS · décisions et surveillances financières" : routinesOnly ? "CHRONOS → ARIANE → PORTUS" : "Portefeuille, surveillances et routines"}</h2>
+    {!routinesOnly && <>
+      <button type="button" onClick={() => setShowBudgetLab((open) => !open)} aria-expanded={showBudgetLab}>
+        {showBudgetLab ? "Fermer budget et laboratoire" : "Ouvrir budget personnel et laboratoire"}
+      </button>
+      {showBudgetLab && <BudgetLabWorkspace request={request} auditOnly={auditOnly} />}
+    </>}
     <p>Données du compte dans le service SIRIUS connecté. Aucun ordre, courtier, courriel ni push externe.
       Les routines et surveillances nécessitent que ce serveur soit allumé ; notifications ci-dessous.</p>
     {error && <p role="alert">{error}</p>}

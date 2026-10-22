@@ -117,6 +117,19 @@ def test_finalize_erases_shared_action_plans_previews_approvals_and_evidence(rev
         assert asyncio.run(reviewed_account[name].count_documents({"user_id": "other"})) == 1
 
 
+def test_finalize_erases_budget_and_lab_only_for_reviewed_account(reviewed_account):
+    names = ("sirius_budget_analyses", "sirius_budget_decisions", "sirius_lab_runs")
+    for name in names:
+        for uid in ("client", "other"):
+            asyncio.run(reviewed_account[name].insert_one({"id": "private", "user_id": uid}))
+    plan = asyncio.run(deletion_plan(reviewed_account, "client"))
+    assert all(plan["collections"][name] == 1 for name in names)
+    assert asyncio.run(finalize_account_deletion(reviewed_account, user_id="client", review=approved()))["account_deleted"]
+    for name in names:
+        assert asyncio.run(reviewed_account[name].count_documents({"user_id": "client"})) == 0
+        assert asyncio.run(reviewed_account[name].count_documents({"user_id": "other"})) == 1
+
+
 def test_finalize_erases_operational_sends_followups_notifications_and_local_outlook_identity(reviewed_account):
     names = ("sirius_work_dispatches", "sirius_work_receipts", "sirius_work_reminders",
              "sirius_work_reminder_controls", "sirius_work_reminder_outcomes",

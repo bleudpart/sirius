@@ -419,10 +419,14 @@ from finance_workspace import FinanceWorkspace, make_finance_router
 from finance_conversation import FinanceConversation
 from action_runs import ActionRuns, make_action_router
 from finance_actions import make_finance_actions
+from budget_lab import BudgetLab, make_budget_lab_router
 
 finance_workspace = FinanceWorkspace(db)
 finance_conversation = FinanceConversation(finance_workspace)
-action_runs = ActionRuns(db, make_finance_actions(finance_workspace))
+budget_lab = BudgetLab(db)
+finance_registry = make_finance_actions(finance_workspace)
+budget_lab.register(finance_registry)
+action_runs = ActionRuns(db, finance_registry)
 from operational_work import OperationalWork, make_operational_router
 
 operational_work = OperationalWork(db, action_runs, work_conversation)
@@ -2289,6 +2293,7 @@ api_router.include_router(make_nummarius_router(db))
 from ariane_market_runs import make_ariane_market_router
 api_router.include_router(make_ariane_market_router(db, require_user))
 api_router.include_router(make_finance_router(finance_workspace, require_user))
+api_router.include_router(make_budget_lab_router(budget_lab, require_user))
 api_router.include_router(make_action_router(action_runs, require_user))
 api_router.include_router(make_operational_router(operational_work, require_user))
 

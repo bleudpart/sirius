@@ -73,6 +73,79 @@ test("hors ligne, seul le bouton réessayer est proposé", async () => {
   }
 });
 
+const changeInput = async (input, value) => {
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+};
+const submitLinkForm = async (container) => act(async () => {
+  container.querySelector('[data-testid="access-link-form"]').dispatchEvent(
+    new Event("submit", { bubbles: true, cancelable: true }),
+  );
+});
+
+test("récupère le mot de passe Cloud puis revient à la liaison sans connexion automatique", async () => {
+  const original = global.fetch;
+  global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
+  const onRefresh = jest.fn();
+  const { container, cleanup } = await render(<AccessLock status={{ state: "unlinked" }}
+    accountEmail="client@example.test" onRefresh={onRefresh} />);
+  try {
+    await act(async () => container.querySelector('[data-testid="access-forgot-password"]').click());
+    expect(container.querySelector('[data-testid="access-password"]')).toBeNull();
+    await submitLinkForm(container);
+    expect(global.fetch.mock.calls[0][0]).toMatch(/\/cloud\/password-reset\/request$/);
+    expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual({ email: "client@example.test" });
+    expect(container.querySelector('[role="status"]').textContent).toContain("code");
+    expect(container.querySelector('[data-testid="access-email"]').disabled).toBe(true);
+    await changeInput(container.querySelector('[data-testid="access-reset-code"]'), "123456");
+    await changeInput(container.querySelector('[data-testid="access-password"]'), "nouveau123");
+    await submitLinkForm(container);
+    expect(global.fetch.mock.calls[1][0]).toMatch(/\/cloud\/password-reset\/confirm$/);
+    expect(JSON.parse(global.fetch.mock.calls[1][1].body)).toEqual({
+      email: "client@example.test", code: "123456", password: "nouveau123",
+    });
+    expect(container.querySelector('[role="status"]').textContent).toContain("Mot de passe modifié");
+    expect(container.querySelector('[data-testid="access-reset-code"]')).toBeNull();
+    expect(container.querySelector('[data-testid="access-password"]').value).toBe("");
+    expect(onRefresh).not.toHaveBeenCalled();
+    await changeInput(container.querySelector('[data-testid="access-password"]'), "nouveau123");
+    await submitLinkForm(container);
+    expect(global.fetch.mock.calls[2][0]).toMatch(/\/cloud\/link$/);
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+  } finally {
+    await cleanup();
+    global.fetch = original;
+  }
+});
+
+test.each([
+  [false, "Veuillez attendre une minute avant de redemander un code."],
+  [true, "Code invalide ou expiré."],
+])("affiche l'erreur de récupération et permet de réessayer (confirmation : %s)", async (confirm, detail) => {
+  const original = global.fetch;
+  global.fetch = jest.fn().mockResolvedValue({ ok: false, json: async () => ({ detail }) });
+  if (confirm) global.fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) });
+  const { container, cleanup } = await render(<AccessLock status={{ state: "unlinked" }}
+    accountEmail="client@example.test" onRefresh={jest.fn()} />);
+  try {
+    await act(async () => container.querySelector('[data-testid="access-forgot-password"]').click());
+    await submitLinkForm(container);
+    if (confirm) {
+      await changeInput(container.querySelector('[data-testid="access-reset-code"]'), "123456");
+      await changeInput(container.querySelector('[data-testid="access-password"]'), "nouveau123");
+      await submitLinkForm(container);
+    }
+    expect(container.querySelector('[role="alert"]').textContent).toBe(detail);
+    expect(container.querySelector('[data-testid="access-link-submit"]').disabled).toBe(false);
+    expect(Boolean(container.querySelector('[data-testid="access-reset-code"]'))).toBe(confirm);
+  } finally {
+    await cleanup();
+    global.fetch = original;
+  }
+});
+
 test("AuthGate remplace le HUD par le verrou quand l'accès est refusé", async () => {
   const originalFetch = global.fetch;
   const originalWindowFetch = window.fetch;

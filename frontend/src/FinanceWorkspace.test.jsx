@@ -34,6 +34,23 @@ const change = (element, value) => act(async () => {
   element.dispatchEvent(new Event(element.tagName === "SELECT" ? "change" : "input", { bubbles: true }));
 });
 
+test("budget and laboratory are accessible on demand without starting any experiment", async () => {
+  const original = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation(async (url, options) => {
+    if (String(url).endsWith("/budget/history")) return { ok: true, json: async () => ({ analyses: [], decisions: [], experiments: [] }) };
+    if (String(url).endsWith("/lab/policy")) return { ok: true, json: async () => ({ cerebras: { enabled: false, reason: "Quota gratuit non vérifié." } }) };
+    return original(url, options);
+  });
+  await mount();
+  expect(global.fetch.mock.calls.some(([url]) => String(url).includes("/lab/"))).toBe(false);
+  await click("Ouvrir budget personnel et laboratoire");
+  expect(host.querySelector('[aria-label="Budget personnel et laboratoire"]')).not.toBeNull();
+  expect(host.textContent).toContain("Quota gratuit non vérifié");
+  expect(posts()).toHaveLength(0);
+  await click("Fermer budget et laboratoire");
+  expect(host.querySelector('[aria-label="Budget personnel et laboratoire"]')).toBeNull();
+});
+
 test("positions and risks use server values, chart and source; preview never confirms implicitly", async () => {
   await mount();
   expect(host.textContent).toContain("concentration > 35 %");

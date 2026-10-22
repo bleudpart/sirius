@@ -24,6 +24,7 @@ PERSONAL_COLLECTIONS = (
     "sirius_finance_portfolios", "sirius_finance_previews", "sirius_finance_alerts", "sirius_finance_routines",
     "sirius_finance_disabled", "sirius_finance_occurrences", "sirius_finance_attempts",
     "sirius_finance_notifications", "sirius_finance_events",
+    "sirius_budget_analyses", "sirius_budget_decisions", "sirius_lab_runs",
     "sirius_action_runs", "sirius_action_steps", "sirius_action_controls",
     "sirius_action_attempts", "sirius_action_events",
     "sirius_work_dispatches", "sirius_work_receipts", "sirius_work_reminders",

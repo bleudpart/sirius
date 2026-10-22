@@ -51,6 +51,9 @@ export default function AccessLock({ status, accountEmail = "", onRefresh, onLog
   const [form, setForm] = useState({ email: accountEmail, password: "", name: "" });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [notice, setNotice] = useState("");
+  const [resetCode, setResetCode] = useState("");
+  const [resetCodeSent, setResetCodeSent] = useState(false);
   const state = status?.state || "expired";
   const cloudEmail = status?.cloud?.email || "";
 
@@ -66,6 +69,7 @@ export default function AccessLock({ status, accountEmail = "", onRefresh, onLog
     event.preventDefault();
     setBusy(true);
     setMessage("");
+    setNotice("");
     try {
       const response = await fetch(`${API_BASE_URL}/cloud/${mode === "register" ? "register" : "link"}`, {
         method: "POST",
@@ -76,6 +80,44 @@ export default function AccessLock({ status, accountEmail = "", onRefresh, onLog
       if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Connexion à ΣIRIUS Cloud impossible.");
       const next = await onRefresh();
       if (next && !next.allowed) setMessage(next.detail || "");
+    } catch (error) {
+      setMessage(error.message || "ΣIRIUS Cloud est injoignable. Vérifiez la connexion Internet.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const changeMode = (next) => {
+    setMode(next);
+    setMessage("");
+    setNotice("");
+    setResetCode("");
+    setResetCodeSent(false);
+    setForm({ ...form, password: "" });
+  };
+
+  const resetPassword = async (event) => {
+    event.preventDefault();
+    setBusy(true);
+    setMessage("");
+    setNotice("");
+    try {
+      const response = await fetch(`${API_BASE_URL}/cloud/password-reset/${resetCodeSent ? "confirm" : "request"}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(resetCodeSent
+          ? { email: form.email.trim(), code: resetCode, password: form.password }
+          : { email: form.email.trim() }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Récupération du mot de passe impossible.");
+      if (resetCodeSent) {
+        changeMode("login");
+        setNotice("Mot de passe modifié. Utilisez le nouveau mot de passe pour relier ce PC.");
+      } else {
+        setResetCodeSent(true);
+        setNotice(data.message || "Si ce compte existe, un code vient d’être envoyé. Vérifiez aussi les spams.");
+      }
     } catch (error) {
       setMessage(error.message || "ΣIRIUS Cloud est injoignable. Vérifiez la connexion Internet.");
     } finally {
@@ -109,25 +151,42 @@ export default function AccessLock({ status, accountEmail = "", onRefresh, onLog
         {state === "unlinked" ? (
           <>
             <p className="auth-tagline">Après 15 jours d'essai, ΣIRIUS demande une licence ou une location. Votre compte permet de vérifier votre accès.</p>
-            <form className="auth-form" onSubmit={link} data-testid="access-link-form">
+            <form className="auth-form" onSubmit={mode === "reset" ? resetPassword : link} data-testid="access-link-form">
               {mode === "register" && (
                 <input type="text" placeholder="Prénom et nom" value={form.name} required autoComplete="name"
                   onChange={(event) => setForm({ ...form, name: event.target.value })} />
               )}
               <input type="email" placeholder="Email" value={form.email} required autoComplete="email"
+                disabled={busy || (mode === "reset" && resetCodeSent)}
                 onChange={(event) => setForm({ ...form, email: event.target.value })} data-testid="access-email" />
-              <input type="password" placeholder={mode === "register" ? "Mot de passe (8 caractères minimum)" : "Mot de passe"}
-                value={form.password} required minLength={mode === "register" ? 8 : undefined}
-                autoComplete={mode === "register" ? "new-password" : "current-password"}
+              {mode === "reset" && resetCodeSent && (
+                <input type="text" inputMode="numeric" autoComplete="one-time-code" placeholder="Code à 6 chiffres"
+                  value={resetCode} required pattern="[0-9]{6}" maxLength={6} disabled={busy}
+                  onChange={(event) => setResetCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                  data-testid="access-reset-code" />
+              )}
+              {(mode !== "reset" || resetCodeSent) && <input type="password"
+                placeholder={mode === "reset" ? "Nouveau mot de passe (8 caractères minimum)" : mode === "register" ? "Mot de passe (8 caractères minimum)" : "Mot de passe"}
+                value={form.password} required minLength={mode !== "login" ? 8 : undefined} disabled={busy}
+                autoComplete={mode !== "login" ? "new-password" : "current-password"}
                 onChange={(event) => setForm({ ...form, password: event.target.value })} data-testid="access-password" />
+              }
               {message && <div className="auth-error" role="alert">{message}</div>}
+              {notice && <p className="auth-powered" role="status">{notice}</p>}
               <button type="submit" className="auth-submit" disabled={busy} data-testid="access-link-submit">
-                <Link2 size={15} /> {mode === "register" ? "CRÉER MON COMPTE" : "RELIER CE PC"}
+                <Link2 size={15} /> {mode === "reset"
+                  ? (resetCodeSent ? "VALIDER LE NOUVEAU MOT DE PASSE" : "RECEVOIR UN CODE")
+                  : mode === "register" ? "CRÉER MON COMPTE" : "RELIER CE PC"}
               </button>
             </form>
-            <button type="button" className="auth-switch" onClick={() => { setMode(mode === "register" ? "login" : "register"); setMessage(""); }}>
-              {mode === "register" ? "J’ai déjà un compte — Se connecter" : "Pas encore de compte — Créer mon compte"}
+            <button type="button" className="auth-switch" disabled={busy} onClick={() => changeMode(mode === "login" ? "register" : "login")}>
+              {mode === "reset" ? "Retour à la connexion" : mode === "register" ? "J’ai déjà un compte — Se connecter" : "Pas encore de compte — Créer mon compte"}
             </button>
+            {mode === "login" && (
+              <button type="button" className="auth-link" disabled={busy} onClick={() => changeMode("reset")} data-testid="access-forgot-password">
+                Mot de passe oublié ?
+              </button>
+            )}
           </>
         ) : (
           <>

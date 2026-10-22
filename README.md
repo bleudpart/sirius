@@ -739,6 +739,80 @@ d'achat, le profil (export et suppression) et la déconnexion.
 Sur l'application Windows empaquetée, l'état est demandé au compte ΣIRIUS
 Cloud relié (cache de 10 minutes, grâce hors ligne de 3 jours) : un PC non
 relié affiche `unlinked`, un PC sans vérification récente `offline`.
+L'écran « Relier ce PC » propose « Mot de passe oublié ? » : le PC relaie
+la demande de code et la confirmation vers le compte Cloud via
+`/api/cloud/password-reset/request` et `/api/cloud/password-reset/confirm`,
+même avant la liaison. Ces routes restent réservées à une session locale
+authentifiée et à une requête directe depuis le PC. Aucun mot de passe local
+ni fichier de session Cloud n'est modifié par la récupération ; après validation,
+l'utilisateur saisit son nouveau mot de passe pour relier le PC.
+L'envoi nécessite la configuration SMTP du serveur Cloud ; les erreurs
+d'envoi, codes expirés et limites de fréquence sont affichés explicitement.
+
+### Budget personnel et laboratoire technique volontaire
+
+Dans PORTUS, ouvrir **Budget personnel et laboratoire**. NÉMÉSIS offre
+le même suivi en lecture seule. Le budget bancaire est distinct du
+portefeuille boursier manuel en USD : son contrat CSV est :
+
+```csv
+date,label,amount,currency
+2026-01-02,"Musique, famille",-9.99,EUR
+2026-02-02,"Musique, famille",-9.99,EUR
+2026-03-02,"Musique, famille",-9.99,EUR
+```
+
+Convertir explicitement le relevé bancaire vers ces quatre colonnes dans
+cet ordre : dates ISO, séparateur virgule, point décimal, débit négatif,
+crédit positif, EUR uniquement. Limites : 200 000 caractères, 2 000 lignes,
+deux décimales ; un fichier chargé dans l'interface est limité à 200 Ko.
+L'analyse enregistre des totaux mensuels et les preuves de récurrence,
+pas le CSV brut ni toutes les opérations. Les montants sont calculés en
+centimes entiers. Réimporter les mêmes opérations, même réordonnées,
+retrouve la même analyse ; les relevés ne sont jamais fusionnés ni
+additionnés. Vérifier les doublons dans le fichier source.
+
+Un candidat nécessite trois débits ou plus de même libellé normalisé,
+des intervalles de 25 à 35 jours et un écart entre montants inférieur
+ou égal à 5 % du montant médian (au moins un centime).
+Ce signal ne prouve ni un abonnement ni son inutilisation. L'utilisateur
+confirme l'usage ; sa dernière déclaration remplace la précédente pour
+ce candidat dans cette analyse. Une inutilisation donne seulement une
+recommandation de vérification du contrat et une estimation annuelle,
+jamais une résiliation. Un solde mensuel importé peut être incomplet :
+aucune capacité d'épargne, optimisation fiscale ou autorisation de
+virement n'en est déduite. Aucun accès bancaire n'est implémenté.
+
+Le laboratoire compare, sur demande et accord explicite, deux parseurs
+prédéfinis sur six cas CSV fictifs fixes. Il journalise score, durée et
+coût nul. Il ne lit pas les relevés clients, n'exécute pas de code généré
+ou de commande système et ne dispose pas d'isolation OS : il s'agit d'un
+micro-benchmark dans le serveur, pas d'un bac à sable général.
+Cerebras est le fournisseur envisagé avec plafond **0 €**, mais reste
+**désactivé** tant que le quota gratuit et son contrôle ne sont pas
+vérifiés. Les clés utilisées par le reste de SIRIUS n'autorisent aucun
+appel du laboratoire. Aucun essai automatique, veille Internet,
+auto-modification, nouveau fournisseur ou déploiement n'est activé.
+
+L'architecture réutilise le registre et l'orchestrateur ARIANE existants,
+sans ouvrir un second moteur d'agents : spécialistes déterministes
+`budget.history` (PORTUS), `lab.policy` (NÉMÉSIS) et `lab.local` (ARIANE).
+Les plans ont des dépendances explicites et le journal de l'orchestrateur ;
+`lab.local` exige une confirmation, une seule tentative et un délai
+maximum de cinq secondes. Son identifiant d'essai dérive de la clé
+d'idempotence du parcours. Ce sont des actions spécialisées encadrées,
+pas des agents LLM autonomes capables de modifier SIRIUS.
+
+Routes authentifiées : `/api/nummarius/budget/analyze`,
+`/budget/history`, `/budget/{id}/usage/{candidate}` et
+`/api/nummarius/lab/policy`, `/lab/local` (les chemins abrégés sont sous
+`/api/nummarius`). Analyses, dernière déclaration d'usage et essais sont
+isolés par compte dans `sirius_budget_analyses`,
+`sirius_budget_decisions`, `sirius_lab_runs`. Ils sont inclus dans
+l'export personnel et la procédure d'effacement du compte. L'interface
+limite l'historique aux vingt dernières analyses et aux vingt derniers
+essais, et aux cent décisions les plus récentes ; les données plus
+anciennes ne sont pas automatiquement effacées.
 
 Dans **Configuration → Clés API et services** (ou **Profil → Gérer mes clés API**), choisissez les services utiles,
 créez leurs clés via les liens des fournisseurs, testez-les puis utilisez

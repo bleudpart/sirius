@@ -234,6 +234,8 @@ def _public_status() -> dict:
 
 
 def make_cloud_link_router(require_user, db, is_direct_local_request):
+    from auth_api import PasswordResetConfirm, PasswordResetRequest
+
     router = APIRouter(prefix="/cloud", tags=["cloud"])
 
     async def _guard(request: Request):
@@ -271,6 +273,27 @@ def make_cloud_link_router(require_user, db, is_direct_local_request):
     async def register(data: CloudLinkRequest, request: Request):
         await _guard(request)
         return await _authenticate("/api/auth/register", data)
+
+    async def _password_reset(path: str, payload: dict) -> dict:
+        try:
+            async with _client() as cx:
+                response = await cx.post(path, json=payload)
+        except httpx.HTTPError as error:
+            raise HTTPException(status_code=502, detail="ΣIRIUS Cloud est injoignable. Vérifiez la connexion Internet.") from error
+        if response.status_code != 200:
+            raise HTTPException(status_code=response.status_code,
+                                detail=_detail(response, "Récupération du mot de passe impossible."))
+        return response.json()
+
+    @router.post("/password-reset/request")
+    async def request_password_reset(data: PasswordResetRequest, request: Request):
+        await _guard(request)
+        return await _password_reset("/api/auth/password-reset/request", data.model_dump())
+
+    @router.post("/password-reset/confirm")
+    async def confirm_password_reset(data: PasswordResetConfirm, request: Request):
+        await _guard(request)
+        return await _password_reset("/api/auth/password-reset/confirm", data.model_dump())
 
     @router.delete("/link")
     async def unlink(request: Request):
