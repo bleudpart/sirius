@@ -1,5 +1,19 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
+contextBridge.exposeInMainWorld("siriusNative", {
+  begin: () => ipcRenderer.invoke("sirius-native-begin"),
+  configure: (token, options) => ipcRenderer.invoke("sirius-native-configure", token, options),
+  chooseFolder: (token) => ipcRenderer.invoke("sirius-native-folder", token),
+  unwatch: (token) => ipcRenderer.invoke("sirius-native-unwatch", token),
+  stop: (token) => ipcRenderer.invoke("sirius-native-stop", token),
+  onEvent: (callback) => {
+    if (typeof callback !== "function") throw new TypeError("Gestionnaire natif invalide.");
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on("sirius-native-event", listener);
+    return () => ipcRenderer.removeListener("sirius-native-event", listener);
+  },
+});
+
 contextBridge.exposeInMainWorld("siriusMedia", {
   closeHud: () => ipcRenderer.invoke("sirius-media-close-hud"),
   toggleHud: () => ipcRenderer.invoke("sirius-media-toggle-hud"),

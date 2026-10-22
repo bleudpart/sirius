@@ -66,12 +66,14 @@ export function createModuleRegistry({ icons, actions, state, user, platform = "
     openGettingStarted,
     openWorkspaceSearch,
     openPrivacy,
+    openNativeAutomation,
   } = actions;
 
   return [
     { id: "getting-started", group: "OUTILS", label: "Guide de démarrage", Icon: icons.BadgeInfo, run: openGettingStarted },
     { id: "workspace-search", group: "OUTILS", label: "Rechercher — dossiers, Microsoft et fonctions", Icon: icons.FolderOpen, run: openWorkspaceSearch },
     { id: "privacy", group: "SYSTÈME", label: "Confidentialité et données", Icon: icons.ShieldCheck, run: openPrivacy },
+    { id: "native-automation", group: "SYSTÈME", label: "Automatisations Windows — hooks natifs", Icon: icons.Workflow, mobile: false, run: openNativeAutomation },
     { id: "voice-profile", group: "SYSTÈME", label: "Ma voix et ma diction", Icon: icons.Mic, run: openVoiceProfile },
     { id: "reload", group: "SYSTÈME", label: "Recharger ΣIRIUS", Icon: icons.RotateCcw, run: reload },
     { id: "display", group: "MÉDIAS", label: "ΣIRIUS DISPLAY", Icon: icons.Monitor, active: state.displayOpen, run: toggleDisplay },
@@ -121,7 +123,7 @@ export function createModuleRegistry({ icons, actions, state, user, platform = "
     { id: "promethee", group: "PANTHÉON", label: "PROMÉTHÉE — gestion de projet", Icon: icons.Flame, run: openPromethee },
     { id: "dossiers-pro", group: "OUTILS", label: "Dossiers intelligents — sources et propositions", Icon: icons.FolderOpen, run: openWorkDossiers },
     { id: "sport-coach", group: "PANTHÉON", label: "ASCLÉPIOS — bien-être & santé", Icon: icons.Activity, run: openSportCoach },
-    { id: "workflows", group: "PANTHÉON", label: "ARIANE — orchestration des modules", Icon: icons.Workflow, run: () => openWorkModule("workflows") },
+    { id: "workflows", group: "PANTHÉON", label: "ARIANE — orchestration et sous-agents IA", Icon: icons.Workflow, run: () => openWorkModule("workflows") },
     { id: "pricing", group: "PANTHÉON", label: "PLUTOS — prix et fournisseurs", Icon: icons.Landmark, run: () => openWorkModule("pricing") },
     { id: "dossiers", group: "PANTHÉON", label: "MNÉMOSYNE — dossiers et archives", Icon: icons.FolderOpen, run: () => openWorkModule("dossiers") },
     { id: "audit", group: "PANTHÉON", label: "NÉMÉSIS — audit et traçabilité", Icon: icons.History, run: () => openWorkModule("audit") },

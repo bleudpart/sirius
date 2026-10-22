@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { API_BASE_URL } from "./lib/api";
 import { newChronosRequestId } from "./chronos";
 import { downloadWorkJson } from "./workModuleBackup";
+import { assertSecureKeyTransport, loadApiKeys } from "./apiKeyStorage";
+import AgentMissionForm from "./AgentMissionForm";
+import ActionInitiatives from "./ActionInitiatives";
 import "./ArianeActions.css";
 
 const ROOT = `${API_BASE_URL}/ariane`;
@@ -60,7 +63,10 @@ export default function ArianeActions({ auditOnly = false }) {
     requests.current.add(controller);
     const timer = setTimeout(() => controller.abort(), 130000);
     try {
-      return await read(await fetch(url, { credentials: "include", ...options, signal: controller.signal }));
+      const key = loadApiKeys().cerebras;
+      if (key) assertSecureKeyTransport();
+      return await read(await fetch(url, { credentials: "include", ...options,
+        headers: { ...options.headers, ...(key ? { "X-Sirius-Cerebras-Key": key } : {}) }, signal: controller.signal }));
     } catch (failure) {
       if (failure.name === "AbortError") throw new Error("Lecture interrompue ou délai dépassé. Consultez la même référence avant de réessayer.");
       throw failure;
@@ -119,6 +125,7 @@ export default function ArianeActions({ auditOnly = false }) {
 
   return <section className="ariane-actions numm-tech numm-tech-card" data-testid="ariane-actions">
     <h2>{auditOnly ? "NÉMÉSIS · preuves des actions communes" : "ARIANE · actions communes"}</h2>
+    <ActionInitiatives auditOnly={auditOnly} onReview={(identity) => operation(`${ROOT}/runs/${identity}`)} />
     <p>Un objectif, des étapes reliées, un résultat vérifiable. Seules les actions du catalogue serveur peuvent être exécutées.
       Les listes manuelles ci-dessous et les anciens parcours financiers restent séparés.</p>
     <p>Chaque modification attend votre accord sur ses entrées exactes. Aucun ordre boursier.
@@ -134,6 +141,9 @@ export default function ArianeActions({ auditOnly = false }) {
       </details>)}
     </details>
     {!auditOnly && <>
+      <AgentMissionForm disabled={busy || !!pending} onPrepare={(mission) => {
+        setObjective(mission.title); setSteps(pretty(mission.steps));
+      }} />
       <fieldset disabled={busy || !!pending}>
         <legend>Préparer un parcours</legend>
         <label>Parcours guidé <select value={template} onChange={(event) => {
@@ -182,6 +192,7 @@ export default function ArianeActions({ auditOnly = false }) {
           {step.attempt_limit ? ` / ${step.attempt_limit} maximum` : ""}
           {step.duration_ms != null ? ` · ${step.duration_ms} ms` : ""}.</p>
         {step.reason && <p>{step.reason}</p>}
+        {step.reflection && <Evidence title="Diagnostic local de l'erreur · aucun appel supplémentaire" value={step.reflection} />}
         {step.retry_after && <p>Reprise d'une tentative interrompue possible après {step.retry_after}, pas avant.</p>}
         {step.approval && <p>Accord explicite enregistré : {step.approval.confirmed_at}.</p>}
         {step.prepared && <details open={step.state === "WAITING_CONFIRMATION"}><summary>Entrées exactes et empreinte de validation</summary>
@@ -197,6 +208,10 @@ export default function ArianeActions({ auditOnly = false }) {
           {" · "}données {step.output.analysis.data_version}</p>}
         {step.output?.findings && <p>{step.output.findings.length} dépassement(s), {step.output.missing.length} réserve(s).
           Résultats descriptifs, pas une recommandation personnalisée.</p>}
+        {step.output?.data?.synthesis && <div><h4>Synthèse SIRIUS</h4><pre>{step.output.data.synthesis}</pre></div>}
+        {step.output?.data?.reflection && <p>Contrôles locaux de structure effectués, sans relecture IA supplémentaire.
+          L'exactitude des faits n'est pas vérifiée. Détails et éventuelles corrections dans les preuves.</p>}
+        {step.output?.issues?.map((issue) => <p role="alert" key={issue}>{issue}</p>)}
         {step.output && <Evidence title="Résultat et données utilisées" value={step.output} />}
       </li>)}</ol>
       <details><summary>Journal NÉMÉSIS des actions communes</summary>

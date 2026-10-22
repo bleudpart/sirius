@@ -1,5 +1,6 @@
 """Read-only budget evidence and an opt-in, fixed synthetic CSV benchmark."""
 
+import asyncio
 import csv
 import io
 import logging
@@ -8,7 +9,7 @@ import sqlite3
 import time
 import uuid
 from collections import defaultdict
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, HTTPException, Request
@@ -29,6 +30,11 @@ class CsvBudgetIn(BaseModel):
 class UsageIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     used: bool = Field(strict=True)
+
+
+class ShadowIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = Field(strict=True)
 
 
 def parse_transactions(text):
@@ -188,13 +194,86 @@ class BudgetLab:
             "analyses": await self.storage(self.db.sirius_budget_analyses.find({"user_id": uid}, {"_id": 0}).sort("created_at", -1).to_list(20)),
             "decisions": await self.storage(self.db.sirius_budget_decisions.find({"user_id": uid}, {"_id": 0}).sort("created_at", -1).to_list(100)),
             "experiments": await self.storage(self.db.sirius_lab_runs.find({"user_id": uid}, {"_id": 0}).sort("created_at", -1).to_list(20)),
+            "shadow": await self.shadow_status(uid),
         }
+
+    async def shadow_status(self, uid):
+        saved = await self.storage(self.db.sirius_shadow_settings.find_one({"user_id": uid}, {"_id": 0}))
+        return saved or {"enabled": False, "next_run_at": None}
+
+    async def configure_shadow(self, uid, body, now=None):
+        now = now or datetime.now(timezone.utc)
+        previous = await self.shadow_status(uid)
+        if previous["enabled"] == body.enabled:
+            return previous
+        setting = {"id": "shadow-local-v1", "user_id": uid, "enabled": body.enabled,
+                   "updated_at": now.isoformat(),
+                   "next_run_at": (now + timedelta(days=1)).isoformat() if body.enabled else None}
+        await self.persist("sirius_shadow_settings", setting)
+        await self.storage(self.db.sirius_shadow_settings.update_one(
+            {"user_id": uid, "id": setting["id"]}, {"$set": setting}))
+        return setting
+
+    async def shadow_tick(self, now=None):
+        now = now or datetime.now(timezone.utc)
+        async for setting in self.db.sirius_shadow_settings.find({
+            "enabled": True, "next_run_at": {"$lte": now.isoformat()},
+        }, {"_id": 0}):
+            uid = setting["user_id"]
+            user = await self.storage(self.db.users.find_one({"user_id": uid}, {"_id": 0}))
+            if not user or user.get("disabled"):
+                continue
+            current = await self.shadow_status(uid)
+            if not current["enabled"] or current.get("updated_at") != setting["updated_at"]:
+                continue
+            recent = await self.storage(self.db.sirius_lab_runs.find({
+                "user_id": uid, "mode": "shadow",
+                "created_at": {"$gt": (now - timedelta(days=1)).isoformat()},
+            }, {"_id": 0}).to_list(1))
+            if recent:
+                continue
+            identity = digest([uid, "shadow-local-v1", now.date().isoformat()])[:32]
+            _, claimed = await self.storage(insert_once(self.db, "sirius_lab_runs", {
+                "id": identity, "user_id": uid, "mode": "shadow", "state": "RUNNING",
+                "created_at": now.isoformat(),
+                "notice": "Essai engagé : résultat non confirmé tant que l'état n'est pas COMPLETED.",
+            }))
+            if not claimed:
+                continue
+            # Fixed synthetic tests only; no URLs, discovery, credentials or generated code.
+            try:
+                result = local_benchmark()
+                strict, naive = result["results"][1], result["results"][0]
+                proposal = ("Préférer le parseur CSV strict au découpage naïf pour ces cas fictifs. "
+                            "Le parseur budgétaire utilise déjà le mode strict ; aucune modification nécessaire."
+                            if strict["correct"] > naive["correct"] else
+                            "Aucune amélioration démontrée par ce banc d'essai limité.")
+                result.update({"state": "COMPLETED", "proposal": proposal, "finished_at": now.isoformat()})
+            except (HTTPException, ValueError):
+                logger.exception("Shadow local benchmark failed")
+                result = {"state": "BLOCKED", "error": "Essai local échoué ; aucune amélioration validée.",
+                          "finished_at": now.isoformat()}
+            await self.storage(self.db.sirius_lab_runs.update_one(
+                {"user_id": uid, "id": identity}, {"$set": result}))
+            await self.storage(self.db.sirius_shadow_settings.update_one(
+                {"user_id": uid, "id": setting["id"], "updated_at": setting["updated_at"]},
+                {"$set": {"next_run_at": (now + timedelta(days=1)).isoformat()}}))
+
+    async def shadow_loop(self):
+        while True:
+            try:
+                await self.shadow_tick()
+            except (sqlite3.Error, PyMongoError, HTTPException):
+                logger.exception("Shadow scheduler unavailable; no successful result assumed")
+            await asyncio.sleep(60)
 
     @staticmethod
     def policy():
         return {"cerebras": {"enabled": False, "monthly_budget_eur": 0, "free_quota_verified": False,
                             "reason": "Quota gratuit non vérifié : aucun appel Cerebras autorisé."},
                 "local": {"enabled": True, "manual_start_only": True, "synthetic_data_only": True},
+                "shadow": {"default_enabled": False, "interval_hours": 24, "external_calls": False,
+                           "catalog": ["decoupage_naif", "csv_strict"]},
                 "code_modification": False, "deployment": False}
 
     async def run_local(self, uid, identity):
@@ -251,5 +330,9 @@ def make_budget_lab_router(service, require_user):
     @router.post("/lab/local")
     async def run_local(request: Request):
         return await service.run_local(await owner(request), uuid.uuid4().hex)
+
+    @router.put("/lab/shadow")
+    async def configure_shadow(body: ShadowIn, request: Request):
+        return await service.configure_shadow(await owner(request), body)
 
     return router

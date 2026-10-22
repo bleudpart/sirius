@@ -59,6 +59,7 @@ export const PackagerPanel = wrap(() => import("@/PackagerPanel"));
 export const TrailerGallery = wrap(() => import("@/TrailerGallery"));
 export const SiriusSetup = wrap(() => import("@/SiriusSetup"));
 export const WorkspaceSearch = wrap(() => import("@/WorkspaceSearch"));
+export const NativeAutomationHub = wrap(() => import("@/NativeAutomationHub"));
 export const FirstRunWizard = wrap(() => import("@/FirstRunWizard"));
 export const PromoPanel = wrap(() => import("@/PromoPanel"));
 export const ThemisPanel = wrap(() => import("@/ThemisPanel"));

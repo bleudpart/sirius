@@ -791,8 +791,17 @@ micro-benchmark dans le serveur, pas d'un bac à sable général.
 Cerebras est le fournisseur envisagé avec plafond **0 €**, mais reste
 **désactivé** tant que le quota gratuit et son contrôle ne sont pas
 vérifiés. Les clés utilisées par le reste de SIRIUS n'autorisent aucun
-appel du laboratoire. Aucun essai automatique, veille Internet,
-auto-modification, nouveau fournisseur ou déploiement n'est activé.
+appel du laboratoire. La veille shadow locale est désactivée par défaut ;
+son activation volontaire autorise un essai fictif au plus toutes les
+24 heures, premier essai après 24 heures. Le serveur connecté doit
+rester allumé. Aucun rattrapage des journées manquées, aucune découverte
+Internet, API externe, auto-modification ou déploiement n'est activé.
+Le catalogue autorisé reste `decoupage_naif` et `csv_strict` : ce banc
+ne découvre pas de nouveaux outils. Il journalise les résultats et
+une proposition argumentée, qui peut conclure qu'aucune modification
+n'est nécessaire. Étendre le catalogue demande un développement et
+une autorisation distincts ; la clé Cerebras des sous-agents ci-dessous
+n'autorise pas Cerebras pour cette veille à 0 €.
 
 L'architecture réutilise le registre et l'orchestrateur ARIANE existants,
 sans ouvrir un second moteur d'agents : spécialistes déterministes
@@ -805,14 +814,120 @@ pas des agents LLM autonomes capables de modifier SIRIUS.
 
 Routes authentifiées : `/api/nummarius/budget/analyze`,
 `/budget/history`, `/budget/{id}/usage/{candidate}` et
-`/api/nummarius/lab/policy`, `/lab/local` (les chemins abrégés sont sous
+`/api/nummarius/lab/policy`, `/lab/local`, `PUT /lab/shadow` (les chemins abrégés sont sous
 `/api/nummarius`). Analyses, dernière déclaration d'usage et essais sont
 isolés par compte dans `sirius_budget_analyses`,
-`sirius_budget_decisions`, `sirius_lab_runs`. Ils sont inclus dans
+`sirius_budget_decisions`, `sirius_lab_runs`, `sirius_shadow_settings`. Ils sont inclus dans
 l'export personnel et la procédure d'effacement du compte. L'interface
 limite l'historique aux vingt dernières analyses et aux vingt derniers
 essais, et aux cent décisions les plus récentes ; les données plus
 anciennes ne sont pas automatiquement effacées.
+
+### Sous-agents IA coordonnés par SIRIUS
+
+Dans **ARIANE — orchestration et sous-agents IA**, saisir un objectif et,
+facultativement, un contexte non sensible. Choisir THOT (analyse du texte),
+HERMÈS (brouillon de message) et/ou CHRONOS (proposition de planning).
+**Préparer cette délégation sans appel IA** remplit le parcours ; démarrer
+sa préparation puis relire les entrées et autoriser l'étape `delegation`.
+Cette confirmation autorise les appels Cerebras pour la mission exacte.
+
+L'action serveur `agents.mission` réutilise le registre, le contrôle de
+confirmation et le journal ARIANE. Elle lance un à trois spécialistes en
+parallèle puis une synthèse du coordinateur. Aucun outil n'est exposé aux
+modèles : pas de lecture des fichiers, mails ou agendas, de shell, d'accès
+Web, d'envoi, d'écriture métier ni de modification de code. Le contenu
+saisi et les résultats sont conservés dans les collections ARIANE par
+compte, incluses dans l'export personnel et couvertes par l'effacement du compte ; ne pas fournir de secrets
+ou de données sensibles. Les réponses restent des propositions à vérifier.
+
+Cerebras est le seul fournisseur, sans repli. La clé personnelle
+déverrouillée est transmise en en-tête à la confirmation, jamais dans le
+plan ni le journal ; sinon la politique de clé serveur et les quotas
+d'essai existants s'appliquent. Aucun appel réel n'est effectué à la
+préparation. Limites : quatre appels maximum par mission, une tentative
+par appel et par étape, 30 secondes par étape ; plafonds de génération
+(raisonnement compris) de 1 024 tokens par spécialiste et 1 536 pour la
+synthèse. Au plus deux missions à la fois par processus serveur et une
+par compte dans ce processus. Ces plafonds ne garantissent pas un coût
+en euros : la facturation et les quotas Cerebras restent applicables,
+contrairement au laboratoire shadow strictement local à 0 €.
+
+Un échec ou une réponse tronquée reste explicitement partiel/bloqué ;
+aucune relance facturable automatique. Les contributions reçues restent
+consultables dans les preuves. Un arrêt empêche la synthèse si elle
+n'a pas commencé, mais ne garantit ni l'annulation ni le remboursement
+des appels déjà engagés. Après coupure, retrouver le même parcours
+plutôt que créer une nouvelle mission.
+
+### Réflexion locale et initiatives ARIANE
+
+Les réponses des spécialistes de `agents.mission` et leur synthèse passent
+par un contrôle structurel local : type, taille maximale de 12 000 caractères,
+contenu non vide, caractères de contrôle, marqueurs de raisonnement/outils
+et fermeture des blocs Markdown. Seuls le BOM initial, les fins de ligne et
+les espaces de bord peuvent être corrigés, puis le texte est recontrôlé
+(deux passes maximum). Un contenu non réparable reste bloqué et est exclu
+de la synthèse ; une synthèse refusée n'est pas affichée comme résultat.
+Le journal conserve le diagnostic, pas le texte refusé.
+
+**Ce n'est ni une vérification factuelle ni une correction sémantique** :
+le chat général n'est pas concerné. Aucun appel IA supplémentaire n'est
+effectué par cette réflexion. Le moteur ARIANE journalise aussi un diagnostic
+local des erreurs d'API (autorisation, quota, entrées/état, résultat incertain).
+Il ne modifie pas les paramètres, ne contourne pas un refus et ne rejoue
+pas automatiquement l'appel. Les éventuelles reprises manuelles conservent
+les confirmations et limites du contrat existant.
+
+Dans ARIANE, **Initiatives locales** est désactivé par défaut. Après
+consentement explicite, le serveur contrôle toutes les quinze minutes
+(premier contrôle après quinze minutes) les vingt derniers parcours non
+expirés créés depuis au moins quinze minutes. Il propose de consulter ceux
+qui sont bloqués ou attendent une confirmation. L'âge concerne le parcours,
+pas la durée exacte d'attente de l'étape. Le serveur doit rester allumé ;
+le panneau affiche les résultats, actualisés chaque minute lorsqu'il est ouvert.
+Il n'y a ni nouvel appel IA, ni exécution, confirmation ou reprise automatique,
+ni notification système automatique. Une proposition ne constitue pas une action.
+
+Les réglages persistent par compte et peuvent être désactivés à tout moment.
+Les propositions sont dédupliquées par parcours et état ; les masquer ne
+relance rien et ne les recrée pas au contrôle suivant. Une proposition devenue
+obsolète reste signalée comme telle. L'affichage est limité aux vingt dernières
+propositions non masquées. Routes authentifiées :
+`GET /api/ariane/initiatives`, `PUT /api/ariane/initiatives/settings`,
+`POST /api/ariane/initiatives/{id}/dismiss`. Les collections
+`sirius_initiative_settings` et `sirius_action_proposals` sont isolées par
+compte, incluses dans l'export personnel et l'effacement du compte.
+
+### Hooks natifs Windows, facultatifs et limités à la session
+
+Dans **Automatisations Windows — hooks natifs** (menu des modules),
+chaque option est désactivée au départ :
+
+- **Ctrl+Alt+S** rappelle la fenêtre SIRIUS sans lancer le microphone ou
+  une IA. Un conflit de raccourci est signalé sans retirer celui d'une
+  autre application. Les anciens raccourcis multimédia restent inchangés.
+- **Notifications Windows** affiche un message générique pour les
+  événements autorisés. Un clic rappelle SIRIUS et ouvre ce panneau.
+  Windows peut masquer les notifications (concentration/autorisations).
+- **Reprise et déverrouillage** inscrit un événement invitant à consulter
+  les tâches ; le bouton correspondant ouvre le suivi CHRONOS. Aucun
+  rappel ni agenda n'est lu automatiquement par le processus Electron.
+- **Dossier choisi** ouvre un sélecteur natif et surveille seulement ce
+  dossier, sans récursion, lecture, classement, exécution ni transfert
+  des fichiers. Racine du disque et dossier personnel complet refusés.
+  Les événements peuvent être regroupés et ne prouvent ni l'arrivée
+  d'un nouveau document ni la fin d'une copie.
+
+Le journal des cent derniers événements et noms de fichiers reste en
+mémoire sur ce PC ; aucun chemin ni événement n'est envoyé au backend
+ou à une IA. Fermer le panneau conserve les hooks ; **Tout arrêter et
+réinitialiser**, la déconnexion/changement de compte, un rechargement,
+un crash du rendu ou la fermeture de SIRIUS les arrêtent. Rien ne tourne
+comme service Windows indépendant ni ne se réactive au prochain lancement.
+Les nouveaux IPC sont réservés au cadre principal de la fenêtre SIRIUS
+et à son origine locale autorisée ; la session native utilise un jeton
+éphémère. Fonctionnalité indisponible dans le navigateur et sur Android.
 
 Dans **Configuration → Clés API et services** (ou **Profil → Gérer mes clés API**), choisissez les services utiles,
 créez leurs clés via les liens des fournisseurs, testez-les puis utilisez

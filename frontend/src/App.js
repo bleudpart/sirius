@@ -10,7 +10,7 @@ import {
   AtlasPanel, HeraclesPanel, HephaistosPanel, MythosGallery, Odysseia, ConsultPanel, PrometheePanel, CalliopePanel, CalendarPanel,
   FaceIdPanel, PythagorePanel, PackagerPanel, TrailerGallery, SiriusSetup, FirstRunWizard, PromoPanel, ThemisPanel,
   AdminPanel, EnterprisePanel, PortusNummarius, AgoraPipeline, NewsPanel, ReveilPanel, SpotifyPanel, MediaHUD, ProductivityPanel,
-  FloorPlanPanel, Photo3DPanel, ConnectionsPanel, MessagingPanel, WorkModulesPanel, WorkDossiersPanel, SportCoachPanel, MediaModulesPanel, VoiceProfilePanel, WorkspaceSearch,
+  FloorPlanPanel, Photo3DPanel, ConnectionsPanel, MessagingPanel, WorkModulesPanel, WorkDossiersPanel, SportCoachPanel, MediaModulesPanel, VoiceProfilePanel, WorkspaceSearch, NativeAutomationHub,
 } from "@/lazyModules";
 import { pushStats, setStatsOffline } from "@/liveStats";
 import { formatLocalDate, formatLocalTime, getLocalDateKey } from "@/dateTime";
@@ -1032,6 +1032,7 @@ function App() {
   const [showNummarius, setShowNummarius] = useState(false);
   const auth = useAuth() || {};
   const authUser = auth.user;
+  const [showNativeAutomation, setShowNativeAutomation] = useState(false);
   useEffect(() => {
     updateWorkConversationContext(null);
   }, [authUser?.user_id, authUser?.id, authUser?.email, updateWorkConversationContext]);
@@ -6924,6 +6925,7 @@ function App() {
       openGettingStarted: () => setShowGettingStarted(true),
       openWorkspaceSearch: () => setWorkspaceSearch({ query: "" }),
       openPrivacy: () => { setSetupInitialTab("confidentialite"); setShowSetup(true); },
+      openNativeAutomation: () => setShowNativeAutomation(true),
       openWorkDossiers: () => setShowWorkDossiers(true),
       openSportCoach: () => setShowSportCoach(true),
       openVoiceProfile: () => setShowVoiceProfile(true),
@@ -6986,6 +6988,11 @@ function App() {
           else moduleActionsRef.current.openWorkModule(id);
         }}
       />
+      {authUser && (window.siriusNative || showNativeAutomation) && <NativeAutomationHub
+        key={authUser.user_id || authUser.id || authUser.email}
+        open={showNativeAutomation} onClose={() => setShowNativeAutomation(false)}
+        onRequestOpen={() => setShowNativeAutomation(true)}
+        onReview={() => { setShowNativeAutomation(false); setActiveWorkModule("planning"); }} />}
       {workspaceSearch && <WorkspaceSearch key={workspaceSearch.query} initialQuery={workspaceSearch.query} modules={moduleItems}
         microsoftFetch={msFetch} onClose={() => setWorkspaceSearch(null)}
         onContact={composeToContact}

@@ -15,6 +15,8 @@ from pymongo.errors import PyMongoError
 
 from action_registry import ActionContext, ActionInputs, ActionRegistry
 from work_draft_recordings import digest, insert_once
+from provider_access import provider_scope
+from local_reflection import reflect_api_error
 
 logger = logging.getLogger(__name__)
 
@@ -247,6 +249,7 @@ class ActionRuns:
         started = time.monotonic()
         await self.event(uid, run_id, step_id, "RUNNING", attempt=number, action=step["action"])
         partial_output = None
+        reflection = None
         try:
             context = ActionContext(uid, run_id, step_id, digest([run_id, step_id]))
             async with asyncio.timeout(definition.timeout_seconds):
@@ -261,6 +264,7 @@ class ActionRuns:
                 outcome, reason = "COMPLETED", None
         except (HTTPException, TimeoutError) as exc:
             outcome = "BLOCKED"
+            reflection = reflect_api_error(exc)
             reason = exc.detail if isinstance(exc, HTTPException) else "Délai dépassé ; résultat non confirmé, reprenez la même référence."
             logger.warning("ARIANE action %s blocked (%s)", step["action"], type(exc).__name__)
         except Exception:
@@ -268,9 +272,10 @@ class ActionRuns:
             raise
         await insert_once(self.db, "sirius_action_steps", {
             "id": attempt_id + ":finished", "user_id": uid, "run_id": run_id, "step": step_id,
-            "state": outcome, "reason": reason, "partial_output": partial_output, "finished_at": now_iso(),
+            "state": outcome, "reason": reason, "partial_output": partial_output,
+            "reflection": reflection, "finished_at": now_iso(),
         })
-        await self.event(uid, run_id, step_id, outcome, reason=reason, attempt=number)
+        await self.event(uid, run_id, step_id, outcome, reason=reason, attempt=number, reflection=reflection)
 
     async def confirm(self, uid, run_id, step_id, body):
         run = await self.owned(uid, run_id)
@@ -331,6 +336,7 @@ class ActionRuns:
                           "attempt_limit": run["contracts"][step_id]["max_attempts"],
                           "retry_after": attempts[0]["lease_until"] if attempts and not finished and not saved else None,
                           "reason": reason})
+            steps[-1]["reflection"] = finished.get("reflection") if finished else None
         all_done = all(step["state"] in ("COMPLETED", "SKIPPED") for step in steps)
         cancellation = await self.db.sirius_action_controls.find_one({"user_id": uid, "id": f"{run_id}:cancel"}, {"_id": 0})
         state = ("COMPLETED" if all_done else "CANCELLED" if cancellation
@@ -355,7 +361,8 @@ def make_action_router(service, require_user):
     async def call(request, operation, *args):
         user = await require_user(request, service.db)
         try:
-            return await operation(user["user_id"], *args)
+            with provider_scope(user, {"cerebras": request.headers.get("x-sirius-cerebras-key", "")}):
+                return await operation(user["user_id"], *args)
         except (sqlite3.Error, PyMongoError) as exc:
             logger.exception("ARIANE shared action persistence unavailable")
             raise HTTPException(503, "Journal ARIANE indisponible. Résultat potentiellement partiel ; reprenez la même référence.") from exc

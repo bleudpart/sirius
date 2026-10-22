@@ -4,7 +4,7 @@ import json
 import sqlite3
 import uuid
 import zipfile
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from unittest.mock import AsyncMock
 
 import pytest
@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 
 from action_registry import ActionRegistry
 from action_runs import ActionRuns, ConfirmIn, RunIn
-from budget_lab import BudgetLab, CsvBudgetIn, UsageIn, local_benchmark, make_budget_lab_router, parse_transactions
+from budget_lab import BudgetLab, CsvBudgetIn, ShadowIn, UsageIn, local_benchmark, make_budget_lab_router, parse_transactions
 from local_docstore import LocalDocStore
 
 CSV = ("date,label,amount,currency\n"
@@ -86,7 +86,8 @@ def test_human_usage_is_scoped_replaceable_and_never_executes(service):
     decisions = run(service.history("one"))["decisions"]
     assert len(decisions) == 1 and decisions[0]["used"] is True
     assert decisions[0]["potential_annual_cents"] == 0
-    assert run(service.history("two")) == {"analyses": [], "decisions": [], "experiments": []}
+    assert run(service.history("two")) == {"analyses": [], "decisions": [], "experiments": [],
+                                          "shadow": {"enabled": False, "next_run_at": None}}
 
 
 @pytest.mark.parametrize("gap,expected", [(24, 0), (25, 1), (35, 1), (36, 0)])
@@ -129,6 +130,50 @@ def test_lab_only_fixed_synthetic_cases_and_zero_network(service, monkeypatch):
     assert run(service.history("two"))["experiments"] == []
 
 
+def test_shadow_disabled_by_default_daily_durable_claim_and_stop(service):
+    now = datetime(2026, 10, 22, 18, tzinfo=timezone.utc)
+    run(service.db.users.insert_one({"user_id": "one"}))
+    run(service.shadow_tick(now))
+    assert run(service.history("one"))["experiments"] == []
+    setting = run(service.configure_shadow("one", ShadowIn(enabled=True), now))
+    assert datetime.fromisoformat(setting["next_run_at"]) == now + timedelta(days=1)
+    run(service.shadow_tick(now + timedelta(days=1) - timedelta(seconds=1)))
+    assert run(service.history("one"))["experiments"] == []
+    due = now + timedelta(days=1)
+    async def concurrent():
+        await asyncio.gather(service.shadow_tick(due), service.shadow_tick(due))
+    run(concurrent())
+    experiments = run(service.history("one"))["experiments"]
+    assert len(experiments) == 1
+    assert experiments[0]["state"] == "COMPLETED"
+    assert experiments[0]["cost_eur"] == experiments[0]["external_calls"] == 0
+    assert "aucune modification nécessaire" in experiments[0]["proposal"]
+    run(service.shadow_tick(due + timedelta(hours=23, minutes=59)))
+    assert len(run(service.history("one"))["experiments"]) == 1
+    run(service.shadow_tick(due + timedelta(days=1)))
+    assert len(run(service.history("one"))["experiments"]) == 2
+    run(service.configure_shadow("one", ShadowIn(enabled=False), due + timedelta(days=1)))
+    run(service.shadow_tick(due + timedelta(days=3)))
+    assert len(run(service.history("one"))["experiments"]) == 2
+    assert run(service.history("two"))["shadow"]["enabled"] is False
+
+
+def test_shadow_disabled_account_no_catchup_and_error_visible(service, monkeypatch):
+    now = datetime(2026, 10, 22, 18, tzinfo=timezone.utc)
+    run(service.db.users.insert_one({"user_id": "one", "disabled": True}))
+    run(service.configure_shadow("one", ShadowIn(enabled=True), now))
+    run(service.shadow_tick(now + timedelta(days=8)))
+    assert run(service.history("one"))["experiments"] == []
+    run(service.db.users.update_one({"user_id": "one"}, {"$set": {"disabled": False}}))
+    monkeypatch.setattr("budget_lab.local_benchmark", lambda: (_ for _ in ()).throw(ValueError("fixture")))
+    run(service.shadow_tick(now + timedelta(days=8)))
+    experiments = run(service.history("one"))["experiments"]
+    assert len(experiments) == 1 and experiments[0]["state"] == "BLOCKED"
+    assert "aucune amélioration validée" in experiments[0]["error"]
+    run(service.shadow_tick(now + timedelta(days=8, minutes=2)))
+    assert len(run(service.history("one"))["experiments"]) == 1
+
+
 def test_actions_delegate_through_existing_orchestrator_and_require_confirmation(service):
     registry = ActionRegistry()
     service.register(registry)
@@ -162,6 +207,7 @@ def test_routes_authentication_strict_inputs_and_account_scope(service):
             ("get", "/budget/history", None), ("get", "/lab/policy", None),
             ("post", "/budget/analyze", {"text": CSV}), ("post", "/lab/local", None),
             ("put", "/budget/missing/usage/missing", {"used": False}),
+            ("put", "/lab/shadow", {"enabled": True}),
         ):
             assert client.request(method, "/api/nummarius" + path, json=body).status_code == 401
         headers = {"x-test-user": "one"}
@@ -192,6 +238,7 @@ def test_budget_and_lab_in_personal_export_without_other_account(service):
         saved = run(service.analyze(uid, CsvBudgetIn(text=CSV)))
         run(service.usage(uid, saved["id"], saved["candidates"][0]["id"], UsageIn(used=False)))
         run(service.run_local(uid, "run-" + uid))
+        run(service.configure_shadow(uid, ShadowIn(enabled=True)))
     route = next(route for route in auth_api.make_auth_router(service.db).routes if route.path == "/auth/privacy/export")
 
     async def exported():
@@ -200,6 +247,6 @@ def test_budget_and_lab_in_personal_export_without_other_account(service):
 
     with zipfile.ZipFile(io.BytesIO(run(exported()))) as archive:
         exported = json.loads(archive.read("sirius-personal-data.json"))
-    for name in ("sirius_budget_analyses", "sirius_budget_decisions", "sirius_lab_runs"):
+    for name in ("sirius_budget_analyses", "sirius_budget_decisions", "sirius_lab_runs", "sirius_shadow_settings"):
         assert len(exported["collections"][name]) == 1
         assert exported["collections"][name][0]["user_id"] == "one"

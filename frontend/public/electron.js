@@ -10,6 +10,7 @@ const {
 const { startBackend, stopBackend } = require("./electron/backend_process");
 const { setupAutoUpdater } = require("./electron/auto_update");
 const { captureRectangle } = require("./electron/capture_region");
+const { NativeAutomation, installNativeAutomation } = require("./electron/native_automation");
 
 // SIRIUS — Application de bureau Windows (Electron)
 // Charge le HUD React compilé (dossier build) et accorde l'accès au micro.
@@ -17,6 +18,7 @@ const { captureRectangle } = require("./electron/capture_region");
 const isDev = !app.isPackaged;
 let mainWindow = null;
 let overlayWindow = null;
+let nativeAutomation = null;
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
 if (!hasSingleInstanceLock) {
@@ -107,6 +109,10 @@ function createWindow() {
   mainWindow.maximize();
 
   mainWindow.loadURL(baseUrl());
+  mainWindow.webContents.on("did-start-navigation", (_event, _url, _inPlace, isMainFrame) => {
+    if (isMainFrame && !_inPlace) nativeAutomation?.reset();
+  });
+  mainWindow.webContents.on("render-process-gone", () => nativeAutomation?.reset());
 
   // Ouvre les liens externes dans le navigateur par défaut
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -124,6 +130,7 @@ function createWindow() {
   });
 
   mainWindow.on("closed", () => {
+    nativeAutomation?.reset();
     mainWindow = null;
   });
 }
@@ -200,6 +207,13 @@ app.whenReady().then(async () => {
   );
 
   createWindow();
+  nativeAutomation = new NativeAutomation({
+    globalShortcut, powerMonitor: require("electron").powerMonitor,
+    Notification: require("electron").Notification, dialog, getWindow: () => mainWindow,
+    home: app.getPath("home"),
+  });
+  installNativeAutomation({ ipcMain, manager: nativeAutomation, getWindow: () => mainWindow,
+    origin: () => new URL(baseUrl()).origin });
 
   // Raccourci global : Alt+Espace ouvre/ferme l'overlay (barre rapide type Spotlight)
   globalShortcut.register("Alt+Space", toggleOverlay);
@@ -313,6 +327,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("will-quit", () => {
+  nativeAutomation?.reset();
   globalShortcut.unregisterAll();
   stopBackend();
 });

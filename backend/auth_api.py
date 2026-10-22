@@ -605,7 +605,10 @@ def make_auth_router(db):
         user_id = user["user_id"]
         export = {"profile": {key: value for key, value in user.items() if key not in {"access_token", "password_hash"}}, "collections": {}}
         for collection_name in ("sirius_chats", "local_memory", "episodic_memory", "user_files", "agora_deals", "themis_docs", "themis_clients", "payment_transactions", "enterprise_members", "enterprise_audit",
-                                "sirius_budget_analyses", "sirius_budget_decisions", "sirius_lab_runs"):
+                                "sirius_budget_analyses", "sirius_budget_decisions", "sirius_lab_runs", "sirius_shadow_settings",
+                                "sirius_action_runs", "sirius_action_steps", "sirius_action_controls",
+                                "sirius_action_attempts", "sirius_action_events",
+                                "sirius_initiative_settings", "sirius_action_proposals"):
             collection = getattr(db, collection_name, None)
             if collection is not None:
                 export["collections"][collection_name] = await collection.find({"user_id": user_id}, {"_id": 0}).to_list(10000)

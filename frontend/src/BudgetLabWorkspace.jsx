@@ -11,6 +11,7 @@ export default function BudgetLabWorkspace({ request, auditOnly = false }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [consent, setConsent] = useState(false);
+  const [shadowConsent, setShadowConsent] = useState(false);
   const locked = useRef(false);
   const lifecycle = useRef(null);
 
@@ -120,7 +121,26 @@ export default function BudgetLabWorkspace({ request, auditOnly = false }) {
     <p>{policy?.cerebras.reason || "Chargement des limites du laboratoire."}</p>
     <p>Banc d'essai dans le processus serveur, pas un bac à sable système : six exemples CSV fictifs fixes,
       deux parseurs prédéfinis. Aucun réseau, code généré, secret, changement de code ou déploiement.
-      Aucun essai en arrière-plan.</p>
+      Les essais manuels et la veille périodique sont séparés.</p>
+    <h4>Veille shadow locale · propositions uniquement</h4>
+    <p>Catalogue autorisé : découpage naïf et parseur CSV strict, sans découverte Internet ni nouvelle API.
+      Après activation, un essai au plus toutes les 24 heures, premier essai après 24 heures,
+      uniquement si le service connecté est allumé. Aucun rattrapage massif, aucun appel Cerebras.</p>
+    <p>État : {history?.shadow?.enabled ? "activée" : "désactivée"}.
+      {history?.shadow?.next_run_at && ` Prochain essai au plus tôt : ${history.shadow.next_run_at}.`}</p>
+    {!auditOnly && <fieldset disabled={busy || !history}>
+      <legend>Autorisation persistante de veille locale</legend>
+      {!history?.shadow?.enabled && <label><input type="checkbox" checked={shadowConsent}
+        onChange={(event) => setShadowConsent(event.target.checked)} />
+        J'autorise les essais quotidiens fictifs et leurs propositions, sans modification du code</label>}
+      <button type="button" disabled={!history?.shadow?.enabled && !shadowConsent} onClick={() => operation(async (signal) => {
+        const result = await request("/lab/shadow", { method: "PUT", signal,
+          headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: !history.shadow?.enabled }) });
+        if (typeof result.enabled !== "boolean") throw new Error("État de veille non vérifiable ; actualisez le suivi.");
+        await load(signal);
+        if (!signal.aborted) { setShadowConsent(false); setNotice(result.enabled ? "Veille locale autorisée." : "Veille locale arrêtée. Les résultats déjà enregistrés sont conservés."); }
+      })}>{history?.shadow?.enabled ? "Arrêter la veille shadow" : "Activer la veille shadow locale"}</button>
+    </fieldset>}
     {!auditOnly && <fieldset disabled={busy || !policy}>
       <legend>Autorisation d'un seul essai local</legend>
       <label><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
@@ -135,9 +155,13 @@ export default function BudgetLabWorkspace({ request, auditOnly = false }) {
       })}>Lancer cet essai local</button>
     </fieldset>}
     <ul>{history?.experiments.map((run) => <li key={run.id}>
-      {run.created_at} · {run.cost_eur} € · {run.external_calls} appel externe
-      <ul>{run.results.map((result) => <li key={result.tool}>{result.tool} : {result.correct}/{result.cases} cas corrects
+      {run.created_at} · {run.mode === "shadow" ? "Veille shadow" : "Essai manuel"} · {run.state || "COMPLETED"}
+      {run.cost_eur != null && <> · {run.cost_eur} € · {run.external_calls} appel externe</>}
+      {run.state === "RUNNING" && <p>Essai engagé, résultat non confirmé. Une interruption du serveur peut empêcher sa finalisation.</p>}
+      {run.error && <p role="alert">{run.error}</p>}
+      <ul>{run.results?.map((result) => <li key={result.tool}>{result.tool} : {result.correct}/{result.cases} cas corrects
         {" · "}{result.elapsed_ms} ms</li>)}</ul><p>{run.scope}</p>
+      {run.proposal && <p>Proposition : {run.proposal} Aucun correctif appliqué.</p>}
     </li>)}</ul>
   </section>;
 }

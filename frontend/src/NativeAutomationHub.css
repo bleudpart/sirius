@@ -1,0 +1,5 @@
+.native-automation-backdrop { position: fixed; inset: 0; z-index: 1300; background: #000b; display: grid; place-items: center; padding: 16px; }
+.native-automation-panel { background: #102330; color: #e1edf4; border: 1px solid #43606f; border-radius: 14px; padding: 20px; width: min(780px, 100%); max-height: 88vh; overflow: auto; overflow-wrap: anywhere; }
+.native-automation-panel label { display: flex; gap: 10px; margin: 12px 0; }
+.native-automation-panel fieldset { min-width: 0; margin: 14px 0; }
+.native-automation-panel button { margin: 5px; padding: 8px; }

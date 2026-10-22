@@ -24,11 +24,14 @@ const click = (text) => act(async () => button(text).click());
 const mount = (auditOnly = false) => act(async () => root.render(<ArianeActions auditOnly={auditOnly} />));
 const response = (data, ok = true) => ({ ok, json: async () => data });
 const posts = () => global.fetch.mock.calls.filter(([, options]) => options.method === "POST");
+const missionForm = () => [...host.querySelectorAll("fieldset")].find((item) =>
+  item.querySelector("legend")?.textContent.includes("délégation"));
 beforeEach(() => {
   originalFetch = global.fetch; originalCrypto = global.crypto;
   global.crypto = { getRandomValues: (bytes) => require("crypto").randomFillSync(bytes) };
   host = document.createElement("div"); document.body.appendChild(host); root = createRoot(host);
-  global.fetch = jest.fn(async (url, options) => response(String(url).endsWith("/actions")
+  global.fetch = jest.fn(async (url, options) => response(String(url).endsWith("/initiatives")
+    ? { settings: { enabled: false }, items: [] } : String(url).endsWith("/actions")
     ? { actions: [contract] } : options.method || String(url).endsWith(id) ? result
       : { items: [{ id, objective: result.plan.objective }], truncated: true }));
 });
@@ -58,6 +61,29 @@ test("guided plans use only registered actions, explicit dependencies and no imp
   expect(JSON.parse(posts()[1][1].body)).toEqual({ confirm: true, fingerprint });
 });
 
+test("multi-agent form prepares the exact context without any API call or implicit approval", async () => {
+  await mount();
+  const mission = missionForm();
+  await act(async () => {
+    const input = mission.querySelector("input");
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, "Organiser une réunion");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    const context = mission.querySelector("textarea");
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(context, "Contexte volontaire uniquement");
+    context.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await click("Préparer cette délégation sans appel IA");
+  expect(posts()).toHaveLength(0);
+  await click("Démarrer la préparation et les lectures");
+  const body = JSON.parse(posts()[0][1].body);
+  expect(body.steps).toEqual([{ id: "delegation", action: "agents.mission", inputs: {
+    objective: "Organiser une réunion", context: "Contexte volontaire uniquement",
+    specialists: ["documents", "messagerie", "planning"],
+  } }]);
+  expect(posts()).toHaveLength(1);
+  expect(host.textContent).toContain("Quatre appels maximum");
+});
+
 test("lost response locks the request payload, retries same reference and prevents double clicks", async () => {
   let count = 0;
   const original = global.fetch.getMockImplementation();
@@ -67,11 +93,11 @@ test("lost response locks the request payload, retries same reference and preven
   });
   await mount(); await click("Démarrer la préparation et les lectures");
   expect(host.querySelector('[role="alert"]').textContent).toContain("Une action peut déjà être enregistrée");
-  expect(host.querySelector("fieldset").disabled).toBe(true);
+  expect(missionForm().disabled).toBe(true);
   await act(async () => { button("Réessayer la même référence").click(); button("Réessayer la même référence").click(); });
   expect(posts()).toHaveLength(2);
   expect(posts()[0][1].body).toBe(posts()[1][1].body);
-  expect(host.querySelector("fieldset").disabled).toBe(false);
+  expect(missionForm().disabled).toBe(false);
 });
 
 test("NEMESIS is read only even for runs waiting for approval", async () => {
@@ -127,5 +153,5 @@ test("an old account response cannot enter the remounted workspace", async () =>
   expect(pendingSignal.aborted).toBe(true);
   await act(async () => finish(response(result)));
   expect(host.textContent).not.toContain("Référence " + id);
-  expect(host.textContent).not.toContain("J'autorise");
+  expect(host.textContent).not.toContain("J'autorise uniquement l'étape");
 });

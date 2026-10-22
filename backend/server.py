@@ -216,13 +216,15 @@ async def _lifespan(_app):
     _connection_task = asyncio.create_task(warm_cerebras_connection())
     finance_task = asyncio.create_task(finance_workspace.loop())
     work_reminders_task = asyncio.create_task(operational_work.loop())
+    shadow_task = asyncio.create_task(budget_lab.shadow_loop())
+    initiative_task = asyncio.create_task(action_initiatives.loop())
     # (Stockage 100% local — plus d'initialisation cloud à faire ici.)
     try:
         yield
     finally:
         # --- Arrêt ---
         tasks = []
-        for task in (_watch_task, _omega_task, _episodic_task, _vector_task, _connection_task, finance_task, work_reminders_task):
+        for task in (_watch_task, _omega_task, _episodic_task, _vector_task, _connection_task, finance_task, work_reminders_task, shadow_task, initiative_task):
             if task:
                 task.cancel()
                 tasks.append(task)
@@ -427,6 +429,11 @@ budget_lab = BudgetLab(db)
 finance_registry = make_finance_actions(finance_workspace)
 budget_lab.register(finance_registry)
 action_runs = ActionRuns(db, finance_registry)
+from specialist_agents import SpecialistAgents
+specialist_agents = SpecialistAgents(db, action_runs)
+specialist_agents.register()
+from action_initiatives import ActionInitiatives, make_initiative_router
+action_initiatives = ActionInitiatives(db, action_runs)
 from operational_work import OperationalWork, make_operational_router
 
 operational_work = OperationalWork(db, action_runs, work_conversation)
@@ -2295,6 +2302,7 @@ api_router.include_router(make_ariane_market_router(db, require_user))
 api_router.include_router(make_finance_router(finance_workspace, require_user))
 api_router.include_router(make_budget_lab_router(budget_lab, require_user))
 api_router.include_router(make_action_router(action_runs, require_user))
+api_router.include_router(make_initiative_router(action_initiatives, require_user))
 api_router.include_router(make_operational_router(operational_work, require_user))
 
 from themis_api import make_themis_router

@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import BudgetLabWorkspace from "./BudgetLabWorkspace";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-let host, root, request, saved, decisions, experiments;
+let host, root, request, saved, decisions, experiments, shadow;
 const analysis = { id: "analysis", first_date: "2026-01-02", last_date: "2026-03-02", transaction_count: 3,
   months: [{ month: "2026-01", income_cents: 100001, expenses_cents: 999, net_cents: 99002 }],
   candidates: [{ id: "music", label: "Musique", occurrences: 3, monthly_cents: 999,
@@ -11,9 +11,11 @@ const analysis = { id: "analysis", first_date: "2026-01-02", last_date: "2026-03
   limitations: ["Aucun virement ni résiliation."] };
 beforeEach(() => {
   saved = []; decisions = []; experiments = [];
+  shadow = { enabled: false, next_run_at: null };
   host = document.createElement("div"); document.body.appendChild(host); root = createRoot(host);
   request = jest.fn(async (path, options = {}) => {
-    if (path === "/budget/history") return { analyses: saved, decisions, experiments };
+    if (path === "/budget/history") return { analyses: saved, decisions, experiments, shadow };
+    if (path === "/lab/shadow") { shadow = { enabled: JSON.parse(options.body).enabled, next_run_at: null }; return shadow; }
     if (path === "/lab/policy") return { cerebras: { enabled: false, reason: "Quota gratuit non vérifié." } };
     if (path === "/budget/analyze") { saved = [analysis]; return analysis; }
     if (path.includes("/usage/")) {
@@ -40,12 +42,25 @@ test("no automatic import, experiment or external call; local consent required",
   expect(host.textContent).toContain("Quota gratuit non vérifié");
   const launch = [...host.querySelectorAll("button")].find((button) => button.textContent === "Lancer cet essai local");
   expect(launch.disabled).toBe(true);
-  await act(async () => host.querySelector('input[type="checkbox"]').click());
+  await act(async () => host.querySelectorAll('input[type="checkbox"]')[1].click());
   await click("Lancer cet essai local");
   expect(request.mock.calls.filter(([path]) => path === "/lab/local")).toHaveLength(1);
   expect(host.textContent).toContain("6/6 cas corrects");
   expect(launch.disabled).toBe(true);
   expect(request.mock.calls.some(([path]) => /cerebras|https:/.test(path))).toBe(false);
+});
+
+test("shadow is opt-in, persists only after explicit consent and can be stopped", async () => {
+  await mount();
+  const activate = [...host.querySelectorAll("button")].find((button) => button.textContent === "Activer la veille shadow locale");
+  expect(activate.disabled).toBe(true);
+  await act(async () => host.querySelectorAll('input[type="checkbox"]')[0].click());
+  await click("Activer la veille shadow locale");
+  expect(request.mock.calls.find(([path]) => path === "/lab/shadow")[1].body).toBe('{"enabled":true}');
+  expect(host.textContent).toContain("Veille locale autorisée");
+  await click("Arrêter la veille shadow");
+  expect(request.mock.calls.filter(([path]) => path === "/lab/shadow")[1][1].body).toBe('{"enabled":false}');
+  expect(host.textContent).toContain("Veille locale arrêtée");
 });
 
 test("CSV import stores a separate analysis and requires explicit usage confirmation", async () => {
