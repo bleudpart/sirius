@@ -98,6 +98,43 @@ test("autonomous preparation only saves a draft and never authorizes execution",
   expect(host.textContent).toContain("Autoriser ce parcours autonome");
 });
 
+test("micro-tool preparation never calls the model before explicit step confirmation", async () => {
+  await mount();
+  const form = [...host.querySelectorAll("fieldset")].find((item) =>
+    item.querySelector("legend")?.textContent.includes("Micro-outils"));
+  await act(async () => {
+    const input = form.querySelector("input");
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, "Nettoyer les bords");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await click("Préparer ce micro-outil sans appel IA");
+  expect(posts()).toHaveLength(0);
+  await click("Démarrer la préparation et les lectures");
+  const body = JSON.parse(posts()[0][1].body);
+  expect(body.steps[0].action).toBe("microtools.compile");
+  expect(body.steps[0].inputs.data).toBe("  Bonjour  ");
+  expect(body.steps[0].inputs.examples).toEqual([{ input: "  exemple  ", expected: "exemple" }]);
+  expect(posts()).toHaveLength(1);
+});
+
+test.each(["COMPLETED", "BLOCKED"])("micro-tool result is exposed only after completion: %s", async (state) => {
+  const original = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation(async (url, options) => String(url).endsWith(id)
+    ? response({ ...result, state, steps: [{ id: "micro_outil", action: "microtools.compile",
+      state, output: { data: { microtool: true, state, result: "Nettoyé",
+        provider_calls: 3, notice: "Exemples seulement." } } }] })
+    : original(url, options));
+  await mount(); await click(`Consulter ${id}`);
+  if (state === "COMPLETED") {
+    expect(host.textContent).toContain("appliqué aux données fournies");
+    expect(host.textContent).toContain("Nettoyé");
+  } else {
+    expect(host.textContent).toContain("bloqué, aucun résultat final validé");
+    expect(host.textContent).not.toContain("Nettoyé");
+  }
+  expect(host.textContent).toContain("3 appel(s) IA");
+});
+
 test("lost response locks the request payload, retries same reference and prevents double clicks", async () => {
   let count = 0;
   const original = global.fetch.getMockImplementation();

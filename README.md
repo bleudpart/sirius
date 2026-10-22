@@ -967,6 +967,69 @@ L'effacement différé du compte serveur ne peut pas purger à distance
 le stockage des appareils. Une erreur de stockage est signalée, jamais
 convertie en consentement implicite.
 
+### Micro-outils dynamiques, langage fermé et trois rôles IA
+
+Dans ARIANE, **Micro-outils · planifier, compiler, vérifier** accepte un
+objectif, des données JSON et un à cinq exemples `{"input": ..., "expected": ...}`.
+La préparation remplit le formulaire sans appel IA. Démarrer le parcours
+puis autoriser explicitement l'étape `micro_outil` permet à
+`microtools.compile` de travailler sur ces entrées exactes.
+
+Le planificateur Cerebras évalue la faisabilité, le codeur génère un programme
+JSON conforme au schéma et le vérificateur peut le refuser. Ce sont trois
+rôles successifs du même fournisseur, pas un essaim général ni des processus
+indépendants. Les exemples et attentes restent ceux de l'utilisateur.
+Le programme doit passer tous ces tests locaux avant l'avis du vérificateur.
+Un JSON invalide ou un test échoué autorise une seule correction du codeur,
+puis de nouveaux tests. Si tous les tests passent et que le vérificateur
+approuve, le même programme est appliqué aux données finales. Une erreur
+sur ces données bloque le résultat, même si les exemples avaient réussi.
+
+**Compilation désigne ici la validation d'un pipeline JSON interprété** :
+ce n'est ni du code natif ni du Python/JavaScript généré. Le langage fermé
+comprend uniquement `strip`, `lower`, `upper`, `lines`, `split`/`join`
+avec séparateur littéral, `replace` littéral, `unique`, `sort`, `column`,
+`filter_equals`, `sum` et `count`. Les opérations ont des types imposés ;
+aucune conversion numérique ou valeur manquante n'est inventée.
+Pas de boucle, branchement libre, regex fournie, import, `eval`, shell,
+fichier, réseau ou installation. Les résultats de l'IA ne peuvent pas
+ajouter d'opération au catalogue ni modifier SIRIUS. Ce n'est **pas un bac
+à sable système pour scripts arbitraires**.
+
+Limites : douze opérations par programme, données/exemple/attendu et chaque
+intermédiaire limités à 16 000 octets JSON UTF-8, textes à 8 000 caractères,
+listes à 200 éléments, objets à vingt clés de cent caractères,
+quatre niveaux et 1 000 nœuds par valeur. Les nombres doivent être finis et
+de valeur absolue au plus 10 puissance 12 ; les sommes décimales restent
+en virgule flottante, pas une comptabilité en centimes exacts.
+Les expansions de remplacement/jointure sont bornées et chaque résultat
+intermédiaire est revalidé. Une comparaison de test est exacte, y compris
+le type JSON du résultat, sans tolérance numérique implicite.
+
+Trois appels IA normalement, quatre au maximum avec correction ; chaque
+appel est borné à six secondes, génération à 1 536 tokens et mission à
+trente secondes. Une seule tentative ARIANE : pas de répétition fournisseur,
+repli ou poursuite indéfinie. Le quota et la clé personnelle Cerebras utilisent
+le même mécanisme que les autres sous-agents, ainsi que leur capacité
+partagée par processus (deux missions simultanées, une par compte).
+La confirmation autorise ces appels potentiellement facturables.
+Le mode d'autonomie en lecture seule n'accepte pas `microtools.compile`.
+
+L'arrêt du parcours empêche les phases suivantes et l'application finale,
+sans annuler ni rembourser un appel déjà parti. Les refus restent partiels
+ou bloqués, jamais présentés comme un résultat validé. Les preuves contiennent
+plan, programme conforme, empreinte, tests, états des rôles et traces locales ;
+le contenu brut d'une génération non conforme n'est pas conservé. Les résultats
+ne sont pas installés ou réutilisés automatiquement dans une autre mission.
+Il n'y a pas d'auto-optimisation du code de SIRIUS.
+
+Objectif, données et exemples sont transmis à Cerebras après accord :
+ne pas fournir de secrets ni de données sensibles. Ils sont conservés avec
+les preuves dans les collections ARIANE existantes, isolées par compte,
+couvertes par l'export personnel et la suppression du compte. Réussir quelques
+exemples et obtenir un accord IA n'est pas une preuve générale de correction
+ou d'exactitude ; relire le résultat avant tout usage conséquent.
+
 ### Hooks natifs Windows, facultatifs et limités à la session
 
 Dans **Automatisations Windows — hooks natifs** (menu des modules),

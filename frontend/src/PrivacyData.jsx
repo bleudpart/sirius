@@ -16,6 +16,7 @@ export default function PrivacyData({ onOpenAccount, onMemory, onConnections }) 
         Service utilisé : <code>{BACKEND_BASE_URL}</code>. Même compte et même service sont nécessaires pour retrouver ces données ailleurs.</dd>
       <dt><strong>Chez des fournisseurs extérieurs</strong></dt>
       <dd>Une demande IA, une transcription distante ou une recherche web peut transmettre le contenu nécessaire au fournisseur configuré.
+        Les missions de micro-outils ARIANE transmettent l'objectif, les données et les exemples fournis à Cerebras après votre confirmation.
         Cerebras, Groq, Kimi et les autres services ne sont pas tous appelés à chaque demande. Leur présence dans les réglages ne prouve pas leur utilisation pour une réponse donnée.</dd>
       <dt><strong>Lecture vocale choisie</strong></dt>
       <dd>{voice.name?.startsWith("browser") ? "Voix de l'appareil sélectionnée." : "Voix distante sélectionnée : le texte à lire peut être transmis à Google ou Gemini selon l'appareil."}

@@ -86,16 +86,19 @@ class SpecialistAgents:
         ))
 
     async def execute(self, context, inputs):
+        return await self.execute_scoped(context, lambda: self.delegate(context, inputs))
+
+    async def execute_scoped(self, context, operation):
         uid = context.user_id
-        if uid in self.active or len(self.active) >= 2:
-            raise HTTPException(409, "Une mission IA est déjà en cours ou la capacité locale est atteinte.")
         user = await self.db.users.find_one({"user_id": uid}, {"_id": 0})
         if not user or user.get("disabled"):
             raise HTTPException(401, "Compte indisponible.")
+        if uid in self.active or len(self.active) >= 2:
+            raise HTTPException(409, "Une mission IA est déjà en cours ou la capacité locale est atteinte.")
         self.active.add(uid)
         try:
             async with metered_scope(self.db, user, {"cerebras": personal_key("cerebras")}, kind="chat"):
-                return await self.delegate(context, inputs)
+                return await operation()
         finally:
             self.active.discard(uid)
 

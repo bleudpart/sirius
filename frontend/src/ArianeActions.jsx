@@ -4,6 +4,7 @@ import { newChronosRequestId } from "./chronos";
 import { downloadWorkJson } from "./workModuleBackup";
 import { assertSecureKeyTransport, loadApiKeys } from "./apiKeyStorage";
 import AgentMissionForm from "./AgentMissionForm";
+import MicroToolForm from "./MicroToolForm";
 import ActionInitiatives from "./ActionInitiatives";
 import BoundedAutonomy from "./BoundedAutonomy";
 import PredictivePreparation from "./PredictivePreparation";
@@ -161,6 +162,9 @@ export default function ArianeActions({ auditOnly = false, user }) {
       <AgentMissionForm disabled={busy || !!pending} onPrepare={(mission) => {
         setObjective(mission.title); setSteps(pretty(mission.steps));
       }} />
+      <MicroToolForm disabled={busy || !!pending} onPrepare={(mission) => {
+        setObjective(mission.title); setSteps(pretty(mission.steps));
+      }} />
       <fieldset disabled={busy || !!pending}>
         <legend>Préparer un parcours</legend>
         <label>Parcours guidé <select value={template} onChange={(event) => {
@@ -229,6 +233,12 @@ export default function ArianeActions({ auditOnly = false, user }) {
         {step.output?.findings && <p>{step.output.findings.length} dépassement(s), {step.output.missing.length} réserve(s).
           Résultats descriptifs, pas une recommandation personnalisée.</p>}
         {step.output?.data?.synthesis && <div><h4>Synthèse SIRIUS</h4><pre>{step.output.data.synthesis}</pre></div>}
+        {step.output?.data?.microtool && <div>
+          <h4>Micro-outil · {step.output.data.state === "COMPLETED" ? "appliqué aux données fournies" : "bloqué, aucun résultat final validé"}</h4>
+          <p>{step.output.data.provider_calls} appel(s) IA. {step.output.data.notice}</p>
+          {step.output.data.state === "COMPLETED" && <pre>{pretty(step.output.data.result)}</pre>}
+          <p>Programme, tests, rôles et traces consultables dans les preuves ci-dessous. Aucun outil ajouté au système.</p>
+        </div>}
         {step.output?.data?.reflection && <p>Contrôles locaux de structure effectués, sans relecture IA supplémentaire.
           L'exactitude des faits n'est pas vérifiée. Détails et éventuelles corrections dans les preuves.</p>}
         {step.output?.issues?.map((issue) => <p role="alert" key={issue}>{issue}</p>)}

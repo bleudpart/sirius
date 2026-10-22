@@ -433,6 +433,9 @@ action_runs = ActionRuns(db, finance_registry)
 from specialist_agents import SpecialistAgents
 specialist_agents = SpecialistAgents(db, action_runs)
 specialist_agents.register()
+from microtool_agents import MicroToolAgents
+microtool_agents = MicroToolAgents(specialist_agents)
+microtool_agents.register()
 from action_initiatives import ActionInitiatives, make_initiative_router
 action_initiatives = ActionInitiatives(db, action_runs)
 from bounded_autonomy import BoundedAutonomy, make_autonomy_router
