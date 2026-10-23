@@ -3,6 +3,9 @@
 L'intégration [Zapier CLI, API keys et REST hooks](./zapier/README.md) dispose
 de sa propre spécification, de clés dédiées et de tests indépendants.
 
+Le socle [WhatsApp Cloud API et Google Workspace](./whatsapp-workspace/README.md)
+décrit les webhooks vérifiés, la synchronisation bornée et les actions confirmées.
+
 ## Périmètre et architecture
 
 Cette intégration est facultative. Installer les sources n'active aucun bot,

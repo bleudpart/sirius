@@ -6,6 +6,8 @@ import os
 import logging
 import re
 import secrets
+import base64
+import hashlib
 from datetime import datetime, timedelta, timezone
 
 import httpx
@@ -19,6 +21,7 @@ from auth_api import resolve_user_id, LEGACY_UID, is_direct_local_request
 from email.message import EmailMessage
 
 from email_signature import add_signature_to_message, load_signature_identity
+from google_connection import get_google_token, read_tokens, stored_tokens
 
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 AUTH_URL = "https://accounts.google.com/o/oauth2/auth"
@@ -94,56 +97,10 @@ def make_gcal_router(db):
         return await resolve_user_id(request, db)
 
     async def _get_token(uid: str) -> str:
-        doc = await db.google_calendar.find_one({"_id": uid})
-        if not doc or not doc.get("tokens"):
-            raise HTTPException(status_code=401, detail="Google Calendar non connecté.")
-        tokens = doc["tokens"]
-        exp = doc.get("expires_at")
-        if exp and datetime.fromisoformat(exp) > datetime.now(timezone.utc) + timedelta(seconds=60):
-            return tokens["access_token"]
-        refresh = tokens.get("refresh_token")
-        if not refresh:
-            await db.google_calendar.update_one(
-                {"_id": uid},
-                {"$set": {"tokens": None, "expires_at": None}},
-            )
-            raise HTTPException(status_code=401, detail="Session Google expirée, reconnectez-vous.")
-        cid, csec = _client_conf()
-        async with httpx.AsyncClient(timeout=15) as cx:
-            r = await cx.post(
-                TOKEN_URL,
-                data={
-                    "client_id": cid,
-                    "client_secret": csec,
-                    "refresh_token": refresh,
-                    "grant_type": "refresh_token",
-                },
-            )
-        if r.status_code != 200:
-                try:
-                    error_data = r.json()
-                except ValueError:
-                    error_data = {}
-                if error_data.get("error") == "invalid_grant":
-                    await db.google_calendar.update_one(
-                        {"_id": uid},
-                        {"$set": {"tokens": None, "expires_at": None}},
-                    )
-                    logger.warning("[GOOGLE] refresh token expiré ou révoqué pour %s", uid)
-                    raise HTTPException(
-                        status_code=401,
-                        detail="Jeton Google expiré ou révoqué. Reconnecte ton compte Google.",
-                    )
-                logger.warning("[GOOGLE] échec du rafraîchissement (%s): %s", r.status_code, error_data.get("error", "réponse inconnue"))
-                raise HTTPException(status_code=401, detail="Rafraîchissement du jeton Google refusé, reconnectez-vous.")
-        new = r.json()
-        tokens["access_token"] = new["access_token"]
-        expires_at = (datetime.now(timezone.utc) + timedelta(seconds=new.get("expires_in", 3500))).isoformat()
-        await db.google_calendar.update_one({"_id": uid}, {"$set": {"tokens": tokens, "expires_at": expires_at}}, upsert=True)
-        return tokens["access_token"]
+        return await get_google_token(db, uid, _client_conf)
 
     @router.get("/oauth/calendar/login")
-    async def gcal_login(request: Request, external: bool = False):
+    async def gcal_login(request: Request, external: bool = False, workspace_readonly: bool = False):
         cid, _ = _client_conf()
         # Comme pour Microsoft (microsoft_graph.py) : le "state" doit être un jeton opaque
         # généré côté serveur et lié à l'utilisateur résolu ICI, jamais l'uid brut envoyé
@@ -156,21 +113,28 @@ def make_gcal_router(db):
                 raise
             uid = LEGACY_UID
         state = secrets.token_urlsafe(32)
+        verifier = secrets.token_urlsafe(48)
         await db.oauth_states.insert_one({
             "_id": f"gcal:{state}", "uid": uid,
             "external": external,
+            "code_verifier": verifier, "redirect_uri": _redirect_uri(request),
             "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
         })
         from urllib.parse import urlencode
 
+        scopes = (("https://www.googleapis.com/auth/calendar.events.readonly "
+                   "https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/gmail.readonly")
+                  if workspace_readonly else SCOPE + " https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/contacts.readonly")
         params = urlencode({
             "client_id": cid,
             "redirect_uri": _redirect_uri(request),
             "response_type": "code",
-            "scope": SCOPE + " https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/contacts.readonly",
+            "scope": scopes,
             "access_type": "offline",
             "prompt": "consent",
             "state": state,
+            "code_challenge": base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("="),
+            "code_challenge_method": "S256",
         })
         return {"authorization_url": f"{AUTH_URL}?{params}"}
 
@@ -183,6 +147,10 @@ def make_gcal_router(db):
         if not st or datetime.fromisoformat(st["expires_at"]) < datetime.now(timezone.utc):
             return _external_oauth_result(False, "Google") if external else RedirectResponse(f"{FRONTEND_URL}/?gcal=error")
         uid = st["uid"]
+        if uid != LEGACY_UID:
+            user = await db.users.find_one({"user_id": uid})
+            if not user or user.get("disabled"):
+                raise HTTPException(401, "Compte indisponible.")
         cid, csec = _client_conf()
         async with httpx.AsyncClient(timeout=20) as cx:
             r = await cx.post(
@@ -191,7 +159,8 @@ def make_gcal_router(db):
                     "code": code,
                     "client_id": cid,
                     "client_secret": csec,
-                    "redirect_uri": _redirect_uri(request),
+                    "redirect_uri": st.get("redirect_uri") or _redirect_uri(request),
+                    **({"code_verifier": st["code_verifier"]} if st.get("code_verifier") else {}),
                     "grant_type": "authorization_code",
                 },
             )
@@ -206,7 +175,7 @@ def make_gcal_router(db):
         expires_at = (datetime.now(timezone.utc) + timedelta(seconds=tokens.get("expires_in", 3500))).isoformat()
         await db.google_calendar.update_one(
             {"_id": uid},
-            {"$set": {"tokens": tokens, "email": email, "expires_at": expires_at, "connected_at": datetime.now(timezone.utc).isoformat()}},
+            {"$set": {**stored_tokens(tokens), "email": email, "expires_at": expires_at, "connected_at": datetime.now(timezone.utc).isoformat()}},
             upsert=True,
         )
         return _external_oauth_result(True, "Google") if external else RedirectResponse(f"{FRONTEND_URL}/?gcal=connected")
@@ -214,11 +183,11 @@ def make_gcal_router(db):
     @router.get("/calendar/status")
     async def gcal_status(request: Request):
         doc = await db.google_calendar.find_one({"_id": await _uid(request)})
-        if not doc or not doc.get("tokens"):
+        if not read_tokens(doc):
             return {"connected": False}
         # Google retire silencieusement les champs non déclarés sur l'écran de consentement :
         # un compte « connecté » peut donc n'avoir que l'agenda. Le HUD doit pouvoir le savoir.
-        granted = (doc.get("tokens") or {}).get("scope") or ""
+        granted = read_tokens(doc).get("scope") or ""
         return {
             "connected": True,
             "email": doc.get("email", ""),

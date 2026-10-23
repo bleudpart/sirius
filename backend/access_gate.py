@@ -162,6 +162,11 @@ async def access_status(db, user: dict, force: bool = False) -> dict:
 def is_open_path(path: str) -> bool:
     # Zapier checks the license with its own scoped identity; revocation stays available.
     return (path == "/api/ariane/phone/webhook"
+            or path in {
+                "/api/integrations/whatsapp/webhook",
+                "/api/integrations/workspace/calendar/webhook",
+                "/api/integrations/workspace/gmail/webhook",
+            }
             or path.startswith("/api/integrations/zapier/")
             or not path.startswith("/api/") or path.startswith(OPEN_PREFIXES))
 

@@ -220,13 +220,14 @@ async def _lifespan(_app):
     initiative_task = asyncio.create_task(action_initiatives.loop())
     autonomy_task = asyncio.create_task(bounded_autonomy.loop())
     zapier_task = asyncio.create_task(zapier_integrations.loop())
+    workspace_task = asyncio.create_task(workspace_channels.loop())
     # (Stockage 100% local — plus d'initialisation cloud à faire ici.)
     try:
         yield
     finally:
         # --- Arrêt ---
         tasks = []
-        for task in (_watch_task, _omega_task, _episodic_task, _vector_task, _connection_task, finance_task, work_reminders_task, shadow_task, initiative_task, autonomy_task, zapier_task):
+        for task in (_watch_task, _omega_task, _episodic_task, _vector_task, _connection_task, finance_task, work_reminders_task, shadow_task, initiative_task, autonomy_task, zapier_task, workspace_task):
             if task:
                 task.cancel()
                 tasks.append(task)
@@ -444,6 +445,10 @@ from meeting_integrations import MeetingIntegrations, make_meeting_router
 meeting_integrations = MeetingIntegrations(db, specialist_agents)
 from zapier_integrations import ZapierIntegrations, make_zapier_router
 zapier_integrations = ZapierIntegrations(db)
+from workspace_channels import WorkspaceChannels
+from messaging_integrations import MessagingIntegrations, make_messaging_router
+workspace_channels = WorkspaceChannels(db)
+messaging_integrations = MessagingIntegrations(db, workspace_channels)
 from action_initiatives import ActionInitiatives, make_initiative_router
 action_initiatives = ActionInitiatives(db, action_runs)
 from bounded_autonomy import BoundedAutonomy, make_autonomy_router
@@ -2322,6 +2327,7 @@ api_router.include_router(make_operational_router(operational_work, require_user
 api_router.include_router(make_phone_router(phone_voice, require_user))
 api_router.include_router(make_meeting_router(meeting_integrations, require_user))
 api_router.include_router(make_zapier_router(zapier_integrations, require_user))
+api_router.include_router(make_messaging_router(messaging_integrations, require_user))
 
 from themis_api import make_themis_router
 api_router.include_router(make_themis_router(db))

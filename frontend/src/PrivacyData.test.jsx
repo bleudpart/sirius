@@ -28,6 +28,8 @@ test("privacy explains real boundaries and opens existing controls without reque
   expect(host.textContent).toContain("aucun audio de Huddle");
   expect(host.textContent).toContain("Automatisations Zapier");
   expect(host.textContent).toContain("ne rappelle pas une requête déjà partie");
+  expect(host.textContent).toContain("WhatsApp et synchronisation Google Workspace");
+  expect(host.textContent).toContain("Aucun message entrant ne déclenche d'action");
   expect(global.fetch).not.toHaveBeenCalled();
   await act(async () => [...host.querySelectorAll("button")].forEach((button) => button.click()));
   expect(account).toHaveBeenCalledTimes(1);

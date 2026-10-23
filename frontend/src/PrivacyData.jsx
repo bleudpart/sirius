@@ -45,6 +45,14 @@ export default function PrivacyData({ onOpenAccount, onMemory, onConnections }) 
         L'ajout de notes est automatique dans le dossier privé choisi, sans appel IA ni validation de tâches.
         Révoquer la clé arrête les prochains envois, mais ne rappelle pas une requête déjà partie.
         L'effacement du compte ne supprime pas les données déjà reçues par Zapier ou ses destinations.</dd>
+      <dt><strong>WhatsApp et synchronisation Google Workspace, facultatifs</strong></dt>
+      <dd>La liaison WhatsApp demande un code à envoyer depuis votre numéro à la ligne professionnelle configurée.
+        Meta transmet les textes reçus à la boîte SIRIUS du compte lié ; les expéditeurs non liés sont ignorés.
+        Aucun message entrant ne déclenche d'action ni de réponse automatique.
+        Google fournit un instantané limité de votre boîte Gmail et des événements à venir, pas une sauvegarde complète.
+        Les notifications de changement ne contiennent pas le corps des e-mails ; SIRIUS relit les métadonnées autorisées.
+        Les nouveaux envois WhatsApp/Gmail et événements de cette intégration nécessitent un aperçu et une confirmation dans SIRIUS.
+        Déconnecter arrête les prochains traitements, mais ne rappelle pas un envoi déjà engagé et n'efface pas les copies chez Meta ou Google.</dd>
       <dt><strong>Conservation et suppression</strong></dt>
       <dd>Il n'existe pas ici de durée unique garantie pour tous les modules. Les fournisseurs appliquent leurs propres conditions.
         L'effacement du compte ne supprime pas automatiquement vos fichiers exportés, sauvegardes ou toutes les listes présentes sur un autre appareil.</dd>

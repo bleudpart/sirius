@@ -4,6 +4,8 @@ motor
 python-dotenv
 pydantic
 httpx
+PyJWT[crypto]>=2.10,<3
+cryptography>=44
 python-multipart
 pyotp
 groq

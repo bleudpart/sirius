@@ -2378,3 +2378,10 @@ Liste complète des modules et dates : [MODULES_SIRIUS.txt](./MODULES_SIRIUS.txt
 Voir la [spécification Zapier CLI](integrations/zapier/README.md) pour les clés
 API dédiées à droits limités, les REST hooks, l'ajout de notes et la recherche
 de dossiers. Intégration facultative, sans activation ni publication automatique.
+
+## WhatsApp et Google Workspace
+
+Voir le [boilerplate et la spécification](integrations/whatsapp-workspace/README.md) :
+webhooks Meta/Pub/Sub/Calendar vérifiés, liaison WhatsApp par preuve, OAuth
+Google partagé et chiffré, snapshots bornés, envois et événements confirmés.
+Aucun service externe activé par l'installation du code.
