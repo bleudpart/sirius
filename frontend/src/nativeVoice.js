@@ -19,7 +19,7 @@ export function stopNativeSpeech() {
   stopChain = stopChain.then(() => TextToSpeech.stop()).catch(reportError);
 }
 
-export async function speakNative(message, { rate = 1, pitch = 1, volume = 1, gender = "female", onstart, onend, onprogress } = {}) {
+export async function speakNative(message, { rate = 1, pitch = 1, volume = 1, gender = "female", onstart, onend, onerror, onprogress } = {}) {
   stopNativeSpeech();
   const current = session;
   let rangeListener;
@@ -51,7 +51,11 @@ export async function speakNative(message, { rate = 1, pitch = 1, volume = 1, ge
       queueStrategy: 0,
     });
   } catch (error) {
-    if (current === session) reportError(error);
+    if (current === session) {
+      reportError(error);
+      // onend suit toujours : onerror permet de ne pas confondre un échec avec une phrase lue.
+      if (onerror) onerror(error);
+    }
   } finally {
     if (rangeListener) await rangeListener.remove();
     if (current === session) {

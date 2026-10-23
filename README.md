@@ -369,11 +369,25 @@ ou le développement d'un sigle.
 Le bulletin est lu passage par passage. Pendant la session, « qui a fait quoi ? »
 ou « répète cette info » rappelle le passage réellement annoncé ; « quel temps
 tu as dit ? » rappelle la météo annoncée, sans nouvelle recherche. « Reprends
-les infos » poursuit après le passage interrompu. Les questions d'explication
+les infos » relit le passage interrompu depuis son début, puis poursuit. Les questions d'explication
 utilisent le contexte annoncé, sans recommencer le bulletin. Ce suivi expire
 après deux heures et sa position de lecture n'est pas restaurée après un
 rechargement de l'application. Hors bulletin, « répète » et « continue » gardent
 le parcours de conversation habituel.
+
+La voix du bulletin garde une seule source pendant toute la lecture : la voix
+distante (Gemini sur Android) tant qu'elle répond, puis la voix locale jusqu'à
+la fin du bulletin dès le premier échec (délai de 28 s, réseau, réponse HTTP ou
+audio vide, lecture bloquée ou coupée), sans nouvelle tentative distante ni
+alternance phrase par phrase. Pendant la lecture d'une phrase, l'audio de la
+phrase suivante est préparé (une seule requête d'avance), puis abandonné en cas
+d'arrêt, de nouvelle demande ou de bascule. Un passage n'est compté comme lu
+qu'après la fin réelle de sa dernière phrase. Si la voix locale échoue ou ne
+démarre pas, la lecture s'arrête avec un message explicite au lieu d'être
+considérée comme terminée, et « reprends » repart du passage interrompu. Une
+phrase coupée en cours de lecture distante est relue entièrement par la voix
+locale. Ce comportement est couvert par des tests automatisés ; il doit encore
+être validé sur un téléphone réel avec un Wi-Fi lent.
 
 Sur Android, l'interruption se fait par Stop ou l'appui pour parler : l'écoute
 simultanée pendant la synthèse vocale reste désactivée pour éviter l'écho.

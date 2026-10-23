@@ -92,6 +92,7 @@ let currentAudio = null;
 let cancelVoiceDiscovery = null;
 let finishCurrentAudio = null;
 let currentRequest = null;
+let activeSequence = null; // lecture en série (bulletin) qui possède la parole
 let googleDownUntil = 0; // clé absente / API en panne → on évite de retenter pendant 10 min
 let geminiDownUntil = 0;
 window.addEventListener(KEY_STORAGE_EVENT, () => {
@@ -195,99 +196,114 @@ export async function playAudio(base64, { volume = 1, onstart, onend } = {}) {
   }
 }
 
+export const GEMINI_TTS_TIMEOUT_MS = 28000;
+const isGeminiRoute = (voice) => voice === GEMINI_VOICE.name || Capacitor.getPlatform() === "android";
+const remoteTimeoutMs = (gemini) => (gemini ? GEMINI_TTS_TIMEOUT_MS : TTS_REQUEST_TIMEOUT_MS);
+const remoteDown = (gemini) => Date.now() < (gemini ? geminiDownUntil : googleDownUntil);
+const remoteError = (code, message, extra = {}) => Object.assign(new Error(message), { code, ...extra });
+
+// Requête unique de synthèse distante : rend l'audio ou lève une erreur typée (http, empty, réseau/abandon).
+async function requestRemoteAudio(message, { gemini, voice, geminiVoice, rate, pitch }, signal) {
+  const keys = loadApiKeys();
+  const voiceKeys = gemini ? { gemini_tts: keys.gemini_tts || "", google_tts: keys.google_tts || "" }
+    : { google_tts: keys.google_tts || "" };
+  const personalKeys = Object.fromEntries(Object.entries(voiceKeys).filter(([, value]) => value));
+  const r = await fetch(`${API}/tts/${gemini ? "gemini" : "google"}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(gemini
+      ? { text: phonetic(message), keys: personalKeys, ...(geminiVoice ? { voice: geminiVoice } : {}) }
+      : { text: phonetic(message), voice, rate, pitch, keys: personalKeys }),
+    credentials: "include",
+    signal,
+  });
+  if (!r.ok) {
+    if (r.status === 503) {
+      if (gemini) geminiDownUntil = Date.now() + 60000;
+      else googleDownUntil = Date.now() + 600000;
+    }
+    throw remoteError("http", `Synthèse distante indisponible (HTTP ${r.status}).`, { status: r.status });
+  }
+  const d = await r.json();
+  const base64 = d.audio_base64 || d.audio;
+  if (!base64) throw remoteError("empty", gemini ? "Réponse Gemini sans audio" : "Réponse vocale sans audio");
+  return { base64, mime: gemini ? "audio/wav" : "audio/mp3" };
+}
+
+// Lecture d'un audio distant déjà reçu. Résultat : ended, failed (avant le son), cut (coupé après
+// le début), stopped (une autre voix a coupé les canaux) ou stale (voix périmée avant lecture).
+async function playRemoteAudio({ base64, mime }, {
+  volume = 1, playbackRate = 1, onstart, onend, onprogress, gemini, endOnCut = true, report = true,
+}, seq) {
+  const audio = new Audio(`data:${mime};base64,` + base64);
+  const disconnect = await connectVoiceEqualizer(audio);
+  if (seq !== speakSeq) { disconnect(); return "stale"; }
+  return new Promise((resolve) => {
+    stopChannels();
+    audio.volume = Math.max(0.2, Math.min(1, volume));
+    audio.playbackRate = playbackRate;
+    audio.preservesPitch = true;
+    currentAudio = audio;
+    let started = false;
+    let finished = false;
+    const finish = (outcome) => {
+      if (finished) return;
+      finished = true;
+      disconnect();
+      audio.onplay = null;
+      audio.onended = null;
+      audio.onerror = null;
+      audio.ontimeupdate = null;
+      if (currentAudio === audio) currentAudio = null;
+      if (finishCurrentAudio === stop) finishCurrentAudio = null;
+      resolve(outcome);
+    };
+    const stop = () => finish("stopped");
+    finishCurrentAudio = stop;
+    audio.onplay = () => {
+      started = true;
+      if (seq !== speakSeq) return;
+      if (onstart) onstart();
+      if (onprogress) onprogress(0);
+    };
+    audio.ontimeupdate = () => {
+      if (started && seq === speakSeq && onprogress && Number.isFinite(audio.duration) && audio.duration > 0) {
+        onprogress(Math.min(1, audio.currentTime / audio.duration));
+      }
+    };
+    audio.onended = () => {
+      finish("ended");
+      if (seq === speakSeq && onend) onend();
+    };
+    audio.onerror = () => {
+      if (gemini && report && seq === speakSeq) reportGeminiFailure("lecture audio");
+      finish(started ? "cut" : "failed");
+      if (endOnCut && started && seq === speakSeq && onend) onend();
+    };
+    audio.play().catch((error) => {
+      if (finished) return;
+      if (gemini && report && seq === speakSeq) reportGeminiFailure(error.name);
+      finish("failed");
+    });
+  });
+}
+
 async function speakRemote(message, { voice, geminiVoice, rate, pitch, volume = 1, onstart, onend, onprogress, timeoutMs, playbackRate = 1 }, seq) {
-  const gemini = voice === GEMINI_VOICE.name || Capacitor.getPlatform() === "android";
-  if (Date.now() < (gemini ? geminiDownUntil : googleDownUntil)) return false;
+  const gemini = isGeminiRoute(voice);
+  if (remoteDown(gemini)) return false;
   const controller = new AbortController();
   currentRequest = controller;
-  const timeout = window.setTimeout(() => controller.abort(), timeoutMs ?? (gemini ? 28000 : TTS_REQUEST_TIMEOUT_MS));
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs ?? remoteTimeoutMs(gemini));
+  let data;
   try {
-    const keys = loadApiKeys();
-    const voiceKeys = gemini ? { gemini_tts: keys.gemini_tts || "", google_tts: keys.google_tts || "" }
-      : { google_tts: keys.google_tts || "" };
-    const personalKeys = Object.fromEntries(Object.entries(voiceKeys).filter(([, value]) => value));
-    const r = await fetch(`${API}/tts/${gemini ? "gemini" : "google"}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(gemini
-        ? { text: phonetic(message), keys: personalKeys, ...(geminiVoice ? { voice: geminiVoice } : {}) }
-        : { text: phonetic(message), voice, rate, pitch, keys: personalKeys }),
-      credentials: "include",
-      signal: controller.signal,
-    });
-    if (seq !== speakSeq) return true;
-    if (!r.ok) {
-      if (r.status === 503) {
-        if (gemini) geminiDownUntil = Date.now() + 60000;
-        else googleDownUntil = Date.now() + 600000;
-      }
-      if (gemini) {
-        reportGeminiFailure(r.status);
-      }
-      return false;
-    }
-    const d = await r.json();
-    window.clearTimeout(timeout);
-    const audioBase64 = d.audio_base64 || d.audio;
-    if (!audioBase64) {
-      if (gemini) throw new Error("Réponse Gemini sans audio");
-      return false;
-    }
-    // Une voix plus récente a pris la parole pendant le chargement → on se tait (pas d'écho)
-    if (seq !== undefined && seq !== speakSeq) return true;
-    if (currentRequest === controller) currentRequest = null;
-    const audio = new Audio(`data:${gemini ? "audio/wav" : "audio/mp3"};base64,` + audioBase64);
-    const disconnect = await connectVoiceEqualizer(audio);
-    if (seq !== speakSeq) { disconnect(); return true; }
-    return await new Promise((resolve) => {
-      stopChannels();
-      audio.volume = Math.max(0.2, Math.min(1, volume));
-      audio.playbackRate = playbackRate;
-      audio.preservesPitch = true;
-      currentAudio = audio;
-      let started = false;
-      let finished = false;
-      const finish = (ok) => {
-        if (finished) return;
-        finished = true;
-        disconnect();
-        audio.onplay = null;
-        audio.onended = null;
-        audio.onerror = null;
-        audio.ontimeupdate = null;
-        if (currentAudio === audio) currentAudio = null;
-        if (finishCurrentAudio === finish) finishCurrentAudio = null;
-        resolve(ok);
-      };
-      finishCurrentAudio = finish;
-      audio.onplay = () => {
-        started = true;
-        if (seq !== speakSeq) return;
-        if (onstart) onstart();
-        if (onprogress) onprogress(0);
-      };
-      audio.ontimeupdate = () => {
-        if (started && seq === speakSeq && onprogress && Number.isFinite(audio.duration) && audio.duration > 0) {
-          onprogress(Math.min(1, audio.currentTime / audio.duration));
-        }
-      };
-      audio.onended = () => {
-        finish(true);
-        if (seq === speakSeq && onend) onend();
-      };
-      audio.onerror = () => {
-        if (gemini && seq === speakSeq) reportGeminiFailure("lecture audio");
-        finish(started);
-        if (started && seq === speakSeq && onend) onend();
-      };
-      audio.play().catch((error) => {
-        if (finished) return;
-        if (gemini && seq === speakSeq) reportGeminiFailure(error.name);
-        finish(false);
-      });
-    });
+    data = await requestRemoteAudio(message, { gemini, voice, geminiVoice, rate, pitch }, controller.signal);
   } catch (e) {
     if (seq !== speakSeq) return true;
+    if (e.code === "http") {
+      if (gemini) reportGeminiFailure(e.status);
+      return false;
+    }
+    if (e.code === "empty" && !gemini) return false;
     console.warn("Synthèse vocale distante : lecture indisponible.", e);
     if (gemini) reportGeminiFailure(e.name);
     return false;
@@ -295,19 +311,32 @@ async function speakRemote(message, { voice, geminiVoice, rate, pitch, volume = 
     window.clearTimeout(timeout);
     if (currentRequest === controller) currentRequest = null;
   }
+  // Une voix plus récente a pris la parole pendant le chargement → on se tait (pas d'écho)
+  if (seq !== speakSeq) return true;
+  try {
+    const outcome = await playRemoteAudio(data, { volume, playbackRate, onstart, onend, onprogress, gemini }, seq);
+    return outcome !== "failed";
+  } catch (e) {
+    if (seq !== speakSeq) return true;
+    console.warn("Synthèse vocale distante : lecture indisponible.", e);
+    if (gemini) reportGeminiFailure(e.name);
+    return false;
+  }
 }
 
 // ---- Synthèse du navigateur (fallback gratuit) ----
-function speakBrowser(message, { rate = 1.0, pitch = 1.08, volume = 1, gender = "female", onstart, onend, onprogress } = {}) {
+function speakBrowser(message, { rate = 1.0, pitch = 1.08, volume = 1, gender = "female", onstart, onend, onerror, onprogress } = {}) {
   const seq = speakSeq;
   if (Capacitor.getPlatform() === "android") {
     stopChannels();
-    void speakNative(phonetic(message), { rate, pitch, volume, gender, onstart, onend, onprogress });
+    void speakNative(phonetic(message), { rate, pitch, volume, gender, onstart, onend, onerror, onprogress });
     return;
   }
   const synth = window.speechSynthesis;
   const end = onend || (() => {});
-  if (!synth || !message) { end(); return; }
+  // onerror distingue un échec d'une fin normale ; onend reste appelé pour les appelants historiques.
+  const fail = (error) => { if (onerror) onerror(error); end(); };
+  if (!synth || !message) { fail(new Error("Synthèse locale indisponible.")); return; }
   const doSpeak = () => {
     if (seq !== speakSeq) return;
     try {
@@ -319,7 +348,7 @@ function speakBrowser(message, { rate = 1.0, pitch = 1.08, volume = 1, gender = 
         window.dispatchEvent(new CustomEvent("sirius-voice-error", {
           detail: "Voix française locale indisponible. Installez une voix française dans les paramètres de synthèse vocale.",
         }));
-        end();
+        fail(new Error("Voix française locale indisponible."));
         return;
       }
       const u = new SpeechSynthesisUtterance(phonetic(message));
@@ -342,9 +371,9 @@ function speakBrowser(message, { rate = 1.0, pitch = 1.08, volume = 1, gender = 
           onprogress(Math.min(1, (event.charIndex + (event.charLength || 0)) / u.text.length));
         }
       };
-      u.onerror = () => { clearKA(); if (seq === speakSeq) end(); };
+      u.onerror = (event) => { clearKA(); if (seq === speakSeq) fail(event); };
       synth.speak(u);
-    } catch (e) { end(); }
+    } catch (e) { fail(e); }
   };
   if (selectFrenchVoice(synth.getVoices(), { gender, localOnly: true })) {
     doSpeak();
@@ -371,7 +400,7 @@ function speakBrowser(message, { rate = 1.0, pitch = 1.08, volume = 1, gender = 
 const isNight = () => { const h = new Date().getHours(); return h >= 22 || h < 5; };
 
 function speechCallbacks(seq, onstart, onend) {
-  const publish = (phase) => window.dispatchEvent(new CustomEvent("sirius-voice-phase", { detail: phase }));
+  const publish = publishPhase;
   publish("preparing");
   return {
     onstart: () => {
@@ -387,57 +416,77 @@ function speechCallbacks(seq, onstart, onend) {
   };
 }
 
-export function speakFr(message, { onpending, onstart, onend } = {}) {
-  if (!message) { (onend || (() => {}))(); return; }
-  const urgent = isUrgent(message); // détecté avant nettoyage (les « ! » comptent)
-  message = cleanTextForSpeech(message);
-  if (!message) { (onend || (() => {}))(); return; }
-  const cfg = loadVoiceConfig();
+// Réglages d'une prise de parole « assistant » : partagés par speakFr et la lecture en série du bulletin,
+// pour que la voix, le genre et le débit choisis restent identiques quel que soit le chemin.
+function speechParams(raw, cfg) {
+  const urgent = isUrgent(raw); // détecté avant nettoyage (les « ! » comptent)
+  const message = cleanTextForSpeech(raw);
   const night = isNight();
   let rate = Math.max(0.5, Math.min(2, urgent ? cfg.rate + 0.13 : cfg.rate));
   if (night) rate = Math.max(0.5, rate * 0.87);
   const volume = night ? 0.72 : 1;
-  const seq = ++speakSeq; utterances += 1; lastUtteranceAt = Date.now();
-  stopChannels();
-  ({ onstart, onend } = speechCallbacks(seq, onstart, onend));
-  if (onpending) onpending();
+  const browserVoice = isBrowserVoice(cfg.name);
   const fem = FEMALE.test(cfg.name);
-  const bPitch = (isBrowserVoice(cfg.name) ? cfg.pitch : (fem ? 1.12 : (urgent ? 0.92 : 0.85))) * (night ? 0.95 : 1);
-  if (isBrowserVoice(cfg.name)) {
-    speakBrowser(message, { rate, pitch: bPitch, volume, gender: getBrowserGender(cfg.name), onstart, onend });
-    return;
-  }
-  if (Capacitor.getPlatform() === "android" || cfg.name === GEMINI_VOICE.name) {
-    speakRemote(message, {
+  const browserPitch = (browserVoice ? cfg.pitch : (fem ? 1.12 : (urgent ? 0.92 : 0.85))) * (night ? 0.95 : 1);
+  const gender = browserVoice ? getBrowserGender(cfg.name) : (fem ? "female" : "male");
+  let remote = null;
+  if (!browserVoice && (Capacitor.getPlatform() === "android" || cfg.name === GEMINI_VOICE.name)) {
+    remote = {
       voice: cfg.name === GEMINI_VOICE.name ? GEMINI_VOICE.name : "fr-FR-Neural2-G",
       geminiVoice: geminiTimbreFor(cfg),
       rate,
       pitch: night ? -4.5 : -3,
-      volume,
-      onstart,
-      onend,
-    }, seq).then((ok) => {
-      if (!ok && seq === speakSeq) {
-        speakBrowser(message, { rate, pitch: bPitch, volume, gender: fem ? "female" : "male", onstart, onend });
-      }
-    });
+    };
+  } else if (!browserVoice) {
+    remote = { voice: cfg.name, rate, pitch: night ? cfg.pitch - 1.5 : cfg.pitch };
+  }
+  return { message, rate, volume, browserPitch, gender, remote };
+}
+
+// Nouvelle prise de parole : invalide les voix en cours et interrompt une lecture en série active.
+// replaced=false signale un simple arrêt (cancelSpeech) plutôt qu'une nouvelle voix.
+function claimSpeech(replaced = true) {
+  speakSeq += 1;
+  if (activeSequence && activeSequence.seq !== speakSeq) activeSequence.interrupt(replaced);
+  return speakSeq;
+}
+const publishPhase = (phase) => window.dispatchEvent(new CustomEvent("sirius-voice-phase", { detail: phase }));
+
+export function speakFr(message, { onpending, onstart, onend } = {}) {
+  if (!message) { (onend || (() => {}))(); return; }
+  const cfg = loadVoiceConfig();
+  const params = speechParams(message, cfg);
+  if (!params.message) { (onend || (() => {}))(); return; }
+  const { rate, volume, browserPitch, gender, remote } = params;
+  message = params.message;
+  const seq = claimSpeech(); utterances += 1; lastUtteranceAt = Date.now();
+  stopChannels();
+  ({ onstart, onend } = speechCallbacks(seq, onstart, onend));
+  if (onpending) onpending();
+  if (!remote) {
+    speakBrowser(message, { rate, pitch: browserPitch, volume, gender, onstart, onend });
     return;
   }
-  speakRemote(message, { voice: cfg.name, rate, pitch: night ? cfg.pitch - 1.5 : cfg.pitch, volume, onstart, onend }, seq).then((ok) => {
-    if (!ok && seq === speakSeq) speakBrowser(message, { rate, pitch: bPitch, volume, gender: fem ? "female" : "male", onstart, onend });
+  speakRemote(message, { ...remote, volume, onstart, onend }, seq).then((ok) => {
+    if (!ok && seq === speakSeq) speakBrowser(message, { rate, pitch: browserPitch, volume, gender, onstart, onend });
   });
 }
 
 // Coupe immédiatement la voix de Sirius (interruption naturelle)
 export function cancelSpeech() {
-  speakSeq += 1; // invalide aussi les voix Google encore en chargement
+  claimSpeech(false); // invalide aussi les voix distantes en chargement et la lecture en série active
   seriesId += 1; // interrompt la file de lecture progressive
   seriesChain = Promise.resolve();
   stopChannels();
-  window.dispatchEvent(new CustomEvent("sirius-voice-phase", { detail: "idle" }));
+  publishPhase("idle");
 }
 
 // ---- Lecture progressive : les phrases s'enchaînent dans l'ordre, sans se couper ----
+// Contrat historique (réponses en flux, lecture du Display) : la promesse se résout toujours,
+// y compris après le garde de 30 s. Le bulletin, qui doit savoir ce qui a vraiment été lu,
+// utilise speakSequence, qui rejette au lieu de simuler une fin.
+export const SERIES_START_GUARD_MS = 30000;
+export const playbackBudgetMs = (text) => Math.max(10000, (String(text || "").length / 8) * 1000 + 5000);
 let seriesChain = Promise.resolve();
 let seriesId = 0;
 
@@ -461,11 +510,11 @@ export function speakSeries(sentence, opts = {}) {
         if (seq === speakSeq) cancelSpeech();
         finish();
       };
-      let guard = setTimeout(expire, 30000);
+      let guard = setTimeout(expire, SERIES_START_GUARD_MS);
       speakFr(phrase, {
         onstart: () => {
           clearTimeout(guard);
-          guard = setTimeout(expire, Math.max(10000, (phrase.length / 8) * 1000 + 5000));
+          guard = setTimeout(expire, playbackBudgetMs(phrase));
           if (opts.onstart) opts.onstart();
         },
         onend: finish,
@@ -476,6 +525,248 @@ export function speakSeries(sentence, opts = {}) {
   return seriesChain;
 }
 
+// ---- Lecture en série fiable (bulletin d'actualités) ----
+// Une seule prise de parole pour toute la série :
+// - fournisseur stable : voix distante tant qu'elle répond, puis voix locale jusqu'à la fin de la série
+//   dès le premier échec (délai, réseau, HTTP, audio vide, lecture), sans nouvelle tentative distante ;
+// - préchargement borné : l'audio de la phrase suivante est demandé pendant la lecture de la phrase
+//   en cours (une seule requête en vol) et annulé en cas d'arrêt ou de bascule ;
+// - aucune fin simulée : onitemend n'est appelé qu'après une lecture réellement terminée ; un échec
+//   de la voix locale ou un dépassement de délai rejette `done` avec une SpeechSequenceError ;
+// - toute nouvelle voix (speakFr, cancelSpeech, autre série…) interrompt la série (code « cancelled »).
+export const SEQUENCE_START_TIMEOUT_MS = 10000;
+
+export class SpeechSequenceError extends Error {
+  constructor(code, index, message, cause) {
+    super(message);
+    this.name = "SpeechSequenceError";
+    this.code = code;
+    this.index = index;
+    if (cause !== undefined) this.cause = cause;
+  }
+}
+
+export function speakSequence(phrases, { onitemstart, onitemend, onprovider } = {}) {
+  const texts = Array.from(phrases || [], (phrase) => String(phrase ?? ""));
+  const cfg = loadVoiceConfig();
+  const cache = [];
+  const paramsAt = (index) => {
+    if (!cache[index]) cache[index] = speechParams(texts[index], cfg);
+    return cache[index];
+  };
+  const routed = !isBrowserVoice(cfg.name);
+  const gemini = routed && (Capacitor.getPlatform() === "android" || cfg.name === GEMINI_VOICE.name);
+  let provider = routed && !remoteDown(gemini) ? "remote" : "local";
+
+  seriesId += 1; // une série plus ancienne ne doit pas reprendre la parole ensuite
+  seriesChain = Promise.resolve();
+  const seq = claimSpeech(); utterances += 1; lastUtteranceAt = Date.now();
+  stopChannels();
+  publishPhase("preparing");
+
+  let closed = false;
+  let currentIndex = 0;
+  let interruptReject;
+  const interrupted = new Promise((_, reject) => { interruptReject = reject; });
+  interrupted.catch(() => {});
+  const controllers = new Set();
+  const prefetched = new Map();
+  const abortRequests = () => {
+    for (const controller of controllers) controller.abort();
+    controllers.clear();
+    prefetched.clear();
+  };
+  const close = () => {
+    closed = true;
+    abortRequests();
+    if (activeSequence === session) activeSequence = null;
+  };
+  const session = {
+    seq,
+    interrupt: (replaced = true) => {
+      if (closed) return;
+      close();
+      const error = new SpeechSequenceError("cancelled", currentIndex, "Lecture interrompue.");
+      error.replaced = replaced;
+      interruptReject(error);
+    },
+  };
+  activeSequence = session;
+  const guard = (promise) => Promise.race([promise, interrupted]);
+  const itemStarted = (index) => {
+    if (closed) return;
+    publishPhase("speaking");
+    if (onitemstart) onitemstart(index);
+  };
+
+  const requestItem = (index) => {
+    const params = paramsAt(index);
+    const controller = new AbortController();
+    controllers.add(controller);
+    let timedOut = false;
+    const timer = window.setTimeout(() => { timedOut = true; controller.abort(); }, remoteTimeoutMs(gemini));
+    const request = requestRemoteAudio(params.message, { gemini, ...params.remote }, controller.signal)
+      .catch((error) => {
+        if (timedOut) throw new SpeechSequenceError("timeout", index, "Synthèse distante trop lente.", error);
+        if (error?.code) throw new SpeechSequenceError(error.code, index, error.message, error);
+        throw new SpeechSequenceError("transport", index, "Synthèse distante injoignable.", error);
+      })
+      .finally(() => {
+        window.clearTimeout(timer);
+        controllers.delete(controller);
+      });
+    request.catch(() => {});
+    return request;
+  };
+  const audioFor = (index) => {
+    const request = prefetched.get(index) || requestItem(index);
+    prefetched.delete(index);
+    return request;
+  };
+  const prefetch = (index) => {
+    if (closed || provider !== "remote" || index >= texts.length || prefetched.has(index)) return;
+    if (!paramsAt(index).message) return;
+    prefetched.set(index, requestItem(index));
+  };
+  const degrade = (reason) => {
+    provider = "local";
+    abortRequests();
+    console.warn("Lecture en série : bascule sur la voix locale jusqu'à la fin.", reason);
+    if (gemini) reportGeminiFailure(reason.code || reason.name);
+    if (onprovider) onprovider("local", reason);
+  };
+
+  // Rend null si la phrase a été entièrement lue, sinon l'erreur qui impose la voix locale.
+  const playRemoteItem = async (index) => {
+    const params = paramsAt(index);
+    let data;
+    try {
+      data = await guard(audioFor(index));
+    } catch (error) {
+      if (closed) throw error;
+      return error;
+    }
+    prefetch(index + 1);
+    let stalled = null;
+    let watchdog = null;
+    const arm = (ms, code) => {
+      window.clearTimeout(watchdog);
+      watchdog = window.setTimeout(() => {
+        stalled = code;
+        if (seq === speakSeq) stopChannels();
+      }, ms);
+    };
+    arm(SEQUENCE_START_TIMEOUT_MS, "start-timeout");
+    let outcome;
+    try {
+      outcome = await guard(playRemoteAudio(data, {
+        volume: params.volume,
+        gemini,
+        report: false,
+        endOnCut: false,
+        onstart: () => {
+          if (closed || stalled) return;
+          arm(playbackBudgetMs(params.message), "playback-timeout");
+          itemStarted(index);
+        },
+      }, seq));
+    } catch (error) {
+      if (closed) throw error;
+      return new SpeechSequenceError("playback", index, "Lecture audio impossible.", error);
+    } finally {
+      window.clearTimeout(watchdog);
+    }
+    if (outcome === "ended") return null;
+    if (stalled) return new SpeechSequenceError(stalled, index, "Lecture audio bloquée.");
+    if (closed || outcome === "stopped" || outcome === "stale") {
+      session.interrupt();
+      throw new SpeechSequenceError("cancelled", index, "Lecture interrompue.");
+    }
+    return new SpeechSequenceError(outcome === "cut" ? "playback-cut" : "playback", index, "Lecture audio interrompue.");
+  };
+
+  const playLocalItem = (index) => new Promise((resolve, reject) => {
+    const params = paramsAt(index);
+    let started = false;
+    let settled = false;
+    let timer = null;
+    const settle = (error) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      if (error) reject(error);
+      else resolve();
+    };
+    const expire = (code) => () => {
+      if (seq === speakSeq) stopChannels();
+      settle(new SpeechSequenceError(code, index, "La voix locale ne répond pas."));
+    };
+    timer = window.setTimeout(expire("local-timeout"), SEQUENCE_START_TIMEOUT_MS);
+    speakBrowser(params.message, {
+      rate: params.rate,
+      pitch: params.browserPitch,
+      volume: params.volume,
+      gender: params.gender,
+      onstart: () => {
+        if (closed || settled) return;
+        started = true;
+        window.clearTimeout(timer);
+        timer = window.setTimeout(expire("local-timeout"), playbackBudgetMs(params.message));
+        itemStarted(index);
+      },
+      onerror: (cause) => settle(new SpeechSequenceError("local-error", index, "Voix locale indisponible.", cause)),
+      onend: () => settle(started ? null : new SpeechSequenceError("local-error", index, "Voix locale indisponible.")),
+    });
+  });
+
+  const run = async () => {
+    if (onprovider) onprovider(provider);
+    for (let index = 0; index < texts.length; index += 1) {
+      currentIndex = index;
+      if (closed) throw new SpeechSequenceError("cancelled", index, "Lecture interrompue.");
+      if (!paramsAt(index).message) {
+        itemStarted(index);
+        if (!closed && onitemend) onitemend(index);
+        continue;
+      }
+      if (provider === "remote") {
+        const failure = await playRemoteItem(index);
+        if (!failure) {
+          if (!closed && onitemend) onitemend(index);
+          continue;
+        }
+        degrade(failure);
+      }
+      await guard(playLocalItem(index));
+      if (!closed && onitemend) onitemend(index);
+    }
+  };
+
+  const done = run().then(() => {
+    const owned = !closed && seq === speakSeq;
+    close();
+    if (owned) publishPhase("idle");
+  }, (error) => {
+    const owned = !closed && seq === speakSeq;
+    close();
+    if (owned) {
+      stopChannels();
+      publishPhase("idle");
+    }
+    throw error instanceof SpeechSequenceError ? error
+      : new SpeechSequenceError("internal", currentIndex, "Lecture en série interrompue.", error);
+  });
+  return {
+    done,
+    get provider() { return provider; },
+    cancel: () => {
+      if (closed) return;
+      if (seq === speakSeq) cancelSpeech();
+      else session.interrupt();
+    },
+  };
+}
+
 // Le boot peut conserver un timbre naturel sans changer les autres présentations.
 export function speakCinematic(message, { onstart, onend, onprogress, natural = false } = {}) {
   if (!message) { (onend || (() => {}))(); return; }
@@ -484,7 +775,7 @@ export function speakCinematic(message, { onstart, onend, onprogress, natural = 
   const cfg = loadVoiceConfig();
   const rate = natural ? 0.96 : 0.85;
   const browserPitch = natural ? 1 : 0.95;
-  const seq = ++speakSeq; utterances += 1; lastUtteranceAt = Date.now();
+  const seq = claimSpeech(); utterances += 1; lastUtteranceAt = Date.now();
   stopChannels();
   ({ onstart, onend } = speechCallbacks(seq, onstart, onend));
   if (isBrowserVoice(cfg.name)) {
@@ -545,7 +836,7 @@ export function speakAsCharacter(message, { profile, module, pitch = 1, rate = 1
   const cfg = loadVoiceConfig();
   const prof = profile || (module && CHAR_PROFILES[module]);
   const p = prof && MYTHOS_VOICES[prof];
-  const seq = ++speakSeq; utterances += 1; lastUtteranceAt = Date.now();
+  const seq = claimSpeech(); utterances += 1; lastUtteranceAt = Date.now();
   stopChannels();
   ({ onstart, onend } = speechCallbacks(seq, onstart, onend));
   if (isBrowserVoice(cfg.name)) {

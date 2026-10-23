@@ -2,7 +2,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
-import { speakFr, cancelSpeech, speakSeries } from "./voice";
+import { speakFr, cancelSpeech, speakSeries, speakSequence } from "./voice";
 import { TextDecoder } from "util";
 import { Capacitor } from "@capacitor/core";
 import { createNativeRecognition } from "./nativeSpeechRecognition";
@@ -23,8 +23,41 @@ jest.mock("./ProactivePanel", () => ({ onInitiative }) => (
   )}>Initiative de test</button>
 ));
 jest.mock("./voice", () => ({
-  speakFr: jest.fn(), cancelSpeech: jest.fn(), speakSeries: jest.fn(() => Promise.resolve()), speakAsCharacter: jest.fn(),
+  speakFr: jest.fn(), cancelSpeech: jest.fn(), speakSeries: jest.fn(() => Promise.resolve()),
+  speakSequence: jest.fn(), speakAsCharacter: jest.fn(),
 }));
+// Le bulletin passe par speakSequence : chaque phrase est déléguée au mock speakSeries pour réutiliser ses attentes.
+// Comme dans voice.js, speakFr (nouvelle voix) ou cancelSpeech (simple arrêt) interrompt la série active.
+let activeMockSequence = null;
+const sequenceThroughSeries = (phrases, { onitemstart, onitemend } = {}) => {
+  activeMockSequence?.interrupt(true);
+  let closed = false;
+  let current = 0;
+  let interruptWith;
+  const interrupted = new Promise((_, reject) => { interruptWith = reject; });
+  const session = {
+    interrupt: (replaced) => {
+      if (closed) return;
+      closed = true;
+      if (activeMockSequence === session) activeMockSequence = null;
+      interruptWith(Object.assign(new Error("Lecture interrompue."), { code: "cancelled", index: current, replaced }));
+    },
+  };
+  activeMockSequence = session;
+  const loop = (async () => {
+    for (let index = 0; index < phrases.length; index += 1) {
+      current = index;
+      await speakSeries(phrases[index], { onstart: () => { if (!closed) onitemstart?.(index); } });
+      if (closed) return;
+      onitemend?.(index);
+    }
+  })();
+  const done = Promise.race([loop, interrupted]).finally(() => {
+    closed = true;
+    if (activeMockSequence === session) activeMockSequence = null;
+  });
+  return { done, provider: "remote", cancel: () => session.interrupt(false) };
+};
 jest.mock("./lazyModules", () => new Proxy({}, { get: (_, key) => {
   if (key === "__esModule") return true;
   if (key === "MediaModulesPanel") return ({ onClose }) => (
@@ -103,6 +136,10 @@ beforeEach(() => {
   jest.clearAllMocks();
   connectStreamingStt.mockResolvedValue(null);
   speakSeries.mockResolvedValue();
+  activeMockSequence = null;
+  speakSequence.mockImplementation(sequenceThroughSeries);
+  speakFr.mockImplementation(() => activeMockSequence?.interrupt(true));
+  cancelSpeech.mockImplementation(() => activeMockSequence?.interrupt(false));
   jest.useFakeTimers();
   global.TextDecoder = TextDecoder;
   chatSignal = null;
@@ -1016,11 +1053,11 @@ function parisWeather() {
   };
 }
 
-function mockBulletinBackend({ weather = parisWeather() } = {}) {
+function mockBulletinBackend({ weather = parisWeather(), franceDescription } = {}) {
   const fallback = global.fetch.getMockImplementation();
   const date = new Date().toISOString();
   const sections = [
-    { id: "france", label: "France", status: "ok", articles: [{ titre: "Le maire annonce une décision", source: "Franceinfo", date, url: "https://www.franceinfo.fr/france/maire.html" }] },
+    { id: "france", label: "France", status: "ok", articles: [{ titre: "Le maire annonce une décision", source: "Franceinfo", date, url: "https://www.franceinfo.fr/france/maire.html", ...(franceDescription ? { description: franceDescription } : {}) }] },
     { id: "monde", label: "International", status: "ok", articles: [{ titre: "Le parlement adopte le texte", source: "Franceinfo", date, url: "https://www.franceinfo.fr/monde/parlement.html" }] },
   ];
   const chatBodies = [];
@@ -1120,6 +1157,60 @@ test("a late callback from an interrupted bulletin cannot move the announced pos
   await send("continue");
   expect(speakSeries.mock.calls[0][0]).toContain("France : Le maire annonce une décision.");
   expect(speakSeries.mock.calls.some(([text]) => text.includes("Le parlement"))).toBe(false);
+});
+
+test("a voice failure in a multi-phrase segment stops explicitly and resumes at that segment's first phrase", async () => {
+  // Rubrique France > 800 caractères : lue en deux phrases ; la seconde échoue (voix locale indisponible).
+  mockBulletinBackend({ franceDescription: `Le conseil ${"détaille longuement ".repeat(50)}le projet.` });
+  const error = jest.spyOn(console, "error").mockImplementation(() => {});
+  let failed = false;
+  speakSeries.mockImplementation((text, options) => {
+    if (!failed && text.includes("le projet.") && !text.includes("Le maire")) {
+      failed = true;
+      return Promise.reject(Object.assign(new Error("Voix locale indisponible."), { code: "local-error" }));
+    }
+    options?.onstart?.();
+    return Promise.resolve();
+  });
+  await mount();
+  await send("les infos");
+  const read = speakSeries.mock.calls.map(([text]) => text);
+  const firstHalf = read.findIndex((text) => text.includes("France : Le maire"));
+  expect(firstHalf).toBeGreaterThan(-1);
+  expect(read[firstHalf + 1]).toContain("le projet.");
+  expect(read.some((text) => text.includes("Le parlement"))).toBe(false);
+  expect(host.textContent).toContain("Voix indisponible : la lecture du bulletin s'est arrêtée.");
+  expect(error).toHaveBeenCalledWith("Lecture du bulletin :", expect.objectContaining({ code: "local-error" }));
+
+  await send("qui a fait quoi ?");
+  expect(lastSpoken()).toContain("France : Le maire annonce une décision.");
+
+  speakSeries.mockClear();
+  await send("reprends");
+  const resumed = speakSeries.mock.calls.map(([text]) => text);
+  expect(resumed[0]).toContain("France : Le maire annonce une décision.");
+  expect(resumed[1]).toContain("le projet.");
+  expect(resumed.filter((text) => text.includes("Le parlement"))).toHaveLength(1);
+  expect(resumed.some((text) => text.includes("Météo"))).toBe(false);
+  expect(newsFetches()).toBe(1);
+});
+
+test("stopping the bulletin voice never marks the interrupted segment as read nor revives old phrases", async () => {
+  mockBulletinBackend();
+  speakSeries.mockImplementation((text, options) => {
+    options?.onstart?.();
+    return text.includes("Le maire") ? new Promise(() => {}) : Promise.resolve();
+  });
+  await mount();
+  await send("les infos");
+  speakSeries.mockClear();
+  await act(async () => { cancelSpeech(); });
+  for (let i = 0; i < 8; i += 1) await act(async () => { jest.advanceTimersByTime(5000); });
+  expect(speakSeries).not.toHaveBeenCalled();
+  expect(host.textContent).not.toContain("Voix indisponible");
+
+  await send("continue");
+  expect(speakSeries.mock.calls[0][0]).toContain("France : Le maire annonce une décision.");
 });
 
 test("an invalid weather payload is announced as unavailable instead of read", async () => {

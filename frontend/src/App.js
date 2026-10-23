@@ -59,7 +59,7 @@ import { buildNewsBulletin, weatherBulletinText } from "./newsBulletin";
 import { fetchWeatherDirect } from "./weatherDirect";
 import { connectStreamingStt } from "@/services/streamingStt";
 import { enabledVoiceVocabulary } from "@/voiceVocabulary";
-import { speakFr, cancelSpeech, speakSeries, speakAsCharacter as speakCharacterVoice, spokenCount, lastSpokenAt } from "@/voice";
+import { speakFr, cancelSpeech, speakSeries, speakSequence, speakAsCharacter as speakCharacterVoice, spokenCount, lastSpokenAt } from "@/voice";
 import { isWindowCommand, observeWindowChanges, shortStatusToSpeak, snapshotWindows, windowChangeConfirmation } from "@/voiceConfirmation";
 import { KEY_STORAGE_EVENT, loadApiKeys, saveApiKeys } from "@/apiKeyStorage";
 import { loadHud, applyHud } from "@/hudPrefs";
@@ -237,6 +237,7 @@ function App() {
   const stopVoiceRef = useRef(() => {});
   const currentSpokenRef = useRef("");
   const lastBulletinRef = useRef(null);
+  const bulletinRunRef = useRef(0);
   const onSpeechStartRef = useRef(() => {});
   const onSpeechEndRef = useRef(() => {});
   const startInterruptListenerRef = useRef(() => {});
@@ -2038,7 +2039,8 @@ function App() {
 
   const speakBulletin = useCallback(async (bulletin, start = 0) => {
     const signal = voiceSessionRef.current.signal;
-    const stale = () => signal.aborted || lastBulletinRef.current !== bulletin;
+    const run = ++bulletinRunRef.current;
+    const stale = () => signal.aborted || lastBulletinRef.current !== bulletin || bulletinRunRef.current !== run;
     if (!bulletin || stale()) return;
     if (start >= bulletin.segments.length) {
       const message = "Le bulletin est terminé.";
@@ -2046,40 +2048,62 @@ function App() {
       speakOut(message);
       return;
     }
+    // Une rubrique n'est « lue » qu'après la fin réelle de sa dernière phrase : la reprise repart
+    // du début de la première rubrique inachevée, sans trou ni doublon de rubrique.
+    const items = [];
+    for (let index = start; index < bulletin.segments.length; index += 1) {
+      const phrases = splitDisplayReading(bulletin.segments[index].text);
+      phrases.forEach((phrase, position) => items.push({ index, phrase, last: position === phrases.length - 1 }));
+    }
     voiceSeriesPendingRef.current = true;
     speakingRef.current = true;
     stopCaptureRef.current();
     void handsFreeRef.current?.setBlocked(true);
     setStatus("speaking");
     setVoicePhase("preparing");
-    try {
-      for (let index = start; index < bulletin.segments.length; index += 1) {
-        for (const phrase of splitDisplayReading(bulletin.segments[index].text)) {
-          if (stale()) return;
-          await speakSeries(phrase, { onstart: () => {
-            if (stale()) return;
-            markSegmentStarted(bulletin, index);
-            currentSpokenRef.current = phrase;
-            setVoicePhase("speaking");
-            onSpeechStartRef.current();
-            // Android garde la capture coupée pendant la synthèse (anti-écho) : startInterruptListener l'ignore.
-            if (autoMicRef.current) startInterruptListenerRef.current();
-          } });
-        }
+    const playback = speakSequence(items.map((item) => item.phrase), {
+      onitemstart: (position) => {
         if (stale()) return;
-        markSegmentCompleted(bulletin, index);
-      }
+        const { index, phrase } = items[position];
+        markSegmentStarted(bulletin, index);
+        currentSpokenRef.current = phrase;
+        setVoicePhase("speaking");
+        onSpeechStartRef.current();
+        // Android garde la capture coupée pendant la synthèse (anti-écho) : startInterruptListener l'ignore.
+        if (autoMicRef.current) startInterruptListenerRef.current();
+      },
+      onitemend: (position) => {
+        if (!stale() && items[position].last) markSegmentCompleted(bulletin, items[position].index);
+      },
+    });
+    const stopPlayback = () => playback.cancel();
+    signal.addEventListener("abort", stopPlayback, { once: true });
+    let cancelled = false;
+    let replaced = false;
+    try {
+      await playback.done;
     } catch (error) {
-      if (!stale()) {
+      cancelled = error?.code === "cancelled";
+      replaced = cancelled && error.replaced !== false;
+      if (!cancelled && !stale()) {
         console.error("Lecture du bulletin :", error);
-        setVoiceMessage("La lecture du bulletin a été interrompue.");
+        bulletin.focused = true;
+        bulletin.resumable = true;
+        setVoiceMessage("Voix indisponible : la lecture du bulletin s'est arrêtée. Dites « reprends » pour continuer à la rubrique interrompue.");
       }
     } finally {
-      if (!signal.aborted) {
+      signal.removeEventListener("abort", stopPlayback);
+      if (!signal.aborted && bulletinRunRef.current === run) {
         voiceSeriesPendingRef.current = false;
         stopInterruptListenerRef.current();
-        setVoicePhase("idle");
-        onSpeechEndRef.current();
+        if (!cancelled || (!replaced && speakingRef.current)) {
+          setVoicePhase("idle");
+          onSpeechEndRef.current();
+        } else if (!speakingRef.current) {
+          // L'écoute d'interruption a déjà repris la main : elle gère la suite de l'échange.
+          setVoicePhase("idle");
+        }
+        // Remplacé par une nouvelle voix : c'est elle qui pilote désormais la phase vocale.
       }
     }
   }, [speakOut]);

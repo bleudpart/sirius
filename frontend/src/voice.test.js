@@ -1,5 +1,8 @@
 import { Capacitor } from "@capacitor/core";
-import { AEDES_VOICE, speakCinematic, speakFr, speakAsCharacter, cancelSpeech, cleanTextForDisplay } from "./voice";
+import {
+  AEDES_VOICE, speakCinematic, speakFr, speakAsCharacter, cancelSpeech, cleanTextForDisplay,
+  speakSequence, speakSeries, GEMINI_TTS_TIMEOUT_MS, SEQUENCE_START_TIMEOUT_MS, SERIES_START_GUARD_MS,
+} from "./voice";
 import { speakNative, stopNativeSpeech } from "./nativeVoice";
 import { KEY_STORAGE_EVENT } from "./apiKeyStorage";
 
@@ -15,7 +18,8 @@ const originalFetch = global.fetch;
 const originalAudio = global.Audio;
 let clock = Date.now();
 const flush = async () => {
-  for (let i = 0; i < 8; i += 1) await Promise.resolve();
+  // Requête puis lecture distantes partagées : quelques micro-tâches de plus avant le secours local.
+  for (let i = 0; i < 16; i += 1) await Promise.resolve();
 };
 
 beforeEach(() => {
@@ -595,4 +599,260 @@ test("les personnages masculins gardent une voix masculine sur Android", async (
   speakAsCharacter("Bonjour.", { module: "ORACLE#" });
   await flush();
   expect(geminiBody().voice).toBe("Aoede");
+});
+
+describe("speakSequence (bulletin) sur réseau lent", () => {
+  let requests;
+  let audios;
+  const settle = async () => { await flush(); await flush(); };
+  const okAudio = (audio = "wav") => ({ ok: true, json: async () => ({ audio_base64: audio }) });
+  const respond = async (index, response) => { requests[index].resolve(response); await settle(); };
+  const nativeCall = (n) => speakNative.mock.calls[n][1];
+  const run = (phrases, extra = {}) => {
+    const events = [];
+    const playback = speakSequence(phrases, {
+      onitemstart: (i) => events.push(`start:${i}`),
+      onitemend: (i) => events.push(`end:${i}`),
+      onprovider: (provider, reason) => events.push(`provider:${provider}${reason ? `:${reason.code}` : ""}`),
+      ...extra,
+    });
+    const outcome = playback.done.then(() => "ok", (error) => error);
+    return { playback, events, outcome };
+  };
+
+  beforeEach(() => {
+    jest.useFakeTimers("legacy");
+    requests = [];
+    audios = [];
+    global.fetch = jest.fn((url, { signal, body }) => new Promise((resolve, reject) => {
+      const request = { url, body: JSON.parse(body), signal, resolve, reject };
+      requests.push(request);
+      signal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })));
+    }));
+    global.Audio = jest.fn(() => {
+      const audio = { pause: jest.fn() };
+      audio.play = jest.fn(() => { Promise.resolve().then(() => audio.onplay?.()); return Promise.resolve(); });
+      audios.push(audio);
+      return audio;
+    });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  test("une synthèse lente juste sous 28 s reste distante, avec préchargement borné de la phrase suivante", async () => {
+    const { playback, events, outcome } = run(["Première rubrique.", "Deuxième rubrique.", "Troisième rubrique."]);
+    await settle();
+    expect(requests).toHaveLength(1);
+    jest.advanceTimersByTime(GEMINI_TTS_TIMEOUT_MS - 1000);
+    await respond(0, okAudio("a0"));
+    expect(events).toEqual(["provider:remote", "start:0"]);
+    expect(requests).toHaveLength(2); // une seule requête d'avance
+    await respond(1, okAudio("a1"));
+    expect(requests).toHaveLength(2);
+    audios[0].onended();
+    await settle();
+    expect(events).toEqual(["provider:remote", "start:0", "end:0", "start:1"]);
+    expect(requests).toHaveLength(3);
+    await respond(2, okAudio("a2"));
+    audios[1].onended();
+    await settle();
+    audios[2].onended();
+    await settle();
+    expect(await outcome).toBe("ok");
+    expect(events).toEqual(["provider:remote", "start:0", "end:0", "start:1", "end:1", "start:2", "end:2"]);
+    expect(playback.provider).toBe("remote");
+    expect(speakNative).not.toHaveBeenCalled();
+  });
+
+  test("le délai de 28 s bascule une seule fois sur la voix locale jusqu'à la fin, sans nouvel appel distant", async () => {
+    const degraded = jest.fn();
+    window.addEventListener("sirius-voice-degraded", degraded);
+    try {
+      const { playback, events, outcome } = run(["Un.", "Deux.", "Trois."]);
+      await settle();
+      jest.advanceTimersByTime(GEMINI_TTS_TIMEOUT_MS - 1);
+      await settle();
+      expect(speakNative).not.toHaveBeenCalled();
+      jest.advanceTimersByTime(1);
+      await settle();
+      expect(events).toEqual(["provider:remote", "provider:local:timeout"]);
+      expect(playback.provider).toBe("local");
+      for (let i = 0; i < 3; i += 1) {
+        expect(speakNative).toHaveBeenCalledTimes(i + 1);
+        nativeCall(i).onstart();
+        nativeCall(i).onend();
+        await settle();
+      }
+      expect(await outcome).toBe("ok");
+      expect(requests).toHaveLength(1);
+      expect(degraded).toHaveBeenCalledTimes(1);
+      expect(events.filter((e) => e.startsWith("end:"))).toEqual(["end:0", "end:1", "end:2"]);
+    } finally {
+      window.removeEventListener("sirius-voice-degraded", degraded);
+    }
+  });
+
+  test.each([
+    ["transport", (request) => request.reject(new TypeError("Failed to fetch"))],
+    ["empty", (request) => request.resolve({ ok: true, json: async () => ({}) })],
+    ["http", (request) => request.resolve({ ok: false, status: 502 })],
+  ])("un échec %s bascule la série sur la voix locale sans réessayer", async (code, fail) => {
+    const { events, outcome } = run(["Un.", "Deux."]);
+    await settle();
+    fail(requests[0]);
+    await settle();
+    expect(events).toEqual(["provider:remote", `provider:local:${code}`]);
+    nativeCall(0).onstart(); nativeCall(0).onend(); await settle();
+    nativeCall(1).onstart(); nativeCall(1).onend(); await settle();
+    expect(await outcome).toBe("ok");
+    expect(requests).toHaveLength(1);
+  });
+
+  test("l'échec de la voix locale de secours rejette sans marquer la phrase comme lue", async () => {
+    const phases = [];
+    const onPhase = (event) => phases.push(event.detail);
+    window.addEventListener("sirius-voice-phase", onPhase);
+    try {
+      const { events, outcome } = run(["Un.", "Deux."]);
+      await settle();
+      requests[0].reject(new TypeError("Failed to fetch"));
+      await settle();
+      nativeCall(0).onerror(new Error("TTS natif"));
+      nativeCall(0).onend();
+      const error = await outcome;
+      expect(error).toMatchObject({ name: "SpeechSequenceError", code: "local-error", index: 0 });
+      expect(events.some((e) => e.startsWith("end:"))).toBe(false);
+      expect(speakNative).toHaveBeenCalledTimes(1);
+      expect(phases.at(-1)).toBe("idle");
+    } finally {
+      window.removeEventListener("sirius-voice-phase", onPhase);
+    }
+  });
+
+  test("une voix locale qui se termine sans avoir parlé est une erreur, pas une fin", async () => {
+    localStorage.setItem("sirius_voice", JSON.stringify(AEDES_VOICE));
+    const { events, outcome } = run(["Un."]);
+    await settle();
+    expect(requests).toHaveLength(0);
+    nativeCall(0).onend();
+    expect(await outcome).toMatchObject({ code: "local-error", index: 0 });
+    expect(events).toEqual(["provider:local"]);
+  });
+
+  test("une voix locale muette expire en erreur explicite, jamais en succès simulé après le garde", async () => {
+    localStorage.setItem("sirius_voice", JSON.stringify(AEDES_VOICE));
+    const { events, outcome } = run(["Un.", "Deux."]);
+    await settle();
+    jest.advanceTimersByTime(SEQUENCE_START_TIMEOUT_MS);
+    expect(await outcome).toMatchObject({ code: "local-timeout", index: 0 });
+    jest.advanceTimersByTime(SERIES_START_GUARD_MS);
+    await settle();
+    expect(events).toEqual(["provider:local"]);
+    expect(speakNative).toHaveBeenCalledTimes(1);
+  });
+
+  test("une coupure en cours de lecture relit la même phrase en local, sans doublon de fin", async () => {
+    const { events, outcome } = run(["Un.", "Deux."]);
+    await settle();
+    await respond(0, okAudio());
+    expect(requests).toHaveLength(2);
+    audios[0].onerror();
+    await settle();
+    expect(requests[1].signal.aborted).toBe(true);
+    expect(events).toEqual(["provider:remote", "start:0", "provider:local:playback-cut"]);
+    expect(speakNative.mock.calls[0][0]).toBe("Un.");
+    nativeCall(0).onstart(); nativeCall(0).onend(); await settle();
+    nativeCall(1).onstart(); nativeCall(1).onend(); await settle();
+    expect(await outcome).toBe("ok");
+    expect(events.filter((e) => e.startsWith("end:"))).toEqual(["end:0", "end:1"]);
+    expect(global.Audio).toHaveBeenCalledTimes(1);
+  });
+
+  test("un audio distant qui ne démarre jamais bascule après le délai de démarrage", async () => {
+    global.Audio = jest.fn(() => ({ pause: jest.fn(), play: jest.fn(() => Promise.resolve()) }));
+    const { events, outcome } = run(["Un."]);
+    await settle();
+    await respond(0, okAudio());
+    jest.advanceTimersByTime(SEQUENCE_START_TIMEOUT_MS);
+    await settle();
+    expect(events).toEqual(["provider:remote", "provider:local:start-timeout"]);
+    nativeCall(0).onstart(); nativeCall(0).onend();
+    expect(await outcome).toBe("ok");
+  });
+
+  test.each([
+    ["cancelSpeech", () => cancelSpeech(), false],
+    ["une nouvelle réponse", () => speakFr("Autre chose"), true],
+  ])("%s pendant le préchargement coupe la lecture et ignore les réponses tardives", async (_, interrupt, replaced) => {
+    const { events, outcome } = run(["Un.", "Deux."]);
+    await settle();
+    await respond(0, okAudio());
+    const prefetch = requests[1];
+    interrupt();
+    const error = await outcome;
+    expect(error).toMatchObject({ code: "cancelled", index: 0, replaced });
+    expect(prefetch.signal.aborted).toBe(true);
+    expect(audios[0].pause).toHaveBeenCalled();
+    audios[0].onended?.();
+    prefetch.resolve(okAudio());
+    await settle();
+    expect(events).toEqual(["provider:remote", "start:0"]);
+    expect(global.Audio).toHaveBeenCalledTimes(1);
+  });
+
+  test("cancel() pendant une synthèse lente annule la requête sans bascule ni voix locale", async () => {
+    const { playback, events, outcome } = run(["Un.", "Deux."]);
+    await settle();
+    playback.cancel();
+    expect(await outcome).toMatchObject({ code: "cancelled" });
+    expect(requests[0].signal.aborted).toBe(true);
+    jest.advanceTimersByTime(GEMINI_TTS_TIMEOUT_MS);
+    await settle();
+    expect(events).toEqual(["provider:remote"]);
+    expect(speakNative).not.toHaveBeenCalled();
+    expect(global.Audio).not.toHaveBeenCalled();
+  });
+
+  test("relancer une série coupe l'ancienne : aucune ancienne phrase ne reprend", async () => {
+    const first = run(["Ancien un.", "Ancien deux."]);
+    await settle();
+    const second = run(["Nouveau."]);
+    expect(await first.outcome).toMatchObject({ code: "cancelled", replaced: true });
+    expect(requests[0].signal.aborted).toBe(true);
+    await settle();
+    await respond(1, okAudio());
+    audios[0].onended();
+    await settle();
+    expect(await second.outcome).toBe("ok");
+    expect(first.events).toEqual(["provider:remote"]);
+    expect(requests.map((r) => r.body.text)).toEqual(["Ancien un.", "Nouveau."]);
+  });
+
+  test("la série garde le timbre et le genre choisis, en distant comme en secours", async () => {
+    speakFr("Référence");
+    await settle();
+    const reference = requests[0].body.voice;
+    requests[0].reject(new TypeError("Failed to fetch"));
+    await settle();
+    const referenceGender = nativeCall(0).gender;
+    const { outcome } = run(["Bulletin."]);
+    await settle();
+    expect(requests[1].body.voice).toBe(reference);
+    requests[1].reject(new TypeError("Failed to fetch"));
+    await settle();
+    expect(nativeCall(1).gender).toBe(referenceGender);
+    nativeCall(1).onstart(); nativeCall(1).onend();
+    expect(await outcome).toBe("ok");
+  });
+
+  test("speakSeries conserve son contrat historique : résolution après le garde de 30 s", async () => {
+    let resolved = false;
+    speakSeries("Phrase du Display.").then(() => { resolved = true; });
+    await settle();
+    jest.advanceTimersByTime(SERIES_START_GUARD_MS);
+    await settle();
+    expect(resolved).toBe(true);
+  });
 });
