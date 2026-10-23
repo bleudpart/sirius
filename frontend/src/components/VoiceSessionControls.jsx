@@ -2,8 +2,12 @@ import { AudioLines, Mic, Square } from "lucide-react";
 
 const LABELS = {
   idle: "Prêt",
+  checking: "Je vérifie le profil vocal…",
   requesting: "Ouverture du microphone…",
   listening: "J’écoute…",
+  verifying: "Je vérifie votre voix…",
+  rejected: "Demande ignorée",
+  error: "Dialogue vocal interrompu",
   transcribing: "Je transcris…",
   thinking: "Je traite votre demande…",
   preparing: "Je prépare la voix…",

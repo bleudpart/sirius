@@ -4,6 +4,7 @@ import { Mic, X } from "lucide-react";
 import { createVoiceProfileStore, voiceProfileAccount } from "./voiceProfileStore";
 import { recordVoiceSample } from "./voiceProfileCapture";
 import { clearVoiceVocabulary, readVoiceVocabulary, saveVoiceVocabulary } from "./voiceVocabulary";
+import VoiceIdentityPanel from "./VoiceIdentityPanel";
 import "./VoiceProfilePanel.css";
 
 const storage = createVoiceProfileStore();
@@ -32,6 +33,7 @@ function VoiceProfileContent({ account, onClose, onBeforeRecord, store, record }
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [vocabulary, setVocabulary] = useState(() => readVoiceVocabulary(account));
   const [term, setTerm] = useState("");
+  const [identityOpen, setIdentityOpen] = useState(false);
   const updateVocabulary = (next) => {
     try { setVocabulary(saveVoiceVocabulary(account, next)); setError(""); }
     catch (err) { setError(err.message); }
@@ -126,6 +128,7 @@ function VoiceProfileContent({ account, onClose, onBeforeRecord, store, record }
     finally { if (current.current === account) setBusy(false); }
   };
   const close = () => { discard(); onClose(); };
+  if (identityOpen) return <VoiceIdentityPanel account={account} onClose={() => setIdentityOpen(false)} onBeforeRecord={onBeforeRecord} record={record} />;
   return <section className="prime-screen voice-profile-panel" data-testid="voice-profile-panel"
     onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); close(); } }}>
     <header className="zeus-head">
@@ -133,8 +136,9 @@ function VoiceProfileContent({ account, onClose, onBeforeRecord, store, record }
       <button type="button" className="setup-close zeus-close" aria-label="Fermer le profil vocal" onClick={close}><X size={18} /></button>
     </header>
     <div className="voice-profile-content">
-      <p>Votre voix, sur cet appareil uniquement. Aucun envoi au serveur, aucune écoute permanente. Un extrait n’est conservé qu’après votre validation.</p>
+      <p>Bibliothèque locale : votre voix, sur cet appareil uniquement. Aucun envoi de ces exemples au serveur, aucune écoute permanente. Un extrait n’est conservé qu’après votre validation.</p>
       <p>Cette bibliothèque conserve vos exemples et leur transcription exacte. Elle n’entraîne pas le moteur de reconnaissance et ne reconnaît pas votre identité.</p>
+      <button type="button" disabled={!account} onClick={() => { discard(); setIdentityOpen(true); }}>Configurer la vérification de ma voix sur le serveur</button>
       {!account && <p role="alert">Connectez-vous pour utiliser votre profil vocal personnel.</p>}
       {error && <p role="alert">{error}</p>}
       {notice && <p role="status">{notice}</p>}

@@ -1,11 +1,13 @@
 import { registerPlugin } from "@capacitor/core";
 import { requestTranscription } from "./services/assistantApi";
 import { isWhisperHallucination } from "./microphoneCapture";
+import { requireVoiceIdentity, verifyVoiceIdentity } from "./voiceIdentity";
 
 const audio = registerPlugin("SiriusAudio");
 
 export function createNativeHandsFree({
   plugin = audio, transcribe = requestTranscription, onState, onTranscript, groqKey = () => "", vocabulary = () => [],
+  requireIdentity = requireVoiceIdentity, verifyIdentity = verifyVoiceIdentity,
 }) {
   let session = null;
   let blocked = true;
@@ -43,14 +45,22 @@ export function createNativeHandsFree({
   const receive = async (current, event) => {
     if (session !== current || blocked || current.processing || current.controller.signal.aborted) return;
     current.processing = true;
-    report("transcribing");
+    report("verifying", "Vérification de votre voix en cours.");
     try {
       await suppress(current, true);
       if (session !== current) return;
       const binary = atob(event.audio);
       const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+      const blob = new Blob([bytes], { type: "audio/wav" });
+      const identity = await verifyIdentity(blob, { signal: current.controller.signal });
+      if (session !== current || current.controller.signal.aborted) return;
+      if (identity.verified !== true) {
+        report("paused", identity.message || "Voix non reconnue : demande ignorée.");
+        return;
+      }
       const form = new FormData();
-      form.append("file", new Blob([bytes], { type: "audio/wav" }), "sirius-native.wav");
+      form.append("file", blob, "sirius-native.wav");
+      report("transcribing", "Voix vérifiée. Transcription de votre phrase en cours.");
       const key = groqKey();
       if (key) form.append("groq_key", key);
       const response = await transcribe(form, { signal: current.controller.signal, vocabulary: vocabulary() });
@@ -94,6 +104,8 @@ export function createNativeHandsFree({
       try {
         await stopping;
         if (session !== current) return;
+        await requireIdentity({ signal: current.controller.signal });
+        if (session !== current || current.controller.signal.aborted) return;
         for (const [name, callback] of [
           ["state", (event) => {
             if (session !== current) return;

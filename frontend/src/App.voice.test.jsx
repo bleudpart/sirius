@@ -10,13 +10,18 @@ import { connectStreamingStt } from "./services/streamingStt";
 import { pttBeep } from "./appLogic";
 import { createNativeHandsFree } from "./nativeHandsFree";
 import { saveVoiceVocabulary } from "./voiceVocabulary";
+import { requireVoiceIdentity, verifyVoiceIdentity } from "./voiceIdentity";
+import { collectVoiceDiagnostic } from "./voiceDiagnostic";
 
+jest.mock("./voiceDiagnostic", () => ({ collectVoiceDiagnostic: jest.fn() }));
+jest.mock("./voiceIdentity", () => ({ requireVoiceIdentity: jest.fn(), verifyVoiceIdentity: jest.fn() }));
 jest.mock("./nativeSpeechRecognition", () => ({ createNativeRecognition: jest.fn() }));
 jest.mock("./nativeHandsFree", () => ({ createNativeHandsFree: jest.fn() }));
 jest.mock("./services/streamingStt", () => ({ connectStreamingStt: jest.fn() }));
 jest.mock("./appLogic", () => ({ ...jest.requireActual("./appLogic"), pttBeep: jest.fn() }));
 
-jest.mock("./AuthGate", () => ({ useAuth: () => ({ user: { id: "voice-test", name: "Validation" } }) }));
+let mockAuthUser;
+jest.mock("./AuthGate", () => ({ useAuth: () => ({ user: mockAuthUser }) }));
 jest.mock("./ProactivePanel", () => ({ onInitiative }) => (
   <button data-testid="test-initiative" onClick={() => onInitiative(
     { id: "initiative-test" }, "Je peux préparer le briefing du jour."
@@ -131,9 +136,39 @@ let nativeCalls;
 let handsFree;
 let handsFreeOptions;
 let originalSpeechRecognition;
+const originalRecorder = window.MediaRecorder;
+const originalMediaDevices = Object.getOwnPropertyDescriptor(navigator, "mediaDevices");
+
+function mockContinuousAudio(transcript = "quelle heure est-il") {
+  const recorders = [];
+  Object.defineProperty(navigator, "mediaDevices", {
+    configurable: true, value: { getUserMedia: jest.fn(async () => ({ getTracks: () => [{ stop: jest.fn() }] })) },
+  });
+  window.MediaRecorder = class {
+    static isTypeSupported() { return true; }
+    constructor() { this.mimeType = "audio/webm"; this.state = "inactive"; recorders.push(this); }
+    start() { this.state = "recording"; this.onstart?.(); }
+    stop() {
+      this.state = "inactive";
+      this.ondataavailable?.({ data: new Blob(["a".repeat(1000)], { type: this.mimeType }) });
+      this.onstop?.();
+    }
+  };
+  const fallback = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation((url, options) => String(url).endsWith("/stt")
+    ? Promise.resolve({ ok: true, json: async () => ({ text: typeof transcript === "function" ? transcript() : transcript }) })
+    : fallback(url, options));
+  return recorders;
+}
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockAuthUser = { id: "voice-test", name: "Validation" };
+  requireVoiceIdentity.mockReset().mockResolvedValue({ ready: true, enrolled: true });
+  verifyVoiceIdentity.mockReset().mockResolvedValue({ verified: true });
+  collectVoiceDiagnostic.mockReset().mockResolvedValue({
+    measuredAt: "2026-10-23T20:00:00Z", checks: [],
+  });
   connectStreamingStt.mockResolvedValue(null);
   speakSeries.mockResolvedValue();
   activeMockSequence = null;
@@ -205,6 +240,9 @@ afterEach(async () => {
   if (originalSpeechRecognition === undefined) delete window.SpeechRecognition;
   else window.SpeechRecognition = originalSpeechRecognition;
   global.TextDecoder = originalTextDecoder;
+  window.MediaRecorder = originalRecorder;
+  if (originalMediaDevices) Object.defineProperty(navigator, "mediaDevices", originalMediaDevices);
+  else delete navigator.mediaDevices;
   jest.restoreAllMocks();
   jest.clearAllTimers();
   jest.useRealTimers();
@@ -520,6 +558,7 @@ test("native hands-free is diagnostic-only, explicitly started, and stopped befo
   handsFree.available.mockResolvedValue({ available: true });
   localStorage.setItem("sirius_android_stt", "native");
   localStorage.setItem("sirius_auto_mic", "1");
+  const recorders = mockContinuousAudio();
   await mount();
   expect(handsFree.start).not.toHaveBeenCalled();
   const button = host.querySelector('[data-testid="sirius-native-capture-btn"]');
@@ -529,13 +568,145 @@ test("native hands-free is diagnostic-only, explicitly started, and stopped befo
   expect(button.textContent).toContain("Arrêter la capture native");
   await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
   expect(handsFree.active).toBe(false);
-  expect(nativeCalls).toHaveLength(1);
+  expect(recorders).toHaveLength(1);
+  expect(nativeCalls).toHaveLength(0);
 });
 
 test("normal Android builds do not offer experimental native hands-free", async () => {
   jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
   await mount();
   expect(host.querySelector('[data-testid="sirius-native-capture-btn"]')).toBeNull();
+});
+
+test("profile readiness has its own state; a second press cancels it before opening the microphone", async () => {
+  const recorders = mockContinuousAudio();
+  let finish;
+  let signal;
+  requireVoiceIdentity.mockImplementationOnce((options) => {
+    signal = options.signal;
+    return new Promise((resolve) => { finish = resolve; });
+  });
+  await mount();
+  await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
+  const controls = host.querySelector('[data-testid="sirius-voice-controls"]');
+  expect(controls.dataset.phase).toBe("checking");
+  expect(controls.textContent).toContain("Je vérifie le profil vocal");
+  expect(host.querySelector('[data-testid="sirius-top-mic-btn"]').getAttribute("aria-pressed")).toBe("true");
+  expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
+  await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
+  expect(signal.aborted).toBe(true);
+  await act(async () => finish({ ready: true, enrolled: true }));
+  expect(recorders).toHaveLength(0);
+  expect(controls.dataset.phase).toBe("idle");
+});
+
+test("speaker comparison is shown separately from STT and a refusal is never spoken", async () => {
+  const recorders = mockContinuousAudio("Explique le ciel bleu");
+  let finish;
+  verifyVoiceIdentity.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+  await mount();
+  await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
+  await act(async () => recorders[0].stop());
+  const controls = host.querySelector('[data-testid="sirius-voice-controls"]');
+  expect(controls.dataset.phase).toBe("verifying");
+  expect(controls.textContent).toContain("Je vérifie votre voix");
+  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/stt"))).toBe(false);
+  await act(async () => finish({ verified: false, message: "Voix non reconnue : demande ignorée." }));
+  expect(controls.dataset.phase).toBe("rejected");
+  expect(speakFr).not.toHaveBeenCalled();
+});
+
+test("Verify Sirius stops listening and opens actionable diagnostics with profile/settings navigation", async () => {
+  const recorders = mockContinuousAudio();
+  await mount();
+  await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
+  await act(async () => host.querySelector('[data-testid="sirius-voice-diagnostic-btn"]').click());
+  expect(recorders[0].state).toBe("inactive");
+  expect(collectVoiceDiagnostic).toHaveBeenCalledTimes(1);
+  expect(host.querySelector('[role="dialog"]').textContent).toContain("Vérifier Sirius");
+  await act(async () => document.dispatchEvent(new KeyboardEvent("keydown", { code: "Space", bubbles: true })));
+  expect(recorders).toHaveLength(1);
+  expect(recorders[0].state).toBe("inactive");
+  const button = (label) => [...host.querySelectorAll("button")].find((item) => item.textContent === label);
+  await act(async () => button("Ouvrir mon profil vocal").click());
+  expect(collectVoiceDiagnostic.mock.calls[0][0].signal.aborted).toBe(true);
+  expect(host.querySelector('[data-testid="workspace-VoiceProfilePanel"]')).not.toBeNull();
+  await act(async () => host.querySelector('[data-testid="workspace-VoiceProfilePanel"] button').click());
+  await act(async () => host.querySelector('[data-testid="sirius-voice-diagnostic-btn"]').click());
+  await act(async () => button("Ouvrir les réglages voix").click());
+  expect(host.querySelector('[data-testid="workspace-SiriusSetup"]').dataset.tab).toBe("voix");
+});
+
+test.each(["android", "web"])("missing speaker enrollment prevents %s continuous listening without opening the microphone", async (platform) => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue(platform);
+  const recorders = mockContinuousAudio();
+  requireVoiceIdentity.mockRejectedValue(new Error("Enregistrez votre voix avant l'écoute continue."));
+  await mount();
+  await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
+  expect(recorders).toHaveLength(0);
+  expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
+  expect(native.listen).not.toHaveBeenCalled();
+  expect(host.querySelector(".voice-session-controls").textContent).toContain("Enregistrez votre voix");
+  expect(host.querySelector('[data-testid="sirius-top-mic-btn"]').getAttribute("aria-pressed")).toBe("false");
+});
+
+test.each(["android", "web"])("TV audio is verified before STT and rejected without a conversation on %s", async (platform) => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue(platform);
+  const recorders = mockContinuousAudio("Explique le ciel bleu");
+  verifyVoiceIdentity.mockResolvedValue({ verified: false, message: "Voix non reconnue : demande ignorée." });
+  await mount();
+  await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
+  await act(async () => recorders[0].stop());
+  expect(verifyVoiceIdentity).toHaveBeenCalledTimes(1);
+  expect(connectStreamingStt).not.toHaveBeenCalled();
+  expect(global.fetch.mock.calls.some(([url]) => /\/(?:stt|intent|chat)(?:\/stream)?$/.test(String(url)))).toBe(false);
+  expect(speakFr).not.toHaveBeenCalled();
+  expect(host.querySelector(".voice-session-controls").textContent).toContain("Voix non reconnue");
+  await act(async () => jest.advanceTimersByTime(600));
+  expect(recorders).toHaveLength(2);
+});
+
+test("a verification outage disables continuous listening instead of using a permissive fallback", async () => {
+  const recorders = mockContinuousAudio("Explique le ciel bleu");
+  verifyVoiceIdentity.mockRejectedValue(new Error("Vérification indisponible"));
+  await mount();
+  await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
+  await act(async () => recorders[0].stop());
+  expect(global.fetch.mock.calls.some(([url]) => /\/(?:stt|intent|chat)(?:\/stream)?$/.test(String(url)))).toBe(false);
+  expect(connectStreamingStt).not.toHaveBeenCalled();
+  expect(host.querySelector(".voice-session-controls").textContent).toContain("Vérification indisponible");
+  await act(async () => jest.advanceTimersByTime(5000));
+  expect(recorders).toHaveLength(1);
+});
+
+test("changing account aborts speaker verification and never transcribes the previous user's audio", async () => {
+  const recorders = mockContinuousAudio("Explique le ciel bleu");
+  let finish;
+  verifyVoiceIdentity.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+  await mount();
+  await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
+  await act(async () => recorders[0].stop());
+  const signal = verifyVoiceIdentity.mock.calls[0][1].signal;
+  mockAuthUser = { id: "another-account", name: "Autre compte" };
+  await mount();
+  expect(signal.aborted).toBe(true);
+  await act(async () => finish({ verified: true }));
+  expect(global.fetch.mock.calls.some(([url]) => /\/(?:stt|intent|chat)(?:\/stream)?$/.test(String(url)))).toBe(false);
+  expect(host.querySelector('[data-testid="sirius-top-mic-btn"]').getAttribute("aria-pressed")).toBe("false");
+});
+
+test("a browser without audio capture stops protected listening instead of retrying text-only recognition", async () => {
+  const speech = jest.fn();
+  window.SpeechRecognition = speech;
+  window.MediaRecorder = undefined;
+  delete navigator.mediaDevices;
+  await mount();
+  await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
+  await act(async () => jest.advanceTimersByTime(5000));
+  expect(speech).not.toHaveBeenCalled();
+  expect(verifyVoiceIdentity).not.toHaveBeenCalled();
+  expect(host.querySelector(".voice-session-controls").textContent).toContain("Enregistrement vocal indisponible");
+  expect(host.querySelector('[data-testid="sirius-top-mic-btn"]').getAttribute("aria-pressed")).toBe("false");
 });
 
 test.each(["Bonjour Zirius", "Zirius bonjour"])(
@@ -554,9 +725,12 @@ test.each(["Bonjour Zirius", "Zirius bonjour"])(
   "the ordinary Android microphone processes the greeting %s", async (greeting) => {
     jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
     localStorage.setItem("sirius_android_stt", "native");
+    const recorders = mockContinuousAudio(greeting);
     await mount();
     await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
-    await act(async () => nativeCalls[0].resolve(greeting));
+    await act(async () => recorders[0].stop());
+    expect(verifyVoiceIdentity).toHaveBeenCalledTimes(1);
+    expect(native.listen).not.toHaveBeenCalled();
     const call = global.fetch.mock.calls.find(([url]) => String(url).endsWith("/chat/stream"));
     expect(JSON.parse(call[1].body).text.toLowerCase()).toBe("bonjour");
   },
@@ -857,28 +1031,32 @@ test("a new request replaces a busy request without needing Stop first", async (
   expect(speakFr.mock.calls.some(([text]) => text.startsWith("Il est "))).toBe(true);
 });
 
-test("Android native test mode replaces a pending answer with a newly spoken question", async () => {
+test("Android protected capture replaces a pending answer with a verified question", async () => {
   jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
   localStorage.setItem("sirius_android_stt", "native");
+  let transcript = "Sirius, explique pourquoi le ciel est bleu";
+  const recorders = mockContinuousAudio(() => transcript);
   await mount();
   await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
-  expect(nativeCalls).toHaveLength(1);
-  await act(async () => nativeCalls[0].resolve("Sirius, explique pourquoi le ciel est bleu"));
+  expect(recorders).toHaveLength(1);
+  await act(async () => recorders[0].stop());
   const previousSignal = chatSignal;
   const lateAnswer = deliverAnswer;
-  expect(nativeCalls).toHaveLength(1);
+  expect(recorders).toHaveLength(1);
   expect(host.querySelector(".voice-session-controls").textContent).toContain("Je traite");
   await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
   expect(previousSignal.aborted).toBe(true);
-  expect(nativeCalls).toHaveLength(1);
+  expect(recorders).toHaveLength(1);
   await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
-  expect(nativeCalls).toHaveLength(2);
-  await act(async () => nativeCalls[1].resolve("Sirius, quelle heure est-il"));
+  expect(recorders).toHaveLength(2);
+  transcript = "Sirius, quelle heure est-il";
+  await act(async () => recorders[1].stop());
   expect(previousSignal.aborted).toBe(true);
   await act(async () => lateAnswer());
   expect(speakFr.mock.calls.some(([text]) => text === "Réponse devenue obsolète")).toBe(false);
   expect(speakFr.mock.calls.some(([text]) => text.startsWith("Il est "))).toBe(true);
-  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/stt"))).toBe(false);
+  expect(verifyVoiceIdentity).toHaveBeenCalledTimes(2);
+  expect(native.listen).not.toHaveBeenCalled();
 });
 
 test("Android manual dictation routes the evening briefing when preceded by the wake word", async () => {
@@ -886,11 +1064,13 @@ test("Android manual dictation routes the evening briefing when preceded by the 
   localStorage.setItem("sirius_android_stt", "native");
   const webSpeech = jest.fn();
   window.SpeechRecognition = webSpeech;
+  const recorders = mockContinuousAudio("Sirius, brieffing du soir");
   await mount();
 
   await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
-  expect(nativeCalls).toHaveLength(1);
-  await act(async () => nativeCalls[0].resolve("Sirius, brieffing du soir"));
+  expect(recorders).toHaveLength(1);
+  await act(async () => recorders[0].stop());
+  expect(verifyVoiceIdentity).toHaveBeenCalledTimes(1);
   expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/work-dossiers/briefing"))).toBe(true);
   const [, briefingOptions] = global.fetch.mock.calls.find(([url]) => String(url).endsWith("/work-dossiers/briefing"));
   expect(briefingOptions.credentials).toBe("include");
@@ -1345,26 +1525,29 @@ test("Display reserves the actual microphone controls and updates on viewport re
 test("Android conversation resumes after each answer without requiring the wake word", async () => {
   jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
   localStorage.setItem("sirius_android_stt", "native");
+  const recorders = mockContinuousAudio();
   await mount();
   await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
-  await act(async () => nativeCalls[0].resolve("quelle heure est-il"));
+  await act(async () => recorders[0].stop());
   expect(speakFr.mock.calls.some(([text]) => text.startsWith("Il est "))).toBe(true);
   const [, options] = speakFr.mock.calls.at(-1);
   await act(async () => options.onstart?.());
   await act(async () => jest.advanceTimersByTime(1000));
-  expect(nativeCalls).toHaveLength(1);
+  expect(recorders).toHaveLength(1);
   expect(host.querySelector('[data-testid="sirius-top-mic-btn"]').getAttribute("aria-pressed")).toBe("true");
   await act(async () => options.onend?.());
   await act(async () => jest.advanceTimersByTime(500));
-  expect(nativeCalls).toHaveLength(2);
-  await act(async () => nativeCalls[1].resolve("quelle heure est-il"));
+  expect(recorders).toHaveLength(2);
+  await act(async () => recorders[1].stop());
   const [, nextOptions] = speakFr.mock.calls.at(-1);
   await act(async () => nextOptions.onend?.());
   await act(async () => jest.advanceTimersByTime(500));
-  expect(nativeCalls).toHaveLength(3);
+  expect(recorders).toHaveLength(3);
   await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
   await act(async () => jest.advanceTimersByTime(5000));
-  expect(nativeCalls).toHaveLength(3);
+  expect(recorders).toHaveLength(3);
+  expect(native.listen).not.toHaveBeenCalled();
+  expect(verifyVoiceIdentity).toHaveBeenCalledTimes(2);
   expect(host.querySelector('[data-testid="sirius-top-mic-btn"]').getAttribute("aria-pressed")).toBe("false");
   expect(global.fetch.mock.calls.some(([url]) => /\/(?:intent|chat)(?:\/stream)?$/.test(String(url)))).toBe(false);
 });
@@ -1372,15 +1555,16 @@ test("Android conversation resumes after each answer without requiring the wake 
 test("Android conversation no longer consumes old read-aloud pill confirmations", async () => {
   jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
   localStorage.setItem("sirius_android_stt", "native");
+  const recorders = mockContinuousAudio("oui");
   const readAnswer = jest.fn(() => true);
   window.__siriusReadAloudAnswer = readAnswer;
   try {
     await mount();
     await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
-    await act(async () => nativeCalls[0].resolve("oui"));
+    await act(async () => recorders[0].stop());
     expect(readAnswer).not.toHaveBeenCalled();
     await act(async () => jest.advanceTimersByTime(5000));
-    expect(nativeCalls).toHaveLength(2);
+    expect(recorders).toHaveLength(2);
   } finally {
     delete window.__siriusReadAloudAnswer;
   }
@@ -1422,15 +1606,20 @@ test("Android does not open a second recognizer during Sirius playback", async (
   expect(webSpeech).not.toHaveBeenCalled();
 });
 
-test("Stop cancels a native microphone and a late result cannot send a request", async () => {
+test("Stop cancels protected verification and a late success cannot send a request", async () => {
   jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
   localStorage.setItem("sirius_android_stt", "native");
+  const recorders = mockContinuousAudio("Explique le ciel bleu");
+  let finish;
+  verifyVoiceIdentity.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
   await mount();
   await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
-  const capture = nativeCalls[0];
+  await act(async () => recorders[0].stop());
+  const signal = verifyVoiceIdentity.mock.calls[0][1].signal;
   await act(async () => host.querySelector(".voice-session-controls button").click());
-  await act(async () => capture.resolve("Explique le ciel bleu"));
-  expect(native.cancel).toHaveBeenCalled();
+  expect(signal.aborted).toBe(true);
+  await act(async () => finish({ verified: true }));
+  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/stt"))).toBe(false);
   expect(global.fetch.mock.calls.some(([url]) => /\/chat(?:\/stream)?$/.test(String(url)))).toBe(false);
 });
 
@@ -1538,6 +1727,8 @@ test.each([false, true])("Android waits for microphone readiness and handles ear
     } else {
       expect(recorders[0].state).toBe("recording");
       expect(connectStreamingStt).toHaveBeenCalledWith(expect.objectContaining({ vocabulary: ["Daniel Partel"] }));
+      expect(requireVoiceIdentity).not.toHaveBeenCalled();
+      expect(verifyVoiceIdentity).not.toHaveBeenCalled();
       expect(host.querySelector('[data-testid="sirius-ptt-btn"]').textContent).toContain("OUVERTURE");
       expect(pttBeep).not.toHaveBeenCalled();
       await act(async () => recorders[0].onstart());
@@ -1555,18 +1746,19 @@ test.each([false, true])("Android waits for microphone readiness and handles ear
   }
 });
 
-test("native permission refusal is explicit and does not silently upload audio", async () => {
+test("protected capture permission refusal is explicit and never uploads audio", async () => {
   jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
   localStorage.setItem("sirius_android_stt", "native");
-  native.listen.mockRejectedValueOnce(Object.assign(new Error("Microphone non autorisé."), { code: "PERMISSION_DENIED" }));
+  mockContinuousAudio();
+  navigator.mediaDevices.getUserMedia.mockRejectedValueOnce(new DOMException("Refus", "NotAllowedError"));
   await mount();
   await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
-  expect(host.querySelector(".voice-session-controls").textContent).toContain("Microphone non autorisé.");
+  expect(host.querySelector(".voice-session-controls").textContent).toContain("Accès au micro refusé");
   expect(host.querySelector('[title="Démarrer la conversation vocale"]')).not.toBeNull();
   expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/stt"))).toBe(false);
 });
 
-test("native unavailability explicitly falls back to server capture", async () => {
+test("text-only Android recognition is bypassed for verified server capture", async () => {
   const previousRecorder = window.MediaRecorder;
   const previousMediaDevices = Object.getOwnPropertyDescriptor(navigator, "mediaDevices");
   const recorders = [];
@@ -1586,7 +1778,8 @@ test("native unavailability explicitly falls back to server capture", async () =
     await mount();
     await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
     expect(recorders).toHaveLength(1);
-    expect(host.querySelector(".voice-session-controls").textContent).toContain("transcription serveur");
+    expect(native.listen).not.toHaveBeenCalled();
+    expect(requireVoiceIdentity).toHaveBeenCalled();
     await act(async () => host.querySelector(".voice-session-controls button").click());
     expect(recorders[0].state).toBe("inactive");
   } finally {
@@ -1683,25 +1876,25 @@ test("web conversation waits for the end of the answer before reopening", async 
     stop() { this.onend?.(); }
     abort() { this.onend?.(); }
   };
+  const recorders = mockContinuousAudio();
   try {
     await mount();
     await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
-    expect(recognitions).toHaveLength(1);
+    expect(recorders).toHaveLength(1);
+    expect(recognitions).toHaveLength(0);
 
     await act(async () => {
-      const result = [{ transcript: "quelle heure est-il", confidence: 0.9 }];
-      result.isFinal = true;
-      recognitions[0].onresult({ resultIndex: 0, results: [result] });
-      jest.advanceTimersByTime(1200);
-      jest.advanceTimersByTime(500);
+      recorders[0].stop();
     });
 
-    expect(recognitions).toHaveLength(1);
+    expect(recorders).toHaveLength(1);
     expect(speakFr.mock.calls.some(([message]) => message.startsWith("Il est "))).toBe(true);
     const [, options] = speakFr.mock.calls.at(-1);
     await act(async () => options.onend?.());
     await act(async () => jest.advanceTimersByTime(600));
-    expect(recognitions).toHaveLength(2);
+    expect(recorders).toHaveLength(2);
+    expect(recognitions).toHaveLength(0);
+    expect(verifyVoiceIdentity).toHaveBeenCalledTimes(1);
     expect(global.fetch.mock.calls.filter(([url]) => /\/(?:intent|chat)(?:\/stream)?$/.test(String(url)))).toEqual([]);
   } finally {
     window.SpeechRecognition = previousRecognition;

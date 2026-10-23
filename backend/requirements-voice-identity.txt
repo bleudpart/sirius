@@ -1,0 +1,3 @@
+# Optional, explicitly operator-installed CPU speaker verification runtime.
+# No weights are bundled or downloaded by SIRIUS.
+sherpa-onnx==2.0.0

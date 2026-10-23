@@ -3030,6 +3030,8 @@ app.add_middleware(ProviderAccessMiddleware, db=db)
 app.include_router(api_router)
 from routes.document_scans import make_document_scans_router
 app.include_router(make_document_scans_router(db, require_user, _validate_upload_content))
+from routes.voice_identity import make_voice_identity_router
+app.include_router(make_voice_identity_router(db, require_user))
 
 # Catalogue public des plateformes multimedia. La route reste hors de /api pour
 # conserver le contrat frontend /modules/media et fonctionner avec le proxy CRA.

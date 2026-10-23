@@ -35,6 +35,9 @@ test("privacy explains real boundaries and opens existing controls without reque
   expect(host.textContent).toContain("aucune prise alimentant un appareil dangereux");
   expect(host.textContent).toContain("DUERP et cahiers personnel / sécurité");
   expect(host.textContent).toContain("une suppression de compte n'efface pas son historique partagé");
+  expect(host.textContent).toContain("empreinte biométrique personnelle");
+  expect(host.textContent).toContain("Une phrase refusée n'est pas transcrite");
+  expect(host.textContent).toContain("bouton micro maintenu");
   expect(global.fetch).not.toHaveBeenCalled();
   await act(async () => [...host.querySelectorAll("button")].forEach((button) => button.click()));
   expect(account).toHaveBeenCalledTimes(1);

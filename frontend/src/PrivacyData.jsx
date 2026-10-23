@@ -21,6 +21,15 @@ export default function PrivacyData({ onOpenAccount, onMemory, onConnections }) 
       <dt><strong>Lecture vocale choisie</strong></dt>
       <dd>{voice.name?.startsWith("browser") ? "Voix de l'appareil sélectionnée." : "Voix distante sélectionnée : le texte à lire peut être transmis à Google ou Gemini selon l'appareil."}
         {" "}Les voix et possibilités hors ligne dépendent du système. La transcription du microphone est distincte de la lecture vocale.</dd>
+      <dt><strong>Vérification du locuteur en écoute continue</strong></dt>
+      <dd>Cette écoute nécessite un profil vocal serveur créé volontairement dans « Ma voix et ma diction ».
+        Après consentement, trois nouvelles références et les extraits à vérifier sont transmis au serveur Sirius.
+        Le serveur conserve une empreinte biométrique personnelle, pas les fichiers audio de référence.
+        Les exemples de la bibliothèque locale ne sont jamais envoyés automatiquement.
+        Une phrase refusée n'est pas transcrite ; une phrase acceptée peut ensuite être envoyée au fournisseur STT habituel.
+        La suppression de l'empreinte dans le profil vocal bloque l'écoute continue. Elle ne rappelle pas une action déjà partie.
+        Le bouton micro maintenu reste utilisable sans vérification du locuteur.
+        Ce filtrage n'est pas une authentification fiable contre la télévision, les voix mélangées, les imitations ou les enregistrements.</dd>
       <dt><strong>Courriels et calendriers</strong></dt>
       <dd>Les comptes connectés donnent accès aux données selon les autorisations accordées. Une recherche Microsoft transmet ses mots-clés à Microsoft. Déconnecter un compte n'efface pas les données déjà enregistrées dans un dossier.</dd>
       <dt><strong>Téléphone Vapi, facultatif</strong></dt>

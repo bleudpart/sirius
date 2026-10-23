@@ -42,6 +42,7 @@ import { Capacitor } from "@capacitor/core";
 import { isWhisperHallucination, microphoneConstraints, requestMicrophoneStream, scheduleHandsFreeRetry, stopRecorderAfterSilence, useServerTranscription } from "@/microphoneCapture";
 import PushToTalkButton from "@/components/PushToTalkButton";
 import VoiceSessionControls from "@/components/VoiceSessionControls";
+import VoiceDiagnosticPanel from "@/components/VoiceDiagnosticPanel";
 import { createNativeRecognition } from "@/nativeSpeechRecognition";
 import { createNativeHandsFree } from "@/nativeHandsFree";
 import { displayReadingText, splitDisplayReading, isDisplayReadCommand } from "@/displayReading";
@@ -59,6 +60,7 @@ import { buildNewsBulletin, weatherBulletinText } from "./newsBulletin";
 import { fetchWeatherDirect } from "./weatherDirect";
 import { connectStreamingStt } from "@/services/streamingStt";
 import { enabledVoiceVocabulary } from "@/voiceVocabulary";
+import { requireVoiceIdentity, verifyVoiceIdentity } from "@/voiceIdentity";
 import { speakFr, cancelSpeech, speakSeries, speakSequence, speakAsCharacter as speakCharacterVoice, spokenCount, lastSpokenAt } from "@/voice";
 import { isWindowCommand, observeWindowChanges, shortStatusToSpeak, snapshotWindows, windowChangeConfirmation } from "@/voiceConfirmation";
 import { KEY_STORAGE_EVENT, loadApiKeys, saveApiKeys } from "@/apiKeyStorage";
@@ -209,6 +211,7 @@ const imageFileToBase64 = (file) => new Promise((resolve, reject) => {
 function App() {
   const [voicePhase, setVoicePhase] = useState("idle");
   const [voiceMessage, setVoiceMessage] = useState("");
+  const [showVoiceDiagnostic, setShowVoiceDiagnostic] = useState(false);
   const [androidRecognition, setAndroidRecognition] = useState(() =>
     localStorage.getItem("sirius_android_stt") === "native" ? "native" : "server");
   const androidRecognitionRef = useRef(androidRecognition);
@@ -1924,6 +1927,8 @@ function App() {
   stopInterruptListenerRef.current = stopInterruptListener;
 
   const startInterruptListener = useCallback(() => {
+    // Text-only interruption is restricted to a deliberately held microphone.
+    if (!pttRef.current) return;
     // Android Web Speech relance le dialogue système pendant la synthèse et peut
     // retranscrire la voix de Sirius comme une nouvelle commande.
     if (Capacitor.getPlatform() === "android") return;
@@ -1940,7 +1945,7 @@ function App() {
       rec.continuous = true;
       const STOPWORDS = /(^|\s)(stop|arr[êe]te|attends|attend|tais[- ]toi|chut|silence|pause|sirius)(\s|$)/i;
       rec.onresult = (e) => {
-        if (signal.aborted || interruptRecRef.current !== rec) return;
+        if (signal.aborted || interruptRecRef.current !== rec || !pttRef.current) return;
         if (!speakingRef.current) return;
         let final = "";
         let interim = "";
@@ -5509,7 +5514,12 @@ function App() {
   }, []);
   
   // ---- Reconnaissance vocale navigateur (Web Speech API) ----
-  const handleTranscript = useCallback((transcript, isFinal, { requireWakeWord = false } = {}) => {
+  const handleTranscript = useCallback((transcript, isFinal, { requireWakeWord = false, speakerVerified = false } = {}) => {
+    if ((autoMicRef.current || conversationMicRef.current || handsFreeRef.current?.active)
+      && !pttRef.current && !speakerVerified) {
+      setVoiceMessage("Commande ignorée : voix non vérifiée. Utilisez le bouton maintenu.");
+      return false;
+    }
     if (String(transcript || "").trim()) {
       lastActivityRef.current = Date.now();
       window.dispatchEvent(new CustomEvent("sirius:activity"));
@@ -5559,23 +5569,29 @@ function App() {
           setVoicePhase("listening");
           setVoiceMessage("Micro natif prêt. Dites votre demande ; Stop ferme la session.");
         } else if (phase === "opening") {
+          setVoicePhase("checking");
           setVoiceMessage("Ouverture du microphone natif — attendez « Prêt ».");
         } else if (phase === "speech") {
           setVoicePhase("listening");
+        } else if (phase === "verifying") {
+          setVoicePhase("verifying");
+          setVoiceMessage("Vérification de votre voix en cours.");
         } else if (phase === "transcribing") {
           setVoicePhase("transcribing");
           setVoiceMessage("Transcription de votre phrase en cours.");
-        } else if (phase === "error" || phase === "stopped") {
-          setVoicePhase((current) => current === "listening" || current === "transcribing" ? "idle" : current);
+        } else if (phase === "error") {
+          setVoicePhase("error");
+        } else if (phase === "stopped") {
+          setVoicePhase((current) => ["checking", "listening", "verifying", "transcribing"].includes(current) ? "idle" : current);
         } else if (phase === "paused") {
-          setVoicePhase((current) => current === "transcribing" ? "idle" : current);
+          setVoicePhase((current) => ["checking", "verifying", "transcribing"].includes(current) ? "idle" : current);
         }
         if (message) setVoiceMessage(message);
       },
       onTranscript: (transcript) => {
         if (!disposed) {
           setVoicePhase("idle");
-          handleTranscriptRef.current(transcript, true);
+          handleTranscriptRef.current(transcript, true, { speakerVerified: true });
         }
       },
       groqKey: () => {
@@ -5608,7 +5624,7 @@ function App() {
   useEffect(() => {
     void handsFreeRef.current?.setBlocked(
       booting || showSetup || windowHidden || pttActive || speakingRef.current || isBusy.current
-      || ["thinking", "preparing", "speaking", "transcribing", "requesting"].includes(voicePhase)
+      || ["thinking", "preparing", "speaking", "verifying", "transcribing", "requesting"].includes(voicePhase)
       || status === "thinking" || status === "speaking"
     );
   });
@@ -5621,6 +5637,9 @@ function App() {
       setStatus("idle");
       setVoicePhase("idle");
       setVoiceMessage("Enregistrement vocal indisponible sur cet appareil.");
+      autoMicRef.current = false;
+      conversationMicRef.current = false;
+      setAutoMic(false);
       return;
     }
     microphoneStartPendingRef.current = true;
@@ -5630,6 +5649,7 @@ function App() {
     const voiceSignal = voiceSessionRef.current.signal;
     const session = ++microphoneSessionRef.current;
     const pushToTalk = pttRef.current;
+    const protectedCapture = !pushToTalk;
     const retryHandsFree = () => {
       clearTimeout(autoListenTimerRef.current);
       autoListenTimerRef.current = scheduleHandsFreeRetry(
@@ -5640,6 +5660,12 @@ function App() {
       );
     };
     try {
+      if (protectedCapture) {
+        setVoicePhase("checking");
+        await requireVoiceIdentity({ signal: voiceSignal });
+        if (voiceSignal.aborted || session !== microphoneSessionRef.current) return;
+        setVoicePhase("requesting");
+      }
       const stream = await requestMicrophoneStream(navigator.mediaDevices, () =>
         session === microphoneSessionRef.current && !speakingRef.current
         && (!pushToTalk || pttRef.current), microphoneConstraints(Capacitor.getPlatform()));
@@ -5656,7 +5682,7 @@ function App() {
       const userGroqKey = (savedKeys.groq_key || savedKeys.groq || "").trim();
       let streamStt = null;
       let streamSttFailed = false;
-      const streamSttPromise = connectStreamingStt({
+      const streamSttPromise = protectedCapture ? Promise.resolve(null) : connectStreamingStt({
         contentType: recorder.mimeType || "audio/webm",
         groqKey: userGroqKey,
         signal: voiceSignal,
@@ -5744,9 +5770,24 @@ function App() {
           return;
         }
         setStatus("thinking");
-        setVoicePhase("transcribing");
-        setText("Transcription vocale ΣIRIUS en cours...");
+        setVoicePhase(protectedCapture ? "verifying" : "transcribing");
+        if (!protectedCapture) setText("Transcription vocale ΣIRIUS en cours...");
         try {
+          if (protectedCapture) {
+            setVoiceMessage("Vérification de votre voix en cours.");
+            const identity = await verifyVoiceIdentity(blob, { signal: voiceSignal });
+            if (voiceSignal.aborted || session !== microphoneSessionRef.current) return;
+            if (identity.verified !== true) {
+              setVoiceMessage(identity.message);
+              setStatus("idle");
+              setVoicePhase("rejected");
+              retryHandsFree();
+              return;
+            }
+            setVoicePhase("transcribing");
+            setVoiceMessage("Transcription de votre phrase en cours.");
+            setText("Transcription vocale ΣIRIUS en cours...");
+          }
           await streamSttPromise;
           if (voiceSignal.aborted || session !== microphoneSessionRef.current) return;
           let payload = null;
@@ -5775,12 +5816,15 @@ function App() {
           if (!transcript) {
             setText("Je n'ai pas distingué de parole. Réessayez plus près du microphone.");
             setStatus("idle");
-            setVoicePhase("idle");
+            setVoicePhase("rejected");
             setVoiceMessage("Aucune parole distinguée. Réessayez près du microphone.");
             retryHandsFree();
             return;
           }
-          if (!handleTranscriptRef.current(transcript, true, { requireWakeWord: autoMicRef.current && !conversationMicRef.current && !pushToTalk })) retryHandsFree();
+          if (!handleTranscriptRef.current(transcript, true, {
+            requireWakeWord: autoMicRef.current && !conversationMicRef.current && !pushToTalk,
+            speakerVerified: protectedCapture,
+          })) retryHandsFree();
         } catch (error) {
           if (serverStreamSttRef.current === streamStt) serverStreamSttRef.current = null;
           streamStt?.close();
@@ -5788,7 +5832,7 @@ function App() {
           console.error("Erreur transcription ΣIRIUS :", error);
           setText(error.message || "La transcription vocale ΣIRIUS est indisponible.");
           setStatus("idle");
-          setVoicePhase("idle");
+          setVoicePhase("error");
           setVoiceMessage(error.message || "Transcription indisponible — réessayez.");
           autoMicRef.current = false;
           conversationMicRef.current = false;
@@ -5829,6 +5873,7 @@ function App() {
         setStatus("listening");
         setVoicePhase("listening");
         setText("Je t'écoute. Cet extrait audio sera envoyé au serveur ΣIRIUS pour transcription.");
+        if (protectedCapture) setVoiceMessage("Écoute protégée : vérification de chaque voix sur le serveur avant transcription.");
       };
       recorder.start(250);
       if (!pushToTalk) {
@@ -5860,14 +5905,17 @@ function App() {
         serverRecorderStreamRef.current.getTracks().forEach((track) => track.stop());
         serverRecorderStreamRef.current = null;
       }
-      setText(error?.name === "NotAllowedError"
+      const captureError = error?.name === "NotAllowedError"
         ? "Accès au micro refusé. Autorisez le microphone dans les paramètres de ΣIRIUS."
-        : "Impossible d'ouvrir le microphone sur cet appareil.");
+        : error.message || "Impossible d'ouvrir le microphone sur cet appareil.";
+      setText(captureError);
       setStatus("idle");
-      setVoicePhase("idle");
-      setVoiceMessage(error?.name === "NotAllowedError" ? "Microphone non autorisé." : "Microphone indisponible.");
+      setVoicePhase("error");
+      setVoiceMessage(captureError);
       microphoneRequestCooldownRef.current = Date.now() + 5000;
       if (autoMicRef.current) {
+        autoMicRef.current = false;
+        conversationMicRef.current = false;
         setAutoMic(false);
       }
     } finally {
@@ -5920,6 +5968,7 @@ function App() {
     void handsFreeRef.current?.stop().catch((error) => setVoiceMessage(`Arrêt du micro natif impossible : ${error.message}`));
     voiceSessionRef.current.stop();
     autoMicRef.current = false;
+    conversationMicRef.current = false;
     setAutoMic(false);
     clearTimeout(autoListenTimerRef.current);
     clearTimeout(window._siriusTTSTimer);
@@ -5937,6 +5986,8 @@ function App() {
     setVoiceMessage("Écoute et réponse interrompues. Une action déjà envoyée peut avoir été exécutée ; vérifiez son résultat.");
   }, [stopListening]);
   stopVoiceRef.current = stopVoice;
+  const voiceAccount = authUser?.user_id || authUser?.id || authUser?._id || authUser?.email || "";
+  useEffect(() => () => stopVoice(), [voiceAccount, stopVoice]);
   const changeAndroidRecognition = useCallback((mode) => {
     stopVoice();
     nativeUnavailableRef.current = false;
@@ -6099,6 +6150,10 @@ function App() {
       || handsFreeRef.current?.active) return;
     voiceSessionRef.current.resume();
     if (!preserveFeedback) setVoiceMessage("");
+    if (!pttRef.current && (autoMicRef.current || conversationMicRef.current)) {
+      startServerListening(preserveFeedback);
+      return;
+    }
     if (Capacitor.getPlatform() === "android" && androidRecognitionRef.current === "native"
       && !nativeUnavailableRef.current && !pttRef.current) {
       void startNativeListening(preserveFeedback);
@@ -6278,13 +6333,22 @@ function App() {
   startListenRef.current = startListening;
 
   const toggleConversation = useCallback(async (serverTest = false) => {
-    if (autoMicRef.current || micOnRef.current || voicePhase === "requesting") {
+    if (autoMicRef.current || micOnRef.current || ["checking", "requesting"].includes(voicePhase)) {
       stopVoice();
       return;
     }
     stopVoice();
+    let openingSignal;
     try {
+      voiceSessionRef.current.resume();
+      const signal = voiceSessionRef.current.signal;
+      openingSignal = signal;
+      setVoicePhase("checking");
+      setVoiceMessage("Vérification du profil vocal sur le serveur. Le microphone n'est pas encore ouvert.");
       await handsFreeRef.current?.stop();
+      if (signal.aborted) return;
+      await requireVoiceIdentity({ signal });
+      if (signal.aborted) return;
       if (serverTest) {
         androidRecognitionRef.current = "server";
         nativeUnavailableRef.current = false;
@@ -6296,7 +6360,9 @@ function App() {
       setAutoMic(true);
       startListening();
     } catch (error) {
+      if (openingSignal?.aborted) return;
       stopVoice();
+      setVoicePhase("error");
       setVoiceMessage(`Ouverture de la conversation impossible : ${error.message}`);
     }
   }, [voicePhase, stopVoice, startListening]);
@@ -6359,7 +6425,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (booting || showSetup) return;
+    if (booting || showSetup || showVoiceDiagnostic) return;
     const isTyping = (e) => {
       const el = e.target;
       return el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable
@@ -6388,7 +6454,7 @@ function App() {
       window.removeEventListener("pointerup", cancel, true);
       document.removeEventListener("visibilitychange", cancel);
     };
-  }, [booting, showSetup, pttDown, pttUp]);
+  }, [booting, showSetup, showVoiceDiagnostic, pttDown, pttUp]);
 
   // Démarrage automatique du micro une fois le boot terminé (mode mains-libres)
   const autoStartedRef = useRef(false);
@@ -7241,6 +7307,10 @@ function App() {
         onOpenHaccp={(source) => { setHaccpSource(source || null); setShowWorkDossiers(false); setHaccp({ sujet: "", auto: false }); }} />}
       {showSportCoach && <SportCoachPanel key={authUser?.id || authUser?._id || authUser?.email || "local"} user={authUser} onClose={() => setShowSportCoach(false)} />}
       {showVoiceProfile && <VoiceProfilePanel key={authUser?.user_id || authUser?.id || authUser?._id || authUser?.email || "none"} user={authUser} onBeforeRecord={stopVoice} onClose={() => setShowVoiceProfile(false)} />}
+      {showVoiceDiagnostic && <VoiceDiagnosticPanel key={voiceAccount}
+        onClose={() => setShowVoiceDiagnostic(false)}
+        onProfile={() => { setShowVoiceDiagnostic(false); setShowVoiceProfile(true); }}
+        onSettings={() => { setShowVoiceDiagnostic(false); setSetupInitialTab("voix"); setShowSetup(true); }} />}
       {showCalliope && <CalliopePanel onClose={() => setShowCalliope(false)} />}
       {showCalendar && <CalendarPanel onClose={() => setShowCalendar(false)} />}
       {showMessaging && <MessagingPanel key={authUser?.user_id || authUser?.id || authUser?._id || authUser?.email || "local"}
@@ -7375,7 +7445,7 @@ function App() {
           <WorkspaceClock />
           <span className={`conn-led ${connected ? "on" : "off"}`} />
           <span className="conn-label">IA CLOUD</span>
-          <MicrophoneIndicator active={autoMic || captureMicOn || interruptMicOn || ["ready", "speech", "paused", "transcribing", "processing"].includes(handsFreePhase)} showLabel />
+          <MicrophoneIndicator active={autoMic || captureMicOn || interruptMicOn || ["ready", "speech", "paused", "verifying", "transcribing", "processing"].includes(handsFreePhase)} showLabel />
           {mode === "brainstorm" && <span className="mode-badge" data-testid="brainstorm-badge">BRAINSTORM</span>}
           
           {/* Connection status badge */}
@@ -7459,11 +7529,11 @@ function App() {
           </button>
           <button
             type="button"
-            className={`profile-btn top-tool-btn top-mic-btn ${autoMic || micOn || voicePhase === "requesting" ? "on" : ""}`}
+            className={`profile-btn top-tool-btn top-mic-btn ${autoMic || micOn || ["checking", "requesting"].includes(voicePhase) ? "on" : ""}`}
             onClick={() => { void toggleConversation(); }}
-            title={autoMic || micOn || voicePhase === "requesting" ? "Arrêter la conversation vocale" : "Démarrer la conversation vocale"}
-            aria-label={autoMic || micOn || voicePhase === "requesting" ? "Arrêter la conversation vocale" : "Démarrer la conversation vocale"}
-            aria-pressed={autoMic || micOn || voicePhase === "requesting"}
+            title={autoMic || micOn || ["checking", "requesting"].includes(voicePhase) ? "Arrêter la conversation vocale" : "Démarrer la conversation vocale"}
+            aria-label={autoMic || micOn || ["checking", "requesting"].includes(voicePhase) ? "Arrêter la conversation vocale" : "Démarrer la conversation vocale"}
+            aria-pressed={autoMic || micOn || ["checking", "requesting"].includes(voicePhase)}
             data-testid="sirius-top-mic-btn"
           >
             {micOn || voicePhase === "requesting" ? <Mic size={15} /> : <MicOff size={15} />}
@@ -7690,7 +7760,7 @@ function App() {
 
         <div className="pantheon-composer">
         <VoiceSessionControls phase={voicePhase} message={voiceMessage} onStop={stopVoice}
-          androidRecognition={Capacitor.getPlatform() === "android" ? androidRecognition : null}
+          androidRecognition={null}
           onRecognitionChange={changeAndroidRecognition} />
         <form className="cmd-bar" onSubmit={sendCommand} data-testid="sirius-cmd-form">
           <span className="cmd-prompt">ΣIRIUS&gt;</span>
@@ -7717,6 +7787,9 @@ function App() {
         </form>
         </div>
         <div className="workspace-shortcuts" role="group" aria-label="Suggestions de demandes">
+          <button type="button" data-testid="sirius-voice-diagnostic-btn"
+            onPointerDown={stopVoice}
+            onClick={() => { stopVoice(); setShowVoiceDiagnostic(true); }}>Vérifier Sirius</button>
           {["Préparer ma journée de demain", "Faire le point sur mon activité", "Organiser une idée de projet"].map((suggestion) => (
             <button key={suggestion} type="button" onClick={() => { setCmd(suggestion); commandInputRef.current?.focus(); }}>{suggestion}</button>
           ))}

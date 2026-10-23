@@ -15,6 +15,7 @@ from runtime_paths import data_file
 CONTACT = "danielsirius.pro2026@gmail.com"
 logger = logging.getLogger(__name__)
 PERSONAL_COLLECTIONS = (
+    "sirius_voice_identities", "sirius_voice_identity_limits",
     "sirius_chats", "local_memory", "episodic_memory",
     "sirius_work_dossiers", "sirius_work_entries", "sirius_work_snapshots", "sirius_work_live_states",
     "sirius_work_proposal_mutes", "agora_deals", "agora_settings",

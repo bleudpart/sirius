@@ -615,6 +615,7 @@ def make_auth_router(db):
                                 "sirius_whatsapp_bindings", "sirius_whatsapp_messages", "sirius_integration_actions",
                                 "sirius_workspace_watches", "sirius_workspace_snapshots",
                                 "sirius_alexa_connections", "sirius_tuya_devices", "sirius_tuya_commands",
+                                "sirius_voice_identities",
                                 "haccp_duerp",
                                 "haccp_safety",
                                 "haccp_sheets",
@@ -630,6 +631,9 @@ def make_auth_router(db):
                     projection["secret_hash"] = 0
                 elif collection_name == "sirius_alexa_connections":
                     projection.update({"access_hash": 0, "refresh_hash": 0})
+                elif collection_name == "sirius_voice_identities":
+                    # The routine archive contains consent/model metadata, never biometric vectors.
+                    projection.update({"embedding": 0, "enrollment_token": 0})
                 export["collections"][collection_name] = await collection.find({"user_id": user_id}, projection).to_list(10000)
         export["exported_at"] = datetime.now(timezone.utc).isoformat()
         buffer = io.BytesIO()

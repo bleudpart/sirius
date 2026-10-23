@@ -439,6 +439,64 @@ Les expressions utiles sont validées séparément ; le guidage textuel des proc
 transcriptions distantes est désactivé par défaut et exige l'activation explicite
 dans la fenêtre. Les moteurs locaux ne sont pas entraînés avec ces extraits.
 
+**Vérification du locuteur sur le serveur Sirius** : un écran distinct dans
+**Ma voix et ma diction** demande un consentement explicite puis trois nouvelles
+références de 3 à 15 secondes, seul dans une pièce calme. Les exemples IndexedDB
+ne sont jamais repris ni envoyés automatiquement. Le serveur reçoit ces références,
+conserve une empreinte biométrique par compte (pas les fichiers audio de référence)
+et compare chaque extrait d'écoute continue avant sa transcription.
+Le profil peut être supprimé depuis cet écran ; la suppression arrête l'écoute
+en cours sur cet appareil et bloque les nouvelles vérifications du compte.
+Une action déjà envoyée n'est pas rappelée.
+
+Sans modèle serveur disponible, sans profil ou en cas d'erreur, l'écoute continue
+est bloquée : aucun repli vers une commande non vérifiée. Une voix refusée n'est
+pas envoyée au moteur STT. Le bouton micro **maintenu volontairement** reste
+disponible sans vérification du locuteur. En écoute continue, les moteurs
+Android/navigateur qui ne fournissent que du texte et le streaming STT anticipé
+sont contournés au profit de la capture audio vérifiable. L'interruption vocale
+pendant une réponse n'est donc plus disponible sans maintien volontaire du micro :
+utiliser Stop ou le bouton maintenu.
+
+Ce filtrage n'est pas une authentification ni une garantie contre la télévision,
+les voix mélangées, les imitations ou la lecture d'un enregistrement de votre voix.
+Le modèle doit être installé et configuré par l'exploitant ; les tests logiciels
+avec empreintes simulées ne prouvent pas un taux de rejet réel. Une validation
+avec votre voix, d'autres locuteurs et la télévision dans les conditions réelles
+reste nécessaire avant de considérer le filtrage comme fiable.
+Les extraits automatiques de moins de 3 secondes sont refusés : pour les demandes
+courtes, utiliser le bouton maintenu. Les limites sont de 15 secondes pour une
+référence et de 20 secondes côté vérification serveur (capture ordinaire : 15 s).
+
+Installation opérateur : dépendances optionnelles dans
+[`backend/requirements-voice-identity.txt`](backend/requirements-voice-identity.txt),
+ffmpeg, modèle WeSpeaker ResNet34-LM local épinglé par SHA-256 et seuil de
+comparaison explicite. Les variables, la provenance des poids et l'attribution
+**CC-BY-4.0** sont détaillées dans
+[`backend/.env.example`](backend/.env.example). Aucun poids n'est téléchargé
+automatiquement ; la protection reste indisponible sans cette configuration.
+L'inférence réelle a été vérifiée sur cinq extraits publics LibriSpeech :
+similarité d'un extrait réservé du même locuteur avec les références 0,895115,
+autre locuteur 0,360959. Cet essai réduit en anglais ne calibre pas le seuil pour
+le français, le téléphone, la télévision ou les mélanges de voix.
+
+**Dialogue vocal et diagnostic** : la barre distingue le contrôle du profil
+(microphone encore fermé), l'écoute, la comparaison du locuteur, la transcription,
+le traitement et la réponse. Un extrait refusé reste un message visuel
+« Demande ignorée », sans réponse parlée à une voix extérieure.
+Un second appui sur le bouton conversation pendant le contrôle initial annule
+l'ouverture ; un résultat tardif ne réactive pas le microphone.
+
+Le bouton **Vérifier Sirius**, près de la zone de demande, arrête l'écoute en cours
+et ouvre des contrôles datés du serveur/session, du profil vocal, des capacités de
+capture et de la permission microphone si elle est lisible. Il ne demande aucune
+nouvelle permission, n'enregistre pas d'audio et ne teste pas automatiquement
+la synthèse vocale. Les états « Non vérifié » ne sont pas des succès : le son réel,
+les fournisseurs STT/TTS et le rejet de la télévision restent à essayer
+volontairement. Des accès directs au profil vocal et aux réglages voix permettent
+de corriger les problèmes. Le temps affiché mesure uniquement l'aller-retour du
+contrôle concerné, pas la latence d'une conversation complète.
+
 Dans **Configuration → Voix**, le profil **Voix des AÈDES — ODYSSEIA** propose
 un conteur français masculin local, avec débit posé (0,90) et hauteur douce (0,94).
 Il utilise une voix française installée sur l'appareil, pas une voix clonée ni un
@@ -2316,25 +2374,21 @@ Liste complète des modules et dates : [MODULES_SIRIUS.txt](./MODULES_SIRIUS.txt
   réseau mobile. Vérifier le temps jusqu'au premier texte puis jusqu'à la voix
   sur appareil après déploiement du backend ; ces changements ne nécessitent pas
   de nouvel APK.
-  Dans l'APK Android, le sélecteur **Micro Android → Local (test)** active un
-  parcours expérimental via `SpeechRecognizer.createOnDeviceSpeechRecognizer`
-  (Android 12 ou ultérieur). Il ne demande pas une reconnaissance native réseau :
-  le moteur local doit être disponible et prendre en charge le français. Sinon,
-  l'indisponibilité est affichée et la capture serveur reprend ; revenir à
-  **Serveur** reste possible à tout moment. Le changement de moteur arrête
-  l'écoute et la réponse en cours ; réactiver ensuite le micro.
-  Le mode serveur reste le choix initial et le talkie-walkie conserve ce parcours.
-  En mains libres local, une nouvelle phrase peut remplacer une demande encore
-  en cours de génération. Toute nouvelle commande invalide les requêtes et la
+  Dans l'APK Android, l'ancien sélecteur **Micro Android → Local (test)** est
+  masqué : ce moteur ne fournit pas l'audio nécessaire à la vérification du
+  locuteur. Une préférence locale antérieure ne contourne pas le filtre :
+  la conversation utilise désormais la capture audio protégée sur le serveur.
+  Le talkie-walkie conserve son parcours volontaire sans comparaison du locuteur.
+  Toute nouvelle commande invalide les requêtes et la
   lecture précédentes : une réponse tardive ne doit plus s'afficher ni parler.
   Une action externe déjà envoyée n'est pas annulée rétroactivement.
-  L'écoute locale est suspendue dès la préparation de la voix pour éviter
+  L'écoute est suspendue dès la préparation de la voix pour éviter
   l'auto-déclenchement ; pendant la lecture, utiliser **Arrêter** ou le
   talkie-walkie pour interrompre, puis formuler la nouvelle demande.
-  Ce mode requiert la reconstruction de l'APK. Comparer sur le Samsung les
+  Cette protection requiert la reconstruction de l'APK. Comparer sur le Samsung les
   délais fin de phrase → texte reconnu → premier texte de réponse → voix,
   la compréhension des noms des modules, le changement de sujet pendant
-  l'attente, le secours serveur, les permissions et le passage en arrière-plan.
+  l'attente, le rejet des voix extérieures, les permissions et le passage en arrière-plan.
   Aucun gain de latence ni qualité hors ligne n'est garanti avant ces essais.
   Le backend transmet l'audio au moteur `WHISPER_API_URL` / `STT_BACKEND_URL`
   configuré, sinon à Groq Whisper si une clé Groq est disponible. Vérifier ce

@@ -13,6 +13,8 @@ test("shows each real phase with an always accessible stop button", async () => 
   try {
     for (const [phase, label] of Object.entries({
       idle: "Prêt", requesting: "Ouverture du microphone…",
+      checking: "Je vérifie le profil vocal…", verifying: "Je vérifie votre voix…",
+      rejected: "Demande ignorée", error: "Dialogue vocal interrompu",
       listening: "J’écoute…", transcribing: "Je transcris…",
       thinking: "Je traite votre demande…", preparing: "Je prépare la voix…", speaking: "Je réponds…",
     })) {
@@ -24,7 +26,7 @@ test("shows each real phase with an always accessible stop button", async () => 
       expect(button.disabled).toBe(false);
       await act(async () => button.click());
     }
-    expect(stop).toHaveBeenCalledTimes(7);
+    expect(stop).toHaveBeenCalledTimes(11);
   } finally {
     await act(async () => root.unmount());
     host.remove();
