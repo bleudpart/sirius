@@ -170,7 +170,8 @@ class MeetingIntegrations:
             result = {"summary": summary["summary"], "tasks": summary["tasks"]}
             await self.db.sirius_meetings.update_one(
                 {"user_id": uid, "id": identity, "state": "SUMMARIZING"},
-                {"$set": {"state": "READY", "result": result, "fingerprint": digest(result)}})
+                {"$set": {"state": "READY", "result": result, "fingerprint": digest(result),
+                          "ready_at": now().isoformat()}})
         except (HTTPException, OpenAIError, TimeoutError, ValueError, ValidationError) as exc:
             logger.warning("Meeting synthesis rejected (%s); no retry", type(exc).__name__)
             await self.db.sirius_meetings.update_one(

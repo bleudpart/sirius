@@ -38,6 +38,13 @@ export default function PrivacyData({ onOpenAccount, onMemory, onConnections }) 
         Les tâches doivent être validées et affectées nominativement dans un dossier privé, sans notification inter-compte.
         Slack reçoit uniquement la synthèse et les tâches validées après confirmation de publication ; aucun audio de Huddle n'est capturé.
         L'effacement d'une réunion ne supprime pas ses tâches déjà enregistrées ni les publications Slack ou les données des fournisseurs.</dd>
+      <dt><strong>Automatisations Zapier, facultatives</strong></dt>
+      <dd>Une clé dédiée, limitée et révocable autorise les Zaps que vous configurez.
+        Les déclencheurs transmettent à Zapier les titres des nouveaux dossiers ou les synthèses des nouvelles réunions,
+        jamais les fragments audio ni les transcriptions complètes. Les étapes suivantes de votre Zap peuvent partager ces données ailleurs.
+        L'ajout de notes est automatique dans le dossier privé choisi, sans appel IA ni validation de tâches.
+        Révoquer la clé arrête les prochains envois, mais ne rappelle pas une requête déjà partie.
+        L'effacement du compte ne supprime pas les données déjà reçues par Zapier ou ses destinations.</dd>
       <dt><strong>Conservation et suppression</strong></dt>
       <dd>Il n'existe pas ici de durée unique garantie pour tous les modules. Les fournisseurs appliquent leurs propres conditions.
         L'effacement du compte ne supprime pas automatiquement vos fichiers exportés, sauvegardes ou toutes les listes présentes sur un autre appareil.</dd>

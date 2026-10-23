@@ -1,0 +1,24 @@
+{
+  "name": "sirius-zapier",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Integration Zapier SIRIUS avec cle dediee et REST hooks",
+  "main": "index.js",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test",
+    "validate": "zapier-platform validate",
+    "push": "zapier-platform push"
+  },
+  "dependencies": { "zapier-platform-core": "19.2.1" },
+  "devDependencies": {
+    "nock": "^14.0.0",
+    "zapier-platform-cli": "19.2.1"
+  },
+  "overrides": {
+    "form-data": "4.0.6",
+    "tmp": "0.2.7",
+    "diff": "8.0.4",
+    "@simple-git/argv-parser": "2.0.1"
+  }
+}

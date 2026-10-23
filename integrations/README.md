@@ -1,5 +1,8 @@
 # SIRIUS : Raycast, réunions Discord et publication Slack
 
+L'intégration [Zapier CLI, API keys et REST hooks](./zapier/README.md) dispose
+de sa propre spécification, de clés dédiées et de tests indépendants.
+
 ## Périmètre et architecture
 
 Cette intégration est facultative. Installer les sources n'active aucun bot,

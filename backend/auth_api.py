@@ -611,10 +611,15 @@ def make_auth_router(db):
                                 "sirius_initiative_settings", "sirius_action_proposals", "sirius_autonomy_sessions",
                                 "sirius_phone_calls", "sirius_phone_settings", "sirius_phone_limits",
                                 "sirius_meetings", "sirius_meeting_publications",
+                                "sirius_zapier_keys", "sirius_zapier_hooks", "sirius_zapier_deliveries",
                                 "sirius_work_dossiers", "sirius_work_entries"):
             collection = getattr(db, collection_name, None)
             if collection is not None:
                 projection = {"_id": 0, "control_url": 0} if collection_name == "sirius_phone_calls" else {"_id": 0}
+                if collection_name == "sirius_zapier_keys":
+                    projection["token_hash"] = 0
+                elif collection_name == "sirius_zapier_hooks":
+                    projection.update({"secret": 0, "target_url": 0})
                 export["collections"][collection_name] = await collection.find({"user_id": user_id}, projection).to_list(10000)
         export["exported_at"] = datetime.now(timezone.utc).isoformat()
         buffer = io.BytesIO()

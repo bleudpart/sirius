@@ -2372,3 +2372,9 @@ Liste complète des modules et dates : [MODULES_SIRIUS.txt](./MODULES_SIRIUS.txt
   python sirius_doctor.py check     # contrôle sans sauvegarde
   ```
 - **Spotify** : enregistre ta Redirect URI locale dans le Dashboard Spotify et ajoute ton compte (User Management, mode Development).
+
+## Automatisations Zapier
+
+Voir la [spécification Zapier CLI](integrations/zapier/README.md) pour les clés
+API dédiées à droits limités, les REST hooks, l'ajout de notes et la recherche
+de dossiers. Intégration facultative, sans activation ni publication automatique.

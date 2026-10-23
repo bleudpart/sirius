@@ -26,6 +26,8 @@ test("privacy explains real boundaries and opens existing controls without reque
   expect(host.textContent).toContain("accord individuel");
   expect(host.textContent).toContain("sans notification inter-compte");
   expect(host.textContent).toContain("aucun audio de Huddle");
+  expect(host.textContent).toContain("Automatisations Zapier");
+  expect(host.textContent).toContain("ne rappelle pas une requête déjà partie");
   expect(global.fetch).not.toHaveBeenCalled();
   await act(async () => [...host.querySelectorAll("button")].forEach((button) => button.click()));
   expect(account).toHaveBeenCalledTimes(1);
