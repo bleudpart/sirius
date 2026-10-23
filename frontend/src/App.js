@@ -43,6 +43,7 @@ import { isWhisperHallucination, microphoneConstraints, requestMicrophoneStream,
 import PushToTalkButton from "@/components/PushToTalkButton";
 import VoiceSessionControls from "@/components/VoiceSessionControls";
 import VoiceDiagnosticPanel from "@/components/VoiceDiagnosticPanel";
+import BulletinNavigation from "@/components/BulletinNavigation";
 import { createNativeRecognition } from "@/nativeSpeechRecognition";
 import { createNativeHandsFree } from "@/nativeHandsFree";
 import { displayReadingText, splitDisplayReading, isDisplayReadCommand } from "@/displayReading";
@@ -55,7 +56,7 @@ import { newsBulletinScope } from "./newsCommandRouting";
 import { isResumeWorkCommand, isWorkBriefingCommand } from "./workBriefing";
 import { chronosConfirmation } from "./chronos";
 import { isOperationalCommand, isWorkConversationCommand, workPreviewFollowup } from "./workConversation";
-import { bulletinFollowUp, createBulletinContext, markSegmentCompleted, markSegmentStarted, releaseBulletinFocus } from "./bulletinDialogue";
+import { bulletinFollowUp, bulletinNavigation, createBulletinContext, markSegmentCompleted, markSegmentStarted, prepareBulletinReading, releaseBulletinFocus } from "./bulletinDialogue";
 import { buildNewsBulletin, weatherBulletinText } from "./newsBulletin";
 import { fetchWeatherDirect } from "./weatherDirect";
 import { connectStreamingStt } from "@/services/streamingStt";
@@ -240,6 +241,7 @@ function App() {
   const stopVoiceRef = useRef(() => {});
   const currentSpokenRef = useRef("");
   const lastBulletinRef = useRef(null);
+  const [bulletinProgress, setBulletinProgress] = useState(null);
   const bulletinRunRef = useRef(0);
   const onSpeechStartRef = useRef(() => {});
   const onSpeechEndRef = useRef(() => {});
@@ -2053,8 +2055,9 @@ function App() {
       speakOut(message);
       return;
     }
-    // Une rubrique n'est « lue » qu'après la fin réelle de sa dernière phrase : la reprise repart
-    // du début de la première rubrique inachevée, sans trou ni doublon de rubrique.
+    prepareBulletinReading(bulletin, start);
+    setBulletinProgress(bulletinNavigation(bulletin));
+    // La reprise suit le curseur de lecture, même après un saut ou le retour à un titre déjà lu.
     const items = [];
     for (let index = start; index < bulletin.segments.length; index += 1) {
       const phrases = splitDisplayReading(bulletin.segments[index].text);
@@ -2071,6 +2074,7 @@ function App() {
         if (stale()) return;
         const { index, phrase } = items[position];
         markSegmentStarted(bulletin, index);
+        setBulletinProgress(bulletinNavigation(bulletin));
         currentSpokenRef.current = phrase;
         setVoicePhase("speaking");
         onSpeechStartRef.current();
@@ -2078,7 +2082,10 @@ function App() {
         if (autoMicRef.current) startInterruptListenerRef.current();
       },
       onitemend: (position) => {
-        if (!stale() && items[position].last) markSegmentCompleted(bulletin, items[position].index);
+        if (!stale() && items[position].last) {
+          markSegmentCompleted(bulletin, items[position].index);
+          setBulletinProgress(bulletinNavigation(bulletin));
+        }
       },
     });
     const stopPlayback = () => playback.cancel();
@@ -4292,8 +4299,8 @@ function App() {
       void launchNewsBulletin(followUp.restartScope);
       return;
     }
-    if (followUp?.resumeAt !== undefined) {
-      void speakBulletin(lastBulletinRef.current, followUp.resumeAt);
+    if (followUp?.resumeAt !== undefined || followUp?.navigateAt !== undefined) {
+      void speakBulletin(lastBulletinRef.current, followUp.navigateAt ?? followUp.resumeAt);
       return;
     }
     if (followUp?.analysis) {
@@ -5988,6 +5995,15 @@ function App() {
   stopVoiceRef.current = stopVoice;
   const voiceAccount = authUser?.user_id || authUser?.id || authUser?._id || authUser?.email || "";
   useEffect(() => () => stopVoice(), [voiceAccount, stopVoice]);
+  useEffect(() => {
+    lastBulletinRef.current = null;
+    setBulletinProgress(null);
+  }, [voiceAccount]);
+  useEffect(() => {
+    if (!bulletinProgress) return;
+    const timer = setTimeout(() => setBulletinProgress(null), Math.max(0, bulletinProgress.expiresAt - Date.now()));
+    return () => clearTimeout(timer);
+  }, [bulletinProgress]);
   const changeAndroidRecognition = useCallback((mode) => {
     stopVoice();
     nativeUnavailableRef.current = false;
@@ -7794,6 +7810,7 @@ function App() {
             <button key={suggestion} type="button" onClick={() => { setCmd(suggestion); commandInputRef.current?.focus(); }}>{suggestion}</button>
           ))}
         </div>
+        <BulletinNavigation navigation={bulletinProgress} onCommand={processCommand} />
         {handsFreeAvailable && (
           <details data-testid="native-audio-diagnostics">
             <summary>Capture native expérimentale et essais audio (Diagnostic)</summary>

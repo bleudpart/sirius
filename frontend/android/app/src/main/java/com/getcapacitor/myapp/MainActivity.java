@@ -14,6 +14,7 @@ public class MainActivity extends BridgeActivity {
 	public void onCreate(Bundle savedInstanceState) {
 		registerPlugin(SiriusSpeechPlugin.class);
 		registerPlugin(SiriusAudioPlugin.class);
+		registerPlugin(SiriusPlaybackPlugin.class);
 		super.onCreate(savedInstanceState);
 	}
 

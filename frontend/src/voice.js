@@ -5,6 +5,7 @@ import { Capacitor } from "@capacitor/core";
 import { applyFrenchPhonetics, normalizeFrenchElisions } from "./phoneticFr";
 import { connectVoiceEqualizer } from "./voiceEqualizer";
 import { speakNative, stopNativeSpeech } from "./nativeVoice";
+import { hasNativeRemoteVoice, playNativeRemoteVoice, stopNativeRemoteVoice } from "./nativeRemoteVoice";
 import { API_BASE_URL } from "./lib/api";
 import { KEY_STORAGE_EVENT, loadApiKeys } from "./apiKeyStorage";
 import { formatSpeechDate } from "./dateTime";
@@ -107,6 +108,7 @@ export const lastSpokenAt = () => lastUtteranceAt;
 
 // Coupe TOUS les canaux audio (synthèse navigateur + audio Google) avant chaque nouvelle voix
 function stopChannels() {
+  stopNativeRemoteVoice();
   if (cancelVoiceDiscovery) {
     cancelVoiceDiscovery();
     cancelVoiceDiscovery = null;
@@ -203,17 +205,22 @@ const remoteDown = (gemini) => Date.now() < (gemini ? geminiDownUntil : googleDo
 const remoteError = (code, message, extra = {}) => Object.assign(new Error(message), { code, ...extra });
 
 // Requête unique de synthèse distante : rend l'audio ou lève une erreur typée (http, empty, réseau/abandon).
-async function requestRemoteAudio(message, { gemini, voice, geminiVoice, rate, pitch }, signal) {
+function remoteSpeechBody(message, { gemini, voice, geminiVoice, rate, pitch }) {
   const keys = loadApiKeys();
   const voiceKeys = gemini ? { gemini_tts: keys.gemini_tts || "", google_tts: keys.google_tts || "" }
     : { google_tts: keys.google_tts || "" };
   const personalKeys = Object.fromEntries(Object.entries(voiceKeys).filter(([, value]) => value));
+  return gemini
+    ? { text: phonetic(message), keys: personalKeys, ...(geminiVoice ? { voice: geminiVoice } : {}) }
+    : { text: phonetic(message), voice, rate, pitch, keys: personalKeys };
+}
+
+async function requestRemoteAudio(message, options, signal) {
+  const { gemini } = options;
   const r = await fetch(`${API}/tts/${gemini ? "gemini" : "google"}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(gemini
-      ? { text: phonetic(message), keys: personalKeys, ...(geminiVoice ? { voice: geminiVoice } : {}) }
-      : { text: phonetic(message), voice, rate, pitch, keys: personalKeys }),
+    body: JSON.stringify(remoteSpeechBody(message, options)),
     credentials: "include",
     signal,
   });
@@ -556,7 +563,8 @@ export function speakSequence(phrases, { onitemstart, onitemend, onprovider } = 
   };
   const routed = !isBrowserVoice(cfg.name);
   const gemini = routed && (Capacitor.getPlatform() === "android" || cfg.name === GEMINI_VOICE.name);
-  let provider = routed && !remoteDown(gemini) ? "remote" : "local";
+  const nativePlayback = routed && hasNativeRemoteVoice();
+  let provider = routed && (nativePlayback || !remoteDown(gemini)) ? "remote" : "local";
 
   seriesId += 1; // une série plus ancienne ne doit pas reprendre la parole ensuite
   seriesChain = Promise.resolve();
@@ -721,6 +729,28 @@ export function speakSequence(phrases, { onitemstart, onitemend, onprovider } = 
 
   const run = async () => {
     if (onprovider) onprovider(provider);
+    if (nativePlayback && texts.length) {
+      try {
+        await guard(playNativeRemoteVoice({
+          endpoint: `${API}/tts/${gemini ? "gemini" : "google"}`,
+          items: texts.map((_, index) => {
+            const params = paramsAt(index);
+            return {
+              body: remoteSpeechBody(params.message, { gemini, ...params.remote }),
+              volume: Math.max(0.2, Math.min(1, params.volume)),
+            };
+          }),
+          onitemstart: (index) => { currentIndex = index; itemStarted(index); },
+          onitemend: (index) => { if (!closed && onitemend) onitemend(index); },
+        }));
+      } catch (error) {
+        if (closed) throw error;
+        // Le lecteur natif possède toute la file, même si la WebView dort : pas de changement de timbre.
+        throw new SpeechSequenceError(error.code || "native-playback", error.index ?? currentIndex,
+          error.message, error);
+      }
+      return;
+    }
     for (let index = 0; index < texts.length; index += 1) {
       currentIndex = index;
       if (closed) throw new SpeechSequenceError("cancelled", index, "Lecture interrompue.");

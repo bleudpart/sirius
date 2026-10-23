@@ -5,6 +5,13 @@ import {
 } from "./voice";
 import { speakNative, stopNativeSpeech } from "./nativeVoice";
 import { KEY_STORAGE_EVENT } from "./apiKeyStorage";
+import { hasNativeRemoteVoice, playNativeRemoteVoice, stopNativeRemoteVoice } from "./nativeRemoteVoice";
+
+jest.mock("./nativeRemoteVoice", () => ({
+  hasNativeRemoteVoice: jest.fn(() => false),
+  playNativeRemoteVoice: jest.fn(),
+  stopNativeRemoteVoice: jest.fn(),
+}));
 
 jest.mock("@capacitor/core", () => ({
   Capacitor: { getPlatform: jest.fn(() => "android") },
@@ -25,11 +32,77 @@ const flush = async () => {
 beforeEach(() => {
   jest.clearAllMocks();
   Capacitor.getPlatform.mockReturnValue("android");
+  hasNativeRemoteVoice.mockReturnValue(false);
   localStorage.clear();
   localStorage.setItem("sirius_voice", JSON.stringify({ name: "fr-FR-Neural2-G", rate: 1, pitch: -3 }));
   clock += 600001;
   jest.spyOn(Date, "now").mockReturnValue(clock);
   global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 503 });
+});
+
+test("Android transfers the whole bulletin to native playback without WebView audio or watchdogs", async () => {
+  hasNativeRemoteVoice.mockReturnValue(true);
+  let callbacks;
+  let finish;
+  playNativeRemoteVoice.mockImplementationOnce(options => {
+    callbacks = options;
+    return new Promise(resolve => { finish = resolve; });
+  });
+  const onitemstart = jest.fn();
+  const onitemend = jest.fn();
+  const sequence = speakSequence(["Premier titre.", "Deuxième titre."], { onitemstart, onitemend });
+  expect(callbacks.endpoint).toEqual(expect.stringContaining("/api/tts/gemini"));
+  expect(callbacks.items).toEqual([
+    expect.objectContaining({ body: expect.objectContaining({ text: "Premier titre." }) }),
+    expect.objectContaining({ body: expect.objectContaining({ text: "Deuxième titre." }) }),
+  ]);
+  callbacks.onitemstart(0);
+  callbacks.onitemend(0);
+  callbacks.onitemstart(1);
+  expect(onitemend.mock.calls).toEqual([[0]]);
+  callbacks.onitemend(1);
+  finish();
+  await sequence.done;
+  expect(onitemstart.mock.calls).toEqual([[0], [1]]);
+  expect(onitemend.mock.calls).toEqual([[0], [1]]);
+  expect(global.fetch).not.toHaveBeenCalled();
+  expect(speakNative).not.toHaveBeenCalled();
+});
+
+test("a native bulletin failure stops explicitly without changing to the local voice", async () => {
+  hasNativeRemoteVoice.mockReturnValue(true);
+  playNativeRemoteVoice.mockRejectedValueOnce(Object.assign(new Error("Lecture bloquée"), {
+    code: "playback-timeout", index: 1,
+  }));
+  const onitemend = jest.fn();
+  const sequence = speakSequence(["Premier titre.", "Deuxième titre."], { onitemend });
+  await expect(sequence.done).rejects.toMatchObject({ code: "playback-timeout", index: 1 });
+  expect(speakNative).not.toHaveBeenCalled();
+  expect(onitemend).not.toHaveBeenCalled();
+  expect(stopNativeRemoteVoice).toHaveBeenCalled();
+});
+
+test("the native bulletin ignores an old WebView cooldown and owns no browser playback timer", async () => {
+  speakFr("Ancienne requête.");
+  await flush();
+  speakNative.mockClear();
+  hasNativeRemoteVoice.mockReturnValue(true);
+  let callbacks;
+  playNativeRemoteVoice.mockImplementationOnce(options => {
+    callbacks = options;
+    return new Promise(() => {});
+  });
+  const onitemend = jest.fn();
+  const timer = jest.spyOn(window, "setTimeout");
+  const sequence = speakSequence(["Titre Gemini."], { onitemend });
+  const rejected = expect(sequence.done).rejects.toMatchObject({ code: "cancelled" });
+  expect(sequence.provider).toBe("remote");
+  expect(timer).not.toHaveBeenCalled();
+  sequence.cancel();
+  callbacks.onitemend(0);
+  await rejected;
+  expect(onitemend).not.toHaveBeenCalled();
+  expect(speakNative).not.toHaveBeenCalled();
 });
 
 afterEach(() => {

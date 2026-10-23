@@ -1,5 +1,5 @@
 import {
-  BULLETIN_CONTEXT_TTL_MS, bulletinFollowUp, createBulletinContext, markSegmentCompleted, markSegmentStarted, releaseBulletinFocus,
+  BULLETIN_CONTEXT_TTL_MS, bulletinFollowUp, bulletinNavigation, createBulletinContext, markSegmentCompleted, markSegmentStarted, prepareBulletinReading, releaseBulletinFocus,
 } from "./bulletinDialogue";
 import newsExamples from "./__fixtures__/newsCommands.json";
 
@@ -131,4 +131,71 @@ test("after an analytic answer, resume stays available but a bare repeat no long
   bulletin.focused = false;
   expect(bulletinFollowUp("répète", bulletin)).toBeNull();
   expect(bulletinFollowUp("reprends", bulletin)).toEqual({ resumeAt: 3 });
+});
+
+test.each(["titre suivant", "passe au titre suivant", "passe à l'info suivante", "Sirius, suivant"])(
+  "moves to the next news item, skipping weather and status: %s", (command) => {
+    expect(bulletinFollowUp(command, heard(1))).toEqual({ navigateAt: 2 });
+    expect(bulletinFollowUp(command, heard(2))).toEqual({ navigateAt: 3 });
+    expect(bulletinFollowUp(command, heard(3)).text).toContain("dernier titre");
+  }
+);
+
+test.each(["titre précédent", "reviens au titre précédent", "précédent"])(
+  "moves backwards without refetching a bulletin: %s", (command) => {
+    expect(bulletinFollowUp(command, heard(3))).toEqual({ navigateAt: 2 });
+    expect(bulletinFollowUp(command, heard(2)).text).toContain("Aucun titre précédent");
+  }
+);
+
+test("replaying an already completed item resumes its interrupted replay, not the old high water mark", () => {
+  const bulletin = heard(4);
+  markSegmentCompleted(bulletin, 4);
+  markSegmentStarted(bulletin, 2);
+  expect(bulletin.completedIndex).toBe(4);
+  expect(bulletinFollowUp("reprends", bulletin)).toEqual({ resumeAt: 2 });
+  markSegmentCompleted(bulletin, 2);
+  expect(bulletinFollowUp("reprends", bulletin)).toEqual({ resumeAt: 3 });
+});
+
+test("selection awaiting audio is resumable but never claims skipped items were announced", () => {
+  const bulletin = heard(0);
+  prepareBulletinReading(bulletin, 3);
+  expect(bulletinFollowUp("reprends", bulletin)).toEqual({ resumeAt: 3 });
+  markSegmentStarted(bulletin, 3);
+  expect(bulletinFollowUp("répète la météo", bulletin).text).toContain("pas encore annoncé");
+  const result = bulletinFollowUp("Pourquoi il a adopté ce texte ?", bulletin);
+  expect(result.analysis).toContain("le parlement");
+  expect(result.analysis).not.toContain("le maire");
+});
+
+test("numbered title selection validates range and details target only the selected fetched source", () => {
+  const bulletin = heard(2);
+  bulletin.segments[3].article = { source: "Franceinfo", url: "https://example.test/parlement" };
+  expect(bulletinFollowUp("lis le titre 2", bulletin)).toEqual({ navigateAt: 3 });
+  expect(bulletinFollowUp("titre 0", bulletin).text).toContain("1 à 2");
+  expect(bulletinFollowUp("titre 999", bulletin).text).toContain("1 à 2");
+  const detail = bulletinFollowUp("développe le titre 2 du bulletin", bulletin);
+  expect(detail.analysis).toContain("Titre sélectionné : International");
+  expect(detail.analysis).toContain("https://example.test/parlement");
+  expect(detail.analysis).toContain("N'invente aucun fait");
+  expect(bulletinFollowUp("reprends", bulletin)).toEqual({ resumeAt: 2 });
+});
+
+test("navigation is contextual, while explicit bulletin commands explain missing or expired context", () => {
+  const bulletin = heard(3);
+  releaseBulletinFocus(bulletin);
+  expect(bulletinFollowUp("suivant", bulletin)).toBeNull();
+  expect(bulletinFollowUp("titre précédent du bulletin", bulletin)).toEqual({ navigateAt: 2 });
+  expect(bulletinFollowUp("titre suivant du bulletin", null).text).toContain("pas de bulletin récent");
+  const expired = { ...bulletin, savedAt: Date.now() - BULLETIN_CONTEXT_TTL_MS - 1 };
+  expect(bulletinNavigation(expired)).toBeNull();
+  expect(bulletinFollowUp("développe le titre 1 du bulletin", expired).text).toContain("pas de bulletin récent");
+});
+
+test("navigation handles a bulletin with no verified news and final title boundaries", () => {
+  const bulletin = createBulletinContext({ segments: segments().filter((item) => item.kind !== "news") });
+  expect(bulletinNavigation(bulletin)).toMatchObject({ count: 0, nextAt: null, previousAt: null });
+  expect(bulletinFollowUp("titre suivant", bulletin).text).toContain("aucun titre vérifié");
+  expect(bulletinNavigation(heard(1))).toMatchObject({ position: -1, nextAt: 2, previousAt: null });
 });

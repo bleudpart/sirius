@@ -375,7 +375,23 @@ après deux heures et sa position de lecture n'est pas restaurée après un
 rechargement de l'application. Hors bulletin, « répète » et « continue » gardent
 le parcours de conversation habituel.
 
-La voix du bulletin garde une seule source pendant toute la lecture : la voix
+**Android avec le lecteur natif `SiriusPlayback`** : le bulletin entier est confié
+à un service de premier plan de type `mediaPlayback`, avec notification et bouton
+**Arrêter**. Il demande les audios au serveur Sirius et les lit sans dépendre des
+minuteurs de la WebView, y compris écran verrouillé. La phrase suivante est
+préparée pendant la lecture, avec une seule requête d'avance. Le jeton de session
+et les clés vocales restent en mémoire ; les audios temporaires du cache privé
+sont supprimés à la fin ou à l'arrêt. Aucun service de capture micro n'est activé.
+Les réglages d'égalisation sont adaptés aux bandes disponibles du lecteur Android
+(le rendu peut différer de l'égaliseur Web Audio). Une panne de réseau, de session,
+de lecture ou une interruption par une autre application arrête explicitement le
+bulletin, sans remplacement par la voix locale ; « reprends » repart du passage
+inachevé. Le verrou de veille est borné et renouvelé par phrase, puis libéré à
+l'arrêt ; la lecture ne redémarre pas toute seule après arrêt de l'application.
+Ce parcours exige un nouvel APK et reste à vérifier
+sur téléphone verrouillé ; il ne promet pas de lecture hors connexion.
+
+**Navigateur et anciens APK sans ce lecteur** : la voix du bulletin garde une seule source pendant toute la lecture : la voix
 distante (Gemini sur Android) tant qu'elle répond, puis la voix locale jusqu'à
 la fin du bulletin dès le premier échec (délai de 28 s, réseau, réponse HTTP ou
 audio vide, lecture bloquée ou coupée), sans nouvelle tentative distante ni
@@ -496,6 +512,25 @@ les fournisseurs STT/TTS et le rejet de la télévision restent à essayer
 volontairement. Des accès directs au profil vocal et aux réglages voix permettent
 de corriger les problèmes. Le temps affiché mesure uniquement l'aller-retour du
 contrôle concerné, pas la latence d'une conversation complète.
+
+**Navigation du bulletin** : des boutons près de la demande indiquent le titre
+en cours et permettent **Titre précédent**, **Titre suivant**, **Développer ce
+titre** et **Reprendre le bulletin**, sans recharger les actualités.
+Les mêmes commandes sont disponibles à l'écrit ou par appui micro volontaire :
+« passe au titre suivant », « reviens au titre précédent », « lis le titre 2 »,
+« développe le titre 2 du bulletin ». Le numéro compte uniquement les actualités,
+pas l'introduction, la météo ou les messages de sources indisponibles.
+Les commandes explicites « du bulletin » restent utilisables après une autre
+conversation ; un simple « suivant » n'est interprété que lorsque le bulletin
+garde le contexte. Le contexte expire après deux heures et est vidé au changement
+de compte.
+
+Un saut ne marque pas les titres évités comme annoncés. Si un titre déjà terminé
+est relu puis interrompu, la reprise recommence ce titre, et non la position la
+plus avancée de l'ancienne lecture. Développer un titre utilise son texte sourcé
+et son lien, sans changer le point de reprise ni inventer les détails absents.
+Le bulletin complet reste le comportement initial ; aucun passage n'est supprimé
+ou raccourci automatiquement.
 
 Dans **Configuration → Voix**, le profil **Voix des AÈDES — ODYSSEIA** propose
 un conteur français masculin local, avec débit posé (0,90) et hauteur douce (0,94).

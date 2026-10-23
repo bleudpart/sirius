@@ -1316,6 +1316,67 @@ test("the bulletin dialogue recalls what was really announced, resumes, and cont
   expect(newsFetches()).toBe(1);
 });
 
+test("bulletin buttons skip forward, replay backwards and resume an interrupted replay without new news requests", async () => {
+  mockBulletinBackend();
+  speakSeries.mockImplementation((text, options) => {
+    options?.onstart?.();
+    return /Le maire|Le parlement/.test(text) ? new Promise(() => {}) : Promise.resolve();
+  });
+  await mount();
+  await send("les infos");
+  const controls = () => host.querySelector('[aria-label="Parcourir le bulletin"]');
+  const click = async (label) => act(async () => [...controls().querySelectorAll("button")].find((button) => button.textContent === label).click());
+  expect(controls().textContent).toContain("Titre 1 sur 2");
+  speakSeries.mockClear();
+  await click("Titre suivant");
+  expect(speakSeries.mock.calls[0][0]).toContain("Le parlement");
+  expect(controls().textContent).toContain("Titre 2 sur 2");
+  speakSeries.mockClear();
+  await click("Titre précédent");
+  expect(speakSeries.mock.calls[0][0]).toContain("Le maire");
+  speakSeries.mockClear();
+  await send("reprends le bulletin");
+  expect(speakSeries.mock.calls[0][0]).toContain("Le maire");
+  expect(newsFetches()).toBe(1);
+});
+
+test("developing a numbered title uses its fetched source without refetching or advancing the reading cursor", async () => {
+  const chatBodies = mockBulletinBackend();
+  speakSeries.mockImplementation((text, options) => {
+    options?.onstart?.();
+    return text.includes("Le maire") ? new Promise(() => {}) : Promise.resolve();
+  });
+  await mount();
+  await send("les infos");
+  await send("développe le titre 2 du bulletin");
+  expect(chatBodies.at(-1)).toContain("Titre sélectionné : International : Le parlement");
+  expect(chatBodies.at(-1)).toContain("https://www.franceinfo.fr/monde/parlement.html");
+  expect(chatBodies.at(-1)).toContain("N'invente aucun fait");
+  speakSeries.mockClear();
+  await send("reprends les infos");
+  expect(speakSeries.mock.calls[0][0]).toContain("Le maire");
+  expect(newsFetches()).toBe(1);
+});
+
+test("a completed title replay remains resumable if interrupted before it finishes again", async () => {
+  mockBulletinBackend();
+  speakSeries.mockImplementation((text, options) => {
+    options?.onstart?.();
+    return Promise.resolve();
+  });
+  await mount();
+  await send("les infos");
+  speakSeries.mockImplementation((text, options) => {
+    options?.onstart?.();
+    return new Promise(() => {});
+  });
+  await send("titre précédent du bulletin");
+  speakSeries.mockClear();
+  await send("reprends le bulletin");
+  expect(speakSeries.mock.calls[0][0]).toContain("Le maire");
+  expect(newsFetches()).toBe(1);
+});
+
 test("a late callback from an interrupted bulletin cannot move the announced position", async () => {
   mockBulletinBackend();
   let staleStart;
