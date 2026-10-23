@@ -10,6 +10,9 @@ from typing import Optional, List, Annotated
 from auth_api import require_user
 from email_signature import signature_identity
 from enterprise import record_audit, require_permission
+from duerp import make_duerp_router
+from safety_documentation import make_safety_router
+from haccp_sheet_documents import make_sheet_documents_router
 
 ReqStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
@@ -25,6 +28,8 @@ TEMP_RANGES = {
     "frigo": (0.0, 4.0),
     "congelateur": (-30.0, -18.0),
     "chaud": (63.0, 110.0),
+    "chambre_froide_positive": (0.0, 4.0),
+    "chambre_froide_negative": (-30.0, -18.0),
 }
 
 PMS_DEFAULTS = [
@@ -156,6 +161,9 @@ FREQ_DAYS = {"quotidien": 1, "hebdomadaire": 7, "mensuel": 30}
 
 def make_haccp_router(db):
     r = APIRouter(prefix="/haccp")
+    r.include_router(make_duerp_router(db))
+    r.include_router(make_safety_router(db))
+    r.include_router(make_sheet_documents_router(db))
 
     async def data_scope(request: Request):
         """Scope authenticated data while keeping legacy local calls compatible."""
@@ -240,7 +248,7 @@ def make_haccp_router(db):
     async def add_equip(body: EquipIn, request: Request):
         scope = await data_scope(request)
         if body.type not in TEMP_RANGES:
-            raise HTTPException(status_code=400, detail="Type invalide (frigo, congelateur, chaud)")
+            raise HTTPException(status_code=400, detail="Type invalide (frigo, congelateur, chaud, chambre_froide_positive, chambre_froide_negative)")
         doc = {"id": str(uuid.uuid4()), "nom": body.nom, "type": body.type, "created_at": now_iso()}
         with_scope(doc, scope)
         await db.haccp_equip.insert_one(dict(doc))

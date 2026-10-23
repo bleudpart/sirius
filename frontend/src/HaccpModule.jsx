@@ -1,17 +1,20 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   X, ClipboardCheck, Tag, Thermometer, ShieldCheck, AlertTriangle, SprayCan,
   Wheat, FileText, Plus, Trash2, Check, Printer, FileDown, Mic,
 } from "lucide-react";
 import SectionSheets from "./HaccpSheets";
+import DuerpSection from "./DuerpSection";
+import SafetyDocumentation from "./SafetyDocumentation";
+import { API_BASE_URL } from "./lib/api";
 
-const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api/haccp";
+const API = `${API_BASE_URL}/haccp`;
 
 const api = async (path, opts) => {
   let r;
   try {
-    r = await fetch(`${API}${path}`, opts ? { headers: { "Content-Type": "application/json" }, ...opts } : undefined);
+    r = await fetch(`${API}${path}`, { credentials: "include", ...(opts ? { headers: { "Content-Type": "application/json" }, ...opts } : {}) });
   } catch (e) {
     window.dispatchEvent(new CustomEvent("haccp-error", { detail: "Serveur HACCP injoignable" }));
     throw e;
@@ -40,6 +43,8 @@ const TABS = [
   { key: "controls", label: "CONTRÔLES", Icon: ClipboardCheck },
   { key: "sheets", label: "FEUILLES", Icon: Printer },
   { key: "audit", label: "AUDIT PDF", Icon: FileDown },
+  { key: "duerp", label: "DUERP", Icon: ShieldCheck },
+  { key: "safety", label: "PERSONNEL & SÉCURITÉ", Icon: ClipboardCheck },
 ];
 
 const Dot = ({ tone }) => <span className={`hc-dot ${tone}`} />;
@@ -152,6 +157,8 @@ function SectionTemp() {
         <select className="cmd-input hc-select" value={eqForm.type} onChange={(e) => setEqForm({ ...eqForm, type: e.target.value })} data-testid="haccp-equip-type">
           <option value="frigo">Froid positif (0 à +4°C)</option>
           <option value="congelateur">Congélateur (≤ -18°C)</option>
+          <option value="chambre_froide_positive">Chambre froide positive (0 à +4°C)</option>
+          <option value="chambre_froide_negative">Chambre froide négative (≤ -18°C)</option>
           <option value="chaud">Liaison chaude (≥ +63°C)</option>
         </select>
         <button className="cmd-send" onClick={addEquip} data-testid="haccp-equip-add"><Plus size={14} /> AJOUTER</button>
@@ -508,14 +515,21 @@ function SectionAudit() {
   );
 }
 
-const SECTIONS = { trace: SectionTrace, temp: SectionTemp, pms: SectionPms, nc: SectionNc, clean: SectionClean, allerg: SectionAllerg, docs: SectionDocs, controls: SectionControls, sheets: SectionSheets, audit: SectionAudit };
+const SECTIONS = { trace: SectionTrace, temp: SectionTemp, pms: SectionPms, nc: SectionNc, clean: SectionClean, allerg: SectionAllerg, docs: SectionDocs, controls: SectionControls, sheets: SectionSheets, audit: SectionAudit, duerp: DuerpSection, safety: SafetyDocumentation };
 
-const SOURCE_TABS = { haccp_trace: "trace", haccp_nonconformity: "nc", haccp_document: "docs" };
+const SOURCE_TABS = { haccp_trace: "trace", haccp_nonconformity: "nc", haccp_document: "docs", duerp: "duerp", safety: "safety" };
 
 export default function HaccpModule({ onClose, initialSource }) {
   const [tab, setTab] = useState(() => SOURCE_TABS[initialSource?.kind] || "trace");
+  const [documentDirty, setDocumentDirty] = useState(false);
+  const navigation = useRef(null);
+  navigation.current = { tab, documentDirty };
+  const mayLeave = () => !documentDirty || window.confirm("Quitter ce document sans enregistrer vos modifications ?");
   useEffect(() => {
-    if (SOURCE_TABS[initialSource?.kind]) setTab(SOURCE_TABS[initialSource.kind]);
+    const next = SOURCE_TABS[initialSource?.kind];
+    const current = navigation.current;
+    if (next && next !== current.tab &&
+        (!current.documentDirty || window.confirm("Quitter ce document sans enregistrer vos modifications ?"))) setTab(next);
   }, [initialSource]);
   const [ov, setOv] = useState(null);
   const [err, setErr] = useState("");
@@ -528,7 +542,7 @@ export default function HaccpModule({ onClose, initialSource }) {
     return () => window.removeEventListener("haccp-error", onErr);
   }, []);
   useEffect(() => {
-    const load = () => fetch(`${API}/overview`).then((r) => r.json()).then(setOv).catch(() => {});
+    const load = () => fetch(`${API}/overview`, { credentials: "include" }).then((r) => r.json()).then(setOv).catch(() => {});
     load();
     const id = setInterval(load, 15000);
     return () => clearInterval(id);
@@ -537,10 +551,10 @@ export default function HaccpModule({ onClose, initialSource }) {
   return (
     <div className="prime-screen" data-testid="haccp-panel">
       <header className="zeus-head">
-        <div className="oracle-title font-divine"><ClipboardCheck size={20} /> HACCP <span className="module-function">— HYGIÈNE &amp; SÉCURITÉ ALIMENTAIRE</span></div>
-        <button className="setup-close zeus-close" onClick={onClose} data-testid="haccp-close-btn"><X size={18} /></button>
+        <div className="oracle-title font-divine"><ClipboardCheck size={20} /> HACCP <span className="module-function">— HYGIÈNE, PERSONNEL &amp; SÉCURITÉ</span></div>
+        <button className="setup-close zeus-close" onClick={() => { if (mayLeave()) onClose(); }} data-testid="haccp-close-btn"><X size={18} /></button>
       </header>
-      <div className="prime-sub">TRAÇABILITÉ · TEMPÉRATURES · PMS · NON-CONFORMITÉS · NETTOYAGE · ALLERGÈNES · DOCUMENTS</div>
+      <div className="prime-sub">HYGIÈNE ALIMENTAIRE · DUERP · PERSONNEL &amp; SÉCURITÉ</div>
       {ov && (
         <div className="hc-alerts" data-testid="haccp-alerts">
           <span className={ov.dlc_alertes ? "ko" : "ok"}>DLC : {ov.dlc_alertes} alerte(s)</span>
@@ -551,14 +565,14 @@ export default function HaccpModule({ onClose, initialSource }) {
       )}
       <div className="hc-tabs" data-testid="haccp-tabs">
         {TABS.map(({ key, label, Icon }) => (
-          <button key={key} className={`hc-tab ${tab === key ? "on" : ""}`} onClick={() => setTab(key)} data-testid={`haccp-tab-${key}`}>
+          <button key={key} className={`hc-tab ${tab === key ? "on" : ""}`} onClick={() => { if (key === tab || mayLeave()) setTab(key); }} data-testid={`haccp-tab-${key}`}>
             <Icon size={13} /> {label}
           </button>
         ))}
       </div>
       <div className="hc-body prime-card">
         {err && <div className="dev-error" data-testid="haccp-error">{err}</div>}
-        <Section focusId={SOURCE_TABS[initialSource?.kind] === tab ? initialSource.id : null} />
+        <Section focusId={SOURCE_TABS[initialSource?.kind] === tab ? initialSource.id : null} onDirtyChange={setDocumentDirty} />
       </div>
     </div>
   );

@@ -1,0 +1,15 @@
+.duerp-section fieldset { margin: 12px 0; padding: 12px; border: 1px solid rgba(145,230,242,.4); border-radius: 8px; min-width: 0; }
+.duerp-section legend { padding: 0 6px; font-weight: 600; }
+.duerp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 12px; }
+.duerp-grid label { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.duerp-grid .cmd-input { width: 100%; min-width: 0; }
+.duerp-grid textarea { resize: vertical; }
+.duerp-section p { line-height: 1.5; }
+.duerp-section .hc-form { margin: 10px 0; }
+.safety-entry { padding: 10px 0; border-bottom: 1px solid rgba(145,230,242,.2); }
+.hc-sheet-edit-scroll { overflow-x: auto; margin: 14px 0; }
+.hc-sheet-edit-table { border-collapse: collapse; width: 100%; }
+.hc-sheet-edit-table th, .hc-sheet-edit-table td { padding: 4px; border: 1px solid rgba(145,230,242,.35); min-width: 125px; }
+.hc-sheet-edit-table .cmd-input { width: 100%; min-width: 115px; }
+.hc-sheet-card { flex-wrap: wrap; }
+.hc-sheet-info { flex-basis: 160px; }

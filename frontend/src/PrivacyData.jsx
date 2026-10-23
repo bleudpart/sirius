@@ -53,6 +53,23 @@ export default function PrivacyData({ onOpenAccount, onMemory, onConnections }) 
         Les notifications de changement ne contiennent pas le corps des e-mails ; SIRIUS relit les métadonnées autorisées.
         Les nouveaux envois WhatsApp/Gmail et événements de cette intégration nécessitent un aperçu et une confirmation dans SIRIUS.
         Déconnecter arrête les prochains traitements, mais ne rappelle pas un envoi déjà engagé et n'efface pas les copies chez Meta ou Google.</dd>
+      <dt><strong>Alexa et Smart Life/Tuya, facultatifs</strong></dt>
+      <dd>Deux liaisons distinctes séparent la lecture des dossiers et synthèses du contrôle domotique.
+        Amazon peut recevoir les titres et synthèses demandés, ainsi que les noms et états des appareils autorisés.
+        Les paroles d'Alexa peuvent être entendues près de l'enceinte.
+        Tuya reçoit les commandes des lampes et prises sélectionnées ; elles ne demandent pas de nouvelle confirmation vocale.
+        N'autorisez aucune prise alimentant un appareil dangereux, un chauffage ou un équipement de sécurité.
+        SIRIUS conserve les autorisations jusqu'à leur retrait ; les résultats de commandes sont nettoyés à la prochaine utilisation après 30 jours.
+        Ces historiques ne contiennent aucun audio Alexa ni secret Tuya.
+        La révocation arrête les nouvelles commandes, pas une commande déjà partie.
+        L'export et l'effacement du compte couvrent ces données serveur, pas les copies conservées chez Amazon ou Tuya.</dd>
+      <dt><strong>DUERP et cahiers personnel / sécurité</strong></dt>
+      <dd>Les versions de vos évaluations, accueils, formations, plannings cuisine / salle, feuilles HACCP modifiables et suivis de sécurité sont conservées dans le service connecté.
+        Elles sont privées au compte ou partagées dans l'entreprise avec les personnes autorisées au module HACCP.
+        Évitez toute donnée de santé, pièce d'identité ou coordonnée privée ; les justificatifs restent des références, sans téléversement ici.
+        Les versions privées sont incluses dans l'export du compte et leur effacement nécessite une revue métier.
+        Les documents partagés relèvent des sauvegardes et de la gestion de l'entreprise ; une suppression de compte n'efface pas son historique partagé.
+        Les impressions et PDF exportés ne sont pas rappelés ni effacés à distance.</dd>
       <dt><strong>Conservation et suppression</strong></dt>
       <dd>Il n'existe pas ici de durée unique garantie pour tous les modules. Les fournisseurs appliquent leurs propres conditions.
         L'effacement du compte ne supprime pas automatiquement vos fichiers exportés, sauvegardes ou toutes les listes présentes sur un autre appareil.</dd>

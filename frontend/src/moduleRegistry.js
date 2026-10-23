@@ -94,7 +94,7 @@ export function createModuleRegistry({ icons, actions, state, user, platform = "
     { id: "oracle", group: "PANTHÉON", label: "ORACLE DIVIN", Icon: icons.Eye, run: openOracle },
     { id: "nummarius", group: "PANTHÉON", label: "PORTUS NUMMARIUS — bourse & marchés", Icon: icons.Landmark, run: openNummarius },
     { id: "europeana", group: "MÉDIAS", label: "Archives Europeana", Icon: icons.Library, run: openEuropeana },
-    { id: "haccp", group: "OUTILS", label: "HACCP — sécurité alimentaire", Icon: icons.ShieldCheck, run: openHaccp },
+    { id: "haccp", group: "OUTILS", label: "HACCP — DUERP, personnel & sécurité alimentaire", Icon: icons.ShieldCheck, run: openHaccp },
     { id: "prime", group: "OUTILS", label: "ΣIRIUS PRIME — mémoire", Icon: icons.Sparkles, run: openPrime },
     { id: "dev", group: "OUTILS", label: "Compagnon Dev", Icon: icons.Code2, run: openDev },
     { id: "analytics", group: "OUTILS", label: "Tableau analytique", Icon: icons.BarChart3, run: openAnalytics },

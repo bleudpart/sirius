@@ -4029,6 +4029,14 @@ function App() {
       (module) => {
         if (module.id === "display") { pinDisplay(); setDisplayOpen(true); }
         else if (module.id === "vision") setShowVision(true);
+        else if (module.id === "haccp" && /\bduerp\b|document unique|risques professionnels/i.test(raw)) {
+          setHaccpSource({ kind: "duerp" });
+          setHaccp({ sujet: "", auto: false });
+        }
+        else if (module.id === "haccp" && /personnel|formation|incendie|[ée]vacuation|v[ée]rification/i.test(raw)) {
+          setHaccpSource({ kind: "safety" });
+          setHaccp({ sujet: "", auto: false });
+        }
         else module.run();
       },
     );

@@ -49,7 +49,7 @@ class FakeDb:
         self.enterprise_sites = FakeCollection([])
         self.enterprise_audit = FakeCollection([])
         self.haccp_trace = FakeCollection([{"id": "trace_1", "company_id": "company_test", "produit": "Lait"}])
-        for collection in ("haccp_equip", "haccp_temp", "haccp_pms", "haccp_nc", "haccp_clean", "haccp_clean_log", "haccp_allerg", "haccp_docs", "haccp_controls", "user_files"):
+        for collection in ("haccp_equip", "haccp_temp", "haccp_pms", "haccp_nc", "haccp_clean", "haccp_clean_log", "haccp_allerg", "haccp_docs", "haccp_controls", "haccp_duerp", "haccp_safety", "haccp_sheets", "user_files"):
             setattr(self, collection, FakeCollection([]))
 
 

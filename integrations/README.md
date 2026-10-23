@@ -6,6 +6,9 @@ de sa propre spécification, de clés dédiées et de tests indépendants.
 Le socle [WhatsApp Cloud API et Google Workspace](./whatsapp-workspace/README.md)
 décrit les webhooks vérifiés, la synchronisation bornée et les actions confirmées.
 
+Les [Skills Alexa et le connecteur Smart Life/Tuya](./alexa/README.md) séparent
+la lecture des dossiers/synthèses des commandes domotiques sur appareils sélectionnés.
+
 ## Périmètre et architecture
 
 Cette intégration est facultative. Installer les sources n'active aucun bot,

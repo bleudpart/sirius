@@ -1,0 +1,17 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "sirius assistant",
+      "intents": [
+        { "name": "ListDossiersIntent", "slots": [], "samples": ["mes dossiers", "liste mes dossiers", "quels sont mes dossiers"] },
+        { "name": "FindDossierIntent", "slots": [{ "name": "titre", "type": "AMAZON.SearchQuery" }],
+          "samples": ["cherche le dossier {titre}", "trouve le dossier {titre}"] },
+        { "name": "LatestMeetingIntent", "slots": [], "samples": ["dernière réunion", "la dernière synthèse", "lis ma dernière réunion"] },
+        { "name": "AMAZON.HelpIntent", "samples": [] },
+        { "name": "AMAZON.StopIntent", "samples": [] },
+        { "name": "AMAZON.CancelIntent", "samples": [] },
+        { "name": "AMAZON.FallbackIntent", "samples": [] }
+      ]
+    }
+  }
+}

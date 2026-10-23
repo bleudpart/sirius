@@ -20,7 +20,7 @@ export const MODULE_ALIASES = {
   memorymgr: "souvenirs memoire",
   faceid: "visage reconnaissance faciale prise de vue faciale capture visage camera faciale webcam faciale photo faciale biometric biometrique",
   files: "fichiers documents mediathèque",
-  haccp: "hygiene alimentaire securite sanitaire",
+  haccp: "hygiene alimentaire securite sanitaire duerp document unique evaluation risques professionnels cahier personnel formations securite incendie exercices evacuation verifications",
   connections: "comptes connectes connexion",
   messaging: "messagerie boite reception courriels gmail outlook",
   mythos: "galerie personnages dieux pantheon",

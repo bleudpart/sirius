@@ -33,6 +33,8 @@ PERSONAL_COLLECTIONS = (
     "sirius_zapier_keys", "sirius_zapier_hooks", "sirius_zapier_deliveries", "sirius_zapier_limits",
     "sirius_whatsapp_challenges", "sirius_whatsapp_bindings", "sirius_whatsapp_messages",
     "sirius_integration_actions", "sirius_workspace_watches", "sirius_workspace_snapshots",
+    "sirius_alexa_codes", "sirius_alexa_connections", "sirius_alexa_refreshes", "sirius_alexa_limits",
+    "sirius_tuya_devices", "sirius_tuya_commands", "sirius_tuya_locks",
     "sirius_action_runs", "sirius_action_steps", "sirius_action_controls",
     "sirius_action_attempts", "sirius_action_events",
     "sirius_work_dispatches", "sirius_work_receipts", "sirius_work_reminders",
@@ -47,6 +49,9 @@ REVIEW_COLLECTIONS = (
     "photo3d_jobs",
     "haccp_trace", "haccp_equip", "haccp_temp", "haccp_nc", "haccp_pms",
     "haccp_clean", "haccp_clean_log", "haccp_allerg", "haccp_docs", "haccp_controls",
+    "haccp_duerp",
+    "haccp_safety",
+    "haccp_sheets",
 )
 FILE_COLLECTIONS = ("files", "user_files")
 ID_COLLECTIONS = ("google_calendar", "microsoft_oauth", "email_prefs", "email_seen")

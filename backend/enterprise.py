@@ -42,6 +42,9 @@ BACKUP_COLLECTIONS = (
     "haccp_allerg",
     "haccp_docs",
     "haccp_controls",
+    "haccp_duerp",
+    "haccp_safety",
+    "haccp_sheets",
     "user_files",
 )
 SAFE_ARCHIVE_NAME = re.compile(r"^[a-zA-Z0-9_.-]{1,120}$")
@@ -187,8 +190,8 @@ async def _restore_company_archive(db, company_id, raw):
         collection = getattr(db, collection_name)
         query = {"id": company_id} if collection_name == "enterprise_companies" else {"company_id": company_id}
         await collection.delete_many(query)
-        if documents:
-            await collection.insert_many(documents)
+        for document in documents:
+            await collection.insert_one(document)
 
     company_uploads = (data_dir() / "uploads" / "documents" / company_id).resolve()
     if company_uploads.exists():

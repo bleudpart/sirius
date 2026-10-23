@@ -449,6 +449,10 @@ from workspace_channels import WorkspaceChannels
 from messaging_integrations import MessagingIntegrations, make_messaging_router
 workspace_channels = WorkspaceChannels(db)
 messaging_integrations = MessagingIntegrations(db, workspace_channels)
+from alexa_integration import AlexaIntegration, make_alexa_router
+from tuya_integration import TuyaIntegration, make_tuya_router
+alexa_integration = AlexaIntegration(db)
+tuya_integration = TuyaIntegration(db, alexa_integration)
 from action_initiatives import ActionInitiatives, make_initiative_router
 action_initiatives = ActionInitiatives(db, action_runs)
 from bounded_autonomy import BoundedAutonomy, make_autonomy_router
@@ -2328,6 +2332,8 @@ api_router.include_router(make_phone_router(phone_voice, require_user))
 api_router.include_router(make_meeting_router(meeting_integrations, require_user))
 api_router.include_router(make_zapier_router(zapier_integrations, require_user))
 api_router.include_router(make_messaging_router(messaging_integrations, require_user))
+api_router.include_router(make_alexa_router(alexa_integration, require_user))
+api_router.include_router(make_tuya_router(tuya_integration, require_user))
 
 from themis_api import make_themis_router
 api_router.include_router(make_themis_router(db))
