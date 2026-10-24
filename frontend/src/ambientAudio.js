@@ -1,7 +1,7 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
 /**
  * Moteur d'ambiance ΣIRIUS — lecture des vrais fichiers musicaux installés
- * (public/audio/ambiance.mp3, public/audio/gregorien.mp3), en boucle.
+ * (public/audio/zirius-loop.wav, public/audio/gregorien.mp3), en boucle.
  * Expose la même interface que HTMLAudioElement (.play(), .pause(), .volume, .src)
  * pour rester compatible avec tout le code existant dans App.js.
  *
@@ -15,7 +15,7 @@
  */
 
 const TRACKS = {
-  epique: "/audio/zirius-loop.wav?revision=2",
+  epique: "/audio/zirius-loop.wav?revision=3",
   gregorien: "/audio/gregorien.mp3",
 };
 

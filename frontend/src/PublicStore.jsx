@@ -211,7 +211,7 @@ export default function PublicStore() {
           {themePlaying ? "Couper le son" : "Activer le son"}
         </button>
         <audio id="public-theme-player" ref={themeAudioRef} hidden loop autoPlay preload="auto"
-          aria-label="Écouter le thème Zirius" src="/audio/zirius-loop.wav?revision=2"
+          aria-label="Écouter le thème Zirius" src="/audio/zirius-loop.wav?revision=3"
           onPlay={() => { setThemePlaying(true); setThemeAutoplayBlocked(false); setThemeAudioError(""); }}
           onPause={() => setThemePlaying(false)}
           onError={() => { setThemePlaying(false); setThemeAudioError("La musique est indisponible. Rechargez la page pour réessayer."); }} />

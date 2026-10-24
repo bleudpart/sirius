@@ -9,10 +9,10 @@ Frontend **React** + Backend **FastAPI** (Python), packagé en application Windo
 L'ambiance principale utilise le morceau « Zirius themes » fourni par Daniel,
 préparé en WAV PCM stéréo avec un raccord circulaire par fondu croisé linéaire
 calé sur une mesure de quatre temps à 90 BPM (117 600 échantillons à 44,1 kHz).
-La boucle conserve 28 temps entiers (environ 18,67 secondes), sans décalage de
-phase rythmique causé par l'ancien recouvrement arbitraire de trois temps.
-Elle est jouée en boucle après le démarrage ; le raccord a été validé à l'écoute
-par Daniel sur trois passages successifs.
+Le fichier joué est l'aperçu complet de 56 secondes demandé par Daniel :
+trois passages identiques de 28 temps (environ 18,67 secondes chacun), soit
+84 temps au total. Il tourne en boucle après le démarrage, sans nouvelle coupe
+ni nouveau fondu ; les deux raccords internes restent ceux de l'aperçu.
 Le WAV évite le délai d'encodage MP3 au raccord ; le lecteur utilise
 `public/audio/zirius-loop.wav`, distinct de l'original MP3 utilisé ailleurs.
 Le choix « Thème Zirius » remplace l'ancienne piste épique sans réinitialiser le
