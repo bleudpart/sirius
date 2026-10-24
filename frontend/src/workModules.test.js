@@ -51,8 +51,39 @@ test.each([
   ["ouvre némésis", "audit"],
   ["ouvre thot", "documents"],
   ["ouvre chronos", "planning"],
+  ["ouvre les dossiers intelligents", "dossiers-pro"],
+  ["ouvre les fichiers", "files"],
+  ["ouvre la gestion de projet", "promethee"],
 ])("voice command '%s' reaches the work module", (command, expectedId) => {
   expect(findModuleForCommand(command, buildRegistry(), MODULE_ALIASES).item?.id).toBe(expectedId);
+});
+
+test.each([
+  ["ouvre les dossiers", "dossiers"],
+  ["ouvre les documents", "documents"],
+  ["ouvre le planning", "planning"],
+])("la commande exacte '%s' ouvre le module de travail plutôt qu'un alias concurrent", (command, expectedId) => {
+  const openWorkModule = jest.fn();
+  const { item } = findModuleForCommand(command, buildRegistry(openWorkModule), MODULE_ALIASES);
+  expect(item?.id).toBe(expectedId);
+  item.run();
+  expect(openWorkModule).toHaveBeenCalledWith(expectedId);
+});
+
+test.each([
+  ["dossiers", "hud"],
+  ["dossiers", "display"],
+  ["documents", "hud"],
+  ["documents", "display"],
+  ["planning", "hud"],
+  ["planning", "display"],
+])("le module exact '%s' conserve sa destination %s indépendamment de l'ordre du registre", (id, target) => {
+  const items = buildRegistry();
+  for (const orderedItems of [items, [...items].reverse()]) {
+    const result = findModuleForCommand(`ouvre le module ${id} dans le ${target}`, orderedItems, MODULE_ALIASES);
+    expect(result.item?.id).toBe(id);
+    expect(result.target).toBe(target);
+  }
 });
 
 test.each(WORK_IDS)("window controller closes '%s'", (id) => {

@@ -32,6 +32,7 @@ export async function playNativeRemoteVoice({ endpoint, items, onitemstart, onit
   const current = generation;
   const id = `voice-${current}`;
   let listener;
+  let disposed = false;
   let rejectDone;
   const done = new Promise((resolve, reject) => {
     rejectDone = reject;
@@ -40,9 +41,9 @@ export async function playNativeRemoteVoice({ endpoint, items, onitemstart, onit
   });
   done.catch(() => {});
   try {
-    await stopChain;
+    await Promise.race([stopChain, done]);
     if (current !== generation) return await done;
-    listener = await Playback.addListener("playback", (event) => {
+    const registration = Playback.addListener("playback", (event) => {
       if (current !== generation || event.id !== id || active?.id !== id) return;
       if (event.phase === "started") onitemstart?.(event.index);
       else if (event.phase === "ended") onitemend?.(event.index);
@@ -53,13 +54,19 @@ export async function playNativeRemoteVoice({ endpoint, items, onitemstart, onit
           index: event.index,
         }));
       }
+    }).then((handle) => {
+      // Une annulation ne doit pas attendre le pont natif, ni perdre son futur listener.
+      if (disposed) return handle.remove();
+      listener = handle;
     });
+    await Promise.race([registration, done]);
     if (current !== generation) return await done;
-    await Playback.start({
+    await Promise.race([Playback.start({
       id, endpoint, items, accessToken: getSessionToken(), equalizer: loadVoiceEqualizer(),
-    });
+    }), done]);
     return await done;
   } finally {
+    disposed = true;
     if (active?.id === id) active = null;
     if (listener) await listener.remove();
   }

@@ -388,6 +388,10 @@ de lecture ou une interruption par une autre application arrête explicitement l
 bulletin, sans remplacement par la voix locale ; « reprends » repart du passage
 inachevé. Le verrou de veille est borné et renouvelé par phrase, puis libéré à
 l'arrêt ; la lecture ne redémarre pas toute seule après arrêt de l'application.
+L'annulation n'attend pas une réponse tardive du pont Android (enregistrement de
+l'écouteur, démarrage ou arrêt précédent). Les écouteurs arrivés après annulation
+sont retirés ; une fin ou une erreur déjà émise par le lecteur natif ne peut pas
+être remplacée ensuite par un échec tardif de l'accusé de démarrage.
 Ce parcours exige un nouvel APK et reste à vérifier
 sur téléphone verrouillé ; il ne promet pas de lecture hors connexion.
 
@@ -616,6 +620,12 @@ multimédia et la boutique ; les installateurs Windows/portable et l'APK Android
 doivent être reconstruits pour intégrer ces changements.
 
 ### Disposition commune des fenêtres
+
+Les commandes d'ouverture privilégient l'identifiant exact d'un module avant les
+alias partagés : « ouvre les dossiers » ouvre MNÉMOSYNE, « ouvre les documents »
+ouvre THOT et « ouvre le planning » ouvre CHRONOS. Le choix ne dépend pas de
+l'ordre des modules dans le registre ; les commandes qualifiées conservent leur
+destination propre.
 
 Sur PC, les boutons de la barre supérieure sont alignés sur une seule ligne,
 avec une hauteur commune de 44 px et un espacement régulier. Si la largeur ou

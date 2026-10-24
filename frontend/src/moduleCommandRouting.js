@@ -80,6 +80,8 @@ export function findModuleForCommand(raw, items, aliases = {}) {
   if (!query) return { item: null, target };
   const tokens = query.split(/\s+/).filter((word) => word.length > 2 && !STOP_WORDS.has(word));
   if (!tokens.length) return { item: null, target };
+  const exactItem = (items || []).find((item) => normalizeModuleText(item.id) === query);
+  if (exactItem) return { item: exactItem, target };
   const singleTermPriority = { camera: "vision", webcam: "vision", photo: "photo3d" };
   if (tokens.length === 1 && singleTermPriority[query]) {
     const preferred = (items || []).find((item) => item.id === singleTermPriority[query]);
