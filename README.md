@@ -491,6 +491,8 @@ comparaison explicite. Les variables, la provenance des poids et l'attribution
 **CC-BY-4.0** sont détaillées dans
 [`backend/.env.example`](backend/.env.example). Aucun poids n'est téléchargé
 automatiquement ; la protection reste indisponible sans cette configuration.
+Pour Hetzner, la [procédure de préparation sans activation](deploy/hetzner/README.md#10-préparer-la-reconnaissance-du-locuteur-sans-lactiver)
+vérifie le modèle et son chargement sans choisir de seuil ni redémarrer le service.
 L'inférence réelle a été vérifiée sur cinq extraits publics LibriSpeech :
 similarité d'un extrait réservé du même locuteur avec les références 0,895115,
 autre locuteur 0,360959. Cet essai réduit en anglais ne calibre pas le seuil pour

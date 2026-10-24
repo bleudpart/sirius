@@ -59,6 +59,11 @@ if grep -Eq '^playwright([<=>=~! ]|$)' "$BACKEND_DIR/requirements.txt"; then
   sudo -u sirius env PLAYWRIGHT_BROWSERS_PATH="$PLAYWRIGHT_BROWSERS_PATH" "$VENV_DIR/bin/python" -m playwright install chromium
 fi
 
+# Installation explicitement préparée par l'opérateur, jamais activée par un déploiement.
+if [[ -f /etc/sirius/voice-identity.prepared ]]; then
+  bash "$APP_DIR/deploy/hetzner/install-voice-identity-runtime.sh"
+fi
+
 if [[ -n "$FRONTEND_ARCHIVE" ]]; then
   echo "==> Publication du site statique"
   install -d -m 0755 "$WEB_DIR/releases" "$WEB_DIR/assets/static"

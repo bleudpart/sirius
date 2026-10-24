@@ -142,3 +142,92 @@ Plan de retour rapide : remettez les enregistrements DNS `A/AAAA` de `api.sirius
 Pour le site seulement, restaurer les anciennes entrées `@` et `www` vers Render,
 sans modifier `api`. Une version locale antérieure peut aussi être réactivée en
 remplaçant le lien `/var/www/sirius/current` par la version choisie.
+
+## 10. Préparer la reconnaissance du locuteur, sans l'activer
+
+Cette étape est **optionnelle**. Elle ne publie pas le code, ne modifie pas
+`/etc/sirius/sirius.env`, ne choisit aucun seuil et ne redémarre pas le service.
+Vérifier l'empreinte SSH du VPS par un canal fiable avant de s'y connecter ; ne
+pas désactiver `StrictHostKeyChecking`. Le backend comprenant
+`voice_identity_worker.py` et `requirements-voice-identity.txt` doit déjà être
+déployé. Aucun accès SSH ni changement de production n'est nécessaire pour
+préparer et tester ces scripts localement.
+
+Sur le VPS, vérifier l'espace disque et la capacité CPU disponible. Le moteur
+utilise un thread CPU par inférence ; un test de chargement ne garantit pas les
+temps de vérification en charge. Installer explicitement le décodeur si absent :
+
+```bash
+sudo apt-get install ffmpeg
+```
+
+L'opérateur télécharge le modèle officiel en dehors du dépôt :
+
+```bash
+curl --fail --location --proto '=https' --proto-redir '=https' \
+  --output /tmp/wespeaker_en_voxceleb_resnet34_LM.onnx \
+  https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/wespeaker_en_voxceleb_resnet34_LM.onnx
+bash /opt/sirius/deploy/hetzner/prepare-voice-identity.sh \
+  --check /tmp/wespeaker_en_voxceleb_resnet34_LM.onnx
+sudo bash /opt/sirius/deploy/hetzner/prepare-voice-identity.sh \
+  --prepare /tmp/wespeaker_en_voxceleb_resnet34_LM.onnx
+```
+
+`--check` est en lecture seule : il vérifie les fichiers requis, ffmpeg et
+l'empreinte officielle, pas l'inférence. `--prepare` installe le runtime optionnel
+dans le venv existant, copie le modèle vérifié dans
+`/var/lib/sirius/models/voice-identity/` (root:sirius, lecture seule pour le service),
+puis charge réellement le modèle sous l'utilisateur `sirius`, sans audio.
+Une empreinte incorrecte ou un modèle installé différent provoque un arrêt
+explicite. Un échec ultérieur peut laisser le runtime ou le modèle installés :
+aucun retour arrière destructif ni activation n'est effectué.
+
+Le marqueur root `/etc/sirius/voice-identity.prepared` n'est créé qu'après réussite.
+Il permet à `deploy.sh` de conserver les dépendances optionnelles lors des prochains
+déploiements ou d'une recréation du venv. Il ne rend **pas** la protection active.
+Le runtime est réinstallé si son manifeste change ou si son marqueur dans le venv
+est absent ; l'absence de sherpa malgré un marqueur provoque un échec explicite.
+Ces scripts n'installent rien sur un serveur qui n'a pas été préparé explicitement.
+
+Conserver l'attribution WeSpeaker (Wang et al., ICASSP 2023) et la licence des poids
+**CC-BY-4.0** ; provenance, licence et SHA-256 attendu sont dans
+[`backend/.env.example`](../../backend/.env.example). Après réussite, supprimer
+uniquement le fichier téléchargé identifié dans `/tmp` s'il n'est plus utile.
+
+### Activation : étape distincte
+
+L'opérateur doit ensuite renseigner les variables `SIRIUS_VOICE_IDENTITY_*` dans
+`/etc/sirius/sirius.env` : chemin absolu du modèle préparé, SHA-256 attendu,
+ffmpeg et **seuil explicite à calibrer**, puis `ENABLED=1` et redémarrage contrôlé.
+Ne pas recopier un seuil d'un essai anglais comme garantie anti-TV en français.
+L'API authentifiée `/api/voice-identity/status` doit ensuite annoncer `ready=true`.
+`/api/health` seul ne prouve pas la disponibilité du moteur vocal.
+
+Dans l'application, le titulaire donne son consentement puis enregistre trois
+nouvelles références de 3 à 15 secondes dans « Ma voix et ma diction ». Valider
+ensuite sa propre voix, une autre voix et la télévision, sur les vrais microphones.
+Le système ne constitue pas une protection anti-rejeu d'un enregistrement de sa
+voix. L'écoute automatique reste bloquée si l'identité est incertaine ou le moteur
+indisponible ; l'appui volontaire pour parler reste le secours prévu.
+
+Pour désactiver : `SIRIUS_VOICE_IDENTITY_ENABLED=0` puis redémarrage contrôlé.
+Ne pas effacer les empreintes des comptes ou les modèles comme méthode d'arrêt.
+Retirer le marqueur opérateur ne désinstalle rien et ne désactive pas le moteur :
+cela retire seulement la gestion optionnelle des dépendances au déploiement.
+
+### Tests locaux de la préparation
+
+Depuis la racine du dépôt :
+
+```powershell
+node --test scripts\voice-identity-deploy.test.mjs
+```
+
+Les tests utilisent Bash (Git for Windows par défaut sous Windows, surcharge
+possible avec `SIRIUS_TEST_BASH`) et des répertoires temporaires isolés.
+Ils simulent sudo, l'installation pip, les permissions et le chargement du modèle ;
+ils ne prouvent donc ni une installation Linux réelle, ni la précision biométrique.
+Ils vérifient notamment les refus avant installation, la copie vérifiée, les
+échecs du moteur, l'idempotence, le maintien du runtime optionnel et l'absence
+d'activation ou de redémarrage du service. Un test vérifie aussi le refus d'un
+faux modèle avec la véritable commande SHA-256.
