@@ -6,7 +6,7 @@
  * pour rester compatible avec tout le code existant dans App.js.
  *
  * Presets :
- *   "epique"    — public/audio/ambiance.mp3
+ *   "epique"    — thème Zirius (identifiant conservé pour les réglages existants)
  *   "gregorien" — public/audio/gregorien.mp3
  *
  * (Une version précédente synthétisait un drone via Web Audio API — remplacée ici par la
@@ -15,7 +15,7 @@
  */
 
 const TRACKS = {
-  epique: "/audio/ambiance.mp3",
+  epique: "/audio/ambiance.mp3?theme=zirius-1",
   gregorien: "/audio/gregorien.mp3",
 };
 

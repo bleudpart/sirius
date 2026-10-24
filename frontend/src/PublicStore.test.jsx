@@ -5,9 +5,13 @@ import PublicStore from "./PublicStore";
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 let container;
 let root;
+let pauseMedia;
+let playMedia;
 const originalFetch = global.fetch;
 
 beforeEach(() => {
+  pauseMedia = jest.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+  playMedia = jest.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -22,6 +26,8 @@ afterEach(() => {
   act(() => root.unmount());
   container.remove();
   global.fetch = originalFetch;
+  pauseMedia.mockRestore();
+  playMedia.mockRestore();
 });
 
 test("offer selection updates the accessible state and checkout summary", () => {
@@ -32,6 +38,36 @@ test("offer selection updates the accessible state and checkout summary", () => 
   expect(plans[2].getAttribute("aria-pressed")).toBe("false");
   expect(plans[3].getAttribute("aria-pressed")).toBe("true");
   expect(container.querySelector(".public-order-summary").textContent).toContain("Lifetime269 €");
+});
+
+test("the store starts the looping Zirius theme softly and pauses it for the demo", () => {
+  const audio = container.querySelector("#public-theme-player");
+  expect(audio.getAttribute("src")).toBe("/audio/ambiance.mp3?theme=zirius-1");
+  expect(audio.controls).toBe(true);
+  expect(audio.loop).toBe(true);
+  expect(audio.autoplay).toBe(true);
+  expect(audio.preload).toBe("auto");
+  expect(playMedia).toHaveBeenCalledTimes(1);
+  expect(audio.volume).toBe(0.12);
+  const pause = jest.spyOn(audio, "pause").mockImplementation(() => {});
+  act(() => container.querySelector("video").dispatchEvent(new Event("play", { bubbles: true })));
+  expect(pause).toHaveBeenCalledTimes(1);
+});
+
+test("blocked autoplay is explained and manual playback clears the notice", async () => {
+  act(() => root.unmount());
+  root = createRoot(container);
+  playMedia.mockRejectedValueOnce(new DOMException("Gesture required", "NotAllowedError"));
+  await act(async () => root.render(<PublicStore />));
+  expect(container.querySelector('[role="status"]').textContent).toContain("bloque le son automatique");
+  act(() => container.querySelector("audio").dispatchEvent(new Event("play")));
+  expect(container.textContent).not.toContain("bloque le son automatique");
+});
+
+test("an unavailable music file is reported without blocking the store", () => {
+  act(() => container.querySelector("audio").dispatchEvent(new Event("error")));
+  expect(container.querySelector('[role="alert"]').textContent).toContain("musique est indisponible");
+  expect(container.querySelectorAll(".public-plan")).toHaveLength(4);
 });
 
 test.each([["standard", "69"], ["pro", "135"], ["lifetime", "269"]])(

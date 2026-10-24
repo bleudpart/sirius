@@ -379,3 +379,8 @@
 .public-trial { max-width:1180px; margin:40px auto; padding:24px; border:1px solid var(--store-line); border-radius:12px; background:rgba(8,29,45,.7); }
 .public-trial p,.public-trial small { line-height:1.7; }
 .public-trial small { display:block; }
+.public-theme-audio { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 12px 0; padding: 12px 16px; border: 1px solid #d7bc7540; border-radius: 12px; background: #091521; color: #f3dfb6; }
+.public-theme-audio label { font-size: 14px; }
+.public-theme-audio audio { width: 280px; max-width: 100%; min-width: 0; }
+.public-theme-audio small { color: #bac6ce; }
+.public-theme-audio [role="alert"] { flex-basis: 100%; color: #ffb8b8; margin: 0; }

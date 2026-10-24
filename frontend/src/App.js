@@ -4453,7 +4453,7 @@ function App() {
       na.play().catch(() => {});
       ambientRef.current = na;
       window.__siriusAmbient = na;
-      const m = choice === "gregorien" ? "Chant grégorien en ambiance." : "Musique épique en ambiance.";
+      const m = choice === "gregorien" ? "Chant grégorien en ambiance." : "Thème Zirius en ambiance.";
       setStatus("speaking"); setText(m); speakOut(m);
       return;
     }
@@ -4802,7 +4802,7 @@ function App() {
       ambientRef.current = na;
       window.__siriusAmbient = na;
       setStatus("speaking");
-      const m = choice === "gregorien" ? "Chant grégorien en ambiance." : "Musique épique en ambiance.";
+      const m = choice === "gregorien" ? "Chant grégorien en ambiance." : "Thème Zirius en ambiance.";
       setText(m); setStatus("speaking"); speakOut(m);
       return;
     }

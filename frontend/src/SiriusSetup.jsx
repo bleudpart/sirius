@@ -647,7 +647,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
             </div>
             <label className="setup-label"><Music size={13} style={{ marginRight: 6, verticalAlign: "-2px" }} />Musique d'ambiance du HUD</label>
             <select className="setup-input" value={ambientTrack} onChange={(e) => setAmbientTrack(e.target.value)} data-testid="setup-ambient-track">
-              <option value="epique">Épique — Oedipus at Colonus</option>
+              <option value="epique">Thème Zirius — ambiance en boucle</option>
               <option value="gregorien">Chant grégorien</option>
               <option value="none">Aucune musique</option>
             </select>

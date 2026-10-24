@@ -24,6 +24,9 @@ const MATRIX_ACTIONS = [
 
 export default function PublicStore() {
   const [mythWindowOpen, setMythWindowOpen] = useState(false);
+  const themeAudioRef = useRef(null);
+  const [themeAudioError, setThemeAudioError] = useState("");
+  const [themeAutoplayBlocked, setThemeAutoplayBlocked] = useState(false);
   const mythDialogRef = useRef(null);
   const mythCloseButtonRef = useRef(null);
   const mythOpenerRef = useRef(null);
@@ -39,6 +42,26 @@ export default function PublicStore() {
   const selectedPlan = PLANS.find((plan) => plan.id === selected);
   const checkoutSessionId = new URLSearchParams(window.location.search).get("session_id");
   const paymentSucceeded = new URLSearchParams(window.location.search).get("payment") === "success";
+
+  useEffect(() => {
+    const audio = themeAudioRef.current;
+    let active = true;
+    if (audio) {
+      audio.volume = 0.12;
+      audio.play().catch((cause) => {
+        if (!active || cause.name === "AbortError") return;
+        if (cause.name === "NotAllowedError") setThemeAutoplayBlocked(true);
+        else setThemeAudioError("La musique n'a pas pu démarrer. Utilisez le lecteur pour réessayer.");
+      });
+    }
+    const pauseHidden = () => { if (document.hidden) audio?.pause(); };
+    document.addEventListener("visibilitychange", pauseHidden);
+    return () => {
+      active = false;
+      document.removeEventListener("visibilitychange", pauseHidden);
+      audio?.pause();
+    };
+  }, []);
 
   useEffect(() => {
     if (!mythWindowOpen) return undefined;
@@ -169,6 +192,18 @@ export default function PublicStore() {
           <a href="/aide-emails.html">Aide</a>
         </nav>
       </header>
+      <div className="public-theme-audio" aria-label="Musique de la boutique">
+        <label htmlFor="public-theme-player">Thème Zirius · musique d'ambiance</label>
+        <audio id="public-theme-player" ref={themeAudioRef} controls loop autoPlay preload="auto"
+          aria-label="Écouter le thème Zirius" src="/audio/ambiance.mp3?theme=zirius-1"
+          onPlay={() => { setThemeAutoplayBlocked(false); setThemeAudioError(""); }}
+          onError={() => setThemeAudioError("La musique est indisponible. Rechargez la page pour réessayer.")}>
+          Votre navigateur ne prend pas en charge la lecture audio.
+        </audio>
+        <small>Lecture automatique · volume initial doux · en boucle · pause et volume dans le lecteur</small>
+        {themeAutoplayBlocked && <p role="status">Votre navigateur bloque le son automatique. Appuyez sur Lecture dans le lecteur pour lancer le thème.</p>}
+        {themeAudioError && <p role="alert">{themeAudioError}</p>}
+      </div>
       <div className="public-showcase">
       <section className="public-hero">
         <p className="public-eyebrow">Votre assistant de travail</p>
@@ -190,7 +225,8 @@ export default function PublicStore() {
       </div>
       <section className="public-demo public-workflow" id="demonstration" aria-labelledby="public-demo-title">
         <h2 id="public-demo-title" className="public-section-title">Voyez ΣIRIUS en situation</h2>
-        <video controls preload="none" poster="/demo/sirius-dossiers.png" aria-label="Démonstration de ΣIRIUS avec des données fictives">
+        <video controls preload="none" poster="/demo/sirius-dossiers.png" aria-label="Démonstration de ΣIRIUS avec des données fictives"
+          onPlay={() => themeAudioRef.current?.pause()}>
           <source src="/demo/sirius-demo-store.mp4" type="video/mp4" />
           <track kind="subtitles" src="/demo/sirius-demo-store.vtt" srcLang="fr" label="Français" default />
           Votre navigateur ne lit pas cette vidéo. <a href="/demo/sirius-demo-store.mp4">Télécharger la démonstration</a>

@@ -4,6 +4,21 @@
 Assistant vocal personnel avec HUD futuriste style « Iron Man ».
 Frontend **React** + Backend **FastAPI** (Python), packagé en application Windows autonome via **Electron**.
 
+### Musique d'ambiance
+
+L'ambiance principale utilise le morceau « Zirius themes » fourni par Daniel,
+converti en MP3 stéréo (environ 21 secondes), joué en boucle après le démarrage.
+Le choix « Thème Zirius » remplace l'ancienne piste épique sans réinitialiser le
+volume ni les préférences existantes. Le chant grégorien et le choix sans musique
+restent disponibles. Sur navigateur, une interaction peut être nécessaire pour
+autoriser la lecture audio.
+La page boutique propose aussi ce thème avec un lecteur audio accessible et une
+tentative de lecture automatique dès l'ouverture. Si le navigateur bloque le son,
+un message invite à appuyer sur Lecture ; aucune interaction n'est détournée.
+Le visiteur peut arrêter la musique ou régler son volume dans le lecteur. La lecture boucle à
+volume initial de 12 %, se coupe lors du lancement de la démonstration vidéo ou
+du passage de l'onglet en arrière-plan, et peut être relancée manuellement.
+
 ### Habillage Panthéon
 
 Le thème commun `frontend/src/pantheonTheme.css` est chargé après les contrats de
