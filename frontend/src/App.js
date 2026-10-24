@@ -7265,7 +7265,9 @@ function App() {
         }}
       />
       {showVision && sysMode !== "safe" && (
-        <VisionModule onClose={() => { setShowVision(false); setVisionAuto(false); }} onSpeak={(m) => speakRef.current(m)} keys={keys} autoAnalyze={visionAuto} />
+        <VisionModule onClose={() => { setShowVision(false); setVisionAuto(false); }}
+          onOpenFaceId={() => { setShowVision(false); setVisionAuto(false); setShowFaceId(true); }}
+          onSpeak={(m) => speakRef.current(m)} keys={keys} autoAnalyze={visionAuto} />
       )}
       {showScripts && <ScriptInstaller onClose={() => setShowScripts(false)} onSpeak={(m) => speakRef.current(m)} />}
       {showLocus && <LocusPanel onClose={() => { setShowLocus(false); setLocusQuery(""); setLocusRoute(null); }} onSpeak={(m) => speakRef.current(m)} keys={keys} initialAddress={locusQuery} initialRoute={locusRoute} />}

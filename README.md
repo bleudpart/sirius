@@ -496,6 +496,29 @@ La reconnaissance faciale locale dispose d'un aperçu caméra élargi sur ordina
 et d'un cadre vertical 4:5 sur téléphone, avec un guide de visage plus grand.
 Les commandes restent sous l'aperçu sur petit écran ; la capture et le traitement
 biométrique locaux restent inchangés.
+Dans **Vision caméra**, un accès **Reconnaissance faciale — FACE ID** permet
+d'ouvrir ce module distinct. La caméra d'analyse est libérée avant la bascule :
+l'analyse d'image et la reconnaissance locale du visage ne sont pas confondues.
+Dans **Architecture & Intérieur → INTÉRIEUR**, **Photographier le lieu à aménager**
+ouvre la caméra arrière si disponible. La capture JPEG (1600 pixels maximum)
+reste en mémoire, peut être retirée et n'est envoyée à l'analyse d'aménagement
+qu'après **Proposer un aménagement**. Elle est identifiée comme l'état réel du lieu,
+pas comme une inspiration à reproduire. Un plan et des dimensions renseignées dans
+STRUCTURE restent nécessaires au placement du mobilier ; une photo n'est pas un
+relevé métrique ni une validation de faisabilité structurelle ou réglementaire.
+Ce parcours utilise une prise de vue ponctuelle, pas un flux vidéo analysé en continu.
+La reconnaissance faciale reste indépendante.
+Après une proposition, **Mes projets · Avant / Après** permet de la nommer puis
+de l'enregistrer dans **Médiathèque → Architecture - Avant-Apres**. Le fichier JSON
+contient la photo réelle jointe, le plan avant, le plan proposé, les envies,
+les conseils, l'éclairage et les achats proposés, sans les clés API.
+**Ouvrir mes projets enregistrés**, dans la même fenêtre, recharge ces fichiers
+depuis le stockage SIRIUS authentifié du compte, même après fermeture de la fenêtre.
+L'emplacement affiché est un dossier de la médiathèque, pas un chemin du téléphone.
+La comparaison présente **AVANT · Sans IA** et **APRÈS · Proposition IA** :
+l'après est une simulation sur plan avec recommandations, pas une photographie
+retouchée. Une nouvelle proposition peut être enregistrée comme une nouvelle version
+sans écraser les précédentes. Les projets sont aussi téléchargeables depuis la médiathèque.
 
 Sans modèle serveur disponible, sans profil ou en cas d'erreur, l'écoute continue
 est bloquée : aucun repli vers une commande non vérifiée. Une voix refusée n'est

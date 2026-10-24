@@ -1,6 +1,6 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ShieldOff, BatteryLow, Camera, X, Loader2, ScanEye, Stethoscope, Power } from "lucide-react";
+import { ShieldOff, BatteryLow, Camera, X, Loader2, ScanEye, ScanFace, Stethoscope, Power } from "lucide-react";
 import "./SystemModes.css";
 import { progress } from "@/SiriusProgress";
 
@@ -79,7 +79,7 @@ export function FrugalWatcher({ active, manual, onAuto }) {
   return null;
 }
 
-export function VisionModule({ onClose, onSpeak, keys, autoAnalyze }) {
+export function VisionModule({ onClose, onSpeak, keys, autoAnalyze, onOpenFaceId }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const autoRanRef = useRef(false);
@@ -155,6 +155,14 @@ export function VisionModule({ onClose, onSpeak, keys, autoAnalyze }) {
         <span className="vision-title"><ScanEye size={13} /> VISION ΣIRIUS</span>
         <button className="vision-icon-btn" onClick={onClose} data-testid="vision-close-btn"><X size={14} /></button>
       </div>
+      {onOpenFaceId && <div className="vision-faceid-access">
+        <p>L'analyse caméra décrit une image. Pour enregistrer ou reconnaître votre visage, ouvrez FACE ID.</p>
+        <button type="button" className="vision-btn" onClick={() => {
+          streamRef.current?.getTracks().forEach((track) => track.stop());
+          streamRef.current = null;
+          onOpenFaceId();
+        }} data-testid="vision-faceid-btn"><ScanFace size={16} /> Reconnaissance faciale — FACE ID</button>
+      </div>}
       {error ? (
         <p className="vision-error" data-testid="vision-error">{error}</p>
       ) : (

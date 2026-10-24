@@ -2,6 +2,12 @@ import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import FloorPlanPanel, { readImportFile } from "./FloorPlan";
 
+jest.mock("./InteriorCamera", () => function Camera({ onCapture }) {
+  return <button data-testid="camera-test-capture" onClick={() => onCapture({
+    dataUrl: "data:image/jpeg;base64,cGhvdG8=", name: "Lieu.jpg", pdf: false, realPlace: true,
+  })}>Capturer</button>;
+});
+
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const PLAN = {
@@ -136,4 +142,36 @@ test("refuse les formats non pris en charge", async () => {
   const big = new File(["x"], "gros.pdf", { type: "application/pdf" });
   Object.defineProperty(big, "size", { value: 13 * 1024 * 1024 });
   await expect(readImportFile(big)).rejects.toThrow(/12 Mo/);
+});
+
+test("a real-place photo requires explicit proposal and is distinguished from inspiration", async () => {
+  localStorage.setItem("sirius_floorplan", JSON.stringify(PLAN));
+  global.fetch.mockReturnValueOnce(jsonResponse({ piece: "Séjour", mobilier: [], conseils: ["Vérifier les dimensions sur place."], achats: [] }));
+  const { q, container } = await render(<FloorPlanPanel keys={{}} initialMode="interieur" onClose={() => {}} />);
+  await click(q("interior-open-camera"));
+  await click(q("camera-test-capture"));
+  expect(global.fetch).not.toHaveBeenCalled();
+  expect(container.textContent).toContain("Lieu à aménager / rénover");
+  expect(q("camera-test-capture")).toBeNull();
+  await click(q("interior-propose"));
+  const body = JSON.parse(global.fetch.mock.calls[0][1].body);
+  expect(body.photo).toBe("data:image/jpeg;base64,cGhvdG8=");
+  expect(body.envies).toContain("lieu réel à aménager ou rénover");
+  expect(body.envies).toContain("sans déduire de dimensions exactes");
+  expect(body.plan).toMatchObject({ titre: "Studio" });
+  global.fetch.mockReturnValueOnce(jsonResponse({ id: "p1", original_filename: "studio.json" }))
+    .mockReturnValueOnce(jsonResponse({ ok: true }));
+  await click(q("interior-save-project"));
+  const stored = global.fetch.mock.calls[1][1].body.get("file");
+  const storedText = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsText(stored);
+  });
+  const project = JSON.parse(storedText);
+  expect(project.before.photo.dataUrl).toBe(body.photo);
+  expect(project.before.plan.mobilier).toEqual(PLAN.mobilier);
+  expect(project.after.plan.mobilier).not.toEqual(PLAN.mobilier);
+  expect(project.after.proposal.conseils).toEqual(["Vérifier les dimensions sur place."]);
+  expect(project).not.toHaveProperty("keys");
+  expect(container.textContent).toContain("Enregistré : Médiathèque > Architecture - Avant-Apres");
 });

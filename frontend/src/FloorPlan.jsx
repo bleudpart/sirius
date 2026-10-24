@@ -7,11 +7,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   X, Ruler, Download, FileDown, Loader2, Mic, Square, ImagePlus, FileText, Building2, Sofa,
-  Sparkles, Trash2, Lightbulb, PaintBucket, Palette,
+  Sparkles, Trash2, Lightbulb, PaintBucket, Palette, Camera,
 } from "lucide-react";
 import { planToSvg2D } from "@/floorplanSvg";
 import { API_BASE_URL } from "@/lib/api";
 import { loadApiKeys } from "@/apiKeyStorage";
+import InteriorCamera from "./InteriorCamera";
+import InteriorProjects from "./InteriorProjects";
 import {
   AMBIANCES, PHOTO_AMBIANCE_ID, applyInteriorProposal, computeInteriorTotals, computeRoomFinishes,
   interiorReportHtml, loadInterior, mergePurchases, parseInteriorRequest, photoAmbiance, planKey,
@@ -427,7 +429,8 @@ function InteriorStudio({ plan, interior, setInterior, finishes, totals, envies,
             </button>
           </div>
         </div>
-        <AttachmentChip file={photo} label="Inspiration" onRemove={() => setPhoto(null)} />
+        <AttachmentChip file={photo} label={photo?.realPlace ? "Lieu à aménager / rénover" : "Inspiration"} onRemove={() => setPhoto(null)} />
+        {photo?.realPlace && <p>La photo montre l'existant. Précisez vos transformations dans Vos envies. Les dimensions et la faisabilité des travaux doivent être vérifiées sur place.</p>}
         <button className="fp-propose" onClick={onPropose} disabled={busy} data-testid="interior-propose">
           {busy ? <><Loader2 size={15} className="fp-spin" /> ΣIRIUS aménage…</> : <><Sofa size={15} /> PROPOSER UN AMÉNAGEMENT · {roomName}</>}
         </button>
@@ -528,6 +531,8 @@ export default function FloorPlanPanel({ keys, initialPrompt, initialMode, onClo
   const [interior, setInterior] = useState(() => loadInterior(loadPlan()));
   const [envies, setEnvies] = useState(initialMode === "interieur" ? initialPrompt || "" : "");
   const [photo, setPhoto] = useState(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [projectDraft, setProjectDraft] = useState(null);
   const svgRef = useRef(null);
   const fileRef = useRef(null);
   const importTarget = useRef("plan");
@@ -535,7 +540,7 @@ export default function FloorPlanPanel({ keys, initialPrompt, initialMode, onClo
 
   const setPlan = useCallback((next) => { setPlanState(next); storePlan(next); }, []);
   const switchView = useCallback((v) => { setView(v); localStorage.setItem("sirius_plan_view", v); }, []);
-  const switchMode = useCallback((m) => { setMode(m); setError(""); localStorage.setItem(MODE_KEY, m); }, []);
+  const switchMode = useCallback((m) => { setCameraOpen(false); setMode(m); setError(""); localStorage.setItem(MODE_KEY, m); }, []);
 
   useEffect(() => {
     setInterior((s) => (s.planKey === planKey(plan) ? s : loadInterior(plan)));
@@ -591,13 +596,24 @@ export default function FloorPlanPanel({ keys, initialPrompt, initialMode, onClo
         body: JSON.stringify({
           plan, piece: pieceName,
           ambiance: photo ? "" : `${style.nom} — ${style.accroche}. Matières : ${style.matieres.join(", ")}.`,
-          envies: text, photo: photo?.dataUrl || "", keys: keys || {},
+          envies: photo?.realPlace
+            ? `La photo jointe montre le lieu réel à aménager ou rénover, pas une inspiration à reproduire. Distingue les observations visibles des hypothèses. Propose des transformations adaptées à la demande, sans déduire de dimensions exactes ni valider la structure, les réseaux ou la sécurité depuis la photo. Signale les vérifications professionnelles nécessaires. Demande : ${text}`
+            : text,
+          photo: photo?.dataUrl || "", keys: keys || {},
         }),
       });
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) throw new Error(data.detail || "Aménagement impossible");
       const target = data.piece || pieceName;
-      setPlan(applyInteriorProposal(plan, target, data.mobilier || []));
+      const afterPlan = applyInteriorProposal(plan, target, data.mobilier || []);
+      setProjectDraft({
+        format: "sirius-interior-project", version: 1,
+        name: `${plan.titre || "Projet intérieur"} — ${target}`,
+        createdAt: new Date().toISOString(), request: text,
+        before: { plan, photo: photo?.realPlace ? photo : null },
+        after: { plan: afterPlan, proposal: { ...data, mobilier: data.mobilier || [], conseils: data.conseils || [] } },
+      });
+      setPlan(afterPlan);
       setInterior((s) => ({
         ...s,
         piece: target,
@@ -761,12 +777,23 @@ export default function FloorPlanPanel({ keys, initialPrompt, initialMode, onClo
                     : <FloorPlanSVG plan={plan} svgRef={svgRef} />)
                 : <div className="fp-empty">Décrivez, dictez ou importez un plan (photo, scan, PDF)… ΣIRIUS trace le plan coté à l'échelle, en couleur, en rendu pro ou en volume 3D.</div>}
           </div>
+          {interiorMode && <div className="fp-interior-tools">
+          <section className="fp-card" aria-label="Prise de vue du lieu">
+            <button type="button" className="fp-propose" disabled={busy} onClick={() => setCameraOpen(true)} data-testid="interior-open-camera"><Camera size={18} />PHOTOGRAPHIER LE LIEU À AMÉNAGER</button>
+            <p>Prenez une photo sur place, vérifiez-la puis demandez une proposition. Il ne s'agit pas d'une analyse vidéo continue ni d'un relevé de mesures.</p>
+            {!hasPlan && <p>Ajoutez d'abord les dimensions et le plan dans STRUCTURE pour obtenir une proposition d'aménagement à partir de cette photo.</p>}
+            {cameraOpen && <InteriorCamera onClose={() => setCameraOpen(false)} onCapture={(image) => { setPhoto(image); setCameraOpen(false); }} />}
+            {photo?.realPlace && <img src={photo.dataUrl} alt="Photo du lieu avant aménagement" style={{ width: "100%", maxHeight: 360, objectFit: "contain" }} />}
+            {!hasPlan && <AttachmentChip file={photo} label="Lieu à aménager / rénover" onRemove={() => setPhoto(null)} />}
+          </section>
+          {interiorMode && <InteriorProjects draft={projectDraft} renderPlan={(savedPlan) => <FloorPlanSVG plan={savedPlan} />} />}
           {interiorMode && hasPlan && (
             <InteriorStudio plan={plan} interior={interior} setInterior={setInterior} finishes={finishes} totals={totals}
               envies={envies} setEnvies={setEnvies} photo={photo} setPhoto={setPhoto} busy={busy}
               onPropose={() => propose()} onImport={() => openImport("photo")} onExport={exportInterior}
               dictation={interiorDictation} />
           )}
+          </div>}
           {!interiorMode && geo && (
             <aside className="fp-side">
               <div className="fp-side-title">{plan.titre}</div>

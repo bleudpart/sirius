@@ -143,3 +143,6 @@
 }
 .vision-spin { animation: visionSpin 1s linear infinite; }
 @keyframes visionSpin { to { transform: rotate(360deg); } }
+.vision-faceid-access { margin: 12px 0; padding: 12px; border: 1px solid #d7bc754d; border-radius: 12px; background: #091521; }
+.vision-faceid-access p { margin: 0 0 10px; color: #d5e1e8; font-size: 13px; line-height: 1.5; }
+.vision-faceid-access .vision-btn { width: 100%; min-height: 44px; white-space: normal; color: #f3dfb6; }

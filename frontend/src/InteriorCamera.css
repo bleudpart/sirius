@@ -1,0 +1,23 @@
+.interior-camera { padding: 16px; margin: 12px 0; border: 1px solid #d7bc7555; border-radius: 16px; background: #091521; color: #edf5f8; }
+.interior-camera header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.interior-camera h3 { margin: 0; color: #f3dfb6; }
+.interior-camera p { font-size: 13px; line-height: 1.5; }
+.interior-camera video { display: block; width: 100%; max-height: 55dvh; aspect-ratio: 4 / 3; object-fit: contain; background: #030b12; border-radius: 12px; }
+.interior-camera button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 10px 14px; border: 1px solid #d7bc7555; border-radius: 10px; background: #142c3c; color: #f3dfb6; cursor: pointer; }
+.interior-camera > button { width: 100%; margin-top: 12px; }
+.interior-camera button:disabled { opacity: .5; cursor: default; }
+.interior-camera [role="alert"] { color: #ffb8b8; }
+.interior-projects { min-width: 0; overflow-wrap: anywhere; }
+.fp-interior-tools { width: 440px; flex: 0 0 440px; min-width: 0; overflow-y: auto; }
+.fp-interior-tools .fp-studio { width: auto; overflow: visible; padding: 0; }
+.interior-projects h3, .interior-projects h4 { color: #f3dfb6; }
+.interior-projects input { display: block; box-sizing: border-box; width: 100%; padding: 10px; color: #edf5f8; background: #091521; border: 1px solid #d7bc7555; border-radius: 8px; }
+.interior-projects button { min-height: 44px; padding: 10px; margin: 4px; border: 1px solid #d7bc7555; border-radius: 8px; background: #142c3c; color: #f3dfb6; cursor: pointer; overflow-wrap: anywhere; max-width: 100%; }
+.interior-projects button:disabled { opacity: .5; cursor: default; }
+.interior-projects [role="alert"] { color: #ffb8b8; }
+.interior-project-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.interior-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.interior-comparison article { min-width: 0; padding: 12px; border: 1px solid #d7bc7540; border-radius: 12px; }
+.interior-comparison img, .interior-comparison svg { display: block; width: 100%; max-height: 400px; object-fit: contain; }
+@media (max-width: 760px) { .interior-comparison { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 1100px) { .fp-body-interior { flex-direction: column; overflow-y: auto; } .fp-interior-tools { width: auto; flex: 0 0 auto; overflow: visible; } }
