@@ -15,7 +15,7 @@
  */
 
 const TRACKS = {
-  epique: "/audio/zirius-loop.wav",
+  epique: "/audio/zirius-loop.wav?revision=2",
   gregorien: "/audio/gregorien.mp3",
 };
 

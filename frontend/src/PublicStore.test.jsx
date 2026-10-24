@@ -42,7 +42,7 @@ test("offer selection updates the accessible state and checkout summary", () => 
 
 test("the store starts the looping Zirius theme softly and pauses it for the demo", () => {
   const audio = container.querySelector("#public-theme-player");
-  expect(audio.getAttribute("src")).toBe("/audio/zirius-loop.wav");
+  expect(audio.getAttribute("src")).toBe("/audio/zirius-loop.wav?revision=2");
   expect(audio.controls).toBe(false);
   expect(audio.hidden).toBe(true);
   expect(audio.loop).toBe(true);

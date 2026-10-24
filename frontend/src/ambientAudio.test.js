@@ -20,7 +20,7 @@ test("the default and saved epic preset use the Zirius theme in a loop", async (
     engine.volume = 0.2;
     await engine.play();
     const audio = instances[instances.length - 1];
-    expect(audio.src).toBe("/audio/zirius-loop.wav");
+    expect(audio.src).toBe("/audio/zirius-loop.wav?revision=2");
     expect(audio.loop).toBe(true);
     expect(audio.volume).toBe(0.2);
     engine.setMood("speaking");
@@ -58,7 +58,10 @@ test("the loop asset is stereo PCM with no silent window around its circular spl
     if (tag === "data") pcm = wav.subarray(offset + 8, offset + 8 + size);
     offset += 8 + size + size % 2;
   }
-  expect(pcm.length / (44100 * 4)).toBeCloseTo(19.3333, 3);
+  const frames = pcm.length / 4;
+  expect(frames).toBe(823200);
+  expect(frames / 29400).toBe(28);
+  expect((frames / 29400) % 4).toBe(0);
   const windowBytes = 441 * 4;
   for (const segment of [pcm.subarray(0, windowBytes), pcm.subarray(pcm.length - windowBytes)]) {
     let energy = 0;
