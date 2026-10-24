@@ -7,15 +7,19 @@ Frontend **React** + Backend **FastAPI** (Python), packagé en application Windo
 ### Musique d'ambiance
 
 L'ambiance principale utilise le morceau « Zirius themes » fourni par Daniel,
-converti en MP3 stéréo (environ 21 secondes), joué en boucle après le démarrage.
+préparé en WAV PCM stéréo avec un raccord circulaire par fondu croisé linéaire de
+2 secondes (boucle d'environ 19,3 secondes), joué en boucle après le démarrage.
+Le WAV évite le délai d'encodage MP3 au raccord ; le lecteur utilise
+`public/audio/zirius-loop.wav`, distinct de l'original MP3 utilisé ailleurs.
 Le choix « Thème Zirius » remplace l'ancienne piste épique sans réinitialiser le
 volume ni les préférences existantes. Le chant grégorien et le choix sans musique
 restent disponibles. Sur navigateur, une interaction peut être nécessaire pour
 autoriser la lecture audio.
 La page boutique propose aussi ce thème avec un lecteur audio accessible et une
 tentative de lecture automatique dès l'ouverture. Si le navigateur bloque le son,
-un message invite à appuyer sur Lecture ; aucune interaction n'est détournée.
-Le visiteur peut arrêter la musique ou régler son volume dans le lecteur. La lecture boucle à
+un petit bouton « Activer le son » permet de démarrer la musique ; aucune interaction n'est détournée.
+Le lecteur natif est masqué : seul un bouton discret « Couper le son » / « Activer le son »
+reste visible et reflète les événements réels de lecture et de pause. La lecture boucle à
 volume initial de 12 %, se coupe lors du lancement de la démonstration vidéo ou
 du passage de l'onglet en arrière-plan, et peut être relancée manuellement.
 

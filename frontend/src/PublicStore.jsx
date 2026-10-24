@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, ShieldCheck, ArrowRight, Mic, FolderOpen, Mail, UserRound, Zap, Star, Search, ChartNoAxesCombined, FileText } from "lucide-react";
+import { Check, ShieldCheck, ArrowRight, Mic, FolderOpen, Mail, UserRound, Zap, Star, Search, ChartNoAxesCombined, FileText, Volume2, VolumeX } from "lucide-react";
 import PublicLegal from "./PublicLegal";
 import "./PublicStore.css";
 import "./publicPantheon.css";
@@ -27,6 +27,7 @@ export default function PublicStore() {
   const themeAudioRef = useRef(null);
   const [themeAudioError, setThemeAudioError] = useState("");
   const [themeAutoplayBlocked, setThemeAutoplayBlocked] = useState(false);
+  const [themePlaying, setThemePlaying] = useState(false);
   const mythDialogRef = useRef(null);
   const mythCloseButtonRef = useRef(null);
   const mythOpenerRef = useRef(null);
@@ -51,7 +52,7 @@ export default function PublicStore() {
       audio.play().catch((cause) => {
         if (!active || cause.name === "AbortError") return;
         if (cause.name === "NotAllowedError") setThemeAutoplayBlocked(true);
-        else setThemeAudioError("La musique n'a pas pu démarrer. Utilisez le lecteur pour réessayer.");
+        else setThemeAudioError("La musique n'a pas pu démarrer. Appuyez sur Activer le son pour réessayer.");
       });
     }
     const pauseHidden = () => { if (document.hidden) audio?.pause(); };
@@ -193,15 +194,28 @@ export default function PublicStore() {
         </nav>
       </header>
       <div className="public-theme-audio" aria-label="Musique de la boutique">
-        <label htmlFor="public-theme-player">Thème Zirius · musique d'ambiance</label>
-        <audio id="public-theme-player" ref={themeAudioRef} controls loop autoPlay preload="auto"
-          aria-label="Écouter le thème Zirius" src="/audio/ambiance.mp3?theme=zirius-1"
-          onPlay={() => { setThemeAutoplayBlocked(false); setThemeAudioError(""); }}
-          onError={() => setThemeAudioError("La musique est indisponible. Rechargez la page pour réessayer.")}>
-          Votre navigateur ne prend pas en charge la lecture audio.
-        </audio>
-        <small>Lecture automatique · volume initial doux · en boucle · pause et volume dans le lecteur</small>
-        {themeAutoplayBlocked && <p role="status">Votre navigateur bloque le son automatique. Appuyez sur Lecture dans le lecteur pour lancer le thème.</p>}
+        <button type="button" className="public-theme-toggle" aria-controls="public-theme-player"
+          aria-label={themePlaying ? "Couper le son" : "Activer le son"}
+          title={themeAutoplayBlocked ? "Le navigateur demande votre accord pour démarrer le son" : "Thème Zirius"}
+          onClick={() => {
+            const audio = themeAudioRef.current;
+            if (!audio) return;
+            if (themePlaying) { audio.pause(); setThemePlaying(false); }
+            else audio.play().catch((cause) => {
+              if (cause.name === "AbortError") return;
+              if (cause.name === "NotAllowedError") setThemeAutoplayBlocked(true);
+              else setThemeAudioError("La musique est indisponible. Réessayez avec Activer le son.");
+            });
+          }}>
+          {themePlaying ? <VolumeX size={16} aria-hidden="true" /> : <Volume2 size={16} aria-hidden="true" />}
+          {themePlaying ? "Couper le son" : "Activer le son"}
+        </button>
+        <audio id="public-theme-player" ref={themeAudioRef} hidden loop autoPlay preload="auto"
+          aria-label="Écouter le thème Zirius" src="/audio/zirius-loop.wav"
+          onPlay={() => { setThemePlaying(true); setThemeAutoplayBlocked(false); setThemeAudioError(""); }}
+          onPause={() => setThemePlaying(false)}
+          onError={() => { setThemePlaying(false); setThemeAudioError("La musique est indisponible. Rechargez la page pour réessayer."); }} />
+        {themeAutoplayBlocked && <span className="public-theme-notice" role="status">Son automatique bloqué par le navigateur.</span>}
         {themeAudioError && <p role="alert">{themeAudioError}</p>}
       </div>
       <div className="public-showcase">

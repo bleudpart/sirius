@@ -42,8 +42,9 @@ test("offer selection updates the accessible state and checkout summary", () => 
 
 test("the store starts the looping Zirius theme softly and pauses it for the demo", () => {
   const audio = container.querySelector("#public-theme-player");
-  expect(audio.getAttribute("src")).toBe("/audio/ambiance.mp3?theme=zirius-1");
-  expect(audio.controls).toBe(true);
+  expect(audio.getAttribute("src")).toBe("/audio/zirius-loop.wav");
+  expect(audio.controls).toBe(false);
+  expect(audio.hidden).toBe(true);
   expect(audio.loop).toBe(true);
   expect(audio.autoplay).toBe(true);
   expect(audio.preload).toBe("auto");
@@ -59,9 +60,15 @@ test("blocked autoplay is explained and manual playback clears the notice", asyn
   root = createRoot(container);
   playMedia.mockRejectedValueOnce(new DOMException("Gesture required", "NotAllowedError"));
   await act(async () => root.render(<PublicStore />));
-  expect(container.querySelector('[role="status"]').textContent).toContain("bloque le son automatique");
+  expect(container.querySelector('[role="status"]').textContent).toContain("bloqué par le navigateur");
+  await act(async () => container.querySelector(".public-theme-toggle").click());
+  expect(playMedia).toHaveBeenCalledTimes(3);
   act(() => container.querySelector("audio").dispatchEvent(new Event("play")));
-  expect(container.textContent).not.toContain("bloque le son automatique");
+  expect(container.textContent).not.toContain("bloqué par le navigateur");
+  expect(container.querySelector(".public-theme-toggle").textContent).toBe("Couper le son");
+  act(() => container.querySelector(".public-theme-toggle").click());
+  expect(container.querySelector(".public-theme-toggle").textContent).toBe("Activer le son");
+  expect(pauseMedia).toHaveBeenCalled();
 });
 
 test("an unavailable music file is reported without blocking the store", () => {
