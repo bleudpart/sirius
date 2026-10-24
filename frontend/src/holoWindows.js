@@ -392,14 +392,15 @@ function decorate(el) {
   bar.setAttribute("data-testid", "holo-win-drag");
   bar.addEventListener("pointerdown", (e) => startDrag(e, el, k));
 
-  const mn = document.createElement("button");
+  const existingMinimize = bar.querySelector(".holo-win-min");
+  const mn = existingMinimize || document.createElement("button");
   mn.type = "button";
   mn.className = "holo-win-min";
   mn.setAttribute("data-testid", "holo-win-min");
   mn.title = "Réduire en pastille";
-  mn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="4" y1="19" x2="20" y2="19"/></svg>';
+  if (!existingMinimize) mn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="4" y1="19" x2="20" y2="19"/></svg>';
   mn.addEventListener("pointerdown", (e) => e.stopPropagation());
-  mn.addEventListener("click", (e) => { e.stopPropagation(); minimize(el); });
+  if (!existingMinimize) mn.addEventListener("click", (e) => { e.stopPropagation(); minimize(el); });
   bar.appendChild(mn);
 
   const rz = document.createElement("div");
@@ -418,6 +419,8 @@ export function minimizeAll() {
   openWindows.forEach((el) => minimize(el));
   return openWindows.length;
 }
+
+export { minimize as minimizeHoloWindow };
 
 function reflowWindows() {
   if (mobilePage()) return;

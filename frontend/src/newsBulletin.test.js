@@ -80,8 +80,11 @@ const sections = () => [
 
 test("the bulletin keeps only sourced items from the last 48 hours, with explicit sections and links", () => {
   const bulletin = buildNewsBulletin({ scope: "all", sections: sections(), weather: { text: "Météo à Lyon.", source: "Open-Meteo", url: "https://open-meteo.com/" }, now: NOW });
-  expect(bulletin.segments.map((segment) => segment.kind)).toEqual(["intro", "weather", "news", "news", "status", "status"]);
-  expect(bulletin.segments[2].text).toMatch(/^France : Décision du maire\. Le conseil a voté\. Publié aujourd'hui à \d{1,2} h 05\. Source : Franceinfo\.$/);
+  expect(bulletin.segments.map((segment) => segment.kind)).toEqual(["intro", "weather", "news", "news", "status", "status", "outro"]);
+  expect(bulletin.segments[2].text).toBe("France : Décision du maire. Le conseil a voté. Source : Franceinfo.");
+  expect(bulletin.displayText).toMatch(/Publié aujourd'hui à \d{1,2} h 05\./);
+  expect(bulletin.spokenText).not.toMatch(/Publié |2026-10-14/);
+  expect(bulletin.segments[2].article.date).toBe(new Date(NOW - 3600000).toISOString());
   expect(bulletin.segments[3].text).toContain("International : Vote du parlement.");
   expect(bulletin.spokenText).not.toMatch(/périmé|futur|Sans lien|Une phrase coup|Ancien match/);
   expect(bulletin.spokenText).toContain("Santé : source temporairement indisponible.");
@@ -89,6 +92,21 @@ test("the bulletin keeps only sourced items from the last 48 hours, with explici
   expect(bulletin.displayText).toContain("Sources :\n- France — Décision du maire (Franceinfo) : https://www.franceinfo.fr/");
   expect(bulletin.displayText).toContain("- Météo (Open-Meteo) : https://open-meteo.com/");
   expect(bulletin.spokenText).not.toContain("https://");
+});
+
+test.each(["all", "france", "international"])("scope %s ends with exactly one queued closing announcement", (scope) => {
+  const bulletin = buildNewsBulletin({ scope, sections: sections(), now: NOW });
+  expect(bulletin.segments.at(-1)).toEqual({ kind: "outro", text: "C'est la fin du bulletin d'information." });
+  expect(bulletin.segments.filter(segment => segment.kind === "outro")).toHaveLength(1);
+  expect(bulletin.spokenText.endsWith("C'est la fin du bulletin d'information.")).toBe(true);
+});
+
+test("an unavailable bulletin announces the missing information before its closing", () => {
+  const bulletin = buildNewsBulletin({
+    sections: [{ id: "france", label: "France", status: "unavailable", articles: [] }], now: NOW,
+  });
+  expect(bulletin.segments.map(segment => segment.kind)).toEqual(["intro", "status", "outro"]);
+  expect(bulletin.spokenText).toContain("source temporairement indisponible.");
 });
 
 test.each([["france", "France", "Vote du parlement"], ["international", "International", "Décision du maire. Le conseil"]])(

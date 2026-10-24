@@ -106,6 +106,7 @@ export const FR_CASED_NAMES = {
 
 // Règles contextuelles qui ne se réduisent pas à un mot isolé.
 const FR_RULES = [
+  [/(?<![\p{L}\p{N}_])jusqu[\s\u200b\u200c\u200d\u2060\ufeff]*['’‘ʼ＇][\s\u200b\u200c\u200d\u2060\ufeff]*à(?![\p{L}\p{N}_])/giu, "juska"],
   [/\bS\.I\.R\.I\.U\.S\b/gi, "Siriusse"],
   // Le mot français évite l'épellation de l'anglicisme par certains moteurs.
   [/(?<![\p{L}\p{N}_@.+-])(?:e[-\u2010\u2011 ]?)?mails(?![\p{L}\p{N}_@+-]|\.\p{L})/giu, "courriels"],
@@ -152,5 +153,5 @@ export const applyFrenchPhonetics = (input) => {
 export const normalizeFrenchElisions = (input) => String(input ?? "")
   .replace(/[\u2010\u2011\u2012]/g, "-")
   .replace(/[\u200b\u200c\u200d\u2060\ufeff]*-[\u200b\u200c\u200d\u2060\ufeff]*/g, "-")
-  .replace(/\b(qu|[cdjlmnst])[\s\u200b\u200c\u200d\u2060\ufeff]*['’‘ʼ＇][\s\u200b\u200c\u200d\u2060\ufeff]*(?=\p{L})/giu, "$1'")
+  .replace(/\b(jusqu|qu|[cdjlmnst])[\s\u200b\u200c\u200d\u2060\ufeff]*['’‘ʼ＇][\s\u200b\u200c\u200d\u2060\ufeff]*(?=\p{L})/giu, "$1'")
   .replace(/[\u200b\u200c\u200d\u2060\ufeff]/g, " ");

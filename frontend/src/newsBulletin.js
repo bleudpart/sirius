@@ -145,7 +145,8 @@ export function buildNewsBulletin({ scope = "all", sections, weather, now = Date
       segments.push({
         kind: "news", section: section.label,
         article: { titre: article.titre, source: article.source, url: article.url, date: article.date },
-        text: `${section.label} : ${title}${description} Publié ${publishedWhen(article.date, now)}. Source : ${article.source}.`,
+        text: `${section.label} : ${title}${description} Source : ${article.source}.`,
+        displayText: `${section.label} : ${title}${description} Publié ${publishedWhen(article.date, now)}. Source : ${article.source}.`,
       });
     });
     if (!distinct.length) {
@@ -154,11 +155,13 @@ export function buildNewsBulletin({ scope = "all", sections, weather, now = Date
           : "aucune information datée des dernières 48 heures disponible."}` });
     }
   });
+  segments.push({ kind: "outro", text: "C'est la fin du bulletin d'information." });
   const spokenText = segments.map((segment) => segment.text).join("\n\n");
+  const displayText = segments.map((segment) => segment.displayText || segment.text).join("\n\n");
   const links = articles.map((article) => `- ${article.section} — ${article.titre} (${article.source}) : ${article.url}`);
   if (weather?.text && weather.source && isHttpUrl(weather.url)) links.push(`- Météo (${weather.source}) : ${weather.url}`);
   return {
     segments, articles, spokenText,
-    displayText: links.length ? `${spokenText}\n\nSources :\n${links.join("\n")}` : spokenText,
+    displayText: links.length ? `${displayText}\n\nSources :\n${links.join("\n")}` : displayText,
   };
 }

@@ -2,10 +2,46 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import VoiceProfilePanel from "./VoiceProfilePanel";
 import { enabledVoiceVocabulary } from "./voiceVocabulary";
+import * as voiceIdentity from "./voiceIdentity";
+
+jest.mock("./voiceIdentity", () => ({
+  voiceIdentityStatus: jest.fn(),
+  enrollVoiceIdentity: jest.fn(),
+  deleteVoiceIdentity: jest.fn(),
+}));
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  voiceIdentity.voiceIdentityStatus.mockReset().mockResolvedValue({ ready: true, enrolled: false });
+});
+afterEach(() => jest.restoreAllMocks());
+const openLibrary = async (host) => act(async () => host.querySelector('[aria-label="Ouvrir la bibliothèque et la diction"]').click());
+
+test("the server verification cross closes the whole profile while return only opens the local profile", async () => {
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  const onClose = jest.fn();
+  const store = { list: jest.fn(async () => []) };
+  const click = async (label) => act(async () => {
+    [...host.querySelectorAll("button")].find((button) => button.textContent === label).click();
+  });
+  try {
+    await act(async () => root.render(<VoiceProfilePanel user={{ user_id: "A" }} onClose={onClose} store={store} />));
+    expect(host.querySelector('[data-testid="voice-identity-panel"]')).not.toBeNull();
+    await openLibrary(host);
+    expect(host.querySelector('[data-testid="voice-profile-panel"]')).not.toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
+    await click("Retour à Ma voix");
+    await act(async () => host.querySelector('[aria-label="Fermer la vérification de ma voix"]').click());
+    expect(onClose).toHaveBeenCalledTimes(1);
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+  }
+});
 
 test("records only on request, confirms exact transcript, deletes with confirmation and cleans preview", async () => {
   const host = document.createElement("div");
@@ -33,6 +69,7 @@ test("records only on request, confirms exact transcript, deletes with confirmat
   });
   try {
     await act(async () => root.render(<VoiceProfilePanel user={{ user_id: "A" }} onClose={() => {}} store={store} record={record} />));
+    await openLibrary(host);
     expect(record).not.toHaveBeenCalled();
     await click("Enregistrer volontairement un extrait");
     await act(async () => callbacks.onReady({ audio: new Blob(["audio"], { type: "audio/webm" }), duration: 1 }));
@@ -68,6 +105,7 @@ test("changing account discards pending recording and clears the other account's
   const record = jest.fn(async () => ({ cancel, stop: jest.fn() }));
   try {
     await act(async () => root.render(<VoiceProfilePanel user={{ user_id: "A" }} onClose={() => {}} store={store} record={record} />));
+    await openLibrary(host);
     await act(async () => [...host.querySelectorAll("button")].find((button) => /Enregistrer volontairement/.test(button.textContent)).click());
     expect(record).toHaveBeenCalledTimes(1);
     await act(async () => root.render(<VoiceProfilePanel user={{ user_id: "B" }} onClose={() => {}} store={store} record={record} />));
@@ -88,6 +126,7 @@ test("closing while the previous voice session stops never requests another micr
   const store = { list: async () => [] };
   try {
     await act(async () => root.render(<VoiceProfilePanel user={{ user_id: "A" }} onClose={() => {}} onBeforeRecord={before} record={record} store={store} />));
+    await openLibrary(host);
     await act(async () => [...host.querySelectorAll("button")].find((button) => /Enregistrer volontairement/.test(button.textContent)).click());
     await act(async () => host.querySelector('[aria-label="Fermer le profil vocal"]').click());
     await act(async () => finish());
@@ -101,6 +140,7 @@ test("explicit expression validation and account toggle never infer terms from r
   const root = createRoot(host);
   try {
     await act(async () => root.render(<VoiceProfilePanel user={{ user_id: "A" }} onClose={() => {}} store={{ list: async () => [] }} />));
+    await openLibrary(host);
     expect(host.querySelector('input[type="checkbox"]').checked).toBe(false);
     await act(async () => {
       const input = host.querySelector('[aria-label="Expression à valider"]');

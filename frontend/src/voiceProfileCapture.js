@@ -1,7 +1,7 @@
 import { microphoneConstraints, requestMicrophoneStream } from "./microphoneCapture";
 import { VOICE_SAMPLE_MAX_BYTES, VOICE_SAMPLE_MAX_SECONDS } from "./voiceProfileStore";
 
-export async function recordVoiceSample({ platform, isCurrent, onReady, onError,
+export async function recordVoiceSample({ platform, isCurrent, onReady, onError, onStart,
   mediaDevices = navigator.mediaDevices, Recorder = globalThis.MediaRecorder }) {
   if (!mediaDevices?.getUserMedia || !Recorder) throw new Error("Enregistrement local indisponible. Aucun extrait ne sera envoyé au serveur.");
   let stream;
@@ -23,7 +23,13 @@ export async function recordVoiceSample({ platform, isCurrent, onReady, onError,
     const mimeType = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"]
       .find((type) => Recorder.isTypeSupported(type));
     recorder = new Recorder(stream, mimeType ? { mimeType } : undefined);
-    const began = Date.now();
+    let began;
+    recorder.onstart = () => {
+      if (cancelled || !isCurrent()) { cancel(); return; }
+      began = Date.now();
+      onStart?.();
+      timer = setTimeout(() => { if (recorder.state === "recording") recorder.stop(); }, VOICE_SAMPLE_MAX_SECONDS * 1000);
+    };
     recorder.ondataavailable = (event) => {
       if (cancelled || !isCurrent() || !event.data.size) return;
       bytes += event.data.size;
@@ -44,7 +50,6 @@ export async function recordVoiceSample({ platform, isCurrent, onReady, onError,
       onReady({ audio, duration: Math.min(VOICE_SAMPLE_MAX_SECONDS, Math.max(0.001, (Date.now() - began) / 1000)) });
     };
     recorder.start(250);
-    timer = setTimeout(() => { if (recorder.state === "recording") recorder.stop(); }, VOICE_SAMPLE_MAX_SECONDS * 1000);
     return { cancel, stop: () => { if (recorder.state === "recording") recorder.stop(); } };
   } catch (error) {
     release();

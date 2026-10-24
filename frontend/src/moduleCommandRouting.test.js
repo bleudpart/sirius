@@ -14,7 +14,7 @@ const modules = [
   { id: "themis", label: "THÉMIS — gestion d'entreprise" },
   { id: "gcal", label: "AGENDA — Google Calendar" },
   { id: "vision", label: "Vision caméra" },
-  { id: "voice-profile", label: "Ma voix et ma diction" },
+  { id: "voice-profile", label: "Ma voix — configuration & diction" },
   { id: "messaging", label: "Messagerie — Gmail & Outlook" },
 ];
 
@@ -22,8 +22,8 @@ test.each(["ouvre la messagerie", "affiche ma boîte de réception"])("opens the
   expect(findModuleForCommand(command, modules, MODULE_ALIASES).item?.id).toBe("messaging");
 });
 
-test.each(["ouvre ma voix et ma diction", "ouvre le profil vocal", "affiche mes extraits vocaux"])(
-  "opens the dedicated local voice profile: %s", (command) => {
+test.each(["ouvre ma voix et ma diction", "ouvre le profil vocal", "affiche mes extraits vocaux", "ouvre configurer ma voix", "ouvre enregistrer ma voix"])(
+  "opens the guided voice workspace: %s", (command) => {
     expect(findModuleForCommand(command, modules, MODULE_ALIASES).item?.id).toBe("voice-profile");
   },
 );

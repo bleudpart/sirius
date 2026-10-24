@@ -2,6 +2,19 @@ import { applyFrenchPhonetics, normalizeFrenchElisions } from "./phoneticFr";
 
 beforeEach(() => localStorage.clear());
 
+test.each(["jusqu'à", "jusqu’à", "jusqu' à", "jusqu ’ à", "jusqu\u200b’\u200bà", "JUSQU’À"])(
+  "guide la liaison de %s sans séparer jusqu et à", (expression) => {
+    expect(applyFrenchPhonetics(`Vent ${expression} 30 kilomètres heure.`))
+      .toBe("Vent juska 30 kilomètres heure.");
+    expect(normalizeFrenchElisions(expression).toLowerCase()).toBe("jusqu'à");
+  },
+);
+
+test("le guide jusqu'à ne modifie pas jusqu'ici, jusque-là ou des mots plus longs", () => {
+  const text = "Jusqu'ici, jusque-là, jusqu'au soir, jusqu'àprès.";
+  expect(applyFrenchPhonetics(text)).toBe(text);
+});
+
 test.each(["Panthéon", "PANTHÉON", "Pantheon"])("guide %s vers le pan nasal français sans découpage", (name) => {
   expect(applyFrenchPhonetics(`Le ${name} est prêt.`)).toBe("Le pantéon est prêt.");
 });

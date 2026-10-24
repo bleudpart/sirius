@@ -44,6 +44,19 @@ test.each(["prime-screen", "fp-overlay", "p3d-overlay", "vision-card", "keys-pan
   }
 );
 
+test("an explicit module minimize button is reused without a duplicate handler or icon replacement", () => {
+  document.body.innerHTML = '<section class="prime-screen"><header><h2>Ma voix</h2><button class="holo-win-min" aria-label="Réduire la fenêtre"><svg data-native-icon="true"></svg></button><button aria-label="Fermer">×</button></header></section>';
+  const button = document.querySelector(".holo-win-min");
+  const click = jest.fn();
+  button.addEventListener("click", click);
+  initHoloWindows();
+  expect(document.querySelectorAll(".holo-win-min")).toHaveLength(1);
+  expect(button.querySelector("[data-native-icon]")).not.toBeNull();
+  button.click();
+  expect(click).toHaveBeenCalledTimes(1);
+  expect(document.querySelector(".holo-dock-pill")).toBeNull();
+});
+
 test.each([true, false])("la croix ferme le module réduit sans le restaurer (mobile=%s)", (mobile) => {
   window.matchMedia.mockReturnValue({ matches: mobile });
   const panel = document.createElement("section");

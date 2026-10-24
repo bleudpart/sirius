@@ -1,13 +1,13 @@
 import { withBackendResponse } from "./lib/backendRequest";
 
 const messages = {
-  no_profile: "Enregistrez votre voix dans « Ma voix et ma diction » avant l'écoute continue. Le bouton maintenu reste disponible.",
+  no_profile: "Enregistrez votre voix dans Outils → Ma voix avant l'écoute continue. Le bouton maintenu reste disponible.",
   speaker_mismatch: "Voix non reconnue : demande ignorée. Utilisez le bouton maintenu si nécessaire.",
   insufficient_audio: "Extrait trop court ou peu audible : demande ignorée. Parlez au moins 3 secondes ou utilisez le bouton micro maintenu pour une demande courte.",
 };
 
 export function voiceIdentityGuidance(status) {
-  if (status?.reason === "model_changed") return "Le modèle vocal a changé. Supprimez l'ancienne empreinte dans « Ma voix et ma diction », puis créez-en une nouvelle.";
+  if (status?.reason === "model_changed") return "Le modèle vocal a changé. Supprimez l'ancienne empreinte dans Outils → Ma voix, puis créez-en une nouvelle.";
   if (["operator_disabled", "threshold_not_configured", "model_checksum_not_configured", "model_missing"].includes(status?.reason)) {
     return "La protection vocale n'est pas activée ou configurée sur le serveur. L'exploitant doit terminer son installation ; utilisez le bouton micro maintenu en attendant.";
   }

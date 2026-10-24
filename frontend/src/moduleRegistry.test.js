@@ -45,7 +45,8 @@ test.each(["web", "android"])("voice profile is available in the %s module wheel
   const open = jest.fn();
   const item = createModuleRegistry({ platform, icons: {}, actions: { openVoiceProfile: open }, state: {}, user: { user_id: "A" } })
     .find((entry) => entry.id === "voice-profile");
-  expect(item.label).toBe("Ma voix et ma diction");
+  expect(item.label).toBe("Ma voix — configuration & diction");
+  expect(item.group).toBe("OUTILS");
   item.run();
   expect(open).toHaveBeenCalled();
 });

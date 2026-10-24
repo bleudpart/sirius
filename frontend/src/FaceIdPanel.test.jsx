@@ -2,6 +2,9 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import * as faceapi from "@vladmandic/face-api";
 import FaceIdPanel from "./FaceIdPanel";
+import fs from "fs";
+import path from "path";
+import postcss from "postcss";
 
 jest.mock("@vladmandic/face-api", () => ({
   nets: {
@@ -15,6 +18,19 @@ jest.mock("@vladmandic/face-api", () => ({
 }));
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+
+test("camera preview reserves a larger desktop surface and a tall mobile frame", () => {
+  const css = postcss.parse(fs.readFileSync(path.join(__dirname, "App.css"), "utf8"));
+  const rules = [];
+  css.walkRules((rule) => rules.push(rule));
+  const value = (rule, property) => rule.nodes.find((node) => node.prop === property)?.value;
+  expect(value(rules.find((rule) => rule.selector === ".faceid-body"), "width")).toBe("min(1280px, 100%)");
+  expect(value(rules.find((rule) => rule.selector === ".faceid-workspace"), "grid-template-columns")).toBe("minmax(0, 2.4fr) minmax(245px, .8fr)");
+  const mobile = rules.find((rule) => rule.selector === ".faceid-stage" && rule.parent.params === "(max-width: 760px)");
+  expect(value(mobile, "aspect-ratio")).toBe("4 / 5");
+  expect(value(mobile, "min-height")).toBe("280px");
+  expect(value(rules.find((rule) => rule.selector === ".faceid-reticle"), "width")).toBe("min(56%, 320px)");
+});
 
 describe("FaceIdPanel", () => {
   let container;

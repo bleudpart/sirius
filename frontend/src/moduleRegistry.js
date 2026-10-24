@@ -74,7 +74,7 @@ export function createModuleRegistry({ icons, actions, state, user, platform = "
     { id: "workspace-search", group: "OUTILS", label: "Rechercher — dossiers, Microsoft et fonctions", Icon: icons.FolderOpen, run: openWorkspaceSearch },
     { id: "privacy", group: "SYSTÈME", label: "Confidentialité et données", Icon: icons.ShieldCheck, run: openPrivacy },
     { id: "native-automation", group: "SYSTÈME", label: "Automatisations Windows — hooks natifs", Icon: icons.Workflow, mobile: false, run: openNativeAutomation },
-    { id: "voice-profile", group: "SYSTÈME", label: "Ma voix et ma diction", Icon: icons.Mic, run: openVoiceProfile },
+    { id: "voice-profile", group: "OUTILS", label: "Ma voix — configuration & diction", Icon: icons.Mic, run: openVoiceProfile },
     { id: "reload", group: "SYSTÈME", label: "Recharger ΣIRIUS", Icon: icons.RotateCcw, run: reload },
     { id: "display", group: "MÉDIAS", label: "ΣIRIUS DISPLAY", Icon: icons.Monitor, active: state.displayOpen, run: toggleDisplay },
     { id: "media-modules", group: "MÉDIAS", label: "Modules multimédia", Icon: icons.Clapperboard, active: platform === "android" ? state.showMediaModules : state.displayOpen && state.displayType === "media", run: showMediaModules },

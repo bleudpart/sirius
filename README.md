@@ -314,6 +314,9 @@ rédaction IA. Le bulletin annonce la météo de la ville du profil et les rubri
 demandées ; au plus deux articles par rubrique sont retenus. Les liens restent
 visibles sans être lus. Sans ville renseignée ou sans prévisions vérifiables,
 l'absence de météo est annoncée, sans choisir Paris implicitement.
+Les dates de publication restent affichées mais ne sont plus lues à voix haute.
+La phrase « C'est la fin du bulletin d'information. » est le dernier segment de
+la lecture : elle n'est pas annoncée après un arrêt ou une panne avant la fin.
 Le chemin vocal général de secours utilise le même bulletin, et non plus une
 lecture limitée à trois titres via NewsAPI.
 
@@ -459,15 +462,40 @@ Les expressions utiles sont validées séparément ; le guidage textuel des proc
 transcriptions distantes est désactivé par défaut et exige l'activation explicite
 dans la fenêtre. Les moteurs locaux ne sont pas entraînés avec ces extraits.
 
-**Vérification du locuteur sur le serveur Sirius** : un écran distinct dans
-**Ma voix et ma diction** demande un consentement explicite puis trois nouvelles
-références de 3 à 15 secondes, seul dans une pièce calme. Les exemples IndexedDB
+**Vérification du locuteur sur le serveur Sirius** : **Outils → Ma voix —
+configuration & diction** ouvre directement un parcours guidé en trois étapes :
+**Préparer**, **Enregistrer**, **Activer**. Après consentement explicite, un grand
+bouton micro permet d'enregistrer trois nouvelles références de 3 à 15 secondes,
+seul dans une pièce calme. Le chronomètre commence au démarrage réel du micro ;
+le carré arrête la prise et l'arrêt automatique intervient à 15 secondes.
+Chaque extrait est réécoutable et doit être confirmé manuellement avant de passer
+au suivant. « Recommencer cet extrait » abandonne la prise non confirmée.
+L'envoi des trois extraits nécessite ensuite « Envoyer et activer mon profil
+vocal » ; seule une confirmation positive du serveur affiche le profil prêt.
+Une erreur conserve les extraits confirmés pour réessayer sans annoncer de succès.
+Les exemples IndexedDB
 ne sont jamais repris ni envoyés automatiquement. Le serveur reçoit ces références,
 conserve une empreinte biométrique par compte (pas les fichiers audio de référence)
 et compare chaque extrait d'écoute continue avant sa transcription.
 Le profil peut être supprimé depuis cet écran ; la suppression arrête l'écoute
 en cours sur cet appareil et bloque les nouvelles vérifications du compte.
 Une action déjà envoyée n'est pas rappelée.
+La croix en haut à droite ferme la fenêtre et annule l'enregistrement en cours
+sans envoyer les références non envoyées. **Bibliothèque et diction** ouvre
+séparément les exemples locaux et le vocabulaire, sans fermer la fenêtre.
+Les références serveur restent en mémoire uniquement et sont abandonnées en
+quittant le parcours ; les URL de réécoute sont libérées. Un profil déjà enregistré
+permet de refaire les prises (avec un nouveau consentement) ou de supprimer son
+empreinte après confirmation. La page n'active pas l'écoute continue elle-même.
+Le bouton **Réduire** range la page dans une pastille sans perdre les extraits
+confirmés ; il annule la prise en cours et suspend la réécoute, sans rien envoyer.
+La pastille permet de reprendre le parcours. L'habillage reste bleu nuit et doré,
+sans effets RGB.
+
+La reconnaissance faciale locale dispose d'un aperçu caméra élargi sur ordinateur
+et d'un cadre vertical 4:5 sur téléphone, avec un guide de visage plus grand.
+Les commandes restent sous l'aperçu sur petit écran ; la capture et le traitement
+biométrique locaux restent inchangés.
 
 Sans modèle serveur disponible, sans profil ou en cas d'erreur, l'écoute continue
 est bloquée : aucun repli vers une commande non vérifiée. Une voix refusée n'est
@@ -706,6 +734,8 @@ Android ; la prononciation effective reste à vérifier avec la voix de l'appare
 Le lexique prononce « planning » sans tiret artificiel. À l'oral, « le/ton
 Sirius Display » devient « mon Sirius Display » ; les élisions « L'… » sont
 envoyées avec un « l » minuscule sans modifier les lettres isolées.
+L'expression « jusqu'à » reçoit un guidage phonétique réservé à la synthèse
+vocale, y compris dans le lecteur Android natif ; son affichage reste inchangé.
 L'indication d'écoute et le signal vocal du micro serveur attendent l'événement
 de démarrage du MediaRecorder. En capture native continue, la parole commencée
 pendant la calibration initiale est conservée dans le pré-roll et n'est pas

@@ -1187,7 +1187,8 @@ test.each([
   expect(message).toContain("Information internationale");
   expect(message).toContain("Résultat sportif");
   expect(message).toContain("Santé : source temporairement indisponible.");
-  expect(message).toContain("Publié aujourd'hui à");
+  expect(message).not.toContain("Publié aujourd'hui à");
+  expect(speakSeries.mock.calls.at(-1)[0]).toBe("C'est la fin du bulletin d'information.");
   expect(message).not.toContain("Une phrase coup");
   expect(localStorage.getItem("sirius_last_briefing_context")).toContain("Information internationale");
 });
@@ -1256,6 +1257,24 @@ function mockBulletinBackend({ weather = parisWeather(), franceDescription } = {
 
 const lastSpoken = () => speakFr.mock.calls.at(-1)?.[0] || "";
 const newsFetches = () => global.fetch.mock.calls.filter(([url]) => String(url).endsWith("/news/briefing")).length;
+
+test("the closing announcement waits for the final news item and publication dates remain visual only", async () => {
+  mockBulletinBackend();
+  let finishLastTitle;
+  speakSeries.mockImplementation((text, options) => {
+    options?.onstart?.();
+    return text.includes("Le parlement") ? new Promise(resolve => { finishLastTitle = resolve; }) : Promise.resolve();
+  });
+  await mount();
+  await send("les infos");
+  expect(speakSeries.mock.calls.map(([text]) => text).join(" ")).not.toContain("Publié ");
+  expect(speakSeries.mock.calls.some(([text]) => text.includes("fin du bulletin"))).toBe(false);
+  for (let i = 0; i < 30; i += 1) await act(async () => { jest.advanceTimersByTime(5000); });
+  expect(host.querySelector('[data-testid="sirius-display-body"]').textContent).toContain("Publié aujourd'hui à");
+  await act(async () => { finishLastTitle(); });
+  expect(speakSeries.mock.calls.at(-1)[0]).toBe("C'est la fin du bulletin d'information.");
+  expect(speakSeries.mock.calls.filter(([text]) => text.includes("fin du bulletin"))).toHaveLength(1);
+});
 
 test("natural scope changes and fresh journal requests keep the dated news path, not contextual chat", async () => {
   const chatBodies = mockBulletinBackend();
@@ -1420,6 +1439,7 @@ test("a voice failure in a multi-phrase segment stops explicitly and resumes at 
   expect(firstHalf).toBeGreaterThan(-1);
   expect(read[firstHalf + 1]).toContain("le projet.");
   expect(read.some((text) => text.includes("Le parlement"))).toBe(false);
+  expect(read.some((text) => text.includes("fin du bulletin"))).toBe(false);
   expect(host.textContent).toContain("Voix indisponible : la lecture du bulletin s'est arrêtée.");
   expect(error).toHaveBeenCalledWith("Lecture du bulletin :", expect.objectContaining({ code: "local-error" }));
 
@@ -1432,6 +1452,7 @@ test("a voice failure in a multi-phrase segment stops explicitly and resumes at 
   expect(resumed[0]).toContain("France : Le maire annonce une décision.");
   expect(resumed[1]).toContain("le projet.");
   expect(resumed.filter((text) => text.includes("Le parlement"))).toHaveLength(1);
+  expect(resumed.at(-1)).toBe("C'est la fin du bulletin d'information.");
   expect(resumed.some((text) => text.includes("Météo"))).toBe(false);
   expect(newsFetches()).toBe(1);
 });

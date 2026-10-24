@@ -207,6 +207,25 @@ test("joins French elisions separated by stray spaces before speech synthesis", 
   }));
 });
 
+test.each(["jusqu'à", "jusqu’à", "jusqu ’ à"])(
+  "weather pronunciation %s reaches Gemini and the local fallback without a broken liaison", async (expression) => {
+    speakFr(`Vent ${expression} 30 kilomètres heure.`);
+    await flush();
+    const request = global.fetch.mock.calls.find(([url]) => String(url).includes("/tts/gemini"));
+    expect(JSON.parse(request[1].body).text).toBe("Vent juska 30 kilomètres heure.");
+    expect(speakNative.mock.calls[0][0]).toBe("Vent juska 30 kilomètres heure.");
+  },
+);
+
+test("the native bulletin receives the same jusqu'à pronunciation guide", async () => {
+  hasNativeRemoteVoice.mockReturnValue(true);
+  playNativeRemoteVoice.mockResolvedValueOnce();
+  await speakSequence(["Vent jusqu’à 30 kilomètres heure."]).done;
+  expect(playNativeRemoteVoice).toHaveBeenCalledWith(expect.objectContaining({
+    items: [expect.objectContaining({ body: expect.objectContaining({ text: "Vent juska 30 kilomètres heure." }) })],
+  }));
+});
+
 test.each(["l 'effet", "l ’ effet", "l ‘effet", "l ʼ effet", "l\u00a0’\u00a0effet", "l' effet"])(
   "keeps %s as one elision in the text sent to TTS",
   async (elision) => {
