@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, ShieldCheck, ArrowRight, Mic, FolderOpen, Mail, UserRound, Zap, Star, Search, ChartNoAxesCombined, FileText, Volume2, VolumeX } from "lucide-react";
 import PublicLegal from "./PublicLegal";
+import PublicAccount from "./PublicAccount";
 import "./PublicStore.css";
 import "./publicPantheon.css";
 
@@ -119,6 +120,7 @@ export default function PublicStore() {
   }, []);
 
   if (["/mentions-legales", "/conditions-generales", "/confidentialite"].includes(window.location.pathname)) return <PublicLegal />;
+  if (window.location.pathname === "/compte") return <PublicAccount />;
 
   const checkout = async (event) => {
     event.preventDefault();
@@ -191,6 +193,7 @@ export default function PublicStore() {
           <a href="#offres">Les offres</a>
           <a href="#essayer">Essai gratuit</a>
           <a href="/aide-emails.html">Aide</a>
+          <a href="/compte">Connexion / Créer un compte</a>
         </nav>
       </header>
       <div className="public-theme-audio" aria-label="Musique de la boutique">

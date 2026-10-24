@@ -27,6 +27,14 @@ reste visible et reflète les événements réels de lecture et de pause. La lec
 volume initial de 12 %, se coupe lors du lancement de la démonstration vidéo ou
 du passage de l'onglet en arrière-plan, et peut être relancée manuellement.
 
+### Compte sur la boutique
+
+La boutique propose « Connexion / Créer un compte » sur `/compte`. Cette page
+réutilise le formulaire d'authentification de l'application (inscription,
+confirmation du mot de passe, consentement, connexion et récupération).
+Elle ne monte ni le HUD ni le boot, ne déclenche aucun paiement et ne modifie
+pas les droits d'accès. Le compte créé peut être utilisé dans l'application.
+
 ### Habillage Panthéon
 
 Le thème commun `frontend/src/pantheonTheme.css` est chargé après les contrats de

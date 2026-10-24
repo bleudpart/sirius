@@ -2,6 +2,11 @@ import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import PublicStore from "./PublicStore";
 
+jest.mock("./components/ReactorVisuals", () => ({
+  CoreRings: () => null,
+  ReactorCore: () => null,
+}));
+
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 let container;
 let root;
@@ -38,6 +43,19 @@ test("offer selection updates the accessible state and checkout summary", () => 
   expect(plans[2].getAttribute("aria-pressed")).toBe("false");
   expect(plans[3].getAttribute("aria-pressed")).toBe("true");
   expect(container.querySelector(".public-order-summary").textContent).toContain("Lifetime269 €");
+});
+
+test("the store offers account creation without checkout or the assistant boot", () => {
+  expect(container.querySelector('nav a[href="/compte"]').textContent).toBe("Connexion / Créer un compte");
+  window.history.replaceState({}, "", "/compte");
+  try {
+    act(() => root.render(<PublicStore />));
+    expect(container.querySelector('[data-testid="auth-screen"]')).not.toBeNull();
+    expect(container.querySelector(".public-account")).not.toBeNull();
+    expect(container.querySelector(".public-purchase")).toBeNull();
+  } finally {
+    window.history.replaceState({}, "", "/");
+  }
 });
 
 test("the store starts the looping Zirius theme softly and pauses it for the demo", () => {

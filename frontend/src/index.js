@@ -29,7 +29,7 @@ const queryClient = new QueryClient({
 const root = ReactDOM.createRoot(document.getElementById("root"));
 const isMediaHud = new URLSearchParams(window.location.search).has("mediaHud");
 const isPublicStore = ["sirius-assistant.fr", "www.sirius-assistant.fr"].includes(window.location.hostname)
-  || window.location.pathname === "/acheter";
+  || ["/acheter", "/compte"].includes(window.location.pathname);
 const stopFdeOmega = initFdeOmega();
 window.addEventListener("beforeunload", stopFdeOmega, { once: true });
 // StrictMode retiré : il double l'exécution des effets en développement,

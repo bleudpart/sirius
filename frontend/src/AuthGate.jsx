@@ -132,7 +132,7 @@ function syncLocalProfile(user) {
   } catch (e) { localStorage.setItem("sirius_profile", JSON.stringify({ name: user.name })); }
 }
 
-function AuthScreen({ onAuth }) {
+export function AuthScreen({ onAuth, accountOnly = false }) {
   const [form, setForm] = useState({ name: "", email: "", password: "", confirmPassword: "" });
   const [mfaCode, setMfaCode] = useState("");
   const [resetCode, setResetCode] = useState("");
@@ -153,7 +153,7 @@ function AuthScreen({ onAuth }) {
       if (registerMode && !termsAccepted) {
         throw new Error("Vous devez accepter les conditions générales et la politique de confidentialité.");
       }
-      const localLogin = LOCAL_BACKEND && !registerMode && !form.email.trim();
+      const localLogin = LOCAL_BACKEND && !accountOnly && !registerMode && !form.email.trim();
       const path = registerMode ? "/api/auth/register" : localLogin ? "/api/auth/local-login" : "/api/auth/login";
       const payload = registerMode
         ? { name: form.name, email: form.email, password: form.password }
@@ -165,7 +165,7 @@ function AuthScreen({ onAuth }) {
       const data = await readResponseData(r);
       if (!r.ok) throw new Error(fmtErr(data.detail));
       rememberAccessToken(data);
-      syncLocalProfile(data);
+      if (!accountOnly) syncLocalProfile(data);
       onAuth(data);
     } catch (e2) { setErr(e2.message); setBusy(false); }
   };
@@ -217,8 +217,8 @@ function AuthScreen({ onAuth }) {
             <input type="text" placeholder="Prénom et nom" value={form.name} required autoComplete="name"
               onChange={(e) => setForm({ ...form, name: e.target.value })} data-testid="auth-name-input" />
           )}
-          <input type="email" placeholder={LOCAL_BACKEND ? "Email (facultatif en local)" : "Email"} value={form.email}
-            required={!LOCAL_BACKEND || registerMode} autoComplete="email"
+          <input type="email" placeholder={LOCAL_BACKEND && !accountOnly ? "Email (facultatif en local)" : "Email"} value={form.email}
+            required={accountOnly || !LOCAL_BACKEND || registerMode} autoComplete="email"
             onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="auth-email-input" />
           {resetMode && resetCodeSent && (
             <input type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6}
@@ -247,7 +247,7 @@ function AuthScreen({ onAuth }) {
           )}
           {err && <div className="auth-error" data-testid="auth-error">{err}</div>}
           <button type="submit" className="auth-submit" disabled={busy} data-testid="auth-submit-btn">
-            <LogIn size={15} /> {resetMode ? (resetCodeSent ? "VALIDER LE NOUVEAU MOT DE PASSE" : "RECEVOIR UN CODE") : (registerMode ? "CRÉER MON COMPTE" : (LOCAL_BACKEND && !form.email.trim() ? "SE CONNECTER AU PC" : "SE CONNECTER"))}
+            <LogIn size={15} /> {resetMode ? (resetCodeSent ? "VALIDER LE NOUVEAU MOT DE PASSE" : "RECEVOIR UN CODE") : (registerMode ? "CRÉER MON COMPTE" : (LOCAL_BACKEND && !accountOnly && !form.email.trim() ? "SE CONNECTER AU PC" : "SE CONNECTER"))}
           </button>
         </form>
         {!registerMode && (
