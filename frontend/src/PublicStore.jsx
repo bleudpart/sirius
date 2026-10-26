@@ -4,6 +4,9 @@ import PublicLegal from "./PublicLegal";
 import PublicAccount from "./PublicAccount";
 import "./PublicStore.css";
 import "./publicPantheon.css";
+import { GaplessLoop } from "./gaplessLoop";
+
+const THEME_URL = "/audio/zirius-loop.wav?revision=3";
 
 const API = `${process.env.REACT_APP_BACKEND_URL || "https://api.sirius-assistant.fr"}/api`;
 
@@ -26,6 +29,19 @@ const MATRIX_ACTIONS = [
 export default function PublicStore() {
   const [mythWindowOpen, setMythWindowOpen] = useState(false);
   const themeAudioRef = useRef(null);
+  const gaplessRef = useRef(null);
+  const gaplessEnabled = useRef(GaplessLoop.supported());
+  const themePlayer = () => {
+    if (!gaplessEnabled.current) return themeAudioRef.current;
+    if (!gaplessRef.current) {
+      gaplessRef.current = new GaplessLoop(THEME_URL, {
+        onPlay: () => { setThemePlaying(true); setThemeAutoplayBlocked(false); setThemeAudioError(""); },
+        onPause: () => setThemePlaying(false),
+      });
+      gaplessRef.current.volume = 0.12;
+    }
+    return gaplessRef.current;
+  };
   const [themeAudioError, setThemeAudioError] = useState("");
   const [themeAutoplayBlocked, setThemeAutoplayBlocked] = useState(false);
   const [themePlaying, setThemePlaying] = useState(false);
@@ -46,7 +62,7 @@ export default function PublicStore() {
   const paymentSucceeded = new URLSearchParams(window.location.search).get("payment") === "success";
 
   useEffect(() => {
-    const audio = themeAudioRef.current;
+    const audio = themePlayer();
     let active = true;
     if (audio) {
       audio.volume = 0.12;
@@ -62,7 +78,10 @@ export default function PublicStore() {
       active = false;
       document.removeEventListener("visibilitychange", pauseHidden);
       audio?.pause();
+      gaplessRef.current?.destroy();
+      gaplessRef.current = null;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -201,7 +220,7 @@ export default function PublicStore() {
           aria-label={themePlaying ? "Couper le son" : "Activer le son"}
           title={themeAutoplayBlocked ? "Le navigateur demande votre accord pour démarrer le son" : "Thème Zirius"}
           onClick={() => {
-            const audio = themeAudioRef.current;
+            const audio = themePlayer();
             if (!audio) return;
             if (themePlaying) { audio.pause(); setThemePlaying(false); }
             else audio.play().catch((cause) => {
@@ -213,8 +232,8 @@ export default function PublicStore() {
           {themePlaying ? <VolumeX size={16} aria-hidden="true" /> : <Volume2 size={16} aria-hidden="true" />}
           {themePlaying ? "Couper le son" : "Activer le son"}
         </button>
-        <audio id="public-theme-player" ref={themeAudioRef} hidden loop autoPlay preload="auto"
-          aria-label="Écouter le thème Zirius" src="/audio/zirius-loop.wav?revision=3"
+        <audio id="public-theme-player" ref={themeAudioRef} hidden loop autoPlay={!gaplessEnabled.current} preload={gaplessEnabled.current ? "none" : "auto"}
+          aria-label="Écouter le thème Zirius" src={THEME_URL}
           onPlay={() => { setThemePlaying(true); setThemeAutoplayBlocked(false); setThemeAudioError(""); }}
           onPause={() => setThemePlaying(false)}
           onError={() => { setThemePlaying(false); setThemeAudioError("La musique est indisponible. Rechargez la page pour réessayer."); }} />
@@ -243,7 +262,7 @@ export default function PublicStore() {
       <section className="public-demo public-workflow" id="demonstration" aria-labelledby="public-demo-title">
         <h2 id="public-demo-title" className="public-section-title">Voyez ΣIRIUS en situation</h2>
         <video controls preload="none" poster="/demo/sirius-dossiers.png" aria-label="Démonstration de ΣIRIUS avec des données fictives"
-          onPlay={() => themeAudioRef.current?.pause()}>
+          onPlay={() => (gaplessRef.current || themeAudioRef.current)?.pause()}>
           <source src="/demo/sirius-demo-store.mp4" type="video/mp4" />
           <track kind="subtitles" src="/demo/sirius-demo-store.vtt" srcLang="fr" label="Français" default />
           Votre navigateur ne lit pas cette vidéo. <a href="/demo/sirius-demo-store.mp4">Télécharger la démonstration</a>
