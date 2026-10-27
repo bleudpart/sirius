@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import { Camera, ClipboardList, QrCode, ShieldCheck, Search, Download, Image, X } from "lucide-react";
 import HaccpLabelCapture from "./HaccpLabelCapture";
 import { API_BASE_URL } from "./lib/api";
 import { haccpFetch } from "./haccpRequest";
+import "./HaccpWorkspace.css";
 
 const ROOT = `${API_BASE_URL}/haccp/registre`;
 export const HACCP_CAPTURE_URL = "https://sirius-assistant.fr/haccp";
@@ -88,43 +90,49 @@ export default function HaccpWorkspace({ standalone = false }) {
     } catch (failure) { if (mounted.current) setError(failure.message); }
     finally { if (mounted.current) setBusy(false); }
   }
-  return <section aria-label="Registre de réception et ouverture ΣIRIUS" style={standalone ? { maxWidth: 850, margin: "auto", padding: 16, minHeight: "100vh", color: "#eee", background: "#111827", overflowWrap: "anywhere" } : undefined}>
-    <h2>ΣIRIUS · Étiquettes cuisine</h2>
-    <nav aria-label="Parcours des étiquettes">
-      <button type="button" className="hc-tab" aria-pressed={tab === "capture"} onClick={() => setTab("capture")}>Réception / Ouverture</button>
-      <button type="button" className="hc-tab" aria-pressed={tab === "registre"} onClick={() => setTab("registre")}>Registre / Contrôle</button>
-      <button type="button" className="hc-tab" aria-pressed={tab === "qr"} onClick={() => setTab("qr")}>QR code réserve</button>
+  return <section aria-label="Registre de réception et ouverture ΣIRIUS" className={`haccp-ui haccp-workspace${standalone ? " haccp-standalone" : ""}`}>
+    <header className="haccp-heading">
+      <div className="haccp-emblem" aria-hidden="true"><ShieldCheck size={30} /></div>
+      <div><p className="haccp-kicker">ΣIRIUS · HACCP</p><h2>ΣIRIUS · Étiquettes cuisine</h2><p>De la réception à l’ouverture, gardez la preuve.</p></div>
+    </header>
+    <nav className="haccp-navigation" aria-label="Parcours des étiquettes">
+      <button type="button" aria-pressed={tab === "capture"} onClick={() => setTab("capture")}><Camera size={19} aria-hidden="true" />Réception / Ouverture</button>
+      <button type="button" aria-pressed={tab === "registre"} onClick={() => setTab("registre")}><ClipboardList size={19} aria-hidden="true" />Registre / Contrôle</button>
+      <button type="button" aria-pressed={tab === "qr"} onClick={() => setTab("qr")}><QrCode size={19} aria-hidden="true" />QR code réserve</button>
     </nav>
     {tab === "capture" && <HaccpLabelCapture />}
-    {tab === "qr" && <section aria-label="QR code de capture">
+    {tab === "qr" && <section className="workspace-surface haccp-card haccp-qr" aria-label="QR code de capture">
+      <p className="haccp-kicker">Accès cuisine</p>
       <h3>Ouvrir la capture sur le téléphone</h3>
-      <div style={{ background: "white", padding: 16, display: "inline-block" }}><QRCodeSVG value={HACCP_CAPTURE_URL} size={200} marginSize={4} /></div>
+      <div className="haccp-qr-code"><QRCodeSVG value={HACCP_CAPTURE_URL} size={200} marginSize={4} /></div>
       <p><a href={HACCP_CAPTURE_URL}>{HACCP_CAPTURE_URL}</a></p>
       <p>À afficher dans la réserve. Ce QR code ne contient aucun secret et ne donne aucun accès sans connexion. Utiliser un compte autorisé du même établissement.</p>
       <p>Il ouvre le registre du serveur Internet, pas les archives locales d’un PC. Connexion Internet requise.</p>
     </section>}
-    {tab === "registre" && <section aria-label="Contrôle sanitaire">
-      <form onSubmit={load}>
-        <label>Lot, produit, fournisseur ou agrément<input className="cmd-input" value={filters.terme} maxLength={255} onChange={(e) => setFilters({ ...filters, terme: e.target.value })} /></label>
+    {tab === "registre" && <section className="workspace-surface haccp-card" aria-label="Contrôle sanitaire">
+      <p className="haccp-kicker">Archives & preuves</p>
+      <h3>Retrouver une étiquette</h3>
+      <form className="haccp-filters" onSubmit={load}>
+        <label className="haccp-search">Lot, produit, fournisseur ou agrément<input value={filters.terme} maxLength={255} onChange={(e) => setFilters({ ...filters, terme: e.target.value })} /></label>
         <label>Du<input type="date" value={filters.date_debut} onChange={(e) => setFilters({ ...filters, date_debut: e.target.value })} /></label>
         <label>Au<input type="date" value={filters.date_fin} onChange={(e) => setFilters({ ...filters, date_fin: e.target.value })} /></label>
-        <label><input type="checkbox" checked={filters.non_conforme_seul} onChange={(e) => setFilters({ ...filters, non_conforme_seul: e.target.checked })} /> Anomalies uniquement</label>
-        <button type="submit" disabled={busy}>Rechercher</button>
-        <button type="button" disabled={busy} onClick={exportCsv}>Exporter le registre CSV de la période</button>
+        <label className="haccp-check haccp-search"><input type="checkbox" checked={filters.non_conforme_seul} onChange={(e) => setFilters({ ...filters, non_conforme_seul: e.target.checked })} /> Anomalies uniquement</label>
+        <button className="haccp-primary" type="submit" disabled={busy}><Search size={18} aria-hidden="true" />Rechercher</button>
+        <button type="button" disabled={busy} onClick={exportCsv}><Download size={18} aria-hidden="true" />Exporter le registre CSV de la période</button>
       </form>
       <p>Dates d’archivage en UTC, fin de journée incluse. L’export couvre toute la période, indépendamment du terme et du filtre d’anomalie.</p>
       {busy && <p role="status">Chargement…</p>}
       {error && <p role="alert">{error}</p>}
-      <ul>{items.map((record) => <li key={record.id} style={{ marginBottom: 16 }}>
+      <ul className="haccp-records">{items.map((record) => <li key={record.id}>
         <strong>{record.nom_produit}</strong> · Lot {record.numero_lot} · {record.type_operation === "ouverture" ? "Ouverture" : "Réception"}
         <p>{record.fournisseur_ou_marque || "Fournisseur non lu"} · {record.type_date} {record.dlc_ou_ddm || "Non lue"} · {record.conforme_reception ? "Étiquette à vérifier" : "Anomalie à vérifier"}</p>
         {record.commentaire_anomalie && <p>{record.commentaire_anomalie}</p>}
         {record.dlc_secondaire && <p>DLC secondaire : {new Date(record.dlc_secondaire).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })} (Europe/Paris)</p>}
-        <button type="button" disabled={busy} onClick={() => showPhoto(record)}>Voir la preuve / imprimer — {record.numero_lot}</button>
+        <button type="button" disabled={busy} onClick={() => showPhoto(record)}><Image size={18} aria-hidden="true" />Voir la preuve / imprimer — {record.numero_lot}</button>
       </li>)}</ul>
       {!busy && items.length === 0 && <p>Aucune fiche affichée. Lancez une recherche ; un résultat vide ne prouve pas une absence de réception.</p>}
-      {photo && <div role="dialog" aria-label="Photo originale de l’étiquette" aria-modal="true">
-        <button onClick={() => { clearPhoto(); setPhoto(null); }}>Fermer la preuve</button>
+      {photo && <div className="haccp-proof" role="dialog" aria-label="Photo originale de l’étiquette" aria-modal="true">
+        <button onClick={() => { clearPhoto(); setPhoto(null); }}><X size={18} aria-hidden="true" />Fermer la preuve</button>
         <img src={photo.src} alt={`Étiquette originale — ${photo.product}`} style={{ maxWidth: "100%", height: "auto" }} />
         <HaccpLabelCapture key={photo.record.id} savedRecord={photo.record} />
       </div>}

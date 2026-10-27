@@ -1,0 +1,210 @@
+ΣIRIUS 1.0.65 - GUIDE D'INSTALLATION ET DE TRACABILITE HACCP
+========================================================
+
+Ce guide accompagne la preparation des applications 1.0.65.
+La presence de ce document ne prouve pas qu'un installateur a deja ete
+construit, publie ou installe. Se reporter au bilan de livraison pour ces etats.
+
+1. NOUVEAUTES
+------------
+- Capture des etiquettes de reception et d'ouverture produit.
+- Analyse de la photo par OpenAI, puis archivage avec la photo originale.
+- Recherche par lot, produit, fournisseur/marque ou agrement.
+- Consultation de la preuve et export CSV pour la periode choisie.
+- QR code fixe pour ouvrir la capture sur un telephone.
+- Reprise d'une ouverture archivee depuis le registre, sans nouvelle photo.
+- Relais d'impression thermique dans l'application Windows.
+- Interface harmonisee avec ΣIRIUS : cartes sombres, accents dores,
+  onglets avec icones et grand bouton de capture adapte au tactile.
+
+L'analyse ne certifie ni la conformite HACCP, ni la chaine du froid, ni une
+temperature mesuree. Relire le produit, le lot et les dates sur l'original.
+Un resultat sans anomalie detectee n'est pas une attestation sanitaire.
+
+2. INSTALLATION WINDOWS
+-----------------------
+Fermer completement ΣIRIUS avant la mise a jour.
+Sauvegarder les donnees utiles avant toute intervention.
+
+Installateur attendu : sirius-setup-1.0.65.exe
+Version portable attendue : SIRIUS-Portable-1.0.65.exe
+
+Choisir un seul mode d'execution a la fois.
+Avec l'installateur, suivre les etapes puis lancer l'application.
+Avec la version portable, lancer directement le fichier executable.
+Portable ne signifie pas que les donnees sont contenues dans l'executable.
+Ne pas supprimer le profil utilisateur pour effectuer une mise a jour.
+
+Pour retrouver les captures du telephone depuis l'application Windows,
+relier le PC au compte ΣIRIUS Cloud du meme etablissement. Les comptes
+entreprise doivent disposer de la permission HACCP.
+Ne pas exposer le backend local ou l'imprimante sur Internet.
+
+3. INSTALLATION ANDROID DIAGNOSTIC
+---------------------------------
+Fichier attendu : SIRIUS-Diagnostic-1.0.65.apk
+
+Il s'agit d'une application de diagnostic, pas d'une mise a jour Google Play.
+Son identifiant est fr.sirius_assistant.app.diagnostic.
+Ne pas desinstaller l'ancienne application Diagnostic pour une simple mise
+a jour : cela pourrait effacer ses donnees locales. Si Android refuse la
+signature, arreter et demander une verification plutot que desinstaller.
+
+Ouvrir l'APK sur le telephone et autoriser ponctuellement l'installation
+depuis cette source si Android le demande. N'utiliser qu'un fichier provenant
+de la livraison ΣIRIUS verifiee. Desactiver cette autorisation apres usage.
+Verifier la version 1.0.65-diagnostic dans les informations de l'application.
+La version Google Play reste une application separee.
+
+4. QR CODE ET ACCES DIRECT
+--------------------------
+Adresse : https://sirius-assistant.fr/haccp
+
+Sur un PC, ouvrir cette adresse, se connecter puis choisir "QR code reserve".
+Scanner le QR affiche avec l'appareil photo du telephone.
+Ouvrir le lien et se connecter au meme compte ou a un compte autorise de
+la meme entreprise.
+
+Le QR ne contient aucun mot de passe et ne donne aucun acces sans connexion.
+Il ouvre la page de capture, pas directement l'appareil photo.
+Il peut etre affiche dans la reserve. Il ne change pas pour chaque produit.
+Le navigateur permet ce parcours sans installer l'APK.
+
+5. PARCOURS QUOTIDIEN
+---------------------
+Reception :
+1) Choisir "Reception".
+2) Renseigner l'operateur.
+3) Appuyer sur "Scanner etiquette" et prendre une photo nette.
+4) Le choix de photo lance automatiquement l'analyse et l'archivage.
+5) Relire les donnees extraites et l'original.
+
+Ouverture :
+1) Scanner immediatement apres l'ouverture reelle du produit.
+2) Choisir "Ouverture produit" et renseigner l'operateur.
+3) Pour calculer une DLC secondaire, activer la regle fabricant/PMS,
+   saisir la duree en heures et sa justification, puis confirmer.
+4) Photographier et verifier le resultat.
+5) Avec le relais Windows configure, utiliser
+   "J'ai verifie : valider et imprimer".
+
+Aucune duree J+3 universelle n'est appliquee.
+Sans regle confirmee, l'ouverture est archivee avec alerte et sans DLC
+secondaire. Une anomalie ou une date incertaine peut aussi bloquer le calcul.
+La duree ne prolonge jamais une DLC initiale.
+L'heure d'ouverture est l'heure serveur a l'envoi : ne pas utiliser ce
+parcours pour antidater une ouverture.
+La confirmation de regle doit etre renouvelee pour le produit suivant.
+
+6. VERIFICATION SANS IMPRIMANTE
+-------------------------------
+Utiliser de preference une vraie reception. Pour un essai, renseigner un
+operateur identifiable, par exemple "TEST - Daniel". L'essai est archive
+reellement et peut consommer du credit OpenAI.
+Ne pas photographier de donnees personnelles.
+
+A. Telephone
+- Ouvrir le QR ou l'adresse /haccp, puis se connecter.
+- Choisir Reception et photographier une etiquette lisible.
+- Comparer produit, lot, nature DLC/DDM et date avec l'original.
+
+B. Registre
+- Ouvrir "Registre / Controle".
+- Rechercher le lot.
+- Choisir "Voir la preuve / imprimer".
+- Verifier la fiche et sa photo originale.
+La recherche et la consultation ne creent pas de nouvelle fiche.
+
+C. PC
+- Ouvrir la meme adresse dans le navigateur du PC.
+- Utiliser le meme compte ou la meme entreprise autorisee.
+- Rechercher le lot et verifier la meme fiche et la meme photo.
+Cela valide le partage telephone-serveur-navigateur PC, pas le relais
+d'impression Electron.
+- Dans l'application Windows reconstruite, verifier aussi le registre apres
+liaison au meme compte Cloud. Un registre vide local ne doit pas etre
+confondu avec le registre du serveur.
+
+D. Export
+- Choisir la periode dans le registre puis exporter le CSV.
+- Ouvrir le fichier et verifier lot, produit et operateur.
+L'export couvre toute la periode, pas seulement le terme recherche.
+Les dates de filtre sont les dates d'archivage en UTC.
+
+E. Ouverture facultative
+- Uniquement pour une ouverture reelle avec une regle fabricant/PMS connue.
+- Verifier l'heure d'ouverture, la justification et la DLC secondaire.
+- Sans imprimante, ne pas activer de poste et ne pas envoyer de demande
+  "valider et imprimer".
+
+7. PANNES ET PROTECTION CONTRE LES DOUBLONS
+------------------------------------------
+Apres une coupure, verifier d'abord le registre.
+Tant que la capture reste ouverte, le bouton de reprise de la meme photo
+reutilise son identifiant et ne doit pas creer une seconde fiche.
+Ne pas changer les parametres d'une tentative deja envoyee.
+Apres fermeture, changement d'onglet ou rechargement, verifier le registre
+avant de reprendre une photo : une nouvelle capture a un nouvel identifiant.
+
+La limite reseau de 45 secondes couvre aussi la lecture de la reponse.
+Il n'y a pas de renvoi automatique aveugle.
+Si le serveur indique que Vision n'est pas configuree, faire configurer
+OPENAI_API_KEY cote serveur. Ne jamais coller une cle dans le chat ou le QR.
+
+Une ouverture ne peut avoir qu'une demande automatique dans sa file.
+Une impression incertaine n'est jamais relancee automatiquement.
+Le secours manuel peut creer un doublon : verifier la file et le papier.
+
+8. A RECEPTION DE L'IMPRIMANTE
+------------------------------
+Installer le pilote Windows officiel et connecter l'imprimante en USB.
+Charger les etiquettes et verifier l'impression dans Windows.
+
+Dans ΣIRIUS Windows, ouvrir HACCP > TRACABILITE, puis le volet de
+configuration de l'imprimante :
+- Selectionner le nom Windows exact de l'imprimante.
+- Saisir la largeur et la hauteur reelles du rouleau en millimetres.
+- Autoriser explicitement l'impression sans dialogue.
+- Enregistrer puis recharger ΣIRIUS.
+
+Le PC doit rester ouvert, connecte et relie au meme perimetre Cloud.
+Le relais interroge la file toutes les 5 secondes.
+Tester une ouverture reelle verifiee et controler la sortie papier :
+- texte complet, lisible, sans decoupe ;
+- produit, lot, ouverture, limite et operateur corrects ;
+- dimensions et detection des espaces entre etiquettes ;
+- resistance des consommables au froid et a l'humidite.
+
+"Transmis a Windows" signifie accepte par le spouleur, pas papier sorti.
+Papier absent, blocage ou perte de confirmation : inspecter avant toute
+impression supplementaire. Ne pas promettre une sortie papier exactement une
+fois. Un seul PC est associe par perimetre ; son remplacement necessite une
+reassociation encadree.
+
+La compatibilite d'un modele commercial, le pilote et le cadrage doivent
+etre confirmes sur le materiel reel. Le Bluetooth proprietaire n'est pas
+pris en charge par ce relais generique.
+
+9. DONNEES ET LIMITES
+---------------------
+Connexion Internet requise pour l'analyse OpenAI et le registre Cloud.
+La photo est transmise a OpenAI : verifier les conditions de confidentialite
+de l'etablissement et du fournisseur avant utilisation.
+Le registre Cloud n'est pas une copie hors ligne synchronisee sur le PC.
+
+Le registre SQL et les photos sont distincts du docstore habituel :
+- haccp.sqlite3 ;
+- storage/etiquettes_haccp/ dans le dossier de donnees du backend.
+Sauvegarder les deux ensemble selon une procedure coherente, sans ecriture
+concurrente. Les sauvegardes automatiques du docstore ne les incluent pas.
+En mode Cloud, les originaux sont sur le serveur, pas seulement sur le PC.
+
+10. CRITERES DE VALIDATION
+--------------------------
+Sans imprimante : analyse reelle, archivage, recherche, preuve, partage
+telephone/PC et export doivent etre controles.
+Avec imprimante : ajouter configuration du relais, USB, cadrage et papier.
+Des tests automatises reussis ne remplacent pas cette recette terrain.
+Un deploiement sain ne prouve pas qu'une cle OpenAI est configuree.
+Ne pas annoncer une validation materielle ou OpenAI tant qu'elle n'a pas
+ete effectivement realisee.

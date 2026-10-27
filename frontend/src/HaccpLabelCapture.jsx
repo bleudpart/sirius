@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Camera, PackageCheck, Scissors, Printer, RotateCcw, ScanLine, LoaderCircle } from "lucide-react";
 import { API_BASE_URL } from "./lib/api";
 import { printHaccpDocument } from "./haccpDocuments";
 import HaccpPrinter, { haccpPrintRequest, haccpPrintStatus } from "./HaccpPrinter";
 import { haccpFetch } from "./haccpRequest";
+import "./HaccpWorkspace.css";
 
 const API = `${API_BASE_URL}/haccp`;
 const displayTime = (value) => value ? new Date(value).toLocaleString("fr-FR", { timeZone: "Europe/Paris" }) : "Non calculée";
@@ -132,32 +134,31 @@ export default function HaccpLabelCapture({ savedRecord = null }) {
   };
 
   return (
-    <section aria-label="Capture des étiquettes ΣIRIUS" className="hc-section">
+    <section aria-label="Capture des étiquettes ΣIRIUS" className="haccp-ui workspace-surface haccp-card haccp-capture">
+      <p className="haccp-kicker">{savedRecord ? "Preuve archivée" : "Capture intelligente"}</p>
       <h3>ΣIRIUS · {savedRecord ? "Vérifier l’étiquette archivée" : "Scanner une étiquette"}</h3>
-      {!savedRecord && <p>1. Choisir l’action · 2. Photographier · 3. Vérifier et imprimer.</p>}
-      <p>Analyse OpenAI, archivage sur le serveur. Aucun contrôle physique ou de température n’est certifié.</p>
-      {!savedRecord && !result && <details><summary>Configurer l’imprimante (une seule fois)</summary><HaccpPrinter /></details>}
+      {!savedRecord && <ol className="haccp-steps" aria-label="Étapes de capture"><li><span>1</span>Choisir l’action</li><li><span>2</span>Photographier</li><li><span>3</span>Vérifier et imprimer</li></ol>}
       {!savedRecord && !result && <form onSubmit={save}>
-        <fieldset disabled={busy} style={{ display: "grid", gap: 12, minWidth: 0 }}>
+        <fieldset disabled={busy} className="haccp-capture-fields">
           <legend>Action</legend>
-          <div role="group" aria-label="Type d’opération">
-            <button type="button" className={`hc-tab ${mode === "reception" ? "on" : ""}`} aria-pressed={mode === "reception"} onClick={() => changeMode("reception")}>Réception</button>
-            <button type="button" className={`hc-tab ${mode === "ouverture" ? "on" : ""}`} aria-pressed={mode === "ouverture"} onClick={() => changeMode("ouverture")}>Ouverture produit</button>
+          <div className="haccp-modes" role="group" aria-label="Type d’opération">
+            <button type="button" aria-pressed={mode === "reception"} onClick={() => changeMode("reception")}><PackageCheck size={20} aria-hidden="true" />Réception</button>
+            <button type="button" aria-pressed={mode === "ouverture"} onClick={() => changeMode("ouverture")}><Scissors size={20} aria-hidden="true" />Ouverture produit</button>
           </div>
           <label>Opérateur
-            <input className="cmd-input" value={operator} maxLength={100} required onChange={(e) => setOperator(e.target.value)} />
+            <input value={operator} maxLength={100} required onChange={(e) => setOperator(e.target.value)} />
           </label>
           {mode === "ouverture" && <>
             <p>L’heure d’ouverture enregistrée sera celle du serveur à l’envoi. Scanner immédiatement après l’ouverture ; aucune durée J+3 n’est présumée.</p>
-            <label><input type="checkbox" checked={hasRule} onChange={(e) => { setHasRule(e.target.checked); setConfirmed(false); }} /> Appliquer une durée fabricant/PMS validée pour ce produit et ses conditions de stockage</label>
+            <label className="haccp-check"><input type="checkbox" checked={hasRule} onChange={(e) => { setHasRule(e.target.checked); setConfirmed(false); }} /> Appliquer une durée fabricant/PMS validée pour ce produit et ses conditions de stockage</label>
             {hasRule ? <>
               <label>Durée après ouverture (heures entières)
-                <input className="cmd-input" type="number" min="1" step="1" value={hours} required onChange={(e) => { setHours(e.target.value); setConfirmed(false); }} />
+                <input type="number" min="1" step="1" value={hours} required onChange={(e) => { setHours(e.target.value); setConfirmed(false); }} />
               </label>
               <label>Justification : indication fabricant ou référence PMS
-                <textarea className="cmd-input" value={reason} maxLength={500} required onChange={(e) => { setReason(e.target.value); setConfirmed(false); }} />
+                <textarea value={reason} maxLength={500} required onChange={(e) => { setReason(e.target.value); setConfirmed(false); }} />
               </label>
-              <label><input type="checkbox" checked={confirmed} required onChange={(e) => setConfirmed(e.target.checked)} /> Je confirme cette durée et ses conditions pour le produit photographié.</label>
+              <label className="haccp-check"><input type="checkbox" checked={confirmed} required onChange={(e) => setConfirmed(e.target.checked)} /> Je confirme cette durée et ses conditions pour le produit photographié.</label>
             </> : <p role="status">Sans règle confirmée : ouverture archivée avec alerte, sans DLC secondaire ni étiquette d’utilisation.</p>}
           </>}
           <input ref={input} type="file" style={{ display: "none" }} accept="image/jpeg,image/png,image/webp" capture="environment" aria-label="Photo de l’étiquette" onChange={(e) => {
@@ -169,13 +170,20 @@ export default function HaccpLabelCapture({ savedRecord = null }) {
             setPreview(previewRef.current);
             if (selected) save(null, selected);
           }} />
-          <button type="button" className="cmd-send" style={{ minHeight: 56 }} disabled={!operator.trim() || (mode === "ouverture" && hasRule && (!confirmed || !reason.trim() || !Number.isSafeInteger(Number(hours)) || Number(hours) <= 0))} onClick={() => input.current?.click()}>{busy ? "Analyse et archivage…" : "Scanner étiquette"}</button>
-          {file && error && <button type="submit" className="cmd-send">Réessayer la même photo sans doublon</button>}
+          <button type="button" className="haccp-scan haccp-primary" aria-busy={busy} disabled={!operator.trim() || (mode === "ouverture" && hasRule && (!confirmed || !reason.trim() || !Number.isSafeInteger(Number(hours)) || Number(hours) <= 0))} onClick={() => input.current?.click()}>
+            {busy ? <LoaderCircle className="haccp-loading" size={30} aria-hidden="true" /> : <Camera size={30} aria-hidden="true" />}
+            <span>{busy ? "Analyse et archivage…" : "Scanner étiquette"}</span>
+            <ScanLine size={22} aria-hidden="true" />
+          </button>
+          <p className="haccp-camera-hint">Photographiez une étiquette nette et complète. L’analyse démarre dès le choix de la photo.</p>
+          {file && error && <button type="submit"><RotateCcw size={18} aria-hidden="true" />Réessayer la même photo sans doublon</button>}
         </fieldset>
       </form>}
+      <p className="haccp-notice">Analyse OpenAI, archivage sur le serveur. Aucun contrôle physique ou de température n’est certifié.</p>
+      {!savedRecord && !result && <details><summary>Configurer l’imprimante (une seule fois)</summary><HaccpPrinter /></details>}
       {preview && <img src={preview} alt="Photo originale à relire avant validation" style={{ maxWidth: "100%", maxHeight: 500, objectFit: "contain" }} />}
       {error && <p role="alert">{error}</p>}
-      {result && <div role="status">
+      {result && <div className={`haccp-result ${result.conforme_reception ? "" : "haccp-result-warning"}`} role="status">
         <h4>{result.conforme_reception ? "Aucune anomalie détectée sur l’étiquette — à vérifier" : "Vérification requise — ne pas valider l’utilisation"}</h4>
         <p>{result.nom_produit} · Lot {result.numero_lot} · {result.type_date} : {result.dlc_ou_ddm || "Illisible ou absente"}</p>
         {result.commentaire_anomalie && <p>{result.commentaire_anomalie}</p>}
@@ -184,19 +192,19 @@ export default function HaccpLabelCapture({ savedRecord = null }) {
           <p>Durée déclarée : {result.duree_conservation_heures ?? "Non renseignée"} h · Référence : {result.justification_duree || "Aucune"}</p>
           {result.dlc_secondaire && result.conforme_reception && <>
             <p>Vérifiez la photo, le produit, le lot et les dates avant de valider.</p>
-            <button className="cmd-send" style={{ minHeight: 56 }} disabled={busy || !!printState} onClick={queuePrint}>J’ai vérifié : valider et imprimer</button>
+            <button className="haccp-primary" disabled={busy || !!printState} onClick={queuePrint}><Printer size={20} aria-hidden="true" />J’ai vérifié : valider et imprimer</button>
             {printState && <button disabled={busy} onClick={checkPrintState}>Voir l’état d’impression</button>}
-            <details><summary>Secours manuel (risque de doublon)</summary><p>Uniquement si aucune demande n’a été envoyée au relais. Vérifiez le registre et le papier avant toute impression manuelle.</p><button className="cmd-send" disabled={busy || !!printState} onClick={print}>Imprimer l’étiquette d’ouverture manuellement</button></details>
+            <details><summary>Secours manuel (risque de doublon)</summary><p>Uniquement si aucune demande n’a été envoyée au relais. Vérifiez le registre et le papier avant toute impression manuelle.</p><button disabled={busy || !!printState} onClick={print}>Imprimer l’étiquette d’ouverture manuellement</button></details>
           </>}
           {printState && <p role="status">{printState}</p>}
         </>}
       </div>}
-      {result && !savedRecord && <button type="button" className="cmd-send" disabled={busy} onClick={() => {
+      {result && !savedRecord && <button type="button" disabled={busy} onClick={() => {
         setResult(null); setError(""); setPrintState(""); setConfirmed(false); setFile(null);
         captureId.current = null; submitted.current = null;
         if (previewRef.current) URL.revokeObjectURL(previewRef.current);
         previewRef.current = null; setPreview(null);
-      }}>Scanner une autre étiquette</button>}
+      }}><Camera size={20} aria-hidden="true" />Scanner une autre étiquette</button>}
     </section>
   );
 }

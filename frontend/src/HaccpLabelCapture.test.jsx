@@ -71,6 +71,9 @@ test("reception stays the default and camera formats are explicit", async () => 
   expect(input.accept).toBe("image/jpeg,image/png,image/webp");
   expect(button("Réception").getAttribute("aria-pressed")).toBe("true");
   expect(button("Scanner étiquette").disabled).toBe(false);
+  expect(button("Scanner étiquette").classList.contains("haccp-scan")).toBe(true);
+  expect(button("Scanner étiquette").classList.contains("cmd-send")).toBe(false);
+  expect(button("Scanner étiquette").querySelector('svg[aria-hidden="true"]')).not.toBeNull();
   await choosePhoto();
   const [url, options] = global.fetch.mock.calls[0];
   expect(url).toMatch(/\/api\/haccp\/etiquettes\/scan$/);
