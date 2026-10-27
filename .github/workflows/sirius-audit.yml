@@ -58,11 +58,16 @@ jobs:
           python -m pytest tests/test_live_work.py tests/test_speech_vocabulary.py -q
           python -m pytest tests/test_news_command_routing.py -q
           python -m py_compile duerp.py safety_documentation.py haccp_sheet_documents.py alexa_integration.py tuya_integration.py
+          python -m py_compile haccp_database.py models/haccp.py models/haccp_printing.py schemas/haccp.py services/haccp_vision.py services/haccp_opening.py routers/haccp.py routers/haccp_printing.py
+          python -m pytest tests/test_haccp_labels.py tests/test_haccp_printing.py -q
           python -m pytest tests/test_duerp.py tests/test_safety_documentation.py tests/test_haccp_sheet_documents.py tests/test_alexa_tuya.py tests/test_speech_elisions.py tests/test_version_consistency.py -q
           python -m pytest tests/test_proactive.py tests/test_briefing_intent.py tests/test_briefing_news.py tests/test_sports_news.py tests/test_gemini_tts.py tests/test_enterprise.py tests/test_sirius_doctor.py tests/test_auth_api_unit.py tests/test_account_inactivity.py tests/test_account_deletion.py tests/test_server_hardening.py tests/test_local_docstore.py tests/test_work_dossiers.py tests/test_brain_response_latency.py tests/test_sirius_targeted_research.py tests/test_sirius_core_prompt.py tests/test_voice_corrections.py tests/test_stt_fallback.py -q
         working-directory: backend
       - name: Frontend automated tests
         run: npm test -- --watchAll=false --runInBand
+        working-directory: frontend
+      - name: Windows printer bridge tests (simulated)
+        run: node --test scripts/haccp-printer.test.cjs scripts/native-automation.test.cjs
         working-directory: frontend
       - name: Run SIRIUS audit
         run: python scripts/sirius_audit.py

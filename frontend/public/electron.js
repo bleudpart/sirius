@@ -11,6 +11,7 @@ const { startBackend, stopBackend } = require("./electron/backend_process");
 const { setupAutoUpdater } = require("./electron/auto_update");
 const { captureRectangle } = require("./electron/capture_region");
 const { NativeAutomation, installNativeAutomation } = require("./electron/native_automation");
+const { installHaccpPrinter } = require("./electron/haccp_printer");
 
 // SIRIUS — Application de bureau Windows (Electron)
 // Charge le HUD React compilé (dossier build) et accorde l'accès au micro.
@@ -83,6 +84,8 @@ function createWindow() {
       preload: mediaPreload,
       // Autorise l'accès aux ressources locales (ws://localhost:8765)
       webSecurity: true,
+      // Le relais d'impression HACCP (poll toutes les 5 s) doit continuer fenêtre minimisée.
+      backgroundThrottling: false,
     },
   });
 
@@ -213,6 +216,8 @@ app.whenReady().then(async () => {
     home: app.getPath("home"),
   });
   installNativeAutomation({ ipcMain, manager: nativeAutomation, getWindow: () => mainWindow,
+    origin: () => new URL(baseUrl()).origin });
+  installHaccpPrinter({ ipcMain, app, BrowserWindow, getWindow: () => mainWindow,
     origin: () => new URL(baseUrl()).origin });
 
   // Raccourci global : Alt+Espace ouvre/ferme l'overlay (barre rapide type Spotlight)

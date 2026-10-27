@@ -20,6 +20,7 @@ api.sirius-assistant.fr {
 	root * /var/www/sirius/current
 	encode zstd gzip
 	header X-Content-Type-Options nosniff
+	redir /haccp/ /haccp 308
 
 	handle /static/* {
 		root * /var/www/sirius/assets

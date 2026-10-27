@@ -7,6 +7,7 @@ import {
 import SectionSheets from "./HaccpSheets";
 import DuerpSection from "./DuerpSection";
 import SafetyDocumentation from "./SafetyDocumentation";
+import HaccpWorkspace from "./HaccpWorkspace";
 import { API_BASE_URL } from "./lib/api";
 
 const API = `${API_BASE_URL}/haccp`;
@@ -79,6 +80,7 @@ function SectionTrace({ focusId }) {
 
   return (
     <div className="hc-section" data-testid="haccp-section-trace">
+      <HaccpWorkspace />
       <div className="hc-form">
         <input className="cmd-input" placeholder="Produit *" value={form.produit} onChange={(e) => setForm({ ...form, produit: e.target.value })} data-testid="haccp-trace-produit" />
         <input className="cmd-input" placeholder="N° de lot" value={form.lot} onChange={(e) => setForm({ ...form, lot: e.target.value })} data-testid="haccp-trace-lot" />

@@ -44,3 +44,10 @@ contextBridge.exposeInMainWorld("siriusDesktop", {
   toggleFullscreen: () => ipcRenderer.invoke("sirius-window-toggle-fullscreen"),
   isFullscreen: () => ipcRenderer.invoke("sirius-window-is-fullscreen"),
 });
+
+contextBridge.exposeInMainWorld("siriusHaccpPrinter", {
+  getConfig: () => ipcRenderer.invoke("sirius-haccp-printer-get-config"),
+  listPrinters: () => ipcRenderer.invoke("sirius-haccp-printer-list"),
+  configure: (config) => ipcRenderer.invoke("sirius-haccp-printer-configure", config),
+  printJob: (job) => ipcRenderer.invoke("sirius-haccp-printer-print", job),
+});

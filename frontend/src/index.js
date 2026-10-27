@@ -10,6 +10,7 @@ import MediaHudWindow from "@/MediaHudWindow";
 import FdeErrorBoundary from "@/FdeErrorBoundary";
 import { initFdeOmega } from "@/fdeOmega";
 import PublicStore from "@/PublicStore";
+import HaccpWorkspace from "@/HaccpWorkspace";
 import "./siriusVisualTheme.css";
 import "./moduleWindowLayout.css";
 import "./pantheonTheme.css";
@@ -28,6 +29,7 @@ const queryClient = new QueryClient({
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 const isMediaHud = new URLSearchParams(window.location.search).has("mediaHud");
+const isHaccpCapture = /^\/haccp\/?$/.test(window.location.pathname);
 const isPublicStore = ["sirius-assistant.fr", "www.sirius-assistant.fr"].includes(window.location.hostname)
   || ["/acheter", "/compte"].includes(window.location.pathname);
 const stopFdeOmega = initFdeOmega();
@@ -37,7 +39,7 @@ window.addEventListener("beforeunload", stopFdeOmega, { once: true });
 root.render(
   <QueryClientProvider client={queryClient}>
     <FdeErrorBoundary>
-      {isPublicStore ? <PublicStore /> : (
+      {isHaccpCapture ? <AuthGate><HaccpWorkspace standalone /></AuthGate> : isPublicStore ? <PublicStore /> : (
         <AuthGate>
           {isMediaHud ? <MediaHudWindow /> : <App />}
         </AuthGate>

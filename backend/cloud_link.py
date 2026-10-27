@@ -172,6 +172,31 @@ async def relay_get_json(path: str) -> dict:
     return data
 
 
+async def relay_haccp_print(path: str, payload: dict | None = None) -> dict:
+    """Relais limite aux commandes d'impression, avec la session Cloud du PC."""
+    response = await _send(
+        "POST" if payload is not None else "GET",
+        "/api/haccp/impression" + path,
+        **({"json": payload} if payload is not None else {}),
+    )
+    if response.status_code != 200:
+        raise HTTPException(response.status_code, _detail(response, "La file d'impression Cloud est indisponible."))
+    try:
+        data = response.json()
+    except ValueError as error:
+        raise HTTPException(502, "La reponse de la file d'impression Cloud est illisible.") from error
+    if not isinstance(data, dict):
+        raise HTTPException(502, "La reponse de la file d'impression Cloud est invalide.")
+    return data
+
+
+async def relay_haccp_registry(method: str, path: str, **kwargs) -> httpx.Response:
+    response = await _send(method, "/api/haccp" + path, **kwargs)
+    if not response.is_success:
+        raise HTTPException(response.status_code, _detail(response, "Le registre HACCP Cloud est indisponible."))
+    return response
+
+
 async def relay_stt(filename: str, data: bytes, content_type: str, *, vocabulary: list[str] | None = None) -> dict:
     # Explicit per-request text hints only; never upload a stored voice profile.
     from speech_vocabulary import confirmed_vocabulary

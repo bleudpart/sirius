@@ -2293,6 +2293,28 @@ api_router.include_router(make_outlook_router(db))
 from haccp import make_haccp_router
 api_router.include_router(make_haccp_router(db))
 
+from routers.haccp import make_haccp_router as make_haccp_labels_router
+
+
+async def _haccp_labels_scope(request: Request) -> str:
+    from enterprise import require_permission
+
+    if cloud_link.relay_allowed() and not is_direct_local_request(request):
+        raise HTTPException(403, "Le relais HACCP Cloud est reserve a ce PC.")
+    user = await require_user(request, db)
+    if user.get("company_id"):
+        membership = await db.enterprise_members.find_one({
+            "company_id": user["company_id"], "user_id": user["user_id"],
+        })
+        require_permission(membership or {}, "haccp")
+        return f"company:{user['company_id']}"
+    return f"user:{user['user_id']}"
+
+
+api_router.include_router(make_haccp_labels_router(_haccp_labels_scope))
+from routers.haccp_printing import make_haccp_print_router
+api_router.include_router(make_haccp_print_router(_haccp_labels_scope, is_direct_local_request))
+
 # PLANS# : plans 2D cotés (style architecte) + export DXF AutoCAD
 from floorplan import make_floorplan_router
 api_router.include_router(make_floorplan_router(_rate_ok))

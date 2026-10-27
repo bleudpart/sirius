@@ -36,6 +36,7 @@ import ModulesMenu from "@/ModulesMenu";
 import MobileNavigation from "@/MobileNavigation";
 import { WorkspaceClock, WorkspaceNavigation, WorkspaceSummary } from "@/components/WorkspaceRails";
 import { useAuth } from "@/AuthGate";
+import { useHaccpPrinterRelay } from "./HaccpPrinter";
 import useMailCache from "@/hooks/useMailCache";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
@@ -1040,6 +1041,7 @@ function App() {
   const [showNummarius, setShowNummarius] = useState(false);
   const auth = useAuth() || {};
   const authUser = auth.user;
+  const haccpPrinterRelay = useHaccpPrinterRelay(authUser?.user_id || authUser?.id || authUser?.email);
   const [showNativeAutomation, setShowNativeAutomation] = useState(false);
   useEffect(() => {
     updateWorkConversationContext(null);
@@ -7089,6 +7091,9 @@ function App() {
       data-guardian-active={hudTheme.guardian.visible}
       data-testid="sirius-hud"
     >
+      {haccpPrinterRelay.error && <div role="alert" style={{ position: "fixed", bottom: 12, left: 12, zIndex: 10000, background: "#291313", padding: 12, maxWidth: 450 }}>
+        Impression HACCP arrêtée : {haccpPrinterRelay.error} Vérifiez le poste puis rechargez ΣIRIUS. Aucun nouvel essai automatique.
+      </div>}
       <GettingStarted
         key={gettingStartedKey(authUser)}
         storageKey={gettingStartedKey(authUser)}

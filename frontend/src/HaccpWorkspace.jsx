@@ -1,0 +1,133 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
+import HaccpLabelCapture from "./HaccpLabelCapture";
+import { API_BASE_URL } from "./lib/api";
+import { haccpFetch } from "./haccpRequest";
+
+const ROOT = `${API_BASE_URL}/haccp/registre`;
+export const HACCP_CAPTURE_URL = "https://sirius-assistant.fr/haccp";
+
+async function checked(response) {
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(typeof body?.detail === "string" ? body.detail : `Registre indisponible (${response.status}).`);
+  }
+  return response;
+}
+
+export default function HaccpWorkspace({ standalone = false }) {
+  const [tab, setTab] = useState("capture");
+  const [filters, setFilters] = useState({ terme: "", date_debut: "", date_fin: "", non_conforme_seul: false });
+  const [items, setItems] = useState([]);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [photo, setPhoto] = useState(null);
+  const photoRef = useRef(null);
+  const controller = useRef(null);
+  const requestNumber = useRef(0);
+  const mounted = useRef(true);
+  const clearPhoto = useCallback(() => {
+    if (photoRef.current) URL.revokeObjectURL(photoRef.current);
+    photoRef.current = null;
+  }, []);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; controller.current?.abort(); clearPhoto(); };
+  }, [clearPhoto]);
+  function params(exporting = false) {
+    const result = new URLSearchParams();
+    Object.entries(filters).forEach(([name, value]) => {
+      if (value && (!exporting || ["date_debut", "date_fin"].includes(name))) result.set(name, String(value));
+    });
+    return result;
+  }
+  async function load(event) {
+    event?.preventDefault();
+    const number = ++requestNumber.current;
+    controller.current?.abort();
+    const next = new AbortController();
+    controller.current = next;
+    setBusy(true); setError(""); setItems([]);
+    try {
+      const records = await haccpFetch(`${ROOT}/recherche?${params()}`, { signal: next.signal },
+        async (response) => (await checked(response)).json());
+      if (!Array.isArray(records)) throw new Error("Réponse du registre invalide.");
+      if (mounted.current && number === requestNumber.current) setItems(records);
+    } catch (failure) {
+      if (failure.name !== "AbortError" && mounted.current && number === requestNumber.current) setError(failure.message);
+    } finally {
+      if (mounted.current && number === requestNumber.current) setBusy(false);
+    }
+  }
+  async function exportCsv() {
+    setError(""); setBusy(true);
+    try {
+      const blob = await haccpFetch(`${ROOT}/export-csv?${params(true)}`, {},
+        async (response) => (await checked(response)).blob());
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url; link.download = `registre-haccp-${new Date().toISOString().replace(/[:.]/g, "-")}.csv`;
+      document.body.appendChild(link); link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (failure) { if (mounted.current) setError(failure.message); }
+    finally { if (mounted.current) setBusy(false); }
+  }
+  async function showPhoto(record) {
+    setError(""); setBusy(true); clearPhoto(); setPhoto(null);
+    try {
+      // L'URL provient toujours de l'API configuree, jamais d'un lien arbitraire du resultat.
+      const blob = await haccpFetch(`${ROOT}/${record.id}/photo`, {}, async (response) => {
+        await checked(response);
+        if (!response.headers.get("content-type")?.startsWith("image/")) throw new Error("La preuve reçue n’est pas une image.");
+        return response.blob();
+      });
+      if (mounted.current) {
+        photoRef.current = URL.createObjectURL(blob);
+        setPhoto({ src: photoRef.current, product: record.nom_produit, record });
+      }
+    } catch (failure) { if (mounted.current) setError(failure.message); }
+    finally { if (mounted.current) setBusy(false); }
+  }
+  return <section aria-label="Registre de réception et ouverture ΣIRIUS" style={standalone ? { maxWidth: 850, margin: "auto", padding: 16, minHeight: "100vh", color: "#eee", background: "#111827", overflowWrap: "anywhere" } : undefined}>
+    <h2>ΣIRIUS · Étiquettes cuisine</h2>
+    <nav aria-label="Parcours des étiquettes">
+      <button type="button" className="hc-tab" aria-pressed={tab === "capture"} onClick={() => setTab("capture")}>Réception / Ouverture</button>
+      <button type="button" className="hc-tab" aria-pressed={tab === "registre"} onClick={() => setTab("registre")}>Registre / Contrôle</button>
+      <button type="button" className="hc-tab" aria-pressed={tab === "qr"} onClick={() => setTab("qr")}>QR code réserve</button>
+    </nav>
+    {tab === "capture" && <HaccpLabelCapture />}
+    {tab === "qr" && <section aria-label="QR code de capture">
+      <h3>Ouvrir la capture sur le téléphone</h3>
+      <div style={{ background: "white", padding: 16, display: "inline-block" }}><QRCodeSVG value={HACCP_CAPTURE_URL} size={200} marginSize={4} /></div>
+      <p><a href={HACCP_CAPTURE_URL}>{HACCP_CAPTURE_URL}</a></p>
+      <p>À afficher dans la réserve. Ce QR code ne contient aucun secret et ne donne aucun accès sans connexion. Utiliser un compte autorisé du même établissement.</p>
+      <p>Il ouvre le registre du serveur Internet, pas les archives locales d’un PC. Connexion Internet requise.</p>
+    </section>}
+    {tab === "registre" && <section aria-label="Contrôle sanitaire">
+      <form onSubmit={load}>
+        <label>Lot, produit, fournisseur ou agrément<input className="cmd-input" value={filters.terme} maxLength={255} onChange={(e) => setFilters({ ...filters, terme: e.target.value })} /></label>
+        <label>Du<input type="date" value={filters.date_debut} onChange={(e) => setFilters({ ...filters, date_debut: e.target.value })} /></label>
+        <label>Au<input type="date" value={filters.date_fin} onChange={(e) => setFilters({ ...filters, date_fin: e.target.value })} /></label>
+        <label><input type="checkbox" checked={filters.non_conforme_seul} onChange={(e) => setFilters({ ...filters, non_conforme_seul: e.target.checked })} /> Anomalies uniquement</label>
+        <button type="submit" disabled={busy}>Rechercher</button>
+        <button type="button" disabled={busy} onClick={exportCsv}>Exporter le registre CSV de la période</button>
+      </form>
+      <p>Dates d’archivage en UTC, fin de journée incluse. L’export couvre toute la période, indépendamment du terme et du filtre d’anomalie.</p>
+      {busy && <p role="status">Chargement…</p>}
+      {error && <p role="alert">{error}</p>}
+      <ul>{items.map((record) => <li key={record.id} style={{ marginBottom: 16 }}>
+        <strong>{record.nom_produit}</strong> · Lot {record.numero_lot} · {record.type_operation === "ouverture" ? "Ouverture" : "Réception"}
+        <p>{record.fournisseur_ou_marque || "Fournisseur non lu"} · {record.type_date} {record.dlc_ou_ddm || "Non lue"} · {record.conforme_reception ? "Étiquette à vérifier" : "Anomalie à vérifier"}</p>
+        {record.commentaire_anomalie && <p>{record.commentaire_anomalie}</p>}
+        {record.dlc_secondaire && <p>DLC secondaire : {new Date(record.dlc_secondaire).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })} (Europe/Paris)</p>}
+        <button type="button" disabled={busy} onClick={() => showPhoto(record)}>Voir la preuve / imprimer — {record.numero_lot}</button>
+      </li>)}</ul>
+      {!busy && items.length === 0 && <p>Aucune fiche affichée. Lancez une recherche ; un résultat vide ne prouve pas une absence de réception.</p>}
+      {photo && <div role="dialog" aria-label="Photo originale de l’étiquette" aria-modal="true">
+        <button onClick={() => { clearPhoto(); setPhoto(null); }}>Fermer la preuve</button>
+        <img src={photo.src} alt={`Étiquette originale — ${photo.product}`} style={{ maxWidth: "100%", height: "auto" }} />
+        <HaccpLabelCapture key={photo.record.id} savedRecord={photo.record} />
+      </div>}
+    </section>}
+  </section>;
+}
