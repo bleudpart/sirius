@@ -62,6 +62,11 @@ test("capture is connected to the existing traceability section without removing
   await act(async () => root.render(<HaccpModule />));
   expect(host.querySelector('[aria-label="Capture des étiquettes ΣIRIUS"]')).not.toBeNull();
   expect(host.querySelector('[data-testid="haccp-trace-add"]')).not.toBeNull();
+  const shortcut = host.querySelector("a.haccp-capture-link");
+  expect(shortcut.href).toBe("https://sirius-assistant.fr/haccp");
+  expect(shortcut.target).toBe("_blank");
+  expect(shortcut.rel).toBe("noopener noreferrer");
+  expect(shortcut.textContent).toBe("Scanner une étiquette");
 });
 
 test("reception stays the default and camera formats are explicit", async () => {

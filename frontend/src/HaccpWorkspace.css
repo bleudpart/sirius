@@ -11,6 +11,16 @@
   color-scheme: dark;
 }
 .haccp-ui, .haccp-ui * { box-sizing: border-box; }
+.haccp-module-shortcut { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 12px 16px; }
+.haccp-ui a.haccp-capture-link {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  min-height: 48px; padding: 12px 18px; border: 1px solid var(--haccp-border);
+  border-radius: 8px; background: #081522; color: var(--haccp-gold);
+  font-weight: 600; text-decoration: none;
+}
+.haccp-capture-link svg { flex-shrink: 0; color: var(--workspace-cyan, #91e6f2); }
+.haccp-ui a.haccp-capture-link:hover { border-color: var(--haccp-gold); background: #102637; }
+.haccp-module-shortcut p { margin: 0; font-size: 12px; }
 .haccp-workspace {
   width: 100%; min-width: 0; display: grid; gap: 20px;
   border: 1px solid var(--haccp-border); border-radius: 8px;

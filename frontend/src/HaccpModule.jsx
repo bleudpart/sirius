@@ -2,12 +2,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   X, ClipboardCheck, Tag, Thermometer, ShieldCheck, AlertTriangle, SprayCan,
-  Wheat, FileText, Plus, Trash2, Check, Printer, FileDown, Mic,
+  Wheat, FileText, Plus, Trash2, Check, Printer, FileDown, Mic, Camera, ExternalLink,
 } from "lucide-react";
 import SectionSheets from "./HaccpSheets";
 import DuerpSection from "./DuerpSection";
 import SafetyDocumentation from "./SafetyDocumentation";
-import HaccpWorkspace from "./HaccpWorkspace";
+import HaccpWorkspace, { HACCP_CAPTURE_URL } from "./HaccpWorkspace";
 import { API_BASE_URL } from "./lib/api";
 
 const API = `${API_BASE_URL}/haccp`;
@@ -557,6 +557,14 @@ export default function HaccpModule({ onClose, initialSource }) {
         <button className="setup-close zeus-close" onClick={() => { if (mayLeave()) onClose(); }} data-testid="haccp-close-btn"><X size={18} /></button>
       </header>
       <div className="prime-sub">HYGIÈNE ALIMENTAIRE · DUERP · PERSONNEL &amp; SÉCURITÉ</div>
+      <div className="haccp-ui haccp-module-shortcut">
+        <a className="haccp-capture-link" href={HACCP_CAPTURE_URL} target="_blank" rel="noopener noreferrer">
+          <Camera size={20} aria-hidden="true" />
+          <span>Scanner une étiquette</span>
+          <ExternalLink size={16} aria-hidden="true" />
+        </a>
+        <p>Capture, registre et QR code · Page Cloud · Connexion au même établissement requise.</p>
+      </div>
       {ov && (
         <div className="hc-alerts" data-testid="haccp-alerts">
           <span className={ov.dlc_alertes ? "ko" : "ok"}>DLC : {ov.dlc_alertes} alerte(s)</span>

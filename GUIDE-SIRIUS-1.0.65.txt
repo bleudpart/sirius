@@ -61,6 +61,8 @@ La version Google Play reste une application separee.
 Adresse : https://sirius-assistant.fr/haccp
 
 Sur un PC, ouvrir cette adresse, se connecter puis choisir "QR code reserve".
+Dans le module HACCP, le raccourci "Scanner une etiquette" en haut du module
+ouvre directement cette page Cloud sans quitter le document en cours.
 Scanner le QR affiche avec l'appareil photo du telephone.
 Ouvrir le lien et se connecter au meme compte ou a un compte autorise de
 la meme entreprise.
