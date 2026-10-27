@@ -27,6 +27,17 @@ reste visible et reflète les événements réels de lecture et de pause. La lec
 volume initial de 12 %, se coupe lors du lancement de la démonstration vidéo ou
 du passage de l'onglet en arrière-plan, et peut être relancée manuellement.
 
+### Protection vocale Windows
+
+Sous Windows empaqueté, la vérification vocale utilise le processus isolé
+`sirius-voice-worker.exe`, livré avec le backend, et non l'exécutable serveur
+comme interpréteur Python. L'activation reste explicite : le modèle, son SHA256,
+le seuil et FFmpeg doivent être configurés dans le `.env` du dossier de données.
+Chaque compte doit ensuite enregistrer ses références avec consentement dans
+« Outils → Ma voix » ; aucune empreinte distante n'est transférée automatiquement.
+Les consignes de préparation concernent le microphone de l'ordinateur, du casque
+ou du téléphone et s'appliquent aux versions Windows et Android.
+
 ### Compte sur la boutique
 
 La boutique propose « Connexion / Créer un compte » sur `/compte`. Cette page
@@ -36,6 +47,11 @@ Elle ne monte ni le HUD ni le boot, ne déclenche aucun paiement et ne modifie
 pas les droits d'accès. Le compte créé peut être utilisé dans l'application.
 
 ### Habillage Panthéon
+
+Le bouton Réglages du bandeau conserve son action et sa cible tactile de 44 px :
+icône à curseurs, fond bleu nuit et contour doré discret, sans halo au survol.
+Il reste sans texte visible à toutes les largeurs pour éviter un libellé coupé ;
+son nom accessible et son infobulle indiquent « Réglages ».
 
 Le thème commun `frontend/src/pantheonTheme.css` est chargé après les contrats de
 fenêtres : bleu nuit, or patiné, coins architecturaux et titres lapidaires avec

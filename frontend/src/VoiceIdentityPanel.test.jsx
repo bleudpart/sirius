@@ -59,6 +59,8 @@ test("the guided page requests no microphone and requires consent, preview confi
   expect(record).not.toHaveBeenCalled();
   expect(api.enroll).not.toHaveBeenCalled();
   expect(host.querySelector('[aria-current="step"]').textContent).toContain("Préparer");
+  expect(host.textContent).toContain("microphone de votre ordinateur, de votre casque ou de votre téléphone");
+  expect(host.textContent).not.toContain("Gardez le téléphone");
   await click("Commencer les enregistrements");
   expect(host.querySelector('[aria-current="step"]').textContent).toContain("Préparer");
   await prepare();

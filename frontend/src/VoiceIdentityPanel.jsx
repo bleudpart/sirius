@@ -208,7 +208,7 @@ export default function VoiceIdentityPanel({ account, onClose, onDismiss = onClo
         </ol>
         {step === 0 && <div className="voice-studio-card">
           <h3>Commençons au calme</h3>
-          <ul className="voice-studio-checklist"><li>Coupez la télévision et la musique.</li><li>Gardez le téléphone près de vous, sans le coller à la bouche.</li><li>Lisez les trois phrases avec votre voix habituelle.</li></ul>
+          <ul className="voice-studio-checklist"><li>Coupez la télévision et la musique.</li><li>Parlez face au microphone de votre ordinateur, de votre casque ou de votre téléphone, sans coller la bouche au micro.</li><li>Lisez les trois phrases avec votre voix habituelle.</li></ul>
           <p>Chaque extrait dure de 3 à 15 secondes. Vous pourrez le réécouter et le recommencer avant de le valider.</p>
           <div className="voice-studio-consent">
             <p>Les trois références et les extraits d'écoute continue seront envoyés au serveur Sirius pour comparaison. Il conserve une empreinte biométrique liée à votre compte, pas les fichiers audio de référence. Vous pourrez supprimer cette empreinte ici.</p>

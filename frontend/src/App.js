@@ -2,7 +2,7 @@
 
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { Mic, MicOff, Clock, Cpu, Wifi, MapPin, Calendar, X, Leaf, UserCog, Brain, Music, Repeat, RotateCcw, BarChart3, Workflow, Ruler, FolderOpen, Code2, Database, Sparkles, Eye, Landmark, Library, Orbit, Monitor, ShieldCheck, Radar, ShieldAlert, Camera, Crop, ImageDown, Fingerprint, Zap, Package, Clapperboard, Grip, Radio, Wrench, FileCode, History, Maximize, Minimize, KeyRound, Home as HomeIcon, BadgeInfo, Globe2, Hammer, TrendingUp, Newspaper, Scale, Flame, BookOpen, Sigma, AlarmClock, Power, Boxes, Link2, Building2, Activity, Mail } from "lucide-react";
+import { Mic, MicOff, Clock, Cpu, Wifi, MapPin, Calendar, X, Leaf, Settings2, Brain, Music, Repeat, RotateCcw, BarChart3, Workflow, Ruler, FolderOpen, Code2, Database, Sparkles, Eye, Landmark, Library, Orbit, Monitor, ShieldCheck, Radar, ShieldAlert, Camera, Crop, ImageDown, Fingerprint, Zap, Package, Clapperboard, Grip, Radio, Wrench, FileCode, History, Maximize, Minimize, KeyRound, Home as HomeIcon, BadgeInfo, Globe2, Hammer, TrendingUp, Newspaper, Scale, Flame, BookOpen, Sigma, AlarmClock, Power, Boxes, Link2, Building2, Activity, Mail } from "lucide-react";
 import {
   ArchitectPanel, SpectatorView, FilesPanel, DevCompanion, ZeusCortex, SiriusPrime, OracleDivin,
   PantheonSystem, NexusCeleste, SiriusDisplay, EuropeanaViewer, HaccpModule, KeysStatus, KeraunosPanel,
@@ -7442,15 +7442,14 @@ function App() {
             </button>
             <button
               type="button"
-              className="profile-btn top-settings-btn"
+              className="profile-btn top-settings-btn top-settings-control"
               onClick={() => { setSetupInitialTab("profil"); setShowSetup(true); }}
               data-testid="sirius-profile-btn"
               title="Réglages : profil et services"
               aria-label="Réglages"
               aria-haspopup="dialog"
             >
-              <UserCog size={18} aria-hidden="true" />
-              <span className="top-settings-label">Réglages</span>
+              <Settings2 size={18} strokeWidth={1.6} aria-hidden="true" />
             </button>
           </div>
         </div>

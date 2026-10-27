@@ -25,6 +25,26 @@ from voice_identity import (InferenceFailure, LocalSpeakerExtractor, MAX_CLIP_BY
 from voice_identity_worker import decode_audio, run as run_worker, unit_vector
 
 
+def test_worker_command_uses_dedicated_executable_when_packaged(monkeypatch):
+    import voice_identity
+
+    monkeypatch.setattr(voice_identity.sys, "frozen", True, raising=False)
+    command = voice_identity.worker_command()
+    assert len(command) == 1
+    assert Path(command[0]).stem == "sirius-voice-worker"
+    assert Path(command[0]).parent == Path(voice_identity.sys.executable).parent
+    assert command[0] != voice_identity.sys.executable
+
+
+def test_worker_command_preserves_python_launch_from_sources(monkeypatch):
+    import voice_identity
+
+    monkeypatch.setattr(voice_identity.sys, "frozen", False, raising=False)
+    command = voice_identity.worker_command()
+    assert command[0] == voice_identity.sys.executable
+    assert Path(command[1]).name == "voice_identity_worker.py"
+
+
 class MockExtractor:
     """A test double returning fixed vectors; never used by production construction."""
     enabled = True

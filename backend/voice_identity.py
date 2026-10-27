@@ -35,6 +35,13 @@ class InferenceFailure(Exception):
     pass
 
 
+def worker_command():
+    if getattr(sys, "frozen", False):
+        name = "sirius-voice-worker.exe" if os.name == "nt" else "sirius-voice-worker"
+        return [str(Path(sys.executable).with_name(name))]
+    return [sys.executable, str(Path(__file__).with_name("voice_identity_worker.py"))]
+
+
 class LocalSpeakerExtractor:
     """Native inference is killed at a hard deadline, not abandoned in a thread."""
 
@@ -70,6 +77,8 @@ class LocalSpeakerExtractor:
             return "ffmpeg_missing"
         if importlib.util.find_spec("sherpa_onnx") is None:
             return "extractor_not_installed"
+        if getattr(sys, "frozen", False) and not Path(worker_command()[0]).is_file():
+            return "worker_missing"
         return None
 
     async def extract(self, clips):
@@ -82,10 +91,10 @@ class LocalSpeakerExtractor:
             "enrollment": len(clips) > 1,
         }).encode()
         process = await asyncio.create_subprocess_exec(
-            sys.executable, str(Path(__file__).with_name("voice_identity_worker.py")),
+            *worker_command(),
             stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.DEVNULL,
-            **({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt"
+            **({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW} if os.name == "nt"
                else {"start_new_session": True}),
         )
         try:

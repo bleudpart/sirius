@@ -103,10 +103,34 @@ exe = EXE(
     upx=True,
     console=False,
 )
+worker_analysis = Analysis(
+    [str(backend_dir / "voice_identity_worker.py")],
+    pathex=[str(backend_dir)],
+    binaries=binaries,
+    datas=[],
+    hiddenimports=collect_submodules("sherpa_onnx"),
+    excludes=["torch", "torchaudio", "torchvision", "transformers", "scipy", "matplotlib"],
+    noarchive=False,
+)
+worker_pyz = PYZ(worker_analysis.pure)
+worker_exe = EXE(
+    worker_pyz,
+    worker_analysis.scripts,
+    [],
+    exclude_binaries=True,
+    name="sirius-voice-worker",
+    debug=False,
+    strip=False,
+    upx=True,
+    console=True,
+)
 collection = COLLECT(
     exe,
+    worker_exe,
     analysis.binaries,
     analysis.datas,
+    worker_analysis.binaries,
+    worker_analysis.datas,
     strip=False,
     upx=True,
     upx_exclude=[],
