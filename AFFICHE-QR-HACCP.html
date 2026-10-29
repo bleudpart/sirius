@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ΣIRIUS - QR cuisine et réserve</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #e9edf0; color: #102637; font-family: "Segoe UI", Arial, sans-serif; }
+    main { width: min(100%, 210mm); margin: 20px auto; padding: 14mm; background: white; text-align: center; border: 1px solid #c5a059; }
+    h1 { margin: 0 0 5mm; color: #806022; font: 32px Georgia, serif; }
+    h2 { margin: 0 0 4mm; font-size: 24px; }
+    p { margin: 3mm 0; line-height: 1.5; }
+    .qr { display: block; width: min(140mm, 100%); height: auto; margin: 4mm auto; }
+    .url { font-size: 16px; overflow-wrap: anywhere; color: #102637; }
+    ol { text-align: left; max-width: 150mm; margin: 6mm auto; padding-left: 8mm; line-height: 1.6; font-size: 17px; }
+    .note { border-top: 1px solid #c5a059; padding-top: 4mm; font-size: 13px; }
+    .signature { margin-top: 3mm; color: #806022; font: 16px Georgia, serif; letter-spacing: .12em; }
+    button { padding: 12px 20px; margin: 0 0 5mm; background: #102637; color: white; border: 1px solid #c5a059; border-radius: 6px; cursor: pointer; font-size: 16px; }
+    @page { size: A4 portrait; margin: 10mm; }
+    @media print {
+      body { background: white; }
+      main { width: 100%; margin: 0; padding: 7mm; break-inside: avoid; }
+      button { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <button type="button" onclick="window.print()">Imprimer l’affiche A4</button>
+    <h1>ΣIRIUS</h1>
+    <h2>Étiquettes cuisine · Réserve</h2>
+    <p>Scannez ce QR code avec l’appareil photo du téléphone.</p>
+    <img class="qr" src="QR-HACCP-GRAND.svg" width="1200" height="1200" alt="QR code vers https://sirius-assistant.fr/haccp">
+    <a class="url" href="https://sirius-assistant.fr/haccp">https://sirius-assistant.fr/haccp</a>
+    <ol>
+      <li>Ouvrez le lien et connectez-vous au compte autorisé.</li>
+      <li>Choisissez <strong>Réception</strong> ou <strong>Ouverture produit</strong>.</li>
+      <li>Renseignez l’opérateur et touchez <strong>Scanner étiquette</strong>.</li>
+      <li>Photographiez, puis vérifiez le produit, le lot et les dates.</li>
+    </ol>
+    <p class="note">Internet requis · Aucun mot de passe dans le QR.<br>
+      Ouverture : durée fabricant/PMS à confirmer, aucun J+3 automatique.<br>
+      Une photo ne certifie ni la température ni la conformité sanitaire.</p>
+    <footer class="signature">ΣIRIUS · par Daniel Partel</footer>
+  </main>
+</body>
+</html>

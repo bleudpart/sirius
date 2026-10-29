@@ -1,0 +1,74 @@
+ΣIRIUS - QR CODE CUISINE / RESERVE
+================================
+
+ADRESSE OUVERTE PAR LE QR CODE
+https://sirius-assistant.fr/haccp
+
+COMMENT UTILISER LE QR CODE
+1. Ouvrir l'appareil photo du telephone.
+2. Viser le grand QR code de l'affiche.
+3. Toucher le lien propose par le telephone.
+4. Se connecter a ΣIRIUS avec le compte autorise de l'etablissement.
+5. Choisir Reception ou Ouverture produit.
+6. Renseigner l'operateur puis toucher "Scanner etiquette".
+7. Photographier l'etiquette nette et complete.
+8. Le choix de la photo lance l'analyse et l'archivage.
+9. Relire le produit, le lot et les dates sur la photo originale.
+
+Le QR code ouvre la page : il ne lance pas directement la camera.
+Il est fixe et reutilisable pour tous les produits.
+Il ne contient aucun mot de passe et ne donne aucun acces sans connexion.
+Une connexion Internet est necessaire. L'APK n'est pas obligatoire :
+le navigateur du telephone suffit.
+
+RECEPTION
+Choisir Reception pour enregistrer l'etiquette du produit recu.
+Verifier la lecture avant d'utiliser les donnees.
+La photo ne controle ni la temperature reelle, ni la chaine du froid,
+ni l'etat physique du produit et ne certifie pas la conformite sanitaire.
+
+OUVERTURE PRODUIT
+Scanner immediatement apres l'ouverture reelle du produit.
+Pour calculer une DLC secondaire, saisir la duree en heures et sa reference
+fabricant/PMS, puis confirmer la regle pour ce produit.
+Ne pas inventer une duree : aucun J+3 universel n'est applique.
+Sans regle validee ou en cas d'anomalie, aucune DLC secondaire utilisable
+n'est garantie. L'heure d'ouverture est celle du serveur a l'envoi.
+
+RETROUVER LA PREUVE
+Dans "Registre / Controle", rechercher le lot ou le produit.
+"Voir la preuve / imprimer" ouvre la fiche et sa photo originale.
+Le PC et le telephone doivent utiliser le meme compte ou des comptes
+autorises de la meme entreprise pour consulter le meme registre Cloud.
+L'export CSV porte sur toute la periode selectionnee.
+
+SANS IMPRIMANTE
+La capture, le registre, la preuve et l'export restent utilisables.
+Ne pas activer de poste ni envoyer de demande d'impression pour un essai
+sans imprimante configuree.
+
+AVEC IMPRIMANTE
+Le relais se configure dans l'application Windows ΣIRIUS, apres installation
+du pilote et verification du format du rouleau.
+"Transmis a Windows" ne prouve pas que le papier est sorti.
+Verifier la sortie et le cadrage sur le materiel reel.
+
+EN CAS DE COUPURE
+Verifier d'abord le registre avant toute nouvelle photo.
+Si la capture est toujours ouverte, utiliser le bouton de reprise de la
+meme photo. Ne pas multiplier les envois.
+
+AFFICHER OU IMPRIMER LE QR CODE
+Ouvrir AFFICHE-QR-HACCP.html dans un navigateur.
+L'affiche contient le QR code localement : aucun generateur externe n'est
+contacte. Aucun mot de passe n'est imprime.
+Pour une feuille A4 : choisir Portrait, echelle 100 %, et desactiver les
+en-tetes/pieds de page. Le QR est prevu a environ 140 x 140 mm.
+Verifier l'apercu : une seule page, QR entier, marges blanches conservees.
+Ne pas recadrer le QR ni supprimer sa bordure blanche.
+Faire un essai de lecture avec le telephone avant d'afficher la feuille.
+Le fichier QR-HACCP-GRAND.svg permet aussi un agrandissement sans perte.
+Ne pas afficher les donnees d'un compte ou un mot de passe a cote du QR.
+
+----------------------------------------
+ΣIRIUS · par Daniel Partel
