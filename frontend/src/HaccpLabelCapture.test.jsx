@@ -1,5 +1,6 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
+import { Capacitor } from "@capacitor/core";
 import HaccpLabelCapture from "./HaccpLabelCapture";
 import HaccpModule from "./HaccpModule";
 import { printHaccpDocument } from "./haccpDocuments";
@@ -67,6 +68,20 @@ test("capture is connected to the existing traceability section without removing
   expect(shortcut.target).toBe("_blank");
   expect(shortcut.rel).toBe("noopener noreferrer");
   expect(shortcut.textContent).toBe("Scanner une étiquette");
+});
+
+test("Android shortcut keeps the scanner inside the native app, including from the registry or another module tab", async () => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  global.fetch.mockResolvedValue(reply({ items: [] }));
+  await act(async () => root.render(<HaccpModule />));
+  expect(host.querySelector("a.haccp-capture-link")).toBeNull();
+  await click("Registre / Contrôle");
+  expect(host.querySelector('[aria-label="Capture des étiquettes ΣIRIUS"]')).toBeNull();
+  await act(async () => host.querySelector("button.haccp-capture-link").click());
+  expect(host.querySelector('[aria-label="Capture des étiquettes ΣIRIUS"]')).not.toBeNull();
+  await act(async () => host.querySelector('[data-testid="haccp-tab-temp"]').click());
+  await act(async () => host.querySelector("button.haccp-capture-link").click());
+  expect(host.querySelector('[aria-label="Capture des étiquettes ΣIRIUS"]')).not.toBeNull();
 });
 
 test("reception stays the default and camera formats are explicit", async () => {

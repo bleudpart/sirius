@@ -2302,6 +2302,7 @@ async def _haccp_labels_scope(request: Request) -> str:
     if cloud_link.relay_allowed() and not is_direct_local_request(request):
         raise HTTPException(403, "Le relais HACCP Cloud est reserve a ce PC.")
     user = await require_user(request, db)
+    request.state.haccp_actor = user["user_id"]
     if user.get("company_id"):
         membership = await db.enterprise_members.find_one({
             "company_id": user["company_id"], "user_id": user["user_id"],

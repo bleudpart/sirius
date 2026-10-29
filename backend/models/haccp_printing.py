@@ -30,3 +30,12 @@ class HaccpPrintJob(Base):
     claimed_at: Mapped[datetime | None] = mapped_column(DateTime)
     status: Mapped[str] = mapped_column(String(16), default="pending", nullable=False)
     detail: Mapped[str | None] = mapped_column(String(500))
+
+
+class HaccpAndroidPrintTarget(Base):
+    """Cible directe distincte du poste Windows, sans modifier les anciennes files."""
+    __tablename__ = "haccp_android_print_targets"
+
+    job_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    device_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    actor_id: Mapped[str] = mapped_column(String(255), nullable=False)

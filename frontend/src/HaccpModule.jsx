@@ -9,6 +9,7 @@ import DuerpSection from "./DuerpSection";
 import SafetyDocumentation from "./SafetyDocumentation";
 import HaccpWorkspace, { HACCP_CAPTURE_URL } from "./HaccpWorkspace";
 import { API_BASE_URL } from "./lib/api";
+import { isAndroidHaccp } from "./nativeHaccpPrinter";
 
 const API = `${API_BASE_URL}/haccp`;
 
@@ -60,7 +61,7 @@ function useFocusSource(items, focusId) {
 }
 
 // ---------- 1. Traçabilité & étiquetage ----------
-function SectionTrace({ focusId }) {
+function SectionTrace({ focusId, captureRequest }) {
   const [items, setItems] = useState([]);
   useFocusSource(items, focusId);
   const [form, setForm] = useState({ produit: "", lot: "", fournisseur: "", dlc: "", temperature_reception: "", quantite: "" });
@@ -80,7 +81,7 @@ function SectionTrace({ focusId }) {
 
   return (
     <div className="hc-section" data-testid="haccp-section-trace">
-      <HaccpWorkspace />
+      <HaccpWorkspace captureRequest={captureRequest} />
       <div className="hc-form">
         <input className="cmd-input" placeholder="Produit *" value={form.produit} onChange={(e) => setForm({ ...form, produit: e.target.value })} data-testid="haccp-trace-produit" />
         <input className="cmd-input" placeholder="N° de lot" value={form.lot} onChange={(e) => setForm({ ...form, lot: e.target.value })} data-testid="haccp-trace-lot" />
@@ -523,6 +524,7 @@ const SOURCE_TABS = { haccp_trace: "trace", haccp_nonconformity: "nc", haccp_doc
 
 export default function HaccpModule({ onClose, initialSource }) {
   const [tab, setTab] = useState(() => SOURCE_TABS[initialSource?.kind] || "trace");
+  const [captureRequest, setCaptureRequest] = useState(0);
   const [documentDirty, setDocumentDirty] = useState(false);
   const navigation = useRef(null);
   navigation.current = { tab, documentDirty };
@@ -558,12 +560,18 @@ export default function HaccpModule({ onClose, initialSource }) {
       </header>
       <div className="prime-sub">HYGIÈNE ALIMENTAIRE · DUERP · PERSONNEL &amp; SÉCURITÉ</div>
       <div className="haccp-ui haccp-module-shortcut">
-        <a className="haccp-capture-link" href={HACCP_CAPTURE_URL} target="_blank" rel="noopener noreferrer">
+        {isAndroidHaccp() ? <button type="button" className="haccp-capture-link" onClick={() => {
+          if (mayLeave()) { setTab("trace"); setCaptureRequest((value) => value + 1); }
+        }}>
+          <Camera size={20} aria-hidden="true" />
+          <span>Scanner une étiquette</span>
+        </button> : <a className="haccp-capture-link" href={HACCP_CAPTURE_URL} target="_blank" rel="noopener noreferrer">
           <Camera size={20} aria-hidden="true" />
           <span>Scanner une étiquette</span>
           <ExternalLink size={16} aria-hidden="true" />
-        </a>
-        <p>Capture, registre et QR code · Page Cloud · Connexion au même établissement requise.</p>
+        </a>}
+        <p>{isAndroidHaccp() ? "Capture dans l’application · Impression Brother Wi-Fi après configuration · Connexion au registre requise."
+          : "Capture, registre et QR code · Page Cloud · Connexion au même établissement requise."}</p>
       </div>
       {ov && (
         <div className="hc-alerts" data-testid="haccp-alerts">
@@ -582,7 +590,7 @@ export default function HaccpModule({ onClose, initialSource }) {
       </div>
       <div className="hc-body prime-card">
         {err && <div className="dev-error" data-testid="haccp-error">{err}</div>}
-        <Section focusId={SOURCE_TABS[initialSource?.kind] === tab ? initialSource.id : null} onDirtyChange={setDocumentDirty} />
+        <Section focusId={SOURCE_TABS[initialSource?.kind] === tab ? initialSource.id : null} onDirtyChange={setDocumentDirty} captureRequest={captureRequest} />
       </div>
     </div>
   );

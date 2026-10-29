@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Camera, PackageCheck, Scissors, Printer, RotateCcw, ScanLine, LoaderCircle } from "lucide-react";
 import { API_BASE_URL } from "./lib/api";
 import { printHaccpDocument } from "./haccpDocuments";
-import HaccpPrinter, { haccpPrintRequest, haccpPrintStatus } from "./HaccpPrinter";
+import HaccpPrinter, { haccpPrintRequest, haccpPrintStatus, printHaccpOpening } from "./HaccpPrinter";
 import { haccpFetch } from "./haccpRequest";
 import "./HaccpWorkspace.css";
 
@@ -118,9 +118,12 @@ export default function HaccpLabelCapture({ savedRecord = null }) {
     if (!result || pending.current) return;
     pending.current = true; setBusy(true); setError("");
     try {
-      const job = await haccpPrintRequest("/demandes", { label_id: result.id, reviewed: true });
-      setPrintState(`${haccpPrintStatus(job.status)}. Aucun doublon ne sera envoyé automatiquement.`);
-    } catch (failure) { setError(failure.message); }
+      const job = await printHaccpOpening(result.id);
+      setPrintState(`${haccpPrintStatus(job.status, job.transport)}. ${job.detail || ""} Aucun doublon ne sera envoyé automatiquement.`);
+    } catch (failure) {
+      setError(failure.message);
+      setPrintState("Demande non confirmée. Consultez l’état et vérifiez le papier avant toute autre impression.");
+    }
     finally { pending.current = false; setBusy(false); }
   };
   const checkPrintState = async () => {
@@ -128,7 +131,7 @@ export default function HaccpLabelCapture({ savedRecord = null }) {
     try {
       const state = await haccpPrintRequest("/etat");
       const job = state.jobs.find((item) => item.label_id === result.id);
-      setPrintState(job ? `${haccpPrintStatus(job.status)}. ${job.detail || ""}`
+      setPrintState(job ? `${haccpPrintStatus(job.status, job.transport)}. ${job.detail || ""}`
         : "Aucune demande trouvée pour cette ouverture.");
     } catch (failure) { setError(failure.message); }
   };

@@ -1,7 +1,7 @@
-ΣIRIUS 1.0.65 - GUIDE D'INSTALLATION ET DE TRACABILITE HACCP
+ΣIRIUS 1.0.66 - GUIDE D'INSTALLATION ET DE TRACABILITE HACCP
 ========================================================
 
-Ce guide accompagne la preparation des applications 1.0.65.
+Ce guide accompagne la preparation des applications 1.0.66.
 La presence de ce document ne prouve pas qu'un installateur a deja ete
 construit, publie ou installe. Se reporter au bilan de livraison pour ces etats.
 
@@ -14,6 +14,8 @@ construit, publie ou installe. Se reporter au bilan de livraison pour ces etats.
 - QR code fixe pour ouvrir la capture sur un telephone.
 - Reprise d'une ouverture archivee depuis le registre, sans nouvelle photo.
 - Relais d'impression thermique dans l'application Windows.
+- Impression Android directe en Wi-Fi pour Brother QL-820NWB, a configurer
+  dans l'application native ; recette sur imprimante reelle indispensable.
 - Interface harmonisee avec ΣIRIUS : cartes sombres, accents dores,
   onglets avec icones et grand bouton de capture adapte au tactile.
 
@@ -26,8 +28,8 @@ Un resultat sans anomalie detectee n'est pas une attestation sanitaire.
 Fermer completement ΣIRIUS avant la mise a jour.
 Sauvegarder les donnees utiles avant toute intervention.
 
-Installateur attendu : sirius-setup-1.0.65.exe
-Version portable attendue : SIRIUS-Portable-1.0.65.exe
+Installateur attendu : sirius-setup-1.0.66.exe
+Version portable attendue : SIRIUS-Portable-1.0.66.exe
 
 Choisir un seul mode d'execution a la fois.
 Avec l'installateur, suivre les etapes puis lancer l'application.
@@ -42,7 +44,7 @@ Ne pas exposer le backend local ou l'imprimante sur Internet.
 
 3. INSTALLATION ANDROID DIAGNOSTIC
 ---------------------------------
-Fichier attendu : SIRIUS-Diagnostic-1.0.65.apk
+Fichier attendu : SIRIUS-Diagnostic-1.0.66.apk
 
 Il s'agit d'une application de diagnostic, pas d'une mise a jour Google Play.
 Son identifiant est fr.sirius_assistant.app.diagnostic.
@@ -53,7 +55,7 @@ signature, arreter et demander une verification plutot que desinstaller.
 Ouvrir l'APK sur le telephone et autoriser ponctuellement l'installation
 depuis cette source si Android le demande. N'utiliser qu'un fichier provenant
 de la livraison ΣIRIUS verifiee. Desactiver cette autorisation apres usage.
-Verifier la version 1.0.65-diagnostic dans les informations de l'application.
+Verifier la version 1.0.66-diagnostic dans les informations de l'application.
 La version Google Play reste une application separee.
 
 4. QR CODE ET ACCES DIRECT
@@ -62,7 +64,8 @@ Adresse : https://sirius-assistant.fr/haccp
 
 Sur un PC, ouvrir cette adresse, se connecter puis choisir "QR code reserve".
 Dans le module HACCP, le raccourci "Scanner une etiquette" en haut du module
-ouvre directement cette page Cloud sans quitter le document en cours.
+ouvre cette page Cloud sur Windows et le site web. Dans l'application
+Android, il ouvre la capture native pour conserver l'acces a l'imprimante.
 Scanner le QR affiche avec l'appareil photo du telephone.
 Ouvrir le lien et se connecter au meme compte ou a un compte autorise de
 la meme entreprise.
@@ -210,3 +213,134 @@ Des tests automatises reussis ne remplacent pas cette recette terrain.
 Un deploiement sain ne prouve pas qu'une cle OpenAI est configuree.
 Ne pas annoncer une validation materielle ou OpenAI tant qu'elle n'a pas
 ete effectivement realisee.
+
+11. AJOUT AU CODE SOURCE : ANDROID WI-FI BROTHER QL-820NWB
+--------------------------------------------------------
+Cette section decrit l'integration ajoutee au code source. Elle n'affirme
+PAS que l'APK 1.0.65 deja installe, une livraison Diagnostic ou Google Play
+contient cette fonction. Une reconstruction Android et un deploiement
+ulterieur du backend et du frontend sont necessaires. Aucune installation
+ou publication n'est effectuee par cet ajout.
+
+Perimetre :
+- Application Android native Capacitor uniquement, pas le navigateur/QR.
+- Brother QL-820NWB uniquement, via son SDK officiel Android 4.13.2.
+- Wi-Fi LAN prive, sans PC, sans ESC/POS et sans Bluetooth.
+- Rouleau continu DK-22205, largeur physique 62 mm, coupe cible 50 mm.
+- Image 696 x 591 points a 300 dpi ; zone imprimable largeur 58,9 mm.
+  Les marges/coupe reelles restent a valider sur l'imprimante.
+- Le rendu est un bitmap natif a champs bornes, pas une page HTML libre.
+  Le texte est mesure et renvoye a la ligne. Un debordement est refuse
+  avant toute connexion, sans troncature ni reduction automatique.
+
+Mise en service sur chaque telephone :
+1) Connecter l'imprimante au Wi-Fi selon la documentation Brother.
+   Reserver son IPv4 dans le routeur et charger le DK-22205.
+2) Mettre le telephone sur ce meme Wi-Fi, sans VPN ni isolation clients.
+3) Dans HACCP > Tracabilite > Imprimante, saisir son IPv4 privee :
+   10.x.x.x, 172.16.x.x a 172.31.x.x ou 192.168.x.x.
+   URL, nom d'hote, IPv6 et adresse Internet publique sont refuses.
+   Sur Android, le raccourci "Scanner une etiquette" reste dans l'application.
+   Le QR public ouvre le navigateur : il ne donne pas acces au pont natif.
+4) Activer l'impression et enregistrer. Android 17 / cible SDK 37 demande
+   l'autorisation reseau local ACCESS_LOCAL_NETWORK ; l'accepter.
+   Sur Android anterieur, INTERNET suffit pour cette liaison TCP.
+   Aucune permission Bluetooth ou localisation n'est ajoutee pour imprimer.
+5) Imprimer explicitement une etiquette "TEST - hors registre".
+   Elle porte TEST, ne cree ni capture ni travail dans le registre serveur.
+   Verifier la largeur, les marges, le texte complet et la coupe.
+6) Pour une ouverture reelle, relire la photo et les dates puis utiliser
+   "J'ai verifie : valider et imprimer". Garder SIRIUS au premier plan.
+
+La configuration IP/rouleau et l'identite du telephone sont sauvegardees
+dans les preferences privees Android. Elles ne configurent pas /poste
+et ne prennent jamais la propriete du poste Windows.
+Chaque utilisateur peut utiliser son telephone et sa configuration locale.
+L'impression directe est desactivee par defaut : tant qu'elle n'est pas
+activee et enregistree, les demandes continuent vers le relais Windows.
+Une fois activee, une erreur Android ne bascule jamais automatiquement
+vers Windows : cela risquerait une double impression.
+Une seule demande automatique est toutefois autorisee par ouverture dans
+le meme registre, quel que soit le telephone ou le transport Windows.
+Pour tester deux utilisateurs, utiliser deux ouvertures reelles distinctes.
+
+Securite contre les doublons :
+- Le serveur conserve la validation et la file durable dans haccp.sqlite3.
+- Les routes /api/haccp/impression/android/demandes, /prise et /confirmation
+  ciblent l'utilisateur authentifie et l'identite du telephone d'origine.
+  Un autre utilisateur de la meme entreprise ne peut pas reclamer son job.
+- Une prise en charge ne rend le contenu qu'une fois ; le relais Windows
+  ne consomme jamais les demandes Android et inversement.
+- Avant tout envoi, le telephone inscrit le job dans son journal durable.
+  Un job deja inscrit est refuse, meme apres fermeture ou redemarrage.
+- Le SDK verifie le modele physique et l'etat avant d'envoyer le bitmap.
+  Papier, batterie, couvercle, modele incorrect, reseau et timeout donnent
+  une erreur explicite/incertitude, sans nouvel essai automatique.
+- Le delai applicatif est de 45 s. Il signale l'incertitude et demande
+  l'annulation SDK. Si le SDK reste bloque, le verrou reste ferme jusqu'a
+  son retour : il ne faut pas promettre l'arret physique au bout de 45 s.
+- Un retour "SDK Brother sans erreur" est une preuve de retour SDK,
+  PAS une garantie de papier imprime ou d'etiquette correctement collee.
+- Une confirmation serveur perdue n'entraine pas de second envoi.
+  Une prise sans confirmation devient incertaine apres deux minutes lors
+  de la consultation de l'etat. Verifier le papier, pas de relance aveugle.
+- Ne pas effacer les donnees ni desinstaller l'application pour depanner :
+  cela efface le journal local et change l'identite du telephone.
+- Aucune impression en arriere-plan ou hors ligne serveur n'est promise.
+
+Reproductibilite developpeur (depuis la racine du depot) :
+1) Lire la licence officielle, puis seulement si elle est acceptee :
+   powershell -File frontend\scripts\setup-brother-sdk.ps1 -AcceptLicense
+   Sans ce parametre, le script refuse tout telechargement.
+2) Source officielle et documentation :
+   https://support.brother.com/g/b/agreement.aspx?dlid=dlfp100900_000
+   https://support.brother.com/g/s/agreement/English/es_mobilesdk.html
+   https://support.brother.com/g/s/es/htmldoc/mobilesdk/guide/getting-started/getting-started-android.html
+   Archive officielle obtenue via le bouton d'accord :
+   https://download.brother.com/welcome/dlfp100900/bpsdkaall4132.zip
+3) Le script verifie l'archive et l'AAR, extrait uniquement l'AAR et
+   joint les copies originales EULA.pdf, Redist.txt et Redist2.txt aux
+   assets Android locaux. Archive/AAR/assets juridiques sont ignores git.
+   Ne pas forcer leur ajout au depot ni redistribuer le SDK brut.
+4) SHA256 archive :
+   73620CA61039B0D2B262F811EA81E21BF0E3142745D3871E037E0168436A7BC3
+   SHA256 BrotherPrintLibrary.aar :
+   DEF6BCCC7415DA38B771186D571757C0A44ADD5358B6DC7A1855FFF77BCED64E
+   Gradle refuse un AAR absent/non conforme ou un accord absent des assets,
+   avec une indication pour relancer le script.
+5) Compiler avec le JDK Android Studio et le SDK Android du poste :
+   cd frontend\android
+   .\gradlew.bat :app:compileDebugJavaWithJavac :app:testDebugUnitTest -PsiriusDiagnostic
+   Cette commande compile/teste ; elle n'installe ni ne publie l'application.
+   Pour preparer les ressources React, utiliser le build frontend habituel
+   puis la synchronisation Capacitor avant une future livraison autorisee.
+
+Licence et distribution :
+Redist.txt du SDK autorise les fichiers libs comme modules redistribuables,
+uniquement incorpores dans une application, inchanges. L'accord demande
+notamment de joindre sa copie, conserver/afficher les notices applicables
+et interdire la redistribution du SDK par les utilisateurs. Les listes
+Redist ne constituent pas une autorisation de publier le SDK seul.
+Avant toute livraison commerciale, verifier toutes les conditions de
+l'accord et les conditions utilisateurs de l'application. L'inclusion du
+PDF n'est pas a elle seule une certification de conformite juridique.
+Aucun logo Brother n'est ajoute et aucune approbation Brother n'est revendiquee.
+
+Recette materielle obligatoire avant mise en production :
+- TEST hors registre : marges, coupe 50 mm, accents, lisibilite.
+- Ouverture courte puis produit/lot/operateur longs : tout le texte doit
+  tenir ou etre refuse avant envoi, jamais coupe silencieusement.
+- Retirer le papier, ouvrir le capot, mettre une batterie faible si
+  disponible, couper le Wi-Fi et utiliser une IP privee injoignable.
+  Verifier erreur/incertitude, aucune relance automatique.
+- Changer le rouleau ou viser un autre modele : refus, pas de compatibilite
+  avec un autre modele annoncee implicitement.
+- Quitter/reprendre l'app pendant une tentative, perdre la confirmation
+  serveur, redemarrer l'app : consulter l'etat et le papier, aucun doublon.
+- Deux telephones/meme ouverture : une seule prise en charge. Deux comptes
+  distincts : isolation ; meme entreprise : registre partage mais jobs
+  directs reserves a leur utilisateur/telephone d'origine.
+- Garder un poste Windows associe : sa configuration et son relais restent
+  inchanges ; ses jobs ne doivent pas etre imprimes par Android.
+Les tests automatises et une compilation Java ne valident pas ces points
+physiques. Ne pas annoncer une impression materielle reussie sans cette recette.

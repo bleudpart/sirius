@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE_URL } from "./lib/api";
 import { haccpFetch } from "./haccpRequest";
+import { androidHaccpPrinter, hasAndroidHaccpPrinter, isAndroidHaccp, printAndroidOpening, validateAndroidPrinter } from "./nativeHaccpPrinter";
 
-export function haccpPrintStatus(status) {
+export function haccpPrintStatus(status, transport = "windows") {
   const labels = {
     pending: "En attente du poste Windows",
     claimed: "Pris en charge par le poste Windows",
@@ -10,8 +11,23 @@ export function haccpPrintStatus(status) {
     cancelled: "Impression annulée — vérifiez la fiche",
     uncertain: "Impression incertaine — vérifiez le papier, ne relancez pas automatiquement",
   };
+  if (transport === "android") {
+    Object.assign(labels, {
+      pending: "En attente de prise en charge par le téléphone Android",
+      claimed: "Pris en charge par le téléphone — ne pas réimprimer",
+      accepted: "SDK Brother sans erreur — vérifiez la sortie papier",
+    });
+  }
   if (!labels[status]) throw new Error("État d’impression inconnu. Vérifiez le poste avant toute nouvelle demande.");
   return labels[status];
+}
+
+export async function printHaccpOpening(labelId) {
+  if (hasAndroidHaccpPrinter()) {
+    const config = await androidHaccpPrinter.getConfig();
+    if (config.enabled) return printAndroidOpening(labelId, haccpPrintRequest);
+  }
+  return haccpPrintRequest("/demandes", { label_id: labelId, reviewed: true });
 }
 
 const API = `${API_BASE_URL}/haccp/impression`;
@@ -43,7 +59,7 @@ export function useHaccpPrinterRelay(accountKey) {
   const stopped = useRef(false);
   useEffect(() => {
     const bridge = window.siriusHaccpPrinter;
-    if (!bridge || !accountKey) return undefined;
+    if (!bridge || !accountKey || isAndroidHaccp()) return undefined;
     let timer;
     let cancelled = false;
     stopped.current = false;
@@ -93,6 +109,71 @@ export function useHaccpPrinterRelay(accountKey) {
 }
 
 export default function HaccpPrinter() {
+  if (isAndroidHaccp()) return <AndroidHaccpPrinter />;
+  return <WindowsHaccpPrinter />;
+}
+
+function AndroidHaccpPrinter() {
+  const available = hasAndroidHaccpPrinter();
+  const [config, setConfig] = useState({ ip: "", model: "QL-820NWB", roll: "DK-22205", widthMm: 62, heightMm: 50, enabled: false });
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let active = true;
+    if (available) androidHaccpPrinter.getConfig().then((saved) => {
+      if (active) setConfig(saved);
+    }).catch((failure) => { if (active) setError(failure.message); });
+    return () => { active = false; };
+  }, [available]);
+  const save = async (event) => {
+    event.preventDefault(); setBusy(true); setError(""); setMessage("");
+    try {
+      const settings = validateAndroidPrinter(config);
+      if (settings.enabled && (await androidHaccpPrinter.requestNetworkAccess())?.granted !== true) {
+        throw new Error("Permission réseau local refusée. Autorisez-la dans les paramètres Android.");
+      }
+      setConfig(await androidHaccpPrinter.configure(settings));
+      setMessage("Configuration Android sauvegardée sur ce téléphone. Aucun poste Windows modifié.");
+    } catch (failure) { setError(failure.message); }
+    finally { setBusy(false); }
+  };
+  const test = async () => {
+    setBusy(true); setError(""); setMessage("");
+    try {
+      const result = await androidHaccpPrinter.printTest();
+      if (result?.accepted !== true) throw new Error(result?.detail || "Test non confirmé : vérifiez le papier, aucun nouvel essai automatique.");
+      setMessage("TEST hors registre : SDK Brother sans erreur. Vérifiez le papier, les marges et la coupe.");
+    } catch (failure) { setError(failure.message); }
+    finally { setBusy(false); }
+  };
+  return <section aria-label="Imprimante ΣIRIUS">
+    <h4>Imprimante Android Wi-Fi · Brother QL-820NWB</h4>
+    {!available ? <p role="alert">Pont Brother absent de cette application. Une nouvelle compilation Android est nécessaire ; le site web ne peut pas imprimer directement.</p> : <>
+      <form onSubmit={save}><fieldset disabled={busy} style={{ display: "grid", gap: 8 }}>
+        <legend>Impression directe depuis ce téléphone, sans PC</legend>
+        <label>Adresse IPv4 LAN de l’imprimante<input required inputMode="decimal" placeholder="192.168.1.50" value={config.ip}
+          onChange={(e) => setConfig({ ...config, ip: e.target.value })} /></label>
+        <p>Modèle : QL-820NWB uniquement · rouleau continu DK-22205 · largeur 62 mm · coupe 50 mm (zone imprimable 58,9 mm).</p>
+        <label><input type="checkbox" checked={config.enabled} onChange={(e) => setConfig({ ...config, enabled: e.target.checked })} /> Utiliser l’impression Android directe après validation d’une ouverture</label>
+        <button type="submit">Enregistrer l’imprimante Android</button>
+      </fieldset></form>
+      <button type="button" disabled={busy || !config.enabled} onClick={test}>Imprimer une étiquette TEST — hors registre</button>
+      <p>Enregistrez avant le test. Autorisez l’accès au réseau local si Android le demande.
+        Même réseau Wi-Fi privé, sans VPN ni isolation des clients ; réservez l’IP dans le routeur.
+        Gardez ΣIRIUS au premier plan. Pas d’impression garantie en arrière-plan.
+        Un retour SDK sans erreur ne garantit pas la sortie papier. Après toute incertitude, vérifiez l’imprimante ; aucune réimpression automatique.</p>
+      <p>Tant que l’impression Android directe n’est pas activée et enregistrée, les demandes utilisent le relais Windows existant.
+        Une erreur d’impression Android ne déclenche jamais un deuxième envoi vers Windows.</p>
+      <p>Impression via le SDK officiel Brother, sous sa <a href="https://support.brother.com/g/s/agreement/English/es_mobilesdk.html"
+        target="_blank" rel="noopener noreferrer">licence d’utilisation</a>. Le SDK inclus ne doit pas être extrait ni redistribué séparément.</p>
+    </>}
+    {error && <p role="alert">{error}</p>}
+    {message && <p role="status">{message}</p>}
+  </section>;
+}
+
+function WindowsHaccpPrinter() {
   const bridge = window.siriusHaccpPrinter;
   const [printers, setPrinters] = useState([]);
   const [config, setConfig] = useState({ deviceName: "", widthMm: 60, heightMm: 50, enabled: false });

@@ -17,8 +17,11 @@ async function checked(response) {
   return response;
 }
 
-export default function HaccpWorkspace({ standalone = false }) {
+export default function HaccpWorkspace({ standalone = false, captureRequest = 0 }) {
   const [tab, setTab] = useState("capture");
+  useEffect(() => {
+    if (captureRequest > 0) setTab("capture");
+  }, [captureRequest]);
   const [filters, setFilters] = useState({ terme: "", date_debut: "", date_fin: "", non_conforme_seul: false });
   const [items, setItems] = useState([]);
   const [error, setError] = useState("");

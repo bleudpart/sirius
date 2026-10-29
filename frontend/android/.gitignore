@@ -3,6 +3,7 @@
 # Built application files
 *.apk
 *.aar
+/app/src/main/assets/brother-sdk/
 *.ap_
 *.aab
 

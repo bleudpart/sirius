@@ -15,6 +15,7 @@ public class MainActivity extends BridgeActivity {
 		registerPlugin(SiriusSpeechPlugin.class);
 		registerPlugin(SiriusAudioPlugin.class);
 		registerPlugin(SiriusPlaybackPlugin.class);
+		registerPlugin(SiriusHaccpPrinterPlugin.class);
 		super.onCreate(savedInstanceState);
 	}
 

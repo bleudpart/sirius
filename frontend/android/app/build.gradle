@@ -1,5 +1,17 @@
 apply plugin: 'com.android.application'
 
+def brotherSdk = file('libs/BrotherPrintLibrary.aar')
+if (!brotherSdk.isFile()) {
+    throw new GradleException('SDK Brother absent : accepter la licence officielle puis executer frontend\\scripts\\setup-brother-sdk.ps1 (SDK 4.13.2). Voir GUIDE-SIRIUS-1.0.66.txt.')
+}
+def brotherHash = java.security.MessageDigest.getInstance('SHA-256').digest(brotherSdk.bytes).encodeHex().toString()
+if (brotherHash != 'def6bccc7415da38b771186d571757c0a44add5358b6dc7a1855fff77bced64e') {
+    throw new GradleException('SDK Brother inattendu : utiliser BrotherPrintLibrary.aar officiel 4.13.2 via setup-brother-sdk.ps1.')
+}
+if (!file('src/main/assets/brother-sdk/EULA.pdf').isFile()) {
+    throw new GradleException('Accord Brother absent des assets : relancer frontend\\scripts\\setup-brother-sdk.ps1 -AcceptLicense apres lecture de la licence.')
+}
+
 def siriusKeystorePath = System.getenv('SIRIUS_ANDROID_KEYSTORE')
 
 gradle.taskGraph.whenReady { graph ->
@@ -23,8 +35,8 @@ android {
         applicationId "fr.sirius_assistant.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 56
-        versionName "1.0.65"
+        versionCode 57
+        versionName "1.0.66"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -69,6 +81,7 @@ repositories {
 }
 
 dependencies {
+    implementation(name: 'BrotherPrintLibrary', ext: 'aar')
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation libs.androidx.appcompat
     implementation libs.androidx.coordinatorlayout

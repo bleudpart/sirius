@@ -15,9 +15,9 @@ from sqlalchemy.orm import Session
 import cloud_link
 from haccp_database import get_db
 from models.haccp import EtiquetteHaccp
-from models.haccp_printing import HaccpPrintJob, HaccpPrintStation
+from models.haccp_printing import HaccpAndroidPrintTarget, HaccpPrintJob, HaccpPrintStation
 from routers.haccp import _response
-from services.haccp_opening import construire_fragment_impression
+from services.haccp_opening import PARIS, construire_fragment_impression
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +44,42 @@ class PrintRequest(BaseModel):
 class PrintAcknowledgement(ClaimRequest):
     status: Literal["accepted", "uncertain"]
     detail: Annotated[str, StringConstraints(max_length=500)] | None = None
+
+
+class AndroidIdentity(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    device_id: uuid.UUID
+
+
+class AndroidPrintRequest(AndroidIdentity):
+    label_id: Annotated[int, Field(strict=True, gt=0)]
+    reviewed: StrictBool
+
+
+class AndroidAcknowledgement(AndroidIdentity):
+    status: Literal["accepted", "uncertain"]
+    detail: Annotated[str, StringConstraints(max_length=500)] | None = None
+
+
+def _actor(request: Request, scope: str) -> str:
+    actor = getattr(request.state, "haccp_actor", None)
+    if actor:
+        return str(actor)
+    if scope.startswith("user:"):
+        return scope[5:]
+    raise HTTPException(403, "Identite de l'operateur requise pour l'impression directe.")
+
+
+def _android_payload(row: EtiquetteHaccp, job_id: str) -> dict:
+    record = _response(row, "/api/haccp/registre")
+    def stamp(value: datetime | None) -> str:
+        return value.astimezone(PARIS).strftime("%d/%m/%Y %H:%M") if value else ""
+    return {
+        "id": job_id, "labelId": row.id,
+        "product": record.nom_produit, "lot": record.numero_lot,
+        "opened": stamp(record.date_ouverture), "deadline": stamp(record.dlc_secondaire),
+        "operator": record.operateur,
+    }
 
 
 @contextmanager
@@ -81,8 +117,9 @@ def _station(db: Session, scope: str, relay_id: str | None = None) -> HaccpPrint
     return station
 
 
-def _job_response(job: HaccpPrintJob) -> dict[str, object]:
+def _job_response(job: HaccpPrintJob, transport: str = "windows") -> dict[str, object]:
     return {"id": job.id, "label_id": job.label_id, "status": job.status, "detail": job.detail,
+            "transport": transport,
             "created_at": job.created_at.replace(tzinfo=timezone.utc).isoformat()}
 
 
@@ -113,7 +150,7 @@ def make_haccp_print_router(
             db.execute(update(HaccpPrintJob).where(
                 HaccpPrintJob.scope_key == scope, HaccpPrintJob.status == "claimed",
                 HaccpPrintJob.claimed_at < stale,
-            ).values(status="uncertain", detail="Confirmation du poste absente. Verifiez le papier, sans reemission automatique."))
+            ).values(status="uncertain", detail="Confirmation de l'appareil absente. Verifiez le papier, sans reemission automatique."))
             db.commit()
             station = db.get(HaccpPrintStation, scope)
             jobs = list(db.scalars(select(HaccpPrintJob).where(
@@ -125,7 +162,7 @@ def make_haccp_print_router(
                     "height_mm": station.height_mm,
                     "online": station.last_seen >= _now() - timedelta(seconds=30),
                 },
-                "jobs": [_job_response(job) for job in jobs],
+                "jobs": [_job_response(job, "android" if db.get(HaccpAndroidPrintTarget, job.id) else "windows") for job in jobs],
             }
 
     @router.post("/poste")
@@ -166,7 +203,7 @@ def make_haccp_print_router(
                 HaccpPrintJob.scope_key == scope, HaccpPrintJob.label_id == row.id,
             ))
             if existing is not None:
-                return _job_response(existing)
+                return _job_response(existing, "android" if db.get(HaccpAndroidPrintTarget, existing.id) else "windows")
             station = _station(db, scope)
             if station.last_seen < _now() - timedelta(seconds=30):
                 raise HTTPException(409, "Le poste d'impression est hors ligne. Ouvrez ΣIRIUS sur le PC.")
@@ -184,7 +221,7 @@ def make_haccp_print_router(
                 ))
                 if existing is None:
                     raise
-                return _job_response(existing)
+                return _job_response(existing, "android" if db.get(HaccpAndroidPrintTarget, existing.id) else "windows")
             return _job_response(job)
 
     @router.post("/prochaine")
@@ -202,6 +239,9 @@ def make_haccp_print_router(
             job = db.scalar(select(HaccpPrintJob).where(
                 HaccpPrintJob.scope_key == scope, HaccpPrintJob.relay_id == station.relay_id,
                 HaccpPrintJob.status == "pending",
+                ~select(HaccpAndroidPrintTarget.job_id).where(
+                    HaccpAndroidPrintTarget.job_id == HaccpPrintJob.id,
+                ).exists(),
             ).order_by(HaccpPrintJob.created_at, HaccpPrintJob.id).limit(1))
             if job is None:
                 return {"job": None}
@@ -239,6 +279,8 @@ def make_haccp_print_router(
             ))
             if job is None:
                 raise HTTPException(404, "Demande d'impression introuvable.")
+            if db.get(HaccpAndroidPrintTarget, job.id) is not None:
+                raise HTTPException(409, "Cette demande est reservee au telephone Android, pas au spouleur Windows.")
             if job.status in {"accepted", "uncertain"}:
                 return _job_response(job)
             if job.status != "claimed":
@@ -248,5 +290,108 @@ def make_haccp_print_router(
                           if body.status == "accepted" else "Impression incertaine. Verifiez le papier et le poste ; aucun nouvel essai automatique.")
             db.commit()
             return _job_response(job)
+
+    def android_only(request: Request, scope: str) -> str:
+        if cloud_link.relay_allowed():
+            raise HTTPException(409, "L'impression Android directe utilise le serveur du registre, pas le relais PC.")
+        return _actor(request, scope)
+
+    def android_job(db: Session, scope: str, actor: str, job_id: uuid.UUID, device_id: uuid.UUID) -> HaccpPrintJob:
+        job = db.scalar(select(HaccpPrintJob).join(
+            HaccpAndroidPrintTarget, HaccpAndroidPrintTarget.job_id == HaccpPrintJob.id,
+        ).where(
+            HaccpPrintJob.id == str(job_id), HaccpPrintJob.scope_key == scope,
+            HaccpAndroidPrintTarget.device_id == str(device_id),
+            HaccpAndroidPrintTarget.actor_id == actor,
+        ))
+        if job is None:
+            raise HTTPException(404, "Demande directe introuvable pour cet utilisateur et ce telephone.")
+        return job
+
+    @router.post("/android/demandes")
+    async def android_enqueue(
+        body: AndroidPrintRequest, request: Request,
+        scope: str = Depends(resolve_scope), db: Session = Depends(get_db),
+    ) -> dict:
+        actor = android_only(request, scope)
+        if not body.reviewed:
+            raise HTTPException(422, "Relisez la photo et les dates avant impression.")
+        with database_errors(db):
+            row = _valid_label(db, scope, body.label_id)
+            existing = db.scalar(select(HaccpPrintJob).where(
+                HaccpPrintJob.scope_key == scope, HaccpPrintJob.label_id == row.id,
+            ))
+            if existing is not None:
+                target = db.get(HaccpAndroidPrintTarget, existing.id)
+                return _job_response(existing, "android" if target else "windows")
+            job = HaccpPrintJob(
+                id=str(uuid.uuid4()), scope_key=scope, label_id=row.id,
+                relay_id=str(body.device_id), status="pending", created_at=_now(),
+            )
+            db.add(job)
+            db.add(HaccpAndroidPrintTarget(job_id=job.id, device_id=str(body.device_id), actor_id=actor))
+            try:
+                db.commit()
+            except IntegrityError:
+                db.rollback()
+                existing = db.scalar(select(HaccpPrintJob).where(
+                    HaccpPrintJob.scope_key == scope, HaccpPrintJob.label_id == row.id,
+                ))
+                if existing is None:
+                    raise
+                return _job_response(existing, "android" if db.get(HaccpAndroidPrintTarget, existing.id) else "windows")
+            return _job_response(job, "android")
+
+    @router.post("/android/demandes/{job_id}/prise")
+    async def android_claim(
+        job_id: uuid.UUID, body: AndroidIdentity, request: Request,
+        scope: str = Depends(resolve_scope), db: Session = Depends(get_db),
+    ) -> dict:
+        actor = android_only(request, scope)
+        with database_errors(db):
+            job = android_job(db, scope, actor, job_id, body.device_id)
+            if job.status != "pending":
+                return {"job": None, "state": _job_response(job, "android")}
+            try:
+                row = _valid_label(db, scope, job.label_id)
+                payload = _android_payload(row, job.id)
+            except HTTPException as error:
+                db.execute(update(HaccpPrintJob).where(
+                    HaccpPrintJob.id == job.id, HaccpPrintJob.status == "pending",
+                ).values(status="cancelled", detail=str(error.detail)))
+                db.commit()
+                db.refresh(job)
+                return {"job": None, "state": _job_response(job, "android")}
+            changed = db.execute(update(HaccpPrintJob).where(
+                HaccpPrintJob.id == job.id, HaccpPrintJob.status == "pending",
+            ).values(status="claimed", claimed_at=_now()))
+            db.commit()
+            if changed.rowcount != 1:
+                return {"job": None}
+            return {"job": payload}
+
+    @router.post("/android/demandes/{job_id}/confirmation")
+    async def android_acknowledge(
+        job_id: uuid.UUID, body: AndroidAcknowledgement, request: Request,
+        scope: str = Depends(resolve_scope), db: Session = Depends(get_db),
+    ) -> dict:
+        actor = android_only(request, scope)
+        with database_errors(db):
+            job = android_job(db, scope, actor, job_id, body.device_id)
+            if job.status in {"accepted", "uncertain"}:
+                return _job_response(job, "android")
+            if job.status != "claimed":
+                raise HTTPException(409, "Demande non prise en charge par ce telephone.")
+            # Compare-and-set : une confirmation concurrente ne remplace jamais l'incertitude.
+            detail = ("SDK Brother sans erreur ; transmission signalee, sortie papier a verifier."
+                      if body.status == "accepted" else "Impression Android incertaine ; verifier le papier, aucun nouvel essai automatique.")
+            if body.detail:
+                detail += " " + body.detail[:250]
+            db.execute(update(HaccpPrintJob).where(
+                HaccpPrintJob.id == job.id, HaccpPrintJob.status == "claimed",
+            ).values(status=body.status, detail=detail[:500]))
+            db.commit()
+            db.refresh(job)
+            return _job_response(job, "android")
 
     return router
