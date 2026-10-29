@@ -8,6 +8,7 @@ import "./HaccpWorkspace.css";
 
 const ROOT = `${API_BASE_URL}/haccp/registre`;
 export const HACCP_CAPTURE_URL = "https://sirius-assistant.fr/haccp";
+const CATEGORIES = ["Viandes", "Poissons", "Produits Laitiers", "Fruits & Légumes", "Épicerie", "Non classé"];
 
 async function checked(response) {
   if (!response.ok) {
@@ -22,7 +23,7 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0 
   useEffect(() => {
     if (captureRequest > 0) setTab("capture");
   }, [captureRequest]);
-  const [filters, setFilters] = useState({ terme: "", date_debut: "", date_fin: "", non_conforme_seul: false });
+  const [filters, setFilters] = useState({ terme: "", categorie: "", date_debut: "", date_fin: "", non_conforme_seul: false });
   const [items, setItems] = useState([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -117,17 +118,22 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0 
       <h3>Retrouver une étiquette</h3>
       <form className="haccp-filters" onSubmit={load}>
         <label className="haccp-search">Lot, produit, fournisseur ou agrément<input value={filters.terme} maxLength={255} onChange={(e) => setFilters({ ...filters, terme: e.target.value })} /></label>
+        <label>Catégorie<select value={filters.categorie} onChange={(e) => setFilters({ ...filters, categorie: e.target.value })}>
+          <option value="">Toutes les catégories</option>
+          {CATEGORIES.map((name) => <option key={name} value={name}>{name}</option>)}
+        </select></label>
         <label>Du<input type="date" value={filters.date_debut} onChange={(e) => setFilters({ ...filters, date_debut: e.target.value })} /></label>
         <label>Au<input type="date" value={filters.date_fin} onChange={(e) => setFilters({ ...filters, date_fin: e.target.value })} /></label>
         <label className="haccp-check haccp-search"><input type="checkbox" checked={filters.non_conforme_seul} onChange={(e) => setFilters({ ...filters, non_conforme_seul: e.target.checked })} /> Anomalies uniquement</label>
         <button className="haccp-primary" type="submit" disabled={busy}><Search size={18} aria-hidden="true" />Rechercher</button>
         <button type="button" disabled={busy} onClick={exportCsv}><Download size={18} aria-hidden="true" />Exporter le registre CSV de la période</button>
       </form>
-      <p>Dates d’archivage en UTC, fin de journée incluse. L’export couvre toute la période, indépendamment du terme et du filtre d’anomalie.</p>
+      <p>Dates d’archivage en UTC, fin de journée incluse. L’export couvre toute la période, indépendamment du terme, de la catégorie et du filtre d’anomalie.</p>
       {busy && <p role="status">Chargement…</p>}
       {error && <p role="alert">{error}</p>}
       <ul className="haccp-records">{items.map((record) => <li key={record.id}>
         <strong>{record.nom_produit}</strong> · Lot {record.numero_lot} · {record.type_operation === "ouverture" ? "Ouverture" : "Réception"}
+        <p>Catégorie : {record.categorie || "Non classé"}</p>
         <p>{record.fournisseur_ou_marque || "Fournisseur non lu"} · {record.type_date} {record.dlc_ou_ddm || "Non lue"} · {record.conforme_reception ? "Étiquette à vérifier" : "Anomalie à vérifier"}</p>
         {record.commentaire_anomalie && <p>{record.commentaire_anomalie}</p>}
         {record.dlc_secondaire && <p>DLC secondaire : {new Date(record.dlc_secondaire).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })} (Europe/Paris)</p>}

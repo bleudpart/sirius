@@ -24,6 +24,12 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Photographier les etiquettes pour la tracabilite HACCP dans SIRIUS.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Permettre au module camera de lire une photo si cette fonction est utilisee.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Permettre au module camera de sauvegarder une photo si cette fonction est activee.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -7,6 +7,10 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, StringConstraints
 
 Texte255 = Annotated[str, StringConstraints(strict=True, strip_whitespace=True, min_length=1, max_length=255)]
 Lot = Annotated[str, StringConstraints(strict=True, strip_whitespace=True, min_length=1, max_length=128)]
+CategorieProduit = Literal["Viandes", "Poissons", "Produits Laitiers", "Fruits & Légumes", "Épicerie", "Non classé"]
+CATEGORIES_PRODUITS: tuple[CategorieProduit, ...] = (
+    "Viandes", "Poissons", "Produits Laitiers", "Fruits & Légumes", "Épicerie", "Non classé",
+)
 Allergene = Literal[
     "Gluten", "Crustacés", "Œufs", "Poissons", "Arachides", "Soja", "Lait",
     "Fruits à coque", "Céleri", "Moutarde", "Sésame", "Sulfites", "Lupin", "Mollusques",
@@ -26,6 +30,16 @@ class EtiquetteVisionOutput(BaseModel):
     allergenes: list[Allergene] = Field(default_factory=list, max_length=14)
     conforme_reception: StrictBool = True
     commentaire_anomalie: Annotated[str, StringConstraints(strict=True, max_length=500)] | None = None
+    categorie: CategorieProduit = "Non classé"
+
+    @field_validator("categorie", mode="before")
+    @classmethod
+    def categorie_connue(cls, value: object) -> object:
+        if value is None:
+            return "Non classé"
+        if isinstance(value, str):
+            return next((name for name in CATEGORIES_PRODUITS if name.casefold() == value.strip().casefold()), "Non classé")
+        return value
 
     @field_validator("dlc_ou_ddm", mode="before")
     @classmethod
@@ -69,8 +83,15 @@ class EtiquetteResponse(EtiquetteVisionOutput, OperationCapture):
     image_url: str
     date_ouverture: datetime | None = None
     dlc_secondaire: datetime | None = None
+    chemin_photo: str | None = None
+    chemin_donnees: str | None = None
+    donnees_url: str | None = None
+    temperature_conforme: None = None
+    fournisseur: str | None = None
+    dlc_dluo: date | None = None
+    date_reception: datetime | None = None
 
-    @field_validator("created_at", "date_ouverture", "dlc_secondaire", mode="after")
+    @field_validator("created_at", "date_ouverture", "dlc_secondaire", "date_reception", mode="after")
     @classmethod
     def horodatage_utc(cls, value: datetime | None) -> datetime | None:
         return value.replace(tzinfo=timezone.utc) if value is not None and value.tzinfo is None else value

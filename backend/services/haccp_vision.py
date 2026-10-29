@@ -39,6 +39,12 @@ Convertis une date certaine en YYYY-MM-DD, sinon null et signale l'incertitude.
 Ne complete jamais un jour ou une annee manquante. DLC depassee : non conforme.
 Lis l'estampille ovale CE (exemple FR 75.056.001 CE) sans reconstruire les chiffres.
 Recopie la consigne de stockage, pas une temperature mesuree supposee.
+Classe le produit dans categorie parmi "Viandes", "Poissons", "Produits Laitiers",
+"Fruits & Légumes", "Épicerie".
+Utilise le produit principal clairement identifiable, pas un allergene ou
+une simple mention de traces. Produit ambigu, compose sans categorie certaine,
+ou information absente : categorie vaut "Non classé".
+La date de reception est fixee par le serveur, jamais inventee depuis l'image.
 Allergenes INCO : utilise uniquement les 14 noms autorises par le schema.
 Inclure les mentions explicites de traces, sans deduire une absence d'allergenes.
 Etiquette illisible, tronquee ou donnee essentielle incertaine : non conforme.

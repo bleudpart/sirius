@@ -159,6 +159,16 @@ def test_scan_archives_original_and_persists_metadata(api):
     assert record["operateur"] == "Chef"
     assert record["dlc_ou_ddm"] == "2099-12-31"
     assert record["numero_lot"] == "LOT-42"
+    assert record["categorie"] == "Non classé"
+    assert record["temperature_conforme"] is None
+    assert record["fournisseur"] == record["fournisseur_ou_marque"]
+    assert record["dlc_dluo"] == record["dlc_ou_ddm"]
+    assert record["date_reception"] == record["created_at"]
+    assert record["chemin_photo"].startswith("receptions/non-classe/")
+    assert record["chemin_donnees"] == f"haccp.sqlite3#etiquettes_haccp/{record['id']}"
+    metadata = client.get(record["donnees_url"], headers={"x-test-user": "one"})
+    assert metadata.json() == record
+    assert metadata.headers["cache-control"] == "private, no-store"
     assert "image_path" not in record and "scope_key" not in record
     assert record["image_url"].endswith(f"/api/haccp/registre/{record['id']}/photo")
     with Session(haccp_database.get_engine()) as db:
@@ -181,10 +191,11 @@ def test_isolation_and_authentication_cover_all_endpoints(api):
     client, _ = api
     record = scan(client).json()
     assert scan(client, user=None).status_code == 401
-    for path in ["recherche", "export-csv", f"{record['id']}/photo"]:
+    for path in ["recherche", "export-csv", f"{record['id']}/photo", f"{record['id']}/donnees"]:
         assert get(client, path, user=None).status_code == 401
     assert get(client, "recherche", user="two").json() == []
     assert get(client, f"{record['id']}/photo", user="two").status_code == 404
+    assert get(client, f"{record['id']}/donnees", user="two").status_code == 404
     assert "LOT-42" not in get(client, "export-csv", user="two").text
 
 
@@ -485,14 +496,22 @@ def test_excessive_duration_fails_explicitly_and_cleans_photo(api):
 def test_sqlite_additive_upgrade_keeps_old_receptions(api):
     client, root = api
     first = scan(client).json()
+    legacy = root / "storage" / "etiquettes_haccp" / "ancienne-photo.png"
+    legacy.parent.mkdir(parents=True, exist_ok=True)
+    (root / first["chemin_photo"]).rename(legacy)
     engine = haccp_database.get_engine()
     engine.dispose()
     haccp_database._configured_engine.cache_clear()
     additions = ["type_operation", "date_ouverture", "dlc_secondaire",
-                 "duree_conservation_heures", "justification_duree", "regle_confirmee", "capture_id", "capture_hash"]
+                 "duree_conservation_heures", "justification_duree", "regle_confirmee", "capture_id", "capture_hash", "categorie"]
     # Reconstruit le schema precedent en gardant les contraintes et la ligne.
     with sqlite3.connect(root / "haccp.sqlite3") as connection:
+        connection.execute(
+            "UPDATE etiquettes_haccp SET image_path = ? WHERE id = ?",
+            ("storage/etiquettes_haccp/ancienne-photo.png", first["id"]),
+        )
         connection.execute("DROP INDEX uq_haccp_capture")
+        connection.execute("DROP INDEX ix_haccp_scope_categorie")
         for column in additions:
             connection.execute(f"ALTER TABLE etiquettes_haccp DROP COLUMN {column}")
     for _ in range(2):
@@ -500,9 +519,87 @@ def test_sqlite_additive_upgrade_keeps_old_receptions(api):
         assert records[0]["id"] == first["id"]
         assert records[0]["type_operation"] == "reception"
         assert records[0]["date_ouverture"] is None and records[0]["dlc_secondaire"] is None
+        assert records[0]["categorie"] == "Non classé"
+        assert records[0]["chemin_photo"] == "storage/etiquettes_haccp/ancienne-photo.png"
+        assert legacy.read_bytes() == picture()
+        assert get(client, f"{first['id']}/photo").content == picture()
         haccp_database.get_engine().dispose()
         haccp_database._configured_engine.cache_clear()
     assert scan(client).status_code == 201
+
+
+@pytest.mark.parametrize("value,expected", [
+    ("Viandes", "Viandes"), (" poissons ", "Poissons"),
+    ("Produits Laitiers", "Produits Laitiers"), ("Fruits & Légumes", "Fruits & Légumes"),
+    ("Épicerie", "Épicerie"), (None, "Non classé"), ("Autres", "Non classé"),
+    ("../../outside", "Non classé"), ("", "Non classé"),
+])
+def test_categories_are_bounded_with_explicit_unclassified_default(value, expected):
+    assert extracted(categorie=value).categorie == expected
+
+
+@pytest.mark.parametrize("value", [42, True, [], {}])
+def test_non_text_categories_are_not_silently_accepted(value):
+    with pytest.raises(ValidationError):
+        extracted(categorie=value)
+
+
+def test_category_archive_preserves_original_and_uses_safe_unique_names(api, monkeypatch):
+    client, root = api
+    monkeypatch.setattr(routes, "analyser_etiquette_vision", AsyncMock(return_value=extracted(
+        categorie="Poissons", nom_produit="../Saumon fumé / test", numero_lot="../../LOT:42",
+    )))
+    first = scan(client).json()
+    second = scan(client).json()
+    assert first["chemin_photo"] != second["chemin_photo"]
+    for record in [first, second]:
+        path = root / record["chemin_photo"]
+        assert path.is_relative_to(root / "receptions" / "poissons")
+        assert "saumon-fume-test_lot-42_" in path.name
+        assert path.name.startswith(datetime.fromisoformat(record["date_reception"]).astimezone(PARIS).strftime("%Y-%m-%d_"))
+        assert path.suffix == ".png"  # Original PNG, jamais renomme faussement en JPEG.
+        assert path.read_bytes() == picture()
+        assert get(client, f"{record['id']}/photo").content == picture()
+    with Session(haccp_database.get_engine()) as db:
+        assert db.query(EtiquetteHaccp).filter_by(categorie="Poissons").count() == 2
+    assert get(client, "recherche", params={"categorie": "Poissons"}).json()[0]["id"] == second["id"]
+    assert get(client, "recherche", params={"categorie": "Viandes"}).json() == []
+    assert get(client, "recherche", params={"categorie": "../../outside"}).status_code == 422
+    assert get(client, "recherche", user="two", params={"categorie": "Poissons"}).json() == []
+    export = get(client, "export-csv")
+    assert "categorie" in export.text and "Poissons" in export.text
+
+
+def test_reception_paths_separate_accounts_and_temperature_is_never_certified(api, monkeypatch):
+    client, _ = api
+    monkeypatch.setattr(routes, "analyser_etiquette_vision", AsyncMock(return_value=extracted(
+        categorie="Produits Laitiers", temperature_stockage="0 a 4 C",
+    )))
+    first = scan(client).json()
+    second = scan(client, user="two").json()
+    assert first["chemin_photo"].split("/")[2] != second["chemin_photo"].split("/")[2]
+    assert first["temperature_conforme"] is None
+    assert first["temperature_stockage"] == "0 a 4 C"
+    with pytest.raises(ValidationError):
+        extracted(temperature_conforme=True)
+
+
+def test_openings_keep_the_original_storage_layout(api):
+    client, _ = api
+    record = scan(client, data={"operation": opening_rule().model_dump_json()}).json()
+    assert record["chemin_photo"].startswith("storage/etiquettes_haccp/")
+    assert record["date_reception"] is None
+
+
+def test_category_move_failure_is_explicit_and_never_inserts(api, monkeypatch):
+    from pathlib import Path
+    client, root = api
+    def fail_move(self, target):
+        raise OSError("disk unavailable")
+    monkeypatch.setattr(Path, "rename", fail_move)
+    assert scan(client).status_code == 500
+    assert get(client, "recherche").json() == []
+    assert list(root.rglob("*.png")) == []
 
 
 def test_linked_pc_scan_and_reads_use_cloud_registry_instead_of_local_lots(api, monkeypatch):
@@ -526,6 +623,11 @@ def test_linked_pc_scan_and_reads_use_cloud_registry_instead_of_local_lots(api, 
     forwarded.return_value = httpx.Response(200, json=[payload])
     assert get(client, "recherche", params={"terme": "LOT"}).json()[0]["id"] == 99
     assert forwarded.call_args.kwargs["params"] == {"terme": "LOT"}
+    forwarded.return_value = httpx.Response(200, json=payload)
+    metadata = get(client, "99/donnees")
+    assert metadata.status_code == 200 and metadata.json()["id"] == 99
+    assert metadata.headers["cache-control"] == "private, no-store"
+    assert forwarded.call_args.args == ("GET", "/registre/99/donnees")
     forwarded.return_value = httpx.Response(200, content=picture(), headers={"content-type": "image/png"})
     assert get(client, "99/photo").content == picture()
     forwarded.return_value = httpx.Response(200, text="<html>Etiquette Cloud</html>")

@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Camera, PackageCheck, Scissors, Printer, RotateCcw, ScanLine, LoaderCircle } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
+import { App } from "@capacitor/app";
+import { Camera as NativeCamera, CameraDirection, CameraResultType, CameraSource } from "@capacitor/camera";
 import { API_BASE_URL } from "./lib/api";
 import { printHaccpDocument } from "./haccpDocuments";
 import HaccpPrinter, { haccpPrintRequest, haccpPrintStatus, printHaccpOpening } from "./HaccpPrinter";
@@ -37,6 +40,7 @@ export default function HaccpLabelCapture({ savedRecord = null }) {
   const frame = useRef(null);
   const input = useRef(null);
   const pending = useRef(false);
+  const takingPhoto = useRef(false);
   const mounted = useRef(true);
   const clearPrintFrame = useCallback(() => {
     frame.current?.remove();
@@ -49,6 +53,24 @@ export default function HaccpLabelCapture({ savedRecord = null }) {
       if (previewRef.current) URL.revokeObjectURL(previewRef.current);
     };
   }, [clearPrintFrame]);
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return undefined;
+    let active = true;
+    const listener = App.addListener("appRestoredResult", (event) => {
+      if (active && event.pluginId === "Camera") {
+        setError("La capture a été interrompue par le redémarrage de l’application. Aucune photo restaurée n’a été envoyée : vérifiez le registre et reprenez le scan avec les bons paramètres.");
+      }
+    });
+    listener.catch((failure) => {
+      if (active) setError(`Suivi du retour caméra indisponible : ${failure.message}`);
+    });
+    return () => {
+      active = false;
+      listener.then((handle) => handle.remove()).catch((failure) => {
+        console.error("HACCP : fermeture du suivi caméra impossible.", failure);
+      });
+    };
+  }, []);
 
   const changeMode = (next) => {
     setMode(next); setConfirmed(false); setResult(null); setError(""); setPrintState("");
@@ -97,6 +119,54 @@ export default function HaccpLabelCapture({ savedRecord = null }) {
       if (mounted.current) setError(`${failure.message} Si la connexion a été coupée, vérifiez le registre avant de renvoyer la photo.`);
     } finally {
       pending.current = false;
+      if (mounted.current) setBusy(false);
+    }
+  };
+  const selectPhoto = (selected) => {
+    if (!selected || !mounted.current) return;
+    setFile(selected); setResult(null); setPrintState("");
+    captureId.current = null; submitted.current = null;
+    if (previewRef.current) URL.revokeObjectURL(previewRef.current);
+    previewRef.current = URL.createObjectURL(selected);
+    setPreview(previewRef.current);
+    return save(null, selected);
+  };
+  const scan = async () => {
+    if (pending.current || takingPhoto.current) return;
+    if (!Capacitor.isNativePlatform()) {
+      input.current?.click();
+      return;
+    }
+    takingPhoto.current = true;
+    setBusy(true); setError("");
+    try {
+      const photo = await NativeCamera.getPhoto({
+        source: CameraSource.Camera,
+        resultType: CameraResultType.Uri,
+        direction: CameraDirection.Rear,
+        quality: 90,
+        width: 2400,
+        height: 2400,
+        correctOrientation: true,
+        allowEditing: false,
+        saveToGallery: false,
+      });
+      if (!mounted.current) return;
+      if (!photo.webPath) throw new Error("La caméra n’a pas retourné de photo lisible.");
+      const response = await fetch(photo.webPath);
+      if (!response.ok) throw new Error("La photo prise ne peut pas être lue.");
+      const blob = await response.blob();
+      if (!blob.size || blob.size > 20 * 1024 * 1024) throw new Error("Photo vide ou supérieure à 20 Mo : reprenez le scan.");
+      if (!["jpeg", "png", "webp"].includes(photo.format)) throw new Error("Format de photo non pris en charge.");
+      await selectPhoto(new File([blob], `etiquette.${photo.format}`, { type: `image/${photo.format}` }));
+    } catch (failure) {
+      const cancelled = failure.message === "User cancelled photos app"
+        || ["OS-PLUG-CAMR-0006", "OS-PLUG-CAMR-0013"].includes(failure.code);
+      if (mounted.current && !cancelled) {
+        setError(`Appareil photo indisponible : ${failure.message || "vérifiez les autorisations caméra dans les paramètres."}`);
+      }
+    } finally {
+      takingPhoto.current = false;
       if (mounted.current) setBusy(false);
     }
   };
@@ -166,14 +236,9 @@ export default function HaccpLabelCapture({ savedRecord = null }) {
           </>}
           <input ref={input} type="file" style={{ display: "none" }} accept="image/jpeg,image/png,image/webp" capture="environment" aria-label="Photo de l’étiquette" onChange={(e) => {
             const selected = e.target.files?.[0] || null;
-            setFile(selected); setResult(null); setPrintState("");
-            captureId.current = null; submitted.current = null;
-            if (previewRef.current) URL.revokeObjectURL(previewRef.current);
-            previewRef.current = selected ? URL.createObjectURL(selected) : null;
-            setPreview(previewRef.current);
-            if (selected) save(null, selected);
+            selectPhoto(selected);
           }} />
-          <button type="button" className="haccp-scan haccp-primary" aria-busy={busy} disabled={!operator.trim() || (mode === "ouverture" && hasRule && (!confirmed || !reason.trim() || !Number.isSafeInteger(Number(hours)) || Number(hours) <= 0))} onClick={() => input.current?.click()}>
+          <button type="button" className="haccp-scan haccp-primary" aria-busy={busy} disabled={busy || !operator.trim() || (mode === "ouverture" && hasRule && (!confirmed || !reason.trim() || !Number.isSafeInteger(Number(hours)) || Number(hours) <= 0))} onClick={scan}>
             {busy ? <LoaderCircle className="haccp-loading" size={30} aria-hidden="true" /> : <Camera size={30} aria-hidden="true" />}
             <span>{busy ? "Analyse et archivage…" : "Scanner étiquette"}</span>
             <ScanLine size={22} aria-hidden="true" />
@@ -189,6 +254,14 @@ export default function HaccpLabelCapture({ savedRecord = null }) {
       {result && <div className={`haccp-result ${result.conforme_reception ? "" : "haccp-result-warning"}`} role="status">
         <h4>{result.conforme_reception ? "Aucune anomalie détectée sur l’étiquette — à vérifier" : "Vérification requise — ne pas valider l’utilisation"}</h4>
         <p>{result.nom_produit} · Lot {result.numero_lot} · {result.type_date} : {result.dlc_ou_ddm || "Illisible ou absente"}</p>
+        <p>Catégorie : {result.categorie || "Non classé"} · Température réelle : non vérifiée par le scan.</p>
+        {result.chemin_photo && result.chemin_donnees && <details>
+          <summary>Photo et métadonnées archivées — voir les emplacements</summary>
+          <p>Emplacements sur le serveur du registre, pas sur le téléphone :</p>
+          <p style={{ overflowWrap: "anywhere" }}>Photo : <code>{result.chemin_photo}</code></p>
+          <p style={{ overflowWrap: "anywhere" }}>Données SQLite : <code>{result.chemin_donnees}</code></p>
+          {result.date_reception && <p>Réception enregistrée : {displayTime(result.date_reception)} (Europe/Paris)</p>}
+        </details>}
         {result.commentaire_anomalie && <p>{result.commentaire_anomalie}</p>}
         {result.type_operation === "ouverture" && <>
           <p>Ouverture : {displayTime(result.date_ouverture)} · DLC secondaire : {displayTime(result.dlc_secondaire)} (Europe/Paris)</p>

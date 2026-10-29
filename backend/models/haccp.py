@@ -11,12 +11,16 @@ class Base(DeclarativeBase):
 
 class EtiquetteHaccp(Base):
     __tablename__ = "etiquettes_haccp"
-    __table_args__ = (Index("uq_haccp_capture", "scope_key", "capture_id", unique=True),)
+    __table_args__ = (
+        Index("uq_haccp_capture", "scope_key", "capture_id", unique=True),
+        Index("ix_haccp_scope_categorie", "scope_key", "categorie"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     scope_key: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
     nom_produit: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
+    categorie: Mapped[str] = mapped_column(String(32), default="Non classé", server_default="Non classé", nullable=False)
     fournisseur_ou_marque: Mapped[str | None] = mapped_column(String(255), index=True)
     numero_lot: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
     dlc_ou_ddm: Mapped[date | None] = mapped_column(Date, index=True)

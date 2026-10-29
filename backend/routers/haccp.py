@@ -6,6 +6,8 @@ import uuid
 import hashlib
 import json
 import os
+import re
+import unicodedata
 from collections.abc import Awaitable, Callable, Iterator
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
@@ -24,8 +26,8 @@ import cloud_link
 from haccp_database import get_db
 from models.haccp import EtiquetteHaccp
 from runtime_paths import data_dir
-from schemas.haccp import EtiquetteResponse, EtiquetteVisionOutput, OperationCapture
-from services.haccp_opening import calculer_ouverture, construire_etiquette
+from schemas.haccp import CategorieProduit, EtiquetteResponse, EtiquetteVisionOutput, OperationCapture
+from services.haccp_opening import PARIS, calculer_ouverture, construire_etiquette
 from services.haccp_vision import (
     VisionAnalysisError,
     VisionConfigurationError,
@@ -40,6 +42,25 @@ IMAGE_FORMATS = {"image/jpeg": ("JPEG", ".jpg"), "image/png": ("PNG", ".png"), "
 
 def image_directory() -> Path:
     return data_dir() / "storage" / "etiquettes_haccp"
+
+
+def reception_directory() -> Path:
+    return data_dir() / "receptions"
+
+
+def _filename_part(value: str, limit: int = 60) -> str:
+    plain = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii").lower()
+    return re.sub(r"[^a-z0-9]+", "-", plain).strip("-")[:limit] or "non-lu"
+
+
+def _reception_path(result: EtiquetteVisionOutput, scope: str, maintenant: datetime, extension: str) -> Path:
+    # Le suffixe unique evite toute collision de lots ; le scope n'apparait pas en clair sur disque.
+    owner = hashlib.sha256(scope.encode("utf-8")).hexdigest()
+    filename = (
+        f"{maintenant.astimezone(PARIS):%Y-%m-%d}_"
+        f"{_filename_part(result.nom_produit)}_{_filename_part(result.numero_lot, 40)}_{uuid.uuid4().hex}{extension}"
+    )
+    return reception_directory() / _filename_part(result.categorie) / owner / filename
 
 
 def validate_image(content: bytes, mime_type: str) -> None:
@@ -69,6 +90,12 @@ def _response(row: EtiquetteHaccp, photo_prefix: str) -> EtiquetteResponse:
         image_url=f"{photo_prefix}/{row.id}/photo",
         **{name: getattr(row, name) for name in OperationCapture.model_fields},
         date_ouverture=row.date_ouverture, dlc_secondaire=row.dlc_secondaire,
+        chemin_photo=row.image_path,
+        chemin_donnees=f"haccp.sqlite3#etiquettes_haccp/{row.id}",
+        donnees_url=f"{photo_prefix}/{row.id}/donnees",
+        fournisseur=row.fournisseur_ou_marque,
+        dlc_dluo=row.dlc_ou_ddm,
+        date_reception=row.created_at if row.type_operation == "reception" else None,
     )
 
 
@@ -84,6 +111,7 @@ def _save_record(
         date_ouverture=maintenant.replace(tzinfo=None) if operation.type_operation == "ouverture" else None,
         dlc_secondaire=limite.replace(tzinfo=None) if limite else None,
         capture_id=capture_id, capture_hash=capture_hash,
+        created_at=maintenant.replace(tzinfo=None),
     )
     try:
         db.add(row)
@@ -99,6 +127,7 @@ def _save_record(
 def _query(
     scope: str, date_debut: date | None, date_fin: date | None,
     terme: str | None = None, non_conforme_seul: bool = False,
+    categorie: CategorieProduit | None = None,
 ) -> Select[tuple[EtiquetteHaccp]]:
     if date_debut and date_fin and date_debut > date_fin:
         raise HTTPException(422, "La date de debut doit preceder ou egaler la date de fin.")
@@ -120,6 +149,8 @@ def _query(
         ]))
     if non_conforme_seul:
         statement = statement.where(EtiquetteHaccp.conforme_reception.is_(False))
+    if categorie is not None:
+        statement = statement.where(EtiquetteHaccp.categorie == categorie)
     return statement.order_by(EtiquetteHaccp.created_at.desc(), EtiquetteHaccp.id.desc())
 
 
@@ -143,6 +174,7 @@ CSV_COLUMNS = [
     "allergenes", "conforme_reception", "commentaire_anomalie", "operateur", "image_url",
     "type_operation", "date_ouverture", "dlc_secondaire", "duree_conservation_heures",
     "justification_duree", "regle_confirmee",
+    "categorie", "date_reception", "temperature_conforme", "chemin_photo", "chemin_donnees",
 ]
 
 
@@ -228,10 +260,16 @@ def make_haccp_router(resolve_scope: Callable[[Request], Awaitable[str]]) -> API
                 result, limite = calculer_ouverture(result, capture, maintenant)
             except ValueError as error:
                 raise HTTPException(422, str(error)) from error
+            if capture.type_operation == "reception":
+                classified = _reception_path(result, scope, maintenant, IMAGE_FORMATS[mime_type][1])
+                await run_in_threadpool(classified.parent.mkdir, parents=True, exist_ok=True)
+                await run_in_threadpool(path.rename, classified)
+                path = classified
+            relative_path = path.relative_to(data_dir()).as_posix()
             try:
                 response = await run_in_threadpool(
                     _save_record, db, result, scope, operateur.strip(),
-                    f"storage/etiquettes_haccp/{filename}", prefix,
+                    relative_path, prefix,
                     capture, maintenant, limite, capture_key, digest,
                 )
             except IntegrityError:
@@ -264,10 +302,11 @@ def make_haccp_router(resolve_scope: Callable[[Request], Awaitable[str]]) -> API
         date_debut: date | None = None,
         date_fin: date | None = None,
         non_conforme_seul: bool = False,
+        categorie: CategorieProduit | None = None,
         scope: str = Depends(resolve_scope),
         db: Session = Depends(get_db),
     ) -> list[EtiquetteResponse]:
-        statement = _query(scope, date_debut, date_fin, terme, non_conforme_seul)
+        statement = _query(scope, date_debut, date_fin, terme, non_conforme_seul, categorie)
         if cloud_link.relay_allowed():
             response = await cloud_link.relay_haccp_registry(
                 "GET", "/registre/recherche", params=dict(request.query_params),
@@ -362,12 +401,35 @@ def make_haccp_router(resolve_scope: Callable[[Request], Awaitable[str]]) -> API
             raise HTTPException(500, "La lecture du registre a echoue.") from error
         if row is None:
             raise HTTPException(404, "Etiquette introuvable.")
-        root = image_directory().resolve()
+        roots = (image_directory().resolve(), reception_directory().resolve())
         path = (data_dir() / row.image_path).resolve()
-        if not path.is_relative_to(root) or not path.is_file():
+        if not any(path.is_relative_to(root) for root in roots) or not path.is_file():
             logger.error("[HACCP] Photo archivee absente ou chemin invalide (id=%s)", id)
             raise HTTPException(404, "La photo originale est introuvable sur disque.")
         mime_type = next((mime for mime, (_, ext) in IMAGE_FORMATS.items() if ext == path.suffix), None)
         return FileResponse(path, media_type=mime_type, headers={"Cache-Control": "private, no-store"})
+
+    @router.get("/registre/{id}/donnees", response_model=EtiquetteResponse)
+    async def donnees(
+        id: Annotated[int, PathParam(ge=1)],
+        request: Request,
+        response: Response,
+        scope: str = Depends(resolve_scope),
+        db: Session = Depends(get_db),
+    ) -> EtiquetteResponse:
+        response.headers["Cache-Control"] = "private, no-store"
+        if cloud_link.relay_allowed():
+            forwarded = await cloud_link.relay_haccp_registry("GET", f"/registre/{id}/donnees")
+            return EtiquetteResponse.model_validate(forwarded.json())
+        try:
+            row = await run_in_threadpool(db.scalar, select(EtiquetteHaccp).where(
+                EtiquetteHaccp.id == id, EtiquetteHaccp.scope_key == scope,
+            ))
+        except SQLAlchemyError as error:
+            logger.exception("[HACCP] Lecture des metadonnees impossible")
+            raise HTTPException(500, "Les metadonnees de reception sont indisponibles.") from error
+        if row is None:
+            raise HTTPException(404, "Etiquette introuvable.")
+        return _response(row, str(request.url_for("haccp_search")).removesuffix("/recherche"))
 
     return router

@@ -7,6 +7,41 @@ construit, publie ou installe. Se reporter au bilan de livraison pour ces etats.
 
 1. NOUVEAUTES
 ------------
+Ajout ulterieur au code source (necessite une nouvelle compilation mobile,
+non present dans l'APK 1.0.66 deja publie) : le scan HACCP dans l'application
+native utilise @capacitor/camera avec CameraSource.Camera, sans selecteur
+Google Photos et sans enregistrement dans la galerie. Une annulation
+n'envoie rien ; une autorisation refusee est signalee. Apres destruction
+de l'application par le systeme pendant la photo, aucune analyse restauree
+n'est lancee automatiquement : verifier le registre et reprendre le scan.
+Sur le site web et Windows, le parcours de selection de fichier est conserve.
+
+Ajout ulterieur au code source : classement automatique des receptions
+dans Viandes, Poissons, Produits Laitiers, Fruits & Legumes, Epicerie,
+ou Non classe en cas d'incertitude. La classification provient de la lecture
+du produit principal, pas de ses seuls allergenes. Elle reste a verifier.
+La photo originale est conservee sans conversion, dans le dossier de donnees
+du serveur : receptions/<categorie-normalisee>/<compte-ou-entreprise-hache>/
+YYYY-MM-DD_<produit>_<lot>_<identifiant-unique>.<extension-originale>.
+La date du nom de fichier est celle de reception serveur en Europe/Paris.
+Les caracteres de chemin sont neutralises ; aucun fichier de lot n'est ecrase.
+Les metadonnees restent dans haccp.sqlite3, table etiquettes_haccp indexee
+par compte/entreprise et categorie. Pas de second registre JSON divergent.
+Le resultat du scan affiche la categorie, l'horodatage et les emplacements
+relatifs de la photo et des donnees sur le serveur, pas sur le telephone.
+Les donnees JSON d'une fiche sont consultables par la route authentifiee
+/api/haccp/registre/<id>/donnees ; la photo reste protegee par le meme compte.
+Le registre permet de filtrer par categorie. Le CSV ajoute categorie,
+date_reception, temperature_conforme et les emplacements ; son export reste
+celui de la periode complete, independamment des filtres d'affichage.
+temperature_conforme reste null (non verifiee) : la consigne de stockage
+imprimee n'est pas une mesure de temperature de reception.
+Les anciennes fiches sont conservees en Non classe sans deplacement des
+photos ; les ouvertures gardent leur stockage et leur circuit d'impression.
+Sauvegarder ensemble haccp.sqlite3, receptions/ et storage/etiquettes_haccp/.
+Ces ajouts necessitent un deploiement serveur et une reconstruction du
+frontend ; aucun fichier de la release 1.0.66 publiee n'est remplace ici.
+
 - Capture des etiquettes de reception et d'ouverture produit.
 - Analyse de la photo par OpenAI, puis archivage avec la photo originale.
 - Recherche par lot, produit, fournisseur/marque ou agrement.

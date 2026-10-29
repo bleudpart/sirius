@@ -46,6 +46,7 @@ def _configured_engine() -> Engine:
             "regle_confirmee": "BOOLEAN NOT NULL DEFAULT 0",
             "capture_id": "VARCHAR(36)",
             "capture_hash": "VARCHAR(64)",
+            "categorie": "VARCHAR(32) NOT NULL DEFAULT 'Non classé'",
         }
         for name, definition in additions.items():
             if name not in columns:
@@ -53,6 +54,10 @@ def _configured_engine() -> Engine:
         connection.exec_driver_sql(
             "CREATE UNIQUE INDEX IF NOT EXISTS uq_haccp_capture "
             "ON etiquettes_haccp(scope_key, capture_id)",
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_haccp_scope_categorie "
+            "ON etiquettes_haccp(scope_key, categorie)",
         )
     return engine
 

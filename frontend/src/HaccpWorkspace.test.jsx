@@ -55,6 +55,23 @@ test("search sends filters with session and renders only returned data", async (
   expect(host.querySelector("script")).toBeNull();
 });
 
+test("category filter is sent to the registry and displayed but does not silently restrict the period CSV", async () => {
+  await renderRegistry();
+  const select = [...host.querySelectorAll("label")].find((label) => label.textContent.startsWith("Catégorie")).querySelector("select");
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(select, "Poissons");
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  global.fetch.mockResolvedValueOnce(reply([{ id: 8, nom_produit: "Saumon", numero_lot: "LOT42", categorie: "Poissons" }]));
+  await search();
+  expect(global.fetch.mock.calls[0][0]).toContain("categorie=Poissons");
+  expect(host.textContent).toContain("Catégorie : Poissons");
+  jest.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+  global.fetch.mockResolvedValueOnce({ ok: true, blob: async () => new Blob(["id;categorie"]) });
+  await click("Exporter");
+  expect(global.fetch.mock.calls[1][0]).not.toContain("categorie=");
+});
+
 test("protected photo uses configured backend instead of trusting arbitrary image_url", async () => {
   await renderRegistry();
   global.fetch.mockResolvedValueOnce(reply([{ id: 8, nom_produit: "Saumon", numero_lot: "LOT42", image_url: "https://evil.test/image" }]));

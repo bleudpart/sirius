@@ -1,6 +1,8 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { Capacitor } from "@capacitor/core";
+import { App } from "@capacitor/app";
+import { Camera, CameraDirection, CameraResultType, CameraSource } from "@capacitor/camera";
 import HaccpLabelCapture from "./HaccpLabelCapture";
 import HaccpModule from "./HaccpModule";
 import { printHaccpDocument } from "./haccpDocuments";
@@ -8,6 +10,15 @@ import { printHaccpDocument } from "./haccpDocuments";
 jest.mock("./haccpDocuments", () => ({
   ...jest.requireActual("./haccpDocuments"),
   printHaccpDocument: jest.fn(),
+}));
+jest.mock("@capacitor/camera", () => ({
+  Camera: { getPhoto: jest.fn() },
+  CameraDirection: { Rear: "REAR" },
+  CameraResultType: { Uri: "uri" },
+  CameraSource: { Camera: "CAMERA" },
+}));
+jest.mock("@capacitor/app", () => ({
+  App: { addListener: jest.fn() },
 }));
 global.IS_REACT_ACT_ENVIRONMENT = true;
 let host, root, originalFetch, originalCrypto;
@@ -29,6 +40,8 @@ beforeEach(() => {
   global.fetch = jest.fn(async () => reply(record));
   host = document.createElement("div"); document.body.appendChild(host); root = createRoot(host);
   printHaccpDocument.mockClear();
+  Camera.getPhoto.mockReset();
+  App.addListener.mockReset().mockResolvedValue({ remove: jest.fn() });
 });
 afterEach(async () => {
   await act(async () => root.unmount());
@@ -100,6 +113,129 @@ test("reception stays the default and camera formats are explicit", async () => 
   expect(options.credentials).toBe("include");
   expect(options.headers).toBeUndefined();
   expect(JSON.parse(options.body.get("operation"))).toEqual({ type_operation: "reception" });
+});
+
+function nativeCamera() {
+  jest.spyOn(Capacitor, "isNativePlatform").mockReturnValue(true);
+  Camera.getPhoto.mockResolvedValue({ webPath: "capacitor://photo.jpg", format: "jpeg" });
+}
+
+test("native scan opens the rear camera directly and uploads the photo without a gallery picker", async () => {
+  nativeCamera();
+  global.fetch.mockResolvedValueOnce({ ok: true, blob: async () => new Blob(["photo"], { type: "image/jpeg" }) })
+    .mockResolvedValueOnce(reply(record));
+  await act(async () => root.render(<HaccpLabelCapture />));
+  const picker = jest.spyOn(host.querySelector('input[type="file"]'), "click");
+  await click("Scanner étiquette");
+  expect(Camera.getPhoto).toHaveBeenCalledWith({
+    source: CameraSource.Camera, resultType: CameraResultType.Uri, direction: CameraDirection.Rear,
+    quality: 90, width: 2400, height: 2400, correctOrientation: true, allowEditing: false, saveToGallery: false,
+  });
+  expect(picker).not.toHaveBeenCalled();
+  const body = global.fetch.mock.calls[1][1].body;
+  expect(body.get("file").type).toBe("image/jpeg");
+  expect(body.get("file").name).toBe("etiquette.jpeg");
+  expect(JSON.parse(body.get("operation"))).toEqual({ type_operation: "reception" });
+  expect(body.get("capture_id")).toBeTruthy();
+  expect(global.fetch).toHaveBeenCalledTimes(2);
+});
+
+test("web scan keeps the file picker and never invokes the native camera", async () => {
+  await act(async () => root.render(<HaccpLabelCapture />));
+  const picker = jest.spyOn(host.querySelector('input[type="file"]'), "click").mockImplementation(() => {});
+  await click("Scanner étiquette");
+  expect(picker).toHaveBeenCalledTimes(1);
+  expect(Camera.getPhoto).not.toHaveBeenCalled();
+  expect(global.fetch).not.toHaveBeenCalled();
+});
+
+test.each([
+  new Error("User cancelled photos app"),
+  Object.assign(new Error("Cancelled"), { code: "OS-PLUG-CAMR-0006" }),
+])("camera cancellation leaves the form usable and never uploads", async (failure) => {
+  nativeCamera();
+  Camera.getPhoto.mockRejectedValue(failure);
+  await act(async () => root.render(<HaccpLabelCapture />));
+  await click("Scanner étiquette");
+  expect(global.fetch).not.toHaveBeenCalled();
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+  expect(button("Scanner étiquette").disabled).toBe(false);
+});
+
+test("permission errors stay explicit and never fall back to the gallery", async () => {
+  nativeCamera();
+  Camera.getPhoto.mockRejectedValue(new Error("Camera permission denied"));
+  await act(async () => root.render(<HaccpLabelCapture />));
+  const picker = jest.spyOn(host.querySelector('input[type="file"]'), "click");
+  await click("Scanner étiquette");
+  expect(host.querySelector('[role="alert"]').textContent).toContain("Camera permission denied");
+  expect(global.fetch).not.toHaveBeenCalled();
+  expect(picker).not.toHaveBeenCalled();
+});
+
+test("an unreadable captured photo is not uploaded", async () => {
+  nativeCamera();
+  global.fetch.mockResolvedValueOnce({ ok: false });
+  await act(async () => root.render(<HaccpLabelCapture />));
+  await click("Scanner étiquette");
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+  expect(host.querySelector('[role="alert"]').textContent).toContain("ne peut pas être lue");
+});
+
+test("rapid double tap launches only one camera and preserves the opening rule", async () => {
+  nativeCamera();
+  let resolvePhoto;
+  Camera.getPhoto.mockReturnValue(new Promise((resolve) => { resolvePhoto = resolve; }));
+  global.fetch.mockResolvedValueOnce({ ok: true, blob: async () => new Blob(["photo"]) })
+    .mockResolvedValueOnce(reply(record));
+  await act(async () => root.render(<HaccpLabelCapture />));
+  await enableRule();
+  await act(async () => { button("Scanner étiquette").click(); button("Scanner étiquette").click(); });
+  expect(Camera.getPhoto).toHaveBeenCalledTimes(1);
+  expect(global.fetch).not.toHaveBeenCalled();
+  await act(async () => resolvePhoto({ webPath: "capacitor://photo.jpg", format: "jpeg" }));
+  expect(JSON.parse(global.fetch.mock.calls[1][1].body.get("operation"))).toEqual({
+    type_operation: "ouverture", duree_conservation_heures: 72,
+    justification_duree: "Notice fabricant", regle_confirmee: true,
+  });
+});
+
+test("a server failure retries the same native photo with the same capture id without reopening the camera", async () => {
+  nativeCamera();
+  global.fetch.mockResolvedValueOnce({ ok: true, blob: async () => new Blob(["photo"]) })
+    .mockResolvedValueOnce(reply({ detail: "Réseau coupé" }, false)).mockResolvedValueOnce(reply(record));
+  await act(async () => root.render(<HaccpLabelCapture />));
+  await click("Scanner étiquette");
+  const first = global.fetch.mock.calls[1][1].body.get("capture_id");
+  await click("Réessayer");
+  expect(global.fetch.mock.calls[2][1].body.get("capture_id")).toBe(first);
+  expect(Camera.getPhoto).toHaveBeenCalledTimes(1);
+});
+
+test("restored camera result never submits with lost operator or PMS context", async () => {
+  nativeCamera();
+  await act(async () => root.render(<HaccpLabelCapture />));
+  const callback = App.addListener.mock.calls.find(([name]) => name === "appRestoredResult")[1];
+  await act(async () => callback({ pluginId: "Camera", success: true, data: { webPath: "restored.jpg" } }));
+  expect(global.fetch).not.toHaveBeenCalled();
+  expect(host.querySelector('[role="alert"]').textContent).toContain("Aucune photo restaurée");
+});
+
+test("scan result confirms classified photo and SQLite archive without certifying a measured temperature", async () => {
+  const archived = {
+    ...record, type_operation: "reception", categorie: "Poissons", temperature_conforme: null,
+    chemin_photo: "receptions/poissons/compte/2026-10-29_saumon_lot42_unique.png",
+    chemin_donnees: "haccp.sqlite3#etiquettes_haccp/8", date_reception: "2026-10-29T10:00:00Z",
+  };
+  global.fetch.mockResolvedValueOnce(reply(archived));
+  await act(async () => root.render(<HaccpLabelCapture />));
+  await choosePhoto();
+  expect(host.textContent).toContain("Catégorie : Poissons");
+  expect(host.textContent).toContain("Photo et métadonnées archivées");
+  expect(host.textContent).toContain(archived.chemin_photo);
+  expect(host.textContent).toContain(archived.chemin_donnees);
+  expect(host.textContent).toContain("Température réelle : non vérifiée");
+  expect(host.textContent).toContain("pas sur le téléphone");
 });
 
 test("opening without a rule is explicit and never defaults to three days", async () => {
