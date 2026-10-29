@@ -4,7 +4,7 @@ const path = require("path");
 const { spawn } = require("child_process");
 
 const HEALTH_URL = "http://127.0.0.1:8001/health";
-const HEALTH_TIMEOUT_MS = 30000;
+const HEALTH_TIMEOUT_MS = 120000;
 const HEALTH_POLL_MIN_MS = 120;
 const HEALTH_POLL_MAX_MS = 1200;
 let backendProcess = null;

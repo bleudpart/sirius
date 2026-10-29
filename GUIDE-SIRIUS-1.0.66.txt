@@ -14,6 +14,8 @@ construit, publie ou installe. Se reporter au bilan de livraison pour ces etats.
 - QR code fixe pour ouvrir la capture sur un telephone.
 - Reprise d'une ouverture archivee depuis le registre, sans nouvelle photo.
 - Relais d'impression thermique dans l'application Windows.
+- Au demarrage Windows, attente du backend local jusqu'a deux minutes
+  avant de signaler un echec, pour les postes plus lents.
 - Impression Android directe en Wi-Fi pour Brother QL-820NWB, a configurer
   dans l'application native ; recette sur imprimante reelle indispensable.
 - Interface harmonisee avec ΣIRIUS : cartes sombres, accents dores,
