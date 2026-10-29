@@ -2,7 +2,7 @@
 // Bouton destructif à double confirmation : 1er clic = armer (3 s), 2e clic = exécuter.
 import { useEffect, useState } from "react";
 
-export function ConfirmButton({ onConfirm, className = "", title = "Supprimer", testId, children, label = "CONFIRMER ?" }) {
+export function ConfirmButton({ onConfirm, className = "", title = "Supprimer", ariaLabel, testId, children, label = "CONFIRMER ?" }) {
   const [armed, setArmed] = useState(false);
   useEffect(() => {
     if (!armed) return;
@@ -14,6 +14,7 @@ export function ConfirmButton({ onConfirm, className = "", title = "Supprimer", 
       type="button"
       className={`${className} ${armed ? "confirm-armed" : ""}`}
       title={armed ? label : title}
+      aria-label={armed ? label : ariaLabel || title}
       onClick={(e) => { e.stopPropagation(); if (armed) { setArmed(false); onConfirm(); } else setArmed(true); }}
       data-testid={testId}
     >

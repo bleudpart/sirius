@@ -21,6 +21,7 @@ jest.mock("./services/streamingStt", () => ({ connectStreamingStt: jest.fn() }))
 jest.mock("./appLogic", () => ({ ...jest.requireActual("./appLogic"), pttBeep: jest.fn() }));
 
 let mockAuthUser;
+let originalSiriusDesktop;
 jest.mock("./AuthGate", () => ({ useAuth: () => ({ user: mockAuthUser }) }));
 jest.mock("./ProactivePanel", () => ({ onInitiative }) => (
   <button data-testid="test-initiative" onClick={() => onInitiative(
@@ -162,6 +163,7 @@ function mockContinuousAudio(transcript = "quelle heure est-il") {
 }
 
 beforeEach(() => {
+  originalSiriusDesktop = window.siriusDesktop;
   jest.clearAllMocks();
   mockAuthUser = { id: "voice-test", name: "Validation" };
   requireVoiceIdentity.mockReset().mockResolvedValue({ ready: true, enrolled: true });
@@ -239,6 +241,8 @@ afterEach(async () => {
   window.matchMedia = originalMatchMedia;
   if (originalSpeechRecognition === undefined) delete window.SpeechRecognition;
   else window.SpeechRecognition = originalSpeechRecognition;
+  if (originalSiriusDesktop === undefined) delete window.siriusDesktop;
+  else window.siriusDesktop = originalSiriusDesktop;
   global.TextDecoder = originalTextDecoder;
   window.MediaRecorder = originalRecorder;
   if (originalMediaDevices) Object.defineProperty(navigator, "mediaDevices", originalMediaDevices);
@@ -252,6 +256,19 @@ async function mount() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   await act(async () => root.render(<QueryClientProvider client={client}><App /></QueryClientProvider>));
 }
+
+test("packaged Electron HUD exposes a confirmed close action", async () => {
+  const closeApp = jest.fn().mockResolvedValue({ closed: true });
+  window.siriusDesktop = { closeApp };
+  await mount();
+  const close = host.querySelector('[data-testid="sirius-app-close-btn"]');
+  expect(close).not.toBeNull();
+  expect(close.title).toBe("Fermer ΣIRIUS");
+  expect(close.getAttribute("aria-label")).toBe("Fermer ΣIRIUS");
+  await act(async () => close.click());
+  await act(async () => close.click());
+  expect(closeApp).toHaveBeenCalledTimes(1);
+});
 
 test("ordinary native STT reads only this account's opted-in text and drops disabled hints", async () => {
   const platform = jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");

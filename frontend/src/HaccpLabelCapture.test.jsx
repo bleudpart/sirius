@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { Capacitor } from "@capacitor/core";
 import { App } from "@capacitor/app";
 import { Camera, CameraDirection, CameraResultType, CameraSource } from "@capacitor/camera";
+import * as haccpPrinter from "./HaccpPrinter";
 import HaccpLabelCapture from "./HaccpLabelCapture";
 import HaccpModule from "./HaccpModule";
 import { printHaccpDocument } from "./haccpDocuments";
@@ -46,6 +47,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount());
   host.remove(); global.fetch = originalFetch; global.crypto = originalCrypto; jest.restoreAllMocks();
+  jest.useRealTimers();
 });
 async function change(input, value) {
   await act(async () => {
@@ -236,6 +238,38 @@ test("scan result confirms classified photo and SQLite archive without certifyin
   expect(host.textContent).toContain(archived.chemin_donnees);
   expect(host.textContent).toContain("Température réelle : non vérifiée");
   expect(host.textContent).toContain("pas sur le téléphone");
+});
+
+test("simplified kitchen scan archives first and requires an explicit review before printing", async () => {
+  await act(async () => root.render(<HaccpLabelCapture kitchenMode />));
+  expect(host.querySelector(".haccp-kitchen-scan")).not.toBeNull();
+  await choosePhoto();
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+  expect(global.fetch.mock.calls[0][0]).toMatch(/\/etiquettes\/scan$/);
+  expect(host.textContent).toContain("Saumon · Lot LOT42");
+  expect(host.textContent).toContain("J’ai vérifié le produit, le lot et la DLC — imprimer");
+  expect(host.querySelector(".haccp-kitchen-print")).not.toBeNull();
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+});
+
+test("kitchen mode shows temporary accepted-print feedback and resets without reloading", async () => {
+  jest.useFakeTimers();
+  const print = jest.spyOn(haccpPrinter, "printHaccpOpening").mockResolvedValue({
+    status: "accepted", transport: "windows", detail: "Transmis à Windows",
+  });
+  await act(async () => root.render(<HaccpLabelCapture kitchenMode />));
+  await enableRule();
+  global.fetch.mockResolvedValueOnce(reply({ ...record, type_operation: "ouverture" }));
+  await choosePhoto();
+  expect(print).not.toHaveBeenCalled();
+  await click("J’ai vérifié le produit, le lot et la DLC");
+  expect(print).toHaveBeenCalledWith(record.id);
+  expect(host.querySelector(".haccp-print-success").textContent).toContain("Demande d’impression envoyée");
+  expect(host.querySelector(".haccp-print-success").textContent).toContain("vérifiez la sortie papier");
+  await act(async () => { jest.advanceTimersByTime(1500); });
+  expect(host.querySelector(".haccp-print-success")).toBeNull();
+  expect(button("Scanner étiquette")).not.toBeNull();
+  jest.useRealTimers();
 });
 
 test("opening without a rule is explicit and never defaults to three days", async () => {

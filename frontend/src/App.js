@@ -1056,6 +1056,7 @@ function App() {
   const mailCache = useMailCache(authUser);
   // Plein écran global du HUD : fenêtre Electron si disponible, sinon API Fullscreen du navigateur
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [desktopCloseError, setDesktopCloseError] = useState("");
   useEffect(() => {
     const onFs = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", onFs);
@@ -1087,6 +1088,17 @@ function App() {
       else await document.documentElement.requestFullscreen({ navigationUI: "hide" });
     } catch (e) {
       console.warn("Plein écran indisponible.", e);
+    }
+  }, []);
+  const closeDesktopApp = useCallback(async () => {
+    if (!window.siriusDesktop?.closeApp) return;
+    setDesktopCloseError("");
+    try {
+      const result = await window.siriusDesktop.closeApp();
+      if (!result?.closed) throw new Error("La fenêtre principale n’a pas confirmé sa fermeture.");
+    } catch (error) {
+      console.error("Impossible de fermer ΣIRIUS.", error);
+      setDesktopCloseError("Impossible de fermer ΣIRIUS. Réessayez ou utilisez le bouton de fermeture Windows.");
     }
   }, []);
   // Application Windows : Échap quitte le plein écran (comme un navigateur) et F11 le bascule.
@@ -7091,6 +7103,9 @@ function App() {
       data-guardian-active={hudTheme.guardian.visible}
       data-testid="sirius-hud"
     >
+      {desktopCloseError && <div role="alert" style={{ position: "fixed", top: 68, right: 12, zIndex: 10000, maxWidth: 420 }}>
+        {desktopCloseError}
+      </div>}
       {haccpPrinterRelay.error && <div role="alert" style={{ position: "fixed", bottom: 12, left: 12, zIndex: 10000, background: "#291313", padding: 12, maxWidth: 450 }}>
         Impression HACCP arrêtée : {haccpPrinterRelay.error} Vérifiez le poste puis rechargez ΣIRIUS. Aucun nouvel essai automatique.
       </div>}
@@ -7578,6 +7593,18 @@ function App() {
               label="ÉTEINDRE ?"
             >
               <Power size={15} />
+            </ConfirmButton>
+          )}
+          {window.siriusDesktop?.closeApp && (
+            <ConfirmButton
+              className="profile-btn sirius-shutdown-btn sirius-app-close-btn"
+              onConfirm={closeDesktopApp}
+              testId="sirius-app-close-btn"
+              title="Fermer ΣIRIUS"
+              ariaLabel="Fermer ΣIRIUS"
+              label="FERMER ?"
+            >
+              <X size={15} aria-hidden="true" />
             </ConfirmButton>
           )}
         </div>

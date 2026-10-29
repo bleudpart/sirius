@@ -21,7 +21,7 @@ async function checkResponse(response) {
   return response;
 }
 
-export default function HaccpLabelCapture({ savedRecord = null }) {
+export default function HaccpLabelCapture({ savedRecord = null, kitchenMode = false }) {
   const [mode, setMode] = useState("reception");
   const [operator, setOperator] = useState("Cuisine");
   const [file, setFile] = useState(null);
@@ -33,6 +33,7 @@ export default function HaccpLabelCapture({ savedRecord = null }) {
   const [result, setResult] = useState(savedRecord);
   const [error, setError] = useState("");
   const [printState, setPrintState] = useState("");
+  const [printSuccess, setPrintSuccess] = useState(false);
   const [preview, setPreview] = useState(null);
   const captureId = useRef(null);
   const submitted = useRef(null);
@@ -42,6 +43,7 @@ export default function HaccpLabelCapture({ savedRecord = null }) {
   const pending = useRef(false);
   const takingPhoto = useRef(false);
   const mounted = useRef(true);
+  const resetTimer = useRef(null);
   const clearPrintFrame = useCallback(() => {
     frame.current?.remove();
     frame.current = null;
@@ -50,6 +52,7 @@ export default function HaccpLabelCapture({ savedRecord = null }) {
     mounted.current = true;
     return () => {
       mounted.current = false; clearPrintFrame();
+      if (resetTimer.current) clearTimeout(resetTimer.current);
       if (previewRef.current) URL.revokeObjectURL(previewRef.current);
     };
   }, [clearPrintFrame]);
@@ -190,6 +193,7 @@ export default function HaccpLabelCapture({ savedRecord = null }) {
     try {
       const job = await printHaccpOpening(result.id);
       setPrintState(`${haccpPrintStatus(job.status, job.transport)}. ${job.detail || ""} Aucun doublon ne sera envoyé automatiquement.`);
+      if (kitchenMode && job.status === "accepted") showKitchenPrintSuccess();
     } catch (failure) {
       setError(failure.message);
       setPrintState("Demande non confirmée. Consultez l’état et vérifiez le papier avant toute autre impression.");
@@ -203,14 +207,32 @@ export default function HaccpLabelCapture({ savedRecord = null }) {
       const job = state.jobs.find((item) => item.label_id === result.id);
       setPrintState(job ? `${haccpPrintStatus(job.status, job.transport)}. ${job.detail || ""}`
         : "Aucune demande trouvée pour cette ouverture.");
+      if (kitchenMode && job?.status === "accepted") showKitchenPrintSuccess();
     } catch (failure) { setError(failure.message); }
+  };
+  const resetCapture = () => {
+    setResult(null); setError(""); setPrintState(""); setPrintSuccess(false); setConfirmed(false); setFile(null);
+    captureId.current = null; submitted.current = null;
+    if (input.current) input.current.value = "";
+    if (previewRef.current) URL.revokeObjectURL(previewRef.current);
+    previewRef.current = null; setPreview(null);
+  };
+  const showKitchenPrintSuccess = () => {
+    setPrintSuccess(true);
+    if (resetTimer.current) clearTimeout(resetTimer.current);
+    resetTimer.current = setTimeout(() => {
+      if (!mounted.current) return;
+      resetCapture();
+      resetTimer.current = null;
+    }, 1500);
   };
 
   return (
-    <section aria-label="Capture des étiquettes ΣIRIUS" className="haccp-ui workspace-surface haccp-card haccp-capture">
-      <p className="haccp-kicker">{savedRecord ? "Preuve archivée" : "Capture intelligente"}</p>
-      <h3>ΣIRIUS · {savedRecord ? "Vérifier l’étiquette archivée" : "Scanner une étiquette"}</h3>
-      {!savedRecord && <ol className="haccp-steps" aria-label="Étapes de capture"><li><span>1</span>Choisir l’action</li><li><span>2</span>Photographier</li><li><span>3</span>Vérifier et imprimer</li></ol>}
+    <section aria-label={kitchenMode ? "Cuisine simplifiée — capture HACCP" : "Capture des étiquettes ΣIRIUS"}
+      className={`haccp-ui workspace-surface haccp-card haccp-capture${kitchenMode ? " haccp-kitchen" : ""}`}>
+      {!kitchenMode && <p className="haccp-kicker">{savedRecord ? "Preuve archivée" : "Capture intelligente"}</p>}
+      <h3>{kitchenMode ? "Cuisine · Scanner une étiquette" : `ΣIRIUS · ${savedRecord ? "Vérifier l’étiquette archivée" : "Scanner une étiquette"}`}</h3>
+      {!savedRecord && !kitchenMode && <ol className="haccp-steps" aria-label="Étapes de capture"><li><span>1</span>Choisir l’action</li><li><span>2</span>Photographier</li><li><span>3</span>Vérifier et imprimer</li></ol>}
       {!savedRecord && !result && <form onSubmit={save}>
         <fieldset disabled={busy} className="haccp-capture-fields">
           <legend>Action</legend>
@@ -238,7 +260,7 @@ export default function HaccpLabelCapture({ savedRecord = null }) {
             const selected = e.target.files?.[0] || null;
             selectPhoto(selected);
           }} />
-          <button type="button" className="haccp-scan haccp-primary" aria-busy={busy} disabled={busy || !operator.trim() || (mode === "ouverture" && hasRule && (!confirmed || !reason.trim() || !Number.isSafeInteger(Number(hours)) || Number(hours) <= 0))} onClick={scan}>
+          <button type="button" className={`haccp-scan haccp-primary${kitchenMode ? " haccp-kitchen-scan" : ""}`} aria-busy={busy} disabled={busy || !operator.trim() || (mode === "ouverture" && hasRule && (!confirmed || !reason.trim() || !Number.isSafeInteger(Number(hours)) || Number(hours) <= 0))} onClick={scan}>
             {busy ? <LoaderCircle className="haccp-loading" size={30} aria-hidden="true" /> : <Camera size={30} aria-hidden="true" />}
             <span>{busy ? "Analyse et archivage…" : "Scanner étiquette"}</span>
             <ScanLine size={22} aria-hidden="true" />
@@ -247,10 +269,15 @@ export default function HaccpLabelCapture({ savedRecord = null }) {
           {file && error && <button type="submit"><RotateCcw size={18} aria-hidden="true" />Réessayer la même photo sans doublon</button>}
         </fieldset>
       </form>}
-      <p className="haccp-notice">Analyse OpenAI, archivage sur le serveur. Aucun contrôle physique ou de température n’est certifié.</p>
-      {!savedRecord && !result && <details><summary>Configurer l’imprimante (une seule fois)</summary><HaccpPrinter /></details>}
+      <p className="haccp-notice">{kitchenMode
+        ? "Après le scan, vérifiez le produit, le lot et la date avant de confirmer l’impression. La température n’est pas mesurée."
+        : "Analyse OpenAI, archivage sur le serveur. Aucun contrôle physique ou de température n’est certifié."}</p>
+      {!kitchenMode && !savedRecord && !result && <details><summary>Configurer l’imprimante (une seule fois)</summary><HaccpPrinter /></details>}
       {preview && <img src={preview} alt="Photo originale à relire avant validation" style={{ maxWidth: "100%", maxHeight: 500, objectFit: "contain" }} />}
       {error && <p role="alert">{error}</p>}
+      {printSuccess && <p className="haccp-print-success" role="status">
+        Demande d’impression envoyée — vérifiez la sortie papier. Préparation du scan suivant…
+      </p>}
       {result && <div className={`haccp-result ${result.conforme_reception ? "" : "haccp-result-warning"}`} role="status">
         <h4>{result.conforme_reception ? "Aucune anomalie détectée sur l’étiquette — à vérifier" : "Vérification requise — ne pas valider l’utilisation"}</h4>
         <p>{result.nom_produit} · Lot {result.numero_lot} · {result.type_date} : {result.dlc_ou_ddm || "Illisible ou absente"}</p>
@@ -268,19 +295,18 @@ export default function HaccpLabelCapture({ savedRecord = null }) {
           <p>Durée déclarée : {result.duree_conservation_heures ?? "Non renseignée"} h · Référence : {result.justification_duree || "Aucune"}</p>
           {result.dlc_secondaire && result.conforme_reception && <>
             <p>Vérifiez la photo, le produit, le lot et les dates avant de valider.</p>
-            <button className="haccp-primary" disabled={busy || !!printState} onClick={queuePrint}><Printer size={20} aria-hidden="true" />J’ai vérifié : valider et imprimer</button>
+            <button className={`haccp-primary${kitchenMode ? " haccp-kitchen-print" : ""}`} disabled={busy || !!printState} onClick={queuePrint}>
+              <Printer size={20} aria-hidden="true" />{kitchenMode
+                ? "J’ai vérifié le produit, le lot et la DLC — imprimer"
+                : "J’ai vérifié : valider et imprimer"}
+            </button>
             {printState && <button disabled={busy} onClick={checkPrintState}>Voir l’état d’impression</button>}
-            <details><summary>Secours manuel (risque de doublon)</summary><p>Uniquement si aucune demande n’a été envoyée au relais. Vérifiez le registre et le papier avant toute impression manuelle.</p><button disabled={busy || !!printState} onClick={print}>Imprimer l’étiquette d’ouverture manuellement</button></details>
+            {!kitchenMode && <details><summary>Secours manuel (risque de doublon)</summary><p>Uniquement si aucune demande n’a été envoyée au relais. Vérifiez le registre et le papier avant toute impression manuelle.</p><button disabled={busy || !!printState} onClick={print}>Imprimer l’étiquette d’ouverture manuellement</button></details>}
           </>}
           {printState && <p role="status">{printState}</p>}
         </>}
       </div>}
-      {result && !savedRecord && <button type="button" disabled={busy} onClick={() => {
-        setResult(null); setError(""); setPrintState(""); setConfirmed(false); setFile(null);
-        captureId.current = null; submitted.current = null;
-        if (previewRef.current) URL.revokeObjectURL(previewRef.current);
-        previewRef.current = null; setPreview(null);
-      }}><Camera size={20} aria-hidden="true" />Scanner une autre étiquette</button>}
+      {result && !savedRecord && !printSuccess && <button type="button" disabled={busy} onClick={resetCapture}><Camera size={20} aria-hidden="true" />Scanner une autre étiquette</button>}
     </section>
   );
 }

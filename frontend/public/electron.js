@@ -253,6 +253,12 @@ app.whenReady().then(async () => {
     const win = BrowserWindow.fromWebContents(event.sender);
     return { fullscreen: !!win && !win.isDestroyed() && win.isFullScreen() };
   });
+  ipcMain.handle("sirius-app-close", (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win || win !== mainWindow || win.isDestroyed()) return { closed: false };
+    win.close();
+    return { closed: true };
+  });
   ipcMain.handle("sirius-files-select-folder", async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
       title: "Choisir un dossier Windows",

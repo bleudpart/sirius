@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld("siriusDesktop", {
   openCaptureFolder: () => ipcRenderer.invoke("sirius-open-capture-folder"),
   toggleFullscreen: () => ipcRenderer.invoke("sirius-window-toggle-fullscreen"),
   isFullscreen: () => ipcRenderer.invoke("sirius-window-is-fullscreen"),
+  closeApp: () => ipcRenderer.invoke("sirius-app-close"),
 });
 
 contextBridge.exposeInMainWorld("siriusHaccpPrinter", {

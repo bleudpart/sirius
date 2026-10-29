@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { Camera, ClipboardList, QrCode, ShieldCheck, Search, Download, Image, X } from "lucide-react";
+import { Camera, ClipboardList, QrCode, ShieldCheck, Search, Download, Image, X, Utensils } from "lucide-react";
 import HaccpLabelCapture from "./HaccpLabelCapture";
 import { API_BASE_URL } from "./lib/api";
 import { haccpFetch } from "./haccpRequest";
@@ -28,6 +28,7 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0 
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [photo, setPhoto] = useState(null);
+  const [wakeLockStatus, setWakeLockStatus] = useState("");
   const photoRef = useRef(null);
   const controller = useRef(null);
   const requestNumber = useRef(0);
@@ -40,6 +41,55 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0 
     mounted.current = true;
     return () => { mounted.current = false; controller.current?.abort(); clearPhoto(); };
   }, [clearPhoto]);
+  useEffect(() => {
+    if (!standalone) return undefined;
+    if (!navigator.wakeLock?.request) {
+      setWakeLockStatus("Ce navigateur ne permet pas de garder l’écran allumé.");
+      return undefined;
+    }
+    let active = true;
+    let lock = null;
+    let requesting = false;
+    const requestLock = async () => {
+      if (!active || document.visibilityState !== "visible" || lock || requesting) return;
+      requesting = true;
+      try {
+        const nextLock = await navigator.wakeLock.request("screen");
+        if (!active || document.visibilityState !== "visible") {
+          await nextLock.release();
+          return;
+        }
+        lock = nextLock;
+        setWakeLockStatus("Écran maintenu allumé pendant le service.");
+        nextLock.addEventListener("release", () => {
+          if (lock === nextLock) {
+            lock = null;
+            if (active) setWakeLockStatus("Verrou d’écran libéré ; il sera redemandé au retour dans l’application.");
+          }
+        }, { once: true });
+      } catch (failure) {
+        if (active) setWakeLockStatus(`Maintien de l’écran indisponible : ${failure.message}`);
+      } finally {
+        requesting = false;
+      }
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") void requestLock();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    void requestLock();
+    return () => {
+      active = false;
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      if (lock) {
+        const heldLock = lock;
+        lock = null;
+        heldLock.release().catch((failure) => {
+          console.error("HACCP : libération du verrou d’écran impossible.", failure);
+        });
+      }
+    };
+  }, [standalone]);
   function params(exporting = false) {
     const result = new URLSearchParams();
     Object.entries(filters).forEach(([name, value]) => {
@@ -101,10 +151,13 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0 
     </header>
     <nav className="haccp-navigation" aria-label="Parcours des étiquettes">
       <button type="button" aria-pressed={tab === "capture"} onClick={() => setTab("capture")}><Camera size={19} aria-hidden="true" />Réception / Ouverture</button>
+      <button type="button" aria-pressed={tab === "kitchen"} onClick={() => setTab("kitchen")}><Utensils size={19} aria-hidden="true" />Cuisine simplifiée</button>
       <button type="button" aria-pressed={tab === "registre"} onClick={() => setTab("registre")}><ClipboardList size={19} aria-hidden="true" />Registre / Contrôle</button>
       <button type="button" aria-pressed={tab === "qr"} onClick={() => setTab("qr")}><QrCode size={19} aria-hidden="true" />QR code réserve</button>
     </nav>
+    {standalone && wakeLockStatus && <p className="haccp-wake-lock" role="status">{wakeLockStatus}</p>}
     {tab === "capture" && <HaccpLabelCapture />}
+    {tab === "kitchen" && <HaccpLabelCapture kitchenMode />}
     {tab === "qr" && <section className="workspace-surface haccp-card haccp-qr" aria-label="QR code de capture">
       <p className="haccp-kicker">Accès cuisine</p>
       <h3>Ouvrir la capture sur le téléphone</h3>

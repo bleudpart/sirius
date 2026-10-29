@@ -3,18 +3,21 @@ import { createRoot } from "react-dom/client";
 import HaccpWorkspace, { HACCP_CAPTURE_URL } from "./HaccpWorkspace";
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
-let host, root, oldFetch;
+let host, root, oldFetch, oldWakeLock;
 const button = (text) => [...host.querySelectorAll("button")].find((item) => item.textContent.includes(text));
 const field = (text) => [...host.querySelectorAll("label")].find((item) => item.textContent.trim().startsWith(text))?.querySelector("input");
 const reply = (value, ok = true) => ({ ok, status: ok ? 200 : 401, json: async () => value });
 beforeEach(() => {
   oldFetch = global.fetch; global.fetch = jest.fn(async () => reply([]));
+  oldWakeLock = Object.getOwnPropertyDescriptor(navigator, "wakeLock");
   URL.createObjectURL = jest.fn(() => "blob:proof"); URL.revokeObjectURL = jest.fn();
   host = document.createElement("div"); document.body.appendChild(host); root = createRoot(host);
 });
 afterEach(async () => {
   await act(async () => root.unmount());
   host.remove(); global.fetch = oldFetch; jest.restoreAllMocks();
+  if (oldWakeLock) Object.defineProperty(navigator, "wakeLock", oldWakeLock);
+  else delete navigator.wakeLock;
 });
 async function click(text) { await act(async () => button(text).click()); }
 async function change(input, value) {
@@ -39,6 +42,38 @@ test("QR points to the authenticated standalone capture without embedded credent
   expect(HACCP_CAPTURE_URL).toBe("https://sirius-assistant.fr/haccp");
   expect(host.textContent).toContain("aucun accès sans connexion");
   expect(global.fetch).not.toHaveBeenCalled();
+});
+
+test("simplified kitchen workspace presents the oversized scan flow without hiding the safety review", async () => {
+  await act(async () => root.render(<HaccpWorkspace standalone />));
+  await click("Cuisine simplifiée");
+  expect(host.querySelector(".haccp-kitchen")).not.toBeNull();
+  expect(host.querySelector("button.haccp-kitchen-scan")).not.toBeNull();
+  expect(host.textContent).toContain("vérifiez le produit, le lot et la date avant de confirmer l’impression");
+  expect(host.textContent).not.toContain("J’ai vérifié le produit, le lot et la DLC — imprimer");
+});
+
+test("standalone scan page requests screen wake lock and reacquires it after release on return", async () => {
+  let releaseListener;
+  const lock = {
+    addEventListener: jest.fn((_event, listener) => { releaseListener = listener; }),
+    release: jest.fn().mockResolvedValue(),
+  };
+  const request = jest.fn().mockResolvedValue(lock);
+  Object.defineProperty(navigator, "wakeLock", { configurable: true, value: { request } });
+  await act(async () => {
+    root.render(<HaccpWorkspace standalone />);
+    await Promise.resolve();
+  });
+  expect(request).toHaveBeenCalledWith("screen");
+  expect(host.textContent).toContain("Écran maintenu allumé pendant le service.");
+  await act(async () => {
+    releaseListener();
+    document.dispatchEvent(new Event("visibilitychange"));
+    await Promise.resolve();
+  });
+  expect(request).toHaveBeenCalledTimes(2);
+  expect(host.textContent).toContain("Écran maintenu allumé pendant le service.");
 });
 
 test("search sends filters with session and renders only returned data", async () => {
