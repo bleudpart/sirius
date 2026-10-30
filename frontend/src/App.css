@@ -6326,6 +6326,33 @@ a.auth-submit { text-decoration: none; }
 
 /* ===== Ergonomie : onglets de configuration, HUD personnalisable, confirmations ===== */
 .setup-tabs { display: flex; gap: 6px; margin: 8px 0 2px; flex-wrap: wrap; }
+.setup-config-block {
+  margin: 0 0 18px; padding: 14px; border: 1px solid rgba(145, 230, 242, 0.22);
+  border-radius: 10px; background: rgba(5, 17, 29, 0.54);
+}
+.setup-config-block h2 {
+  display: flex; align-items: center; gap: 8px; margin: 0 0 10px;
+  color: var(--sirius-cyan, #91e6f2); font: 600 13px "Orbitron", sans-serif;
+}
+.setup-theme-colors { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.setup-theme-color {
+  display: grid; gap: 6px; min-width: 0; padding: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 7px;
+  color: #d7e8ee; font-size: 11px;
+}
+.setup-theme-color input[type="color"] {
+  width: 100%; height: 36px; padding: 3px; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 5px; background: transparent;
+}
+.setup-theme-color code { color: #9fb2bf; font: 11px monospace; }
+.setup-theme-preview {
+  display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--preview-cyan), transparent 55%);
+  border-radius: 7px; color: var(--preview-cyan); background: var(--preview-background);
+  font: 600 11px "Orbitron", sans-serif;
+}
+.setup-theme-preview i { width: 26px; height: 4px; border-radius: 4px; background: var(--preview-gold); }
+.setup-theme-preview b { margin-left: auto; color: var(--preview-gold); font-size: 9px; }
 .setup-tab {
   display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
   background: transparent; border: 1px solid rgba(255, 255, 255, 0.14); color: #7c98a2;
@@ -6353,6 +6380,9 @@ a.auth-submit { text-decoration: none; }
   font-family: "Orbitron", sans-serif; display: inline-flex; align-items: center;
 }
 .setup-keytest:disabled { opacity: 0.5; cursor: wait; }
+@media (max-width: 520px) {
+  .setup-theme-colors { grid-template-columns: 1fr; }
+}
 .setup-keystatus { display: flex; align-items: center; gap: 6px; margin: 5px 0 0; font-size: 12px; }
 .setup-keystatus.ok { color: #9fd8c9; }
 .setup-keystatus.ko { color: #f43f5e; }

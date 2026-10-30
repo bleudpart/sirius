@@ -70,6 +70,27 @@ test("Android captures raw audio because device voice processing can return a si
   expect(microphoneConstraints("web")).toEqual({ audio: true });
 });
 
+test("the selected microphone is applied to browser and Android capture constraints", () => {
+  const savedDevice = localStorage.getItem("sirius_microphone_device");
+  localStorage.setItem("sirius_microphone_device", "usb-microphone-1");
+  try {
+    expect(microphoneConstraints("web")).toEqual({
+      audio: { deviceId: { ideal: "usb-microphone-1" } },
+    });
+    expect(microphoneConstraints("android")).toEqual({
+      audio: {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+        deviceId: { ideal: "usb-microphone-1" },
+      },
+    });
+  } finally {
+    if (savedDevice === null) localStorage.removeItem("sirius_microphone_device");
+    else localStorage.setItem("sirius_microphone_device", savedDevice);
+  }
+});
+
 test("the silence threshold follows background noise so raw capture still ends a sentence", () => {
   const detect = createSilenceDetector();
   const ambient = new Float32Array([0.034, -0.034]);

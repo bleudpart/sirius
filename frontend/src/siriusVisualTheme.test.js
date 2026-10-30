@@ -56,8 +56,8 @@ test("the real reactor is reduced by 25 percent on desktop and tablet with a com
 });
 
 test("original palette and white subtitles are shared with lazy modules, wheels and Store", () => {
-  expect(css).toContain("--workspace-cyan: #91e6f2");
-  expect(css).toContain("--workspace-gold: #d8b875");
+  expect(css).toContain("--workspace-cyan: var(--sirius-cyan, #91e6f2)");
+  expect(css).toContain("--workspace-gold: var(--sirius-gold, #d8b875)");
   for (const subtitle of [".sirius-tagline", ".prime-sub", ".auth-sub", ".modmenu-label small", ".public-plan-tagline"]) {
     const matches = [];
     root.walkRules((rule) => {
@@ -106,14 +106,14 @@ test("original scenery remains visible and frames retain restrained animated gol
   expect(css).toContain("animation: sirFrameSpin 14s steps(360) infinite");
   expect(css).toContain("animation: sirSpectrum 10s linear infinite");
   expect(css).toContain("@media (prefers-reduced-motion: reduce)");
-  expect(css).toContain("--workspace-rgb: linear-gradient(90deg, #c9a24d, #91e6f2 35%, #86a8ff 65%, #c9a24d)");
+  expect(css).toContain("--workspace-rgb: linear-gradient(90deg, var(--workspace-gold), var(--workspace-cyan) 35%, #86a8ff 65%, var(--workspace-gold))");
   root.walkDecls("--workspace-frame", (decl) => {
     expect(decl.parent.selector).toContain(".holo-win");
     expect(decl.parent.selector).not.toBe('html[data-sirius-visual-theme="classic"]');
   });
 
   expect(css).toContain("var(--workspace-frame-colours)");
-  expect(css).toContain("#91e6f2 38%");
+  expect(css).toContain("var(--workspace-cyan) 38%");
 });
 
 test("startup frames stay static on touch screens and in reduced-motion mode", () => {

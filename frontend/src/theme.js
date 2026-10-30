@@ -39,36 +39,90 @@ export const SIRIUS_THEME = Object.freeze({
   }),
 });
 
-export function renderHUD(state) {
+export function renderHUD(state, theme = loadVisualTheme()) {
+  const colors = normalizeVisualTheme(theme);
   return {
     core: {
-      color: SIRIUS_THEME.colors.cyan,
+      color: colors.cyan,
       glow: SIRIUS_THEME.glow.intensity,
       active: state.coreActive,
     },
     guardian: {
-      color: SIRIUS_THEME.colors.cyan,
-      gold: SIRIUS_THEME.colors.gold,
+      color: colors.cyan,
+      gold: colors.gold,
       visible: state.guardianActive,
     },
     medallions: {
       count: SIRIUS_THEME.layout.medallionCount,
-      color: SIRIUS_THEME.colors.gold,
+      color: colors.gold,
     },
     infoPanels: state.infoPanels,
   };
 }
 
-export function getHUDStyleVariables() {
+export const VISUAL_THEME_DEFAULTS = Object.freeze({
+  cyan: SIRIUS_THEME.colors.cyan,
+  gold: SIRIUS_THEME.colors.gold,
+  background: SIRIUS_THEME.colors.background,
+});
+
+const VISUAL_THEME_STORAGE_KEY = "sirius_visual_theme";
+const COLOR_PATTERN = /^#[\da-f]{6}$/i;
+
+export function normalizeVisualTheme(value = {}) {
+  return Object.fromEntries(Object.entries(VISUAL_THEME_DEFAULTS).map(([key, fallback]) => [
+    key,
+    COLOR_PATTERN.test(value?.[key] || "") ? value[key] : fallback,
+  ]));
+}
+
+export function loadVisualTheme() {
+  try {
+    return normalizeVisualTheme(JSON.parse(localStorage.getItem(VISUAL_THEME_STORAGE_KEY) || "{}"));
+  } catch {
+    return { ...VISUAL_THEME_DEFAULTS };
+  }
+}
+
+function colorWithAlpha(color, alpha) {
+  const [red, green, blue] = color.slice(1).match(/.{2}/g).map((part) => parseInt(part, 16));
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
+
+function lightenColor(color, amount) {
+  const channels = color.slice(1).match(/.{2}/g).map((part) => parseInt(part, 16));
+  return `#${channels.map((channel) => Math.round(channel + (255 - channel) * amount)
+    .toString(16).padStart(2, "0")).join("")}`;
+}
+
+export function saveVisualTheme(patch) {
+  if (Object.entries(patch).some(([key, color]) => !(key in VISUAL_THEME_DEFAULTS) || !COLOR_PATTERN.test(color || ""))) {
+    throw new Error("Une couleur de ΣIRIUS est invalide.");
+  }
+  const next = normalizeVisualTheme({ ...loadVisualTheme(), ...patch });
+  localStorage.setItem(VISUAL_THEME_STORAGE_KEY, JSON.stringify(next));
+  applyVisualTheme(next);
+  window.dispatchEvent(new CustomEvent("sirius-visual-theme-changed", { detail: next }));
+  return next;
+}
+
+export function getHUDStyleVariables(theme = loadVisualTheme()) {
+  const colors = normalizeVisualTheme(theme);
   return {
-    "--sirius-cyan": SIRIUS_THEME.colors.cyan,
-    "--sirius-cyan-bright": SIRIUS_THEME.colors.cyanBright,
+    "--sirius-cyan": colors.cyan,
+    "--sirius-cyan-bright": lightenColor(colors.cyan, 0.3),
+    "--sirius-cyan-light": lightenColor(colors.cyan, 0.3),
+    "--sirius-cyan-glow": colorWithAlpha(colors.cyan, SIRIUS_THEME.glow.intensity),
+    "--sirius-cyan-line": colorWithAlpha(colors.cyan, 0.24),
+    "--sirius-cyan-shadow": colorWithAlpha(colors.cyan, 0.045),
+    "--workspace-cyan": colors.cyan,
     "--sirius-cyan-deep": SIRIUS_THEME.colors.cyanDeep,
-    "--sirius-gold": SIRIUS_THEME.colors.gold,
-    "--sirius-gold-bright": SIRIUS_THEME.colors.goldBright,
-    "--sirius-background": SIRIUS_THEME.colors.background,
-    "--sirius-cyan-glow": SIRIUS_THEME.glow.cyan,
-    "--sirius-gold-glow": SIRIUS_THEME.glow.gold,
+    "--sirius-gold": colors.gold,
+    "--sirius-gold-bright": lightenColor(colors.gold, 0.3),
+    "--sirius-gold-light": lightenColor(colors.gold, 0.3),
+    "--sirius-background": colors.background,
+    "--sirius-gold-glow": colorWithAlpha(colors.gold, SIRIUS_THEME.glow.intensity),
+    "--workspace-gold": colors.gold,
     "--sirius-globe-scale": SIRIUS_THEME.layout.globeScale,
     "--sirius-space-xs": `${SIRIUS_THEME.spacing.xs}px`,
     "--sirius-space-sm": `${SIRIUS_THEME.spacing.sm}px`,
@@ -82,4 +136,11 @@ export function getHUDStyleVariables() {
     "--sirius-motion-normal": `${SIRIUS_THEME.motion.normal}ms`,
     "--sirius-motion-slow": `${SIRIUS_THEME.motion.slow}ms`,
   };
+}
+
+export function applyVisualTheme(theme = loadVisualTheme()) {
+  const root = document.documentElement;
+  for (const [property, value] of Object.entries(getHUDStyleVariables(theme))) {
+    root.style.setProperty(property, value);
+  }
 }

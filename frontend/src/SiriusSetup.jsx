@@ -1,11 +1,13 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
-import { useState, useRef, useEffect } from "react";
-import { User, KeyRound, Sparkles, ExternalLink, X, Download, Upload, Music, Volume2, Brain, Monitor, RotateCcw, CheckCircle2, XCircle, Loader2, Zap, Layers, Rocket, HardDrive } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { User, KeyRound, Sparkles, ExternalLink, X, Download, Upload, Music, Volume2, Brain, Monitor, RotateCcw, CheckCircle2, XCircle, Loader2, Zap, Layers, Rocket, HardDrive, Mic, Settings2 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { speakFr, speakAsCharacter, CHAR_PROFILES, MYTHOS_VOICES, loadCharOverrides, DEFAULT_VOICE, AEDES_VOICE, loadVoiceConfig } from "@/voice";
 import VoiceEqualizerPanel from "./VoiceEqualizerPanel";
 import { GEMINI_VOICE, GEMINI_TIMBRES, geminiTimbreFor } from "./voice";
 import { HUD_DEFAULTS, loadHud, saveHud } from "@/hudPrefs";
+import { loadPreferredMicrophoneDevice, MICROPHONE_DEVICE_STORAGE_KEY } from "@/microphoneCapture";
+import { loadVisualTheme, saveVisualTheme, VISUAL_THEME_DEFAULTS } from "@/theme";
 import { ConfirmButton } from "@/ConfirmButton";
 import { exportAccountProfile, importAccountProfile, validatePersonalService } from "@/accountSetup";
 import { assertSecureKeyTransport, loadApiKeys } from "@/apiKeyStorage";
@@ -16,9 +18,9 @@ import { EMAIL_HELP_URL } from "@/helpLinks";
 
 const TABS = [
   { id: "profil", label: "PROFIL", Icon: User },
-  { id: "voix", label: "VOIX", Icon: Volume2 },
+  { id: "voix", label: "VOIX & MICRO", Icon: Volume2 },
   { id: "ia", label: "IA", Icon: Brain },
-  { id: "hud", label: "HUD", Icon: Monitor },
+  { id: "hud", label: "HUD & COULEURS", Icon: Monitor },
   { id: "stockage", label: "STOCKAGE", Icon: HardDrive },
   { id: "confidentialite", label: "CONFIDENTIALITÉ ET DONNÉES", Icon: HardDrive },
   { id: "api", label: "CLÉS API ET SERVICES", Icon: KeyRound },
@@ -175,6 +177,49 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
     return nv;
   });
   const [voiceTesting, setVoiceTesting] = useState(false);
+  const [microphones, setMicrophones] = useState([]);
+  const [microphoneDeviceId, setMicrophoneDeviceId] = useState(loadPreferredMicrophoneDevice);
+  const [microphoneBusy, setMicrophoneBusy] = useState(false);
+  const [microphoneStatus, setMicrophoneStatus] = useState(null);
+  const refreshMicrophones = useCallback(async (requestPermission = false) => {
+    setMicrophoneBusy(true);
+    setMicrophoneStatus(null);
+    let stream;
+    try {
+      const mediaDevices = navigator.mediaDevices;
+      if (!mediaDevices?.enumerateDevices) {
+        throw new Error("La sélection de microphone n’est pas prise en charge par ce navigateur.");
+      }
+      if (requestPermission) {
+        if (!mediaDevices.getUserMedia) throw new Error("L’accès au microphone n’est pas pris en charge.");
+        stream = await mediaDevices.getUserMedia({ audio: true });
+      }
+      const inputs = (await mediaDevices.enumerateDevices()).filter((device) => device.kind === "audioinput");
+      setMicrophones(inputs);
+      setMicrophoneStatus({
+        message: inputs.length
+          ? `${inputs.length} microphone${inputs.length > 1 ? "s" : ""} disponible${inputs.length > 1 ? "s" : ""}.`
+          : "Aucun microphone externe détecté. La source par défaut de l’appareil sera utilisée.",
+      });
+    } catch (error) {
+      setMicrophoneStatus({ message: error.message || "Détection du microphone impossible.", error: true });
+    } finally {
+      stream?.getTracks().forEach((track) => track.stop());
+      setMicrophoneBusy(false);
+    }
+  }, []);
+  useEffect(() => {
+    if (tab === "voix") void refreshMicrophones();
+  }, [tab, refreshMicrophones]);
+  const selectMicrophone = (deviceId) => {
+    try {
+      localStorage.setItem(MICROPHONE_DEVICE_STORAGE_KEY, deviceId);
+      setMicrophoneDeviceId(deviceId);
+      setMicrophoneStatus({ message: deviceId ? "Microphone enregistré pour les prochaines écoutes." : "La source par défaut de l’appareil est sélectionnée." });
+    } catch (error) {
+      setMicrophoneStatus({ message: `Le choix du microphone n’a pas été enregistré : ${error.message}`, error: true });
+    }
+  };
   const testVoice = () => {
     if (voiceTesting) return;
     setVoiceTesting(true);
@@ -187,6 +232,8 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
 
   // HUD : transparence, taille, mode minimal
   const [hud, setHud] = useState(loadHud);
+  const [visualTheme, setVisualTheme] = useState(loadVisualTheme);
+  const [themeError, setThemeError] = useState("");
   const [readAloudOn, setReadAloudOn] = useState(localStorage.getItem("sirius_read_aloud") !== "off");
   const [actionConfirmOn, setActionConfirmOn] = useState(localStorage.getItem("sirius_action_confirm") !== "off");
   const [hudError, setHudError] = useState("");
@@ -194,6 +241,14 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
     const next = { ...hud, ...patch };
     try { saveHud(next); setHud(next); setHudError(""); }
     catch (error) { console.error("Réglages d'affichage :", error); setHudError("Les réglages n'ont pas été enregistrés. Votre affichage précédent est conservé. Libérez le stockage du navigateur puis réessayez."); }
+  };
+  const updateVisualTheme = (patch) => {
+    try {
+      setVisualTheme(saveVisualTheme(patch));
+      setThemeError("");
+    } catch (error) {
+      setThemeError(`La couleur n’a pas été enregistrée : ${error.message}`);
+    }
   };
   const [nas, setNas] = useState(() => {
     try { return JSON.parse(localStorage.getItem("sirius_nas")) || { path: "", enabled: false }; } catch (e) { return { path: "", enabled: false }; }
@@ -369,7 +424,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
           <Sparkles size={26} />
           <div>
             <h1 className="setup-title">CONFIGURATION DE ΣIRIUS</h1>
-            <p className="setup-sub">Personnalisez votre assistant. Aucun réglage technique n’est obligatoire.</p>
+            <p className="setup-sub">Microphone, voix, couleurs, affichage, mode IA, services et stockage : tout se règle ici.</p>
           </div>
         </div>
 
@@ -441,6 +496,32 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
 
         {tab === "voix" && (
           <section className="setup-section setup-single" data-testid="setup-panel-voix">
+            <section className="setup-config-block" aria-label="Microphone d’entrée">
+              <h2><Mic size={16} aria-hidden="true" /> Microphone d’entrée</h2>
+              <p className="setup-note">Choisissez le micro utilisé pour les commandes vocales. Le choix est mémorisé sur cet appareil ; l’accès au micro n’est demandé qu’au démarrage d’une écoute.</p>
+              <label className="setup-label" htmlFor="setup-microphone-device">Source du microphone</label>
+              <select id="setup-microphone-device" className="setup-input" value={microphoneDeviceId}
+                onChange={(event) => selectMicrophone(event.target.value)} data-testid="setup-microphone-device">
+                <option value="">Microphone par défaut de l’appareil</option>
+                {microphoneDeviceId && !microphones.some((device) => device.deviceId === microphoneDeviceId)
+                  && <option value={microphoneDeviceId}>Microphone enregistré — non détecté</option>}
+                {microphones.map((device, index) => (
+                  <option key={device.deviceId || `microphone-${index}`} value={device.deviceId}>
+                    {device.label || `Microphone ${index + 1}`}
+                  </option>
+                ))}
+              </select>
+              <div className="setup-actions">
+                <button type="button" className="setup-keytest" onClick={() => void refreshMicrophones()} disabled={microphoneBusy}
+                  data-testid="setup-microphone-refresh">Actualiser</button>
+                <button type="button" className="setup-keytest" onClick={() => void refreshMicrophones(true)} disabled={microphoneBusy}
+                  data-testid="setup-microphone-detect">
+                  {microphoneBusy ? "Détection…" : "Autoriser et détecter"}
+                </button>
+              </div>
+              {microphoneStatus && <p className="setup-note" role={microphoneStatus.error ? "alert" : "status"}>{microphoneStatus.message}</p>}
+            </section>
+            <h2 className="setup-section-head">Voix de ΣIRIUS</h2>
             <label className="setup-label">Préréglage <span className="setup-tag opt">1 clic</span></label>
             <button type="button" className={`setup-voice-preset ${voiceCfg.name === "gemini" ? "active" : ""}`}
               onClick={() => updateVoice({ ...GEMINI_VOICE })} data-testid="setup-voice-preset-gemini">
@@ -615,6 +696,35 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
 
         {tab === "hud" && (
           <section className="setup-section setup-single" data-testid="setup-panel-hud">
+            <section className="setup-config-block" aria-label="Couleurs de ΣIRIUS">
+              <h2><Settings2 size={16} aria-hidden="true" /> Couleurs de ΣIRIUS</h2>
+              <p className="setup-note">Modifiez la palette cyan/or et le fond de l’interface. Les changements sont enregistrés immédiatement sur cet appareil.</p>
+              <div className="setup-theme-colors">
+                {[["cyan", "Accent principal"], ["gold", "Accent secondaire"], ["background", "Fond profond"]].map(([key, label]) => (
+                  <label className="setup-theme-color" key={key} htmlFor={`setup-theme-${key}`}>
+                    <span>{label}</span>
+                    <input id={`setup-theme-${key}`} type="color" value={visualTheme[key]}
+                      onChange={(event) => updateVisualTheme({ [key]: event.target.value })}
+                      data-testid={`setup-theme-${key}`} />
+                    <code>{visualTheme[key].toUpperCase()}</code>
+                  </label>
+                ))}
+              </div>
+              <div className="setup-theme-preview" style={{
+                "--preview-cyan": visualTheme.cyan,
+                "--preview-gold": visualTheme.gold,
+                "--preview-background": visualTheme.background,
+              }} aria-label="Aperçu de la palette">
+                <span>ΣIRIUS</span><i /><b>APERÇU</b>
+              </div>
+              {themeError && <p role="alert">{themeError}</p>}
+              <div className="setup-actions">
+                <ConfirmButton className="setup-reset" label="CONFIRMER ?" title="Réinitialiser les couleurs de ΣIRIUS"
+                  testId="setup-reset-colors" onConfirm={() => updateVisualTheme({ ...VISUAL_THEME_DEFAULTS })}>
+                  <RotateCcw size={13} /> COULEURS PAR DÉFAUT
+                </ConfirmButton>
+              </div>
+            </section>
             <label className="setup-label">Transparence des panneaux <span className="setup-tag opt">{Math.round(hud.alpha * 100)} %</span></label>
             <input className="setup-range" type="range" min="0.4" max="1" step="0.05" value={hud.alpha}
               onChange={(e) => updateHud({ alpha: parseFloat(e.target.value) })} data-testid="setup-hud-alpha" />

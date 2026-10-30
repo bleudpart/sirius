@@ -80,7 +80,7 @@ import { detectMailProvider, extractContactQuery, extractEmailRecipientQuery, is
 import { chooseBestVoiceTranscript, extractVoiceCommand, normalizeVoiceTranscript, removeVoiceWakeWord, startsWithVoiceWakeWord } from "@/voiceCorrections";
 import { initHoloWindows, minimizeAll, resetHoloWindowLayout } from "@/holoWindows";
 import { ConfirmButton } from "@/ConfirmButton";
-import { getHUDStyleVariables, renderHUD } from "@/theme";
+import { applyVisualTheme, getHUDStyleVariables, loadVisualTheme, renderHUD } from "@/theme";
 import { SiriusInfoHub, SiriusInfoWheel } from "@/hud/SiriusHudPanels";
 import { restoreHudPanel } from "@/hud/hudPanelState";
 import { BACKEND_BASE_URL } from "@/lib/api";
@@ -612,6 +612,12 @@ function App() {
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [ecoMode, setEcoMode] = useState(() => localStorage.getItem("sirius_eco") === "1");
   const [reduceVisualEffects, setReduceVisualEffects] = useState(() => loadHud().reducedMotion || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches || false);
+  const [visualTheme, setVisualTheme] = useState(loadVisualTheme);
+  useEffect(() => {
+    const sync = () => setVisualTheme(loadVisualTheme());
+    window.addEventListener("sirius-visual-theme-changed", sync);
+    return () => window.removeEventListener("sirius-visual-theme-changed", sync);
+  }, []);
   useEffect(() => {
     const media = window.matchMedia?.("(prefers-reduced-motion: reduce)");
     const sync = () => setReduceVisualEffects(!!loadHud().reducedMotion || !!media?.matches);
@@ -1406,13 +1412,14 @@ function App() {
   }, [status]);
 
   const isThinking = status === "thinking";
-  const accentColor = isThinking ? thinkColor : conf.color;
-  const glowColor = isThinking ? thinkColor : conf.glow;
+  const accentColor = isThinking ? thinkColor : status === "idle" ? visualTheme.cyan : conf.color;
+  const glowColor = isThinking ? thinkColor : status === "idle"
+    ? getHUDStyleVariables(visualTheme)["--sirius-cyan-glow"] : conf.glow;
   const hudTheme = renderHUD({
     coreActive: status !== "idle",
     guardianActive: true,
     infoPanels: true,
-  });
+  }, visualTheme);
 
   // Volume animé en mode parole — écrit dans la ref du pouls, sans re-render
   useEffect(() => {
@@ -6628,7 +6635,11 @@ function App() {
   }, []);
 
   // Préférences HUD (transparence, taille, minimal) appliquées au démarrage + sons d'interface
-  useEffect(() => { applyHud(loadHud()); initUiSounds(); initHoloFx(); initReadAloud(); initHoloWindows(); }, []);
+  useEffect(() => {
+    applyHud(loadHud());
+    applyVisualTheme(loadVisualTheme());
+    initUiSounds(); initHoloFx(); initReadAloud(); initHoloWindows();
+  }, []);
 
   // Thème par heure : le sanctuaire évolue avec la journée (aube dorée, jour, crépuscule, nuit profonde)
   useEffect(() => {
@@ -7097,7 +7108,7 @@ function App() {
   return (
     <div
       className={`sirius-root workspace-mode mobile-section-${mobileDestination} ${booting ? "is-booting" : ""} ${ecoMode || reduceVisualEffects ? "eco" : ""} ${windowHidden ? "backgrounded" : ""} mode-${sysMode}`}
-      style={{ ...getHUDStyleVariables(), "--accent": accentColor, "--glow": glowColor, "--hud-scale": hudScale }}
+      style={{ ...getHUDStyleVariables(visualTheme), "--accent": accentColor, "--glow": glowColor, "--hud-scale": hudScale }}
       data-core-active={hudTheme.core.active}
       data-pantheon-active={booting || status !== "idle" || voicePhase !== "idle"}
       data-guardian-active={hudTheme.guardian.visible}
@@ -7463,10 +7474,10 @@ function App() {
             <button
               type="button"
               className="profile-btn top-settings-btn top-settings-control"
-              onClick={() => { setSetupInitialTab("profil"); setShowSetup(true); }}
+              onClick={() => { setSetupInitialTab("voix"); setShowSetup(true); }}
               data-testid="sirius-profile-btn"
-              title="Réglages : profil et services"
-              aria-label="Réglages"
+              title="Configurer ΣIRIUS : microphone, voix, couleurs, HUD et services"
+              aria-label="Configurer ΣIRIUS"
               aria-haspopup="dialog"
             >
               <Settings2 size={18} strokeWidth={1.6} aria-hidden="true" />
@@ -7742,7 +7753,7 @@ function App() {
           onAssistant={() => navigateMobile("assistant")}
           onModules={() => navigateMobile("modules")}
           onInfo={() => navigateMobile("info")}
-          onSettings={() => navigateMobile("profile")}
+          onSettings={() => { setShowVoiceDiagnostic(false); setSetupInitialTab("voix"); navigateMobile("profile"); }}
           onOdysseia={() => moduleActionsRef.current.openOdysseia()}
           onDossiers={() => moduleActionsRef.current.openWorkDossiers()}
           onVoice={() => moduleActionsRef.current.openVoiceProfile()}
@@ -7775,7 +7786,7 @@ function App() {
                   ))}
                 </div>
               </div>
-              <ReactorCore status={status} volume={0.35} color="#91e6f2" eco={ecoMode || reduceVisualEffects} />
+              <ReactorCore status={status} volume={0.35} color={visualTheme.cyan} eco={ecoMode || reduceVisualEffects} />
             </div>
             <Waveform status={status} color={accentColor} />
             {activeCard && (

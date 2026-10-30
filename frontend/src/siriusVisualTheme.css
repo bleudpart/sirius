@@ -27,17 +27,17 @@ body.hud-high-contrast :is(.setup-note, .getting-started-voice) { opacity: 1; co
   }
 }
 html[data-sirius-visual-theme="classic"] {
-  --workspace-cyan: #91e6f2;
-  --workspace-gold: #d8b875;
+  --workspace-cyan: var(--sirius-cyan, #91e6f2);
+  --workspace-gold: var(--sirius-gold, #d8b875);
   --workspace-text: #ffffff;
   --workspace-surface: linear-gradient(145deg, rgba(16, 40, 61, .98), rgba(6, 19, 33, .98));
-  --workspace-line: rgba(145, 230, 242, .24);
-  --workspace-shadow: 0 14px 32px rgba(0, 5, 14, .3), inset 0 1px 0 rgba(145, 230, 242, .045);
+  --workspace-line: var(--sirius-cyan-line, rgba(145, 230, 242, .24));
+  --workspace-shadow: 0 14px 32px rgba(0, 5, 14, .3), inset 0 1px 0 var(--sirius-cyan-shadow, rgba(145, 230, 242, .045));
   --workspace-font: "Segoe UI", system-ui, sans-serif;
-  --workspace-rgb: linear-gradient(90deg, #c9a24d, #91e6f2 35%, #86a8ff 65%, #c9a24d);
-  --workspace-frame-colours: #c9a24d, #f4e3b4 10%, #c9a24d 22%,
-    #91e6f2 38%, #6ea6b3 48%, #91e6f2 58%, #c9a24d 74%,
-    #91e6f2 86%, #c9a24d 96%;
+  --workspace-rgb: linear-gradient(90deg, var(--workspace-gold), var(--workspace-cyan) 35%, #86a8ff 65%, var(--workspace-gold));
+  --workspace-frame-colours: var(--workspace-gold), var(--sirius-gold-bright) 10%, var(--workspace-gold) 22%,
+    var(--workspace-cyan) 38%, #6ea6b3 48%, var(--workspace-cyan) 58%, var(--workspace-gold) 74%,
+    var(--workspace-cyan) 86%, var(--workspace-gold) 96%;
 }
 
 /* Resolve the non-inherited animated angle on each frame, not on the document. */

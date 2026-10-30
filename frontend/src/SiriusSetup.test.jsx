@@ -4,6 +4,7 @@ import { openKeys, sealKeys } from "./deviceKeyStore";
 import AuthGate, { useAuth } from "./AuthGate";
 import SiriusSetup from "./SiriusSetup";
 import { hasSavedPersonalKeys, loadApiKeys, setKeyAccount } from "./apiKeyStorage";
+import { applyVisualTheme, VISUAL_THEME_DEFAULTS } from "./theme";
 
 jest.mock("./deviceKeyStore", () => ({
   sealKeys: jest.fn(async (keys) => ({ sealed: JSON.stringify(keys) })),
@@ -55,6 +56,69 @@ test("le préréglage Gemini est explicite, sauvegardé et ne propose pas la hau
     await act(async () => root.unmount());
     if (saved === null) localStorage.removeItem("sirius_voice");
     else localStorage.setItem("sirius_voice", saved);
+  }
+});
+
+test("la configuration sélectionne le microphone et ne demande l’accès qu’après action", async () => {
+  const savedDevice = localStorage.getItem("sirius_microphone_device");
+  const originalMediaDevices = Object.getOwnPropertyDescriptor(navigator, "mediaDevices");
+  const stop = jest.fn();
+  const devices = [
+    { kind: "audioinput", deviceId: "usb-1", label: "Micro USB" },
+    { kind: "audioinput", deviceId: "built-in-1", label: "Micro intégré" },
+  ];
+  const mediaDevices = {
+    enumerateDevices: jest.fn().mockResolvedValue(devices),
+    getUserMedia: jest.fn().mockResolvedValue({ getTracks: () => [{ stop }] }),
+  };
+  Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: mediaDevices });
+  const host = document.createElement("div");
+  const root = createRoot(host);
+  try {
+    await act(async () => root.render(<SiriusSetup initialTab="voix" onComplete={jest.fn()} onCancel={jest.fn()} />));
+    const select = host.querySelector('[data-testid="setup-microphone-device"]');
+    expect([...select.options].map((option) => option.textContent)).toEqual([
+      "Microphone par défaut de l’appareil", "Micro USB", "Micro intégré",
+    ]);
+    expect(mediaDevices.getUserMedia).not.toHaveBeenCalled();
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(select, "usb-1");
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(localStorage.getItem("sirius_microphone_device")).toBe("usb-1");
+    await act(async () => host.querySelector('[data-testid="setup-microphone-detect"]').click());
+    expect(mediaDevices.getUserMedia).toHaveBeenCalledWith({ audio: true });
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(host.textContent).toContain("2 microphones disponibles");
+  } finally {
+    await act(async () => root.unmount());
+    if (savedDevice === null) localStorage.removeItem("sirius_microphone_device");
+    else localStorage.setItem("sirius_microphone_device", savedDevice);
+    if (originalMediaDevices) Object.defineProperty(navigator, "mediaDevices", originalMediaDevices);
+    else delete navigator.mediaDevices;
+  }
+});
+
+test("les choix de couleurs du HUD sont immédiatement appliqués et enregistrés", async () => {
+  const host = document.createElement("div");
+  const root = createRoot(host);
+  const savedTheme = localStorage.getItem("sirius_visual_theme");
+  try {
+    await act(async () => root.render(<SiriusSetup initialTab="hud" onComplete={jest.fn()} onCancel={jest.fn()} />));
+    const color = host.querySelector('[data-testid="setup-theme-cyan"]');
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(color, "#ff8800");
+      color.dispatchEvent(new Event("input", { bubbles: true }));
+      color.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(JSON.parse(localStorage.getItem("sirius_visual_theme")).cyan).toBe("#ff8800");
+    expect(document.documentElement.style.getPropertyValue("--sirius-cyan")).toBe("#ff8800");
+    expect(host.querySelector(".setup-theme-preview").style.getPropertyValue("--preview-cyan")).toBe("#ff8800");
+  } finally {
+    await act(async () => root.unmount());
+    if (savedTheme === null) localStorage.removeItem("sirius_visual_theme");
+    else localStorage.setItem("sirius_visual_theme", savedTheme);
+    applyVisualTheme(savedTheme === null ? VISUAL_THEME_DEFAULTS : JSON.parse(savedTheme));
   }
 });
 

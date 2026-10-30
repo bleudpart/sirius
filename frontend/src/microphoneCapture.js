@@ -5,10 +5,18 @@ export function useServerTranscription(platform) {
 // Sur Android (Samsung notamment), l'anti-écho et l'anti-bruit de la WebView basculent le
 // micro en mode « communication » et peuvent livrer un flux totalement muet : Whisper
 // invente alors du texte (« Sous-titrage… »). La capture brute reste fiable.
-export function microphoneConstraints(platform) {
-  return platform === "android"
-    ? { audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }
-    : { audio: true };
+export const MICROPHONE_DEVICE_STORAGE_KEY = "sirius_microphone_device";
+
+export function loadPreferredMicrophoneDevice() {
+  return localStorage.getItem(MICROPHONE_DEVICE_STORAGE_KEY) || "";
+}
+
+export function microphoneConstraints(platform, deviceId = loadPreferredMicrophoneDevice()) {
+  const audio = platform === "android"
+    ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+    : {};
+  if (deviceId) audio.deviceId = { ideal: deviceId };
+  return { audio: Object.keys(audio).length ? audio : true };
 }
 
 export async function requestMicrophoneStream(mediaDevices, isCurrent, constraints = { audio: true }) {

@@ -553,11 +553,11 @@ test("settings starts the header beside the brand, outside microphone and captur
   expect(host.querySelectorAll('[data-testid="sirius-profile-btn"]')).toHaveLength(1);
   expect(settings.closest(".top-bar-start").querySelector('[data-testid="sirius-brand-tag"]')).not.toBeNull();
   expect(settings.closest(".conn-status")).toBeNull();
-  expect(settings.getAttribute("aria-label")).toBe("Réglages");
+  expect(settings.getAttribute("aria-label")).toBe("Configurer ΣIRIUS");
   expect(settings.classList.contains("top-settings-control")).toBe(true);
   expect(settings.querySelector("svg").getAttribute("aria-hidden")).toBe("true");
   expect(settings.textContent).toBe("");
-  expect(settings.getAttribute("title")).toBe("Réglages : profil et services");
+  expect(settings.getAttribute("title")).toBe("Configurer ΣIRIUS : microphone, voix, couleurs, HUD et services");
   await act(async () => settings.click());
   expect(host.querySelector('[data-testid="workspace-SiriusSetup"]')).not.toBeNull();
 });
