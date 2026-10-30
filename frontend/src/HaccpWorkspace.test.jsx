@@ -8,7 +8,21 @@ const button = (text) => [...host.querySelectorAll("button")].find((item) => ite
 const field = (text) => [...host.querySelectorAll("label")].find((item) => item.textContent.trim().startsWith(text))?.querySelector("input");
 const reply = (value, ok = true) => ({ ok, status: ok ? 200 : 401, json: async () => value });
 beforeEach(() => {
-  oldFetch = global.fetch; global.fetch = jest.fn(async () => reply([]));
+  oldFetch = global.fetch;
+  global.fetch = jest.fn(async (url) => {
+    if (url.endsWith("/enterprise/context")) return reply({ company: { id: "company-1", name: "Le Groupe" } });
+    if (url.endsWith("/enterprise/sites")) return reply({ items: [{ id: "site-1", name: "Le Papillon", active: true }] });
+    if (url.includes("/haccp/receptions/dossier")) return reply({
+      restaurant_name: "Le Papillon",
+      restaurant_slug: "le-papillon",
+      directory: "uploads/le-papillon",
+      directory_existed: false,
+      items: [],
+      total: 0,
+    });
+    return reply([]);
+  });
+  localStorage.clear();
   oldWakeLock = Object.getOwnPropertyDescriptor(navigator, "wakeLock");
   URL.createObjectURL = jest.fn(() => "blob:proof"); URL.revokeObjectURL = jest.fn();
   host = document.createElement("div"); document.body.appendChild(host); root = createRoot(host);
@@ -28,20 +42,79 @@ async function change(input, value) {
 }
 async function renderRegistry() {
   await act(async () => root.render(<HaccpWorkspace standalone />));
+  global.fetch.mockClear();
   await click("Registre / Contrôle");
 }
 async function search() {
   await act(async () => host.querySelector("form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
 }
 
-test("QR points to the authenticated standalone capture without embedded credentials", async () => {
+test("QR points to the authenticated standalone capture and loads its active establishment", async () => {
   await act(async () => root.render(<HaccpWorkspace />));
   await click("QR code réserve");
   expect(host.querySelector("svg")).not.toBeNull();
   expect(host.querySelector("a").href).toBe(HACCP_CAPTURE_URL);
   expect(HACCP_CAPTURE_URL).toBe("https://sirius-assistant.fr/haccp");
   expect(host.textContent).toContain("aucun accès sans connexion");
-  expect(global.fetch).not.toHaveBeenCalled();
+  expect(global.fetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/enterprise\/context$/), expect.any(Object));
+});
+
+test("existing restaurant folders require resuming before scans and show saved documents", async () => {
+  global.fetch.mockImplementation(async (url) => {
+    if (url.endsWith("/enterprise/context")) return reply({ company: { id: "company-1", name: "Le Groupe" } });
+    if (url.endsWith("/enterprise/sites")) return reply({ items: [{ id: "site-1", name: "Le Papillon", active: true }] });
+    if (url.includes("/haccp/receptions/dossier")) return reply({
+      restaurant_name: "Le Papillon", restaurant_slug: "le-papillon",
+      directory: "uploads/le-papillon", directory_existed: true,
+      items: [{ name: "le-papillon_reception_20261029_225501_a8f9c321.jpg" }], total: 1,
+    });
+    return reply([]);
+  });
+  await act(async () => root.render(<HaccpWorkspace />));
+  expect(host.textContent).toContain("Dossier en cours : le-papillon");
+  expect(host.textContent).toContain("le-papillon_reception_20261029_225501_a8f9c321.jpg");
+  expect(button("Reprendre / Continuer")).not.toBeNull();
+  expect(host.querySelector(".haccp-capture-fields").disabled).toBe(true);
+  await click("Reprendre / Continuer");
+  expect(host.querySelector(".haccp-capture-fields").disabled).toBe(false);
+});
+
+test("late dossier responses cannot replace the currently selected establishment", async () => {
+  let resolveFirst;
+  let resolveSecond;
+  global.fetch.mockImplementation(async (url) => {
+    if (url.endsWith("/enterprise/context")) return reply({ company: { id: "company-1", name: "Le Groupe" } });
+    if (url.endsWith("/enterprise/sites")) return reply({ items: [
+      { id: "site-1", name: "Le Papillon", active: true },
+      { id: "site-2", name: "La Sirène", active: true },
+    ] });
+    if (url.includes("/haccp/receptions/dossier")) {
+      return new Promise((resolve) => {
+        if (url.includes("Le+Papillon")) resolveFirst = resolve;
+        else resolveSecond = resolve;
+      });
+    }
+    return reply([]);
+  });
+  await act(async () => root.render(<HaccpWorkspace />));
+  const select = host.querySelector(".haccp-establishment select");
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(select, "Le Papillon");
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(select, "La Sirène");
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await act(async () => resolveSecond(reply({
+    restaurant_name: "La Sirène", restaurant_slug: "la-sirene", directory_existed: false, items: [],
+  })));
+  expect(host.textContent).toContain("Dossier en cours : la-sirene");
+  await act(async () => resolveFirst(reply({
+    restaurant_name: "Le Papillon", restaurant_slug: "le-papillon", directory_existed: false, items: [],
+  })));
+  expect(host.textContent).toContain("Dossier en cours : la-sirene");
+  expect(host.textContent).not.toContain("Dossier en cours : le-papillon");
 });
 
 test("simplified kitchen workspace presents the oversized scan flow without hiding the safety review", async () => {

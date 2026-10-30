@@ -8,6 +8,7 @@ import "./HaccpWorkspace.css";
 
 const API = `${API_BASE_URL}/haccp`;
 const displayTime = (value) => value ? new Date(value).toLocaleString("fr-FR", { timeZone: "Europe/Paris" }) : "Non calculée";
+const noop = () => Promise.resolve();
 
 async function checkResponse(response) {
   if (!response.ok) {
@@ -18,7 +19,13 @@ async function checkResponse(response) {
   return response;
 }
 
-export default function HaccpLabelCapture({ savedRecord = null, kitchenMode = false }) {
+export default function HaccpLabelCapture({
+  savedRecord = null,
+  kitchenMode = false,
+  establishmentName = "Restaurant",
+  sessionReady = true,
+  onCaptureSaved = noop,
+}) {
   const [mode, setMode] = useState("reception");
   const [operator, setOperator] = useState("Cuisine");
   const [file, setFile] = useState(null);
@@ -116,6 +123,14 @@ export default function HaccpLabelCapture({ savedRecord = null, kitchenMode = fa
     event?.preventDefault();
     if (pending.current) return;
     setError(""); setResult(null); setPrintState("");
+    if (!sessionReady) {
+      setError("Ouvrez ou reprenez le dossier de l’établissement avant le scan.");
+      return;
+    }
+    if (!establishmentName.trim()) {
+      setError("Sélectionnez ou saisissez le restaurant actif avant le scan.");
+      return;
+    }
     if (!selectedFile || !operator.trim()) {
       setError("Choisissez une photo et indiquez l’opérateur.");
       return;
@@ -134,8 +149,13 @@ export default function HaccpLabelCapture({ savedRecord = null, kitchenMode = fa
     const body = new FormData();
     body.append("file", selectedFile);
     body.append("operateur", operator.trim());
+    body.append("restaurant_name", establishmentName.trim());
     body.append("operation", JSON.stringify(operation));
-    const snapshot = JSON.stringify({ operation, operateur: operator.trim() });
+    const snapshot = JSON.stringify({
+      operation,
+      operateur: operator.trim(),
+      restaurant_name: establishmentName.trim(),
+    });
     if (submitted.current && submitted.current !== snapshot) {
       setError("Une tentative existe pour cette photo. Rétablissez les mêmes paramètres pour vérifier son résultat, ou reprenez une photo pour une nouvelle fiche.");
       return;
@@ -150,6 +170,11 @@ export default function HaccpLabelCapture({ savedRecord = null, kitchenMode = fa
       }, async (response) => (await checkResponse(response)).json());
       if (mounted.current) {
         setResult(record); setFile(null); setConfirmed(false);
+      }
+      try {
+        await onCaptureSaved(record);
+      } catch (failure) {
+        if (mounted.current) setError(`Scan archivé, mais la liste du dossier n’a pas pu être actualisée : ${failure.message}`);
       }
     } catch (failure) {
       if (mounted.current) setError(`${failure.message} Si la connexion a été coupée, vérifiez le registre avant de renvoyer la photo.`);
@@ -256,7 +281,7 @@ export default function HaccpLabelCapture({ savedRecord = null, kitchenMode = fa
       <h3>{kitchenMode ? "Cuisine · Scanner une étiquette" : `ΣIRIUS · ${savedRecord ? "Vérifier l’étiquette archivée" : "Scanner une étiquette"}`}</h3>
       {!savedRecord && !kitchenMode && <ol className="haccp-steps" aria-label="Étapes de capture"><li><span>1</span>Choisir l’action</li><li><span>2</span>Photographier</li><li><span>3</span>Vérifier et imprimer</li></ol>}
       {!savedRecord && <form onSubmit={save}>
-        <fieldset disabled={busy || capturing || !!result} className="haccp-capture-fields">
+        <fieldset disabled={busy || capturing || !!result || !sessionReady} className="haccp-capture-fields">
           <legend>Action</legend>
           <div className="haccp-modes" role="group" aria-label="Type d’opération">
             <button type="button" aria-pressed={mode === "reception"} onClick={() => changeMode("reception")}><PackageCheck size={20} aria-hidden="true" />Réception</button>
@@ -288,8 +313,10 @@ export default function HaccpLabelCapture({ savedRecord = null, kitchenMode = fa
             <canvas ref={canvas} className="haccp-capture-canvas" aria-hidden="true" />
             <button type="button" className={`haccp-scan haccp-primary haccp-camera-action${kitchenMode ? " haccp-kitchen-scan" : ""}`}
               aria-busy={capturing || busy}
-              disabled={!cameraReady || busy || capturing || !!result || !operator.trim() || (mode === "ouverture" && hasRule && (!confirmed || !reason.trim() || !Number.isSafeInteger(Number(hours)) || Number(hours) <= 0))}
-              onClick={capture}>
+                disabled={!cameraReady || busy || capturing || !!result || !sessionReady || !establishmentName.trim()
+                  || !operator.trim() || (mode === "ouverture" && hasRule
+                    && (!confirmed || !reason.trim() || !Number.isSafeInteger(Number(hours)) || Number(hours) <= 0))}
+                onClick={capture}>
               {capturing || busy ? <LoaderCircle className="haccp-loading" size={30} aria-hidden="true" /> : <Camera size={30} aria-hidden="true" />}
               <span>{capturing || busy ? "Analyse de l’étiquette en cours…" : "Capturer l’étiquette"}</span>
               <ScanLine size={22} aria-hidden="true" />

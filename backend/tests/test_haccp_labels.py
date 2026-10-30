@@ -2,8 +2,10 @@ import asyncio
 import csv
 import io
 import json
+import re
 import sqlite3
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -119,6 +121,13 @@ def picture(fmt="PNG"):
     return buffer.getvalue()
 
 
+def assert_jpeg(content):
+    with Image.open(io.BytesIO(content)) as image:
+        assert image.format == "JPEG"
+        assert image.mode == "RGB"
+        assert min(image.getpixel((0, 0))) >= 245
+
+
 @pytest.fixture
 def api(tmp_path, monkeypatch):
     monkeypatch.setenv("SIRIUS_DATA_DIR", str(tmp_path))
@@ -141,9 +150,10 @@ def api(tmp_path, monkeypatch):
 
 
 def scan(client, user="one", content=None, mime="image/png", data=None):
+    form = {"restaurant_name": "Restaurant"} | (data or {})
     return client.post(
         "/api/haccp/etiquettes/scan", files={"file": ("../../unsafe.png", content if content is not None else picture(), mime)},
-        data=data or {}, headers={"x-test-user": user} if user else {},
+        data=form, headers={"x-test-user": user} if user else {},
     )
 
 
@@ -151,7 +161,15 @@ def get(client, path, user="one", **kwargs):
     return client.get("/api/haccp/registre/" + path, headers={"x-test-user": user} if user else {}, **kwargs)
 
 
-def test_scan_archives_original_and_persists_metadata(api):
+def dossier(client, restaurant_name="Restaurant", user="one"):
+    return client.get(
+        "/api/haccp/receptions/dossier",
+        params={"restaurant_name": restaurant_name},
+        headers={"x-test-user": user} if user else {},
+    )
+
+
+def test_scan_archives_jpeg_and_persists_metadata(api):
     client, root = api
     response = scan(client, data={"operateur": "Chef"})
     assert response.status_code == 201, response.text
@@ -164,7 +182,8 @@ def test_scan_archives_original_and_persists_metadata(api):
     assert record["fournisseur"] == record["fournisseur_ou_marque"]
     assert record["dlc_dluo"] == record["dlc_ou_ddm"]
     assert record["date_reception"] == record["created_at"]
-    assert record["chemin_photo"].startswith("receptions/non-classe/")
+    assert record["chemin_photo"].startswith("uploads/restaurant/")
+    assert re.fullmatch(r"restaurant_reception_\d{8}_\d{6}_[a-f0-9]{8}\.jpg", Path(record["chemin_photo"]).name)
     assert record["chemin_donnees"] == f"haccp.sqlite3#etiquettes_haccp/{record['id']}"
     metadata = client.get(record["donnees_url"], headers={"x-test-user": "one"})
     assert metadata.json() == record
@@ -174,11 +193,46 @@ def test_scan_archives_original_and_persists_metadata(api):
     with Session(haccp_database.get_engine()) as db:
         row = db.get(EtiquetteHaccp, record["id"])
         assert row.scope_key == "user:one"
-        assert (root / row.image_path).read_bytes() == picture()
+        assert_jpeg((root / row.image_path).read_bytes())
     photo = client.get(record["image_url"], headers={"x-test-user": "one"})
-    assert photo.status_code == 200 and photo.content == picture()
-    assert photo.headers["content-type"] == "image/png"
+    assert photo.status_code == 200
+    assert_jpeg(photo.content)
+    assert photo.headers["content-type"] == "image/jpeg"
     assert get(client, "recherche").json()[0]["id"] == record["id"]
+
+
+def test_restaurant_dossier_is_created_resumed_and_refreshed_after_scan(api):
+    client, root = api
+    first = dossier(client, "Le Papillon")
+    assert first.status_code == 200
+    assert first.json()["restaurant_slug"] == "le-papillon"
+    assert first.json()["directory"] == "uploads/le-papillon"
+    assert first.json()["directory_existed"] is False
+    assert first.json()["items"] == []
+    assert (root / "uploads" / "le-papillon").is_dir()
+
+    resumed = dossier(client, "Le Papillon")
+    assert resumed.json()["directory_existed"] is True
+    scan_response = scan(client, data={"restaurant_name": "Le Papillon"})
+    assert scan_response.status_code == 201
+    filename = Path(scan_response.json()["chemin_photo"]).name
+    assert re.fullmatch(r"le-papillon_reception_\d{8}_\d{6}_[a-f0-9]{8}\.jpg", filename)
+    listed = dossier(client, "Le Papillon").json()
+    assert listed["directory_existed"] is True
+    assert listed["total"] == 1
+    assert listed["items"][0]["name"] == filename
+
+
+def test_restaurant_dossier_slug_is_safe_and_scoped_by_account(api):
+    client, root = api
+    unsafe_name = dossier(client, "../../Le Papillon")
+    assert unsafe_name.status_code == 200
+    assert unsafe_name.json()["restaurant_slug"] == "le-papillon"
+    assert (root / unsafe_name.json()["directory"]).resolve().is_relative_to((root / "uploads").resolve())
+    other_user = dossier(client, "Le Papillon", user="two").json()
+    assert other_user["directory_existed"] is False
+    assert other_user["total"] == 0
+    assert dossier(client, "🔥").status_code == 422
 
 
 @pytest.mark.parametrize("fmt,mime", [("JPEG", "image/jpeg"), ("WEBP", "image/webp")])
@@ -254,7 +308,7 @@ def test_csv_utf8_all_columns_quoting_and_formula_protection(api, monkeypatch):
 def test_invalid_uploads_are_not_archived(api, content, mime, operator, status):
     client, root = api
     assert scan(client, content=content, mime=mime, data={"operateur": operator}).status_code == status
-    assert list(root.rglob("*.png")) == []
+    assert list(root.rglob("*.jpg")) == []
     assert get(client, "recherche").json() == []
 
 
@@ -273,7 +327,7 @@ def test_vision_failure_removes_photo_and_does_not_insert(api, monkeypatch, erro
     client, root = api
     monkeypatch.setattr(routes, "analyser_etiquette_vision", AsyncMock(side_effect=error))
     assert scan(client).status_code == status
-    assert list(root.rglob("*.png")) == []
+    assert list(root.rglob("*.jpg")) == []
     assert get(client, "recherche").json() == []
 
 
@@ -284,7 +338,7 @@ def test_database_failure_rolls_back_and_removes_photo(api, monkeypatch):
     with monkeypatch.context() as patch:
         patch.setattr(Session, "commit", fail_commit)
         assert scan(client).status_code == 500
-    assert list(root.rglob("*.png")) == []
+    assert list(root.rglob("*.jpg")) == []
     assert get(client, "recherche").json() == []
 
 
@@ -295,7 +349,7 @@ def test_disk_failure_is_explicit_and_never_inserts(api, monkeypatch):
     monkeypatch.setattr(routes, "_write_image", fail_write)
     assert scan(client).status_code == 500
     assert get(client, "recherche").json() == []
-    assert list(root.rglob("*.png")) == []
+    assert list(root.rglob("*.jpg")) == []
 
 
 def test_query_failure_is_an_explicit_server_error(api, monkeypatch):
@@ -347,6 +401,7 @@ def test_real_server_registration_and_account_company_permissions(monkeypatch):
 
     paths = server.app.openapi()["paths"]
     assert "post" in paths["/api/haccp/etiquettes/scan"]
+    assert "get" in paths["/api/haccp/receptions/dossier"]
     assert "get" in paths["/api/haccp/registre/recherche"]
     assert "get" in paths["/api/haccp/registre/export-csv"]
     assert "get" in paths["/api/haccp/registre/{id}/photo"]
@@ -482,21 +537,21 @@ def test_invalid_operation_is_rejected_before_photo_or_vision(api, monkeypatch, 
     monkeypatch.setattr(routes, "analyser_etiquette_vision", analyzer)
     assert scan(client, data={"operation": operation}).status_code == 422
     analyzer.assert_not_awaited()
-    assert list(root.rglob("*.png")) == []
+    assert list(root.rglob("*.jpg")) == []
 
 
 def test_excessive_duration_fails_explicitly_and_cleans_photo(api):
     client, root = api
     payload = opening_rule().model_dump() | {"duree_conservation_heures": 10**100}
     assert scan(client, data={"operation": json.dumps(payload)}).status_code == 422
-    assert list(root.rglob("*.png")) == []
+    assert list(root.rglob("*.jpg")) == []
     assert get(client, "recherche").json() == []
 
 
 def test_sqlite_additive_upgrade_keeps_old_receptions(api):
     client, root = api
     first = scan(client).json()
-    legacy = root / "storage" / "etiquettes_haccp" / "ancienne-photo.png"
+    legacy = root / "storage" / "etiquettes_haccp" / "ancienne-photo.jpg"
     legacy.parent.mkdir(parents=True, exist_ok=True)
     (root / first["chemin_photo"]).rename(legacy)
     engine = haccp_database.get_engine()
@@ -508,7 +563,7 @@ def test_sqlite_additive_upgrade_keeps_old_receptions(api):
     with sqlite3.connect(root / "haccp.sqlite3") as connection:
         connection.execute(
             "UPDATE etiquettes_haccp SET image_path = ? WHERE id = ?",
-            ("storage/etiquettes_haccp/ancienne-photo.png", first["id"]),
+            ("storage/etiquettes_haccp/ancienne-photo.jpg", first["id"]),
         )
         connection.execute("DROP INDEX uq_haccp_capture")
         connection.execute("DROP INDEX ix_haccp_scope_categorie")
@@ -520,9 +575,9 @@ def test_sqlite_additive_upgrade_keeps_old_receptions(api):
         assert records[0]["type_operation"] == "reception"
         assert records[0]["date_ouverture"] is None and records[0]["dlc_secondaire"] is None
         assert records[0]["categorie"] == "Non classé"
-        assert records[0]["chemin_photo"] == "storage/etiquettes_haccp/ancienne-photo.png"
-        assert legacy.read_bytes() == picture()
-        assert get(client, f"{first['id']}/photo").content == picture()
+        assert records[0]["chemin_photo"] == "storage/etiquettes_haccp/ancienne-photo.jpg"
+        assert_jpeg(legacy.read_bytes())
+        assert_jpeg(get(client, f"{first['id']}/photo").content)
         haccp_database.get_engine().dispose()
         haccp_database._configured_engine.cache_clear()
     assert scan(client).status_code == 201
@@ -544,7 +599,7 @@ def test_non_text_categories_are_not_silently_accepted(value):
         extracted(categorie=value)
 
 
-def test_category_archive_preserves_original_and_uses_safe_unique_names(api, monkeypatch):
+def test_archived_files_use_restaurant_type_timestamp_and_unique_jpeg_names(api, monkeypatch):
     client, root = api
     monkeypatch.setattr(routes, "analyser_etiquette_vision", AsyncMock(return_value=extracted(
         categorie="Poissons", nom_produit="../Saumon fumé / test", numero_lot="../../LOT:42",
@@ -554,12 +609,11 @@ def test_category_archive_preserves_original_and_uses_safe_unique_names(api, mon
     assert first["chemin_photo"] != second["chemin_photo"]
     for record in [first, second]:
         path = root / record["chemin_photo"]
-        assert path.is_relative_to(root / "receptions" / "poissons")
-        assert "saumon-fume-test_lot-42_" in path.name
-        assert path.name.startswith(datetime.fromisoformat(record["date_reception"]).astimezone(PARIS).strftime("%Y-%m-%d_"))
-        assert path.suffix == ".png"  # Original PNG, jamais renomme faussement en JPEG.
-        assert path.read_bytes() == picture()
-        assert get(client, f"{record['id']}/photo").content == picture()
+        assert path.is_relative_to(root / "uploads" / "restaurant")
+        timestamp = datetime.fromisoformat(record["date_reception"]).astimezone(PARIS).strftime("%Y%m%d_%H%M%S")
+        assert re.fullmatch(rf"restaurant_reception_{timestamp}_[a-f0-9]{{8}}\.jpg", path.name)
+        assert_jpeg(path.read_bytes())
+        assert_jpeg(get(client, f"{record['id']}/photo").content)
     with Session(haccp_database.get_engine()) as db:
         assert db.query(EtiquetteHaccp).filter_by(categorie="Poissons").count() == 2
     assert get(client, "recherche", params={"categorie": "Poissons"}).json()[0]["id"] == second["id"]
@@ -584,22 +638,19 @@ def test_reception_paths_separate_accounts_and_temperature_is_never_certified(ap
         extracted(temperature_conforme=True)
 
 
-def test_openings_keep_the_original_storage_layout(api):
+def test_openings_use_the_selected_restaurant_dossier(api):
     client, _ = api
     record = scan(client, data={"operation": opening_rule().model_dump_json()}).json()
-    assert record["chemin_photo"].startswith("storage/etiquettes_haccp/")
+    assert re.fullmatch(r"uploads/restaurant/[a-f0-9]{64}/restaurant_ouverture_\d{8}_\d{6}_[a-f0-9]{8}\.jpg", record["chemin_photo"])
     assert record["date_reception"] is None
 
 
-def test_category_move_failure_is_explicit_and_never_inserts(api, monkeypatch):
-    from pathlib import Path
+def test_establishment_directory_creation_failure_is_explicit_and_never_inserts(api, monkeypatch):
     client, root = api
-    def fail_move(self, target):
-        raise OSError("disk unavailable")
-    monkeypatch.setattr(Path, "rename", fail_move)
+    monkeypatch.setattr(routes.os, "makedirs", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("disk unavailable")))
     assert scan(client).status_code == 500
     assert get(client, "recherche").json() == []
-    assert list(root.rglob("*.png")) == []
+    assert list(root.rglob("*.jpg")) == []
 
 
 def test_linked_pc_scan_and_reads_use_cloud_registry_instead_of_local_lots(api, monkeypatch):
@@ -618,11 +669,19 @@ def test_linked_pc_scan_and_reads_use_cloud_registry_instead_of_local_lots(api, 
     analyzer.assert_not_awaited()
     assert forwarded.call_args.args == ("POST", "/etiquettes/scan")
     assert forwarded.call_args.kwargs["files"]["file"][1] == picture()
+    assert forwarded.call_args.kwargs["data"]["restaurant_name"] == "Restaurant"
     with Session(haccp_database.get_engine()) as db:
         assert db.query(EtiquetteHaccp).count() == 0
     forwarded.return_value = httpx.Response(200, json=[payload])
     assert get(client, "recherche", params={"terme": "LOT"}).json()[0]["id"] == 99
     assert forwarded.call_args.kwargs["params"] == {"terme": "LOT"}
+    forwarded.return_value = httpx.Response(200, json={
+        "restaurant_name": "Restaurant", "restaurant_slug": "restaurant",
+        "directory": "uploads/restaurant", "directory_existed": False, "items": [], "total": 0,
+    })
+    assert dossier(client).json()["restaurant_slug"] == "restaurant"
+    assert forwarded.call_args.args == ("GET", "/receptions/dossier")
+    assert forwarded.call_args.kwargs["params"] == {"restaurant_name": "Restaurant"}
     forwarded.return_value = httpx.Response(200, json=payload)
     metadata = get(client, "99/donnees")
     assert metadata.status_code == 200 and metadata.json()["id"] == 99
@@ -644,7 +703,7 @@ def test_cloud_registry_failure_is_not_saved_locally_or_hidden(api, monkeypatch)
     ))
     assert scan(client).status_code == 502
     assert get(client, "recherche").status_code == 502
-    assert list(root.rglob("*.png")) == []
+    assert list(root.rglob("*.jpg")) == []
 
 
 def test_retry_of_same_capture_returns_same_record_without_rerunning_vision(api, monkeypatch):
@@ -658,11 +717,11 @@ def test_retry_of_same_capture_returns_same_record_without_rerunning_vision(api,
     second = scan(client, data={"capture_id": key})
     assert second.status_code == 201 and second.json() == first.json()
     analyzer.assert_awaited_once()
-    assert len(list(root.rglob("*.png"))) == 1
+    assert len(list(root.rglob("*.jpg"))) == 1
     assert len(get(client, "recherche").json()) == 1
     conflict = scan(client, data={"capture_id": key, "operateur": "Autre"})
     assert conflict.status_code == 409
-    assert len(list(root.rglob("*.png"))) == 1
+    assert len(list(root.rglob("*.jpg"))) == 1
     assert scan(client, data={"capture_id": "invalid"}).status_code == 422
 
 
@@ -676,5 +735,5 @@ def test_concurrent_same_capture_commits_exactly_one_photo_and_record(api, monke
         results = list(pool.map(lambda _: scan(client, data={"capture_id": key}), range(2)))
     assert [result.status_code for result in results] == [201, 201]
     assert results[0].json()["id"] == results[1].json()["id"]
-    assert len(list(root.rglob("*.png"))) == 1
+    assert len(list(root.rglob("*.jpg"))) == 1
     assert len(get(client, "recherche").json()) == 1

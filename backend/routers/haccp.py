@@ -11,11 +11,11 @@ import unicodedata
 from collections.abc import Awaitable, Callable, Iterator
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
+from PIL import Image, ImageOps, UnidentifiedImageError
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Path as PathParam, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
-from PIL import Image, UnidentifiedImageError
 from pydantic import ValidationError
 from sqlalchemy import Select, func, or_, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -48,19 +48,68 @@ def reception_directory() -> Path:
     return data_dir() / "receptions"
 
 
-def _filename_part(value: str, limit: int = 60) -> str:
-    plain = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii").lower()
-    return re.sub(r"[^a-z0-9]+", "-", plain).strip("-")[:limit] or "non-lu"
+def _restaurant_slug(value: str) -> str:
+    plain = unicodedata.normalize("NFKD", value.strip()).encode("ascii", "ignore").decode("ascii").lower()
+    slug = re.sub(r"[^a-z0-9]+", "-", plain).strip("-")[:80].strip("-")
+    if not slug:
+        raise HTTPException(422, "Le nom de l'établissement doit contenir au moins une lettre ou un chiffre.")
+    return slug
 
 
-def _reception_path(result: EtiquetteVisionOutput, scope: str, maintenant: datetime, extension: str) -> Path:
-    # Le suffixe unique evite toute collision de lots ; le scope n'apparait pas en clair sur disque.
-    owner = hashlib.sha256(scope.encode("utf-8")).hexdigest()
-    filename = (
-        f"{maintenant.astimezone(PARIS):%Y-%m-%d}_"
-        f"{_filename_part(result.nom_produit)}_{_filename_part(result.numero_lot, 40)}_{uuid.uuid4().hex}{extension}"
+def _ensure_reception_directory(scope: str, restaurant_name: str) -> tuple[Path, str, bool]:
+    slug = _restaurant_slug(restaurant_name)
+    directory = data_dir() / "uploads" / slug / hashlib.sha256(scope.encode("utf-8")).hexdigest()
+    existed = directory.exists()
+    os.makedirs(directory, exist_ok=True)
+    return directory, slug, existed
+
+
+def _reception_filename(slug: str, type_operation: str, maintenant: datetime) -> str:
+    timestamp = maintenant.astimezone(PARIS).strftime("%Y%m%d_%H%M%S")
+    return f"{slug}_{type_operation}_{timestamp}_{uuid.uuid4().hex[:8]}.jpg"
+
+
+def _jpeg_bytes(content: bytes) -> bytes:
+    try:
+        with Image.open(io.BytesIO(content)) as source:
+            image = ImageOps.exif_transpose(source)
+            if "A" in image.getbands():
+                background = Image.new("RGB", image.size, "white")
+                background.paste(image.convert("RGB"), mask=image.getchannel("A"))
+                image = background
+            else:
+                image = image.convert("RGB")
+            output = io.BytesIO()
+            image.save(output, format="JPEG", quality=95)
+            return output.getvalue()
+    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError) as error:
+        raise HTTPException(400, "Le fichier ne contient pas une image valide et lisible.") from error
+
+
+def _reception_dossier(scope: str, restaurant_name: str) -> dict:
+    directory, slug, existed = _ensure_reception_directory(scope, restaurant_name)
+    filename_pattern = re.compile(
+        rf"{re.escape(slug)}_(?:reception|ouverture)_\d{{8}}_\d{{6}}_[a-f0-9]{{8}}\.jpg"
     )
-    return reception_directory() / _filename_part(result.categorie) / owner / filename
+    files = []
+    for path in directory.iterdir():
+        if not path.is_file() or not filename_pattern.fullmatch(path.name):
+            continue
+        stat = path.stat()
+        files.append({
+            "name": path.name,
+            "size": stat.st_size,
+            "updated_at": datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat(),
+        })
+    files.sort(key=lambda item: (item["updated_at"], item["name"]), reverse=True)
+    return {
+        "restaurant_name": restaurant_name.strip(),
+        "restaurant_slug": slug,
+        "directory": f"uploads/{slug}",
+        "directory_existed": existed,
+        "items": files,
+        "total": len(files),
+    }
 
 
 def validate_image(content: bytes, mime_type: str) -> None:
@@ -203,11 +252,30 @@ def _csv_lines(records: list[EtiquetteResponse]) -> Iterator[str]:
 def make_haccp_router(resolve_scope: Callable[[Request], Awaitable[str]]) -> APIRouter:
     router = APIRouter(prefix="/haccp", tags=["haccp-etiquettes"])
 
+    @router.get("/receptions/dossier")
+    async def dossier_reception(
+        restaurant_name: Annotated[str, Query(min_length=1, max_length=160)],
+        scope: str = Depends(resolve_scope),
+    ) -> dict:
+        if cloud_link.relay_allowed():
+            response = await cloud_link.relay_haccp_registry(
+                "GET", "/receptions/dossier", params={"restaurant_name": restaurant_name},
+            )
+            return response.json()
+        try:
+            return await run_in_threadpool(_reception_dossier, scope, restaurant_name)
+        except HTTPException:
+            raise
+        except OSError as error:
+            logger.exception("[HACCP] Ouverture du dossier de reception impossible")
+            raise HTTPException(500, "Le dossier de réception n'a pas pu être ouvert.") from error
+
     @router.post("/etiquettes/scan", response_model=EtiquetteResponse, status_code=201)
     async def scan(
         request: Request,
         file: UploadFile = File(...),
         operateur: Annotated[str, Form(max_length=100)] = "Cuisine",
+        restaurant_name: Annotated[str, Form(max_length=160)] = "Restaurant",
         operation: Annotated[str, Form(max_length=2000)] = "{}",
         capture_id: Annotated[uuid.UUID | None, Form()] = None,
         scope: str = Depends(resolve_scope),
@@ -218,6 +286,9 @@ def make_haccp_router(resolve_scope: Callable[[Request], Awaitable[str]]) -> API
             raise HTTPException(400, "Formats autorises : JPEG, PNG et WebP.")
         if not operateur.strip():
             raise HTTPException(422, "Le nom de l'operateur ne peut pas etre vide.")
+        if not restaurant_name.strip():
+            raise HTTPException(422, "Le nom de l'établissement ne peut pas être vide.")
+        restaurant_slug = _restaurant_slug(restaurant_name)
         try:
             capture = OperationCapture.model_validate_json(operation)
         except ValidationError as error:
@@ -235,17 +306,18 @@ def make_haccp_router(resolve_scope: Callable[[Request], Awaitable[str]]) -> API
             response = await cloud_link.relay_haccp_registry(
                 "POST", "/etiquettes/scan",
                 files={"file": ("etiquette" + IMAGE_FORMATS[mime_type][1], content, mime_type)},
-                data={"operateur": operateur.strip(), "operation": capture.model_dump_json(),
+                data={"operateur": operateur.strip(), "restaurant_name": restaurant_name.strip(),
+                      "operation": capture.model_dump_json(),
                       **({"capture_id": str(capture_id)} if capture_id else {})},
             )
             return EtiquetteResponse.model_validate(response.json())
-        filename = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%f") + "_" + uuid.uuid4().hex + IMAGE_FORMATS[mime_type][1]
-        path = image_directory() / filename
+        path: Path | None = None
         saved = False
         prefix = str(request.url_for("haccp_search")).removesuffix("/recherche")
         digest = hashlib.sha256(
             content + json.dumps(
-                {"operation": capture.model_dump(), "operateur": operateur.strip()},
+                {"operation": capture.model_dump(), "operateur": operateur.strip(),
+                 "restaurant_slug": restaurant_slug},
                 sort_keys=True, ensure_ascii=False,
             ).encode("utf-8"),
         ).hexdigest()
@@ -254,17 +326,15 @@ def make_haccp_router(resolve_scope: Callable[[Request], Awaitable[str]]) -> API
             previous = await run_in_threadpool(_existing_capture, db, scope, capture_key, digest, prefix)
             if previous is not None:
                 return previous
-            await run_in_threadpool(_write_image, path, content)
             result = await analyser_etiquette_vision(content, mime_type)
             try:
                 result, limite = calculer_ouverture(result, capture, maintenant)
             except ValueError as error:
                 raise HTTPException(422, str(error)) from error
-            if capture.type_operation == "reception":
-                classified = _reception_path(result, scope, maintenant, IMAGE_FORMATS[mime_type][1])
-                await run_in_threadpool(classified.parent.mkdir, parents=True, exist_ok=True)
-                await run_in_threadpool(path.rename, classified)
-                path = classified
+            directory, _, _ = await run_in_threadpool(_ensure_reception_directory, scope, restaurant_name)
+            path = directory / _reception_filename(restaurant_slug, capture.type_operation, maintenant)
+            stored_image = await run_in_threadpool(_jpeg_bytes, content)
+            await run_in_threadpool(_write_image, path, stored_image)
             relative_path = path.relative_to(data_dir()).as_posix()
             try:
                 response = await run_in_threadpool(
@@ -289,7 +359,7 @@ def make_haccp_router(resolve_scope: Callable[[Request], Awaitable[str]]) -> API
             logger.exception("[HACCP] Archivage de l'etiquette impossible")
             raise HTTPException(500, "L'etiquette n'a pas pu etre archivee. Reessayez.") from error
         finally:
-            if not saved:
+            if not saved and path is not None:
                 try:
                     path.unlink(missing_ok=True)
                 except OSError:
@@ -401,11 +471,15 @@ def make_haccp_router(resolve_scope: Callable[[Request], Awaitable[str]]) -> API
             raise HTTPException(500, "La lecture du registre a echoue.") from error
         if row is None:
             raise HTTPException(404, "Etiquette introuvable.")
-        roots = (image_directory().resolve(), reception_directory().resolve())
+        roots = (
+            image_directory().resolve(),
+            reception_directory().resolve(),
+            (data_dir() / "uploads").resolve(),
+        )
         path = (data_dir() / row.image_path).resolve()
         if not any(path.is_relative_to(root) for root in roots) or not path.is_file():
             logger.error("[HACCP] Photo archivee absente ou chemin invalide (id=%s)", id)
-            raise HTTPException(404, "La photo originale est introuvable sur disque.")
+            raise HTTPException(404, "La photo archivée est introuvable sur disque.")
         mime_type = next((mime for mime, (_, ext) in IMAGE_FORMATS.items() if ext == path.suffix), None)
         return FileResponse(path, media_type=mime_type, headers={"Cache-Control": "private, no-store"})
 

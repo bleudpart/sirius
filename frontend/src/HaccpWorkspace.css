@@ -75,6 +75,13 @@ body:has(.haccp-standalone) {
 }
 .haccp-capture { display: grid; gap: 14px; }
 .haccp-capture > :is(h3, p) { margin: 0; }
+.haccp-establishment { display: grid; gap: 12px; }
+.haccp-establishment > p { margin: 0; }
+.haccp-establishment-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; }
+.haccp-establishment-name { color: #f2d99a !important; font-size: 17px; font-weight: 700; }
+.haccp-establishment-resume { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.haccp-establishment-resume p { margin: 0; }
+.haccp-ui .haccp-establishment-files ul { display: grid; gap: 6px; margin: 0; padding: 0 0 0 20px; color: var(--haccp-muted); font-size: 13px; }
 .haccp-ui .haccp-notice { font-size: 13px; padding: 12px 14px; border-left: 2px solid var(--haccp-gold); background: rgba(197, 160, 89, .05); }
 .haccp-steps { display: flex; flex-wrap: wrap; gap: 12px 20px; list-style: none; padding: 0; margin: 4px 0; color: var(--haccp-muted); font-size: 13px; }
 .haccp-steps li { display: flex; align-items: center; gap: 8px; }
@@ -170,6 +177,8 @@ body:has(.haccp-standalone) {
   .haccp-ui button { padding: 12px; }
   .haccp-ui button.haccp-scan { padding: 20px 16px; font-size: 18px; }
   .haccp-camera-stage { min-height: min(68vh, 620px); grid-template-rows: minmax(280px, 1fr) auto; padding: 10px; }
+  .haccp-establishment-form { grid-template-columns: 1fr; }
+  .haccp-establishment-resume { align-items: stretch; flex-direction: column; }
   .haccp-ui button.haccp-camera-action { min-height: 86px; font-size: 22px; }
   .haccp-kitchen .haccp-modes button { min-height: 72px; font-size: 18px; }
   .haccp-ui button.haccp-kitchen-scan { min-height: 124px; }

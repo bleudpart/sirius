@@ -125,6 +125,7 @@ test("reception opens the rear live camera and captures full-resolution video wi
   expect(options.headers).toBeUndefined();
   expect(options.body.get("file").type).toBe("image/jpeg");
   expect(options.body.get("file").name).toBe("etiquette.jpg");
+  expect(options.body.get("restaurant_name")).toBe("Restaurant");
   expect(JSON.parse(options.body.get("operation"))).toEqual({ type_operation: "reception" });
 });
 
@@ -222,6 +223,17 @@ test("scan result confirms classified photo and SQLite archive without certifyin
   expect(host.textContent).toContain(archived.chemin_donnees);
   expect(host.textContent).toContain("Température réelle : non vérifiée");
   expect(host.textContent).toContain("pas sur le téléphone");
+});
+
+test("successful scan refreshes the selected restaurant document list", async () => {
+  const refreshDocuments = jest.fn().mockResolvedValue();
+  await act(async () => root.render(<HaccpLabelCapture
+    establishmentName="Le Papillon"
+    onCaptureSaved={refreshDocuments}
+  />));
+  await choosePhoto();
+  expect(global.fetch.mock.calls[0][1].body.get("restaurant_name")).toBe("Le Papillon");
+  expect(refreshDocuments).toHaveBeenCalledWith(record);
 });
 
 test("simplified kitchen scan archives first and requires an explicit review before printing", async () => {

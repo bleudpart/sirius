@@ -29,9 +29,21 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0 
   const [busy, setBusy] = useState(false);
   const [photo, setPhoto] = useState(null);
   const [wakeLockStatus, setWakeLockStatus] = useState("");
+  const [establishmentOptions, setEstablishmentOptions] = useState([]);
+  const [activeEstablishment, setActiveEstablishment] = useState("");
+  const [establishmentDraft, setEstablishmentDraft] = useState("");
+  const [establishmentLoading, setEstablishmentLoading] = useState(true);
+  const [establishmentError, setEstablishmentError] = useState("");
+  const [dossier, setDossier] = useState(null);
+  const [dossierLoading, setDossierLoading] = useState(false);
+  const [dossierError, setDossierError] = useState("");
+  const [sessionReady, setSessionReady] = useState(false);
   const photoRef = useRef(null);
   const controller = useRef(null);
+  const dossierRequest = useRef(0);
   const requestNumber = useRef(0);
+  const activeEstablishmentRef = useRef(activeEstablishment);
+  activeEstablishmentRef.current = activeEstablishment;
   const mounted = useRef(true);
   const clearPhoto = useCallback(() => {
     if (photoRef.current) URL.revokeObjectURL(photoRef.current);
@@ -41,6 +53,110 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0 
     mounted.current = true;
     return () => { mounted.current = false; controller.current?.abort(); clearPhoto(); };
   }, [clearPhoto]);
+  const loadDossier = useCallback(async (name, preserveSession = false) => {
+    if (!mounted.current) return;
+    const normalizedName = name.trim();
+    if (!normalizedName) return;
+    const request = ++dossierRequest.current;
+    setDossierLoading(true);
+    setDossierError("");
+    if (!preserveSession) {
+      setDossier(null);
+      setSessionReady(false);
+    }
+    try {
+      const params = new URLSearchParams({ restaurant_name: normalizedName });
+      const data = await haccpFetch(`${API_BASE_URL}/haccp/receptions/dossier?${params}`, {},
+        async (response) => (await checked(response)).json());
+      if (!data || typeof data.restaurant_slug !== "string" || typeof data.directory_existed !== "boolean" || !Array.isArray(data.items)) {
+        throw new Error("La réponse du dossier d’établissement est invalide.");
+      }
+      if (mounted.current && request === dossierRequest.current
+        && activeEstablishmentRef.current === normalizedName) {
+        setDossier(data);
+        if (!preserveSession) setSessionReady(!data.directory_existed);
+      }
+    } catch (failure) {
+      if (mounted.current && request === dossierRequest.current
+        && activeEstablishmentRef.current === normalizedName) {
+        setDossier(null);
+        setSessionReady(false);
+        setDossierError(failure.message);
+      }
+    } finally {
+      if (mounted.current && request === dossierRequest.current) setDossierLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    let active = true;
+    const loadEstablishments = async () => {
+      setEstablishmentLoading(true);
+      setEstablishmentError("");
+      let companyName = "";
+      try {
+        const context = await haccpFetch(`${API_BASE_URL}/enterprise/context`, {},
+          async (response) => (await checked(response)).json());
+        companyName = context?.company?.name?.trim() || "";
+        const sitesResponse = context?.company
+          ? await haccpFetch(`${API_BASE_URL}/enterprise/sites`, {},
+            async (response) => (await checked(response)).json())
+          : { items: [] };
+        const sites = (Array.isArray(sitesResponse.items) ? sitesResponse.items : [])
+          .filter((site) => site.active && typeof site.name === "string" && site.name.trim());
+        const remembered = localStorage.getItem("sirius.haccp.establishment") || "";
+        let selected = "";
+        let options = [];
+        if (sites.length) {
+          options = sites;
+          selected = sites.find((site) => site.name === remembered)?.name
+            || (sites.length === 1 ? sites[0].name : "");
+        } else {
+          selected = companyName || remembered;
+        }
+        if (!active) return;
+        setEstablishmentOptions(options);
+        setEstablishmentDraft(selected);
+        setActiveEstablishment(selected);
+      } catch (failure) {
+        if (active) {
+          setEstablishmentError(failure.message);
+          setEstablishmentOptions([]);
+          setEstablishmentDraft(localStorage.getItem("sirius.haccp.establishment") || companyName);
+        }
+      } finally {
+        if (active) setEstablishmentLoading(false);
+      }
+    };
+    void loadEstablishments();
+    return () => { active = false; };
+  }, []);
+  useEffect(() => {
+    if (!activeEstablishment) {
+      dossierRequest.current += 1;
+      setDossier(null);
+      setSessionReady(false);
+      setDossierError("");
+      return undefined;
+    }
+    localStorage.setItem("sirius.haccp.establishment", activeEstablishment);
+    void loadDossier(activeEstablishment);
+    return undefined;
+  }, [activeEstablishment, loadDossier]);
+  const openManualDossier = (event) => {
+    event.preventDefault();
+    const name = establishmentDraft.trim();
+    if (!name) {
+      setEstablishmentError("Indiquez le nom du restaurant actif.");
+      return;
+    }
+    setEstablishmentError("");
+    if (name === activeEstablishment) void loadDossier(name);
+    else setActiveEstablishment(name);
+  };
+  const refreshDossier = useCallback(() => {
+    if (activeEstablishment) return loadDossier(activeEstablishment, true);
+    return Promise.resolve();
+  }, [activeEstablishment, loadDossier]);
   useEffect(() => {
     if (!standalone) return undefined;
     if (!navigator.wakeLock?.request) {
@@ -156,8 +272,49 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0 
       <button type="button" aria-pressed={tab === "qr"} onClick={() => setTab("qr")}><QrCode size={19} aria-hidden="true" />QR code réserve</button>
     </nav>
     {standalone && wakeLockStatus && <p className="haccp-wake-lock" role="status">{wakeLockStatus}</p>}
-    {tab === "capture" && <HaccpLabelCapture />}
-    {tab === "kitchen" && <HaccpLabelCapture kitchenMode />}
+    {(tab === "capture" || tab === "kitchen") && <section className="haccp-card haccp-establishment" aria-label="Dossier de l’établissement">
+      <p className="haccp-kicker">Établissement actif</p>
+      {establishmentLoading && <p role="status">Recherche de l’établissement…</p>}
+      {!establishmentLoading && establishmentOptions.length > 1 && <label>Restaurant actif
+        <select value={activeEstablishment} onChange={(event) => setActiveEstablishment(event.target.value)}>
+          <option value="">Choisir un établissement</option>
+          {establishmentOptions.map((site) => <option key={site.id} value={site.name}>{site.name}</option>)}
+        </select>
+      </label>}
+      {!establishmentLoading && establishmentOptions.length === 1 && activeEstablishment
+        && <p className="haccp-establishment-name">{activeEstablishment}</p>}
+      {!establishmentLoading && establishmentOptions.length === 0 && <form className="haccp-establishment-form" onSubmit={openManualDossier}>
+        <label>Nom du restaurant actif
+          <input value={establishmentDraft} maxLength={160} onChange={(event) => setEstablishmentDraft(event.target.value)} />
+        </label>
+        <button type="submit" disabled={!establishmentDraft.trim() || dossierLoading}>Ouvrir le dossier</button>
+      </form>}
+      {establishmentError && <p role="alert">{establishmentError}</p>}
+      {dossierLoading && <p role="status">Ouverture du dossier…</p>}
+      {dossierError && <p role="alert">{dossierError}</p>}
+      {dossier && <>
+        <p className="haccp-establishment-name">Dossier en cours : <strong>{dossier.restaurant_slug}</strong></p>
+        {dossier.directory_existed && !sessionReady && <div className="haccp-establishment-resume">
+          <p>Un dossier existe déjà. Reprenez-le pour ajouter de nouveaux scans sans écraser les documents.</p>
+          <button type="button" disabled={dossierLoading} onClick={() => setSessionReady(true)}>Reprendre / Continuer</button>
+        </div>}
+        {!dossier.directory_existed && <p role="status">Nouveau dossier créé et prêt pour les scans.</p>}
+        {!!dossier.items.length && <details className="haccp-establishment-files">
+          <summary>Documents du dossier ({dossier.items.length})</summary>
+          <ul>{dossier.items.map((item) => <li key={item.name}>{item.name}</li>)}</ul>
+        </details>}
+      </>}
+    </section>}
+    {tab === "capture" && <HaccpLabelCapture
+      establishmentName={activeEstablishment}
+      sessionReady={sessionReady}
+      onCaptureSaved={refreshDossier}
+    />}
+    {tab === "kitchen" && <HaccpLabelCapture kitchenMode
+      establishmentName={activeEstablishment}
+      sessionReady={sessionReady}
+      onCaptureSaved={refreshDossier}
+    />}
     {tab === "qr" && <section className="workspace-surface haccp-card haccp-qr" aria-label="QR code de capture">
       <p className="haccp-kicker">Accès cuisine</p>
       <h3>Ouvrir la capture sur le téléphone</h3>
