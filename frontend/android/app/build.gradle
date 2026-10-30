@@ -2,7 +2,7 @@ apply plugin: 'com.android.application'
 
 def brotherSdk = file('libs/BrotherPrintLibrary.aar')
 if (!brotherSdk.isFile()) {
-    throw new GradleException('SDK Brother absent : accepter la licence officielle puis executer frontend\\scripts\\setup-brother-sdk.ps1 (SDK 4.13.2). Voir GUIDE-SIRIUS-1.0.66.txt.')
+    throw new GradleException('SDK Brother absent : accepter la licence officielle puis executer frontend\\scripts\\setup-brother-sdk.ps1 (SDK 4.13.2). Voir GUIDE-SIRIUS-1.0.67.txt.')
 }
 def brotherHash = java.security.MessageDigest.getInstance('SHA-256').digest(brotherSdk.bytes).encodeHex().toString()
 if (brotherHash != 'def6bccc7415da38b771186d571757c0a44add5358b6dc7a1855fff77bced64e') {
@@ -35,8 +35,8 @@ android {
         applicationId "fr.sirius_assistant.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 57
-        versionName "1.0.66"
+        versionCode 58
+        versionName "1.0.67"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

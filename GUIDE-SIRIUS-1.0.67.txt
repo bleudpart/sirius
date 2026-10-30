@@ -1,22 +1,31 @@
-ΣIRIUS 1.0.66 - GUIDE D'INSTALLATION ET DE TRACABILITE HACCP
+ΣIRIUS 1.0.67 - GUIDE D'INSTALLATION ET DE TRACABILITE HACCP
 ========================================================
 
-Ce guide accompagne la preparation des applications 1.0.66.
+Ce guide accompagne la preparation des applications 1.0.67.
 La presence de ce document ne prouve pas qu'un installateur a deja ete
 construit, publie ou installe. Se reporter au bilan de livraison pour ces etats.
 
 1. NOUVEAUTES
 ------------
-Ajout ulterieur au code source (necessite une nouvelle compilation mobile,
-non present dans l'APK 1.0.66 deja publie) : le scan HACCP dans l'application
-native utilise @capacitor/camera avec CameraSource.Camera, sans selecteur
-Google Photos et sans enregistrement dans la galerie. Une annulation
-n'envoie rien ; une autorisation refusee est signalee. Apres destruction
-de l'application par le systeme pendant la photo, aucune analyse restauree
-n'est lancee automatiquement : verifier le registre et reprendre le scan.
-Sur le site web et Windows, le parcours de selection de fichier est conserve.
+Nouveautes 1.0.67 :
+- Camera integree dans la page de scan HACCP (web, Windows et Android) :
+  apercu video plein cadre, viseur avec balayage, grand bouton
+  "Capturer l'etiquette". L'appareil photo du telephone n'est plus ouvert ;
+  la camera est liberee a la fermeture du scan.
+- Mode cuisine : boutons tactiles geants, impression directe de
+  l'etiquette, bandeau vert "Etiquette imprimee" puis scan suivant
+  sans rechargement. L'ecran reste allume pendant le service quand le
+  navigateur le permet (Screen Wake Lock).
+- Dossiers par etablissement : le restaurant actif donne un dossier
+  uploads/<slug-du-restaurant>/ (ex. le-papillon), repris s'il existe.
+  Fichiers nommes <slug>_<type>_AAAAMMJJ_HHMMSS_<id>.jpg ; le dossier
+  en cours est affiche et sa liste se recharge apres chaque capture.
+- Panneau de configuration (roue dentee) : choix du microphone, couleurs
+  de ΣIRIUS (cyan, or, fond) avec apercu et reinitialisation, reglages
+  HUD, voix, IA, stockage et confidentialite. Sur Android, la
+  reconnaissance vocale native peut ignorer le microphone choisi.
 
-Ajout ulterieur au code source : classement automatique des receptions
+Classement automatique des receptions
 dans Viandes, Poissons, Produits Laitiers, Fruits & Legumes, Epicerie,
 ou Non classe en cas d'incertitude. La classification provient de la lecture
 du produit principal, pas de ses seuls allergenes. Elle reste a verifier.
@@ -40,7 +49,7 @@ Les anciennes fiches sont conservees en Non classe sans deplacement des
 photos ; les ouvertures gardent leur stockage et leur circuit d'impression.
 Sauvegarder ensemble haccp.sqlite3, receptions/ et storage/etiquettes_haccp/.
 Ces ajouts necessitent un deploiement serveur et une reconstruction du
-frontend ; aucun fichier de la release 1.0.66 publiee n'est remplace ici.
+frontend.
 
 - Capture des etiquettes de reception et d'ouverture produit.
 - Analyse de la photo par OpenAI, puis archivage avec la photo originale.
@@ -65,8 +74,8 @@ Un resultat sans anomalie detectee n'est pas une attestation sanitaire.
 Fermer completement ΣIRIUS avant la mise a jour.
 Sauvegarder les donnees utiles avant toute intervention.
 
-Installateur attendu : sirius-setup-1.0.66.exe
-Version portable attendue : SIRIUS-Portable-1.0.66.exe
+Installateur attendu : sirius-setup-1.0.67.exe
+Version portable attendue : SIRIUS-Portable-1.0.67.exe
 
 Choisir un seul mode d'execution a la fois.
 Avec l'installateur, suivre les etapes puis lancer l'application.
@@ -81,7 +90,7 @@ Ne pas exposer le backend local ou l'imprimante sur Internet.
 
 3. INSTALLATION ANDROID DIAGNOSTIC
 ---------------------------------
-Fichier attendu : SIRIUS-Diagnostic-1.0.66.apk
+Fichier attendu : SIRIUS-Diagnostic-1.0.67.apk
 
 Il s'agit d'une application de diagnostic, pas d'une mise a jour Google Play.
 Son identifiant est fr.sirius_assistant.app.diagnostic.
@@ -92,7 +101,7 @@ signature, arreter et demander une verification plutot que desinstaller.
 Ouvrir l'APK sur le telephone et autoriser ponctuellement l'installation
 depuis cette source si Android le demande. N'utiliser qu'un fichier provenant
 de la livraison ΣIRIUS verifiee. Desactiver cette autorisation apres usage.
-Verifier la version 1.0.66-diagnostic dans les informations de l'application.
+Verifier la version 1.0.67-diagnostic dans les informations de l'application.
 La version Google Play reste une application separee.
 
 4. QR CODE ET ACCES DIRECT
