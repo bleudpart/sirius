@@ -44,7 +44,6 @@ import { isWhisperHallucination, microphoneConstraints, requestMicrophoneStream,
 import PushToTalkButton from "@/components/PushToTalkButton";
 import VoiceSessionControls from "@/components/VoiceSessionControls";
 import VoiceDiagnosticPanel from "@/components/VoiceDiagnosticPanel";
-import BulletinNavigation from "@/components/BulletinNavigation";
 import { createNativeRecognition } from "@/nativeSpeechRecognition";
 import { createNativeHandsFree } from "@/nativeHandsFree";
 import { displayReadingText, splitDisplayReading, isDisplayReadCommand } from "@/displayReading";
@@ -57,7 +56,8 @@ import { newsBulletinScope } from "./newsCommandRouting";
 import { isResumeWorkCommand, isWorkBriefingCommand } from "./workBriefing";
 import { chronosConfirmation } from "./chronos";
 import { isOperationalCommand, isWorkConversationCommand, workPreviewFollowup } from "./workConversation";
-import { bulletinFollowUp, bulletinNavigation, createBulletinContext, markSegmentCompleted, markSegmentStarted, prepareBulletinReading, releaseBulletinFocus } from "./bulletinDialogue";
+import { bulletinFollowUp, createBulletinContext, markSegmentCompleted, markSegmentStarted, prepareBulletinReading, releaseBulletinFocus } from "./bulletinDialogue";
+import { AUDIO_DIAGNOSTICS_EVENT, loadShowAudioDiagnostics } from "./audioDiagnosticsSetting";
 import { buildNewsBulletin, weatherBulletinText } from "./newsBulletin";
 import { fetchWeatherDirect } from "./weatherDirect";
 import { connectStreamingStt } from "@/services/streamingStt";
@@ -242,7 +242,6 @@ function App() {
   const stopVoiceRef = useRef(() => {});
   const currentSpokenRef = useRef("");
   const lastBulletinRef = useRef(null);
-  const [bulletinProgress, setBulletinProgress] = useState(null);
   const bulletinRunRef = useRef(0);
   const onSpeechStartRef = useRef(() => {});
   const onSpeechEndRef = useRef(() => {});
@@ -613,6 +612,12 @@ function App() {
   const [ecoMode, setEcoMode] = useState(() => localStorage.getItem("sirius_eco") === "1");
   const [reduceVisualEffects, setReduceVisualEffects] = useState(() => loadHud().reducedMotion || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches || false);
   const [visualTheme, setVisualTheme] = useState(loadVisualTheme);
+  const [showAudioDiagnostics, setShowAudioDiagnostics] = useState(loadShowAudioDiagnostics);
+  useEffect(() => {
+    const sync = (event) => setShowAudioDiagnostics(event?.detail?.enabled ?? loadShowAudioDiagnostics());
+    window.addEventListener(AUDIO_DIAGNOSTICS_EVENT, sync);
+    return () => window.removeEventListener(AUDIO_DIAGNOSTICS_EVENT, sync);
+  }, []);
   useEffect(() => {
     const sync = () => setVisualTheme(loadVisualTheme());
     window.addEventListener("sirius-visual-theme-changed", sync);
@@ -2077,7 +2082,6 @@ function App() {
       return;
     }
     prepareBulletinReading(bulletin, start);
-    setBulletinProgress(bulletinNavigation(bulletin));
     // La reprise suit le curseur de lecture, même après un saut ou le retour à un titre déjà lu.
     const items = [];
     for (let index = start; index < bulletin.segments.length; index += 1) {
@@ -2095,7 +2099,6 @@ function App() {
         if (stale()) return;
         const { index, phrase } = items[position];
         markSegmentStarted(bulletin, index);
-        setBulletinProgress(bulletinNavigation(bulletin));
         currentSpokenRef.current = phrase;
         setVoicePhase("speaking");
         onSpeechStartRef.current();
@@ -2105,7 +2108,6 @@ function App() {
       onitemend: (position) => {
         if (!stale() && items[position].last) {
           markSegmentCompleted(bulletin, items[position].index);
-          setBulletinProgress(bulletinNavigation(bulletin));
         }
       },
     });
@@ -6018,13 +6020,7 @@ function App() {
   useEffect(() => () => stopVoice(), [voiceAccount, stopVoice]);
   useEffect(() => {
     lastBulletinRef.current = null;
-    setBulletinProgress(null);
   }, [voiceAccount]);
-  useEffect(() => {
-    if (!bulletinProgress) return;
-    const timer = setTimeout(() => setBulletinProgress(null), Math.max(0, bulletinProgress.expiresAt - Date.now()));
-    return () => clearTimeout(timer);
-  }, [bulletinProgress]);
   const changeAndroidRecognition = useCallback((mode) => {
     stopVoice();
     nativeUnavailableRef.current = false;
@@ -7854,8 +7850,7 @@ function App() {
             <button key={suggestion} type="button" onClick={() => { setCmd(suggestion); commandInputRef.current?.focus(); }}>{suggestion}</button>
           ))}
         </div>
-        <BulletinNavigation navigation={bulletinProgress} onCommand={processCommand} />
-        {handsFreeAvailable && (
+        {handsFreeAvailable && showAudioDiagnostics && (
           <details data-testid="native-audio-diagnostics">
             <summary>Capture native expérimentale et essais audio (Diagnostic)</summary>
             <button type="button" data-testid="sirius-native-capture-btn"

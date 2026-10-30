@@ -99,6 +99,41 @@ test("la configuration sélectionne le microphone et ne demande l’accès qu’
   }
 });
 
+test("les outils audio Diagnostic s’activent depuis la configuration Android", async () => {
+  const { Capacitor } = require("@capacitor/core");
+  const platform = jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  const listener = jest.fn();
+  window.addEventListener("sirius-audio-diagnostics-changed", listener);
+  const host = document.createElement("div");
+  const root = createRoot(host);
+  try {
+    await act(async () => root.render(<SiriusSetup initialTab="voix" onComplete={jest.fn()} onCancel={jest.fn()} />));
+    const toggle = host.querySelector('[data-testid="setup-audio-diagnostics"]');
+    expect(toggle.checked).toBe(false);
+    await act(async () => toggle.click());
+    expect(localStorage.getItem("sirius_show_audio_diagnostics")).toBe("1");
+    expect(listener.mock.calls.at(-1)[0].detail).toEqual({ enabled: true });
+    await act(async () => toggle.click());
+    expect(localStorage.getItem("sirius_show_audio_diagnostics")).toBeNull();
+  } finally {
+    await act(async () => root.unmount());
+    window.removeEventListener("sirius-audio-diagnostics-changed", listener);
+    localStorage.removeItem("sirius_show_audio_diagnostics");
+    platform.mockRestore();
+  }
+});
+
+test("le réglage audio Diagnostic n’apparaît pas hors Android", async () => {
+  const host = document.createElement("div");
+  const root = createRoot(host);
+  try {
+    await act(async () => root.render(<SiriusSetup initialTab="voix" onComplete={jest.fn()} onCancel={jest.fn()} />));
+    expect(host.querySelector('[data-testid="setup-audio-diagnostics"]')).toBeNull();
+  } finally {
+    await act(async () => root.unmount());
+  }
+});
+
 test("les choix de couleurs du HUD sont immédiatement appliqués et enregistrés", async () => {
   const host = document.createElement("div");
   const root = createRoot(host);

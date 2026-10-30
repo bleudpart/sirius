@@ -579,6 +579,7 @@ test("native hands-free is diagnostic-only, explicitly started, and stopped befo
   handsFree.available.mockResolvedValue({ available: true });
   localStorage.setItem("sirius_android_stt", "native");
   localStorage.setItem("sirius_auto_mic", "1");
+  localStorage.setItem("sirius_show_audio_diagnostics", "1");
   const recorders = mockContinuousAudio();
   await mount();
   expect(handsFree.start).not.toHaveBeenCalled();
@@ -595,8 +596,18 @@ test("native hands-free is diagnostic-only, explicitly started, and stopped befo
 
 test("normal Android builds do not offer experimental native hands-free", async () => {
   jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  localStorage.setItem("sirius_show_audio_diagnostics", "1");
   await mount();
   expect(host.querySelector('[data-testid="sirius-native-capture-btn"]')).toBeNull();
+});
+
+test("diagnostic audio tools stay hidden from the HUD until enabled in settings", async () => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  handsFree.available.mockResolvedValue({ available: true });
+  await mount();
+  expect(host.querySelector('[data-testid="native-audio-diagnostics"]')).toBeNull();
+  await act(async () => window.dispatchEvent(new CustomEvent("sirius-audio-diagnostics-changed", { detail: { enabled: true } })));
+  expect(host.querySelector('[data-testid="native-audio-diagnostics"]')).not.toBeNull();
 });
 
 test("profile readiness has its own state; a second press cancels it before opening the microphone", async () => {
@@ -734,6 +745,7 @@ test.each(["Bonjour Zirius", "Zirius bonjour"])(
   "native continuous capture processes the greeting %s", async (greeting) => {
     jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
     handsFree.available.mockResolvedValue({ available: true });
+    localStorage.setItem("sirius_show_audio_diagnostics", "1");
     await mount();
     await act(async () => host.querySelector('[data-testid="sirius-native-capture-btn"]').click());
     await act(async () => handsFreeOptions.onTranscript(greeting));
@@ -1356,7 +1368,7 @@ test("the bulletin dialogue recalls what was really announced, resumes, and cont
   expect(newsFetches()).toBe(1);
 });
 
-test("bulletin buttons skip forward, replay backwards and resume an interrupted replay without new news requests", async () => {
+test("bulletin voice commands skip forward, replay backwards and resume without HUD title controls or new news requests", async () => {
   mockBulletinBackend();
   speakSeries.mockImplementation((text, options) => {
     options?.onstart?.();
@@ -1364,15 +1376,13 @@ test("bulletin buttons skip forward, replay backwards and resume an interrupted 
   });
   await mount();
   await send("les infos");
-  const controls = () => host.querySelector('[aria-label="Parcourir le bulletin"]');
-  const click = async (label) => act(async () => [...controls().querySelectorAll("button")].find((button) => button.textContent === label).click());
-  expect(controls().textContent).toContain("Titre 1 sur 2");
+  expect(host.querySelector('[aria-label="Parcourir le bulletin"]')).toBeNull();
+  expect(host.textContent).not.toContain("Titre 1 sur 2");
   speakSeries.mockClear();
-  await click("Titre suivant");
+  await send("titre suivant du bulletin");
   expect(speakSeries.mock.calls[0][0]).toContain("Le parlement");
-  expect(controls().textContent).toContain("Titre 2 sur 2");
   speakSeries.mockClear();
-  await click("Titre précédent");
+  await send("titre précédent du bulletin");
   expect(speakSeries.mock.calls[0][0]).toContain("Le maire");
   speakSeries.mockClear();
   await send("reprends le bulletin");

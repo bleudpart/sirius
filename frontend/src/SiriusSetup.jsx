@@ -7,6 +7,8 @@ import VoiceEqualizerPanel from "./VoiceEqualizerPanel";
 import { GEMINI_VOICE, GEMINI_TIMBRES, geminiTimbreFor } from "./voice";
 import { HUD_DEFAULTS, loadHud, saveHud } from "@/hudPrefs";
 import { loadPreferredMicrophoneDevice, MICROPHONE_DEVICE_STORAGE_KEY } from "@/microphoneCapture";
+import { loadShowAudioDiagnostics, saveShowAudioDiagnostics } from "@/audioDiagnosticsSetting";
+import { Capacitor } from "@capacitor/core";
 import { loadVisualTheme, saveVisualTheme, VISUAL_THEME_DEFAULTS } from "@/theme";
 import { ConfirmButton } from "@/ConfirmButton";
 import { exportAccountProfile, importAccountProfile, validatePersonalService } from "@/accountSetup";
@@ -181,6 +183,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
   const [microphoneDeviceId, setMicrophoneDeviceId] = useState(loadPreferredMicrophoneDevice);
   const [microphoneBusy, setMicrophoneBusy] = useState(false);
   const [microphoneStatus, setMicrophoneStatus] = useState(null);
+  const [showAudioDiagnostics, setShowAudioDiagnostics] = useState(loadShowAudioDiagnostics);
   const refreshMicrophones = useCallback(async (requestPermission = false) => {
     setMicrophoneBusy(true);
     setMicrophoneStatus(null);
@@ -520,6 +523,14 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
                 </button>
               </div>
               {microphoneStatus && <p className="setup-note" role={microphoneStatus.error ? "alert" : "status"}>{microphoneStatus.message}</p>}
+              {Capacitor.getPlatform() === "android" && (
+                <label className="setup-label" htmlFor="setup-audio-diagnostics">
+                  <input id="setup-audio-diagnostics" type="checkbox" checked={showAudioDiagnostics}
+                    onChange={(event) => { setShowAudioDiagnostics(event.target.checked); saveShowAudioDiagnostics(event.target.checked); }}
+                    data-testid="setup-audio-diagnostics" />
+                  {" "}Afficher les outils de capture native et d’essais audio dans le HUD (version Diagnostic)
+                </label>
+              )}
             </section>
             <h2 className="setup-section-head">Voix de ΣIRIUS</h2>
             <label className="setup-label">Préréglage <span className="setup-tag opt">1 clic</span></label>
