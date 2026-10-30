@@ -1,8 +1,6 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { Capacitor } from "@capacitor/core";
-import { App } from "@capacitor/app";
-import { Camera, CameraDirection, CameraResultType, CameraSource } from "@capacitor/camera";
 import * as haccpPrinter from "./HaccpPrinter";
 import HaccpLabelCapture from "./HaccpLabelCapture";
 import HaccpModule from "./HaccpModule";
@@ -12,17 +10,8 @@ jest.mock("./haccpDocuments", () => ({
   ...jest.requireActual("./haccpDocuments"),
   printHaccpDocument: jest.fn(),
 }));
-jest.mock("@capacitor/camera", () => ({
-  Camera: { getPhoto: jest.fn() },
-  CameraDirection: { Rear: "REAR" },
-  CameraResultType: { Uri: "uri" },
-  CameraSource: { Camera: "CAMERA" },
-}));
-jest.mock("@capacitor/app", () => ({
-  App: { addListener: jest.fn() },
-}));
 global.IS_REACT_ACT_ENVIRONMENT = true;
-let host, root, originalFetch, originalCrypto;
+let host, root, originalFetch, originalCrypto, originalMediaDevices, cameraTrack, getUserMedia;
 const reply = (data, ok = true) => ({ ok, status: ok ? 200 : 422, json: async () => data });
 const button = (text) => [...host.querySelectorAll("button")].find((item) => item.textContent.includes(text));
 const field = (text) => [...host.querySelectorAll("label")].find((item) => item.textContent.trim().startsWith(text))?.querySelector("input,textarea");
@@ -37,16 +26,21 @@ beforeEach(() => {
   URL.revokeObjectURL = jest.fn();
   originalCrypto = global.crypto;
   global.crypto = { randomUUID: jest.fn(() => "23fd6fd1-9af7-4ab9-854c-46216281c265") };
+  originalMediaDevices = Object.getOwnPropertyDescriptor(navigator, "mediaDevices");
+  cameraTrack = { stop: jest.fn() };
+  getUserMedia = jest.fn().mockResolvedValue({ getTracks: () => [cameraTrack] });
+  Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia } });
+  jest.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
   originalFetch = global.fetch;
   global.fetch = jest.fn(async () => reply(record));
   host = document.createElement("div"); document.body.appendChild(host); root = createRoot(host);
   printHaccpDocument.mockClear();
-  Camera.getPhoto.mockReset();
-  App.addListener.mockReset().mockResolvedValue({ remove: jest.fn() });
 });
 afterEach(async () => {
   await act(async () => root.unmount());
   host.remove(); global.fetch = originalFetch; global.crypto = originalCrypto; jest.restoreAllMocks();
+  if (originalMediaDevices) Object.defineProperty(navigator, "mediaDevices", originalMediaDevices);
+  else delete navigator.mediaDevices;
   jest.useRealTimers();
 });
 async function change(input, value) {
@@ -57,9 +51,18 @@ async function change(input, value) {
   });
 }
 async function choosePhoto() {
-  const input = host.querySelector('input[type="file"]');
-  Object.defineProperty(input, "files", { configurable: true, value: [new File(["photo"], "label.png", { type: "image/png" })] });
-  await act(async () => input.dispatchEvent(new Event("change", { bubbles: true })));
+  const video = host.querySelector("video");
+  Object.defineProperty(video, "videoWidth", { configurable: true, value: 1920 });
+  Object.defineProperty(video, "videoHeight", { configurable: true, value: 1080 });
+  const canvas = host.querySelector("canvas");
+  const drawImage = jest.fn();
+  Object.defineProperty(canvas, "getContext", { configurable: true, value: jest.fn(() => ({ drawImage })) });
+  Object.defineProperty(canvas, "toBlob", {
+    configurable: true,
+    value: (callback) => callback(new Blob(["photo"], { type: "image/jpeg" })),
+  });
+  await click("Capturer l’étiquette");
+  return { canvas, drawImage };
 }
 async function submit() {
   await act(async () => host.querySelector("form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
@@ -99,128 +102,109 @@ test("Android shortcut keeps the scanner inside the native app, including from t
   expect(host.querySelector('[aria-label="Capture des étiquettes ΣIRIUS"]')).not.toBeNull();
 });
 
-test("reception stays the default and camera formats are explicit", async () => {
+test("reception opens the rear live camera and captures full-resolution video without a file picker", async () => {
   await act(async () => root.render(<HaccpLabelCapture />));
-  const input = host.querySelector('input[type="file"]');
-  expect(input.getAttribute("capture")).toBe("environment");
-  expect(input.accept).toBe("image/jpeg,image/png,image/webp");
+  expect(getUserMedia).toHaveBeenCalledWith({
+    video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
+    audio: false,
+  });
+  const video = host.querySelector("video");
+  expect(video.autoplay).toBe(true);
+  expect(video.playsInline).toBe(true);
+  expect(video.muted).toBe(true);
+  expect(host.querySelector('input[type="file"]')).toBeNull();
   expect(button("Réception").getAttribute("aria-pressed")).toBe("true");
-  expect(button("Scanner étiquette").disabled).toBe(false);
-  expect(button("Scanner étiquette").classList.contains("haccp-scan")).toBe(true);
-  expect(button("Scanner étiquette").classList.contains("cmd-send")).toBe(false);
-  expect(button("Scanner étiquette").querySelector('svg[aria-hidden="true"]')).not.toBeNull();
-  await choosePhoto();
+  expect(button("Capturer l’étiquette").disabled).toBe(false);
+  const { canvas, drawImage } = await choosePhoto();
+  expect(canvas.width).toBe(1920);
+  expect(canvas.height).toBe(1080);
+  expect(drawImage).toHaveBeenCalledWith(video, 0, 0, 1920, 1080);
   const [url, options] = global.fetch.mock.calls[0];
   expect(url).toMatch(/\/api\/haccp\/etiquettes\/scan$/);
   expect(options.credentials).toBe("include");
   expect(options.headers).toBeUndefined();
+  expect(options.body.get("file").type).toBe("image/jpeg");
+  expect(options.body.get("file").name).toBe("etiquette.jpg");
   expect(JSON.parse(options.body.get("operation"))).toEqual({ type_operation: "reception" });
 });
 
-function nativeCamera() {
-  jest.spyOn(Capacitor, "isNativePlatform").mockReturnValue(true);
-  Camera.getPhoto.mockResolvedValue({ webPath: "capacitor://photo.jpg", format: "jpeg" });
-}
-
-test("native scan opens the rear camera directly and uploads the photo without a gallery picker", async () => {
-  nativeCamera();
-  global.fetch.mockResolvedValueOnce({ ok: true, blob: async () => new Blob(["photo"], { type: "image/jpeg" }) })
-    .mockResolvedValueOnce(reply(record));
+test("camera permission failures stay explicit and can be retried", async () => {
+  getUserMedia.mockRejectedValueOnce(new Error("Camera permission denied"));
   await act(async () => root.render(<HaccpLabelCapture />));
-  const picker = jest.spyOn(host.querySelector('input[type="file"]'), "click");
-  await click("Scanner étiquette");
-  expect(Camera.getPhoto).toHaveBeenCalledWith({
-    source: CameraSource.Camera, resultType: CameraResultType.Uri, direction: CameraDirection.Rear,
-    quality: 90, width: 2400, height: 2400, correctOrientation: true, allowEditing: false, saveToGallery: false,
-  });
-  expect(picker).not.toHaveBeenCalled();
-  const body = global.fetch.mock.calls[1][1].body;
-  expect(body.get("file").type).toBe("image/jpeg");
-  expect(body.get("file").name).toBe("etiquette.jpeg");
-  expect(JSON.parse(body.get("operation"))).toEqual({ type_operation: "reception" });
-  expect(body.get("capture_id")).toBeTruthy();
-  expect(global.fetch).toHaveBeenCalledTimes(2);
-});
-
-test("web scan keeps the file picker and never invokes the native camera", async () => {
-  await act(async () => root.render(<HaccpLabelCapture />));
-  const picker = jest.spyOn(host.querySelector('input[type="file"]'), "click").mockImplementation(() => {});
-  await click("Scanner étiquette");
-  expect(picker).toHaveBeenCalledTimes(1);
-  expect(Camera.getPhoto).not.toHaveBeenCalled();
-  expect(global.fetch).not.toHaveBeenCalled();
-});
-
-test.each([
-  new Error("User cancelled photos app"),
-  Object.assign(new Error("Cancelled"), { code: "OS-PLUG-CAMR-0006" }),
-])("camera cancellation leaves the form usable and never uploads", async (failure) => {
-  nativeCamera();
-  Camera.getPhoto.mockRejectedValue(failure);
-  await act(async () => root.render(<HaccpLabelCapture />));
-  await click("Scanner étiquette");
-  expect(global.fetch).not.toHaveBeenCalled();
-  expect(host.querySelector('[role="alert"]')).toBeNull();
-  expect(button("Scanner étiquette").disabled).toBe(false);
-});
-
-test("permission errors stay explicit and never fall back to the gallery", async () => {
-  nativeCamera();
-  Camera.getPhoto.mockRejectedValue(new Error("Camera permission denied"));
-  await act(async () => root.render(<HaccpLabelCapture />));
-  const picker = jest.spyOn(host.querySelector('input[type="file"]'), "click");
-  await click("Scanner étiquette");
   expect(host.querySelector('[role="alert"]').textContent).toContain("Camera permission denied");
   expect(global.fetch).not.toHaveBeenCalled();
-  expect(picker).not.toHaveBeenCalled();
+  getUserMedia.mockResolvedValueOnce({ getTracks: () => [cameraTrack] });
+  await click("Réessayer l’accès caméra");
+  expect(getUserMedia).toHaveBeenCalledTimes(2);
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+  expect(button("Capturer l’étiquette").disabled).toBe(false);
 });
 
-test("an unreadable captured photo is not uploaded", async () => {
-  nativeCamera();
-  global.fetch.mockResolvedValueOnce({ ok: false });
+test("video playback failure releases the camera and can be retried", async () => {
+  HTMLMediaElement.prototype.play.mockRejectedValueOnce(new Error("Playback blocked"));
   await act(async () => root.render(<HaccpLabelCapture />));
-  await click("Scanner étiquette");
-  expect(global.fetch).toHaveBeenCalledTimes(1);
-  expect(host.querySelector('[role="alert"]').textContent).toContain("ne peut pas être lue");
+  expect(cameraTrack.stop).toHaveBeenCalledTimes(1);
+  expect(host.querySelector('[role="alert"]').textContent).toContain("Playback blocked");
+  getUserMedia.mockResolvedValueOnce({ getTracks: () => [cameraTrack] });
+  await click("Réessayer l’accès caméra");
+  expect(getUserMedia).toHaveBeenCalledTimes(2);
+  expect(button("Capturer l’étiquette").disabled).toBe(false);
 });
 
-test("rapid double tap launches only one camera and preserves the opening rule", async () => {
-  nativeCamera();
-  let resolvePhoto;
-  Camera.getPhoto.mockReturnValue(new Promise((resolve) => { resolvePhoto = resolve; }));
-  global.fetch.mockResolvedValueOnce({ ok: true, blob: async () => new Blob(["photo"]) })
-    .mockResolvedValueOnce(reply(record));
+test("camera capture failure leaves the live stream available for another attempt", async () => {
+  await act(async () => root.render(<HaccpLabelCapture />));
+  const video = host.querySelector("video");
+  Object.defineProperty(video, "videoWidth", { configurable: true, value: 0 });
+  Object.defineProperty(video, "videoHeight", { configurable: true, value: 0 });
+  await click("Capturer l’étiquette");
+  expect(host.querySelector('[role="alert"]').textContent).toContain("flux vidéo n’est pas encore prêt");
+  expect(global.fetch).not.toHaveBeenCalled();
+  expect(button("Capturer l’étiquette").disabled).toBe(false);
+});
+
+test("rapid double tap captures once and preserves the opening rule", async () => {
   await act(async () => root.render(<HaccpLabelCapture />));
   await enableRule();
-  await act(async () => { button("Scanner étiquette").click(); button("Scanner étiquette").click(); });
-  expect(Camera.getPhoto).toHaveBeenCalledTimes(1);
+  const video = host.querySelector("video");
+  Object.defineProperty(video, "videoWidth", { configurable: true, value: 1920 });
+  Object.defineProperty(video, "videoHeight", { configurable: true, value: 1080 });
+  const canvas = host.querySelector("canvas");
+  const drawImage = jest.fn();
+  Object.defineProperty(canvas, "getContext", { configurable: true, value: jest.fn(() => ({ drawImage })) });
+  let resolveBlob;
+  Object.defineProperty(canvas, "toBlob", {
+    configurable: true,
+    value: (callback) => { resolveBlob = callback; },
+  });
+  await act(async () => {
+    button("Capturer l’étiquette").click();
+    button("Capturer l’étiquette").click();
+  });
+  expect(drawImage).toHaveBeenCalledTimes(1);
   expect(global.fetch).not.toHaveBeenCalled();
-  await act(async () => resolvePhoto({ webPath: "capacitor://photo.jpg", format: "jpeg" }));
-  expect(JSON.parse(global.fetch.mock.calls[1][1].body.get("operation"))).toEqual({
+  await act(async () => resolveBlob(new Blob(["photo"], { type: "image/jpeg" })));
+  expect(JSON.parse(global.fetch.mock.calls[0][1].body.get("operation"))).toEqual({
     type_operation: "ouverture", duree_conservation_heures: 72,
     justification_duree: "Notice fabricant", regle_confirmee: true,
   });
 });
 
-test("a server failure retries the same native photo with the same capture id without reopening the camera", async () => {
-  nativeCamera();
-  global.fetch.mockResolvedValueOnce({ ok: true, blob: async () => new Blob(["photo"]) })
-    .mockResolvedValueOnce(reply({ detail: "Réseau coupé" }, false)).mockResolvedValueOnce(reply(record));
+test("a server failure retries the same captured image with the same capture id", async () => {
+  global.fetch.mockResolvedValueOnce(reply({ detail: "Réseau coupé" }, false))
+    .mockResolvedValueOnce(reply(record));
   await act(async () => root.render(<HaccpLabelCapture />));
-  await click("Scanner étiquette");
-  const first = global.fetch.mock.calls[1][1].body.get("capture_id");
-  await click("Réessayer");
-  expect(global.fetch.mock.calls[2][1].body.get("capture_id")).toBe(first);
-  expect(Camera.getPhoto).toHaveBeenCalledTimes(1);
+  await choosePhoto();
+  const first = global.fetch.mock.calls[0][1].body.get("capture_id");
+  await click("Réessayer la même photo sans doublon");
+  expect(global.fetch.mock.calls[1][1].body.get("capture_id")).toBe(first);
+  expect(getUserMedia).toHaveBeenCalledTimes(1);
 });
 
-test("restored camera result never submits with lost operator or PMS context", async () => {
-  nativeCamera();
+test("camera tracks stop when the capture component unmounts", async () => {
   await act(async () => root.render(<HaccpLabelCapture />));
-  const callback = App.addListener.mock.calls.find(([name]) => name === "appRestoredResult")[1];
-  await act(async () => callback({ pluginId: "Camera", success: true, data: { webPath: "restored.jpg" } }));
-  expect(global.fetch).not.toHaveBeenCalled();
-  expect(host.querySelector('[role="alert"]').textContent).toContain("Aucune photo restaurée");
+  expect(host.querySelector("video").srcObject).not.toBeNull();
+  await act(async () => root.unmount());
+  expect(cameraTrack.stop).toHaveBeenCalledTimes(1);
 });
 
 test("scan result confirms classified photo and SQLite archive without certifying a measured temperature", async () => {
@@ -268,7 +252,7 @@ test("kitchen mode shows temporary accepted-print feedback and resets without re
   expect(host.querySelector(".haccp-print-success").textContent).toContain("vérifiez la sortie papier");
   await act(async () => { jest.advanceTimersByTime(1500); });
   expect(host.querySelector(".haccp-print-success")).toBeNull();
-  expect(button("Scanner étiquette")).not.toBeNull();
+  expect(button("Capturer l’étiquette")).not.toBeNull();
   jest.useRealTimers();
 });
 
@@ -307,7 +291,7 @@ test("changing the duration invalidates confirmation and never submits an unconf
   await change(field("Durée après"), "12"); await choosePhoto();
   expect(field("Je confirme").checked).toBe(false);
   expect(global.fetch).not.toHaveBeenCalled();
-  expect(host.querySelector('[role="alert"]').textContent).toContain("confirmez");
+  expect(button("Capturer l’étiquette").disabled).toBe(true);
 });
 
 test("scan failure is visible, keeps the photo and never prints or retries automatically", async () => {
@@ -356,10 +340,13 @@ test("retry after lost response reuses capture UUID and shows the original photo
 test("the next product always requires confirmation again and hides the previous photograph", async () => {
   await act(async () => root.render(<HaccpLabelCapture />));
   await enableRule(); await choosePhoto();
-  expect(host.querySelector("form")).toBeNull();
+  expect(host.querySelector("form")).not.toBeNull();
+  expect(button("Capturer l’étiquette").disabled).toBe(true);
   await click("Scanner une autre");
   expect(field("Je confirme").checked).toBe(false);
-  expect(button("Scanner étiquette").disabled).toBe(true);
+  expect(button("Capturer l’étiquette").disabled).toBe(true);
+  await act(async () => field("Je confirme").click());
+  expect(button("Capturer l’étiquette").disabled).toBe(false);
   expect(host.querySelector("img")).toBeNull();
 });
 

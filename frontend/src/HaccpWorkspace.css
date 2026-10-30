@@ -92,6 +92,39 @@ body:has(.haccp-standalone) {
 .haccp-ui textarea { min-height: 90px; resize: vertical; }
 .haccp-ui label.haccp-check { display: flex; align-items: flex-start; gap: 12px; padding: 12px; border: 1px solid var(--haccp-border); border-radius: 10px; background: rgba(197, 160, 89, .04); }
 .haccp-ui input[type="checkbox"] { flex-shrink: 0; width: 20px; height: 20px; margin: 2px 0; accent-color: var(--haccp-gold); }
+.haccp-camera-stage {
+  position: relative; display: grid; grid-template-rows: minmax(320px, 1fr) auto; gap: 12px;
+  min-height: min(70vh, 680px); padding: 14px; overflow: hidden;
+  border: 1px solid var(--haccp-border); border-radius: 16px; background: #02080c;
+}
+.haccp-camera-stage video {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #02080c;
+}
+.haccp-viewfinder {
+  position: absolute; z-index: 1; left: 50%; top: 43%; width: min(84%, 680px); height: 48%;
+  transform: translate(-50%, -50%); border: 2px solid rgba(115, 255, 158, .88);
+  border-radius: 12px; box-shadow: 0 0 0 999px rgba(0, 0, 0, .24), 0 0 22px rgba(39, 255, 113, .32);
+  pointer-events: none;
+}
+.haccp-viewfinder::before {
+  content: ""; position: absolute; inset: -2px; border: 5px solid transparent; border-radius: inherit;
+  border-image: linear-gradient(90deg, #70ff9b 0 26px, transparent 26px calc(100% - 26px), #70ff9b calc(100% - 26px)) 1;
+}
+.haccp-laser {
+  position: absolute; left: 3%; right: 3%; top: 0; height: 2px;
+  background: #58ff88; box-shadow: 0 0 9px 3px #39ff7188; animation: haccp-laser-scan 2.4s ease-in-out infinite alternate;
+}
+.haccp-camera-stage.is-capturing .haccp-laser { animation-play-state: paused; }
+.haccp-ui button.haccp-camera-action { position: relative; z-index: 2; align-self: end; width: 100%; min-height: 92px; }
+.haccp-ui .haccp-camera-state {
+  position: absolute; z-index: 3; left: 50%; top: 50%; display: flex; align-items: center; gap: 12px;
+  width: max-content; max-width: calc(100% - 32px); padding: 14px 18px; transform: translate(-50%, -50%);
+  border: 1px solid var(--haccp-border); border-radius: 12px; background: #06101beF; color: var(--haccp-text);
+  text-align: center;
+}
+.haccp-ui .haccp-camera-loading { top: 28%; }
+.haccp-capture-canvas { display: none; }
+@keyframes haccp-laser-scan { from { top: 3%; } to { top: calc(97% - 2px); } }
 .haccp-ui button.haccp-scan { width: 100%; min-height: 86px; padding: 22px; border-radius: 8px; font-size: 19px; gap: 16px; }
 .haccp-kitchen .haccp-capture-fields { gap: 24px; }
 .haccp-kitchen .haccp-modes button { min-height: 76px; font-size: 20px; }
@@ -124,6 +157,7 @@ body:has(.haccp-standalone) {
 @media (prefers-reduced-motion: reduce) {
   .haccp-ui button { transition: none; }
   .haccp-loading { animation: none; }
+  .haccp-laser { animation: none; }
 }
 @media (max-width: 600px) {
   .haccp-heading { gap: 12px; align-items: flex-start; }
@@ -135,6 +169,8 @@ body:has(.haccp-standalone) {
   .haccp-filters { grid-template-columns: 1fr; }
   .haccp-ui button { padding: 12px; }
   .haccp-ui button.haccp-scan { padding: 20px 16px; font-size: 18px; }
+  .haccp-camera-stage { min-height: min(68vh, 620px); grid-template-rows: minmax(280px, 1fr) auto; padding: 10px; }
+  .haccp-ui button.haccp-camera-action { min-height: 86px; font-size: 22px; }
   .haccp-kitchen .haccp-modes button { min-height: 72px; font-size: 18px; }
   .haccp-ui button.haccp-kitchen-scan { min-height: 124px; }
   .haccp-qr-code { max-width: 100%; }

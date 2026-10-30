@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Camera, PackageCheck, Scissors, Printer, RotateCcw, ScanLine, LoaderCircle } from "lucide-react";
-import { Capacitor } from "@capacitor/core";
-import { App } from "@capacitor/app";
-import { Camera as NativeCamera, CameraDirection, CameraResultType, CameraSource } from "@capacitor/camera";
 import { API_BASE_URL } from "./lib/api";
 import { printHaccpDocument } from "./haccpDocuments";
 import HaccpPrinter, { haccpPrintRequest, haccpPrintStatus, printHaccpOpening } from "./HaccpPrinter";
@@ -35,11 +32,16 @@ export default function HaccpLabelCapture({ savedRecord = null, kitchenMode = fa
   const [printState, setPrintState] = useState("");
   const [printSuccess, setPrintSuccess] = useState(false);
   const [preview, setPreview] = useState(null);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [capturing, setCapturing] = useState(false);
+  const [cameraAttempt, setCameraAttempt] = useState(0);
   const captureId = useRef(null);
   const submitted = useRef(null);
   const previewRef = useRef(null);
   const frame = useRef(null);
-  const input = useRef(null);
+  const video = useRef(null);
+  const canvas = useRef(null);
+  const stream = useRef(null);
   const pending = useRef(false);
   const takingPhoto = useRef(false);
   const mounted = useRef(true);
@@ -57,23 +59,55 @@ export default function HaccpLabelCapture({ savedRecord = null, kitchenMode = fa
     };
   }, [clearPrintFrame]);
   useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return undefined;
     let active = true;
-    const listener = App.addListener("appRestoredResult", (event) => {
-      if (active && event.pluginId === "Camera") {
-        setError("La capture a été interrompue par le redémarrage de l’application. Aucune photo restaurée n’a été envoyée : vérifiez le registre et reprenez le scan avec les bons paramètres.");
+    const activeVideo = video.current;
+    if (savedRecord) return undefined;
+    const startCamera = async () => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setError("La caméra intégrée n’est pas disponible dans ce navigateur. Ouvrez la page en HTTPS ou dans l’application compatible.");
+        return;
       }
-    });
-    listener.catch((failure) => {
-      if (active) setError(`Suivi du retour caméra indisponible : ${failure.message}`);
-    });
+      let cameraStream;
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "environment",
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
+          audio: false,
+        });
+        if (!active) {
+          cameraStream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        stream.current = cameraStream;
+        if (activeVideo) {
+          activeVideo.srcObject = cameraStream;
+          await activeVideo.play();
+        }
+        if (active) {
+          setCameraReady(true);
+          setError("");
+        }
+      } catch (failure) {
+        cameraStream?.getTracks().forEach((track) => track.stop());
+        if (stream.current === cameraStream) stream.current = null;
+        if (activeVideo) activeVideo.srcObject = null;
+        if (active) {
+          setCameraReady(false);
+          setError(`Caméra indisponible : ${failure.message || "autorisez l’accès à la caméra puis réessayez."}`);
+        }
+      }
+    };
+    void startCamera();
     return () => {
       active = false;
-      listener.then((handle) => handle.remove()).catch((failure) => {
-        console.error("HACCP : fermeture du suivi caméra impossible.", failure);
-      });
+      stream.current?.getTracks().forEach((track) => track.stop());
+      stream.current = null;
+      if (activeVideo) activeVideo.srcObject = null;
     };
-  }, []);
+  }, [cameraAttempt, savedRecord]);
 
   const changeMode = (next) => {
     setMode(next); setConfirmed(false); setResult(null); setError(""); setPrintState("");
@@ -116,7 +150,6 @@ export default function HaccpLabelCapture({ savedRecord = null, kitchenMode = fa
       }, async (response) => (await checkResponse(response)).json());
       if (mounted.current) {
         setResult(record); setFile(null); setConfirmed(false);
-        if (input.current) input.current.value = "";
       }
     } catch (failure) {
       if (mounted.current) setError(`${failure.message} Si la connexion a été coupée, vérifiez le registre avant de renvoyer la photo.`);
@@ -125,52 +158,42 @@ export default function HaccpLabelCapture({ savedRecord = null, kitchenMode = fa
       if (mounted.current) setBusy(false);
     }
   };
-  const selectPhoto = (selected) => {
-    if (!selected || !mounted.current) return;
-    setFile(selected); setResult(null); setPrintState("");
-    captureId.current = null; submitted.current = null;
-    if (previewRef.current) URL.revokeObjectURL(previewRef.current);
-    previewRef.current = URL.createObjectURL(selected);
-    setPreview(previewRef.current);
-    return save(null, selected);
-  };
-  const scan = async () => {
-    if (pending.current || takingPhoto.current) return;
-    if (!Capacitor.isNativePlatform()) {
-      input.current?.click();
-      return;
-    }
+  const capture = async () => {
+    if (pending.current || takingPhoto.current || !cameraReady || result) return;
     takingPhoto.current = true;
-    setBusy(true); setError("");
+    setCapturing(true); setError("");
     try {
-      const photo = await NativeCamera.getPhoto({
-        source: CameraSource.Camera,
-        resultType: CameraResultType.Uri,
-        direction: CameraDirection.Rear,
-        quality: 90,
-        width: 2400,
-        height: 2400,
-        correctOrientation: true,
-        allowEditing: false,
-        saveToGallery: false,
+      const activeVideo = video.current;
+      const activeCanvas = canvas.current;
+      if (!activeVideo || !activeCanvas || !activeVideo.videoWidth || !activeVideo.videoHeight) {
+        throw new Error("Le flux vidéo n’est pas encore prêt. Réessayez dans un instant.");
+      }
+      activeCanvas.width = activeVideo.videoWidth;
+      activeCanvas.height = activeVideo.videoHeight;
+      const context = activeCanvas.getContext("2d");
+      if (!context) throw new Error("La capture de l’image vidéo est indisponible.");
+      context.drawImage(activeVideo, 0, 0, activeCanvas.width, activeCanvas.height);
+      const blob = await new Promise((resolve, reject) => {
+        activeCanvas.toBlob((image) => image
+          ? resolve(image)
+          : reject(new Error("La caméra n’a pas pu créer l’image. Réessayez.")), "image/jpeg", 0.94);
       });
       if (!mounted.current) return;
-      if (!photo.webPath) throw new Error("La caméra n’a pas retourné de photo lisible.");
-      const response = await fetch(photo.webPath);
-      if (!response.ok) throw new Error("La photo prise ne peut pas être lue.");
-      const blob = await response.blob();
-      if (!blob.size || blob.size > 20 * 1024 * 1024) throw new Error("Photo vide ou supérieure à 20 Mo : reprenez le scan.");
-      if (!["jpeg", "png", "webp"].includes(photo.format)) throw new Error("Format de photo non pris en charge.");
-      await selectPhoto(new File([blob], `etiquette.${photo.format}`, { type: `image/${photo.format}` }));
-    } catch (failure) {
-      const cancelled = failure.message === "User cancelled photos app"
-        || ["OS-PLUG-CAMR-0006", "OS-PLUG-CAMR-0013"].includes(failure.code);
-      if (mounted.current && !cancelled) {
-        setError(`Appareil photo indisponible : ${failure.message || "vérifiez les autorisations caméra dans les paramètres."}`);
+      if (!blob.size || blob.size > 20 * 1024 * 1024) {
+        throw new Error("Capture vide ou supérieure à 20 Mo. Réessayez en cadrant plus près.");
       }
+      const selectedFile = new File([blob], "etiquette.jpg", { type: "image/jpeg" });
+      setFile(selectedFile); setResult(null); setPrintState("");
+      captureId.current = null; submitted.current = null;
+      if (previewRef.current) URL.revokeObjectURL(previewRef.current);
+      previewRef.current = URL.createObjectURL(selectedFile);
+      setPreview(previewRef.current);
+      await save(null, selectedFile);
+    } catch (failure) {
+      if (mounted.current) setError(failure.message || "Capture impossible. Le flux caméra reste actif ; réessayez.");
     } finally {
       takingPhoto.current = false;
-      if (mounted.current) setBusy(false);
+      if (mounted.current) setCapturing(false);
     }
   };
   const print = async () => {
@@ -213,7 +236,6 @@ export default function HaccpLabelCapture({ savedRecord = null, kitchenMode = fa
   const resetCapture = () => {
     setResult(null); setError(""); setPrintState(""); setPrintSuccess(false); setConfirmed(false); setFile(null);
     captureId.current = null; submitted.current = null;
-    if (input.current) input.current.value = "";
     if (previewRef.current) URL.revokeObjectURL(previewRef.current);
     previewRef.current = null; setPreview(null);
   };
@@ -233,8 +255,8 @@ export default function HaccpLabelCapture({ savedRecord = null, kitchenMode = fa
       {!kitchenMode && <p className="haccp-kicker">{savedRecord ? "Preuve archivée" : "Capture intelligente"}</p>}
       <h3>{kitchenMode ? "Cuisine · Scanner une étiquette" : `ΣIRIUS · ${savedRecord ? "Vérifier l’étiquette archivée" : "Scanner une étiquette"}`}</h3>
       {!savedRecord && !kitchenMode && <ol className="haccp-steps" aria-label="Étapes de capture"><li><span>1</span>Choisir l’action</li><li><span>2</span>Photographier</li><li><span>3</span>Vérifier et imprimer</li></ol>}
-      {!savedRecord && !result && <form onSubmit={save}>
-        <fieldset disabled={busy} className="haccp-capture-fields">
+      {!savedRecord && <form onSubmit={save}>
+        <fieldset disabled={busy || capturing || !!result} className="haccp-capture-fields">
           <legend>Action</legend>
           <div className="haccp-modes" role="group" aria-label="Type d’opération">
             <button type="button" aria-pressed={mode === "reception"} onClick={() => changeMode("reception")}><PackageCheck size={20} aria-hidden="true" />Réception</button>
@@ -256,16 +278,26 @@ export default function HaccpLabelCapture({ savedRecord = null, kitchenMode = fa
               <label className="haccp-check"><input type="checkbox" checked={confirmed} required onChange={(e) => setConfirmed(e.target.checked)} /> Je confirme cette durée et ses conditions pour le produit photographié.</label>
             </> : <p role="status">Sans règle confirmée : ouverture archivée avec alerte, sans DLC secondaire ni étiquette d’utilisation.</p>}
           </>}
-          <input ref={input} type="file" style={{ display: "none" }} accept="image/jpeg,image/png,image/webp" capture="environment" aria-label="Photo de l’étiquette" onChange={(e) => {
-            const selected = e.target.files?.[0] || null;
-            selectPhoto(selected);
-          }} />
-          <button type="button" className={`haccp-scan haccp-primary${kitchenMode ? " haccp-kitchen-scan" : ""}`} aria-busy={busy} disabled={busy || !operator.trim() || (mode === "ouverture" && hasRule && (!confirmed || !reason.trim() || !Number.isSafeInteger(Number(hours)) || Number(hours) <= 0))} onClick={scan}>
-            {busy ? <LoaderCircle className="haccp-loading" size={30} aria-hidden="true" /> : <Camera size={30} aria-hidden="true" />}
-            <span>{busy ? "Analyse et archivage…" : "Scanner étiquette"}</span>
-            <ScanLine size={22} aria-hidden="true" />
-          </button>
-          <p className="haccp-camera-hint">Photographiez une étiquette nette et complète. L’analyse démarre dès le choix de la photo.</p>
+          <div className={`haccp-camera-stage${capturing || busy ? " is-capturing" : ""}${cameraReady ? " is-ready" : ""}`}>
+            <video ref={video} autoPlay playsInline muted aria-label="Aperçu en direct de la caméra arrière" />
+            <div className="haccp-viewfinder" aria-hidden="true"><span className="haccp-laser" /></div>
+            {!cameraReady && <p className="haccp-camera-state" role="status">{error || "Démarrage de la caméra…"}</p>}
+            {(capturing || busy) && <p className="haccp-camera-state haccp-camera-loading" role="status">
+              <LoaderCircle className="haccp-loading" size={26} aria-hidden="true" />Analyse de l’étiquette en cours…
+            </p>}
+            <canvas ref={canvas} className="haccp-capture-canvas" aria-hidden="true" />
+            <button type="button" className={`haccp-scan haccp-primary haccp-camera-action${kitchenMode ? " haccp-kitchen-scan" : ""}`}
+              aria-busy={capturing || busy}
+              disabled={!cameraReady || busy || capturing || !!result || !operator.trim() || (mode === "ouverture" && hasRule && (!confirmed || !reason.trim() || !Number.isSafeInteger(Number(hours)) || Number(hours) <= 0))}
+              onClick={capture}>
+              {capturing || busy ? <LoaderCircle className="haccp-loading" size={30} aria-hidden="true" /> : <Camera size={30} aria-hidden="true" />}
+              <span>{capturing || busy ? "Analyse de l’étiquette en cours…" : "Capturer l’étiquette"}</span>
+              <ScanLine size={22} aria-hidden="true" />
+            </button>
+          </div>
+          {!cameraReady && <button type="button" disabled={busy || capturing} onClick={() => setCameraAttempt((attempt) => attempt + 1)}>
+            <RotateCcw size={18} aria-hidden="true" />Réessayer l’accès caméra
+          </button>}
           {file && error && <button type="submit"><RotateCcw size={18} aria-hidden="true" />Réessayer la même photo sans doublon</button>}
         </fieldset>
       </form>}
