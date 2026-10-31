@@ -134,12 +134,16 @@ def test_validation_errors_are_explicit_and_in_french(client, payload, message):
     (b"[]", JSON, 422, "Un objet JSON est attendu."),
     (b'{"amount_ht": NaN}', JSON, 400, "Valeur JSON non finie interdite : NaN."),
     (b'{"date": "2026-01-15", "date": "2026-01-16"}', JSON, 400, "Clé JSON en double."),
-    (b"[" * 5000, JSON, 400, "JSON invalide : imbrication trop profonde."),
+    (b"[" * 5000, JSON, 400, "JSON invalide : imbrication de plus de 64 niveaux."),
+    (b'{"label": ' + b"[" * 64 + b"]" * 64 + b"}", JSON, 400, "JSON invalide : imbrication de plus de 64 niveaux."),
     (b'{"amount_ht": ' + b"9" * 5000 + b"}", JSON, 400, "JSON invalide : nombre hors limites."),
     (b"\xff", JSON, 400, "Encodage UTF-8 requis."),
     (b'{"date": ', JSON, 400, "JSON invalide (ligne 1, colonne 10)."),
     (b'{"label": "' + b"x" * (64 * 1024) + b'"}', JSON, 413, "Charge utile supérieure à 64 Kio."),
-], ids=["content-type", "array", "nan", "duplicate-key", "nesting", "huge-int", "utf8", "syntax", "too-large"])
+], ids=[
+    "content-type", "array", "nan", "duplicate-key", "nesting", "deep-balanced", "huge-int", "utf8", "syntax",
+    "too-large",
+])
 def test_json_transport_errors_never_reach_the_ledger(client, engine, content, headers, status, detail):
     response = client.post(REVENUES, content=content, headers=headers | USER)
     assert (response.status_code, response.json()["detail"]) == (status, detail)

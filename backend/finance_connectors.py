@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, localcontext
 from enum import Enum
+from itertools import accumulate
 from typing import TypeAlias
 
 from pydantic import Field, TypeAdapter, ValidationError, model_validator
@@ -29,6 +30,11 @@ StandardizedTransaction: TypeAlias = TransactionRevenueIn | PurchaseExpenseIn | 
 STANDARDIZED_TRANSACTIONS = TypeAdapter(list[StandardizedTransaction])
 MAX_CONNECTOR_ROWS = 5_000
 MAX_CONNECTOR_PAYLOAD_BYTES = 5 * 1024 * 1024
+MAX_JSON_DEPTH = 64
+JSON_TOO_DEEP = f"JSON invalide : imbrication de plus de {MAX_JSON_DEPTH} niveaux."
+INVALID_JSON = "JSON UTF-8 invalide, trop imbriqué ou contenant un nombre non fini."
+_DEPTH_STEP = {ord("["): 1, ord("{"): 1, ord("]"): -1, ord("}"): -1}
+_NOT_BRACKET_BYTES = bytes(byte for byte in range(256) if byte not in b"[]{}")
 
 
 class ConnectorValidationError(ValueError):
@@ -68,19 +74,38 @@ def _records_checksum(transactions: list[StandardizedTransaction]) -> str:
     ])).hexdigest()
 
 
+def json_nesting_exceeds(text: str, limit: int = MAX_JSON_DEPTH) -> bool:
+    """Profondeur lue sur le texte avant décodage, car la limite de récursion du décodeur C varie selon la plateforme.
+
+    Uniquement des opérations natives, sans regex à retour arrière : temps linéaire et mémoire bornée sur 5 Mio.
+    """
+    # Échappements retirés par paires de gauche à droite, comme le décodeur : restent les guillemets délimiteurs.
+    unescaped = text.replace("\\\\", "").replace('\\"', "")
+    outside_strings = "".join(unescaped.split('"')[::2])
+    brackets = outside_strings.encode("ascii", "ignore").translate(None, _NOT_BRACKET_BYTES)
+    depths = accumulate(map(_DEPTH_STEP.__getitem__, brackets))
+    return any(map(limit.__lt__, depths))
+
+
 def _document(raw_data: dict | bytes) -> dict:
     if isinstance(raw_data, bytes):
         if not raw_data or len(raw_data) > MAX_CONNECTOR_PAYLOAD_BYTES:
             raise ConnectorValidationError("Charge utile JSON vide ou trop volumineuse.")
         try:
+            text = raw_data.decode("utf-8-sig")
+        except UnicodeDecodeError as error:
+            raise ConnectorValidationError(INVALID_JSON) from error
+        if json_nesting_exceeds(text):
+            raise ConnectorValidationError(JSON_TOO_DEEP)
+        try:
             payload = json.loads(
-                raw_data.decode("utf-8-sig"),
+                text,
                 parse_float=Decimal,
-                parse_constant=lambda value: (_ for _ in ()).throw(ValueError(f"Constante JSON interdite: {value}")),
+                parse_constant=lambda value: (_ for _ in ()).throw(ValueError(f"Constante JSON interdite : {value}")),
                 object_pairs_hook=_unique_json_object,
             )
-        except (UnicodeDecodeError, json.JSONDecodeError, ValueError, RecursionError) as error:
-            raise ConnectorValidationError("JSON UTF-8 invalide, trop imbriqué ou contenant un nombre non fini.") from error
+        except (json.JSONDecodeError, ValueError, RecursionError) as error:
+            raise ConnectorValidationError(INVALID_JSON) from error
     elif isinstance(raw_data, dict):
         payload = raw_data
     else:
@@ -90,7 +115,7 @@ def _document(raw_data: dict | bytes) -> dict:
     try:
         encoded = _canonical_json(payload)
     except (TypeError, ValueError, UnicodeError) as error:
-        raise ConnectorValidationError("Objet JSON invalide ou non representable.") from error
+        raise ConnectorValidationError("Objet JSON invalide ou non représentable.") from error
     if len(encoded) > MAX_CONNECTOR_PAYLOAD_BYTES:
         raise ConnectorValidationError("Charge utile JSON trop volumineuse.")
     return payload

@@ -529,14 +529,14 @@ Les tableaux de bord prennent `start_date`, `end_date` (ISO, 10 ans au plus) et
 
 | Code | Cas |
 |---|---|
-| 400 | JSON invalide (y compris clé en double, `NaN` ou `Infinity`), encodage non UTF-8, corps vide, `Content-Length` invalide |
+| 400 | JSON invalide (y compris clé en double, `NaN`, `Infinity` ou imbrication de plus de 64 niveaux), encodage non UTF-8, corps vide, `Content-Length` invalide |
 | 401 | Non authentifié ; signature ou horodatage du webhook invalide |
 | 403 | Rôle autre qu’admin ou manager |
 | 404 | Entreprise inaccessible, profil, pièce ou import introuvable |
 | 409 | Date déjà occupée, devise verrouillée, clé d’idempotence réutilisée pour un autre contenu, relevé déjà importé, transaction source déjà importée |
 | 413 | Corps de plus de 64 Kio (saisie) ou 5 Mio (import) |
 | 415 | `Content-Type` inattendu ou corps compressé |
-| 422 | Paramètres ou pièce invalides, format, checksum, devise ou totaux d’import incohérents, période inversée ou de plus de 10 ans, démonstration hors 2023-2025 |
+| 422 | Paramètres ou pièce invalides, format (y compris JSON d’import imbriqué sur plus de 64 niveaux), checksum, devise ou totaux d’import incohérents, période inversée ou de plus de 10 ans, démonstration hors 2023-2025 |
 | 500 | Données enregistrées incohérentes : erreur journalisée, aucun tableau partiel |
 | 503 | Stockage ou vérification des droits indisponible ; webhook POS non configuré |
 

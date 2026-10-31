@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import json
+import random
 import time
 from decimal import Decimal as D
 from types import SimpleNamespace
@@ -13,8 +14,8 @@ from sqlalchemy import URL, select
 from sqlalchemy.orm import Session
 
 from finance_connectors import (
-    BankStatementCSVAdapter, ConnectorValidationError, IngestionConflictError, InvoiceOCRAdapter,
-    InvoiceOCRPayload, POSWebhookAdapter, POSWebhookPayload, _canonical_json,
+    MAX_JSON_DEPTH, BankStatementCSVAdapter, ConnectorValidationError, IngestionConflictError, InvoiceOCRAdapter,
+    InvoiceOCRPayload, POSWebhookAdapter, POSWebhookPayload, _canonical_json, json_nesting_exceeds,
 )
 from finance_database import create_finance_engine, get_db
 from ingestion_service import ingest_payload
@@ -173,6 +174,61 @@ def test_json_duplicate_keys_and_invalid_calendar_dates_are_rejected():
     ).hexdigest()
     with pytest.raises(ConnectorValidationError, match="Champs absents ou invalides"):
         POSWebhookAdapter("a", "EUR").parse_payload(_raw(payload))
+
+
+@pytest.mark.parametrize(("text", "expected"), [
+    ("[" * MAX_JSON_DEPTH + "]" * MAX_JSON_DEPTH, False),
+    ("[" * (MAX_JSON_DEPTH + 1), True),
+    ('{"a": "' + "[" * 100 + '"}', False),
+    ('{"a": "\\"' + "[" * 100 + '"}', False),
+    ('{"a": "\\\\", "b": ' + "[" * 70 + "]" * 70 + "}", True),
+    ('{"a": "' + "[" * 100, False),
+], ids=["at-limit", "over-limit", "brackets-in-string", "escaped-quote", "escaped-backslash", "unterminated-string"])
+def test_json_depth_is_read_from_the_text_before_decoding(text, expected):
+    assert json_nesting_exceeds(text) is expected
+
+
+def _depth(value):
+    children = value.values() if isinstance(value, dict) else value if isinstance(value, list) else None
+    return 0 if children is None else 1 + max(map(_depth, children), default=0)
+
+
+def test_json_depth_matches_the_decoded_structure_around_the_limit():
+    rng = random.Random(2026)
+    pieces = ['"', "\\", "\\\\", '\\"', "[", "]", "{", "}", "é", "\u2028", "😀", "a"]
+
+    def text():
+        return "".join(rng.choice(pieces) for _ in range(rng.randint(0, 5)))
+
+    def document(budget):
+        roll = rng.random()
+        if budget == 0 or roll < 0.3:
+            return rng.choice([text(), 1, True, None])
+        children = [document(budget - 1) for _ in range(rng.randint(0, 3))]
+        return children if roll < 0.65 else {text() + str(index): child for index, child in enumerate(children)}
+
+    for _ in range(300):
+        value = document(rng.randint(0, 5))
+        for _ in range(rng.choice([1, 2, 58, 60, 62, 63, 64, 65])):
+            value = [text(), value] if rng.random() < 0.5 else {text(): value}
+        depth = _depth(value)
+        for encoded in (json.dumps(value), json.dumps(value, ensure_ascii=False, indent=1)):
+            assert json_nesting_exceeds(encoded, depth - 1) and not json_nesting_exceeds(encoded, depth)
+            assert json_nesting_exceeds(encoded) is (depth > MAX_JSON_DEPTH)
+
+
+def test_json_nested_beyond_the_limit_is_rejected_on_every_platform(api, engine):
+    deep = b'{"event_id": ' + b"[" * MAX_JSON_DEPTH + b"]" * MAX_JSON_DEPTH + b"}"
+    with pytest.raises(ConnectorValidationError, match="imbrication de plus de 64 niveaux"):
+        POSWebhookAdapter("a", "EUR").parse_payload(deep)
+    response = api.post(
+        "/api/finance/a/ingestions/pos_webhook", content=b"[" * 5000,
+        headers={"x-test-user": "u1", "Content-Type": "application/json"},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"] == "JSON invalide : imbrication de plus de 64 niveaux."
+    with Session(engine) as session:
+        assert session.scalars(select(FinanceIngestionBatch)).all() == []
 
 
 def test_ingestion_is_atomic_idempotent_and_conflict_safe(engine):

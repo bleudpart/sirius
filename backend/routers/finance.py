@@ -21,7 +21,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from finance_database import get_db
-from finance_connectors import ConnectorValidationError, IngestionConflictError, MAX_CONNECTOR_PAYLOAD_BYTES
+from finance_connectors import (
+    ConnectorValidationError, IngestionConflictError, JSON_TOO_DEEP, MAX_CONNECTOR_PAYLOAD_BYTES,
+    json_nesting_exceeds,
+)
 from finance_demo import DEMO_END, DEMO_START, demo_catalog, demo_company, demo_report
 from finance_entries import (
     EntryConflictError, EntryNotFoundError, EntryValidationError, audit_log, create_entry, delete_entry,
@@ -83,6 +86,8 @@ def parse_json_object(raw: bytes) -> dict[str, object]:
         text = raw.decode("utf-8")
     except UnicodeDecodeError as error:
         raise HTTPException(400, "Encodage UTF-8 requis.") from error
+    if json_nesting_exceeds(text):
+        raise HTTPException(400, JSON_TOO_DEEP)
     try:
         value = json.loads(text, parse_float=Decimal, parse_constant=_reject_constant, object_pairs_hook=_unique_object)
     except JsonRejected as error:
@@ -92,7 +97,7 @@ def parse_json_object(raw: bytes) -> dict[str, object]:
     except ValueError as error:
         raise HTTPException(400, "JSON invalide : nombre hors limites.") from error
     except RecursionError as error:
-        raise HTTPException(400, "JSON invalide : imbrication trop profonde.") from error
+        raise HTTPException(400, JSON_TOO_DEEP) from error
     if not isinstance(value, dict):
         raise HTTPException(422, "Un objet JSON est attendu.")
     return value
