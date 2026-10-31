@@ -133,12 +133,12 @@ def _error_message(error: ErrorDetails) -> str:
     return messages.get(kind, "valeur invalide")
 
 
-def validation_detail(error: ValidationError) -> str:
+def validation_detail(error: ValidationError, labels: Mapping[str, str] = FIELD_LABELS) -> str:
     details: list[str] = []
     for item in error.errors():
         field = next((part for part in item["loc"] if isinstance(part, str)), None)
         message = _error_message(item)
-        text = f"{FIELD_LABELS.get(field, field)} : {message}" if field else message
+        text = f"{labels.get(field, field)} : {message}" if field else message
         if text not in details:
             details.append(text)
     return " ; ".join(details) or "Saisie invalide."

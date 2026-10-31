@@ -1,4 +1,4 @@
-"""Finance multi-entreprise authentifiée : tableau de bord, saisie manuelle, imports et journal d'audit."""
+"""Finance multi-entreprise authentifiée : tableau de bord, stress test, saisie manuelle, imports et journal d'audit."""
 import hashlib
 import hmac
 import json
@@ -28,7 +28,7 @@ from finance_connectors import (
 from finance_demo import DEMO_END, DEMO_START, demo_catalog, demo_company, demo_report
 from finance_entries import (
     EntryConflictError, EntryNotFoundError, EntryValidationError, audit_log, create_entry, delete_entry,
-    get_profile, list_demo_entries, list_entries, save_profile,
+    get_profile, list_demo_entries, list_entries, save_profile, validation_detail,
 )
 from ingestion_service import IngestionBatchNotFoundError, MAX_BATCH_LIST, ingest_payload, list_batches, revert_batch
 from kpi_engine import FinanceDataset, build_report, comparison_period
@@ -45,6 +45,8 @@ from schemas.finance_entries import (
     CompanyProfileEnvelope, FinanceAuditLog, FinanceEntry, FinanceEntryKind, FinanceEntryList,
 )
 from schemas.finance_ingestion import FinanceIngestionLog, FinanceIngestionResult
+from schemas.finance_simulation import SIMULATION_FIELD_LABELS, SimulationRequest, SimulationResponse
+from simulation_service import SimulationError, run_stress_test, snapshot_from_dataset
 
 logger = logging.getLogger(__name__)
 SIGNATURE_PATTERN = re.compile(r"^sha256=[a-f0-9]{64}$")
@@ -197,6 +199,16 @@ def load_dashboard(
     return build_report(dataset, period, comparison)
 
 
+def simulation_request(payload: Mapping[str, object], company_id: str) -> SimulationRequest:
+    try:
+        scenario = SimulationRequest.model_validate(payload)
+    except ValidationError as error:
+        raise HTTPException(422, validation_detail(error, SIMULATION_FIELD_LABELS)) from error
+    if scenario.id_entreprise != company_id:
+        raise HTTPException(422, "Entreprise : l’identifiant du scénario ne correspond pas à l’entreprise demandée.")
+    return scenario
+
+
 def make_company_finance_router(db: MembershipDatabase, require_user: AuthResolver) -> APIRouter:
     router = APIRouter(prefix="/finance", tags=["finance-entreprise"])
 
@@ -337,6 +349,49 @@ def make_company_finance_router(db: MembershipDatabase, require_user: AuthResolv
         except ValueError as error:
             logger.exception("[FINANCE] Données enregistrées incohérentes : tableau non calculé")
             raise HTTPException(500, "Données financières incohérentes : tableau non calculé.") from error
+
+    # Stress test : la situation de référence est lue, le scénario est appliqué en mémoire, rien n'est écrit.
+    @router.post("/demo/{sector}/stress-test", response_model=SimulationResponse)
+    def demo_stress_test(
+        sector: SectorEnum,
+        start_date: Annotated[IsoDate, Query()],
+        end_date: Annotated[IsoDate, Query()],
+        _user: Annotated[Mapping[str, object], Depends(authenticated)],
+        payload: Annotated[dict[str, object], Depends(json_object)],
+    ) -> SimulationResponse:
+        period = demo_period(start_date, end_date)
+        dataset = demo_company(sector).dataset
+        scenario = simulation_request(payload, dataset.company.id)
+        try:
+            return run_stress_test(snapshot_from_dataset(dataset, period, demo=True), scenario)
+        except SimulationError as error:
+            raise HTTPException(422, str(error)) from error
+        except ValueError as error:
+            logger.exception("[FINANCE] Simulation de démonstration non calculée")
+            raise HTTPException(500, "Démonstration indisponible : simulation non calculée.") from error
+
+    @router.post("/{company_id}/stress-test", response_model=SimulationResponse)
+    def stress_test(
+        company_id: Annotated[CompanyId, Path()],
+        start_date: Annotated[IsoDate, Query()],
+        end_date: Annotated[IsoDate, Query()],
+        member: Annotated[FinanceMember, Depends(membership)],
+        payload: Annotated[dict[str, object], Depends(json_object)],
+        session: Annotated[Session, Depends(get_db)],
+    ) -> SimulationResponse:
+        period = parse_period(start_date, end_date)
+        scenario = simulation_request(payload, member.company_id)
+        try:
+            dataset = load_dataset(session, member.company_id, [period])
+            return run_stress_test(snapshot_from_dataset(dataset, period), scenario)
+        except SimulationError as error:
+            raise HTTPException(422, str(error)) from error
+        except SQLAlchemyError as error:
+            logger.exception("[FINANCE] Lecture du registre financier impossible")
+            raise HTTPException(503, "Le registre financier est indisponible.") from error
+        except ValueError as error:
+            logger.exception("[FINANCE] Données enregistrées incohérentes : simulation non calculée")
+            raise HTTPException(500, "Données financières incohérentes : simulation non calculée.") from error
 
     @router.post("/{company_id}/ingestions/{source}", response_model=FinanceIngestionResult)
     async def ingest(

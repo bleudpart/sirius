@@ -2,13 +2,12 @@ import { useMemo, useRef, useState } from "react";
 import { FileSpreadsheet, Printer } from "lucide-react";
 import {
   COMPARISONS, DASHBOARD_GROUPS, DEMO_NOTICE, METRICS, NOT_CERTIFIED_NOTICE, SECTORS, SECTOR_METRICS, SEVERITIES,
-  SIG_ROWS, SUMMARY_METRICS, THRESHOLDS, barPermille, buildFinanceCsv, comparisonIndex, decimalSign, describePeriod,
-  downloadText, financeCsvFilename, formatChange, formatFinanceValue, formatMetric, formatTimestamp, formatVariationPct,
-  inclusiveDays, isAdverse, maxAbsDecimal, metricKind, metricLabel, metricValue, monthlyLabel, nullReason,
-  printFinanceReport, sigRows, sortAlerts, thresholdStatus,
+  SIG_ROWS, STATUS_LABELS, SUMMARY_METRICS, THRESHOLDS, barPermille, buildFinanceCsv, comparisonIndex, decimalSign,
+  describePeriod, downloadText, financeCsvFilename, formatChange, formatFinanceValue, formatMetric, formatTimestamp,
+  formatVariationPct, inclusiveDays, isAdverse, maxAbsDecimal, metricKind, metricLabel, metricValue, monthlyLabel,
+  nullReason, printFinanceReport, sigRows, sortAlerts, thresholdStatus,
 } from "./companyFinance";
 
-const STATUS_LABELS = Object.freeze({ ok: "Repère respecté", watch: "À surveiller", critical: "Seuil critique" });
 const CHANGE_PREFIX = Object.freeze({ year_ago: "vs N-1", previous: "vs période précédente" });
 const COMPARED_COLUMN = Object.freeze({ year_ago: "N-1", previous: "Période précédente" });
 
@@ -98,7 +97,7 @@ function ProjectsTable({ projects, currency }) {
   </div>;
 }
 
-function BarCell({ value, max, currency }) {
+export function BarCell({ value, max, currency }) {
   if (value === null) return <td>Non calculable</td>;
   const negative = decimalSign(value) < 0;
   return <td className="company-finance-bar-cell">

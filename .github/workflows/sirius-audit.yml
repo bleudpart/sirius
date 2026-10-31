@@ -46,8 +46,8 @@ jobs:
           python -m py_compile ariane_market_runs.py
           python -m pytest tests/test_ariane_market_runs.py -q
           python -m py_compile finance_workspace.py finance_conversation.py
-          python -m py_compile finance_database.py finance_connectors.py ingestion_service.py kpi_engine.py finance_demo.py finance_entries.py models/finance.py schemas/finance.py schemas/finance_entries.py schemas/finance_ingestion.py routers/finance.py
-          python -m pytest tests/test_finance_workspace.py tests/test_company_finance.py tests/test_finance_banking.py tests/test_finance_entries.py tests/test_finance_ingestion.py tests/test_finance_bank_statements.py tests/test_finance_demo.py -q
+          python -m py_compile finance_database.py finance_connectors.py ingestion_service.py kpi_engine.py finance_demo.py finance_entries.py simulation_service.py models/finance.py schemas/finance.py schemas/finance_entries.py schemas/finance_ingestion.py schemas/finance_simulation.py routers/finance.py
+          python -m pytest tests/test_finance_workspace.py tests/test_company_finance.py tests/test_finance_banking.py tests/test_finance_entries.py tests/test_finance_ingestion.py tests/test_finance_bank_statements.py tests/test_finance_demo.py tests/test_finance_simulation.py -q
           python -m py_compile action_registry.py action_runs.py finance_actions.py
           python -m pytest tests/test_action_runs.py -q
           python -m py_compile operational_work.py

@@ -202,7 +202,7 @@ describe("données réelles de l’entreprise", () => {
     ["session expirée", () => reply(401, { detail: "Not authenticated" }), "Accès entreprise",
       "Session expirée : reconnectez-vous pour accéder à la finance d’entreprise."],
     ["serveur injoignable", () => Promise.reject(new TypeError("Failed to fetch")), "Accès entreprise",
-      "Serveur SIRIUS injoignable"],
+      "Serveur ΣIRIUS injoignable"],
   ])("%s : aucun chiffre demandé, la démonstration reste accessible", async (_, context, title, message) => {
     serve({ context });
     await renderDashboard();

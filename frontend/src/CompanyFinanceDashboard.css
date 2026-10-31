@@ -150,6 +150,32 @@
 .company-finance-warnings li { color: #f5dfaf; }
 .company-finance-journal { margin-top: 8px; }
 
+/* Simulation : formulaire de leviers et rapport « Avant / Après », mêmes cartes que la saisie et le tableau de bord. */
+.company-finance-simulation { display: grid; gap: 14px; }
+.company-finance-simulation > .numm-tech-card { margin: 0; }
+.company-finance-simulation-form h3 { margin: 0; color: #f5dfaf; font-size: 16px; letter-spacing: .02em; }
+.company-finance-simulation-form > p { margin: 0; color: #a7bdcc; font-size: 13px; }
+.company-finance-simulation-notice {
+  margin: 0 0 14px; padding: 10px 12px; border-left: 3px solid #8ee5d9; border-radius: 0 8px 8px 0;
+  background: rgba(142, 229, 217, .08); color: #c9f3ee;
+}
+.company-finance-scenario { display: flex; flex-wrap: wrap; gap: 6px 8px; margin: 10px 0 0; padding: 0; list-style: none; }
+.company-finance-scenario li {
+  padding: 4px 10px; border: 1px solid #33505d; border-radius: 999px; background: rgba(21, 43, 56, .6);
+  color: #b9cbd8; font-size: 12px;
+}
+.company-finance-scenario strong { color: #f5dfaf; font-weight: 600; font-variant-numeric: tabular-nums; }
+.company-finance-rupture {
+  margin: 12px 0; padding: 12px 14px; border: 1px solid #8ee5d9; border-left-width: 4px; border-radius: 10px;
+  background: rgba(142, 229, 217, .08);
+}
+.company-finance-rupture strong { color: #8ee5d9; font-weight: 600; }
+.company-finance-rupture p { margin: 4px 0 0; color: #dce6ee; }
+.company-finance-rupture[data-state="rupture"] { border-color: #ffb2a5; background: rgba(255, 178, 165, .08); }
+.company-finance-rupture[data-state="rupture"] strong { color: #ffb2a5; }
+.company-finance-rupture[data-state="unknown"] { border-color: #e2ca95; background: rgba(226, 202, 149, .08); }
+.company-finance-rupture[data-state="unknown"] strong { color: #f5dfaf; }
+
 @media (max-width: 600px) {
   .company-finance-filters > button, .company-finance-actions button { flex: 1 1 100%; }
   .company-finance .numm-tech-metrics, .company-finance-fields { grid-template-columns: 1fr; }
@@ -209,4 +235,12 @@
   #sirius-print-root .company-finance-definitions div { margin: 0 0 4pt; padding: 3pt 6pt; border-left: 2px solid #bbb; background: #fff; break-inside: avoid; }
   #sirius-print-root .company-finance-definitions dt { color: #111; }
   #sirius-print-root .numm-tech-disclaimer { padding-top: 6pt; border-top: 1px solid #bbb; color: #333; font-size: 8pt; }
+  #sirius-print-root .company-finance-simulation-notice { margin: 0 0 8pt; padding: 4pt 8pt; border-left: 3px solid #1b7f5b; background: #fff; }
+  #sirius-print-root .company-finance-scenario { gap: 3pt 6pt; margin-top: 6pt; }
+  #sirius-print-root .company-finance-scenario li { padding: 1pt 6pt; border-color: #bbb; background: #fff; font-size: 8pt; }
+  #sirius-print-root .company-finance-scenario strong { color: #111; }
+  #sirius-print-root .company-finance-rupture { margin: 6pt 0 8pt; padding: 6pt 8pt; border-color: #1b7f5b; background: #fff; break-inside: avoid; }
+  #sirius-print-root .company-finance-rupture[data-state="rupture"] { border-color: #b00020; }
+  #sirius-print-root .company-finance-rupture[data-state="unknown"] { border-color: #b7791f; }
+  #sirius-print-root .company-finance-rupture strong { color: #111; }
 }

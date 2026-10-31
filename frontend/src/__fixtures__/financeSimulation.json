@@ -1,0 +1,723 @@
+{
+  "source": "Généré par backend/tests/test_finance_simulation.py à partir du moteur : ne pas modifier à la main.",
+  "cases": {
+    "demo": {
+      "snapshot": {
+        "entreprise": {
+          "id": "demo-hospitality",
+          "name": "Brasserie Le Grand Comptoir (fictive)",
+          "sector": "HOSPITALITY",
+          "currency": "EUR"
+        },
+        "periode_reference": {
+          "start_date": "2025-01-01",
+          "end_date": "2025-12-31"
+        },
+        "demo": true,
+        "mois_reference": "12.00",
+        "chiffre_affaires_ht": "79000.00",
+        "achats_matieres": "22025.30",
+        "autres_charges_variables": "551.61",
+        "charges_fixes": "43521.18",
+        "interets_emprunts": "434.67",
+        "capital_rembourse": "5573.27",
+        "tresorerie_cloture": "181869.88",
+        "flux_bancaire_reel": "2688.99",
+        "alertes_reference": []
+      },
+      "scenario": {
+        "id_entreprise": "demo-hospitality",
+        "delta_ca_percent": "-15",
+        "delta_cout_matiere_percent": "5",
+        "charge_fixe_additionnelle_mensuelle": "2800.00",
+        "investissement_emprunt_mensualite": "450.00",
+        "duree_mois": 6,
+        "jours_ouverture_mois": "26",
+        "solde_tresorerie_actuel": null
+      },
+      "response": {
+        "version_calcul": "1",
+        "demo": true,
+        "entreprise": {
+          "id": "demo-hospitality",
+          "name": "Brasserie Le Grand Comptoir (fictive)",
+          "sector": "HOSPITALITY",
+          "currency": "EUR"
+        },
+        "periode_reference": {
+          "start_date": "2025-01-01",
+          "end_date": "2025-12-31"
+        },
+        "mois_reference": "12.00",
+        "scenario": {
+          "id_entreprise": "demo-hospitality",
+          "delta_ca_percent": "-15",
+          "delta_cout_matiere_percent": "5",
+          "charge_fixe_additionnelle_mensuelle": "2800.00",
+          "investissement_emprunt_mensualite": "450.00",
+          "duree_mois": 6,
+          "jours_ouverture_mois": "26",
+          "solde_tresorerie_actuel": null
+        },
+        "hypotheses": [
+          "Base : moyennes mensuelles HT de la période de référence (mois calendaires proratisés), arrondies au centime.",
+          "Variation du CA appliquée en volume : achats matières et autres charges variables (sous-traitance, fournitures) suivent l’activité.",
+          "Variation du coût matière appliquée aux seuls achats de matières premières et de marchandises consommés, variation de stocks comprise.",
+          "Charges fixes de référence (loyers, salaires chargés, assurances, frais généraux) inchangées, augmentées de la charge additionnelle saisie.",
+          "Investissement financé en totalité par l’emprunt ; sa mensualité (capital et intérêts non distingués) s’ajoute au service de la dette, sans effet sur l’EBE.",
+          "Seuil de rentabilité = charges fixes ÷ taux de marge sur coûts variables ; point mort de trésorerie = (charges fixes + annuités d’emprunt) ÷ ce même taux.",
+          "Flux de trésorerie mensuel = EBE − annuités d’emprunt, constant chaque mois (sans saisonnalité) ; jalons J+30, J+60 et J+90 = fins des mois 1, 2 et 3.",
+          "Hors TVA (supposée neutre), variation du BFR, impôt sur les sociétés, autres investissements, apports et prélèvements."
+        ],
+        "avant": {
+          "chiffre_affaires_ht": "79000.00",
+          "achats_matieres": "22025.30",
+          "autres_charges_variables": "551.61",
+          "marge_sur_couts_variables": "56423.09",
+          "taux_marge_sur_couts_variables": "71.42",
+          "charges_fixes": "43521.18",
+          "ebe": "12901.91",
+          "taux_ebe": "16.33",
+          "interets_emprunts": "434.67",
+          "capital_rembourse": "5573.27",
+          "nouvelle_mensualite": "0.00",
+          "service_dette": "6007.94",
+          "couverture_service_dette": "2.15",
+          "flux_tresorerie": "6893.97",
+          "seuil_rentabilite": "60935.57",
+          "point_mort_tresorerie": "69347.50",
+          "seuil_rentabilite_journalier": "2343.68",
+          "point_mort_journalier": "2667.21"
+        },
+        "apres": {
+          "chiffre_affaires_ht": "67150.00",
+          "achats_matieres": "19657.58",
+          "autres_charges_variables": "468.87",
+          "marge_sur_couts_variables": "47023.55",
+          "taux_marge_sur_couts_variables": "70.03",
+          "charges_fixes": "46321.18",
+          "ebe": "702.37",
+          "taux_ebe": "1.05",
+          "interets_emprunts": "434.67",
+          "capital_rembourse": "5573.27",
+          "nouvelle_mensualite": "450.00",
+          "service_dette": "6457.94",
+          "couverture_service_dette": "0.11",
+          "flux_tresorerie": "-5755.57",
+          "seuil_rentabilite": "66147.01",
+          "point_mort_tresorerie": "75369.00",
+          "seuil_rentabilite_journalier": "2544.12",
+          "point_mort_journalier": "2898.81"
+        },
+        "point_mort_journalier_avant": "2667.21",
+        "point_mort_journalier_apres": "2898.81",
+        "ca_supplementaire_requis_pour_equilibre": "8219.00",
+        "ebe_projete_mensuel": "702.37",
+        "variation_ebe_mensuelle": "-12199.54",
+        "solde_depart": "181869.88",
+        "source_solde_depart": "cloture_reference",
+        "flux_bancaire_reel_mensuel": "2688.99",
+        "jalons_tresorerie": [
+          {
+            "mois": 1,
+            "jour": 30,
+            "flux_cumule_sans_projet": "6893.97",
+            "flux_cumule_avec_projet": "-5755.57",
+            "solde_sans_projet": "188763.85",
+            "solde_avec_projet": "176114.31"
+          },
+          {
+            "mois": 2,
+            "jour": 60,
+            "flux_cumule_sans_projet": "13787.94",
+            "flux_cumule_avec_projet": "-11511.14",
+            "solde_sans_projet": "195657.82",
+            "solde_avec_projet": "170358.74"
+          },
+          {
+            "mois": 3,
+            "jour": 90,
+            "flux_cumule_sans_projet": "20681.91",
+            "flux_cumule_avec_projet": "-17266.71",
+            "solde_sans_projet": "202551.79",
+            "solde_avec_projet": "164603.17"
+          }
+        ],
+        "projection": [
+          {
+            "mois": 1,
+            "jour": 30,
+            "flux_cumule_sans_projet": "6893.97",
+            "flux_cumule_avec_projet": "-5755.57",
+            "solde_sans_projet": "188763.85",
+            "solde_avec_projet": "176114.31"
+          },
+          {
+            "mois": 2,
+            "jour": 60,
+            "flux_cumule_sans_projet": "13787.94",
+            "flux_cumule_avec_projet": "-11511.14",
+            "solde_sans_projet": "195657.82",
+            "solde_avec_projet": "170358.74"
+          },
+          {
+            "mois": 3,
+            "jour": 90,
+            "flux_cumule_sans_projet": "20681.91",
+            "flux_cumule_avec_projet": "-17266.71",
+            "solde_sans_projet": "202551.79",
+            "solde_avec_projet": "164603.17"
+          },
+          {
+            "mois": 4,
+            "jour": 120,
+            "flux_cumule_sans_projet": "27575.88",
+            "flux_cumule_avec_projet": "-23022.28",
+            "solde_sans_projet": "209445.76",
+            "solde_avec_projet": "158847.60"
+          },
+          {
+            "mois": 5,
+            "jour": 150,
+            "flux_cumule_sans_projet": "34469.85",
+            "flux_cumule_avec_projet": "-28777.85",
+            "solde_sans_projet": "216339.73",
+            "solde_avec_projet": "153092.03"
+          },
+          {
+            "mois": 6,
+            "jour": 180,
+            "flux_cumule_sans_projet": "41363.82",
+            "flux_cumule_avec_projet": "-34533.42",
+            "solde_sans_projet": "223233.70",
+            "solde_avec_projet": "147336.46"
+          }
+        ],
+        "tresorerie_residuelle_fin_periode": "147336.46",
+        "variation_tresorerie_periode": "-34533.42",
+        "besoin_financement_max": "0.00",
+        "alerte_rupture_tresorerie": {
+          "rupture": false,
+          "mois_estime": null,
+          "autonomie_mois": "31.6",
+          "message": "Pas de rupture sur 6 mois ; au rythme simulé, la trésorerie s’épuiserait en 31,6 mois environ."
+        },
+        "alertes": [
+          {
+            "code": "DEMO_DATA",
+            "severity": "info",
+            "message": "Données fictives de démonstration : aucune entreprise réelle, aucun chiffre client."
+          },
+          {
+            "code": "SIMULATION_ONLY",
+            "severity": "info",
+            "message": "Simulation en mémoire : aucune donnée enregistrée n’est modifiée. Projection de gestion indicative, à hypothèses constantes."
+          },
+          {
+            "code": "DEBT_SERVICE_NOT_COVERED",
+            "severity": "critical",
+            "message": "L’EBE projeté ne couvre pas les annuités d’emprunt, nouvelle mensualité comprise (couverture inférieure à 1)."
+          },
+          {
+            "code": "BELOW_CASH_BREAK_EVEN",
+            "severity": "warning",
+            "message": "CA projeté inférieur au point mort de trésorerie : charges et annuités d’emprunt non couvertes."
+          }
+        ]
+      }
+    },
+    "rupture": {
+      "snapshot": {
+        "entreprise": {
+          "id": "company_a",
+          "name": "Entreprise test",
+          "sector": "HOSPITALITY",
+          "currency": "EUR"
+        },
+        "periode_reference": {
+          "start_date": "2025-01-01",
+          "end_date": "2025-12-31"
+        },
+        "demo": false,
+        "mois_reference": "12.00",
+        "chiffre_affaires_ht": "40000.00",
+        "achats_matieres": "11200.00",
+        "autres_charges_variables": "800.00",
+        "charges_fixes": "22000.00",
+        "interets_emprunts": "300.00",
+        "capital_rembourse": "1200.00",
+        "tresorerie_cloture": null,
+        "flux_bancaire_reel": null,
+        "alertes_reference": []
+      },
+      "scenario": {
+        "id_entreprise": "company_a",
+        "delta_ca_percent": "-15",
+        "delta_cout_matiere_percent": "5",
+        "charge_fixe_additionnelle_mensuelle": "2800.00",
+        "investissement_emprunt_mensualite": "450.00",
+        "duree_mois": 6,
+        "jours_ouverture_mois": "30",
+        "solde_tresorerie_actuel": "15000.00"
+      },
+      "response": {
+        "version_calcul": "1",
+        "demo": false,
+        "entreprise": {
+          "id": "company_a",
+          "name": "Entreprise test",
+          "sector": "HOSPITALITY",
+          "currency": "EUR"
+        },
+        "periode_reference": {
+          "start_date": "2025-01-01",
+          "end_date": "2025-12-31"
+        },
+        "mois_reference": "12.00",
+        "scenario": {
+          "id_entreprise": "company_a",
+          "delta_ca_percent": "-15",
+          "delta_cout_matiere_percent": "5",
+          "charge_fixe_additionnelle_mensuelle": "2800.00",
+          "investissement_emprunt_mensualite": "450.00",
+          "duree_mois": 6,
+          "jours_ouverture_mois": "30",
+          "solde_tresorerie_actuel": "15000.00"
+        },
+        "hypotheses": [
+          "Base : moyennes mensuelles HT de la période de référence (mois calendaires proratisés), arrondies au centime.",
+          "Variation du CA appliquée en volume : achats matières et autres charges variables (sous-traitance, fournitures) suivent l’activité.",
+          "Variation du coût matière appliquée aux seuls achats de matières premières et de marchandises consommés, variation de stocks comprise.",
+          "Charges fixes de référence (loyers, salaires chargés, assurances, frais généraux) inchangées, augmentées de la charge additionnelle saisie.",
+          "Investissement financé en totalité par l’emprunt ; sa mensualité (capital et intérêts non distingués) s’ajoute au service de la dette, sans effet sur l’EBE.",
+          "Seuil de rentabilité = charges fixes ÷ taux de marge sur coûts variables ; point mort de trésorerie = (charges fixes + annuités d’emprunt) ÷ ce même taux.",
+          "Flux de trésorerie mensuel = EBE − annuités d’emprunt, constant chaque mois (sans saisonnalité) ; jalons J+30, J+60 et J+90 = fins des mois 1, 2 et 3.",
+          "Hors TVA (supposée neutre), variation du BFR, impôt sur les sociétés, autres investissements, apports et prélèvements."
+        ],
+        "avant": {
+          "chiffre_affaires_ht": "40000.00",
+          "achats_matieres": "11200.00",
+          "autres_charges_variables": "800.00",
+          "marge_sur_couts_variables": "28000.00",
+          "taux_marge_sur_couts_variables": "70.00",
+          "charges_fixes": "22000.00",
+          "ebe": "6000.00",
+          "taux_ebe": "15.00",
+          "interets_emprunts": "300.00",
+          "capital_rembourse": "1200.00",
+          "nouvelle_mensualite": "0.00",
+          "service_dette": "1500.00",
+          "couverture_service_dette": "4.00",
+          "flux_tresorerie": "4500.00",
+          "seuil_rentabilite": "31428.57",
+          "point_mort_tresorerie": "33571.43",
+          "seuil_rentabilite_journalier": "1047.62",
+          "point_mort_journalier": "1119.05"
+        },
+        "apres": {
+          "chiffre_affaires_ht": "34000.00",
+          "achats_matieres": "9996.00",
+          "autres_charges_variables": "680.00",
+          "marge_sur_couts_variables": "23324.00",
+          "taux_marge_sur_couts_variables": "68.60",
+          "charges_fixes": "24800.00",
+          "ebe": "-1476.00",
+          "taux_ebe": "-4.34",
+          "interets_emprunts": "300.00",
+          "capital_rembourse": "1200.00",
+          "nouvelle_mensualite": "450.00",
+          "service_dette": "1950.00",
+          "couverture_service_dette": "-0.76",
+          "flux_tresorerie": "-3426.00",
+          "seuil_rentabilite": "36151.60",
+          "point_mort_tresorerie": "38994.17",
+          "seuil_rentabilite_journalier": "1205.05",
+          "point_mort_journalier": "1299.81"
+        },
+        "point_mort_journalier_avant": "1119.05",
+        "point_mort_journalier_apres": "1299.81",
+        "ca_supplementaire_requis_pour_equilibre": "4994.17",
+        "ebe_projete_mensuel": "-1476.00",
+        "variation_ebe_mensuelle": "-7476.00",
+        "solde_depart": "15000.00",
+        "source_solde_depart": "declare",
+        "flux_bancaire_reel_mensuel": null,
+        "jalons_tresorerie": [
+          {
+            "mois": 1,
+            "jour": 30,
+            "flux_cumule_sans_projet": "4500.00",
+            "flux_cumule_avec_projet": "-3426.00",
+            "solde_sans_projet": "19500.00",
+            "solde_avec_projet": "11574.00"
+          },
+          {
+            "mois": 2,
+            "jour": 60,
+            "flux_cumule_sans_projet": "9000.00",
+            "flux_cumule_avec_projet": "-6852.00",
+            "solde_sans_projet": "24000.00",
+            "solde_avec_projet": "8148.00"
+          },
+          {
+            "mois": 3,
+            "jour": 90,
+            "flux_cumule_sans_projet": "13500.00",
+            "flux_cumule_avec_projet": "-10278.00",
+            "solde_sans_projet": "28500.00",
+            "solde_avec_projet": "4722.00"
+          }
+        ],
+        "projection": [
+          {
+            "mois": 1,
+            "jour": 30,
+            "flux_cumule_sans_projet": "4500.00",
+            "flux_cumule_avec_projet": "-3426.00",
+            "solde_sans_projet": "19500.00",
+            "solde_avec_projet": "11574.00"
+          },
+          {
+            "mois": 2,
+            "jour": 60,
+            "flux_cumule_sans_projet": "9000.00",
+            "flux_cumule_avec_projet": "-6852.00",
+            "solde_sans_projet": "24000.00",
+            "solde_avec_projet": "8148.00"
+          },
+          {
+            "mois": 3,
+            "jour": 90,
+            "flux_cumule_sans_projet": "13500.00",
+            "flux_cumule_avec_projet": "-10278.00",
+            "solde_sans_projet": "28500.00",
+            "solde_avec_projet": "4722.00"
+          },
+          {
+            "mois": 4,
+            "jour": 120,
+            "flux_cumule_sans_projet": "18000.00",
+            "flux_cumule_avec_projet": "-13704.00",
+            "solde_sans_projet": "33000.00",
+            "solde_avec_projet": "1296.00"
+          },
+          {
+            "mois": 5,
+            "jour": 150,
+            "flux_cumule_sans_projet": "22500.00",
+            "flux_cumule_avec_projet": "-17130.00",
+            "solde_sans_projet": "37500.00",
+            "solde_avec_projet": "-2130.00"
+          },
+          {
+            "mois": 6,
+            "jour": 180,
+            "flux_cumule_sans_projet": "27000.00",
+            "flux_cumule_avec_projet": "-20556.00",
+            "solde_sans_projet": "42000.00",
+            "solde_avec_projet": "-5556.00"
+          }
+        ],
+        "tresorerie_residuelle_fin_periode": "-5556.00",
+        "variation_tresorerie_periode": "-20556.00",
+        "besoin_financement_max": "5556.00",
+        "alerte_rupture_tresorerie": {
+          "rupture": true,
+          "mois_estime": 5,
+          "autonomie_mois": "4.4",
+          "message": "Trésorerie négative au mois 5 (vers J+150) au rythme simulé."
+        },
+        "alertes": [
+          {
+            "code": "SIMULATION_ONLY",
+            "severity": "info",
+            "message": "Simulation en mémoire : aucune donnée enregistrée n’est modifiée. Projection de gestion indicative, à hypothèses constantes."
+          },
+          {
+            "code": "NEGATIVE_EBE_PROJECTED",
+            "severity": "critical",
+            "message": "EBE mensuel projeté négatif : l’exploitation ne couvre plus ses charges."
+          },
+          {
+            "code": "DEBT_SERVICE_NOT_COVERED",
+            "severity": "critical",
+            "message": "L’EBE projeté ne couvre pas les annuités d’emprunt, nouvelle mensualité comprise (couverture inférieure à 1)."
+          },
+          {
+            "code": "BELOW_CASH_BREAK_EVEN",
+            "severity": "warning",
+            "message": "CA projeté inférieur au point mort de trésorerie : charges et annuités d’emprunt non couvertes."
+          },
+          {
+            "code": "CASH_RUPTURE",
+            "severity": "critical",
+            "message": "Trésorerie négative au mois 5 (vers J+150) au rythme simulé."
+          }
+        ]
+      }
+    },
+    "sans_solde": {
+      "snapshot": {
+        "entreprise": {
+          "id": "company_a",
+          "name": "Entreprise test",
+          "sector": "HOSPITALITY",
+          "currency": "EUR"
+        },
+        "periode_reference": {
+          "start_date": "2025-01-01",
+          "end_date": "2025-12-31"
+        },
+        "demo": false,
+        "mois_reference": "12.00",
+        "chiffre_affaires_ht": "40000.00",
+        "achats_matieres": "11200.00",
+        "autres_charges_variables": "800.00",
+        "charges_fixes": "22000.00",
+        "interets_emprunts": "300.00",
+        "capital_rembourse": "1200.00",
+        "tresorerie_cloture": null,
+        "flux_bancaire_reel": null,
+        "alertes_reference": []
+      },
+      "scenario": {
+        "id_entreprise": "company_a",
+        "delta_ca_percent": "5",
+        "delta_cout_matiere_percent": "0",
+        "charge_fixe_additionnelle_mensuelle": "2800.00",
+        "investissement_emprunt_mensualite": "0",
+        "duree_mois": 12,
+        "jours_ouverture_mois": "30",
+        "solde_tresorerie_actuel": null
+      },
+      "response": {
+        "version_calcul": "1",
+        "demo": false,
+        "entreprise": {
+          "id": "company_a",
+          "name": "Entreprise test",
+          "sector": "HOSPITALITY",
+          "currency": "EUR"
+        },
+        "periode_reference": {
+          "start_date": "2025-01-01",
+          "end_date": "2025-12-31"
+        },
+        "mois_reference": "12.00",
+        "scenario": {
+          "id_entreprise": "company_a",
+          "delta_ca_percent": "5",
+          "delta_cout_matiere_percent": "0",
+          "charge_fixe_additionnelle_mensuelle": "2800.00",
+          "investissement_emprunt_mensualite": "0",
+          "duree_mois": 12,
+          "jours_ouverture_mois": "30",
+          "solde_tresorerie_actuel": null
+        },
+        "hypotheses": [
+          "Base : moyennes mensuelles HT de la période de référence (mois calendaires proratisés), arrondies au centime.",
+          "Variation du CA appliquée en volume : achats matières et autres charges variables (sous-traitance, fournitures) suivent l’activité.",
+          "Variation du coût matière appliquée aux seuls achats de matières premières et de marchandises consommés, variation de stocks comprise.",
+          "Charges fixes de référence (loyers, salaires chargés, assurances, frais généraux) inchangées, augmentées de la charge additionnelle saisie.",
+          "Investissement financé en totalité par l’emprunt ; sa mensualité (capital et intérêts non distingués) s’ajoute au service de la dette, sans effet sur l’EBE.",
+          "Seuil de rentabilité = charges fixes ÷ taux de marge sur coûts variables ; point mort de trésorerie = (charges fixes + annuités d’emprunt) ÷ ce même taux.",
+          "Flux de trésorerie mensuel = EBE − annuités d’emprunt, constant chaque mois (sans saisonnalité) ; jalons J+30, J+60 et J+90 = fins des mois 1, 2 et 3.",
+          "Hors TVA (supposée neutre), variation du BFR, impôt sur les sociétés, autres investissements, apports et prélèvements."
+        ],
+        "avant": {
+          "chiffre_affaires_ht": "40000.00",
+          "achats_matieres": "11200.00",
+          "autres_charges_variables": "800.00",
+          "marge_sur_couts_variables": "28000.00",
+          "taux_marge_sur_couts_variables": "70.00",
+          "charges_fixes": "22000.00",
+          "ebe": "6000.00",
+          "taux_ebe": "15.00",
+          "interets_emprunts": "300.00",
+          "capital_rembourse": "1200.00",
+          "nouvelle_mensualite": "0.00",
+          "service_dette": "1500.00",
+          "couverture_service_dette": "4.00",
+          "flux_tresorerie": "4500.00",
+          "seuil_rentabilite": "31428.57",
+          "point_mort_tresorerie": "33571.43",
+          "seuil_rentabilite_journalier": "1047.62",
+          "point_mort_journalier": "1119.05"
+        },
+        "apres": {
+          "chiffre_affaires_ht": "42000.00",
+          "achats_matieres": "11760.00",
+          "autres_charges_variables": "840.00",
+          "marge_sur_couts_variables": "29400.00",
+          "taux_marge_sur_couts_variables": "70.00",
+          "charges_fixes": "24800.00",
+          "ebe": "4600.00",
+          "taux_ebe": "10.95",
+          "interets_emprunts": "300.00",
+          "capital_rembourse": "1200.00",
+          "nouvelle_mensualite": "0.00",
+          "service_dette": "1500.00",
+          "couverture_service_dette": "3.07",
+          "flux_tresorerie": "3100.00",
+          "seuil_rentabilite": "35428.57",
+          "point_mort_tresorerie": "37571.43",
+          "seuil_rentabilite_journalier": "1180.95",
+          "point_mort_journalier": "1252.38"
+        },
+        "point_mort_journalier_avant": "1119.05",
+        "point_mort_journalier_apres": "1252.38",
+        "ca_supplementaire_requis_pour_equilibre": "0.00",
+        "ebe_projete_mensuel": "4600.00",
+        "variation_ebe_mensuelle": "-1400.00",
+        "solde_depart": null,
+        "source_solde_depart": null,
+        "flux_bancaire_reel_mensuel": null,
+        "jalons_tresorerie": [
+          {
+            "mois": 1,
+            "jour": 30,
+            "flux_cumule_sans_projet": "4500.00",
+            "flux_cumule_avec_projet": "3100.00",
+            "solde_sans_projet": null,
+            "solde_avec_projet": null
+          },
+          {
+            "mois": 2,
+            "jour": 60,
+            "flux_cumule_sans_projet": "9000.00",
+            "flux_cumule_avec_projet": "6200.00",
+            "solde_sans_projet": null,
+            "solde_avec_projet": null
+          },
+          {
+            "mois": 3,
+            "jour": 90,
+            "flux_cumule_sans_projet": "13500.00",
+            "flux_cumule_avec_projet": "9300.00",
+            "solde_sans_projet": null,
+            "solde_avec_projet": null
+          }
+        ],
+        "projection": [
+          {
+            "mois": 1,
+            "jour": 30,
+            "flux_cumule_sans_projet": "4500.00",
+            "flux_cumule_avec_projet": "3100.00",
+            "solde_sans_projet": null,
+            "solde_avec_projet": null
+          },
+          {
+            "mois": 2,
+            "jour": 60,
+            "flux_cumule_sans_projet": "9000.00",
+            "flux_cumule_avec_projet": "6200.00",
+            "solde_sans_projet": null,
+            "solde_avec_projet": null
+          },
+          {
+            "mois": 3,
+            "jour": 90,
+            "flux_cumule_sans_projet": "13500.00",
+            "flux_cumule_avec_projet": "9300.00",
+            "solde_sans_projet": null,
+            "solde_avec_projet": null
+          },
+          {
+            "mois": 4,
+            "jour": 120,
+            "flux_cumule_sans_projet": "18000.00",
+            "flux_cumule_avec_projet": "12400.00",
+            "solde_sans_projet": null,
+            "solde_avec_projet": null
+          },
+          {
+            "mois": 5,
+            "jour": 150,
+            "flux_cumule_sans_projet": "22500.00",
+            "flux_cumule_avec_projet": "15500.00",
+            "solde_sans_projet": null,
+            "solde_avec_projet": null
+          },
+          {
+            "mois": 6,
+            "jour": 180,
+            "flux_cumule_sans_projet": "27000.00",
+            "flux_cumule_avec_projet": "18600.00",
+            "solde_sans_projet": null,
+            "solde_avec_projet": null
+          },
+          {
+            "mois": 7,
+            "jour": 210,
+            "flux_cumule_sans_projet": "31500.00",
+            "flux_cumule_avec_projet": "21700.00",
+            "solde_sans_projet": null,
+            "solde_avec_projet": null
+          },
+          {
+            "mois": 8,
+            "jour": 240,
+            "flux_cumule_sans_projet": "36000.00",
+            "flux_cumule_avec_projet": "24800.00",
+            "solde_sans_projet": null,
+            "solde_avec_projet": null
+          },
+          {
+            "mois": 9,
+            "jour": 270,
+            "flux_cumule_sans_projet": "40500.00",
+            "flux_cumule_avec_projet": "27900.00",
+            "solde_sans_projet": null,
+            "solde_avec_projet": null
+          },
+          {
+            "mois": 10,
+            "jour": 300,
+            "flux_cumule_sans_projet": "45000.00",
+            "flux_cumule_avec_projet": "31000.00",
+            "solde_sans_projet": null,
+            "solde_avec_projet": null
+          },
+          {
+            "mois": 11,
+            "jour": 330,
+            "flux_cumule_sans_projet": "49500.00",
+            "flux_cumule_avec_projet": "34100.00",
+            "solde_sans_projet": null,
+            "solde_avec_projet": null
+          },
+          {
+            "mois": 12,
+            "jour": 360,
+            "flux_cumule_sans_projet": "54000.00",
+            "flux_cumule_avec_projet": "37200.00",
+            "solde_sans_projet": null,
+            "solde_avec_projet": null
+          }
+        ],
+        "tresorerie_residuelle_fin_periode": null,
+        "variation_tresorerie_periode": "37200.00",
+        "besoin_financement_max": null,
+        "alerte_rupture_tresorerie": {
+          "rupture": null,
+          "mois_estime": null,
+          "autonomie_mois": null,
+          "message": "Rupture non évaluable : solde de trésorerie de départ inconnu."
+        },
+        "alertes": [
+          {
+            "code": "SIMULATION_ONLY",
+            "severity": "info",
+            "message": "Simulation en mémoire : aucune donnée enregistrée n’est modifiée. Projection de gestion indicative, à hypothèses constantes."
+          },
+          {
+            "code": "MISSING_START_CASH",
+            "severity": "warning",
+            "message": "Solde de trésorerie inconnu : saisissez le solde bancaire actuel, ou un solde d’ouverture dans le registre, pour projeter la trésorerie."
+          }
+        ]
+      }
+    }
+  }
+}

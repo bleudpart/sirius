@@ -16,7 +16,8 @@ mêmes cartes bleu nuit et doré que les autres espaces financiers. Deux espaces
 - **Démonstration fictive** : quatre entreprises inventées, en lecture seule,
   pour découvrir l’outil sans rien saisir.
 
-Chaque espace propose deux vues : **Tableau de bord** et **Saisie & imports**.
+Chaque espace propose trois vues : **Tableau de bord**, **Saisie & imports** et
+**Simulation** (stress test calculé en mémoire, sans rien enregistrer).
 
 ## Démarrage pour un test bancaire
 
@@ -128,6 +129,10 @@ Date;Libellé;Débit;Crédit;Référence
   chevauche le précédent n’ajoute que les nouvelles opérations.
 - **Annulation d’import** : « Annuler l’import » supprime en une seule
   transaction les écritures encore liées à ce lot.
+- **Simulation** : tous leviers à zéro, les colonnes « Avant » et « Après » sont
+  identiques et reprennent le tableau de bord de la même période ramené au
+  mois, à quelques centimes près ; un scénario ne modifie ni les pièces ni le
+  journal d’audit (voir [Simulation et stress test](#simulation-et-stress-test)).
 
 ## Architecture et accès
 
@@ -153,6 +158,11 @@ Date;Libellé;Débit;Crédit;Référence
   et annulable.
 - [finance_demo.py](finance_demo.py) : démonstrations calculées en mémoire, sans
   accès à la base.
+- [simulation_service.py](simulation_service.py) et
+  [schemas/finance_simulation.py](schemas/finance_simulation.py) : stress test.
+  La situation de référence est lue par le moteur du tableau de bord, puis le
+  scénario est appliqué par une fonction pure (`run_stress_test`), sans accès au
+  stockage.
 - [finance_database.py](finance_database.py) : SQLite
   `data_file("finance.sqlite3")` ouvert à la première requête, clés étrangères
   actives, transaction explicite pour une lecture cohérente.
@@ -163,7 +173,8 @@ Date;Libellé;Débit;Crédit;Référence
   [useFinanceLoader.js](../frontend/src/useFinanceLoader.js),
   [CompanyFinanceDashboard.jsx](../frontend/src/CompanyFinanceDashboard.jsx),
   [CompanyFinanceReport.jsx](../frontend/src/CompanyFinanceReport.jsx),
-  [CompanyFinanceEntry.jsx](../frontend/src/CompanyFinanceEntry.jsx) et
+  [CompanyFinanceEntry.jsx](../frontend/src/CompanyFinanceEntry.jsx),
+  [CompanyFinanceSimulation.jsx](../frontend/src/CompanyFinanceSimulation.jsx) et
   [CompanyFinanceDashboard.css](../frontend/src/CompanyFinanceDashboard.css),
   intégrés à [PortusNummarius.jsx](../frontend/src/PortusNummarius.jsx).
 
@@ -339,7 +350,7 @@ journal d’audit ; le même relevé peut ensuite être réimporté.
   cinq minutes. Le secret de l’entreprise (32 octets au moins) se configure dans
   `SIRIUS_FINANCE_POS_SECRET_<20 premiers caractères hexadécimaux en majuscules
   du SHA-256 de company_id>` ; sans lui, la route répond 503. Ce contrat est
-  propre à SIRIUS : un pont doit authentifier puis traduire les événements
+  propre à ΣIRIUS : un pont doit authentifier puis traduire les événements
   natifs Square ou SumUp.
 - OCR : `invoice_id`, `supplier`, `date`, `currency`, `lines[]` (`line_id`,
   `amount_ht`, `amount_vat`, `category`, `allocation`, `business_reference`,
@@ -489,6 +500,149 @@ calcule les statuts affichés.
   d’indisponibilité), suivi des chantiers, de l’évolution mensuelle, des points
   d’attention et de l’avertissement.
 
+## Simulation et stress test
+
+La vue **Simulation** projette l’effet d’un événement (embauche, matériel
+financé à crédit, hausse des coûts matières, baisse d’activité) sur le point
+mort et la trésorerie. Le calcul se fait **en mémoire** : les pièces de la
+période sont lues, mais rien n’est écrit (ni pièce, ni journal d’audit, ni
+scénario). La vue existe dans les deux espaces ; en démonstration, elle porte
+sur l’entreprise fictive affichée. Le résultat est une projection de gestion
+indicative, à hypothèses constantes, et non une prévision bancaire.
+
+**Situation de référence** : moyennes mensuelles HT de la période choisie dans
+le filtre, calculées par le moteur du tableau de bord. Les mois sont des mois
+calendaires proratisés : 12 pour une année civile, 1,87 du 15/01 au 10/03. La
+colonne « Avant » reprend donc le tableau de bord de la même période ramené au
+mois, à quelques centimes près, puisque les moyennes sont arrondies au centime.
+
+| Levier | Unité | Bornes | Défaut |
+|---|---|---|---|
+| Variation du chiffre d’affaires | % signé (−15 = −15 %) | −100 à 1 000, 2 décimales | 0 |
+| Variation du coût matière | % signé | −100 à 1 000, 2 décimales | 0 |
+| Charge fixe additionnelle mensuelle | € HT par mois, négative pour une économie | l’économie ne peut dépasser les charges fixes | 0 |
+| Mensualité du nouvel emprunt | € par mois | ≥ 0 | 0 |
+| Durée de projection | mois entiers | 1 à 36 | 12 |
+| Jours d’ouverture par mois | 30 = tous les jours, 26 = fermé le dimanche, 21 = cinq jours par semaine | > 0 et ≤ 31 | 30 |
+| Solde de trésorerie actuel | € | facultatif | trésorerie de clôture de la période |
+
+Une embauche se saisit en charge fixe additionnelle : salaire brut plus
+charges patronales.
+
+À l’écran, le calcul ne part qu’au clic sur « Lancer la simulation » ;
+« Scénario neutre » remet les leviers à leur valeur par défaut. Un scénario
+lancé est recalculé quand la période de référence change ou au clic sur
+« Actualiser ». Si un levier est modifié après le calcul, une note le signale
+jusqu’au lancement suivant. Chaque entreprise, réelle ou fictive, garde son
+dernier scénario lancé quand on change de vue ou d’espace, puis le recalcule au
+retour ; il n’est jamais enregistré. En démonstration, un scénario d’exemple est
+prérempli : CA −15 %, coût matière +5 %, embauche à 2 800 € par mois,
+mensualité de 450 €, sur 6 mois et 26 jours d’ouverture. Le rapport s’exporte
+en CSV et s’imprime comme celui du tableau de bord, avertissement compris.
+
+Calcul mensuel. Notations : g est la variation du CA et m celle du coût
+matière, en fraction (−15 % donne g = −0,15).
+
+| Grandeur | Après scénario |
+|---|---|
+| CA HT | CA × (1 + g) |
+| Achats matières consommés (marchandises, variation de stocks comprise) | matières × (1 + g) × (1 + m) |
+| Autres charges variables (sous-traitance, fournitures) | autres × (1 + g) |
+| Charges fixes (loyers, salaires chargés, assurances, frais généraux) | charges fixes + charge additionnelle |
+| Marge sur coûts variables | CA − matières − autres charges variables |
+| EBE | marge sur coûts variables − charges fixes |
+| Service de la dette | intérêts + capital remboursé + nouvelle mensualité |
+| Couverture des annuités | EBE ÷ service de la dette |
+| Flux de trésorerie mensuel | EBE − service de la dette |
+
+- **Taux de marge sur coûts variables** : il est calculé au volume de
+  référence, (CA − matières × (1 + m) − autres) ÷ CA. Une variation d’activité
+  ne le change pas, puisque les charges variables suivent le volume ; une
+  hausse du coût matière le réduit.
+- **Seuils** :
+  - seuil de rentabilité = charges fixes ÷ taux de marge ;
+  - point mort de trésorerie = (charges fixes + service de la dette) ÷ taux de
+    marge ;
+  - versions journalières : divisées par les jours d’ouverture.
+
+  `point_mort_journalier_avant` et `point_mort_journalier_apres` désignent le
+  point mort de trésorerie journalier.
+- **CA supplémentaire requis pour l’équilibre** = max(0, point mort de
+  trésorerie − CA projeté). C’est le CA mensuel à trouver pour couvrir les
+  charges fixes et les annuités.
+- **Nouvel emprunt** : l’investissement est supposé financé en totalité par
+  l’emprunt. Sa mensualité, capital et intérêts non distingués, s’ajoute au
+  service de la dette, sans effet sur l’EBE.
+- **Solde de départ** : le solde déclaré ; à défaut, la trésorerie de clôture de
+  la période de référence (solde d’ouverture plus mouvements saisis). Sans l’un
+  ni l’autre, la trésorerie n’est pas projetée.
+- **Projection** : solde à la fin du mois k = solde de départ + k × flux
+  mensuel, sans puis avec le scénario. Les jalons J+30, J+60 et J+90
+  correspondent aux fins des mois 1, 2 et 3 ; ils sont toujours fournis, même
+  pour une durée plus courte.
+- **Rupture** : premier mois dont le solde de fin de mois devient strictement
+  négatif ; elle est signalée si elle survient dans la durée de projection. Un
+  solde de départ déjà négatif est une rupture au mois 0. L’autonomie vaut solde
+  de départ ÷ flux mensuel négatif, en mois, à 1 décimale.
+- **Besoin de financement maximal** = max(0, −min(solde de départ, solde final)).
+  Le flux étant constant, le point bas est au départ ou à la fin.
+- **Non modélisés** : TVA (supposée neutre), variation du BFR, impôt sur les
+  sociétés, autres investissements, apports, prélèvements et saisonnalité. La
+  réponse rappelle ces hypothèses dans `hypotheses`.
+
+Points d’attention de la simulation, dans leur ordre d’affichage :
+
+| Code | Gravité | Déclenchement |
+|---|---|---|
+| `DEMO_DATA` | information | Démonstration fictive |
+| `SIMULATION_ONLY` | information | Toujours : simulation en mémoire, projection indicative |
+| `NO_EXPENSE_DATA`, `NO_OVERHEAD_DATA` | à surveiller | Repris du tableau de bord : aucun achat ou aucune charge récurrente sur la période |
+| `SHORT_REFERENCE` | à surveiller | Période de référence de moins de 3 mois : moyennes peu représentatives |
+| `NO_REVENUE_BASE` | prioritaire | Aucun CA positif : taux de marge, seuil et point mort non calculables |
+| `NON_POSITIVE_MARGIN` | prioritaire | Marge sur coûts variables nulle ou négative dans le scénario |
+| `NEGATIVE_EBE_PROJECTED` | prioritaire | EBE mensuel projeté négatif |
+| `DEBT_SERVICE_NOT_COVERED` | prioritaire | Couverture projetée inférieure à 1 |
+| `DEBT_SERVICE_TIGHT` | à surveiller | Couverture projetée inférieure à 1,2 |
+| `BELOW_CASH_BREAK_EVEN` | à surveiller | CA projeté inférieur au point mort de trésorerie |
+| `MISSING_START_CASH` | à surveiller | Solde de trésorerie de départ inconnu |
+| `CASH_RUPTURE` | prioritaire | Trésorerie négative dans la durée de projection |
+| `CASH_FLOW_GAP` | information | Le flux bancaire réel moyen s’écarte du flux de gestion de référence (EBE − annuités) de plus de 10 % du CA mensuel |
+
+Comme au tableau de bord, la couverture est arrondie à 2 décimales avant d’être
+comparée aux repères.
+
+Exemple vérifié par les tests automatisés : une entreprise de services, sur un
+trimestre de référence. Moyennes mensuelles :
+
+- CA 12 000 € ; sous-traitance 500 € ; matières 300 € ;
+- charges fixes 6 200 € (loyer 2 000 €, salaires chargés 4 200 €) ;
+- emprunt : intérêts 200 €, capital 800 € ;
+- trésorerie de clôture 25 000 €.
+
+Scénario : CA −20 %, embauche à 1 500 € par mois, nouvel emprunt de 400 € par
+mois, sur 12 mois.
+
+| Par mois | Avant | Après |
+|---|---|---|
+| CA HT | 12 000,00 | 9 600,00 |
+| Marge sur coûts variables (taux) | 11 200,00 (93,33 %) | 8 960,00 (93,33 %) |
+| Charges fixes | 6 200,00 | 7 700,00 |
+| EBE | 5 000,00 | 1 260,00 |
+| Service de la dette | 1 000,00 | 1 400,00 |
+| Couverture des annuités | 5,00 | 0,90 |
+| Flux de trésorerie | 4 000,00 | −140,00 |
+| Seuil de rentabilité | 6 642,86 | 8 250,00 |
+| Point mort de trésorerie (par jour, sur 30 jours) | 7 714,29 (257,14) | 9 750,00 (325,00) |
+
+Résultats :
+
+- il faut 150,00 € de CA mensuel supplémentaire pour retrouver l’équilibre ;
+- la trésorerie atteint 23 320,00 € au bout de 12 mois, sans rupture
+  (autonomie de 178,6 mois au rythme simulé) ;
+- points d’attention : `DEBT_SERVICE_NOT_COVERED`, `BELOW_CASH_BREAK_EVEN` et
+  `CASH_FLOW_GAP`. Ce dernier s’explique ainsi : seuls 5 000 € d’encaissements
+  ont été saisis en mouvements bancaires sur le trimestre.
+
 ## Limites connues
 
 - Pas d’amortissements, d’impôt sur les sociétés ni de résultat net : EBE et CAF
@@ -497,7 +651,10 @@ calcule les statuts affichés.
 - TVA théorique : pas de régime sur les encaissements, de crédit antérieur ni de
   date d’exigibilité. En saisie manuelle, la TVA d’un achat est déductible en
   totalité ou pas du tout.
-- Pas de prévisionnel ni de plan de financement.
+- Pas de prévisionnel complet ni de plan de financement. La
+  [simulation](#simulation-et-stress-test) applique un scénario à hypothèses
+  constantes, sans saisonnalité, TVA, BFR, impôt ni tableau d’amortissement ;
+  les scénarios ne sont pas enregistrés.
 - Doublons non détectés entre relevés CSV et OFX, ni entre saisies manuelles.
 - Une devise par entreprise, aucune conversion ; pas de consolidation.
 - Ne pas saisir une charge récurrente une seconde fois comme achat. Le moyen de
@@ -511,7 +668,9 @@ calcule les statuts affichés.
 | GET | `/api/finance/demo/companies` | Catalogue de la démonstration |
 | GET | `/api/finance/demo/{sector}/dashboard` | Tableau fictif (2023 à 2025) |
 | GET | `/api/finance/demo/{sector}/entries/{kind}` | Pièces fictives |
+| POST | `/api/finance/demo/{sector}/stress-test` | Simulation sur une démonstration |
 | GET | `/api/finance/{company_id}/dashboard` | Tableau de bord |
+| POST | `/api/finance/{company_id}/stress-test` | Simulation, sans écriture |
 | GET, PUT | `/api/finance/{company_id}/profile` | Profil financier |
 | GET, POST | `/api/finance/{company_id}/entries/{kind}` | Liste et saisie |
 | DELETE | `/api/finance/{company_id}/entries/{kind}/{entry_id}` | Suppression |
@@ -527,6 +686,34 @@ Les tableaux de bord prennent `start_date`, `end_date` (ISO, 10 ans au plus) et
 (discriminé par `sector`), `comparison` (`null` sans comparaison), `monthly` et
 `alerts` (`code`, `severity` `info`/`warning`/`critical`, `message`).
 
+Les simulations (`stress-test`) prennent en paramètres `start_date` et
+`end_date`, qui fixent la période de référence avec les mêmes bornes que le
+tableau de bord.
+
+Corps JSON `SimulationRequest` :
+
+- `id_entreprise`, identique à celui de la route ;
+- les leviers : `delta_ca_percent`, `delta_cout_matiere_percent`,
+  `charge_fixe_additionnelle_mensuelle`, `investissement_emprunt_mensualite`,
+  `duree_mois`, `jours_ouverture_mois` et `solde_tresorerie_actuel`.
+
+Réponse `SimulationResponse`, avec `version_calcul` `"1"` :
+
+- indicateurs : `avant` et `apres` ; `point_mort_journalier_avant` et
+  `point_mort_journalier_apres` ; `ca_supplementaire_requis_pour_equilibre` ;
+  `ebe_projete_mensuel` ; `variation_ebe_mensuelle` ;
+- trésorerie :
+  - `solde_depart` et `source_solde_depart` (`declare` ou
+    `cloture_reference`) ;
+  - `jalons_tresorerie` (J+30, J+60, J+90) et `projection` mois par mois ;
+  - `tresorerie_residuelle_fin_periode` ; `besoin_financement_max` ;
+  - `alerte_rupture_tresorerie` (`rupture`, `mois_estime`, `autonomie_mois`,
+    `message`) ;
+- `hypotheses` et `alertes`.
+
+Droits : la route d’entreprise exige les mêmes droits que le tableau de bord ;
+celle de démonstration, une session ouverte.
+
 | Code | Cas |
 |---|---|
 | 400 | JSON invalide (y compris clé en double, `NaN`, `Infinity` ou imbrication de plus de 64 niveaux), encodage non UTF-8, corps vide, `Content-Length` invalide |
@@ -536,7 +723,7 @@ Les tableaux de bord prennent `start_date`, `end_date` (ISO, 10 ans au plus) et
 | 409 | Date déjà occupée, devise verrouillée, clé d’idempotence réutilisée pour un autre contenu, relevé déjà importé, transaction source déjà importée |
 | 413 | Corps de plus de 64 Kio (saisie) ou 5 Mio (import) |
 | 415 | `Content-Type` inattendu ou corps compressé |
-| 422 | Paramètres ou pièce invalides, format (y compris JSON d’import imbriqué sur plus de 64 niveaux), checksum, devise ou totaux d’import incohérents, période inversée ou de plus de 10 ans, démonstration hors 2023-2025 |
+| 422 | Paramètres, pièce ou scénario invalides (dont une économie supérieure aux charges fixes), format (y compris JSON d’import imbriqué sur plus de 64 niveaux), checksum, devise ou totaux d’import incohérents, période inversée ou de plus de 10 ans, démonstration hors 2023-2025 |
 | 500 | Données enregistrées incohérentes : erreur journalisée, aucun tableau partiel |
 | 503 | Stockage ou vérification des droits indisponible ; webhook POS non configuré |
 
@@ -557,6 +744,17 @@ Exploitation :
 Tests, depuis `backend` puis `frontend` :
 
 ```powershell
-..\.venv\Scripts\python.exe -m pytest tests\test_company_finance.py tests\test_finance_banking.py tests\test_finance_entries.py tests\test_finance_ingestion.py tests\test_finance_bank_statements.py tests\test_finance_demo.py -q
-npm test -- --watchAll=false --runInBand src/companyFinance.test.js src/CompanyFinanceDashboard.test.jsx src/CompanyFinanceEntry.test.jsx
+..\.venv\Scripts\python.exe -m pytest tests\test_company_finance.py tests\test_finance_banking.py tests\test_finance_entries.py tests\test_finance_ingestion.py tests\test_finance_bank_statements.py tests\test_finance_demo.py tests\test_finance_simulation.py -q
+npm test -- --watchAll=false --runInBand src/companyFinance.test.js src/CompanyFinanceDashboard.test.jsx src/CompanyFinanceEntry.test.jsx src/CompanyFinanceSimulation.test.jsx
+```
+
+Les tests de l’interface s’appuient sur la fixture
+[financeSimulation.json](../frontend/src/__fixtures__/financeSimulation.json),
+produite par le moteur et contrôlée par
+[test_finance_simulation.py](tests/test_finance_simulation.py). Après une
+évolution volontaire du calcul, la régénérer depuis `backend`, puis relire le
+diff :
+
+```powershell
+$env:SIRIUS_UPDATE_FIXTURES="1"; ..\.venv\Scripts\python.exe -m pytest tests\test_finance_simulation.py -k fixture -q; Remove-Item Env:SIRIUS_UPDATE_FIXTURES
 ```

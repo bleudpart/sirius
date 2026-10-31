@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Building2, FlaskConical, LayoutDashboard, PencilLine, RefreshCw, ShieldCheck } from "lucide-react";
+import { Building2, Calculator, FlaskConical, LayoutDashboard, PencilLine, RefreshCw, ShieldCheck } from "lucide-react";
 import {
   COMPARISONS, DEMO_NOTICE, DEMO_REFERENCE_DATE, DEMO_WINDOW, SECTORS, SECTOR_KEYS, canUseFinance, defaultQuery,
   fetchDemoCatalog, fetchEnterpriseContext, fetchFinanceDashboard, localToday, periodError, periodPresets,
@@ -7,6 +7,7 @@ import {
 import useFinanceLoader from "./useFinanceLoader";
 import CompanyFinanceReport from "./CompanyFinanceReport";
 import CompanyFinanceEntry from "./CompanyFinanceEntry";
+import CompanyFinanceSimulation from "./CompanyFinanceSimulation";
 import "./NummariusAnalytics.css";
 import "./CompanyFinanceDashboard.css";
 
@@ -32,6 +33,7 @@ export default function CompanyFinanceDashboard() {
   const [draft, setDraft] = useState(query);
   const [formError, setFormError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
+  const [scenarios, setScenarios] = useState({});
   const demo = mode === "demo";
 
   const context = useFinanceLoader((signal) => fetchEnterpriseContext(signal), []);
@@ -82,8 +84,13 @@ export default function CompanyFinanceDashboard() {
   const data = dashboard.data;
   const dirty = draft.start_date !== query.start_date || draft.end_date !== query.end_date;
   const description = demo ? catalog.data?.companies.find((company) => company.sector === demoSector)?.description : "";
-  const readOnly = view === "dashboard" || demo;
+  const readOnly = view !== "entries" || demo;
   const openDemo = () => switchMode("demo");
+  const workspace = `${mode}-${scope}`;
+  let filterNote = "Les listes de pièces suivent cette période.";
+  if (dirty) filterNote = "Filtres modifiés, à appliquer.";
+  else if (view === "dashboard") filterNote = "Aucune écriture comptable effectuée.";
+  else if (view === "simulation") filterNote = "Période de référence de la simulation ; aucune écriture effectuée.";
 
   let gate = null;
   if (!demo) {
@@ -116,6 +123,7 @@ export default function CompanyFinanceDashboard() {
       <div role="group" aria-label="Affichage">
         <button type="button" aria-pressed={view === "dashboard"} onClick={() => setView("dashboard")}><LayoutDashboard size={16} aria-hidden="true" /> Tableau de bord</button>
         <button type="button" aria-pressed={view === "entries"} onClick={() => setView("entries")}><PencilLine size={16} aria-hidden="true" /> Saisie & imports</button>
+        <button type="button" aria-pressed={view === "simulation"} onClick={() => setView("simulation")}><Calculator size={16} aria-hidden="true" /> Simulation</button>
       </div>
     </div>
 
@@ -151,9 +159,7 @@ export default function CompanyFinanceDashboard() {
           aria-pressed={query.start_date === preset.start_date && query.end_date === preset.end_date}
           onClick={() => applyPeriod(preset)}>{preset.label}</button>)}
       </div>
-      <p className="company-finance-filter-note">Dates incluses · {dirty
-        ? "Filtres modifiés, à appliquer."
-        : view === "dashboard" ? "Aucune écriture comptable effectuée." : "Les listes de pièces suivent cette période."}</p>
+      <p className="company-finance-filter-note">Dates incluses · {filterNote}</p>
       {formError && <p role="alert">{formError}</p>}
     </form>
 
@@ -176,8 +182,12 @@ export default function CompanyFinanceDashboard() {
         </div>}
         {data && <CompanyFinanceReport data={data} />}
       </>}
-      {!gate && view === "entries" && <CompanyFinanceEntry key={`${mode}-${scope}`} companyId={companyId}
+      {!gate && view === "entries" && <CompanyFinanceEntry key={workspace} companyId={companyId}
         companyName={context.data?.companyName ?? ""} demoSector={demo ? demoSector : null} query={query} reloadKey={reloadKey} />}
+      {!gate && view === "simulation" && <CompanyFinanceSimulation key={workspace} companyId={companyId}
+        demoSector={demo ? demoSector : null} query={query} reloadKey={reloadKey} saved={scenarios[workspace]}
+        onSaved={(saved) => setScenarios((current) => ({ ...current, [workspace]: saved }))}
+        onConfigure={() => setView("entries")} onDemo={demo ? undefined : openDemo} />}
     </div>
   </section>;
 }

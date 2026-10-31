@@ -1,4 +1,5 @@
 import fixtures from "./__fixtures__/financeDashboardV2.json";
+import simulation from "./__fixtures__/financeSimulation.json";
 import { API_BASE_URL } from "./lib/api";
 import {
   DEMO_NOTICE, DEMO_REFERENCE_DATE, DEMO_WINDOW_MESSAGE, INVALID_PAYLOAD_MESSAGE, MAX_IMPORT_BYTES, NOT_CERTIFIED_NOTICE,
@@ -9,6 +10,9 @@ import {
   monthlyLabel, normalizeDemoCatalog, parseDecimalInput, periodError, periodPresets, printFinanceReport, sigRows,
   thresholdStatus, uploadBankStatement, validFinancePeriod, validateFinanceDashboard, visibleFields, withTimeout,
   ENTRY_FIELDS, dashboardPath,
+  NEUTRAL_SIMULATION, SECTORS, SIMULATION_DISCLAIMER, SIMULATION_LEVERS, SIMULATION_NOTICE, SIMULATION_ROWS,
+  buildSimulationCsv, buildSimulationPayload, decimalDifference, demoStressTestPath, formatLever, initialSimulationValues,
+  ruptureState, runStressTest, simulationCsvFilename, simulationValueText, stressTestPath, validateSimulation,
 } from "./companyFinance";
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
@@ -261,7 +265,7 @@ describe("export CSV pour tableur", () => {
 
   test("format français : BOM UTF-8, point-virgule, virgule décimale, fins de ligne CRLF", () => {
     const csv = buildFinanceCsv(fixtures.dashboard, { exportedAt });
-    expect(csv.startsWith("\ufeffRapport financier SIRIUS;Durand Rénovation (fictive)\r\n")).toBe(true);
+    expect(csv.startsWith("\ufeffRapport financier ΣIRIUS;Durand Rénovation (fictive)\r\n")).toBe(true);
     expect(csv.endsWith(`Avertissement;${NOT_CERTIFIED_NOTICE}\r\n`)).toBe(true);
     expect(csv.replace(/\r\n/g, "")).not.toMatch(/[\r\n]/);
     const lines = csv.split("\r\n");
@@ -295,7 +299,7 @@ describe("export CSV pour tableur", () => {
     data.company.name = '=HYPERLINK("http://x";"clic")';
     data.specific.projects[0].business_reference = "@SUM(A1)";
     const csv = buildFinanceCsv(data, { exportedAt });
-    expect(csv.split("\r\n")[0]).toBe('\ufeffRapport financier SIRIUS;"\'=HYPERLINK(""http://x"";""clic"")"');
+    expect(csv.split("\r\n")[0]).toBe('\ufeffRapport financier ΣIRIUS;"\'=HYPERLINK(""http://x"";""clic"")"');
     expect(csv).toContain("\r\n'@SUM(A1);");
   });
 
@@ -582,7 +586,7 @@ describe("téléchargement et impression", () => {
       node.innerHTML = '<h3 id="title">Rapport</h3><div data-print-hide="true"><button>Export</button></div>'
         + "<details><summary>Méthode</summary><p>Définitions</p></details>";
       document.body.appendChild(node);
-      document.title = "SIRIUS";
+      document.title = "ΣIRIUS";
     });
     afterEach(() => {
       window.print = originalPrint;
@@ -613,7 +617,7 @@ describe("téléchargement et impression", () => {
       window.dispatchEvent(new Event("afterprint"));
       expect(document.getElementById("sirius-print-root")).toBeNull();
       expect(document.documentElement.classList.contains("sirius-printing")).toBe(false);
-      expect(document.title).toBe("SIRIUS");
+      expect(document.title).toBe("ΣIRIUS");
     });
 
     test("nettoyage de secours après 60 secondes et en cas d’échec", () => {
@@ -629,5 +633,322 @@ describe("téléchargement et impression", () => {
       expect(document.getElementById("sirius-print-root")).toBeNull();
       expect(document.documentElement.classList.contains("sirius-printing")).toBe(false);
     });
+  });
+});
+
+// Les réponses de référence sont produites par le vrai moteur (backend/tests/test_finance_simulation.py).
+describe("simulation et stress test", () => {
+  const CASES = simulation.cases;
+  const QUERY = { start_date: "2025-01-01", end_date: "2025-12-31", comparison: "year_ago" };
+  const MONTHS_ERROR = "Nombre entier de mois attendu, de 1 à 36.";
+  const INVALID_NUMBER = "Nombre invalide : chiffres et une seule virgule décimale (ex. 1250,50).";
+  const TYPED = {
+    delta_ca_percent: " \u221215 ", delta_cout_matiere_percent: "+5", charge_fixe_additionnelle_mensuelle: "2 800,00",
+    investissement_emprunt_mensualite: "450", duree_mois: "6", jours_ouverture_mois: "30",
+    solde_tresorerie_actuel: `15${NNBSP}000`,
+  };
+  const LEVERS = {
+    delta_ca_percent: "-15", delta_cout_matiere_percent: "5", charge_fixe_additionnelle_mensuelle: "2800.00",
+    investissement_emprunt_mensualite: "450", duree_mois: 6, jours_ouverture_mois: "30", solde_tresorerie_actuel: "15000",
+  };
+  const optionsOf = (name, scenario = CASES[name].scenario) => {
+    const { response: data } = CASES[name];
+    return { companyId: data.entreprise.id, period: data.periode_reference, demo: data.demo, scenario };
+  };
+  const exportedAt = new Date("2026-01-01T00:00:00Z");
+
+  test("saisie à la française normalisée en charge utile exacte, dans l’ordre des leviers", () => {
+    const { payload, errors } = buildSimulationPayload(TYPED);
+    expect(errors).toEqual({});
+    expect(payload).toEqual(LEVERS);
+    expect(Object.keys(payload)).toEqual(SIMULATION_LEVERS.map((item) => item.name));
+    expect(buildSimulationPayload(initialSimulationValues())).toEqual({
+      payload: {
+        delta_ca_percent: "0", delta_cout_matiere_percent: "0", charge_fixe_additionnelle_mensuelle: "0",
+        investissement_emprunt_mensualite: "0", duree_mois: 12, jours_ouverture_mois: "30", solde_tresorerie_actuel: null,
+      },
+      errors: {},
+    });
+    const missing = buildSimulationPayload(null);
+    expect(missing.payload).toEqual({ solde_tresorerie_actuel: null });
+    expect(Object.values(missing.errors)).toEqual(Array(6).fill("Valeur requise."));
+  });
+
+  test("valeurs initiales : scénario neutre, exemple chiffré en démonstration, copies modifiables", () => {
+    const values = initialSimulationValues();
+    expect(values).toEqual(NEUTRAL_SIMULATION);
+    values.delta_ca_percent = "-5";
+    expect(NEUTRAL_SIMULATION.delta_ca_percent).toBe("0");
+    expect(initialSimulationValues(true)).toEqual({
+      delta_ca_percent: "-15", delta_cout_matiere_percent: "5", charge_fixe_additionnelle_mensuelle: "2800",
+      investissement_emprunt_mensualite: "450", duree_mois: "6", jours_ouverture_mois: "26", solde_tresorerie_actuel: "",
+    });
+  });
+
+  test.each([
+    ["delta_ca_percent", "-100", "-100"],
+    ["delta_ca_percent", "1000", "1000"],
+    ["delta_cout_matiere_percent", "-2,5", "-2.5"],
+    ["charge_fixe_additionnelle_mensuelle", "-300", "-300"],
+    ["investissement_emprunt_mensualite", "0", "0"],
+    ["duree_mois", "1", 1],
+    ["duree_mois", "36", 36],
+    ["jours_ouverture_mois", "31", "31"],
+    ["jours_ouverture_mois", "0,5", "0.5"],
+    ["solde_tresorerie_actuel", "-2 500,50", "-2500.50"],
+    ["solde_tresorerie_actuel", "  ", null],
+  ])("%s : « %s » est accepté", (name, text, expected) => {
+    const { payload, errors } = buildSimulationPayload({ ...TYPED, [name]: text });
+    expect(errors).toEqual({});
+    expect(payload[name]).toBe(expected);
+  });
+
+  test.each([
+    ["delta_ca_percent", "", "Valeur requise."],
+    ["delta_ca_percent", "-100,01", "Valeur inférieure au minimum autorisé (−100)."],
+    ["delta_ca_percent", "1000,01", `Valeur supérieure au maximum autorisé (1${NNBSP}000).`],
+    ["delta_ca_percent", "12,345", "2 décimales au maximum."],
+    ["delta_cout_matiere_percent", "5 %", INVALID_NUMBER],
+    ["charge_fixe_additionnelle_mensuelle", "1,234.5", INVALID_NUMBER],
+    ["charge_fixe_additionnelle_mensuelle", "1234567890123", "12 chiffres au maximum avant la virgule."],
+    ["investissement_emprunt_mensualite", "-450", "Valeur positive ou nulle attendue."],
+    ["duree_mois", "", "Valeur requise."],
+    ["duree_mois", "0", MONTHS_ERROR],
+    ["duree_mois", "37", MONTHS_ERROR],
+    ["duree_mois", "6,5", MONTHS_ERROR],
+    ["jours_ouverture_mois", "0", "Valeur strictement positive attendue."],
+    ["jours_ouverture_mois", "-1", "Valeur positive ou nulle attendue."],
+    ["jours_ouverture_mois", "32", "Valeur supérieure au maximum autorisé (31)."],
+    ["solde_tresorerie_actuel", "1,234", "2 décimales au maximum."],
+  ])("%s : « %s » est refusé", (name, text, message) => {
+    const { payload, errors } = buildSimulationPayload({ ...TYPED, [name]: text });
+    expect(errors).toEqual({ [name]: message });
+    expect(payload).not.toHaveProperty(name);
+  });
+
+  test("les leviers et les indicateurs couvrent exactement la réponse du serveur", () => {
+    const data = CASES.rupture.response;
+    expect(SIMULATION_LEVERS.map((item) => item.name)).toEqual(Object.keys(data.scenario).filter((key) => key !== "id_entreprise"));
+    expect(SIMULATION_ROWS.map((row) => row.key).sort()).toEqual(Object.keys(data.avant).sort());
+    expect(Object.keys(data.apres).sort()).toEqual(Object.keys(data.avant).sort());
+  });
+
+  test.each(Object.keys(CASES))("la réponse réelle du moteur (%s) est acceptée", (name) => {
+    const data = CASES[name].response;
+    expect(validateSimulation(clone(data), optionsOf(name))).toEqual(data);
+  });
+
+  test("écho du scénario : décimaux comparés par valeur, durée et solde absent comparés strictement", () => {
+    const sent = { ...CASES.rupture.scenario, investissement_emprunt_mensualite: "450", solde_tresorerie_actuel: "15000" };
+    const check = (name, scenario) => () => validateSimulation(clone(CASES[name].response), optionsOf(name, scenario));
+    expect(check("rupture", sent)).not.toThrow();
+    expect(check("rupture", { ...sent, duree_mois: "6" })).toThrow(INVALID_PAYLOAD_MESSAGE);
+    expect(check("rupture", { ...sent, solde_tresorerie_actuel: null })).toThrow(INVALID_PAYLOAD_MESSAGE);
+    expect(check("rupture", { ...sent, delta_cout_matiere_percent: "5.01" })).toThrow(INVALID_PAYLOAD_MESSAGE);
+    expect(check("sans_solde", { ...CASES.sans_solde.scenario, solde_tresorerie_actuel: "0" })).toThrow(INVALID_PAYLOAD_MESSAGE);
+  });
+
+  test.each([
+    ["autre version de calcul", "rupture", (data) => { data.version_calcul = "2"; }],
+    ["simulation réelle présentée comme démonstration", "rupture", (data) => { data.demo = true; }],
+    ["démonstration présentée comme réelle", "demo", (data) => { data.demo = false; }],
+    ["autre entreprise", "rupture", (data) => { data.entreprise.id = "company_b"; }],
+    ["autre période de référence", "rupture", (data) => {
+      data.periode_reference = { start_date: "2024-01-01", end_date: "2024-12-31" };
+    }],
+    ["mois de référence nul", "rupture", (data) => { data.mois_reference = "0"; }],
+    ["écho d’un autre scénario", "rupture", (data) => { data.scenario.delta_ca_percent = "-14"; }],
+    ["écho d’une autre entreprise", "rupture", (data) => { data.scenario.id_entreprise = "company_b"; }],
+    ["durée en texte", "rupture", (data) => { data.scenario.duree_mois = "6"; }],
+    ["hypothèse non textuelle", "rupture", (data) => { data.hypotheses.push(1); }],
+    ["montant numérique", "rupture", (data) => { data.apres.ebe = -1476; }],
+    ["indicateur absent", "rupture", (data) => { delete data.avant.flux_tresorerie; }],
+    ["indicateur obligatoire nul", "rupture", (data) => { data.apres.chiffre_affaires_ht = null; }],
+    ["trois décimales", "rupture", (data) => { data.besoin_financement_max = "5556.001"; }],
+    ["source de solde forgée", "rupture", (data) => { data.source_solde_depart = "toString"; }],
+    ["projection tronquée", "rupture", (data) => { data.projection.pop(); }],
+    ["jalon décalé", "rupture", (data) => { data.jalons_tresorerie[0].jour = 31; }],
+    ["rupture sans mois estimé", "rupture", (data) => { data.alerte_rupture_tresorerie.mois_estime = null; }],
+    ["rupture au-delà de la durée", "rupture", (data) => { data.alerte_rupture_tresorerie.mois_estime = 7; }],
+    ["message de rupture vide", "rupture", (data) => { data.alerte_rupture_tresorerie.message = " "; }],
+    ["gravité inconnue", "rupture", (data) => { data.alertes.push({ code: "X", severity: "fatal", message: "?" }); }],
+    ["EBE projeté incohérent", "rupture", (data) => { data.ebe_projete_mensuel = "-1475.00"; }],
+    ["variation d’EBE incohérente", "rupture", (data) => { data.variation_ebe_mensuelle = "-7475.00"; }],
+    ["point mort journalier incohérent", "rupture", (data) => { data.point_mort_journalier_apres = "1299.80"; }],
+    ["trésorerie finale incohérente", "rupture", (data) => { data.tresorerie_residuelle_fin_periode = "-5555.00"; }],
+    ["variation de trésorerie incohérente", "rupture", (data) => { data.variation_tresorerie_periode = "-20555.00"; }],
+    ["solde projeté sans solde de départ", "sans_solde", (data) => { data.jalons_tresorerie[0].solde_avec_projet = "100.00"; }],
+    ["rupture affirmée sans solde de départ", "sans_solde", (data) => { data.alerte_rupture_tresorerie.rupture = false; }],
+    ["trésorerie finale sans solde de départ", "sans_solde", (data) => { data.tresorerie_residuelle_fin_periode = "0.00"; }],
+    ["source annoncée sans solde de départ", "sans_solde", (data) => { data.source_solde_depart = "declare"; }],
+  ])("refuse une réponse corrompue : %s (%s)", (_, name, corrupt) => {
+    const data = clone(CASES[name].response);
+    corrupt(data);
+    expect(() => validateSimulation(data, optionsOf(name))).toThrow(
+      expect.objectContaining({ code: "INVALID_PAYLOAD", message: INVALID_PAYLOAD_MESSAGE }),
+    );
+  });
+
+  test("écart décimal exact, sans flottant", () => {
+    expect(decimalDifference("702.37", "12901.91")).toBe("-12199.54");
+    expect(decimalDifference("68.60", "70.00")).toBe("-1.40");
+    expect(decimalDifference("0.3", "0.1")).toBe("0.20");
+    expect(decimalDifference("9007199254740993.99", "0.01")).toBe("9007199254740993.98");
+    expect(decimalDifference("1.5", "1.50")).toBe("0.00");
+    expect(decimalDifference("1.2345", "0")).toBe("1.2345");
+    expect(decimalDifference(null, "1.00")).toBeNull();
+  });
+
+  test("leviers, états de rupture et valeurs absentes lisibles par un banquier", () => {
+    expect(formatLever("delta_ca_percent", "-15")).toBe(`−15${NBSP}%`);
+    expect(formatLever("delta_cout_matiere_percent", "5")).toBe(`+5${NBSP}%`);
+    expect(formatLever("charge_fixe_additionnelle_mensuelle", "2800.00")).toBe(`+2${NNBSP}800,00${NBSP}€ HT par mois`);
+    expect(formatLever("charge_fixe_additionnelle_mensuelle", "-300")).toBe(`−300,00${NBSP}€ HT par mois`);
+    expect(formatLever("investissement_emprunt_mensualite", "450.00")).toBe(`450,00${NBSP}€ par mois`);
+    expect(formatLever("duree_mois", 6)).toBe(`6${NBSP}mois`);
+    expect(formatLever("jours_ouverture_mois", "26")).toBe(`26${NBSP}jours`);
+    expect(formatLever("solde_tresorerie_actuel", "15000.00")).toBe(`15${NNBSP}000,00${NBSP}€`);
+    expect(formatLever("solde_tresorerie_actuel", null)).toBe("Non déclaré");
+    expect([true, false, null].map((rupture) => ruptureState({ rupture }))).toEqual(["rupture", "ok", "unknown"]);
+    const row = (key) => SIMULATION_ROWS.find((item) => item.key === key);
+    expect(simulationValueText(row("couverture_service_dette"), null)).toBe("Sans annuité");
+    expect(simulationValueText(row("couverture_service_dette"), "-0.76")).toBe(`−0,76${NBSP}fois`);
+    expect(simulationValueText(row("seuil_rentabilite"), null)).toBe("Non calculable");
+  });
+
+  test("chemins du stress test : période de référence seule, identifiants encodés", () => {
+    expect(stressTestPath("a b/c", QUERY)).toBe("/finance/a%20b%2Fc/stress-test?start_date=2025-01-01&end_date=2025-12-31");
+    expect(demoStressTestPath("HOSPITALITY", QUERY))
+      .toBe("/finance/demo/HOSPITALITY/stress-test?start_date=2025-01-01&end_date=2025-12-31");
+  });
+
+  test("POST du scénario saisi, réponse contrôlée avant affichage", async () => {
+    global.fetch = jest.fn(() => Promise.resolve(response(200, clone(CASES.rupture.response))));
+    const { signal } = new AbortController();
+    await expect(runStressTest({ companyId: "company_a", query: QUERY, levers: LEVERS, signal }))
+      .resolves.toEqual(CASES.rupture.response);
+    const [url, options] = global.fetch.mock.calls[0];
+    expect(url).toBe(`${API_BASE_URL}/finance/company_a/stress-test?start_date=2025-01-01&end_date=2025-12-31`);
+    expect(options).toMatchObject({ method: "POST", credentials: "include", headers: { "Content-Type": "application/json" } });
+    expect(options.signal).toBe(signal);
+    expect(options.body).toBe(
+      '{"id_entreprise":"company_a","delta_ca_percent":"-15","delta_cout_matiere_percent":"5",'
+      + '"charge_fixe_additionnelle_mensuelle":"2800.00","investissement_emprunt_mensualite":"450","duree_mois":6,'
+      + '"jours_ouverture_mois":"30","solde_tresorerie_actuel":"15000"}',
+    );
+  });
+
+  test("démonstration : chemin dédié, identifiant fictif, et jamais affichée pour une entreprise réelle", async () => {
+    const levers = buildSimulationPayload(initialSimulationValues(true)).payload;
+    global.fetch = jest.fn(() => Promise.resolve(response(200, clone(CASES.demo.response))));
+    await expect(runStressTest({ companyId: "company_a", demoSector: "HOSPITALITY", query: QUERY, levers }))
+      .resolves.toMatchObject({ demo: true, entreprise: { id: "demo-hospitality" } });
+    const [url, options] = global.fetch.mock.calls[0];
+    expect(url).toBe(`${API_BASE_URL}/finance/demo/HOSPITALITY/stress-test?start_date=2025-01-01&end_date=2025-12-31`);
+    expect(JSON.parse(options.body)).toEqual({ id_entreprise: "demo-hospitality", ...levers });
+    expect(levers.solde_tresorerie_actuel).toBeNull();
+    await expect(runStressTest({ companyId: "demo-hospitality", query: QUERY, levers }))
+      .rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
+  });
+
+  test("le refus métier du serveur est relayé tel quel", async () => {
+    const detail = "Charge fixe additionnelle mensuelle : l’économie dépasse les charges fixes de la période de référence.";
+    global.fetch = jest.fn(() => Promise.resolve(response(422, { detail })));
+    await expect(runStressTest({ companyId: "company_a", query: QUERY, levers: LEVERS }))
+      .rejects.toMatchObject({ code: "HTTP_422", message: detail });
+  });
+
+  test("CSV de simulation : format français, leviers, avant / après, trésorerie et avertissement", () => {
+    const data = CASES.rupture.response;
+    const csv = buildSimulationCsv(data, { exportedAt });
+    expect(csv.startsWith("\ufeffSimulation ΣIRIUS;Entreprise test\r\n")).toBe(true);
+    expect(csv.endsWith(`Avertissement;${SIMULATION_DISCLAIMER} ${NOT_CERTIFIED_NOTICE}\r\n`)).toBe(true);
+    expect(csv.replace(/\r\n/g, "")).not.toMatch(/[\r\n]/);
+    expect(csv).not.toMatch(/undefined|NaN|null/);
+    const lines = csv.split("\r\n");
+    expect(lines).toEqual(expect.arrayContaining([
+      `Secteur;${SECTORS.HOSPITALITY}`,
+      "Période de référence;du 01/01/2025 au 31/12/2025",
+      "Mois de référence;12,00",
+      "Devise;EUR",
+      "Version de calcul;1",
+      "Nature des données;Données saisies par l’entreprise, non certifiées",
+      `Nature du calcul;${SIMULATION_NOTICE}`,
+      "Levier;Valeur;Unité",
+      "Variation du chiffre d’affaires;-15;%",
+      "Variation du coût matière;5;%",
+      "Charge fixe additionnelle mensuelle;2800,00;EUR",
+      "Mensualité du nouvel emprunt;450,00;EUR",
+      "Durée de projection;6;mois",
+      "Jours d’ouverture par mois;30;jours",
+      "Solde de trésorerie actuel;15000,00;EUR",
+      "Indicateur mensuel;Avant;Après;Écart;Unité;Note",
+      "Chiffre d’affaires HT;40000,00;34000,00;-6000,00;EUR;",
+      "Taux de marge sur coûts variables (au volume de référence);70,00;68,60;-1,40;%;",
+      "Excédent brut d’exploitation (EBE);6000,00;-1476,00;-7476,00;EUR;",
+      "Couverture des annuités (EBE ÷ service de la dette);4,00;-0,76;-4,76;fois;",
+      "Point mort de trésorerie journalier;1119,05;1299,81;180,76;EUR;",
+      "Synthèse;Valeur;Unité;Note",
+      "Solde de trésorerie de départ;15000,00;EUR;solde bancaire déclaré pour la simulation",
+      "Flux bancaire réel mensuel moyen (période de référence);;EUR;Aucun mouvement bancaire saisi",
+      "Trésorerie en fin de projection (mois 6);-5556,00;EUR;",
+      "Besoin de financement maximal;5556,00;EUR;",
+      "Rupture de trésorerie;Rupture de trésorerie;;Trésorerie négative au mois 5 (vers J+150) au rythme simulé.",
+      "Mois estimé de rupture;5;mois;",
+      "Autonomie au rythme simulé;4,4;mois;",
+      "Jalons;Jour;Flux cumulé sans le scénario;Flux cumulé avec le scénario;Trésorerie sans le scénario;Trésorerie avec le scénario",
+      "J+30;30;4500,00;-3426,00;19500,00;11574,00",
+      "J+90;90;13500,00;-10278,00;28500,00;4722,00",
+      "Fin du mois 6;180;27000,00;-20556,00;42000,00;-5556,00",
+      "Points d’attention;Code;Message",
+      "Hypothèses",
+      ...data.hypotheses.map((item) => (item.includes(";") ? `"${item}"` : item)),
+    ]));
+    const alerts = lines.slice(lines.indexOf("Points d’attention;Code;Message") + 1, lines.indexOf("Hypothèses") - 1);
+    expect(alerts.map((line) => line.split(";")[0])).toEqual(["Prioritaire", "Prioritaire", "Prioritaire", "À surveiller", "Information"]);
+    expect(alerts[0]).toBe("Prioritaire;NEGATIVE_EBE_PROJECTED;EBE mensuel projeté négatif : l’exploitation ne couvre plus ses charges.");
+    expect(lines.filter((line) => line.startsWith("Fin du mois "))).toHaveLength(6);
+    expect(simulationCsvFilename(data)).toBe("sirius-simulation-company_a-2025-01-01_2025-12-31.csv");
+    expect(simulationCsvFilename({ ...data, entreprise: { ...data.entreprise, id: "a b/c" } }))
+      .toBe("sirius-simulation-a_b_c-2025-01-01_2025-12-31.csv");
+  });
+
+  test("CSV sans solde de départ, démonstration et indicateurs non calculables expliqués", () => {
+    const lines = buildSimulationCsv(CASES.sans_solde.response, { exportedAt }).split("\r\n");
+    expect(lines).toEqual(expect.arrayContaining([
+      "Solde de trésorerie actuel;;EUR",
+      "Solde de trésorerie de départ;;EUR;Inconnu : trésorerie non projetée",
+      "Trésorerie en fin de projection (mois 12);;EUR;",
+      "Besoin de financement maximal;;EUR;",
+      "Rupture de trésorerie;Rupture non évaluable;;Rupture non évaluable : solde de trésorerie de départ inconnu.",
+      "Mois estimé de rupture;;mois;",
+      "J+30;30;4500,00;3100,00;;",
+    ]));
+    expect(lines.filter((line) => line.startsWith("Fin du mois "))).toHaveLength(12);
+    const demo = buildSimulationCsv(CASES.demo.response, { exportedAt }).split("\r\n");
+    expect(demo).toEqual(expect.arrayContaining([
+      `Nature des données;${DEMO_NOTICE}`,
+      "Solde de trésorerie de départ;181869,88;EUR;trésorerie reconstituée en fin de période de référence",
+      "Flux bancaire réel mensuel moyen (période de référence);2688,99;EUR;",
+      'Rupture de trésorerie;Pas de rupture;;"Pas de rupture sur 6 mois ; au rythme simulé, la trésorerie s’épuiserait en 31,6 mois environ."',
+    ]));
+    const data = clone(CASES.rupture.response);
+    data.avant.couverture_service_dette = null;
+    data.apres.couverture_service_dette = null;
+    data.apres.seuil_rentabilite = null;
+    const nulls = buildSimulationCsv(data, { exportedAt }).split("\r\n");
+    expect(nulls).toContain("Couverture des annuités (EBE ÷ service de la dette);;;;fois;Sans annuité");
+    expect(nulls).toContain("Seuil de rentabilité (CA HT mensuel);31428,57;;;EUR;Non calculable");
+  });
+
+  test("CSV de simulation : formules de tableur neutralisées, séparateurs protégés", () => {
+    const data = clone(CASES.rupture.response);
+    data.entreprise.name = '=HYPERLINK("http://x";"clic")';
+    data.alertes[0].message = "@SUM(A1)";
+    data.hypotheses[0] = "-2+3";
+    const lines = buildSimulationCsv(data, { exportedAt }).split("\r\n");
+    expect(lines[0]).toBe('\ufeffSimulation ΣIRIUS;"\'=HYPERLINK(""http://x"";""clic"")"');
+    expect(lines).toContain("Information;SIMULATION_ONLY;'@SUM(A1)");
+    expect(lines).toContain("'-2+3");
   });
 });

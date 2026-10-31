@@ -345,6 +345,7 @@ export const THRESHOLDS = Object.freeze({
   equity_ratio_pct: Object.freeze({ min: "20", label: "Repère : au moins 20 % du total du bilan." }),
   cash_days: Object.freeze({ min: "30", label: "Repère : au moins 30 jours de décaissements." }),
 });
+export const STATUS_LABELS = Object.freeze({ ok: "Repère respecté", watch: "À surveiller", critical: "Seuil critique" });
 
 // Un montant négatif sur ces indicateurs signale une difficulté (affichage en rouge).
 const NEGATIVE_IS_ADVERSE = new Set([
@@ -486,6 +487,16 @@ export function compareDecimal(left, right) {
 }
 
 export const decimalSign = (value) => compareDecimal(value, "0");
+
+// Écart exact gauche − droite (BigInt à 4 décimales), au moins 2 décimales conservées ; null si un terme manque.
+export function decimalDifference(left, right) {
+  if (typeof left !== "string" || typeof right !== "string") return null;
+  const scaled = decimalToScaled(left) - decimalToScaled(right);
+  const negative = scaled < ZERO;
+  const digits = (negative ? -scaled : scaled).toString().padStart(5, "0");
+  const text = `${negative ? "-" : ""}${digits.slice(0, -4)}.${digits.slice(-4)}`;
+  return text.replace(/(\.\d{2}\d*?)0+$/, "$1");
+}
 
 export function maxAbsDecimal(values) {
   let best = null;
@@ -750,6 +761,16 @@ function invalidPayload(detail) {
 const isPeriodObject = (value) =>
   isPlainObject(value) && isDate(value.start_date) && isDate(value.end_date) && value.end_date >= value.start_date;
 
+const isAlertList = (alerts) => Array.isArray(alerts) && alerts.every((alert) => isPlainObject(alert)
+  && typeof alert.code === "string" && hasOwn(SEVERITIES, alert.severity) && typeof alert.message === "string");
+
+const isCompanyOf = (company, companyId) => isPlainObject(company) && company.id === companyId
+  && typeof company.name === "string" && Boolean(company.name.trim()) && isSector(company.sector)
+  && typeof company.currency === "string" && /^[A-Z]{3}$/.test(company.currency);
+
+const samePeriod = (value, period) =>
+  isPeriodObject(value) && (!period || (value.start_date === period.start_date && value.end_date === period.end_date));
+
 function checkMetric(section, key, nullable, where) {
   if (!hasOwn(section, key)) throw invalidPayload(`${where}.${key} absent`);
   const value = section[key];
@@ -822,14 +843,8 @@ export function validateFinanceDashboard(data, { companyId, period, comparison =
   if (data.calculation_version !== CALCULATION_VERSION) throw invalidPayload("version de calcul");
   if (data.demo !== demo) throw invalidPayload("nature démonstration / réel");
   const { company } = data;
-  if (!isPlainObject(company) || company.id !== companyId || typeof company.name !== "string" || !company.name.trim()
-    || !isSector(company.sector) || typeof company.currency !== "string" || !/^[A-Z]{3}$/.test(company.currency)) {
-    throw invalidPayload("entreprise");
-  }
-  if (!isPeriodObject(data.period)
-    || (period && (data.period.start_date !== period.start_date || data.period.end_date !== period.end_date))) {
-    throw invalidPayload("période");
-  }
+  if (!isCompanyOf(company, companyId)) throw invalidPayload("entreprise");
+  if (!samePeriod(data.period, period)) throw invalidPayload("période");
   if (!isPlainObject(data.common) || !isPlainObject(data.banking)) throw invalidPayload("sections d’indicateurs");
   COMMON_KEYS.forEach((key) => checkMetric(data.common, key, COMMON_NULLABLE.has(key), "common"));
   BANKING_KEYS.forEach((key) => checkMetric(data.banking, key, !BANKING_REQUIRED.has(key), "banking"));
@@ -839,10 +854,7 @@ export function validateFinanceDashboard(data, { companyId, period, comparison =
   if (company.sector === "CONSTRUCTION") validateProjects(specific.projects);
   validateComparison(data.comparison, comparison);
   validateMonthly(data.monthly, data.period);
-  if (!Array.isArray(data.alerts) || data.alerts.some((alert) => !isPlainObject(alert) || typeof alert.code !== "string"
-    || !hasOwn(SEVERITIES, alert.severity) || typeof alert.message !== "string")) {
-    throw invalidPayload("alertes");
-  }
+  if (!isAlertList(data.alerts)) throw invalidPayload("alertes");
   return data;
 }
 
@@ -891,7 +903,7 @@ export async function financeRequest(path, { method = "GET", body, headers, sign
     response = await fetch(`${API_BASE_URL}${path}`, { method, credentials: "include", headers, body, signal });
   } catch (error) {
     if (error?.name === "AbortError") throw error;
-    throw new FinanceError("Serveur SIRIUS injoignable : vérifiez la connexion puis réessayez.", { code: "NETWORK" });
+    throw new FinanceError("Serveur ΣIRIUS injoignable : vérifiez la connexion puis réessayez.", { code: "NETWORK" });
   }
   if (response.status === 204) return null;
   let payload = null;
@@ -978,6 +990,9 @@ export const ingestionPath = (companyId, source) => `/finance/${enc(companyId)}/
 export const ingestionsPath = (companyId, limit = 50) => `/finance/${enc(companyId)}/ingestions?limit=${limit}`;
 export const ingestionBatchPath = (companyId, batchId) => `/finance/${enc(companyId)}/ingestions/${enc(batchId)}`;
 export const auditPath = (companyId) => `/finance/${enc(companyId)}/audit`;
+const referenceParams = ({ start_date: start, end_date: end } = {}) => [["start_date", start], ["end_date", end]];
+export const stressTestPath = (companyId, query) => `/finance/${enc(companyId)}/stress-test${searchString(referenceParams(query))}`;
+export const demoStressTestPath = (sector, query) => `/finance/demo/${enc(sector)}/stress-test${searchString(referenceParams(query))}`;
 
 const jsonRequest = (path, method, payload, signal) =>
   financeRequest(path, {
@@ -1090,7 +1105,7 @@ export const ENTRY_KIND_LABELS = Object.freeze({
 });
 export const ENTRY_KINDS = Object.freeze(Object.keys(ENTRY_KIND_LABELS));
 export const ENTRY_KIND_HELP = Object.freeze({
-  revenues: "Une ligne par Z de caisse, facture ou encaissement de CA. Montant HT négatif pour un avoir ; le TTC est calculé par SIRIUS.",
+  revenues: "Une ligne par Z de caisse, facture ou encaissement de CA. Montant HT négatif pour un avoir ; le TTC est calculé par ΣIRIUS.",
   expenses: "Factures fournisseurs. Coût retenu : TTC − TVA déductible. Les équipements sont exclus de l’EBE (investissement).",
   overheads: "Charges fixes mensuelles, proratisées au jour : loyer, salaires et charges, échéances d’emprunt, assurances.",
   inventories: "Valeur du stock au premier jour de la période analysée et au lendemain de son dernier jour.",
@@ -1475,7 +1490,7 @@ export function buildFinanceCsv(data, { exportedAt = new Date() } = {}) {
     ? `${COMPARISONS[data.comparison.mode]} ${describePeriod(data.comparison.period)}${data.comparison.has_data ? "" : " (aucune donnée)"}`
     : COMPARISONS.none;
   const lines = [
-    csvRow(["Rapport financier SIRIUS", csvText(company.name)]),
+    csvRow(["Rapport financier ΣIRIUS", csvText(company.name)]),
     csvRow(["Secteur", csvText(SECTORS[company.sector])]),
     csvRow(["Période", csvText(describePeriod(period))]),
     csvRow(["Comparaison", csvText(comparisonText)]),
@@ -1603,4 +1618,363 @@ export function printFinanceReport(node, { title } = {}) {
     return false;
   }
   return true;
+}
+
+// ——— Simulation et stress test : leviers saisis, calcul en mémoire par le serveur, aucune écriture. ———
+export const SIMULATION_VERSION = "1";
+export const MAX_SIMULATION_MONTHS = 36;
+export const SIMULATION_NOTICE = "Simulation en mémoire : aucune donnée enregistrée n’est modifiée.";
+export const SIMULATION_DISCLAIMER =
+  "Projection de gestion indicative, à hypothèses constantes : elle ne remplace ni un prévisionnel établi par un expert-comptable ni un accord de financement.";
+export const START_SOURCES = Object.freeze({
+  declare: "solde bancaire déclaré pour la simulation",
+  cloture_reference: "trésorerie reconstituée en fin de période de référence",
+});
+const MILESTONE_MONTHS = Object.freeze([1, 2, 3]);
+const DAYS_PER_MONTH = 30;
+
+const lever = (name, label, help, rules) => Object.freeze({ name, label, help, ...rules });
+
+// Libellés identiques à ceux des messages 422 du serveur (SIMULATION_FIELD_LABELS).
+export const SIMULATION_LEVERS = Object.freeze([
+  lever("delta_ca_percent", "Variation du chiffre d’affaires",
+    "−15 pour une baisse de 15 % des ventes. Achats et charges variables suivent l’activité.",
+    { type: "percent", suffix: "(%)", signed: true, placeholder: "0" }),
+  lever("delta_cout_matiere_percent", "Variation du coût matière",
+    "+5 pour des matières premières et marchandises 5 % plus chères, à volume égal.",
+    { type: "percent", suffix: "(%)", signed: true, placeholder: "0" }),
+  lever("charge_fixe_additionnelle_mensuelle", "Charge fixe additionnelle mensuelle",
+    "Embauche (salaire brut + charges patronales), loyer… Montant négatif pour une économie.",
+    { type: "money", suffix: "(HT)", signed: true, placeholder: "0,00" }),
+  lever("investissement_emprunt_mensualite", "Mensualité du nouvel emprunt",
+    "Investissement financé à crédit : mensualité totale, capital et intérêts. Sans effet sur l’EBE.",
+    { type: "money", placeholder: "0,00" }),
+  lever("duree_mois", "Durée de projection", `Nombre entier de mois, de 1 à ${MAX_SIMULATION_MONTHS}.`,
+    { type: "months", suffix: "(mois)", placeholder: "12" }),
+  lever("jours_ouverture_mois", "Jours d’ouverture par mois",
+    "30 = tous les jours, 26 = fermé le dimanche, 21 = cinq jours par semaine.",
+    { type: "days", placeholder: "30" }),
+  lever("solde_tresorerie_actuel", "Solde de trésorerie actuel",
+    "Solde bancaire du jour. À défaut : trésorerie reconstituée en fin de période de référence, si un solde d’ouverture est saisi.",
+    { type: "money", suffix: "(facultatif)", signed: true, optional: true, placeholder: "0,00" }),
+]);
+
+export const NEUTRAL_SIMULATION = Object.freeze({
+  delta_ca_percent: "0", delta_cout_matiere_percent: "0", charge_fixe_additionnelle_mensuelle: "0",
+  investissement_emprunt_mensualite: "0", duree_mois: "12", jours_ouverture_mois: "30", solde_tresorerie_actuel: "",
+});
+// Exemple de la démonstration : baisse d’activité, hausse des matières, embauche et crédit matériel.
+export const DEMO_SIMULATION = Object.freeze({
+  delta_ca_percent: "-15", delta_cout_matiere_percent: "5", charge_fixe_additionnelle_mensuelle: "2800",
+  investissement_emprunt_mensualite: "450", duree_mois: "6", jours_ouverture_mois: "26", solde_tresorerie_actuel: "",
+});
+export const initialSimulationValues = (demo = false) => ({ ...(demo ? DEMO_SIMULATION : NEUTRAL_SIMULATION) });
+
+function parseLever(item, text) {
+  switch (item.type) {
+    case "percent": {
+      const result = parseDecimalInput(text, { scale: 2, allowNegative: true, maxWhole: 4, max: "1000" });
+      if (result.value !== undefined && compareDecimal(result.value, "-100") < 0) {
+        return { error: "Valeur inférieure au minimum autorisé (−100)." };
+      }
+      return result;
+    }
+    case "months":
+      return /^\d{1,2}$/.test(text) && Number(text) >= 1 && Number(text) <= MAX_SIMULATION_MONTHS
+        ? { value: Number(text) }
+        : { error: `Nombre entier de mois attendu, de 1 à ${MAX_SIMULATION_MONTHS}.` };
+    case "days": {
+      const result = parseDecimalInput(text, { scale: 2, maxWhole: 2, max: "31" });
+      if (result.value !== undefined && decimalSign(result.value) <= 0) return { error: "Valeur strictement positive attendue." };
+      return result;
+    }
+    default:
+      return parseDecimalInput(text, { scale: 2, allowNegative: Boolean(item.signed) });
+  }
+}
+
+// Leviers saisis → charge utile exacte : décimaux en chaînes, durée en entier, solde absent → null.
+export function buildSimulationPayload(values) {
+  const payload = {};
+  const errors = {};
+  SIMULATION_LEVERS.forEach((item) => {
+    const raw = values?.[item.name];
+    const text = typeof raw === "string" ? raw.trim() : "";
+    if (!text) {
+      if (item.optional) payload[item.name] = null;
+      else errors[item.name] = "Valeur requise.";
+      return;
+    }
+    const result = parseLever(item, text);
+    if (result.error) errors[item.name] = result.error;
+    else payload[item.name] = result.value;
+  });
+  return { payload, errors };
+}
+
+export function formatLever(name, value, currency = "EUR") {
+  switch (name) {
+    case "delta_ca_percent":
+    case "delta_cout_matiere_percent":
+      return formatVariationPct(value);
+    case "charge_fixe_additionnelle_mensuelle":
+      return `${formatChange(value, "money", currency)} HT par mois`;
+    case "investissement_emprunt_mensualite":
+      return `${formatFinanceValue(value, "money", currency)} par mois`;
+    case "duree_mois":
+      return `${value}${NBSP}mois`;
+    case "jours_ouverture_mois":
+      return `${formatFinanceValue(value, "number")}${NBSP}jours`;
+    default:
+      return value === null ? "Non déclaré" : formatFinanceValue(value, "money", currency);
+  }
+}
+
+const simulationRow = (key, label, rules = {}) =>
+  Object.freeze({ key, label, kind: "money", sign: "", nullable: false, group: "resultat", ...rules });
+
+// Lignes « Avant » / « Après », dans l’ordre d’affichage ; elles servent aussi au contrôle de la réponse.
+export const SIMULATION_ROWS = Object.freeze([
+  simulationRow("chiffre_affaires_ht", "Chiffre d’affaires HT", { total: true, adverse: true }),
+  simulationRow("achats_matieres", "Matières premières et marchandises consommées", { sign: "−" }),
+  simulationRow("autres_charges_variables", "Sous-traitance et fournitures", { sign: "−" }),
+  simulationRow("marge_sur_couts_variables", "Marge sur coûts variables", { sign: "=", total: true, adverse: true }),
+  simulationRow("taux_marge_sur_couts_variables", "Taux de marge sur coûts variables (au volume de référence)",
+    { kind: "percent", nullable: true, detail: true, adverse: true }),
+  simulationRow("charges_fixes", "Charges fixes (loyers, salaires chargés, assurances, frais généraux)", { sign: "−" }),
+  simulationRow("ebe", "Excédent brut d’exploitation (EBE)", { sign: "=", total: true, adverse: true }),
+  simulationRow("taux_ebe", "Taux d’EBE", { kind: "percent", nullable: true, detail: true, adverse: true }),
+  simulationRow("service_dette", "Service de la dette (annuités d’emprunt)", { sign: "−" }),
+  simulationRow("interets_emprunts", "dont intérêts", { detail: true }),
+  simulationRow("capital_rembourse", "dont capital remboursé", { detail: true }),
+  simulationRow("nouvelle_mensualite", "dont nouvelle mensualité", { detail: true }),
+  simulationRow("flux_tresorerie", "Flux de trésorerie mensuel (EBE − annuités)", { sign: "=", total: true, adverse: true }),
+  simulationRow("couverture_service_dette", "Couverture des annuités (EBE ÷ service de la dette)",
+    { kind: "ratio", nullable: true, adverse: true, nullText: "Sans annuité" }),
+  simulationRow("seuil_rentabilite", "Seuil de rentabilité (CA HT mensuel)", { nullable: true, group: "seuils" }),
+  simulationRow("point_mort_tresorerie", "Point mort de trésorerie (CA HT mensuel, annuités comprises)",
+    { nullable: true, group: "seuils" }),
+  simulationRow("seuil_rentabilite_journalier", "Seuil de rentabilité journalier", { nullable: true, group: "seuils" }),
+  simulationRow("point_mort_journalier", "Point mort de trésorerie journalier", { nullable: true, group: "seuils" }),
+]);
+
+export const simulationValueText = (row, value, currency = "EUR") =>
+  value === null && row.nullText ? row.nullText : formatFinanceValue(value, row.kind, currency);
+
+const SIMULATION_FIELDS = Object.freeze([
+  ["point_mort_journalier_avant", true], ["point_mort_journalier_apres", true],
+  ["ca_supplementaire_requis_pour_equilibre", true], ["ebe_projete_mensuel", false], ["variation_ebe_mensuelle", false],
+  ["solde_depart", true], ["flux_bancaire_reel_mensuel", true], ["tresorerie_residuelle_fin_periode", true],
+  ["variation_tresorerie_periode", false], ["besoin_financement_max", true],
+]);
+
+function checkField(section, key, kind, nullable, where) {
+  if (!hasOwn(section, key)) throw invalidPayload(`${where}.${key} absent`);
+  const value = section[key];
+  if (value === null ? !nullable : !isDecimalString(value, kind)) throw invalidPayload(`${where}.${key} invalide`);
+}
+
+const sameDecimal = (left, right) => (left === null || right === null ? left === right : compareDecimal(left, right) === 0);
+const isMonthCount = (value, min = 0) => Number.isInteger(value) && value >= min && value <= MAX_SIMULATION_MONTHS;
+
+function validateScenarioEcho(echo, companyId, sent) {
+  if (!isPlainObject(echo) || echo.id_entreprise !== companyId || !isMonthCount(echo.duree_mois, 1)) {
+    throw invalidPayload("scénario");
+  }
+  SIMULATION_LEVERS.forEach(({ name, optional }) => {
+    const value = echo[name];
+    if (name === "duree_mois") {
+      if (sent && value !== sent.duree_mois) throw invalidPayload("scénario.duree_mois");
+      return;
+    }
+    if (optional && value === null) {
+      if (sent && sent[name] !== null) throw invalidPayload(`scénario.${name}`);
+      return;
+    }
+    // Le serveur peut normaliser l’écriture (450 → 450.00) : comparaison par valeur.
+    if (!isDecimalString(value) || (sent && (typeof sent[name] !== "string" || compareDecimal(value, sent[name]) !== 0))) {
+      throw invalidPayload(`scénario.${name}`);
+    }
+  });
+}
+
+function validateIndicators(section, where) {
+  if (!isPlainObject(section)) throw invalidPayload(where);
+  SIMULATION_ROWS.forEach((row) => checkField(section, row.key, row.kind, row.nullable, where));
+}
+
+function validateCashPoints(points, months, known, where) {
+  if (!Array.isArray(points) || points.length !== months.length) throw invalidPayload(where);
+  points.forEach((point, index) => {
+    if (!isPlainObject(point) || point.mois !== months[index] || point.jour !== months[index] * DAYS_PER_MONTH) {
+      throw invalidPayload(`${where}.mois`);
+    }
+    checkField(point, "flux_cumule_sans_projet", "money", false, where);
+    checkField(point, "flux_cumule_avec_projet", "money", false, where);
+    checkField(point, "solde_sans_projet", "money", !known, where);
+    checkField(point, "solde_avec_projet", "money", !known, where);
+    if (!known && (point.solde_sans_projet !== null || point.solde_avec_projet !== null)) {
+      throw invalidPayload(`${where}.solde sans solde de départ`);
+    }
+  });
+}
+
+function validateRupture(value, known, months) {
+  if (!isPlainObject(value) || typeof value.message !== "string" || !value.message.trim()) throw invalidPayload("rupture");
+  const { rupture, mois_estime: month, autonomie_mois: autonomy } = value;
+  const valid = known
+    ? (rupture === true && isMonthCount(month) && month <= months && isDecimalString(autonomy))
+      || (rupture === false && month === null && (autonomy === null || isDecimalString(autonomy)))
+    : rupture === null && month === null && autonomy === null;
+  if (!valid) throw invalidPayload("rupture de trésorerie");
+}
+
+export function validateSimulation(data, { companyId, period, demo = false, scenario = null } = {}) {
+  if (!isPlainObject(data)) throw invalidPayload("charge utile");
+  if (data.version_calcul !== SIMULATION_VERSION) throw invalidPayload("version de calcul");
+  if (data.demo !== demo) throw invalidPayload("nature démonstration / réel");
+  if (!isCompanyOf(data.entreprise, companyId)) throw invalidPayload("entreprise");
+  if (!samePeriod(data.periode_reference, period)) throw invalidPayload("période de référence");
+  if (!isDecimalString(data.mois_reference) || decimalSign(data.mois_reference) <= 0) throw invalidPayload("mois de référence");
+  validateScenarioEcho(data.scenario, companyId, scenario);
+  if (!Array.isArray(data.hypotheses) || data.hypotheses.some((item) => typeof item !== "string")) {
+    throw invalidPayload("hypothèses");
+  }
+  validateIndicators(data.avant, "avant");
+  validateIndicators(data.apres, "apres");
+  SIMULATION_FIELDS.forEach(([key, nullable]) => checkField(data, key, "money", nullable, "simulation"));
+  const known = data.solde_depart !== null;
+  if (known ? !hasOwn(START_SOURCES, data.source_solde_depart) : data.source_solde_depart !== null) {
+    throw invalidPayload("source du solde de départ");
+  }
+  if ((data.tresorerie_residuelle_fin_periode !== null) !== known || (data.besoin_financement_max !== null) !== known) {
+    throw invalidPayload("trésorerie sans solde de départ");
+  }
+  const months = data.scenario.duree_mois;
+  validateCashPoints(data.jalons_tresorerie, MILESTONE_MONTHS, known, "jalons");
+  validateCashPoints(data.projection, Array.from({ length: months }, (_, index) => index + 1), known, "projection");
+  validateRupture(data.alerte_rupture_tresorerie, known, months);
+  if (!isAlertList(data.alertes)) throw invalidPayload("alertes");
+  const last = data.projection[months - 1];
+  const consistent = sameDecimal(data.point_mort_journalier_avant, data.avant.point_mort_journalier)
+    && sameDecimal(data.point_mort_journalier_apres, data.apres.point_mort_journalier)
+    && sameDecimal(data.ebe_projete_mensuel, data.apres.ebe)
+    && sameDecimal(data.variation_ebe_mensuelle, decimalDifference(data.apres.ebe, data.avant.ebe))
+    && sameDecimal(data.tresorerie_residuelle_fin_periode, last.solde_avec_projet)
+    && sameDecimal(data.variation_tresorerie_periode, last.flux_cumule_avec_projet);
+  if (!consistent) throw invalidPayload("synthèse incohérente avec le détail");
+  return data;
+}
+
+// POST en mémoire côté serveur : la réponse n’est affichée qu’après contrôle complet, écho du scénario compris.
+export async function runStressTest({ companyId, demoSector = null, query, levers, signal }) {
+  const demo = Boolean(demoSector);
+  const id = demo ? demoCompanyId(demoSector) : companyId;
+  const scenario = { id_entreprise: id, ...levers };
+  const path = demo ? demoStressTestPath(demoSector, query) : stressTestPath(companyId, query);
+  const data = await jsonRequest(path, "POST", scenario, signal);
+  return validateSimulation(data, {
+    companyId: id,
+    period: { start_date: query.start_date, end_date: query.end_date },
+    demo,
+    scenario,
+  });
+}
+
+export const RUPTURE_STATES = Object.freeze({ rupture: "Rupture de trésorerie", ok: "Pas de rupture", unknown: "Rupture non évaluable" });
+export const ruptureState = (alert) => {
+  if (alert.rupture === null) return "unknown";
+  return alert.rupture ? "rupture" : "ok";
+};
+
+export function simulationCsvFilename(data) {
+  const id = String(data?.entreprise?.id ?? "entreprise").replace(/[^A-Za-z0-9_-]/g, "_");
+  return `sirius-simulation-${id}-${data?.periode_reference?.start_date}_${data?.periode_reference?.end_date}.csv`;
+}
+
+const LEVER_UNITS = Object.freeze({ percent: "%", months: "mois", days: "jours" });
+
+export function buildSimulationCsv(data, { exportedAt = new Date() } = {}) {
+  const { entreprise: company, periode_reference: period, scenario, avant: before, apres: after } = data;
+  const currency = company.currency;
+  const rupture = data.alerte_rupture_tresorerie;
+  const lines = [
+    csvRow(["Simulation ΣIRIUS", csvText(company.name)]),
+    csvRow(["Secteur", csvText(SECTORS[company.sector])]),
+    csvRow(["Période de référence", csvText(describePeriod(period))]),
+    csvRow(["Mois de référence", csvValue(data.mois_reference, "number")]),
+    csvRow(["Devise", csvText(currency)]),
+    csvRow(["Version de calcul", csvText(data.version_calcul)]),
+    csvRow(["Nature des données", csvText(data.demo ? DEMO_NOTICE : "Données saisies par l’entreprise, non certifiées")]),
+    csvRow(["Nature du calcul", csvText(SIMULATION_NOTICE)]),
+    csvRow(["Exporté le", csvText(formatTimestamp(exportedAt.toISOString()))]),
+    "",
+    csvRow(["Levier", "Valeur", "Unité"]),
+  ];
+  SIMULATION_LEVERS.forEach((item) => lines.push(csvRow([
+    csvText(item.label),
+    csvValue(scenario[item.name], "number"),
+    csvText(LEVER_UNITS[item.type] ?? currency),
+  ])));
+  lines.push("", csvRow(["Indicateur mensuel", "Avant", "Après", "Écart", "Unité", "Note"]));
+  SIMULATION_ROWS.forEach((row) => {
+    const note = [before[row.key], after[row.key]].includes(null) ? (row.nullText ?? "Non calculable") : "";
+    lines.push(csvRow([
+      csvText(row.label),
+      csvValue(before[row.key], row.kind),
+      csvValue(after[row.key], row.kind),
+      csvValue(decimalDifference(after[row.key], before[row.key]), row.kind),
+      csvText(csvUnit(row.kind, currency)),
+      csvText(note),
+    ]));
+  });
+  const summary = [
+    ["Point mort de trésorerie journalier avant", data.point_mort_journalier_avant, currency],
+    ["Point mort de trésorerie journalier après", data.point_mort_journalier_apres, currency],
+    ["CA supplémentaire requis pour l’équilibre (par mois)", data.ca_supplementaire_requis_pour_equilibre, currency],
+    ["EBE projeté mensuel", data.ebe_projete_mensuel, currency],
+    ["Variation mensuelle de l’EBE", data.variation_ebe_mensuelle, currency],
+    ["Solde de trésorerie de départ", data.solde_depart, currency,
+      data.source_solde_depart ? START_SOURCES[data.source_solde_depart] : "Inconnu : trésorerie non projetée"],
+    ["Flux bancaire réel mensuel moyen (période de référence)", data.flux_bancaire_reel_mensuel, currency,
+      data.flux_bancaire_reel_mensuel === null ? "Aucun mouvement bancaire saisi" : ""],
+    [`Trésorerie en fin de projection (mois ${scenario.duree_mois})`, data.tresorerie_residuelle_fin_periode, currency],
+    ["Variation de trésorerie sur la projection", data.variation_tresorerie_periode, currency],
+    ["Besoin de financement maximal", data.besoin_financement_max, currency],
+  ];
+  lines.push("", csvRow(["Synthèse", "Valeur", "Unité", "Note"]));
+  summary.forEach(([label, value, unit, note = ""]) => lines.push(csvRow([
+    csvText(label), csvValue(value, "money"), csvText(unit), csvText(note),
+  ])));
+  lines.push(
+    csvRow(["Rupture de trésorerie", csvText(RUPTURE_STATES[ruptureState(rupture)]), "", csvText(rupture.message)]),
+    csvRow(["Mois estimé de rupture", csvValue(rupture.mois_estime, "number"), "mois", ""]),
+    csvRow(["Autonomie au rythme simulé", csvValue(rupture.autonomie_mois, "number"), "mois", ""]),
+  );
+  const pointRow = (label, point) => csvRow([
+    csvText(label),
+    String(point.jour),
+    csvValue(point.flux_cumule_sans_projet, "money"),
+    csvValue(point.flux_cumule_avec_projet, "money"),
+    csvValue(point.solde_sans_projet, "money"),
+    csvValue(point.solde_avec_projet, "money"),
+  ]);
+  const pointHead = (title) => csvRow([
+    title, "Jour", "Flux cumulé sans le scénario", "Flux cumulé avec le scénario",
+    "Trésorerie sans le scénario", "Trésorerie avec le scénario",
+  ]);
+  lines.push("", pointHead("Jalons"));
+  data.jalons_tresorerie.forEach((point) => lines.push(pointRow(`J+${point.jour}`, point)));
+  lines.push("", pointHead("Projection mensuelle"));
+  data.projection.forEach((point) => lines.push(pointRow(`Fin du mois ${point.mois}`, point)));
+  lines.push("", csvRow(["Points d’attention", "Code", "Message"]));
+  sortAlerts(data.alertes).forEach((alert) => lines.push(csvRow([
+    csvText(SEVERITIES[alert.severity]),
+    csvText(alert.code),
+    csvText(alert.message),
+  ])));
+  lines.push("", "Hypothèses");
+  data.hypotheses.forEach((item) => lines.push(csvText(item)));
+  lines.push("", csvRow(["Avertissement", csvText(`${SIMULATION_DISCLAIMER} ${NOT_CERTIFIED_NOTICE}`)]));
+  return `\ufeff${lines.join("\r\n")}\r\n`;
 }
