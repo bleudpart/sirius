@@ -14,6 +14,7 @@ import importlib
 import secrets
 import hmac
 import binascii
+import threading
 from collections import deque
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -190,6 +191,23 @@ async def _run_vector_warmup_loop_delayed():
         await vector_warmup_loop()
 
 
+def _finance_demo_prewarm_enabled() -> bool:
+    """Serveur : démonstrations financières prêtes avant le premier clic. Poste de bureau : à la demande."""
+    configured = os.getenv("SIRIUS_FINANCE_DEMO_PREWARM", "").strip()
+    if configured:
+        return configured == "1"
+    return os.getenv("SIRIUS_PACKAGED", "").strip() != "1"
+
+
+async def _prewarm_finance_demo(stop) -> None:
+    from finance_demo import prewarm_demo_companies
+    try:
+        await asyncio.to_thread(prewarm_demo_companies, stop)
+        logger.info("[FINANCE] Démonstrations fictives prêtes")
+    except Exception:
+        logger.exception("[FINANCE] Préchauffage des démonstrations fictives impossible")
+
+
 @asynccontextmanager
 async def _lifespan(_app):
     # --- Démarrage ---
@@ -221,13 +239,18 @@ async def _lifespan(_app):
     autonomy_task = asyncio.create_task(bounded_autonomy.loop())
     zapier_task = asyncio.create_task(zapier_integrations.loop())
     workspace_task = asyncio.create_task(workspace_channels.loop())
+    finance_demo_stop = threading.Event()
+    finance_demo_task = asyncio.create_task(
+        _delayed_background_loop(30.0, lambda: _prewarm_finance_demo(finance_demo_stop))
+    ) if _finance_demo_prewarm_enabled() else None
     # (Stockage 100% local — plus d'initialisation cloud à faire ici.)
     try:
         yield
     finally:
         # --- Arrêt ---
+        finance_demo_stop.set()
         tasks = []
-        for task in (_watch_task, _omega_task, _episodic_task, _vector_task, _connection_task, finance_task, work_reminders_task, shadow_task, initiative_task, autonomy_task, zapier_task, workspace_task):
+        for task in (_watch_task, _omega_task, _episodic_task, _vector_task, _connection_task, finance_task, work_reminders_task, shadow_task, initiative_task, autonomy_task, zapier_task, workspace_task, finance_demo_task):
             if task:
                 task.cancel()
                 tasks.append(task)
@@ -2346,6 +2369,8 @@ api_router.include_router(make_nummarius_router(db))
 from ariane_market_runs import make_ariane_market_router
 api_router.include_router(make_ariane_market_router(db, require_user))
 api_router.include_router(make_finance_router(finance_workspace, require_user))
+from routers.finance import make_company_finance_router
+api_router.include_router(make_company_finance_router(db, require_user))
 api_router.include_router(make_budget_lab_router(budget_lab, require_user))
 api_router.include_router(make_action_router(action_runs, require_user))
 api_router.include_router(make_initiative_router(action_initiatives, require_user))

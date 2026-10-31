@@ -1,0 +1,3309 @@
+{
+ "dashboard": {
+  "company": {
+   "id": "demo-construction",
+   "name": "Durand Rénovation (fictive)",
+   "sector": "CONSTRUCTION",
+   "currency": "EUR"
+  },
+  "period": {
+   "start_date": "2025-03-01",
+   "end_date": "2025-03-31"
+  },
+  "calculation_version": "2",
+  "demo": true,
+  "common": {
+   "revenue_ht": "146680.61",
+   "revenue_ttc": "169132.28",
+   "variable_costs": "61205.73",
+   "stock_variation": null,
+   "fixed_costs": "62866.00",
+   "recurring_commitments": "63150.54",
+   "financial_expenses": "401.59",
+   "operating_expenses": "124071.73",
+   "contribution_margin_pct": "58.27",
+   "break_even_revenue_ht": "107882.26",
+   "approximate_ebe": "22608.88",
+   "vat_collected": "22451.67",
+   "vat_deductible": "9802.45",
+   "vat_balance_estimate": "12649.22",
+   "cash_inflows": "145496.33",
+   "cash_outflows": "153141.91",
+   "cash_net_flow": "-7645.58",
+   "opening_cash": "235831.55",
+   "closing_cash": "228185.97"
+  },
+  "banking": {
+   "external_charges": "71146.73",
+   "external_charges_pct": "48.50",
+   "value_added": "75533.88",
+   "value_added_pct": "51.50",
+   "payroll_costs": "52925.00",
+   "payroll_costs_pct": "36.08",
+   "payroll_to_value_added_pct": "70.07",
+   "ebe_margin_pct": "15.41",
+   "financial_expenses_to_revenue_pct": "0.27",
+   "approximate_caf": "22207.29",
+   "caf_margin_pct": "15.14",
+   "loan_principal_repaid": "4143.95",
+   "debt_service": "4545.54",
+   "debt_service_coverage": "4.97",
+   "caf_after_principal": "18063.34",
+   "financial_expenses_to_ebe_pct": "1.78",
+   "safety_margin": "38798.35",
+   "safety_margin_pct": "26.45",
+   "break_even_date": "2025-03-31",
+   "cash_days": "46.2",
+   "balance_sheet_date": "2024-12-31",
+   "working_capital_requirement": "172950.20",
+   "working_capital_days": "36.6",
+   "customer_days": "66.5",
+   "supplier_days": "30.4",
+   "inventory_days": "0.0",
+   "financial_debt": "126076.18",
+   "net_debt": "-53385.17",
+   "equity": "357210.37",
+   "gearing": "-0.15",
+   "equity_ratio_pct": "53.05",
+   "debt_repayment_years": "0.5"
+  },
+  "specific": {
+   "sector": "CONSTRUCTION",
+   "dry_cost": "59032.60",
+   "margin": "87648.01",
+   "margin_pct": "59.75",
+   "projects": [
+    {
+     "business_reference": "CH-2025-02 Rénovation de boutique",
+     "revenue_ht": "26290.20",
+     "dry_cost": "10000.60",
+     "margin": "16289.60",
+     "margin_pct": "61.96"
+    },
+    {
+     "business_reference": "CH-2025-03 Isolation et remplacement des menuiseries",
+     "revenue_ht": "18144.54",
+     "dry_cost": "7585.30",
+     "margin": "10559.24",
+     "margin_pct": "58.20"
+    },
+    {
+     "business_reference": "CH-2025-04 Réfection d'un cabinet médical",
+     "revenue_ht": "36766.44",
+     "dry_cost": "13127.71",
+     "margin": "23638.73",
+     "margin_pct": "64.29"
+    },
+    {
+     "business_reference": "CH-2025-05 Extension en ossature bois",
+     "revenue_ht": "50700.00",
+     "dry_cost": "22891.88",
+     "margin": "27808.12",
+     "margin_pct": "54.85"
+    },
+    {
+     "business_reference": "CH-2025-06 Aménagement d'un plateau tertiaire",
+     "revenue_ht": "14779.43",
+     "dry_cost": "5427.11",
+     "margin": "9352.32",
+     "margin_pct": "63.28"
+    }
+   ],
+   "unallocated_revenue_ht": "0",
+   "unallocated_dry_cost": "0"
+  },
+  "comparison": {
+   "mode": "year_ago",
+   "period": {
+    "start_date": "2024-03-01",
+    "end_date": "2024-03-31"
+   },
+   "has_data": true,
+   "variations": [
+    {
+     "key": "revenue_ht",
+     "current": "146680.61",
+     "previous": "153922.92",
+     "change": "-7242.31",
+     "change_pct": "-4.71"
+    },
+    {
+     "key": "revenue_ttc",
+     "current": "169132.28",
+     "previous": "178642.03",
+     "change": "-9509.75",
+     "change_pct": "-5.32"
+    },
+    {
+     "key": "variable_costs",
+     "current": "61205.73",
+     "previous": "73553.23",
+     "change": "-12347.50",
+     "change_pct": "-16.79"
+    },
+    {
+     "key": "stock_variation",
+     "current": null,
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "fixed_costs",
+     "current": "62866.00",
+     "previous": "60330.83",
+     "change": "2535.17",
+     "change_pct": "4.20"
+    },
+    {
+     "key": "recurring_commitments",
+     "current": "63150.54",
+     "previous": "60751.54",
+     "change": "2399.00",
+     "change_pct": "3.95"
+    },
+    {
+     "key": "financial_expenses",
+     "current": "401.59",
+     "previous": "540.87",
+     "change": "-139.28",
+     "change_pct": "-25.75"
+    },
+    {
+     "key": "operating_expenses",
+     "current": "124071.73",
+     "previous": "133884.06",
+     "change": "-9812.33",
+     "change_pct": "-7.33"
+    },
+    {
+     "key": "contribution_margin_pct",
+     "current": "58.27",
+     "previous": "52.21",
+     "change": "6.06",
+     "change_pct": null
+    },
+    {
+     "key": "break_even_revenue_ht",
+     "current": "107882.26",
+     "previous": "115544.77",
+     "change": "-7662.51",
+     "change_pct": "-6.63"
+    },
+    {
+     "key": "approximate_ebe",
+     "current": "22608.88",
+     "previous": "20038.86",
+     "change": "2570.02",
+     "change_pct": "12.83"
+    },
+    {
+     "key": "vat_collected",
+     "current": "22451.67",
+     "previous": "24719.11",
+     "change": "-2267.44",
+     "change_pct": "-9.17"
+    },
+    {
+     "key": "vat_deductible",
+     "current": "9802.45",
+     "previous": "10377.70",
+     "change": "-575.25",
+     "change_pct": "-5.54"
+    },
+    {
+     "key": "vat_balance_estimate",
+     "current": "12649.22",
+     "previous": "14341.41",
+     "change": "-1692.19",
+     "change_pct": "-11.80"
+    },
+    {
+     "key": "cash_inflows",
+     "current": "145496.33",
+     "previous": "176996.14",
+     "change": "-31499.81",
+     "change_pct": "-17.80"
+    },
+    {
+     "key": "cash_outflows",
+     "current": "153141.91",
+     "previous": "128850.24",
+     "change": "24291.67",
+     "change_pct": "18.85"
+    },
+    {
+     "key": "cash_net_flow",
+     "current": "-7645.58",
+     "previous": "48145.90",
+     "change": "-55791.48",
+     "change_pct": "-115.88"
+    },
+    {
+     "key": "opening_cash",
+     "current": "235831.55",
+     "previous": "122821.01",
+     "change": "113010.54",
+     "change_pct": "92.01"
+    },
+    {
+     "key": "closing_cash",
+     "current": "228185.97",
+     "previous": "170966.91",
+     "change": "57219.06",
+     "change_pct": "33.47"
+    },
+    {
+     "key": "external_charges",
+     "current": "71146.73",
+     "previous": "83134.06",
+     "change": "-11987.33",
+     "change_pct": "-14.42"
+    },
+    {
+     "key": "external_charges_pct",
+     "current": "48.50",
+     "previous": "54.01",
+     "change": "-5.51",
+     "change_pct": null
+    },
+    {
+     "key": "value_added",
+     "current": "75533.88",
+     "previous": "70788.86",
+     "change": "4745.02",
+     "change_pct": "6.70"
+    },
+    {
+     "key": "value_added_pct",
+     "current": "51.50",
+     "previous": "45.99",
+     "change": "5.51",
+     "change_pct": null
+    },
+    {
+     "key": "payroll_costs",
+     "current": "52925.00",
+     "previous": "50750.00",
+     "change": "2175.00",
+     "change_pct": "4.29"
+    },
+    {
+     "key": "payroll_costs_pct",
+     "current": "36.08",
+     "previous": "32.97",
+     "change": "3.11",
+     "change_pct": null
+    },
+    {
+     "key": "payroll_to_value_added_pct",
+     "current": "70.07",
+     "previous": "71.69",
+     "change": "-1.62",
+     "change_pct": null
+    },
+    {
+     "key": "ebe_margin_pct",
+     "current": "15.41",
+     "previous": "13.02",
+     "change": "2.39",
+     "change_pct": null
+    },
+    {
+     "key": "financial_expenses_to_revenue_pct",
+     "current": "0.27",
+     "previous": "0.35",
+     "change": "-0.08",
+     "change_pct": null
+    },
+    {
+     "key": "approximate_caf",
+     "current": "22207.29",
+     "previous": "19497.99",
+     "change": "2709.30",
+     "change_pct": "13.90"
+    },
+    {
+     "key": "caf_margin_pct",
+     "current": "15.14",
+     "previous": "12.67",
+     "change": "2.47",
+     "change_pct": null
+    },
+    {
+     "key": "loan_principal_repaid",
+     "current": "4143.95",
+     "previous": "4004.67",
+     "change": "139.28",
+     "change_pct": "3.48"
+    },
+    {
+     "key": "debt_service",
+     "current": "4545.54",
+     "previous": "4545.54",
+     "change": "0.00",
+     "change_pct": "0.00"
+    },
+    {
+     "key": "debt_service_coverage",
+     "current": "4.97",
+     "previous": "4.41",
+     "change": "0.56",
+     "change_pct": null
+    },
+    {
+     "key": "caf_after_principal",
+     "current": "18063.34",
+     "previous": "15493.32",
+     "change": "2570.02",
+     "change_pct": "16.59"
+    },
+    {
+     "key": "financial_expenses_to_ebe_pct",
+     "current": "1.78",
+     "previous": "2.70",
+     "change": "-0.92",
+     "change_pct": null
+    },
+    {
+     "key": "safety_margin",
+     "current": "38798.35",
+     "previous": "38378.15",
+     "change": "420.20",
+     "change_pct": "1.09"
+    },
+    {
+     "key": "safety_margin_pct",
+     "current": "26.45",
+     "previous": "24.93",
+     "change": "1.52",
+     "change_pct": null
+    },
+    {
+     "key": "cash_days",
+     "current": "46.2",
+     "previous": "41.1",
+     "change": "5.1",
+     "change_pct": null
+    },
+    {
+     "key": "working_capital_requirement",
+     "current": "172950.20",
+     "previous": "120469.54",
+     "change": "52480.66",
+     "change_pct": "43.56"
+    },
+    {
+     "key": "working_capital_days",
+     "current": "36.6",
+     "previous": "24.3",
+     "change": "12.3",
+     "change_pct": null
+    },
+    {
+     "key": "customer_days",
+     "current": "66.5",
+     "previous": "43.0",
+     "change": "23.5",
+     "change_pct": null
+    },
+    {
+     "key": "supplier_days",
+     "current": "30.4",
+     "previous": "18.8",
+     "change": "11.6",
+     "change_pct": null
+    },
+    {
+     "key": "inventory_days",
+     "current": "0.0",
+     "previous": "0.0",
+     "change": "0.0",
+     "change_pct": null
+    },
+    {
+     "key": "financial_debt",
+     "current": "126076.18",
+     "previous": "174615.71",
+     "change": "-48539.53",
+     "change_pct": "-27.80"
+    },
+    {
+     "key": "net_debt",
+     "current": "-53385.17",
+     "previous": "15147.70",
+     "change": "-68532.87",
+     "change_pct": "-452.43"
+    },
+    {
+     "key": "equity",
+     "current": "357210.37",
+     "previous": "331306.75",
+     "change": "25903.62",
+     "change_pct": "7.82"
+    },
+    {
+     "key": "gearing",
+     "current": "-0.15",
+     "previous": "0.05",
+     "change": "-0.20",
+     "change_pct": null
+    },
+    {
+     "key": "equity_ratio_pct",
+     "current": "53.05",
+     "previous": "52.33",
+     "change": "0.72",
+     "change_pct": null
+    },
+    {
+     "key": "debt_repayment_years",
+     "current": "0.5",
+     "previous": "0.8",
+     "change": "-0.3",
+     "change_pct": null
+    },
+    {
+     "key": "dry_cost",
+     "current": "59032.60",
+     "previous": "71530.31",
+     "change": "-12497.71",
+     "change_pct": "-17.47"
+    },
+    {
+     "key": "margin",
+     "current": "87648.01",
+     "previous": "82392.61",
+     "change": "5255.40",
+     "change_pct": "6.38"
+    },
+    {
+     "key": "margin_pct",
+     "current": "59.75",
+     "previous": "53.53",
+     "change": "6.22",
+     "change_pct": null
+    },
+    {
+     "key": "unallocated_revenue_ht",
+     "current": "0",
+     "previous": "0",
+     "change": "0",
+     "change_pct": null
+    },
+    {
+     "key": "unallocated_dry_cost",
+     "current": "0",
+     "previous": "0",
+     "change": "0",
+     "change_pct": null
+    }
+   ]
+  },
+  "monthly": [
+   {
+    "period": {
+     "start_date": "2025-03-01",
+     "end_date": "2025-03-31"
+    },
+    "revenue_ht": "146680.61",
+    "stock_variation": null,
+    "approximate_ebe": "22608.88",
+    "ebe_margin_pct": "15.41",
+    "approximate_caf": "22207.29",
+    "cash_net_flow": "-7645.58",
+    "closing_cash": "228185.97"
+   }
+  ],
+  "alerts": [
+   {
+    "code": "DEMO_DATA",
+    "severity": "info",
+    "message": "Données fictives de démonstration : aucune entreprise réelle, aucun chiffre client."
+   },
+   {
+    "code": "MANAGEMENT_ESTIMATES",
+    "severity": "info",
+    "message": "Indicateurs de gestion sur les pièces saisies : valeur ajoutée, EBE et seuil de rentabilité calculés hors variation de stocks (inventaires de début et de fin de période non saisis), hors amortissements et impôt sur les sociétés ; CAF approchée = EBE − intérêts d’emprunt (avant IS). TVA théorique sur pièces et charges proratisées, pas une déclaration fiscale. Ne pas saisir deux fois une charge récurrente sous forme d’achat."
+   },
+   {
+    "code": "CASH_LEDGER_ONLY",
+    "severity": "info",
+    "message": "La trésorerie utilise uniquement les mouvements de caisse/banque saisis et un solde initial ; aucune facture n’est supposée payée."
+   }
+  ]
+ },
+ "sectors": {
+  "HOSPITALITY": {
+   "company": {
+    "id": "demo-hospitality",
+    "name": "Brasserie Le Grand Comptoir (fictive)",
+    "sector": "HOSPITALITY",
+    "currency": "EUR"
+   },
+   "period": {
+    "start_date": "2025-03-01",
+    "end_date": "2025-03-31"
+   },
+   "calculation_version": "2",
+   "demo": true,
+   "common": {
+    "revenue_ht": "78972.01",
+    "revenue_ttc": "88862.47",
+    "variable_costs": "22865.36",
+    "stock_variation": "-939.92",
+    "fixed_costs": "43726.84",
+    "recurring_commitments": "45080.44",
+    "financial_expenses": "470.23",
+    "operating_expenses": "66592.20",
+    "contribution_margin_pct": "71.05",
+    "break_even_revenue_ht": "61547.01",
+    "approximate_ebe": "12379.81",
+    "vat_collected": "9890.46",
+    "vat_deductible": "4666.83",
+    "vat_balance_estimate": "5223.63",
+    "cash_inflows": "93266.41",
+    "cash_outflows": "88586.72",
+    "cash_net_flow": "4679.69",
+    "opening_cash": "124769.49",
+    "closing_cash": "129449.18"
+   },
+   "banking": {
+    "external_charges": "36857.70",
+    "external_charges_pct": "46.67",
+    "value_added": "42114.31",
+    "value_added_pct": "53.33",
+    "payroll_costs": "29734.50",
+    "payroll_costs_pct": "37.65",
+    "payroll_to_value_added_pct": "70.60",
+    "ebe_margin_pct": "15.68",
+    "financial_expenses_to_revenue_pct": "0.60",
+    "approximate_caf": "11909.58",
+    "caf_margin_pct": "15.08",
+    "loan_principal_repaid": "5537.71",
+    "debt_service": "6007.94",
+    "debt_service_coverage": "2.06",
+    "caf_after_principal": "6371.87",
+    "financial_expenses_to_ebe_pct": "3.80",
+    "safety_margin": "17425.00",
+    "safety_margin_pct": "22.06",
+    "break_even_date": "2025-03-25",
+    "cash_days": "45.3",
+    "balance_sheet_date": "2024-12-31",
+    "working_capital_requirement": "-30978.71",
+    "working_capital_days": "-12.2",
+    "customer_days": "1.0",
+    "supplier_days": "21.5",
+    "inventory_days": "19.6",
+    "financial_debt": "256174.65",
+    "net_debt": "106572.67",
+    "equity": "421210.52",
+    "gearing": "0.25",
+    "equity_ratio_pct": "58.08",
+    "debt_repayment_years": "1.8"
+   },
+   "specific": {
+    "sector": "HOSPITALITY",
+    "food_consumed_cost": "16164.46",
+    "beverage_consumed_cost": "6178.79",
+    "food_cost_pct": "31.11",
+    "beverage_cost_pct": "22.87",
+    "prime_cost_pct": "65.94"
+   },
+   "comparison": {
+    "mode": "year_ago",
+    "period": {
+     "start_date": "2024-03-01",
+     "end_date": "2024-03-31"
+    },
+    "has_data": true,
+    "variations": [
+     {
+      "key": "revenue_ht",
+      "current": "78972.01",
+      "previous": "84776.61",
+      "change": "-5804.60",
+      "change_pct": "-6.85"
+     },
+     {
+      "key": "revenue_ttc",
+      "current": "88862.47",
+      "previous": "95384.86",
+      "change": "-6522.39",
+      "change_pct": "-6.84"
+     },
+     {
+      "key": "variable_costs",
+      "current": "22865.36",
+      "previous": "24026.69",
+      "change": "-1161.33",
+      "change_pct": "-4.83"
+     },
+     {
+      "key": "stock_variation",
+      "current": "-939.92",
+      "previous": "-2545.55",
+      "change": "1605.63",
+      "change_pct": null
+     },
+     {
+      "key": "fixed_costs",
+      "current": "43726.84",
+      "previous": "42504.55",
+      "change": "1222.29",
+      "change_pct": "2.88"
+     },
+     {
+      "key": "recurring_commitments",
+      "current": "45080.44",
+      "previous": "42733.69",
+      "change": "2346.75",
+      "change_pct": "5.49"
+     },
+     {
+      "key": "financial_expenses",
+      "current": "470.23",
+      "previous": "336.66",
+      "change": "133.57",
+      "change_pct": "39.68"
+     },
+     {
+      "key": "operating_expenses",
+      "current": "66592.20",
+      "previous": "66531.24",
+      "change": "60.96",
+      "change_pct": "0.09"
+     },
+     {
+      "key": "contribution_margin_pct",
+      "current": "71.05",
+      "previous": "71.66",
+      "change": "-0.61",
+      "change_pct": null
+     },
+     {
+      "key": "break_even_revenue_ht",
+      "current": "61547.01",
+      "previous": "59315.17",
+      "change": "2231.84",
+      "change_pct": "3.76"
+     },
+     {
+      "key": "approximate_ebe",
+      "current": "12379.81",
+      "previous": "18245.37",
+      "change": "-5865.56",
+      "change_pct": "-32.15"
+     },
+     {
+      "key": "vat_collected",
+      "current": "9890.46",
+      "previous": "10608.25",
+      "change": "-717.79",
+      "change_pct": "-6.77"
+     },
+     {
+      "key": "vat_deductible",
+      "current": "4666.83",
+      "previous": "18058.61",
+      "change": "-13391.78",
+      "change_pct": "-74.16"
+     },
+     {
+      "key": "vat_balance_estimate",
+      "current": "5223.63",
+      "previous": "-7450.36",
+      "change": "12673.99",
+      "change_pct": null
+     },
+     {
+      "key": "cash_inflows",
+      "current": "93266.41",
+      "previous": "151401.48",
+      "change": "-58135.07",
+      "change_pct": "-38.40"
+     },
+     {
+      "key": "cash_outflows",
+      "current": "88586.72",
+      "previous": "162549.86",
+      "change": "-73963.14",
+      "change_pct": "-45.50"
+     },
+     {
+      "key": "cash_net_flow",
+      "current": "4679.69",
+      "previous": "-11148.38",
+      "change": "15828.07",
+      "change_pct": null
+     },
+     {
+      "key": "opening_cash",
+      "current": "124769.49",
+      "previous": "102706.94",
+      "change": "22062.55",
+      "change_pct": "21.48"
+     },
+     {
+      "key": "closing_cash",
+      "current": "129449.18",
+      "previous": "91558.56",
+      "change": "37890.62",
+      "change_pct": "41.38"
+     },
+     {
+      "key": "external_charges",
+      "current": "36857.70",
+      "previous": "37699.74",
+      "change": "-842.04",
+      "change_pct": "-2.23"
+     },
+     {
+      "key": "external_charges_pct",
+      "current": "46.67",
+      "previous": "44.47",
+      "change": "2.20",
+      "change_pct": null
+     },
+     {
+      "key": "value_added",
+      "current": "42114.31",
+      "previous": "47076.87",
+      "change": "-4962.56",
+      "change_pct": "-10.54"
+     },
+     {
+      "key": "value_added_pct",
+      "current": "53.33",
+      "previous": "55.53",
+      "change": "-2.20",
+      "change_pct": null
+     },
+     {
+      "key": "payroll_costs",
+      "current": "29734.50",
+      "previous": "28831.50",
+      "change": "903.00",
+      "change_pct": "3.13"
+     },
+     {
+      "key": "payroll_costs_pct",
+      "current": "37.65",
+      "previous": "34.01",
+      "change": "3.64",
+      "change_pct": null
+     },
+     {
+      "key": "payroll_to_value_added_pct",
+      "current": "70.60",
+      "previous": "61.24",
+      "change": "9.36",
+      "change_pct": null
+     },
+     {
+      "key": "ebe_margin_pct",
+      "current": "15.68",
+      "previous": "21.52",
+      "change": "-5.84",
+      "change_pct": null
+     },
+     {
+      "key": "financial_expenses_to_revenue_pct",
+      "current": "0.60",
+      "previous": "0.40",
+      "change": "0.20",
+      "change_pct": null
+     },
+     {
+      "key": "approximate_caf",
+      "current": "11909.58",
+      "previous": "17908.71",
+      "change": "-5999.13",
+      "change_pct": "-33.50"
+     },
+     {
+      "key": "caf_margin_pct",
+      "current": "15.08",
+      "previous": "21.12",
+      "change": "-6.04",
+      "change_pct": null
+     },
+     {
+      "key": "loan_principal_repaid",
+      "current": "5537.71",
+      "previous": "4456.53",
+      "change": "1081.18",
+      "change_pct": "24.26"
+     },
+     {
+      "key": "debt_service",
+      "current": "6007.94",
+      "previous": "4793.19",
+      "change": "1214.75",
+      "change_pct": "25.34"
+     },
+     {
+      "key": "debt_service_coverage",
+      "current": "2.06",
+      "previous": "3.81",
+      "change": "-1.75",
+      "change_pct": null
+     },
+     {
+      "key": "caf_after_principal",
+      "current": "6371.87",
+      "previous": "13452.18",
+      "change": "-7080.31",
+      "change_pct": "-52.63"
+     },
+     {
+      "key": "financial_expenses_to_ebe_pct",
+      "current": "3.80",
+      "previous": "1.85",
+      "change": "1.95",
+      "change_pct": null
+     },
+     {
+      "key": "safety_margin",
+      "current": "17425.00",
+      "previous": "25461.44",
+      "change": "-8036.44",
+      "change_pct": "-31.56"
+     },
+     {
+      "key": "safety_margin_pct",
+      "current": "22.06",
+      "previous": "30.03",
+      "change": "-7.97",
+      "change_pct": null
+     },
+     {
+      "key": "cash_days",
+      "current": "45.3",
+      "previous": "17.5",
+      "change": "27.8",
+      "change_pct": null
+     },
+     {
+      "key": "working_capital_requirement",
+      "current": "-30978.71",
+      "previous": "-27942.68",
+      "change": "-3036.03",
+      "change_pct": null
+     },
+     {
+      "key": "working_capital_days",
+      "current": "-12.2",
+      "previous": "-10.2",
+      "change": "-2.0",
+      "change_pct": null
+     },
+     {
+      "key": "customer_days",
+      "current": "1.0",
+      "previous": "3.7",
+      "change": "-2.7",
+      "change_pct": null
+     },
+     {
+      "key": "supplier_days",
+      "current": "21.5",
+      "previous": "24.2",
+      "change": "-2.7",
+      "change_pct": null
+     },
+     {
+      "key": "inventory_days",
+      "current": "19.6",
+      "previous": "20.8",
+      "change": "-1.2",
+      "change_pct": null
+     },
+     {
+      "key": "financial_debt",
+      "current": "256174.65",
+      "previous": "253736.13",
+      "change": "2438.52",
+      "change_pct": "0.96"
+     },
+     {
+      "key": "net_debt",
+      "current": "106572.67",
+      "previous": "135099.31",
+      "change": "-28526.64",
+      "change_pct": "-21.12"
+     },
+     {
+      "key": "equity",
+      "current": "421210.52",
+      "previous": "356600.87",
+      "change": "64609.65",
+      "change_pct": "18.12"
+     },
+     {
+      "key": "gearing",
+      "current": "0.25",
+      "previous": "0.38",
+      "change": "-0.13",
+      "change_pct": null
+     },
+     {
+      "key": "equity_ratio_pct",
+      "current": "58.08",
+      "previous": "53.59",
+      "change": "4.49",
+      "change_pct": null
+     },
+     {
+      "key": "debt_repayment_years",
+      "current": "1.8",
+      "previous": "1.2",
+      "change": "0.6",
+      "change_pct": null
+     },
+     {
+      "key": "food_consumed_cost",
+      "current": "16164.46",
+      "previous": "16923.93",
+      "change": "-759.47",
+      "change_pct": "-4.49"
+     },
+     {
+      "key": "beverage_consumed_cost",
+      "current": "6178.79",
+      "previous": "6588.81",
+      "change": "-410.02",
+      "change_pct": "-6.22"
+     },
+     {
+      "key": "food_cost_pct",
+      "current": "31.11",
+      "previous": "30.30",
+      "change": "0.81",
+      "change_pct": null
+     },
+     {
+      "key": "beverage_cost_pct",
+      "current": "22.87",
+      "previous": "22.78",
+      "change": "0.09",
+      "change_pct": null
+     },
+     {
+      "key": "prime_cost_pct",
+      "current": "65.94",
+      "previous": "61.74",
+      "change": "4.20",
+      "change_pct": null
+     }
+    ]
+   },
+   "monthly": [
+    {
+     "period": {
+      "start_date": "2025-03-01",
+      "end_date": "2025-03-31"
+     },
+     "revenue_ht": "78972.01",
+     "stock_variation": "-939.92",
+     "approximate_ebe": "12379.81",
+     "ebe_margin_pct": "15.68",
+     "approximate_caf": "11909.58",
+     "cash_net_flow": "4679.69",
+     "closing_cash": "129449.18"
+    }
+   ],
+   "alerts": [
+    {
+     "code": "DEMO_DATA",
+     "severity": "info",
+     "message": "Données fictives de démonstration : aucune entreprise réelle, aucun chiffre client."
+    },
+    {
+     "code": "MANAGEMENT_ESTIMATES",
+     "severity": "info",
+     "message": "Indicateurs de gestion sur les pièces saisies : valeur ajoutée, EBE et seuil de rentabilité calculés avec la variation de stocks intégrée pour les familles inventoriées au début et au lendemain de la fin de période, hors amortissements et impôt sur les sociétés ; CAF approchée = EBE − intérêts d’emprunt (avant IS). TVA théorique sur pièces et charges proratisées, pas une déclaration fiscale. Ne pas saisir deux fois une charge récurrente sous forme d’achat."
+    },
+    {
+     "code": "CASH_LEDGER_ONLY",
+     "severity": "info",
+     "message": "La trésorerie utilise uniquement les mouvements de caisse/banque saisis et un solde initial ; aucune facture n’est supposée payée."
+    }
+   ]
+  },
+  "RETAIL": {
+   "company": {
+    "id": "demo-retail",
+    "name": "Maison Lumière — décoration (fictive)",
+    "sector": "RETAIL",
+    "currency": "EUR"
+   },
+   "period": {
+    "start_date": "2025-03-01",
+    "end_date": "2025-03-31"
+   },
+   "calculation_version": "2",
+   "demo": true,
+   "common": {
+    "revenue_ht": "45673.94",
+    "revenue_ttc": "54808.75",
+    "variable_costs": "20631.90",
+    "stock_variation": "-6849.05",
+    "fixed_costs": "23804.95",
+    "recurring_commitments": "24131.09",
+    "financial_expenses": "71.21",
+    "operating_expenses": "44436.85",
+    "contribution_margin_pct": "54.83",
+    "break_even_revenue_ht": "43417.62",
+    "approximate_ebe": "1237.09",
+    "vat_collected": "9134.81",
+    "vat_deductible": "7049.88",
+    "vat_balance_estimate": "2084.93",
+    "cash_inflows": "57268.48",
+    "cash_outflows": "51358.17",
+    "cash_net_flow": "5910.31",
+    "opening_cash": "111611.27",
+    "closing_cash": "117521.58"
+   },
+   "banking": {
+    "external_charges": "28913.35",
+    "external_charges_pct": "63.30",
+    "value_added": "16760.59",
+    "value_added_pct": "36.70",
+    "payroll_costs": "15523.50",
+    "payroll_costs_pct": "33.99",
+    "payroll_to_value_added_pct": "92.62",
+    "ebe_margin_pct": "2.71",
+    "financial_expenses_to_revenue_pct": "0.16",
+    "approximate_caf": "1165.88",
+    "caf_margin_pct": "2.55",
+    "loan_principal_repaid": "1676.38",
+    "debt_service": "1747.59",
+    "debt_service_coverage": "0.71",
+    "caf_after_principal": "-510.50",
+    "financial_expenses_to_ebe_pct": "5.76",
+    "safety_margin": "2256.32",
+    "safety_margin_pct": "4.94",
+    "break_even_date": "2025-03-29",
+    "cash_days": "70.9",
+    "balance_sheet_date": "2024-12-31",
+    "working_capital_requirement": "33443.19",
+    "working_capital_days": "22.7",
+    "customer_days": "3.3",
+    "supplier_days": "49.4",
+    "inventory_days": "190.3",
+    "financial_debt": "116646.10",
+    "net_debt": "-79333.51",
+    "equity": "304893.36",
+    "gearing": "-0.26",
+    "equity_ratio_pct": "58.80",
+    "debt_repayment_years": "8.5"
+   },
+   "specific": {
+    "sector": "RETAIL",
+    "goods_consumed_cost": "20277.40",
+    "commercial_margin": "25396.54",
+    "commercial_margin_pct": "55.60",
+    "estimated_stock_turnover": "0.17",
+    "average_basket_ht": "41.83"
+   },
+   "comparison": {
+    "mode": "year_ago",
+    "period": {
+     "start_date": "2024-03-01",
+     "end_date": "2024-03-31"
+    },
+    "has_data": true,
+    "variations": [
+     {
+      "key": "revenue_ht",
+      "current": "45673.94",
+      "previous": "47522.58",
+      "change": "-1848.64",
+      "change_pct": "-3.89"
+     },
+     {
+      "key": "revenue_ttc",
+      "current": "54808.75",
+      "previous": "57027.11",
+      "change": "-2218.36",
+      "change_pct": "-3.89"
+     },
+     {
+      "key": "variable_costs",
+      "current": "20631.90",
+      "previous": "21547.99",
+      "change": "-916.09",
+      "change_pct": "-4.25"
+     },
+     {
+      "key": "stock_variation",
+      "current": "-6849.05",
+      "previous": "-6387.74",
+      "change": "-461.31",
+      "change_pct": null
+     },
+     {
+      "key": "fixed_costs",
+      "current": "23804.95",
+      "previous": "23350.27",
+      "change": "454.68",
+      "change_pct": "1.95"
+     },
+     {
+      "key": "recurring_commitments",
+      "current": "24131.09",
+      "previous": "23567.09",
+      "change": "564.00",
+      "change_pct": "2.39"
+     },
+     {
+      "key": "financial_expenses",
+      "current": "71.21",
+      "previous": "93.68",
+      "change": "-22.47",
+      "change_pct": "-23.99"
+     },
+     {
+      "key": "operating_expenses",
+      "current": "44436.85",
+      "previous": "44898.26",
+      "change": "-461.41",
+      "change_pct": "-1.03"
+     },
+     {
+      "key": "contribution_margin_pct",
+      "current": "54.83",
+      "previous": "54.66",
+      "change": "0.17",
+      "change_pct": null
+     },
+     {
+      "key": "break_even_revenue_ht",
+      "current": "43417.62",
+      "previous": "42721.18",
+      "change": "696.44",
+      "change_pct": "1.63"
+     },
+     {
+      "key": "approximate_ebe",
+      "current": "1237.09",
+      "previous": "2624.32",
+      "change": "-1387.23",
+      "change_pct": "-52.86"
+     },
+     {
+      "key": "vat_collected",
+      "current": "9134.81",
+      "previous": "9504.53",
+      "change": "-369.72",
+      "change_pct": "-3.89"
+     },
+     {
+      "key": "vat_deductible",
+      "current": "7049.88",
+      "previous": "7129.96",
+      "change": "-80.08",
+      "change_pct": "-1.12"
+     },
+     {
+      "key": "vat_balance_estimate",
+      "current": "2084.93",
+      "previous": "2374.57",
+      "change": "-289.64",
+      "change_pct": "-12.20"
+     },
+     {
+      "key": "cash_inflows",
+      "current": "57268.48",
+      "previous": "52251.54",
+      "change": "5016.94",
+      "change_pct": "9.60"
+     },
+     {
+      "key": "cash_outflows",
+      "current": "51358.17",
+      "previous": "55540.93",
+      "change": "-4182.76",
+      "change_pct": "-7.53"
+     },
+     {
+      "key": "cash_net_flow",
+      "current": "5910.31",
+      "previous": "-3289.39",
+      "change": "9199.70",
+      "change_pct": null
+     },
+     {
+      "key": "opening_cash",
+      "current": "111611.27",
+      "previous": "93194.37",
+      "change": "18416.90",
+      "change_pct": "19.76"
+     },
+     {
+      "key": "closing_cash",
+      "current": "117521.58",
+      "previous": "89904.98",
+      "change": "27616.60",
+      "change_pct": "30.72"
+     },
+     {
+      "key": "external_charges",
+      "current": "28913.35",
+      "previous": "29767.76",
+      "change": "-854.41",
+      "change_pct": "-2.87"
+     },
+     {
+      "key": "external_charges_pct",
+      "current": "63.30",
+      "previous": "62.64",
+      "change": "0.66",
+      "change_pct": null
+     },
+     {
+      "key": "value_added",
+      "current": "16760.59",
+      "previous": "17754.82",
+      "change": "-994.23",
+      "change_pct": "-5.60"
+     },
+     {
+      "key": "value_added_pct",
+      "current": "36.70",
+      "previous": "37.36",
+      "change": "-0.66",
+      "change_pct": null
+     },
+     {
+      "key": "payroll_costs",
+      "current": "15523.50",
+      "previous": "15130.50",
+      "change": "393.00",
+      "change_pct": "2.60"
+     },
+     {
+      "key": "payroll_costs_pct",
+      "current": "33.99",
+      "previous": "31.84",
+      "change": "2.15",
+      "change_pct": null
+     },
+     {
+      "key": "payroll_to_value_added_pct",
+      "current": "92.62",
+      "previous": "85.22",
+      "change": "7.40",
+      "change_pct": null
+     },
+     {
+      "key": "ebe_margin_pct",
+      "current": "2.71",
+      "previous": "5.52",
+      "change": "-2.81",
+      "change_pct": null
+     },
+     {
+      "key": "financial_expenses_to_revenue_pct",
+      "current": "0.16",
+      "previous": "0.20",
+      "change": "-0.04",
+      "change_pct": null
+     },
+     {
+      "key": "approximate_caf",
+      "current": "1165.88",
+      "previous": "2530.64",
+      "change": "-1364.76",
+      "change_pct": "-53.93"
+     },
+     {
+      "key": "caf_margin_pct",
+      "current": "2.55",
+      "previous": "5.33",
+      "change": "-2.78",
+      "change_pct": null
+     },
+     {
+      "key": "loan_principal_repaid",
+      "current": "1676.38",
+      "previous": "1653.91",
+      "change": "22.47",
+      "change_pct": "1.36"
+     },
+     {
+      "key": "debt_service",
+      "current": "1747.59",
+      "previous": "1747.59",
+      "change": "0.00",
+      "change_pct": "0.00"
+     },
+     {
+      "key": "debt_service_coverage",
+      "current": "0.71",
+      "previous": "1.50",
+      "change": "-0.79",
+      "change_pct": null
+     },
+     {
+      "key": "caf_after_principal",
+      "current": "-510.50",
+      "previous": "876.73",
+      "change": "-1387.23",
+      "change_pct": "-158.23"
+     },
+     {
+      "key": "financial_expenses_to_ebe_pct",
+      "current": "5.76",
+      "previous": "3.57",
+      "change": "2.19",
+      "change_pct": null
+     },
+     {
+      "key": "safety_margin",
+      "current": "2256.32",
+      "previous": "4801.40",
+      "change": "-2545.08",
+      "change_pct": "-53.01"
+     },
+     {
+      "key": "safety_margin_pct",
+      "current": "4.94",
+      "previous": "10.10",
+      "change": "-5.16",
+      "change_pct": null
+     },
+     {
+      "key": "cash_days",
+      "current": "70.9",
+      "previous": "50.2",
+      "change": "20.7",
+      "change_pct": null
+     },
+     {
+      "key": "working_capital_requirement",
+      "current": "33443.19",
+      "previous": "40841.48",
+      "change": "-7398.29",
+      "change_pct": "-18.11"
+     },
+     {
+      "key": "working_capital_days",
+      "current": "22.7",
+      "previous": "26.6",
+      "change": "-3.9",
+      "change_pct": null
+     },
+     {
+      "key": "customer_days",
+      "current": "3.3",
+      "previous": "9.6",
+      "change": "-6.3",
+      "change_pct": null
+     },
+     {
+      "key": "supplier_days",
+      "current": "49.4",
+      "previous": "46.5",
+      "change": "2.9",
+      "change_pct": null
+     },
+     {
+      "key": "inventory_days",
+      "current": "190.3",
+      "previous": "176.0",
+      "change": "14.3",
+      "change_pct": null
+     },
+     {
+      "key": "financial_debt",
+      "current": "116646.10",
+      "previous": "86571.46",
+      "change": "30074.64",
+      "change_pct": "34.74"
+     },
+     {
+      "key": "net_debt",
+      "current": "-79333.51",
+      "previous": "-25574.27",
+      "change": "-53759.24",
+      "change_pct": null
+     },
+     {
+      "key": "equity",
+      "current": "304893.36",
+      "previous": "279632.41",
+      "change": "25260.95",
+      "change_pct": "9.03"
+     },
+     {
+      "key": "gearing",
+      "current": "-0.26",
+      "previous": "-0.09",
+      "change": "-0.17",
+      "change_pct": null
+     },
+     {
+      "key": "equity_ratio_pct",
+      "current": "58.80",
+      "previous": "60.44",
+      "change": "-1.64",
+      "change_pct": null
+     },
+     {
+      "key": "debt_repayment_years",
+      "current": "8.5",
+      "previous": "2.9",
+      "change": "5.6",
+      "change_pct": null
+     },
+     {
+      "key": "goods_consumed_cost",
+      "current": "20277.40",
+      "previous": "21059.98",
+      "change": "-782.58",
+      "change_pct": "-3.72"
+     },
+     {
+      "key": "commercial_margin",
+      "current": "25396.54",
+      "previous": "26462.60",
+      "change": "-1066.06",
+      "change_pct": "-4.03"
+     },
+     {
+      "key": "commercial_margin_pct",
+      "current": "55.60",
+      "previous": "55.68",
+      "change": "-0.08",
+      "change_pct": null
+     },
+     {
+      "key": "estimated_stock_turnover",
+      "current": "0.17",
+      "previous": "0.18",
+      "change": "-0.01",
+      "change_pct": null
+     },
+     {
+      "key": "average_basket_ht",
+      "current": "41.83",
+      "previous": "41.54",
+      "change": "0.29",
+      "change_pct": "0.70"
+     }
+    ]
+   },
+   "monthly": [
+    {
+     "period": {
+      "start_date": "2025-03-01",
+      "end_date": "2025-03-31"
+     },
+     "revenue_ht": "45673.94",
+     "stock_variation": "-6849.05",
+     "approximate_ebe": "1237.09",
+     "ebe_margin_pct": "2.71",
+     "approximate_caf": "1165.88",
+     "cash_net_flow": "5910.31",
+     "closing_cash": "117521.58"
+    }
+   ],
+   "alerts": [
+    {
+     "code": "DEMO_DATA",
+     "severity": "info",
+     "message": "Données fictives de démonstration : aucune entreprise réelle, aucun chiffre client."
+    },
+    {
+     "code": "MANAGEMENT_ESTIMATES",
+     "severity": "info",
+     "message": "Indicateurs de gestion sur les pièces saisies : valeur ajoutée, EBE et seuil de rentabilité calculés avec la variation de stocks intégrée pour les familles inventoriées au début et au lendemain de la fin de période, hors amortissements et impôt sur les sociétés ; CAF approchée = EBE − intérêts d’emprunt (avant IS). TVA théorique sur pièces et charges proratisées, pas une déclaration fiscale. Ne pas saisir deux fois une charge récurrente sous forme d’achat."
+    },
+    {
+     "code": "DEBT_SERVICE_NOT_COVERED",
+     "severity": "critical",
+     "message": "L’EBE ne couvre pas les annuités d’emprunt (capital + intérêts) : la CAF est inférieure au capital remboursé."
+    },
+    {
+     "code": "LONG_REPAYMENT",
+     "severity": "warning",
+     "message": "Plus de 4 années de CAF sont nécessaires pour rembourser la dette financière."
+    },
+    {
+     "code": "CASH_LEDGER_ONLY",
+     "severity": "info",
+     "message": "La trésorerie utilise uniquement les mouvements de caisse/banque saisis et un solde initial ; aucune facture n’est supposée payée."
+    }
+   ]
+  },
+  "SERVICES": {
+   "company": {
+    "id": "demo-services",
+    "name": "Altitude Conseil (fictive)",
+    "sector": "SERVICES",
+    "currency": "EUR"
+   },
+   "period": {
+    "start_date": "2025-03-01",
+    "end_date": "2025-03-31"
+   },
+   "calculation_version": "2",
+   "demo": true,
+   "common": {
+    "revenue_ht": "112551.01",
+    "revenue_ttc": "135061.21",
+    "variable_costs": "0.00",
+    "stock_variation": null,
+    "fixed_costs": "87662.62",
+    "recurring_commitments": "82840.39",
+    "financial_expenses": "33.77",
+    "operating_expenses": "87662.62",
+    "contribution_margin_pct": "100.00",
+    "break_even_revenue_ht": "87662.62",
+    "approximate_ebe": "24888.39",
+    "vat_collected": "22510.20",
+    "vat_deductible": "1870.43",
+    "vat_balance_estimate": "20639.77",
+    "cash_inflows": "132427.45",
+    "cash_outflows": "115935.60",
+    "cash_net_flow": "16491.85",
+    "opening_cash": "279287.83",
+    "closing_cash": "295779.68"
+   },
+   "banking": {
+    "external_charges": "10728.62",
+    "external_charges_pct": "9.53",
+    "value_added": "101822.39",
+    "value_added_pct": "90.47",
+    "payroll_costs": "76934.00",
+    "payroll_costs_pct": "68.35",
+    "payroll_to_value_added_pct": "75.56",
+    "ebe_margin_pct": "22.11",
+    "financial_expenses_to_revenue_pct": "0.03",
+    "approximate_caf": "24854.62",
+    "caf_margin_pct": "22.08",
+    "loan_principal_repaid": "850.62",
+    "debt_service": "884.39",
+    "debt_service_coverage": "28.14",
+    "caf_after_principal": "24004.00",
+    "financial_expenses_to_ebe_pct": "0.14",
+    "safety_margin": "24888.39",
+    "safety_margin_pct": "22.11",
+    "break_even_date": "2025-03-31",
+    "cash_days": "79.1",
+    "balance_sheet_date": "2024-12-31",
+    "working_capital_requirement": "153165.29",
+    "working_capital_days": "42.2",
+    "customer_days": "62.5",
+    "supplier_days": "13.9",
+    "inventory_days": null,
+    "financial_debt": "12084.66",
+    "net_debt": "-257462.11",
+    "equity": "430460.73",
+    "gearing": "-0.60",
+    "equity_ratio_pct": "76.61",
+    "debt_repayment_years": "0.0"
+   },
+   "specific": {
+    "sector": "SERVICES",
+    "average_hourly_rate_ht": "114.85",
+    "average_daily_rate_ht": "803.94",
+    "structure_cost_ratio_pct": "77.89"
+   },
+   "comparison": {
+    "mode": "year_ago",
+    "period": {
+     "start_date": "2024-03-01",
+     "end_date": "2024-03-31"
+    },
+    "has_data": true,
+    "variations": [
+     {
+      "key": "revenue_ht",
+      "current": "112551.01",
+      "previous": "101418.95",
+      "change": "11132.06",
+      "change_pct": "10.98"
+     },
+     {
+      "key": "revenue_ttc",
+      "current": "135061.21",
+      "previous": "121702.74",
+      "change": "13358.47",
+      "change_pct": "10.98"
+     },
+     {
+      "key": "variable_costs",
+      "current": "0.00",
+      "previous": "0.00",
+      "change": "0.00",
+      "change_pct": null
+     },
+     {
+      "key": "stock_variation",
+      "current": null,
+      "previous": null,
+      "change": null,
+      "change_pct": null
+     },
+     {
+      "key": "fixed_costs",
+      "current": "87662.62",
+      "previous": "78464.31",
+      "change": "9198.31",
+      "change_pct": "11.72"
+     },
+     {
+      "key": "recurring_commitments",
+      "current": "82840.39",
+      "previous": "73279.39",
+      "change": "9561.00",
+      "change_pct": "13.05"
+     },
+     {
+      "key": "financial_expenses",
+      "current": "33.77",
+      "previous": "66.26",
+      "change": "-32.49",
+      "change_pct": "-49.03"
+     },
+     {
+      "key": "operating_expenses",
+      "current": "87662.62",
+      "previous": "78464.31",
+      "change": "9198.31",
+      "change_pct": "11.72"
+     },
+     {
+      "key": "contribution_margin_pct",
+      "current": "100.00",
+      "previous": "100.00",
+      "change": "0.00",
+      "change_pct": null
+     },
+     {
+      "key": "break_even_revenue_ht",
+      "current": "87662.62",
+      "previous": "78464.31",
+      "change": "9198.31",
+      "change_pct": "11.72"
+     },
+     {
+      "key": "approximate_ebe",
+      "current": "24888.39",
+      "previous": "22954.64",
+      "change": "1933.75",
+      "change_pct": "8.42"
+     },
+     {
+      "key": "vat_collected",
+      "current": "22510.20",
+      "previous": "20283.79",
+      "change": "2226.41",
+      "change_pct": "10.98"
+     },
+     {
+      "key": "vat_deductible",
+      "current": "1870.43",
+      "previous": "1918.59",
+      "change": "-48.16",
+      "change_pct": "-2.51"
+     },
+     {
+      "key": "vat_balance_estimate",
+      "current": "20639.77",
+      "previous": "18365.20",
+      "change": "2274.57",
+      "change_pct": "12.39"
+     },
+     {
+      "key": "cash_inflows",
+      "current": "132427.45",
+      "previous": "102059.40",
+      "change": "30368.05",
+      "change_pct": "29.76"
+     },
+     {
+      "key": "cash_outflows",
+      "current": "115935.60",
+      "previous": "101497.99",
+      "change": "14437.61",
+      "change_pct": "14.22"
+     },
+     {
+      "key": "cash_net_flow",
+      "current": "16491.85",
+      "previous": "561.41",
+      "change": "15930.44",
+      "change_pct": "2837.58"
+     },
+     {
+      "key": "opening_cash",
+      "current": "279287.83",
+      "previous": "208523.88",
+      "change": "70763.95",
+      "change_pct": "33.94"
+     },
+     {
+      "key": "closing_cash",
+      "current": "295779.68",
+      "previous": "209085.29",
+      "change": "86694.39",
+      "change_pct": "41.46"
+     },
+     {
+      "key": "external_charges",
+      "current": "10728.62",
+      "previous": "10968.31",
+      "change": "-239.69",
+      "change_pct": "-2.19"
+     },
+     {
+      "key": "external_charges_pct",
+      "current": "9.53",
+      "previous": "10.81",
+      "change": "-1.28",
+      "change_pct": null
+     },
+     {
+      "key": "value_added",
+      "current": "101822.39",
+      "previous": "90450.64",
+      "change": "11371.75",
+      "change_pct": "12.57"
+     },
+     {
+      "key": "value_added_pct",
+      "current": "90.47",
+      "previous": "89.19",
+      "change": "1.28",
+      "change_pct": null
+     },
+     {
+      "key": "payroll_costs",
+      "current": "76934.00",
+      "previous": "67496.00",
+      "change": "9438.00",
+      "change_pct": "13.98"
+     },
+     {
+      "key": "payroll_costs_pct",
+      "current": "68.35",
+      "previous": "66.55",
+      "change": "1.80",
+      "change_pct": null
+     },
+     {
+      "key": "payroll_to_value_added_pct",
+      "current": "75.56",
+      "previous": "74.62",
+      "change": "0.94",
+      "change_pct": null
+     },
+     {
+      "key": "ebe_margin_pct",
+      "current": "22.11",
+      "previous": "22.63",
+      "change": "-0.52",
+      "change_pct": null
+     },
+     {
+      "key": "financial_expenses_to_revenue_pct",
+      "current": "0.03",
+      "previous": "0.07",
+      "change": "-0.04",
+      "change_pct": null
+     },
+     {
+      "key": "approximate_caf",
+      "current": "24854.62",
+      "previous": "22888.38",
+      "change": "1966.24",
+      "change_pct": "8.59"
+     },
+     {
+      "key": "caf_margin_pct",
+      "current": "22.08",
+      "previous": "22.57",
+      "change": "-0.49",
+      "change_pct": null
+     },
+     {
+      "key": "loan_principal_repaid",
+      "current": "850.62",
+      "previous": "818.13",
+      "change": "32.49",
+      "change_pct": "3.97"
+     },
+     {
+      "key": "debt_service",
+      "current": "884.39",
+      "previous": "884.39",
+      "change": "0.00",
+      "change_pct": "0.00"
+     },
+     {
+      "key": "debt_service_coverage",
+      "current": "28.14",
+      "previous": "25.96",
+      "change": "2.18",
+      "change_pct": null
+     },
+     {
+      "key": "caf_after_principal",
+      "current": "24004.00",
+      "previous": "22070.25",
+      "change": "1933.75",
+      "change_pct": "8.76"
+     },
+     {
+      "key": "financial_expenses_to_ebe_pct",
+      "current": "0.14",
+      "previous": "0.29",
+      "change": "-0.15",
+      "change_pct": null
+     },
+     {
+      "key": "safety_margin",
+      "current": "24888.39",
+      "previous": "22954.64",
+      "change": "1933.75",
+      "change_pct": "8.42"
+     },
+     {
+      "key": "safety_margin_pct",
+      "current": "22.11",
+      "previous": "22.63",
+      "change": "-0.52",
+      "change_pct": null
+     },
+     {
+      "key": "cash_days",
+      "current": "79.1",
+      "previous": "63.9",
+      "change": "15.2",
+      "change_pct": null
+     },
+     {
+      "key": "working_capital_requirement",
+      "current": "153165.29",
+      "previous": "147137.80",
+      "change": "6027.49",
+      "change_pct": "4.10"
+     },
+     {
+      "key": "working_capital_days",
+      "current": "42.2",
+      "previous": "45.0",
+      "change": "-2.8",
+      "change_pct": null
+     },
+     {
+      "key": "customer_days",
+      "current": "62.5",
+      "previous": "60.5",
+      "change": "2.0",
+      "change_pct": null
+     },
+     {
+      "key": "supplier_days",
+      "current": "13.9",
+      "previous": "13.6",
+      "change": "0.3",
+      "change_pct": null
+     },
+     {
+      "key": "inventory_days",
+      "current": null,
+      "previous": null,
+      "change": null,
+      "change_pct": null
+     },
+     {
+      "key": "financial_debt",
+      "current": "12084.66",
+      "previous": "22015.01",
+      "change": "-9930.35",
+      "change_pct": "-45.11"
+     },
+     {
+      "key": "net_debt",
+      "current": "-257462.11",
+      "previous": "-158013.82",
+      "change": "-99448.29",
+      "change_pct": null
+     },
+     {
+      "key": "equity",
+      "current": "430460.73",
+      "previous": "345965.79",
+      "change": "84494.94",
+      "change_pct": "24.42"
+     },
+     {
+      "key": "gearing",
+      "current": "-0.60",
+      "previous": "-0.46",
+      "change": "-0.14",
+      "change_pct": null
+     },
+     {
+      "key": "equity_ratio_pct",
+      "current": "76.61",
+      "previous": "75.46",
+      "change": "1.15",
+      "change_pct": null
+     },
+     {
+      "key": "debt_repayment_years",
+      "current": "0.0",
+      "previous": "0.1",
+      "change": "-0.1",
+      "change_pct": null
+     },
+     {
+      "key": "average_hourly_rate_ht",
+      "current": "114.85",
+      "previous": "112.31",
+      "change": "2.54",
+      "change_pct": "2.26"
+     },
+     {
+      "key": "average_daily_rate_ht",
+      "current": "803.94",
+      "previous": "786.19",
+      "change": "17.75",
+      "change_pct": "2.26"
+     },
+     {
+      "key": "structure_cost_ratio_pct",
+      "current": "77.89",
+      "previous": "77.37",
+      "change": "0.52",
+      "change_pct": null
+     }
+    ]
+   },
+   "monthly": [
+    {
+     "period": {
+      "start_date": "2025-03-01",
+      "end_date": "2025-03-31"
+     },
+     "revenue_ht": "112551.01",
+     "stock_variation": null,
+     "approximate_ebe": "24888.39",
+     "ebe_margin_pct": "22.11",
+     "approximate_caf": "24854.62",
+     "cash_net_flow": "16491.85",
+     "closing_cash": "295779.68"
+    }
+   ],
+   "alerts": [
+    {
+     "code": "DEMO_DATA",
+     "severity": "info",
+     "message": "Données fictives de démonstration : aucune entreprise réelle, aucun chiffre client."
+    },
+    {
+     "code": "MANAGEMENT_ESTIMATES",
+     "severity": "info",
+     "message": "Indicateurs de gestion sur les pièces saisies : valeur ajoutée, EBE et seuil de rentabilité calculés hors variation de stocks (inventaires de début et de fin de période non saisis), hors amortissements et impôt sur les sociétés ; CAF approchée = EBE − intérêts d’emprunt (avant IS). TVA théorique sur pièces et charges proratisées, pas une déclaration fiscale. Ne pas saisir deux fois une charge récurrente sous forme d’achat."
+    },
+    {
+     "code": "CASH_LEDGER_ONLY",
+     "severity": "info",
+     "message": "La trésorerie utilise uniquement les mouvements de caisse/banque saisis et un solde initial ; aucune facture n’est supposée payée."
+    }
+   ]
+  }
+ },
+ "annual": {
+  "company": {
+   "id": "demo-hospitality",
+   "name": "Brasserie Le Grand Comptoir (fictive)",
+   "sector": "HOSPITALITY",
+   "currency": "EUR"
+  },
+  "period": {
+   "start_date": "2024-01-01",
+   "end_date": "2024-12-31"
+  },
+  "calculation_version": "2",
+  "demo": true,
+  "common": {
+   "revenue_ht": "915000.00",
+   "revenue_ttc": "1029361.72",
+   "variable_costs": "258725.86",
+   "stock_variation": "1661.93",
+   "fixed_costs": "508570.38",
+   "recurring_commitments": "523737.03",
+   "financial_expenses": "5889.55",
+   "operating_expenses": "767296.24",
+   "contribution_margin_pct": "71.72",
+   "break_even_revenue_ht": "709066.33",
+   "approximate_ebe": "147703.76",
+   "vat_collected": "114361.72",
+   "vat_deductible": "66375.72",
+   "vat_balance_estimate": "47986.00",
+   "cash_inflows": "1102992.76",
+   "cash_outflows": "1072027.60",
+   "cash_net_flow": "30965.16",
+   "opening_cash": "118636.82",
+   "closing_cash": "149601.98"
+  },
+  "banking": {
+   "external_charges": "421318.24",
+   "external_charges_pct": "46.05",
+   "value_added": "493681.76",
+   "value_added_pct": "53.95",
+   "payroll_costs": "345978.00",
+   "payroll_costs_pct": "37.81",
+   "payroll_to_value_added_pct": "70.08",
+   "ebe_margin_pct": "16.14",
+   "financial_expenses_to_revenue_pct": "0.64",
+   "approximate_caf": "141814.21",
+   "caf_margin_pct": "15.50",
+   "loan_principal_repaid": "62561.48",
+   "debt_service": "68451.03",
+   "debt_service_coverage": "2.16",
+   "caf_after_principal": "79252.73",
+   "financial_expenses_to_ebe_pct": "3.99",
+   "safety_margin": "205933.67",
+   "safety_margin_pct": "22.51",
+   "break_even_date": "2024-10-13",
+   "cash_days": "51.1",
+   "balance_sheet_date": "2024-12-31",
+   "working_capital_requirement": "-30978.71",
+   "working_capital_days": "-12.4",
+   "customer_days": "1.0",
+   "supplier_days": "22.8",
+   "inventory_days": "20.5",
+   "financial_debt": "256174.65",
+   "net_debt": "106572.67",
+   "equity": "421210.52",
+   "gearing": "0.25",
+   "equity_ratio_pct": "58.08",
+   "debt_repayment_years": "1.8"
+  },
+  "specific": {
+   "sector": "HOSPITALITY",
+   "food_consumed_cost": "178875.89",
+   "beverage_consumed_cost": "73606.52",
+   "food_cost_pct": "29.61",
+   "beverage_cost_pct": "23.67",
+   "prime_cost_pct": "65.41"
+  },
+  "comparison": {
+   "mode": "previous",
+   "period": {
+    "start_date": "2023-01-01",
+    "end_date": "2023-12-31"
+   },
+   "has_data": true,
+   "variations": [
+    {
+     "key": "revenue_ht",
+     "current": "915000.00",
+     "previous": "880000.00",
+     "change": "35000.00",
+     "change_pct": "3.98"
+    },
+    {
+     "key": "revenue_ttc",
+     "current": "1029361.72",
+     "previous": "990069.13",
+     "change": "39292.59",
+     "change_pct": "3.97"
+    },
+    {
+     "key": "variable_costs",
+     "current": "258725.86",
+     "previous": "250211.17",
+     "change": "8514.69",
+     "change_pct": "3.40"
+    },
+    {
+     "key": "stock_variation",
+     "current": "1661.93",
+     "previous": "-1896.06",
+     "change": "3557.99",
+     "change_pct": null
+    },
+    {
+     "key": "fixed_costs",
+     "current": "508570.38",
+     "previous": "494473.31",
+     "change": "14097.07",
+     "change_pct": "2.85"
+    },
+    {
+     "key": "recurring_commitments",
+     "current": "523737.03",
+     "previous": "497726.28",
+     "change": "26010.75",
+     "change_pct": "5.23"
+    },
+    {
+     "key": "financial_expenses",
+     "current": "5889.55",
+     "previous": "4660.27",
+     "change": "1229.28",
+     "change_pct": "26.38"
+    },
+    {
+     "key": "operating_expenses",
+     "current": "767296.24",
+     "previous": "744684.48",
+     "change": "22611.76",
+     "change_pct": "3.04"
+    },
+    {
+     "key": "contribution_margin_pct",
+     "current": "71.72",
+     "previous": "71.57",
+     "change": "0.15",
+     "change_pct": null
+    },
+    {
+     "key": "break_even_revenue_ht",
+     "current": "709066.33",
+     "previous": "690924.47",
+     "change": "18141.86",
+     "change_pct": "2.63"
+    },
+    {
+     "key": "approximate_ebe",
+     "current": "147703.76",
+     "previous": "135315.52",
+     "change": "12388.24",
+     "change_pct": "9.16"
+    },
+    {
+     "key": "vat_collected",
+     "current": "114361.72",
+     "previous": "110069.13",
+     "change": "4292.59",
+     "change_pct": "3.90"
+    },
+    {
+     "key": "vat_deductible",
+     "current": "66375.72",
+     "previous": "52469.32",
+     "change": "13906.40",
+     "change_pct": "26.50"
+    },
+    {
+     "key": "vat_balance_estimate",
+     "current": "47986.00",
+     "previous": "57599.81",
+     "change": "-9613.81",
+     "change_pct": "-16.69"
+    },
+    {
+     "key": "cash_inflows",
+     "current": "1102992.76",
+     "previous": "983558.94",
+     "change": "119433.82",
+     "change_pct": "12.14"
+    },
+    {
+     "key": "cash_outflows",
+     "current": "1072027.60",
+     "previous": "956922.12",
+     "change": "115105.48",
+     "change_pct": "12.03"
+    },
+    {
+     "key": "cash_net_flow",
+     "current": "30965.16",
+     "previous": "26636.82",
+     "change": "4328.34",
+     "change_pct": "16.25"
+    },
+    {
+     "key": "opening_cash",
+     "current": "118636.82",
+     "previous": "92000.00",
+     "change": "26636.82",
+     "change_pct": "28.95"
+    },
+    {
+     "key": "closing_cash",
+     "current": "149601.98",
+     "previous": "118636.82",
+     "change": "30965.16",
+     "change_pct": "26.10"
+    },
+    {
+     "key": "external_charges",
+     "current": "421318.24",
+     "previous": "410316.48",
+     "change": "11001.76",
+     "change_pct": "2.68"
+    },
+    {
+     "key": "external_charges_pct",
+     "current": "46.05",
+     "previous": "46.63",
+     "change": "-0.58",
+     "change_pct": null
+    },
+    {
+     "key": "value_added",
+     "current": "493681.76",
+     "previous": "469683.52",
+     "change": "23998.24",
+     "change_pct": "5.11"
+    },
+    {
+     "key": "value_added_pct",
+     "current": "53.95",
+     "previous": "53.37",
+     "change": "0.58",
+     "change_pct": null
+    },
+    {
+     "key": "payroll_costs",
+     "current": "345978.00",
+     "previous": "334368.00",
+     "change": "11610.00",
+     "change_pct": "3.47"
+    },
+    {
+     "key": "payroll_costs_pct",
+     "current": "37.81",
+     "previous": "38.00",
+     "change": "-0.19",
+     "change_pct": null
+    },
+    {
+     "key": "payroll_to_value_added_pct",
+     "current": "70.08",
+     "previous": "71.19",
+     "change": "-1.11",
+     "change_pct": null
+    },
+    {
+     "key": "ebe_margin_pct",
+     "current": "16.14",
+     "previous": "15.38",
+     "change": "0.76",
+     "change_pct": null
+    },
+    {
+     "key": "financial_expenses_to_revenue_pct",
+     "current": "0.64",
+     "previous": "0.53",
+     "change": "0.11",
+     "change_pct": null
+    },
+    {
+     "key": "approximate_caf",
+     "current": "141814.21",
+     "previous": "130655.25",
+     "change": "11158.96",
+     "change_pct": "8.54"
+    },
+    {
+     "key": "caf_margin_pct",
+     "current": "15.50",
+     "previous": "14.85",
+     "change": "0.65",
+     "change_pct": null
+    },
+    {
+     "key": "loan_principal_repaid",
+     "current": "62561.48",
+     "previous": "52858.01",
+     "change": "9703.47",
+     "change_pct": "18.36"
+    },
+    {
+     "key": "debt_service",
+     "current": "68451.03",
+     "previous": "57518.28",
+     "change": "10932.75",
+     "change_pct": "19.01"
+    },
+    {
+     "key": "debt_service_coverage",
+     "current": "2.16",
+     "previous": "2.35",
+     "change": "-0.19",
+     "change_pct": null
+    },
+    {
+     "key": "caf_after_principal",
+     "current": "79252.73",
+     "previous": "77797.24",
+     "change": "1455.49",
+     "change_pct": "1.87"
+    },
+    {
+     "key": "financial_expenses_to_ebe_pct",
+     "current": "3.99",
+     "previous": "3.44",
+     "change": "0.55",
+     "change_pct": null
+    },
+    {
+     "key": "safety_margin",
+     "current": "205933.67",
+     "previous": "189075.53",
+     "change": "16858.14",
+     "change_pct": "8.92"
+    },
+    {
+     "key": "safety_margin_pct",
+     "current": "22.51",
+     "previous": "21.49",
+     "change": "1.02",
+     "change_pct": null
+    },
+    {
+     "key": "cash_days",
+     "current": "51.1",
+     "previous": "45.3",
+     "change": "5.8",
+     "change_pct": null
+    },
+    {
+     "key": "working_capital_requirement",
+     "current": "-30978.71",
+     "previous": "-27942.68",
+     "change": "-3036.03",
+     "change_pct": null
+    },
+    {
+     "key": "working_capital_days",
+     "current": "-12.4",
+     "previous": "-11.6",
+     "change": "-0.8",
+     "change_pct": null
+    },
+    {
+     "key": "customer_days",
+     "current": "1.0",
+     "previous": "4.2",
+     "change": "-3.2",
+     "change_pct": null
+    },
+    {
+     "key": "supplier_days",
+     "current": "22.8",
+     "previous": "27.8",
+     "change": "-5.0",
+     "change_pct": null
+    },
+    {
+     "key": "inventory_days",
+     "current": "20.5",
+     "previous": "23.6",
+     "change": "-3.1",
+     "change_pct": null
+    },
+    {
+     "key": "financial_debt",
+     "current": "256174.65",
+     "previous": "253736.13",
+     "change": "2438.52",
+     "change_pct": "0.96"
+    },
+    {
+     "key": "net_debt",
+     "current": "106572.67",
+     "previous": "135099.31",
+     "change": "-28526.64",
+     "change_pct": "-21.12"
+    },
+    {
+     "key": "equity",
+     "current": "421210.52",
+     "previous": "356600.87",
+     "change": "64609.65",
+     "change_pct": "18.12"
+    },
+    {
+     "key": "gearing",
+     "current": "0.25",
+     "previous": "0.38",
+     "change": "-0.13",
+     "change_pct": null
+    },
+    {
+     "key": "equity_ratio_pct",
+     "current": "58.08",
+     "previous": "53.59",
+     "change": "4.49",
+     "change_pct": null
+    },
+    {
+     "key": "debt_repayment_years",
+     "current": "1.8",
+     "previous": "1.9",
+     "change": "-0.1",
+     "change_pct": null
+    },
+    {
+     "key": "food_consumed_cost",
+     "current": "178875.89",
+     "previous": "173801.17",
+     "change": "5074.72",
+     "change_pct": "2.92"
+    },
+    {
+     "key": "beverage_consumed_cost",
+     "current": "73606.52",
+     "previous": "70175.48",
+     "change": "3431.04",
+     "change_pct": "4.89"
+    },
+    {
+     "key": "food_cost_pct",
+     "current": "29.61",
+     "previous": "29.96",
+     "change": "-0.35",
+     "change_pct": null
+    },
+    {
+     "key": "beverage_cost_pct",
+     "current": "23.67",
+     "previous": "23.41",
+     "change": "0.26",
+     "change_pct": null
+    },
+    {
+     "key": "prime_cost_pct",
+     "current": "65.41",
+     "previous": "65.72",
+     "change": "-0.31",
+     "change_pct": null
+    }
+   ]
+  },
+  "monthly": [
+   {
+    "period": {
+     "start_date": "2024-01-01",
+     "end_date": "2024-01-31"
+    },
+    "revenue_ht": "34718.66",
+    "stock_variation": "5401.59",
+    "approximate_ebe": "-17655.34",
+    "ebe_margin_pct": "-50.85",
+    "approximate_caf": "-18004.23",
+    "cash_net_flow": "-39109.44",
+    "closing_cash": "79527.38"
+   },
+   {
+    "period": {
+     "start_date": "2024-02-01",
+     "end_date": "2024-02-29"
+    },
+    "revenue_ht": "70617.95",
+    "stock_variation": "-2258.53",
+    "approximate_ebe": "7884.05",
+    "ebe_margin_pct": "11.16",
+    "approximate_caf": "7541.27",
+    "cash_net_flow": "23179.56",
+    "closing_cash": "102706.94"
+   },
+   {
+    "period": {
+     "start_date": "2024-03-01",
+     "end_date": "2024-03-31"
+    },
+    "revenue_ht": "84776.61",
+    "stock_variation": "-2545.55",
+    "approximate_ebe": "18245.37",
+    "ebe_margin_pct": "21.52",
+    "approximate_caf": "17908.71",
+    "cash_net_flow": "-11148.38",
+    "closing_cash": "91558.56"
+   },
+   {
+    "period": {
+     "start_date": "2024-04-01",
+     "end_date": "2024-04-30"
+    },
+    "revenue_ht": "75297.68",
+    "stock_variation": "898.45",
+    "approximate_ebe": "12305.01",
+    "ebe_margin_pct": "16.34",
+    "approximate_caf": "11725.31",
+    "cash_net_flow": "14381.18",
+    "closing_cash": "105939.74"
+   },
+   {
+    "period": {
+     "start_date": "2024-05-01",
+     "end_date": "2024-05-31"
+    },
+    "revenue_ht": "86375.53",
+    "stock_variation": "-800.85",
+    "approximate_ebe": "19673.02",
+    "ebe_margin_pct": "22.78",
+    "approximate_caf": "19103.16",
+    "cash_net_flow": "18156.68",
+    "closing_cash": "124096.42"
+   },
+   {
+    "period": {
+     "start_date": "2024-06-01",
+     "end_date": "2024-06-30"
+    },
+    "revenue_ht": "85456.03",
+    "stock_variation": "-1928.34",
+    "approximate_ebe": "18862.74",
+    "ebe_margin_pct": "22.07",
+    "approximate_caf": "18302.74",
+    "cash_net_flow": "4621.49",
+    "closing_cash": "128717.91"
+   },
+   {
+    "period": {
+     "start_date": "2024-07-01",
+     "end_date": "2024-07-31"
+    },
+    "revenue_ht": "80408.45",
+    "stock_variation": "3344.42",
+    "approximate_ebe": "15151.23",
+    "ebe_margin_pct": "18.84",
+    "approximate_caf": "14601.11",
+    "cash_net_flow": "-13962.18",
+    "closing_cash": "114755.73"
+   },
+   {
+    "period": {
+     "start_date": "2024-08-01",
+     "end_date": "2024-08-31"
+    },
+    "revenue_ht": "76339.27",
+    "stock_variation": "-473.64",
+    "approximate_ebe": "12324.83",
+    "ebe_margin_pct": "16.14",
+    "approximate_caf": "11784.62",
+    "cash_net_flow": "2221.84",
+    "closing_cash": "116977.57"
+   },
+   {
+    "period": {
+     "start_date": "2024-09-01",
+     "end_date": "2024-09-30"
+    },
+    "revenue_ht": "79230.15",
+    "stock_variation": "1158.24",
+    "approximate_ebe": "15020.29",
+    "ebe_margin_pct": "18.96",
+    "approximate_caf": "14490.01",
+    "cash_net_flow": "11628.55",
+    "closing_cash": "128606.12"
+   },
+   {
+    "period": {
+     "start_date": "2024-10-01",
+     "end_date": "2024-10-31"
+    },
+    "revenue_ht": "80209.05",
+    "stock_variation": "-2333.28",
+    "approximate_ebe": "15063.11",
+    "ebe_margin_pct": "18.78",
+    "approximate_caf": "14542.78",
+    "cash_net_flow": "6101.43",
+    "closing_cash": "134707.55"
+   },
+   {
+    "period": {
+     "start_date": "2024-11-01",
+     "end_date": "2024-11-30"
+    },
+    "revenue_ht": "75997.58",
+    "stock_variation": "983.91",
+    "approximate_ebe": "11751.49",
+    "ebe_margin_pct": "15.46",
+    "approximate_caf": "11241.13",
+    "cash_net_flow": "-1166.56",
+    "closing_cash": "133540.99"
+   },
+   {
+    "period": {
+     "start_date": "2024-12-01",
+     "end_date": "2024-12-31"
+    },
+    "revenue_ht": "85573.04",
+    "stock_variation": "215.51",
+    "approximate_ebe": "19077.96",
+    "ebe_margin_pct": "22.29",
+    "approximate_caf": "18577.60",
+    "cash_net_flow": "16060.99",
+    "closing_cash": "149601.98"
+   }
+  ],
+  "alerts": [
+   {
+    "code": "DEMO_DATA",
+    "severity": "info",
+    "message": "Données fictives de démonstration : aucune entreprise réelle, aucun chiffre client."
+   },
+   {
+    "code": "MANAGEMENT_ESTIMATES",
+    "severity": "info",
+    "message": "Indicateurs de gestion sur les pièces saisies : valeur ajoutée, EBE et seuil de rentabilité calculés avec la variation de stocks intégrée pour les familles inventoriées au début et au lendemain de la fin de période, hors amortissements et impôt sur les sociétés ; CAF approchée = EBE − intérêts d’emprunt (avant IS). TVA théorique sur pièces et charges proratisées, pas une déclaration fiscale. Ne pas saisir deux fois une charge récurrente sous forme d’achat."
+   },
+   {
+    "code": "CASH_LEDGER_ONLY",
+    "severity": "info",
+    "message": "La trésorerie utilise uniquement les mouvements de caisse/banque saisis et un solde initial ; aucune facture n’est supposée payée."
+   }
+  ]
+ },
+ "noComparisonData": {
+  "company": {
+   "id": "demo-services",
+   "name": "Altitude Conseil (fictive)",
+   "sector": "SERVICES",
+   "currency": "EUR"
+  },
+  "period": {
+   "start_date": "2023-01-01",
+   "end_date": "2023-01-31"
+  },
+  "calculation_version": "2",
+  "demo": true,
+  "common": {
+   "revenue_ht": "100530.00",
+   "revenue_ttc": "120636.00",
+   "variable_costs": "0.00",
+   "stock_variation": null,
+   "fixed_costs": "76131.45",
+   "recurring_commitments": "70234.00",
+   "financial_expenses": "0.00",
+   "operating_expenses": "76131.45",
+   "contribution_margin_pct": "100.00",
+   "break_even_revenue_ht": "76131.45",
+   "approximate_ebe": "24398.55",
+   "vat_collected": "20106.00",
+   "vat_deductible": "1864.45",
+   "vat_balance_estimate": "18241.55",
+   "cash_inflows": "104500.00",
+   "cash_outflows": "95100.00",
+   "cash_net_flow": "9400.00",
+   "opening_cash": "165000.00",
+   "closing_cash": "174400.00"
+  },
+  "banking": {
+   "external_charges": "10637.45",
+   "external_charges_pct": "10.58",
+   "value_added": "89892.55",
+   "value_added_pct": "89.42",
+   "payroll_costs": "65494.00",
+   "payroll_costs_pct": "65.15",
+   "payroll_to_value_added_pct": "72.86",
+   "ebe_margin_pct": "24.27",
+   "financial_expenses_to_revenue_pct": "0.00",
+   "approximate_caf": "24398.55",
+   "caf_margin_pct": "24.27",
+   "loan_principal_repaid": "0.00",
+   "debt_service": "0.00",
+   "debt_service_coverage": null,
+   "caf_after_principal": "24398.55",
+   "financial_expenses_to_ebe_pct": "0.00",
+   "safety_margin": "24398.55",
+   "safety_margin_pct": "24.27",
+   "break_even_date": "2023-01-31",
+   "cash_days": "56.8",
+   "balance_sheet_date": "2022-12-31",
+   "working_capital_requirement": "101783.33",
+   "working_capital_days": "31.4",
+   "customer_days": "48.8",
+   "supplier_days": "23.6",
+   "inventory_days": null,
+   "financial_debt": "0",
+   "net_debt": "-165000.00",
+   "equity": "299383.33",
+   "gearing": "-0.55",
+   "equity_ratio_pct": "77.24",
+   "debt_repayment_years": "0.0"
+  },
+  "specific": {
+   "sector": "SERVICES",
+   "average_hourly_rate_ht": "109.21",
+   "average_daily_rate_ht": "764.49",
+   "structure_cost_ratio_pct": "75.73"
+  },
+  "comparison": {
+   "mode": "year_ago",
+   "period": {
+    "start_date": "2022-01-01",
+    "end_date": "2022-01-31"
+   },
+   "has_data": false,
+   "variations": [
+    {
+     "key": "revenue_ht",
+     "current": "100530.00",
+     "previous": "0.00",
+     "change": "100530.00",
+     "change_pct": null
+    },
+    {
+     "key": "revenue_ttc",
+     "current": "120636.00",
+     "previous": "0.00",
+     "change": "120636.00",
+     "change_pct": null
+    },
+    {
+     "key": "variable_costs",
+     "current": "0.00",
+     "previous": "0.00",
+     "change": "0.00",
+     "change_pct": null
+    },
+    {
+     "key": "stock_variation",
+     "current": null,
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "fixed_costs",
+     "current": "76131.45",
+     "previous": "0.00",
+     "change": "76131.45",
+     "change_pct": null
+    },
+    {
+     "key": "recurring_commitments",
+     "current": "70234.00",
+     "previous": "0.00",
+     "change": "70234.00",
+     "change_pct": null
+    },
+    {
+     "key": "financial_expenses",
+     "current": "0.00",
+     "previous": "0.00",
+     "change": "0.00",
+     "change_pct": null
+    },
+    {
+     "key": "operating_expenses",
+     "current": "76131.45",
+     "previous": "0.00",
+     "change": "76131.45",
+     "change_pct": null
+    },
+    {
+     "key": "contribution_margin_pct",
+     "current": "100.00",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "break_even_revenue_ht",
+     "current": "76131.45",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "approximate_ebe",
+     "current": "24398.55",
+     "previous": "0.00",
+     "change": "24398.55",
+     "change_pct": null
+    },
+    {
+     "key": "vat_collected",
+     "current": "20106.00",
+     "previous": "0.00",
+     "change": "20106.00",
+     "change_pct": null
+    },
+    {
+     "key": "vat_deductible",
+     "current": "1864.45",
+     "previous": "0.00",
+     "change": "1864.45",
+     "change_pct": null
+    },
+    {
+     "key": "vat_balance_estimate",
+     "current": "18241.55",
+     "previous": "0.00",
+     "change": "18241.55",
+     "change_pct": null
+    },
+    {
+     "key": "cash_inflows",
+     "current": "104500.00",
+     "previous": "0.00",
+     "change": "104500.00",
+     "change_pct": null
+    },
+    {
+     "key": "cash_outflows",
+     "current": "95100.00",
+     "previous": "0.00",
+     "change": "95100.00",
+     "change_pct": null
+    },
+    {
+     "key": "cash_net_flow",
+     "current": "9400.00",
+     "previous": "0.00",
+     "change": "9400.00",
+     "change_pct": null
+    },
+    {
+     "key": "opening_cash",
+     "current": "165000.00",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "closing_cash",
+     "current": "174400.00",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "external_charges",
+     "current": "10637.45",
+     "previous": "0.00",
+     "change": "10637.45",
+     "change_pct": null
+    },
+    {
+     "key": "external_charges_pct",
+     "current": "10.58",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "value_added",
+     "current": "89892.55",
+     "previous": "0.00",
+     "change": "89892.55",
+     "change_pct": null
+    },
+    {
+     "key": "value_added_pct",
+     "current": "89.42",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "payroll_costs",
+     "current": "65494.00",
+     "previous": "0.00",
+     "change": "65494.00",
+     "change_pct": null
+    },
+    {
+     "key": "payroll_costs_pct",
+     "current": "65.15",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "payroll_to_value_added_pct",
+     "current": "72.86",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "ebe_margin_pct",
+     "current": "24.27",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "financial_expenses_to_revenue_pct",
+     "current": "0.00",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "approximate_caf",
+     "current": "24398.55",
+     "previous": "0.00",
+     "change": "24398.55",
+     "change_pct": null
+    },
+    {
+     "key": "caf_margin_pct",
+     "current": "24.27",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "loan_principal_repaid",
+     "current": "0.00",
+     "previous": "0.00",
+     "change": "0.00",
+     "change_pct": null
+    },
+    {
+     "key": "debt_service",
+     "current": "0.00",
+     "previous": "0.00",
+     "change": "0.00",
+     "change_pct": null
+    },
+    {
+     "key": "debt_service_coverage",
+     "current": null,
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "caf_after_principal",
+     "current": "24398.55",
+     "previous": "0.00",
+     "change": "24398.55",
+     "change_pct": null
+    },
+    {
+     "key": "financial_expenses_to_ebe_pct",
+     "current": "0.00",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "safety_margin",
+     "current": "24398.55",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "safety_margin_pct",
+     "current": "24.27",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "cash_days",
+     "current": "56.8",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "working_capital_requirement",
+     "current": "101783.33",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "working_capital_days",
+     "current": "31.4",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "customer_days",
+     "current": "48.8",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "supplier_days",
+     "current": "23.6",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "inventory_days",
+     "current": null,
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "financial_debt",
+     "current": "0",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "net_debt",
+     "current": "-165000.00",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "equity",
+     "current": "299383.33",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "gearing",
+     "current": "-0.55",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "equity_ratio_pct",
+     "current": "77.24",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "debt_repayment_years",
+     "current": "0.0",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "average_hourly_rate_ht",
+     "current": "109.21",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "average_daily_rate_ht",
+     "current": "764.49",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    },
+    {
+     "key": "structure_cost_ratio_pct",
+     "current": "75.73",
+     "previous": null,
+     "change": null,
+     "change_pct": null
+    }
+   ]
+  },
+  "monthly": [
+   {
+    "period": {
+     "start_date": "2023-01-01",
+     "end_date": "2023-01-31"
+    },
+    "revenue_ht": "100530.00",
+    "stock_variation": null,
+    "approximate_ebe": "24398.55",
+    "ebe_margin_pct": "24.27",
+    "approximate_caf": "24398.55",
+    "cash_net_flow": "9400.00",
+    "closing_cash": "174400.00"
+   }
+  ],
+  "alerts": [
+   {
+    "code": "DEMO_DATA",
+    "severity": "info",
+    "message": "Données fictives de démonstration : aucune entreprise réelle, aucun chiffre client."
+   },
+   {
+    "code": "MANAGEMENT_ESTIMATES",
+    "severity": "info",
+    "message": "Indicateurs de gestion sur les pièces saisies : valeur ajoutée, EBE et seuil de rentabilité calculés hors variation de stocks (inventaires de début et de fin de période non saisis), hors amortissements et impôt sur les sociétés ; CAF approchée = EBE − intérêts d’emprunt (avant IS). TVA théorique sur pièces et charges proratisées, pas une déclaration fiscale. Ne pas saisir deux fois une charge récurrente sous forme d’achat."
+   },
+   {
+    "code": "CASH_LEDGER_ONLY",
+    "severity": "info",
+    "message": "La trésorerie utilise uniquement les mouvements de caisse/banque saisis et un solde initial ; aucune facture n’est supposée payée."
+   }
+  ]
+ },
+ "withoutComparison": {
+  "company": {
+   "id": "demo-retail",
+   "name": "Maison Lumière — décoration (fictive)",
+   "sector": "RETAIL",
+   "currency": "EUR"
+  },
+  "period": {
+   "start_date": "2025-03-01",
+   "end_date": "2025-03-31"
+  },
+  "calculation_version": "2",
+  "demo": true,
+  "common": {
+   "revenue_ht": "45673.94",
+   "revenue_ttc": "54808.75",
+   "variable_costs": "20631.90",
+   "stock_variation": "-6849.05",
+   "fixed_costs": "23804.95",
+   "recurring_commitments": "24131.09",
+   "financial_expenses": "71.21",
+   "operating_expenses": "44436.85",
+   "contribution_margin_pct": "54.83",
+   "break_even_revenue_ht": "43417.62",
+   "approximate_ebe": "1237.09",
+   "vat_collected": "9134.81",
+   "vat_deductible": "7049.88",
+   "vat_balance_estimate": "2084.93",
+   "cash_inflows": "57268.48",
+   "cash_outflows": "51358.17",
+   "cash_net_flow": "5910.31",
+   "opening_cash": "111611.27",
+   "closing_cash": "117521.58"
+  },
+  "banking": {
+   "external_charges": "28913.35",
+   "external_charges_pct": "63.30",
+   "value_added": "16760.59",
+   "value_added_pct": "36.70",
+   "payroll_costs": "15523.50",
+   "payroll_costs_pct": "33.99",
+   "payroll_to_value_added_pct": "92.62",
+   "ebe_margin_pct": "2.71",
+   "financial_expenses_to_revenue_pct": "0.16",
+   "approximate_caf": "1165.88",
+   "caf_margin_pct": "2.55",
+   "loan_principal_repaid": "1676.38",
+   "debt_service": "1747.59",
+   "debt_service_coverage": "0.71",
+   "caf_after_principal": "-510.50",
+   "financial_expenses_to_ebe_pct": "5.76",
+   "safety_margin": "2256.32",
+   "safety_margin_pct": "4.94",
+   "break_even_date": "2025-03-29",
+   "cash_days": "70.9",
+   "balance_sheet_date": "2024-12-31",
+   "working_capital_requirement": "33443.19",
+   "working_capital_days": "22.7",
+   "customer_days": "3.3",
+   "supplier_days": "49.4",
+   "inventory_days": "190.3",
+   "financial_debt": "116646.10",
+   "net_debt": "-79333.51",
+   "equity": "304893.36",
+   "gearing": "-0.26",
+   "equity_ratio_pct": "58.80",
+   "debt_repayment_years": "8.5"
+  },
+  "specific": {
+   "sector": "RETAIL",
+   "goods_consumed_cost": "20277.40",
+   "commercial_margin": "25396.54",
+   "commercial_margin_pct": "55.60",
+   "estimated_stock_turnover": "0.17",
+   "average_basket_ht": "41.83"
+  },
+  "comparison": null,
+  "monthly": [
+   {
+    "period": {
+     "start_date": "2025-03-01",
+     "end_date": "2025-03-31"
+    },
+    "revenue_ht": "45673.94",
+    "stock_variation": "-6849.05",
+    "approximate_ebe": "1237.09",
+    "ebe_margin_pct": "2.71",
+    "approximate_caf": "1165.88",
+    "cash_net_flow": "5910.31",
+    "closing_cash": "117521.58"
+   }
+  ],
+  "alerts": [
+   {
+    "code": "DEMO_DATA",
+    "severity": "info",
+    "message": "Données fictives de démonstration : aucune entreprise réelle, aucun chiffre client."
+   },
+   {
+    "code": "MANAGEMENT_ESTIMATES",
+    "severity": "info",
+    "message": "Indicateurs de gestion sur les pièces saisies : valeur ajoutée, EBE et seuil de rentabilité calculés avec la variation de stocks intégrée pour les familles inventoriées au début et au lendemain de la fin de période, hors amortissements et impôt sur les sociétés ; CAF approchée = EBE − intérêts d’emprunt (avant IS). TVA théorique sur pièces et charges proratisées, pas une déclaration fiscale. Ne pas saisir deux fois une charge récurrente sous forme d’achat."
+   },
+   {
+    "code": "DEBT_SERVICE_NOT_COVERED",
+    "severity": "critical",
+    "message": "L’EBE ne couvre pas les annuités d’emprunt (capital + intérêts) : la CAF est inférieure au capital remboursé."
+   },
+   {
+    "code": "LONG_REPAYMENT",
+    "severity": "warning",
+    "message": "Plus de 4 années de CAF sont nécessaires pour rembourser la dette financière."
+   },
+   {
+    "code": "CASH_LEDGER_ONLY",
+    "severity": "info",
+    "message": "La trésorerie utilise uniquement les mouvements de caisse/banque saisis et un solde initial ; aucune facture n’est supposée payée."
+   }
+  ]
+ },
+ "catalog": {
+  "period": {
+   "start_date": "2023-01-01",
+   "end_date": "2025-12-31"
+  },
+  "notice": "Entreprises entièrement fictives : aucun chiffre client, aucune entreprise réelle. Pièces générées de façon déterministe à partir d'un grand livre en partie double (bilans équilibrés, trésorerie rapprochée).",
+  "companies": [
+   {
+    "company": {
+     "id": "demo-hospitality",
+     "name": "Brasserie Le Grand Comptoir (fictive)",
+     "sector": "HOSPITALITY",
+     "currency": "EUR"
+    },
+    "description": "Brasserie de centre-ville (95 couverts), fermée le lundi et deux semaines en janvier. Fonds de commerce acquis en 2021 grâce à un prêt bancaire ; matériel de cuisine financé à crédit en mars 2024."
+   },
+   {
+    "company": {
+     "id": "demo-construction",
+     "name": "Durand Rénovation (fictive)",
+     "sector": "CONSTRUCTION",
+     "currency": "EUR"
+    },
+    "description": "Entreprise de rénovation tous corps d'état (une douzaine de salariés), clientèle de particuliers et de professionnels, deux chantiers ouverts par mois et facturés en situations mensuelles. TVA sur les encaissements ; un chantier déficitaire en 2024 à cause d'un désamiantage imprévu."
+   },
+   {
+    "company": {
+     "id": "demo-retail",
+     "name": "Maison Lumière — décoration (fictive)",
+     "sector": "RETAIL",
+     "currency": "EUR"
+    },
+    "description": "Boutique de décoration et de luminaires en centre-ville, ouverte du mardi au samedi et les dimanches de décembre. Forte saisonnalité de Noël, soldes d'hiver et d'été ; après une fin d'année 2023 tendue, le stock de Noël 2024 est financé par un crédit de campagne. Résultat 2022 mis en réserve, puis la moitié des bénéfices distribuée."
+   },
+   {
+    "company": {
+     "id": "demo-services",
+     "name": "Altitude Conseil (fictive)",
+     "sector": "SERVICES",
+     "currency": "EUR"
+    },
+    "description": "Cabinet de conseil en organisation de huit consultants, cinq clients grands comptes et publics facturés au temps passé (taux journalier indexé de 3 % par an). Délais de paiement de 45 à 75 jours ; TVA sur les encaissements."
+   }
+  ]
+ }
+}

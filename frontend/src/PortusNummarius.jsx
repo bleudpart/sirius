@@ -7,6 +7,7 @@ import { API_BASE_URL } from "@/lib/api";
 import { personalMarketHeaders } from "@/apiKeyStorage";
 import NummariusAnalytics from "./NummariusAnalytics";
 import FinanceWorkspace from "./FinanceWorkspace";
+import CompanyFinanceDashboard from "./CompanyFinanceDashboard";
 
 const API = API_BASE_URL;
 const RANGES = [["1s", "1 SEM"], ["1m", "1 MOIS"], ["3m", "3 MOIS"], ["max", "MAX"]];
@@ -118,18 +119,19 @@ export default function PortusNummarius({ onClose }) {
   return (
     <div className="prime-screen" data-testid="nummarius-panel">
       <header className="zeus-head">
-        <div className="zeus-title font-divine"><Landmark size={20} /> PORTUS NUMMARIUS — BOURSE & MARCHÉS</div>
+        <div className="zeus-title font-divine"><Landmark size={20} /> PORTUS NUMMARIUS — FINANCES & MARCHÉS</div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <button className="file-btn" onClick={loadMarket} title="Actualiser" data-testid="nummarius-refresh-btn"><RefreshCw size={13} /></button>
+          {workspace !== "company" && <button className="file-btn" onClick={loadMarket} title="Actualiser" data-testid="nummarius-refresh-btn"><RefreshCw size={13} /></button>}
           <button className="setup-close zeus-close" onClick={onClose} data-testid="nummarius-close-btn">✕</button>
         </div>
       </header>
-      <nav className="numm-workspace-tabs" aria-label="Espace boursier">
+      <nav className="numm-workspace-tabs" aria-label="Espaces financiers">
         <button type="button" aria-pressed={workspace === "market"} onClick={() => setWorkspace("market")}>Marchés & alertes de prix</button>
         <button type="button" aria-pressed={workspace === "technical"} onClick={() => setWorkspace("technical")}>Analyse technique & comparateur</button>
         <button type="button" aria-pressed={workspace === "finance"} onClick={() => setWorkspace("finance")}>Portefeuille & routines confirmées</button>
+        <button type="button" aria-pressed={workspace === "company"} onClick={() => setWorkspace("company")}>Finance d’entreprise</button>
       </nav>
-      {workspace === "finance" ? <FinanceWorkspace /> : workspace === "technical" ? <NummariusAnalytics /> : <div className="gcal-body numm-body">
+      {workspace === "company" ? <CompanyFinanceDashboard /> : workspace === "finance" ? <FinanceWorkspace /> : workspace === "technical" ? <NummariusAnalytics /> : <div className="gcal-body numm-body">
         <aside className="numm-side">
           <img src="/holo/nummarius.jpg" alt="Portus Nummarius" className="numm-avatar" data-testid="nummarius-avatar" draggable={false} />
           <div className="numm-avatar-caption font-divine">GARDIEN DES MARCHÉS</div>

@@ -7411,7 +7411,7 @@ function App() {
       {showPythagore && <PythagorePanel onClose={() => setShowPythagore(false)} />}
       {showAdmin && authUser?.role === "admin" && <AdminPanel onClose={() => setShowAdmin(false)} />}
       {showEnterprise && <EnterprisePanel onClose={() => setShowEnterprise(false)} />}
-      {showNummarius && <PortusNummarius onClose={() => setShowNummarius(false)} />}
+      {showNummarius && <PortusNummarius key={voiceAccount} onClose={() => setShowNummarius(false)} />}
       {showNews && <NewsPanel onClose={() => setShowNews(false)} />}
       {argusAlert && (
         <div className="argus-alert" role="alertdialog" aria-live="assertive" aria-label="Alerte ARGUS" data-testid="argus-alert">

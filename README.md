@@ -1947,6 +1947,43 @@ atomiques SQLite/Mongo. NÉMÉSIS affiche leurs cent derniers événements ; auc
 mutation financière n'est disponible depuis sa vue de consultation. L'effacement
 de compte inclut toutes ces collections, après arrêt de son activité.
 
+### Finance d'entreprise multisectorielle de ΣIRIUS
+
+Tableau de gestion destiné au dirigeant et à son banquier : formation du
+résultat, capacité de remboursement, point mort, trésorerie, bilan simplifié et
+BFR, puis indicateurs du secteur déclaré (restauration, BTP, commerce,
+services). Ce n'est ni une comptabilité certifiée, ni une déclaration de TVA :
+tout est calculé de façon déterministe en `Decimal` à partir des pièces
+enregistrées, dans un registre SQLAlchemy distinct du portefeuille personnel.
+[Le guide backend](backend/FINANCE.md) fait référence : parcours de test
+bancaire et grille de recette, formules, seuils, limites, API et exploitation.
+
+L'onglet **Finance d’entreprise** de NUMMARIUS s'ouvre dans la même fenêtre et
+avec les mêmes cartes bleu nuit/doré que les autres espaces financiers :
+
+- **Démonstration fictive** : quatre entreprises inventées, une par secteur,
+  sur les exercices 2023 à 2025, en lecture seule pour toute session ouverte.
+  Un bandeau permanent, et la mention « DONNÉES FICTIVES DE DÉMONSTRATION » sur
+  le rapport et son export, évitent toute confusion avec des chiffres réels.
+- **Mon entreprise** : les vrais chiffres de l'entreprise rattachée au compte,
+  réservés à ses membres **admin/manager**. La vue **Saisie & imports** gère le
+  profil financier et chaque type de pièce (ventes, achats, charges fixes,
+  inventaires, soldes et mouvements de trésorerie, bilans) avec un journal
+  d'audit. Les relevés bancaires CSV et OFX s'importent depuis l'interface ;
+  les ventes POS (webhook signé HMAC) et les factures OCR passent par l'API.
+  Chaque import est atomique, idempotent et annulable.
+
+Le **Tableau de bord** compare la période à la même période N-1 ou à la période
+précédente, détaille l'évolution mois par mois et produit un rapport « Dossier
+de gestion » à exporter en CSV ou à imprimer en PDF. Les montants JSON sont des
+chaînes décimales, affichées sans calcul en flottants dans le navigateur ; un
+indicateur incalculable reste `null`, jamais remplacé par zéro. La trésorerie
+provient uniquement des soldes et mouvements saisis, jamais de factures
+supposées payées. Les cartes s'empilent sur téléphone et les marges par chantier
+restent lisibles dans un tableau à défilement interne. Le fichier
+`data_dir()/finance.sqlite3` doit être sauvegardé séparément : il n'est pas
+inclus dans les exports du docstore.
+
 ### PORTUS NUMMARIUS : premier espace d'analyse technique
 
 Le module conserve sa vue Marchés et ses alertes de prix existantes. L'onglet

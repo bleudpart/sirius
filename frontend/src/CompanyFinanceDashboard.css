@@ -1,0 +1,212 @@
+/* Finance d’entreprise : palette NUMMARIUS (bleu nuit, doré, turquoise) partagée avec NummariusAnalytics.css. */
+.company-finance { overflow-wrap: anywhere; }
+.company-finance-kicker { margin: 0; color: var(--workspace-gold, #d8b875); font-size: 12px; letter-spacing: .12em; }
+.company-finance-badge { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; color: #b9cbd8; font-size: 13px; }
+.company-finance button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; }
+.company-finance button:disabled { opacity: .6; cursor: wait; }
+.company-finance button:not([aria-pressed="true"]):not(:disabled):hover { border-color: #e2ca95; color: #f5dfaf; }
+.company-finance .numm-tech-card strong { display: inline; font-size: inherit; color: inherit; }
+.company-finance-toolbar { margin: 0 0 14px; }
+
+/* Démonstration fictive : toujours signalée par un cadre doré. */
+.company-finance-demo-banner {
+  margin: 0 0 14px; padding: 12px 14px; border: 1px solid #e2ca95; border-left-width: 4px; border-radius: 10px;
+  background: rgba(226, 202, 149, .1); color: #f5dfaf;
+}
+.company-finance-demo-banner strong { font-weight: 600; }
+.company-finance-sectors, .company-finance-presets, .company-finance-kinds { display: flex; flex-wrap: wrap; gap: 6px; }
+.company-finance-demo-panel .company-finance-filter-note { margin-top: 12px; }
+
+/* Période analysée */
+.company-finance-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 14px; }
+.company-finance-filters label { display: flex; flex: 1 1 170px; flex-direction: column; gap: 6px; min-width: 0; }
+.company-finance-filters input, .company-finance-filters select,
+.company-finance-field input:not([type="checkbox"]), .company-finance-field select {
+  width: 100%; min-width: 0; box-sizing: border-box; min-height: 44px; padding: 9px 12px;
+  border: 1px solid #43606f; border-radius: 8px; background: #152b38; color: #e1edf4; color-scheme: dark; font: inherit;
+}
+.company-finance-filters input:focus-visible, .company-finance-filters select:focus-visible,
+.company-finance-field input:focus-visible, .company-finance-field select:focus-visible {
+  outline: 2px solid var(--workspace-gold, #d8b875); outline-offset: 3px;
+}
+.company-finance-presets { flex-basis: 100%; }
+.company-finance-filter-note { flex-basis: 100%; margin: 0; color: #a7bdcc; font-size: 12px; }
+.company-finance-filters [role="alert"] { flex-basis: 100%; margin: 0; }
+
+/* Messages */
+.company-finance-notice { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.company-finance-notice svg { color: #e2ca95; }
+.company-finance-notice h3 { margin: 0; color: #f5dfaf; font-size: 16px; }
+.company-finance-notice p { margin: 0; }
+.company-finance-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.company-finance-actions small { margin: 0; }
+.company-finance-error { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
+.company-finance-error [role="alert"] { flex: 1 1 280px; margin: 0; }
+.company-finance-feedback {
+  margin: 10px 0; padding: 10px 12px; border-left: 3px solid #8ee5d9; border-radius: 0 8px 8px 0;
+  background: rgba(142, 229, 217, .08); color: #c9f3ee;
+}
+
+/* Rapport (écran) : les sélecteurs restent valables dans le clone imprimé. */
+.company-finance-report-head {
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 16px;
+  padding: 18px 20px; margin-bottom: 14px; border: 1px solid #33505d; border-left: 3px solid #e2ca95; border-radius: 14px;
+  background: linear-gradient(115deg, #122832, #0d1b27);
+}
+.company-finance-report-head > div:first-child { flex: 1 1 320px; min-width: 0; }
+.company-finance-report-head h3 { margin: 4px 0 6px; color: #f5dfaf; font-size: clamp(18px, 2.2vw, 24px); letter-spacing: 0; }
+.company-finance-report-head p { margin: 2px 0; color: #b9cbd8; font-size: 13px; }
+.company-finance-report h4 {
+  margin: 26px 0 10px; padding-bottom: 6px; border-bottom: 1px solid #304957;
+  color: #e2ca95; font-size: 15px; font-weight: 600; letter-spacing: .03em;
+}
+.company-finance-report .numm-tech-card > h4:first-child { margin-top: 0; }
+.company-finance-intro, .company-finance-note { margin: 4px 0 10px; color: #a7bdcc; font-size: 13px; }
+.company-finance-metrics { margin: 12px 0 6px; }
+.company-finance-metrics dt { color: #b9cbd8; font-size: 13px; }
+.company-finance-metrics dd {
+  margin: 10px 0 0; color: #8ee5d9; font-size: clamp(18px, 2vw, 26px); line-height: 1.3;
+  font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+}
+.company-finance-metrics dd[data-negative="true"] { color: #ffb2a5; }
+.company-finance-metric { display: flex; flex-direction: column; border-top: 3px solid #304957; }
+.company-finance-metric small { margin-top: 4px; font-size: 12px; }
+.company-finance-metric[data-status="ok"] { border-top-color: #8ee5d9; }
+.company-finance-metric[data-status="watch"] { border-top-color: #e2ca95; }
+.company-finance-metric[data-status="critical"] { border-top-color: #ffb2a5; }
+.company-finance-report .company-finance-status { font-weight: 600; }
+.company-finance-metric[data-status="ok"] .company-finance-status { color: #8ee5d9; }
+.company-finance-metric[data-status="watch"] .company-finance-status { color: #e2ca95; }
+.company-finance-metric[data-status="critical"] .company-finance-status { color: #ffb2a5; }
+.company-finance-report .company-finance-change { color: #c8d9e5; font-variant-numeric: tabular-nums; }
+
+/* Tableaux du rapport : montants alignés à droite, en-têtes de ligne à gauche. */
+.company-finance-report .numm-tech-table td { min-width: 0; text-align: right; white-space: nowrap; }
+.company-finance-report .numm-tech-table thead th:not(:first-child) { text-align: right; }
+.company-finance-report .numm-tech-table td[colspan] { text-align: left; white-space: normal; }
+.company-finance-report .numm-tech-table tbody th { min-width: 180px; color: #dce6ee; font-weight: 400; }
+.company-finance-report .numm-tech-table td[data-negative="true"],
+.company-finance-report .numm-tech-table span[data-negative="true"] { color: #ffb2a5; }
+.company-finance-sig tr[data-total="true"] th, .company-finance-sig tr[data-total="true"] td {
+  background: rgba(226, 202, 149, .07); color: #f5dfaf; font-weight: 600;
+}
+.company-finance-sig tr[data-detail="true"] th { padding-left: 34px; color: #a7bdcc; }
+.company-finance-sig tr[data-detail="true"] td { color: #a7bdcc; }
+.company-finance-sign { display: inline-block; width: 1.4em; color: #e2ca95; font-variant-numeric: tabular-nums; }
+.company-finance-bar-cell { min-width: 150px; }
+.company-finance-bar {
+  display: block; width: var(--bar-size, 0%); max-width: 100%; height: 6px; margin: 0 0 6px auto; border-radius: 3px;
+  background: linear-gradient(90deg, #4f8fa8, #8ee5d9);
+}
+.company-finance-bar[data-negative="true"] { background: #ffb2a5; }
+.company-finance-alerts { padding: 0; margin: 0; list-style: none; }
+.company-finance-alerts li { padding: 12px; margin-top: 12px; border-left: 3px solid #43606f; border-radius: 0 8px 8px 0; background: rgba(21, 43, 56, .5); }
+.company-finance-alerts li[data-severity="critical"] { border-color: #ffb2a5; }
+.company-finance-alerts li[data-severity="warning"] { border-color: var(--workspace-gold, #d8b875); }
+.company-finance-alert-label { color: #b9cbd8; font-size: 12px; font-weight: 600; }
+.company-finance-alerts li[data-severity="critical"] .company-finance-alert-label { color: #ffb2a5; }
+.company-finance-alerts li[data-severity="warning"] .company-finance-alert-label { color: var(--workspace-gold, #d8b875); }
+.company-finance-alerts p { margin: 4px 0 0; }
+.company-finance-comparison > summary, .company-finance-method > summary, .company-finance-audit > summary { padding: 6px 0; font-weight: 600; }
+.company-finance-comparison[open] > summary, .company-finance-method[open] > summary, .company-finance-audit[open] > summary { margin-bottom: 12px; }
+.company-finance-method p { color: #c8d9e5; }
+.company-finance-definitions { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px 18px; margin: 14px 0 0; }
+.company-finance-definitions div { padding: 10px 12px; border-left: 2px solid #43606f; border-radius: 0 8px 8px 0; background: rgba(21, 43, 56, .45); }
+.company-finance-definitions dt { color: #e2ca95; font-size: 13px; font-weight: 600; }
+.company-finance-definitions dd { margin: 4px 0 0; color: #c8d9e5; font-size: 13px; }
+
+/* Saisie & imports */
+.company-finance-entry { display: grid; gap: 14px; }
+.company-finance-entry > .numm-tech-card { margin: 0; }
+.company-finance-entry h3 { margin: 0 0 10px; color: #f5dfaf; font-size: 16px; letter-spacing: .02em; }
+.company-finance-entry h4 { margin: 20px 0 10px; color: #e2ca95; font-size: 14px; }
+.company-finance-entry p { margin: 0 0 10px; }
+.company-finance-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px 18px; margin: 0 0 12px; }
+.company-finance-facts dt { color: #a7bdcc; font-size: 12px; }
+.company-finance-facts dd { margin: 2px 0 0; color: #e1edf4; font-weight: 600; }
+.company-finance-form { display: grid; gap: 14px; margin-top: 10px; }
+.company-finance-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px 16px; }
+.company-finance-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.company-finance-field label { color: #c8d9e5; font-size: 13px; }
+.company-finance-field input[type="file"] { padding: 8px; }
+.company-finance-field [aria-invalid="true"] { border-color: #ffb2a5; }
+.company-finance-field small { margin-top: 0; font-size: 12px; }
+.company-finance .company-finance-field-error { color: #ffb2a5; }
+.company-finance-check { justify-content: flex-end; }
+.company-finance-check label { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.company-finance-check input { width: 20px; height: 20px; accent-color: #e2ca95; }
+.company-finance-kinds { margin: 4px 0 10px; }
+.company-finance-entry-table td { min-width: 0; white-space: nowrap; }
+.company-finance-entry-table td[colspan] { white-space: normal; }
+.company-finance-entry-table details { min-width: 180px; white-space: normal; }
+.company-finance-confirm { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.company-finance .company-finance-confirm button:first-child { border-color: #ffb2a5; color: #ffb2a5; }
+.company-finance-import-result {
+  margin: 12px 0; padding: 12px 14px; border-left: 3px solid #8ee5d9; border-radius: 0 8px 8px 0;
+  background: rgba(142, 229, 217, .08);
+}
+.company-finance-import-result p { margin: 0 0 6px; }
+.company-finance-warnings, .company-finance-notes { margin: 6px 0 0; padding-left: 20px; }
+.company-finance-warnings li { color: #f5dfaf; }
+.company-finance-journal { margin-top: 8px; }
+
+@media (max-width: 600px) {
+  .company-finance-filters > button, .company-finance-actions button { flex: 1 1 100%; }
+  .company-finance .numm-tech-metrics, .company-finance-fields { grid-template-columns: 1fr; }
+  .company-finance-report-head { padding: 14px; }
+  .company-finance-toolbar [role="group"] { width: 100%; }
+  .company-finance-toolbar [role="group"] button { flex: 1 1 auto; }
+  .company-finance-sig tr[data-detail="true"] th { padding-left: 22px; }
+}
+
+/* Impression : seul le clone #sirius-print-root est imprimé, en thème clair lisible par un banquier. */
+#sirius-print-root { display: none; }
+@media print {
+  html.sirius-printing, html.sirius-printing body {
+    height: auto !important; min-height: 0 !important; overflow: visible !important; background: #fff !important; zoom: 1 !important;
+  }
+  html.sirius-printing body > *:not(#sirius-print-root) { display: none !important; }
+  #sirius-print-root, #sirius-print-root * { visibility: visible !important; }
+  #sirius-print-root {
+    display: block !important; position: static !important; color: #111; background: #fff; font-size: 10pt; line-height: 1.4;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  #sirius-print-root .company-finance-report-head { padding: 0 0 8pt; border: 0; border-bottom: 2px solid #8a6d1d; border-radius: 0; background: none; }
+  #sirius-print-root h3 { margin: 2pt 0 4pt; color: #111; font-size: 16pt; }
+  #sirius-print-root h4 { margin: 14pt 0 6pt; padding-bottom: 3pt; border-bottom: 1px solid #8a6d1d; color: #111; font-size: 12pt; break-after: avoid; }
+  #sirius-print-root p, #sirius-print-root small, #sirius-print-root dt, #sirius-print-root dd, #sirius-print-root li,
+  #sirius-print-root summary, #sirius-print-root .company-finance-change, #sirius-print-root .company-finance-status { color: #222; }
+  #sirius-print-root .company-finance-kicker, #sirius-print-root .company-finance-sign { color: #8a6d1d; }
+  #sirius-print-root small { display: block; margin-top: 2pt; font-size: 8pt; }
+  #sirius-print-root .numm-tech-card { margin: 0 0 8pt; padding: 8pt; border: 1px solid #bbb; border-radius: 4pt; background: #fff; break-inside: avoid; }
+  #sirius-print-root .numm-tech-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6pt; margin: 6pt 0; }
+  #sirius-print-root .numm-tech-metrics .numm-tech-card { margin: 0; }
+  #sirius-print-root .company-finance-metrics dd { margin-top: 3pt; color: #111; font-size: 13pt; }
+  #sirius-print-root .company-finance-metric[data-status="ok"] { border-top-color: #1b7f5b; }
+  #sirius-print-root .company-finance-metric[data-status="watch"] { border-top-color: #b7791f; }
+  #sirius-print-root .company-finance-metric[data-status="critical"] { border-top-color: #b00020; }
+  #sirius-print-root [data-negative="true"] { color: #b00020 !important; }
+  #sirius-print-root .numm-tech-table-wrap { overflow: visible; margin-bottom: 8pt; border: 1px solid #bbb; border-radius: 0; }
+  #sirius-print-root .numm-tech-table { background: #fff; color: #111; font-size: 8.5pt; }
+  #sirius-print-root .numm-tech-table caption, #sirius-print-root .numm-tech-table thead { background: #f1ede3; color: #111; }
+  #sirius-print-root .numm-tech-table caption { padding: 5pt 6pt; }
+  #sirius-print-root .numm-tech-table th, #sirius-print-root .numm-tech-table td { padding: 3pt 6pt; border-bottom: 1px solid #ccc; color: #111; }
+  #sirius-print-root .numm-tech-table tbody th { min-width: 0; }
+  #sirius-print-root thead { display: table-header-group; }
+  #sirius-print-root tr { break-inside: avoid; }
+  #sirius-print-root .company-finance-sig tr[data-total="true"] th, #sirius-print-root .company-finance-sig tr[data-total="true"] td { background: #f6f1e4; font-weight: 700; }
+  #sirius-print-root .company-finance-sig tr[data-detail="true"] th, #sirius-print-root .company-finance-sig tr[data-detail="true"] td { color: #444; }
+  #sirius-print-root .company-finance-bar { height: 4px; background: #5b7f95; }
+  #sirius-print-root .company-finance-bar[data-negative="true"] { background: #b00020; }
+  #sirius-print-root .company-finance-demo-banner { border: 2px solid #8a6d1d; background: #fff8e1; color: #111; }
+  #sirius-print-root .company-finance-alerts li { margin-top: 6pt; padding: 6pt; border-left-color: #999; background: #fff; break-inside: avoid; }
+  #sirius-print-root .company-finance-alerts li[data-severity="critical"] { border-left-color: #b00020; }
+  #sirius-print-root .company-finance-alerts li[data-severity="warning"] { border-left-color: #b7791f; }
+  #sirius-print-root .company-finance-alert-label { color: #111; }
+  #sirius-print-root details > summary { list-style: none; color: #111; font-weight: 700; }
+  #sirius-print-root details > summary::-webkit-details-marker { display: none; }
+  #sirius-print-root .company-finance-definitions { display: block; columns: 2; column-gap: 12pt; }
+  #sirius-print-root .company-finance-definitions div { margin: 0 0 4pt; padding: 3pt 6pt; border-left: 2px solid #bbb; background: #fff; break-inside: avoid; }
+  #sirius-print-root .company-finance-definitions dt { color: #111; }
+  #sirius-print-root .numm-tech-disclaimer { padding-top: 6pt; border-top: 1px solid #bbb; color: #333; font-size: 8pt; }
+}
