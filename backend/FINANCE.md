@@ -8,6 +8,25 @@ produit par un modèle d’IA : tout est calculé de façon déterministe, en `D
 à partir des pièces enregistrées. Le portefeuille personnel de NUMMARIUS est un
 registre distinct que ce module ne lit ni ne modifie.
 
+## Répartition entre les deux cerveaux de ΣIRIUS
+
+Les deux cerveaux ont des responsabilités distinctes et ne se bloquent pas :
+
+| Cerveau opérationnel — temps réel | Cerveau analytique & stratégique — arrière-plan |
+|---|---|
+| Comprendre et exécuter les commandes ; lire les étiquettes et factures par OCR ; contrôler la conformité et la traçabilité pendant l’activité. | Agréger les écritures validées, suivre les indicateurs sur une fenêtre glissante de trois mois et les comparer aux périodes de référence. |
+| Valider une saisie ou un import dans sa transaction, puis répondre sans attendre l’analyse stratégique. | Calculer les ratios, détecter les dérives et seuils, projeter la trésorerie et conserver les alertes et synthèses. |
+| Calculer à la demande un tableau de bord ou un stress test sur la période choisie. | Rédiger la synthèse IA en étape finale, seulement à partir de chiffres déjà calculés et vérifiables ; sinon, utiliser une synthèse déterministe. |
+| Pour une question stratégique, lire l’état publié. Si celui-ci manque ou date de plus de 24 heures, demander son actualisation sans retarder la réponse. | Consolider périodiquement et publier un nouvel état, les alertes suivies et les recommandations dans ZEUS CORTEX. |
+
+Le seul échange opérationnel → analytique est un signal après validation :
+entreprise, type d’opération, source, référence facultative, auteur, nombre
+d’écritures quand il est connu et date. Il ne contient aucun montant ni ligne financière. Le cerveau
+analytique ne valide, ne modifie et ne supprime jamais les écritures ; le cerveau
+opérationnel n’exécute pas de calcul stratégique de fond dans le temps de réponse.
+Les seuils sont des repères de gestion, pas une notation bancaire ni un conseil
+juridique, fiscal ou comptable.
+
 Accès : **NUMMARIUS → Finance d’entreprise**, dans la même fenêtre et avec les
 mêmes cartes bleu nuit et doré que les autres espaces financiers. Deux espaces :
 
@@ -18,6 +37,93 @@ mêmes cartes bleu nuit et doré que les autres espaces financiers. Deux espaces
 
 Chaque espace propose trois vues : **Tableau de bord**, **Saisie & imports** et
 **Simulation** (stress test calculé en mémoire, sans rien enregistrer).
+
+### Cerveau analytique dans ZEUS CORTEX
+
+La section **CERVEAU ANALYTIQUE & STRATÉGIQUE** de ZEUS CORTEX affiche les
+responsabilités des deux cerveaux, l'entreprise, la période réellement analysée,
+les indicateurs, un indice interne, les alertes et leurs plans d'action, les
+projections J+0/J+15/J+30/J+60/J+90, la synthèse et le journal d'exécution.
+La télémétrie opérationnelle existante reste indépendante : une erreur de lecture
+financière ne masque pas les commandes, les services et les ressources.
+
+- **Activation** : profil financier existant et membre **admin/manager**.
+  L'ouverture de ZEUS CORTEX demande une première analyse si aucun état n'existe.
+  Un profil absent propose de le créer dans NUMMARIUS, sans inventer de chiffres.
+- **Déclenchement** : profil modifié, écriture créée/supprimée, import validé/annulé
+  et webhook POS accepté signalent leur succès via `BackgroundTasks`. Un import
+  rejoué ou sans nouvelle écriture ne déclenche rien. Le callback ne fait
+  qu'alimenter la file ; il n'appelle ni le moteur financier ni l'IA.
+- **Ordonnancement** : un worker `asyncio` unique, file bornée à 256 signaux et
+  entreprises en attente, regroupement après 20 secondes de calme, au plus
+  120 secondes de regroupement. « Relancer l'analyse » est immédiat dans la file,
+  sans interrompre l'analyse déjà en cours. Les calculs et accès SQL passent par
+  `asyncio.to_thread` ; aucune transaction ne reste ouverte pendant la rédaction IA.
+- **Consolidation** : première vérification cinq minutes après démarrage, puis
+  toutes les heures. Un état non vérifié depuis 24 heures est recalculé ; la
+  rédaction IA est sollicitée après sept jours depuis la dernière sollicitation,
+  lors d'une nouvelle alerte ou aggravation au moins de niveau vigilance, ou sur
+  demande manuelle. Deux sollicitations IA sont espacées d'au moins 15 minutes
+  par entreprise ; les chiffres restent actualisés entre-temps. Un seuil détecté
+  pendant cette temporisation est replanifié. Une demande manuelle sans nouveau
+  seuil reçoit un repli déterministe, sans devenir un appel différé au propriétaire.
+- **Données** : fenêtre de trois mois terminée à la dernière vente connue
+  (à défaut, dernière activité), jamais après aujourd'hui. Comparaison à la période
+  précédente ; pour le CA, priorité à la même période de l'année précédente si
+  elle comporte un CA positif. Les pièces de plus de 45 jours sont signalées.
+- **Projection** : dernier solde reconstitué jusqu'à aujourd'hui, puis prolongation
+  du plus faible des flux mensuels disponibles : CAF après remboursement du capital
+  et flux bancaire net. Un flux manquant reste absent, pas zéro. Les jours écoulés
+  depuis la dernière observation bancaire sont pris en compte. Le premier jour
+  strictement négatif constitue la rupture ; un solde exactement nul n'est pas
+  encore négatif. Cette projection reste hors saisonnalité, TVA, BFR, IS et nouveaux
+  investissements ; elle ne garantit ni liquidité ni financement.
+- **Indice** : `100 − 25 × alertes critiques − 10 × alertes de vigilance`, plancher
+  zéro ; absent sans CA positif. C'est un repère interne explicite, **pas une note
+  bancaire**, et les alertes de complétude restent visibles même avec un indice élevé.
+- **IA** : fournisseur déjà configuré dans ΣIRIUS, sous le quota existant. Le
+  propriétaire est utilisé pour une consolidation, un seuil ou un webhook ; sinon
+  l'auteur de la demande. Aucun montant n'est calculé par le modèle. Les données
+  transmises sont consolidées, sans nom d'entreprise ni pièces brutes. Le JSON et
+  les nombres sont vérifiés ; absence de droits, quota, fournisseur indisponible,
+  réponse invalide ou chiffre inconnu donnent une synthèse déterministe avec motif
+  visible. Cette garde ne certifie pas l'interprétation sémantique du modèle.
+- **Acquittement** : signifie « pris en compte ». Une aggravation réactive
+  l'alerte ; sa disparition du calcul la résout. Une récidive après résolution crée
+  une nouvelle occurrence. L'auteur, la date et le commentaire facultatif sont
+  conservés. Aucun acquittement ne modifie une écriture financière.
+- **Proactivité et conversation** : les alertes actives prioritaires alimentent
+  les suggestions et proposent d'ouvrir ZEUS CORTEX. Les questions sur la santé
+  de l'entreprise lisent l'état publié, sans recalcul synchrone. Aucun chiffre
+  financier n'est diffusé par le mécanisme push global non cloisonné.
+
+Les repères sectoriels sont indicatifs : aliments > 33 % (vigilance), > 38 %
+(critique), boissons > 30 %, matières et personnel > 65 % / > 70 %. Une dérive de
+marge de −3 / −6 points et une baisse de CA de −15 / −30 % déclenchent vigilance /
+critique. Les ratios bancaires réutilisent les repères du tableau de bord.
+Une rupture projetée sous 15 jours est critique, sous 30 jours une vigilance, et
+sous 90 jours une information (bornes incluses).
+
+Les tables `brain_snapshots`, `brain_alerts`, `brain_syntheses` et `brain_runs`
+sont dans le même `finance.sqlite3`, sans écriture dans les tables des pièces.
+Rétention par entreprise : 400 états, 100 synthèses, 200 exécutions et 300 alertes
+résolues ; les alertes non résolues sont conservées. La file est **en mémoire** :
+un arrêt peut perdre des signaux en attente ; la vérification périodique rattrape
+les états anciens. Un échec d'analyse est journalisé et réessayé deux fois,
+puis reste visible. Une file pleine refuse explicitement les nouvelles demandes.
+
+Cette implantation vise **un seul processus Uvicorn**, comme le service Hetzner
+et l'application locale actuels. Elle ne fournit pas une livraison « exactement
+une fois », un traitement distribué ni une garantie de latence sous saturation
+CPU/disque. Avant un déploiement multi-workers, prévoir une file durable partagée
+et un verrou/lease d'exécution par entreprise.
+
+Implémentation : [contrats](brain_analytical/schemas.py),
+[répartition](brain_analytical/repartition.py), [collecte](brain_analytical/collecte.py),
+[règles](brain_analytical/regles.py), [stockage](brain_analytical/store.py),
+[conseiller](brain_analytical/strategic_advisor.py),
+[orchestrateur](brain_analytical/orchestrator.py),
+[routes](brain_analytical/routes.py) et [conversation](brain_analytical/conversation.py).
 
 ## Démarrage pour un test bancaire
 
@@ -679,6 +785,10 @@ Résultats :
 | POST | `/api/finance/{company_id}/ingestions/{source}` | Import |
 | DELETE | `/api/finance/{company_id}/ingestions/{batch_id}` | Annulation d’un import |
 | POST | `/api/finance/{company_id}/webhooks/pos` | Webhook POS signé |
+| GET | `/api/cortex/analytique` | État autorisé de l'entreprise courante et répartition des deux cerveaux |
+| GET | `/api/finance/{company_id}/cerveau` | Dernier état publié, alertes suivies, synthèse et journal |
+| POST | `/api/finance/{company_id}/cerveau/analyse` | Planifier l'analyse ; corps `{}`, réponse 202, ou 503 si non planifiée |
+| POST | `/api/finance/{company_id}/cerveau/alertes/{alert_id}/acquitter` | Acquitter une alerte ; corps `{}` ou `{"commentaire":"..."}` (300 caractères) |
 
 Les tableaux de bord prennent `start_date`, `end_date` (ISO, 10 ans au plus) et
 `comparison`. Réponse `FinanceDashboard` : `company`, `period`,
@@ -689,6 +799,12 @@ Les tableaux de bord prennent `start_date`, `end_date` (ISO, 10 ans au plus) et
 Les simulations (`stress-test`) prennent en paramètres `start_date` et
 `end_date`, qui fixent la période de référence avec les mêmes bornes que le
 tableau de bord.
+
+Les deux POST du cerveau exigent `application/json`, un corps non compressé
+de 4 Kio au plus et les droits admin/manager sur l'entreprise. Un identifiant
+d'alerte d'une autre entreprise ne donne accès à aucune information (404).
+Les nombres financiers des états analytiques sont eux aussi des chaînes
+décimales, et les valeurs indisponibles restent `null`.
 
 Corps JSON `SimulationRequest` :
 

@@ -17,6 +17,7 @@ from datetime import datetime, timedelta, timezone
 
 from local_memory import _conn, _local_datetime
 from productivite.store import ProductivityStore
+from brain_analytical.schemas import AlerteSuivie, SeveriteAlerte, StatutAlerte
 
 MODES = ("proactif",)
 _MODE_LIMITS = {"proactif": 6}
@@ -329,6 +330,12 @@ _URGENCY_ORDER = {"haute": 0, "moyenne": 1, "faible": 2}
 def _intervention(item: dict) -> dict:
     """Décide comment Sirius peut prendre en charge une suggestion sans agir à l'aveugle."""
     kind = item["kind"].split(":", 1)[0]
+    if kind == "strategie":
+        return {
+            "decision": "proposer",
+            "message": "Je peux ouvrir ZEUS CORTEX pour te montrer les chiffres vérifiés et le plan d'action.",
+            "alternative": "Tu peux acquitter l'alerte une fois prise en compte ; aucune écriture financière ne sera modifiée.",
+        }
     if kind == "actualite":
         return {
             "decision": "informer",
@@ -416,13 +423,28 @@ def _news_candidates(news_sections: list[dict], now: datetime) -> list[dict]:
     return candidates
 
 
-def evaluate(user_id: str, now=None, *, news_sections: list[dict] | None = None) -> dict:
+def _strategic_candidates(alerts: list[AlerteSuivie]) -> list[dict]:
+    return [{
+        "kind": f"strategie:{row.alerte.code}:{row.alerte.severite.value}",
+        "state": str(row.id),
+        "title": f"Cerveau analytique · {row.alerte.libelle_metrique}",
+        "description": row.alerte.explication,
+        "urgency": "haute" if row.alerte.severite == SeveriteAlerte.CRITICAL else "moyenne",
+        "reason": f"Alerte issue des pièces financières, vérifiée le {row.derniere_detection:%d/%m/%Y}.",
+        "benefit": row.alerte.plan_action[0],
+        "confidence": 0.9,
+        "action": {"type": "command", "text": "Ouvre ZEUS CORTEX"},
+    } for row in alerts if row.statut == StatutAlerte.OUVERTE and row.alerte.severite != SeveriteAlerte.INFO]
+
+
+def evaluate(user_id: str, now=None, *, news_sections: list[dict] | None = None,
+             strategic_alerts: list[AlerteSuivie] | None = None) -> dict:
     """Évalue et retourne les suggestions actives pour l'utilisateur."""
     now = now or datetime.now(timezone.utc)
     mode = get_mode(user_id)
     muted = _muted_kinds(user_id, now)
 
-    candidates = [c for c in _candidates(user_id, now) + _news_candidates(news_sections or [], now)
+    candidates = [c for c in _strategic_candidates(strategic_alerts or []) + _candidates(user_id, now) + _news_candidates(news_sections or [], now)
                   if c["kind"] not in muted]
     candidates.sort(key=lambda c: (_URGENCY_ORDER.get(c["urgency"], 3), -c["confidence"]))
     selected = candidates[: _MODE_LIMITS[mode]]

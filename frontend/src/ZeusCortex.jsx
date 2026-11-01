@@ -3,9 +3,11 @@
 // (tables events / facts / service_log et relevé psutil). Aucun signal n'est simulé.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { X, Send } from "lucide-react";
+import { BACKEND_BASE_URL } from "./lib/api";
+import ZeusAnalyticalBrain from "./ZeusAnalyticalBrain";
 import "./ZeusCortex.css";
 
-const API = process.env.REACT_APP_BACKEND_URL;
+const API = BACKEND_BASE_URL;
 const PALETTE = ["#7fb2d4", "#6fae9f", "#c2925a", "#8d8fc4", "#b0728a"];
 const DAYS_FR = ["DIM", "LUN", "MAR", "MER", "JEU", "VEN", "SAM"];
 
@@ -312,6 +314,8 @@ export default function ZeusCortex({ onClose, onAsk, answer }) {
         <Kpi label="MÉMOIRE SYSTÈME" value={stats?.ram} suffix=" %" delay={335} />
       </div>
 
+      <ZeusAnalyticalBrain />
+
       <div className="zcx-row zcx-rA">
         <div className="zcx-cell" style={{ animationDelay: "200ms" }}>
           <h2>ACTIVITÉ — 30 JOURS</h2>
@@ -406,7 +410,7 @@ export default function ZeusCortex({ onClose, onAsk, answer }) {
 
       <div className="zcx-foot">
         <div>Dernière mesure <b>{board?.generated_at ? hhmm(board.generated_at) : "—"}</b></div>
-        <div>Sources <b>events · facts · service_log · psutil</b></div>
+        <div>Sources <b>events · facts · service_log · psutil · registre financier · brain_*</b></div>
         <div>Fenêtre <b>{board?.days ?? 30} jours</b></div>
         <div>Échantillons <b>{nf(totals.commandes)}</b></div>
       </div>
@@ -421,7 +425,7 @@ export default function ZeusCortex({ onClose, onAsk, answer }) {
             type="text"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Posez votre question directement à Sirius..."
+            placeholder="Posez votre question directement à ΣIRIUS..."
             data-testid="zeus-ask-input"
           />
           <button type="submit" className="cmd-send" data-testid="zeus-ask-send"><Send size={15} /></button>

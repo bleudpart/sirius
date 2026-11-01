@@ -1,5 +1,5 @@
 
-# SIRIUS Assistant
+# ΣIRIUS Assistant
 
 Assistant vocal personnel avec HUD futuriste style « Iron Man ».
 Frontend **React** + Backend **FastAPI** (Python), packagé en application Windows autonome via **Electron**.
@@ -1957,6 +1957,13 @@ tout est calculé de façon déterministe en `Decimal` à partir des pièces
 enregistrées, dans un registre SQLAlchemy distinct du portefeuille personnel.
 [Le guide backend](backend/FINANCE.md) fait référence : parcours de test
 bancaire et grille de recette, formules, seuils, limites, API et exploitation.
+
+**ZEUS CORTEX** expose aussi le cerveau analytique de ΣIRIUS : santé financière,
+alertes suivies et acquittables, trésorerie glissante et synthèses traçables.
+Un worker asynchrone reçoit les écritures validées et consolide les données ;
+le cerveau opérationnel reste disponible et consulte seulement l'état publié.
+La répartition des tâches, les déclencheurs, les droits et les limites sont
+détaillés dans [le guide des deux cerveaux](backend/FINANCE.md#cerveau-analytique-dans-zeus-cortex).
 
 L'onglet **Finance d’entreprise** de NUMMARIUS s'ouvre dans la même fenêtre et
 avec les mêmes cartes bleu nuit/doré que les autres espaces financiers :

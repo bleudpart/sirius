@@ -1,0 +1,446 @@
+{
+  "etat": {
+    "company_id": "a",
+    "snapshot": {
+      "version": "1",
+      "company_id": "a",
+      "entreprise": "Entreprise A",
+      "secteur": "SERVICES",
+      "devise": "EUR",
+      "periode": {
+        "start_date": "2026-01-01",
+        "end_date": "2026-03-31"
+      },
+      "periode_comparee": {
+        "start_date": "2025-10-01",
+        "end_date": "2025-12-31"
+      },
+      "date_analyse": "2026-03-31",
+      "derniere_donnee": "2026-03-31",
+      "calcule_le": "2026-03-31T12:00:00Z",
+      "declencheur": "MANUEL",
+      "niveau": "CRITIQUE",
+      "indice": 75,
+      "methode_indice": "Repère interne : 100 − 25 par alerte critique − 10 par vigilance, plancher 0. Pas une notation bancaire.",
+      "indicateurs": [
+        {
+          "cle": "revenue_ht",
+          "libelle": "CA HT",
+          "valeur": "36000.00",
+          "unite": "eur",
+          "precedent": null,
+          "variation": null
+        },
+        {
+          "cle": "ca_mensuel",
+          "libelle": "CA mensuel moyen",
+          "valeur": "12000.00",
+          "unite": "eur",
+          "precedent": null,
+          "variation": null
+        },
+        {
+          "cle": "contribution_margin_pct",
+          "libelle": "Marge sur coûts variables",
+          "valeur": "25.00",
+          "unite": "pct",
+          "precedent": null,
+          "variation": null
+        },
+        {
+          "cle": "approximate_ebe",
+          "libelle": "EBE approché",
+          "valeur": "-3000.00",
+          "unite": "eur",
+          "precedent": null,
+          "variation": null
+        },
+        {
+          "cle": "ebe_margin_pct",
+          "libelle": "Taux d'EBE",
+          "valeur": "-8.33",
+          "unite": "pct",
+          "precedent": null,
+          "variation": null
+        },
+        {
+          "cle": "break_even_revenue_ht",
+          "libelle": "Seuil de rentabilité",
+          "valeur": "48000.00",
+          "unite": "eur",
+          "precedent": null,
+          "variation": null
+        },
+        {
+          "cle": "debt_service_coverage",
+          "libelle": "Couverture des annuités",
+          "valeur": null,
+          "unite": "ratio",
+          "precedent": null,
+          "variation": null
+        },
+        {
+          "cle": "average_hourly_rate_ht",
+          "libelle": "Taux horaire HT",
+          "valeur": "60.00",
+          "unite": "eur",
+          "precedent": null,
+          "variation": null
+        },
+        {
+          "cle": "average_daily_rate_ht",
+          "libelle": "Taux journalier HT",
+          "valeur": "480.00",
+          "unite": "eur",
+          "precedent": null,
+          "variation": null
+        },
+        {
+          "cle": "structure_cost_ratio_pct",
+          "libelle": "Charges de structure / CA",
+          "valeur": "33.33",
+          "unite": "pct",
+          "precedent": null,
+          "variation": null
+        }
+      ],
+      "alertes": [
+        {
+          "code": "EBE_NEGATIF",
+          "severite": "CRITICAL",
+          "metrique": "approximate_ebe",
+          "libelle_metrique": "EBE approché",
+          "valeur": "-3000.00",
+          "seuil": "0",
+          "unite": "eur",
+          "explication": "EBE de −3 000 EUR sur la période. Le CA manque de 12 000 EUR pour atteindre le seuil.",
+          "plan_action": [
+            "Revoir les prix, consommations et charges fixes avec l'expert-comptable."
+          ],
+          "codes_tableau_de_bord": [
+            "NEGATIVE_EBE",
+            "BELOW_BREAK_EVEN"
+          ]
+        },
+        {
+          "code": "TENSION_TRESORERIE",
+          "severite": "INFO",
+          "metrique": "jours_autonomie",
+          "libelle_metrique": "Rupture de trésorerie estimée",
+          "valeur": "46",
+          "seuil": "90",
+          "unite": "jours",
+          "explication": "Premier solde négatif estimé dans 46 jour(s), à flux constant.",
+          "plan_action": [
+            "Actualiser le calendrier des règlements et encaissements, puis préparer les solutions de financement."
+          ],
+          "codes_tableau_de_bord": []
+        },
+        {
+          "code": "COMPLETUDE_DONNEES",
+          "severite": "INFO",
+          "metrique": "completude",
+          "libelle_metrique": "Complétude des données",
+          "valeur": "1",
+          "seuil": "0",
+          "unite": "nombre",
+          "explication": "1 contrôle(s) de données sur la fenêtre du 01/01/2026 au 31/03/2026.",
+          "plan_action": [
+            "Aucun bilan saisi à la date de fin : BFR, endettement, autonomie financière et capacité de remboursement indisponibles."
+          ],
+          "codes_tableau_de_bord": [
+            "BALANCE_SHEET_MISSING"
+          ]
+        }
+      ],
+      "projection": {
+        "solde_depart": "1500.00",
+        "date_depart": "2026-03-31",
+        "flux_mensuel_gestion": "-1000.00",
+        "flux_mensuel_bancaire": null,
+        "flux_mensuel_retenu": "-1000.00",
+        "source_flux": "gestion",
+        "points": [
+          {
+            "jour": 0,
+            "echeance": "2026-03-31",
+            "solde": "1500.00"
+          },
+          {
+            "jour": 15,
+            "echeance": "2026-04-15",
+            "solde": "1000.00"
+          },
+          {
+            "jour": 30,
+            "echeance": "2026-04-30",
+            "solde": "500.00"
+          },
+          {
+            "jour": 60,
+            "echeance": "2026-05-30",
+            "solde": "-500.00"
+          },
+          {
+            "jour": 90,
+            "echeance": "2026-06-29",
+            "solde": "-1500.00"
+          }
+        ],
+        "jour_rupture": 46,
+        "date_rupture": "2026-05-16",
+        "methode": "Projection indicative : minimum des flux mensuels disponibles (CAF après capital et flux bancaire), réparti sur 30 jours depuis la dernière observation. Hors saisonnalité, TVA, variation du BFR, IS et nouveaux investissements ; un flux absent n'est jamais remplacé par zéro."
+      },
+      "empreinte": "2dc33d52f77c585a13c8ccc0302095f6be62cf698cd66088198aff94fc891fd4"
+    },
+    "synthese": {
+      "company_id": "a",
+      "empreinte_snapshot": "2dc33d52f77c585a13c8ccc0302095f6be62cf698cd66088198aff94fc891fd4",
+      "generee_le": "2026-03-31T12:00:00Z",
+      "declencheur": "MANUEL",
+      "source": "DETERMINISTE",
+      "modele": null,
+      "motif_repli": "Aucun fournisseur IA configuré.",
+      "resume": "Situation nécessitant une attention prioritaire. 3 point(s) d'attention sur les pièces analysées.",
+      "points_cles": [
+        "EBE de −3 000 EUR sur la période. Le CA manque de 12 000 EUR pour atteindre le seuil.",
+        "Premier solde négatif estimé dans 46 jour(s), à flux constant.",
+        "1 contrôle(s) de données sur la fenêtre du 01/01/2026 au 31/03/2026."
+      ],
+      "recommandations": [
+        {
+          "titre": "EBE approché",
+          "action": "Revoir les prix, consommations et charges fixes avec l'expert-comptable.",
+          "horizon": "IMMEDIAT",
+          "metriques": [
+            "approximate_ebe"
+          ]
+        },
+        {
+          "titre": "Rupture de trésorerie estimée",
+          "action": "Actualiser le calendrier des règlements et encaissements, puis préparer les solutions de financement.",
+          "horizon": "TRIMESTRE",
+          "metriques": [
+            "jours_autonomie"
+          ]
+        },
+        {
+          "titre": "Complétude des données",
+          "action": "Aucun bilan saisi à la date de fin : BFR, endettement, autonomie financière et capacité de remboursement indisponibles.",
+          "horizon": "TRIMESTRE",
+          "metriques": [
+            "completude"
+          ]
+        }
+      ],
+      "avertissement": "Repères indicatifs issus des pièces saisies, non certifiés. Faire valider les décisions par l'expert-comptable, le banquier ou le courtier."
+    },
+    "synthese_a_jour": true,
+    "alertes": [
+      {
+        "id": 1,
+        "statut": "OUVERTE",
+        "alerte": {
+          "code": "EBE_NEGATIF",
+          "severite": "CRITICAL",
+          "metrique": "approximate_ebe",
+          "libelle_metrique": "EBE approché",
+          "valeur": "-3000.00",
+          "seuil": "0",
+          "unite": "eur",
+          "explication": "EBE de −3 000 EUR sur la période. Le CA manque de 12 000 EUR pour atteindre le seuil.",
+          "plan_action": [
+            "Revoir les prix, consommations et charges fixes avec l'expert-comptable."
+          ],
+          "codes_tableau_de_bord": [
+            "NEGATIVE_EBE",
+            "BELOW_BREAK_EVEN"
+          ]
+        },
+        "premiere_detection": "2026-03-31T12:00:00Z",
+        "derniere_detection": "2026-03-31T12:00:00Z",
+        "occurrences": 1,
+        "acquittee_le": null,
+        "acquittee_par": null,
+        "resolue_le": null,
+        "commentaire": null
+      },
+      {
+        "id": 2,
+        "statut": "OUVERTE",
+        "alerte": {
+          "code": "TENSION_TRESORERIE",
+          "severite": "INFO",
+          "metrique": "jours_autonomie",
+          "libelle_metrique": "Rupture de trésorerie estimée",
+          "valeur": "46",
+          "seuil": "90",
+          "unite": "jours",
+          "explication": "Premier solde négatif estimé dans 46 jour(s), à flux constant.",
+          "plan_action": [
+            "Actualiser le calendrier des règlements et encaissements, puis préparer les solutions de financement."
+          ],
+          "codes_tableau_de_bord": []
+        },
+        "premiere_detection": "2026-03-31T12:00:00Z",
+        "derniere_detection": "2026-03-31T12:00:00Z",
+        "occurrences": 1,
+        "acquittee_le": null,
+        "acquittee_par": null,
+        "resolue_le": null,
+        "commentaire": null
+      },
+      {
+        "id": 3,
+        "statut": "OUVERTE",
+        "alerte": {
+          "code": "COMPLETUDE_DONNEES",
+          "severite": "INFO",
+          "metrique": "completude",
+          "libelle_metrique": "Complétude des données",
+          "valeur": "1",
+          "seuil": "0",
+          "unite": "nombre",
+          "explication": "1 contrôle(s) de données sur la fenêtre du 01/01/2026 au 31/03/2026.",
+          "plan_action": [
+            "Aucun bilan saisi à la date de fin : BFR, endettement, autonomie financière et capacité de remboursement indisponibles."
+          ],
+          "codes_tableau_de_bord": [
+            "BALANCE_SHEET_MISSING"
+          ]
+        },
+        "premiere_detection": "2026-03-31T12:00:00Z",
+        "derniere_detection": "2026-03-31T12:00:00Z",
+        "occurrences": 1,
+        "acquittee_le": null,
+        "acquittee_par": null,
+        "resolue_le": null,
+        "commentaire": null
+      }
+    ],
+    "executions": [
+      {
+        "id": 1,
+        "declencheur": "MANUEL",
+        "statut": "TERMINEE",
+        "demarre_le": "2026-03-31T12:00:00Z",
+        "duree_ms": 25,
+        "detail": "Analyse vérifiée sur les pièces enregistrées."
+      }
+    ],
+    "orchestrateur": {
+      "actif": true,
+      "en_attente": 0,
+      "evenements_recus": 0,
+      "evenements_rejetes": 0,
+      "analyses_terminees": 1,
+      "analyses_en_echec": 0,
+      "syntheses_ia": 0,
+      "derniere_analyse": "2026-03-31T12:00:00Z",
+      "dernier_cycle_periodique": null
+    },
+    "verifie_le": "2026-03-31T12:00:00Z",
+    "message": null
+  },
+  "message": null,
+  "repartition": [
+    {
+      "cle": "commandes",
+      "libelle": "Commandes vocales et écrites",
+      "cerveau": "OPERATIONNEL",
+      "mode": "TEMPS_REEL",
+      "detail": "Comprend et exécute la demande sur-le-champ ; aucune analyse de fond dans le temps de réponse."
+    },
+    {
+      "cle": "ocr",
+      "libelle": "OCR d'étiquettes et de factures",
+      "cerveau": "OPERATIONNEL",
+      "mode": "TEMPS_REEL",
+      "detail": "Lit le document à la capture et le fait vérifier avant tout enregistrement."
+    },
+    {
+      "cle": "conformite",
+      "libelle": "Conformité immédiate (HACCP, traçabilité)",
+      "cerveau": "OPERATIONNEL",
+      "mode": "TEMPS_REEL",
+      "detail": "Contrôles, relevés et non-conformités au fil du service, sans attendre le cerveau analytique."
+    },
+    {
+      "cle": "saisie",
+      "libelle": "Saisie, imports et tickets de caisse",
+      "cerveau": "OPERATIONNEL",
+      "mode": "TEMPS_REEL",
+      "detail": "Valide chaque écriture dans sa transaction, répond, puis signale le changement en tâche de fond."
+    },
+    {
+      "cle": "tableau_de_bord",
+      "libelle": "Tableau de bord et stress test à la demande",
+      "cerveau": "OPERATIONNEL",
+      "mode": "TEMPS_REEL",
+      "detail": "Calcul déterministe immédiat sur la période choisie par l'utilisateur."
+    },
+    {
+      "cle": "questions_strategiques",
+      "libelle": "Réponses sur la santé de l'entreprise",
+      "cerveau": "OPERATIONNEL",
+      "mode": "TEMPS_REEL",
+      "detail": "Lit le dernier état publié par le cerveau analytique, sans recalcul ; demande une analyse si cet état manque ou date de plus de 24 h."
+    },
+    {
+      "cle": "surveillance",
+      "libelle": "Surveillance des constantes vitales",
+      "cerveau": "ANALYTIQUE",
+      "mode": "ARRIERE_PLAN",
+      "detail": "Fenêtre glissante de 3 mois comparée à la précédente : CA, marges, EBE, point mort, trésorerie, dette."
+    },
+    {
+      "cle": "seuils",
+      "libelle": "Détection des seuils et des dérives",
+      "cerveau": "ANALYTIQUE",
+      "mode": "ARRIERE_PLAN",
+      "detail": "Coût matière, prime cost, dérive de marge, baisse d'activité, couverture des annuités, capitaux propres."
+    },
+    {
+      "cle": "projection",
+      "libelle": "Projection de trésorerie J+15 à J+90",
+      "cerveau": "ANALYTIQUE",
+      "mode": "ARRIERE_PLAN",
+      "detail": "Solde reconstitué prolongé du flux mensuel le plus prudent entre gestion et banque."
+    },
+    {
+      "cle": "synthese",
+      "libelle": "Synthèse stratégique par IA",
+      "cerveau": "ANALYTIQUE",
+      "mode": "ARRIERE_PLAN",
+      "detail": "Le modèle n'explique que des chiffres déjà calculés ; un chiffre non fourni impose le repli déterministe."
+    },
+    {
+      "cle": "consolidation",
+      "libelle": "Consolidation périodique",
+      "cerveau": "ANALYTIQUE",
+      "mode": "ARRIERE_PLAN",
+      "detail": "Vérification horaire, point quotidien conservé, synthèse IA au moins hebdomadaire."
+    },
+    {
+      "cle": "alertes",
+      "libelle": "Alertes suivies et dossier banque",
+      "cerveau": "ANALYTIQUE",
+      "mode": "ARRIERE_PLAN",
+      "detail": "Nouvelle, aggravée, atténuée ou résolue ; acquittement tracé ; notification des alertes critiques."
+    }
+  ],
+  "echanges": [
+    {
+      "de": "OPERATIONNEL",
+      "vers": "ANALYTIQUE",
+      "canal": "Signal d'écriture validée",
+      "detail": "Entreprise, nature et auteur, jamais de montant ; signaux regroupés entre 20 s et 2 min."
+    },
+    {
+      "de": "ANALYTIQUE",
+      "vers": "OPERATIONNEL",
+      "canal": "État publié",
+      "detail": "Alertes, projection et synthèse lues par les suggestions proactives, la conversation et ZEUS CORTEX."
+    }
+  ]
+}

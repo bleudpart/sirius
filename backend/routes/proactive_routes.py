@@ -7,7 +7,7 @@ import proactive
 from briefing_news import fetch_briefing_news
 
 
-def make_proactive_router(db, require_user):
+def make_proactive_router(db, require_user, strategic_source=None):
     router = APIRouter(tags=["proactive"])
 
     @router.post("/suggestions/evaluate")
@@ -15,7 +15,8 @@ def make_proactive_router(db, require_user):
         """Suggestions proactives issues de la mémoire réelle (projets, épisodes, habitudes)."""
         uid = (await require_user(request, db))["user_id"]
         news = await fetch_briefing_news()
-        result = proactive.evaluate(uid, news_sections=news["sections"])
+        strategic_alerts = await strategic_source(uid) if strategic_source is not None else None
+        result = proactive.evaluate(uid, news_sections=news["sections"], strategic_alerts=strategic_alerts)
         result["news_status"] = "partial" if any(
             section["status"] == "unavailable" for section in news["sections"]
         ) else "ok"

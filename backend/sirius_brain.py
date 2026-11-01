@@ -1632,7 +1632,8 @@ async def summarize_episode(history):
 # ==========================================
 async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="normal", keys=None, mood=None, environment=None):
     """
-    Cerveau central et unique de ΣIRIUS.
+    Cerveau opérationnel de ΣIRIUS, consacré aux réponses utilisateur.
+    Le cerveau analytique d'entreprise publie ses états séparément, en arrière-plan.
     Cerebras/Groq répondent en mode normal ; Kimi rédige les réponses en mode profond.
     """
     keys = keys or {}

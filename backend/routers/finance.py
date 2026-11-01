@@ -13,7 +13,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from typing import Annotated, Protocol, TypeVar
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Path, Query, Request, Response
 from pydantic import ValidationError
 from pymongo.errors import PyMongoError
 from sqlalchemy import and_, or_, select
@@ -67,6 +67,16 @@ class FinanceMember:
     user_id: str
 
 
+@dataclass(frozen=True)
+class FinanceChange:
+    company_id: str
+    action: str
+    source: str
+    reference: str | None
+    user_id: str | None
+    nombre_ecritures: int | None = 1
+
+
 class JsonRejected(ValueError):
     """Message en français, directement affichable."""
 
@@ -114,6 +124,52 @@ class MembershipDatabase(Protocol):
 
 
 AuthResolver = Callable[[Request, MembershipDatabase], Awaitable[Mapping[str, object]]]
+
+
+async def resolve_finance_member(db: MembershipDatabase, require_user: AuthResolver,
+                                 request: Request, company_id: str) -> FinanceMember:
+    user = await require_user(request, db)
+    try:
+        member = await db.enterprise_members.find_one({"user_id": user["user_id"], "company_id": company_id})
+    except (sqlite3.Error, PyMongoError) as error:
+        logger.exception("[FINANCE] Vérification des droits entreprise impossible")
+        raise HTTPException(503, "Vérification des droits entreprise indisponible.") from error
+    if member is None:
+        raise HTTPException(404, "Entreprise inaccessible.")
+    if member.get("role") not in {"admin", "manager"}:
+        raise HTTPException(403, "La finance d’entreprise est réservée aux administrateurs et gestionnaires.")
+    return FinanceMember(company_id=company_id, user_id=str(user["user_id"]))
+
+
+async def read_bounded_body(request: Request, limit: int = MAX_CONNECTOR_PAYLOAD_BYTES) -> bytes:
+    content_encoding = request.headers.get("content-encoding", "identity").lower()
+    if content_encoding not in {"", "identity"}:
+        raise HTTPException(415, "Compression de payload non prise en charge.")
+    too_large = f"Charge utile supérieure à {limit // 1024 // 1024} Mio." if limit >= 1024 * 1024 else (
+        f"Charge utile supérieure à {limit // 1024} Kio."
+    )
+    declared_length = request.headers.get("content-length")
+    if declared_length is not None:
+        try:
+            if int(declared_length) > limit:
+                raise HTTPException(413, too_large)
+        except ValueError as error:
+            raise HTTPException(400, "Content-Length invalide.") from error
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > limit:
+            raise HTTPException(413, too_large)
+    if not body:
+        raise HTTPException(400, "Charge utile vide.")
+    return bytes(body)
+
+
+async def read_json_object(request: Request, limit: int = MAX_ENTRY_PAYLOAD_BYTES) -> dict[str, object]:
+    actual = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+    if actual != "application/json":
+        raise HTTPException(415, "Content-Type requis : application/json.")
+    return parse_json_object(await read_bounded_body(request, limit))
 
 
 def parse_period(start_date: date, end_date: date) -> Period:
@@ -209,8 +265,16 @@ def simulation_request(payload: Mapping[str, object], company_id: str) -> Simula
     return scenario
 
 
-def make_company_finance_router(db: MembershipDatabase, require_user: AuthResolver) -> APIRouter:
+def make_company_finance_router(
+    db: MembershipDatabase, require_user: AuthResolver,
+    on_change: Callable[[FinanceChange], Awaitable[None]] | None = None,
+) -> APIRouter:
     router = APIRouter(prefix="/finance", tags=["finance-entreprise"])
+
+    def changed(tasks: BackgroundTasks, company_id: str, action: str, source: str,
+                reference: str | None, user_id: str | None, nombre_ecritures: int | None = 1) -> None:
+        if on_change is not None:
+            tasks.add_task(on_change, FinanceChange(company_id, action, source, reference, user_id, nombre_ecritures))
 
     async def authenticated(request: Request) -> Mapping[str, object]:
         return await require_user(request, db)
@@ -249,51 +313,13 @@ def make_company_finance_router(db: MembershipDatabase, require_user: AuthResolv
         return list_demo_entries(demo_company(sector).dataset, kind, start_date, end_date, limit)
 
     async def membership(request: Request, company_id: str) -> FinanceMember:
-        user = await require_user(request, db)
-        try:
-            member = await db.enterprise_members.find_one({
-                "user_id": user["user_id"], "company_id": company_id,
-            })
-        except (sqlite3.Error, PyMongoError) as error:
-            logger.exception("[FINANCE] Vérification des droits entreprise impossible")
-            raise HTTPException(503, "Vérification des droits entreprise indisponible.") from error
-        if member is None:
-            raise HTTPException(404, "Entreprise inaccessible.")
-        if member.get("role") not in {"admin", "manager"}:
-            raise HTTPException(403, "La finance d’entreprise est réservée aux administrateurs et gestionnaires.")
-        return FinanceMember(company_id=company_id, user_id=str(user["user_id"]))
+        return await resolve_finance_member(db, require_user, request, company_id)
 
     async def authorize(request: Request, company_id: str) -> str:
         return (await membership(request, company_id)).company_id
 
-    async def read_bounded_body(request: Request, limit: int = MAX_CONNECTOR_PAYLOAD_BYTES) -> bytes:
-        content_encoding = request.headers.get("content-encoding", "identity").lower()
-        if content_encoding not in {"", "identity"}:
-            raise HTTPException(415, "Compression de payload non prise en charge.")
-        too_large = f"Charge utile supérieure à {limit // 1024 // 1024} Mio." if limit >= 1024 * 1024 else (
-            f"Charge utile supérieure à {limit // 1024} Kio."
-        )
-        declared_length = request.headers.get("content-length")
-        if declared_length is not None:
-            try:
-                if int(declared_length) > limit:
-                    raise HTTPException(413, too_large)
-            except ValueError as error:
-                raise HTTPException(400, "Content-Length invalide.") from error
-        body = bytearray()
-        async for chunk in request.stream():
-            body.extend(chunk)
-            if len(body) > limit:
-                raise HTTPException(413, too_large)
-        if not body:
-            raise HTTPException(400, "Charge utile vide.")
-        return bytes(body)
-
     async def json_object(request: Request) -> dict[str, object]:
-        actual = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
-        if actual != "application/json":
-            raise HTTPException(415, "Content-Type requis : application/json.")
-        return parse_json_object(await read_bounded_body(request, MAX_ENTRY_PAYLOAD_BYTES))
+        return await read_json_object(request)
 
     def content_type(request: Request, source: FinanceIngestionSource) -> None:
         actual = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
@@ -398,6 +424,7 @@ def make_company_finance_router(db: MembershipDatabase, require_user: AuthResolv
         company_id: Annotated[CompanyId, Path()],
         source: FinanceIngestionSource,
         request: Request,
+        background_tasks: BackgroundTasks,
         member: Annotated[FinanceMember, Depends(membership)],
         session: Annotated[Session, Depends(get_db)],
         idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
@@ -406,7 +433,10 @@ def make_company_finance_router(db: MembershipDatabase, require_user: AuthResolv
             raise HTTPException(422, "Clé d’idempotence invalide.")
         content_type(request, source)
         raw_data = await read_bounded_body(request)
-        return persist_ingestion(session, member.company_id, source, raw_data, idempotency_key, member.user_id)
+        result = persist_ingestion(session, member.company_id, source, raw_data, idempotency_key, member.user_id)
+        if not result.replayed and result.record_count:
+            changed(background_tasks, company_id, "IMPORT_VALIDE", source.value, result.batch_id, member.user_id, result.record_count)
+        return result
 
     @router.get("/{company_id}/ingestions", response_model=FinanceIngestionLog)
     def read_ingestions(
@@ -425,6 +455,7 @@ def make_company_finance_router(db: MembershipDatabase, require_user: AuthResolv
     def cancel_ingestion(
         company_id: Annotated[CompanyId, Path()],
         batch_id: Annotated[str, Path(pattern=r"^[0-9a-f-]{36}$")],
+        background_tasks: BackgroundTasks,
         member: Annotated[FinanceMember, Depends(membership)],
         session: Annotated[Session, Depends(get_db)],
     ) -> Response:
@@ -435,6 +466,7 @@ def make_company_finance_router(db: MembershipDatabase, require_user: AuthResolv
         except SQLAlchemyError as error:
             logger.exception("[FINANCE] Annulation de l'import impossible")
             raise HTTPException(503, "Annulation impossible : stockage indisponible, rien n’a été supprimé.") from error
+        changed(background_tasks, company_id, "IMPORT_ANNULE", "import", batch_id, member.user_id, None)
         return Response(status_code=204)
 
     @router.get("/{company_id}/profile", response_model=CompanyProfileEnvelope)
@@ -448,11 +480,14 @@ def make_company_finance_router(db: MembershipDatabase, require_user: AuthResolv
     @router.put("/{company_id}/profile", response_model=CompanyProfileIn)
     def write_profile(
         company_id: Annotated[CompanyId, Path()],
+        background_tasks: BackgroundTasks,
         member: Annotated[FinanceMember, Depends(membership)],
         payload: Annotated[dict[str, object], Depends(json_object)],
         session: Annotated[Session, Depends(get_db)],
     ) -> CompanyProfileIn:
-        return guarded(lambda: save_profile(session, member.company_id, payload, member.user_id))
+        result = guarded(lambda: save_profile(session, member.company_id, payload, member.user_id))
+        changed(background_tasks, company_id, "PROFIL_MODIFIE", "profil", None, member.user_id, 0)
+        return result
 
     @router.get("/{company_id}/entries/{kind}", response_model=FinanceEntryList)
     def read_entries(
@@ -472,21 +507,26 @@ def make_company_finance_router(db: MembershipDatabase, require_user: AuthResolv
     def add_entry(
         company_id: Annotated[CompanyId, Path()],
         kind: FinanceEntryKind,
+        background_tasks: BackgroundTasks,
         member: Annotated[FinanceMember, Depends(membership)],
         payload: Annotated[dict[str, object], Depends(json_object)],
         session: Annotated[Session, Depends(get_db)],
     ) -> FinanceEntry:
-        return guarded(lambda: create_entry(session, member.company_id, kind, payload, member.user_id))
+        result = guarded(lambda: create_entry(session, member.company_id, kind, payload, member.user_id))
+        changed(background_tasks, company_id, "SAISIE_VALIDEE", kind.value, str(result.id), member.user_id)
+        return result
 
     @router.delete("/{company_id}/entries/{kind}/{entry_id}", status_code=204, response_class=Response)
     def remove_entry(
         company_id: Annotated[CompanyId, Path()],
         kind: FinanceEntryKind,
         entry_id: Annotated[int, Path(ge=1, le=2**63 - 1)],
+        background_tasks: BackgroundTasks,
         member: Annotated[FinanceMember, Depends(membership)],
         session: Annotated[Session, Depends(get_db)],
     ) -> Response:
         guarded(lambda: delete_entry(session, member.company_id, kind, entry_id, member.user_id))
+        changed(background_tasks, company_id, "SAISIE_SUPPRIMEE", kind.value, str(entry_id), member.user_id)
         return Response(status_code=204)
 
     @router.get("/{company_id}/audit", response_model=FinanceAuditLog)
@@ -501,6 +541,7 @@ def make_company_finance_router(db: MembershipDatabase, require_user: AuthResolv
     async def pos_webhook(
         company_id: Annotated[CompanyId, Path()],
         request: Request,
+        background_tasks: BackgroundTasks,
         session: Annotated[Session, Depends(get_db)],
         timestamp: Annotated[str, Header(alias="X-Sirius-Timestamp")],
         signature: Annotated[str, Header(alias="X-Sirius-Signature")],
@@ -521,6 +562,9 @@ def make_company_finance_router(db: MembershipDatabase, require_user: AuthResolv
         expected = "sha256=" + hmac.new(secret.encode("utf-8"), signed, hashlib.sha256).hexdigest()
         if not hmac.compare_digest(signature, expected):
             raise HTTPException(401, "Signature du webhook POS invalide.")
-        return persist_ingestion(session, company_id, FinanceIngestionSource.POS_WEBHOOK, raw_data, None, "pos_webhook")
+        result = persist_ingestion(session, company_id, FinanceIngestionSource.POS_WEBHOOK, raw_data, None, "pos_webhook")
+        if not result.replayed and result.record_count:
+            changed(background_tasks, company_id, "TICKET_CAISSE", "pos_webhook", result.batch_id, None, result.record_count)
+        return result
 
     return router

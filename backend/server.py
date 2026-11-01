@@ -233,6 +233,7 @@ async def _lifespan(_app):
     from sirius_brain import warm_cerebras_connection, close_cerebras_connections
     _connection_task = asyncio.create_task(warm_cerebras_connection())
     finance_task = asyncio.create_task(finance_workspace.loop())
+    analytical_task = asyncio.create_task(cerveau_analytique.loop())
     work_reminders_task = asyncio.create_task(operational_work.loop())
     shadow_task = asyncio.create_task(budget_lab.shadow_loop())
     initiative_task = asyncio.create_task(action_initiatives.loop())
@@ -250,7 +251,7 @@ async def _lifespan(_app):
         # --- Arrêt ---
         finance_demo_stop.set()
         tasks = []
-        for task in (_watch_task, _omega_task, _episodic_task, _vector_task, _connection_task, finance_task, work_reminders_task, shadow_task, initiative_task, autonomy_task, zapier_task, workspace_task, finance_demo_task):
+        for task in (_watch_task, _omega_task, _episodic_task, _vector_task, _connection_task, finance_task, analytical_task, work_reminders_task, shadow_task, initiative_task, autonomy_task, zapier_task, workspace_task, finance_demo_task):
             if task:
                 task.cancel()
                 tasks.append(task)
@@ -260,7 +261,7 @@ async def _lifespan(_app):
         client.close()
 
 
-app = FastAPI(title="Sirius Backend API", version="1.0.0", lifespan=_lifespan)
+app = FastAPI(title="ΣIRIUS Backend API", version="1.0.0", lifespan=_lifespan)
 
 # Imports des modules Sirius
 from storage import put_object, get_object, APP_NAME
@@ -451,6 +452,11 @@ from budget_lab import BudgetLab, make_budget_lab_router
 
 finance_workspace = FinanceWorkspace(db)
 finance_conversation = FinanceConversation(finance_workspace)
+from brain_analytical.orchestrator import AnalyticalOrchestrator
+from brain_analytical.conversation import repondre as repondre_analyse
+from brain_analytical.routes import make_analytical_router, make_strategic_source
+
+cerveau_analytique = AnalyticalOrchestrator(db)
 budget_lab = BudgetLab(db)
 finance_registry = make_finance_actions(finance_workspace)
 budget_lab.register(finance_registry)
@@ -487,7 +493,9 @@ operational_work.register()
 
 
 async def _work_chat_response(req, user, request, session_id, history):
-    result = await operational_work.handle(req, user)
+    result = await repondre_analyse(req, user, db, cerveau_analytique)
+    if result is None:
+        result = await operational_work.handle(req, user)
     if result is None:
         result = await finance_conversation.handle(req, user)
     if result is None:
@@ -2370,7 +2378,8 @@ from ariane_market_runs import make_ariane_market_router
 api_router.include_router(make_ariane_market_router(db, require_user))
 api_router.include_router(make_finance_router(finance_workspace, require_user))
 from routers.finance import make_company_finance_router
-api_router.include_router(make_company_finance_router(db, require_user))
+api_router.include_router(make_company_finance_router(db, require_user, cerveau_analytique.on_finance_change))
+api_router.include_router(make_analytical_router(db, require_user, cerveau_analytique))
 api_router.include_router(make_budget_lab_router(budget_lab, require_user))
 api_router.include_router(make_action_router(action_runs, require_user))
 api_router.include_router(make_initiative_router(action_initiatives, require_user))
@@ -2414,7 +2423,7 @@ from routes.work_dossiers import make_work_dossiers_router  # noqa: E402
 api_router.include_router(
     make_supervision_router(db, omega, require_user, _require_local_control, _admin_token_matches)
 )
-api_router.include_router(make_proactive_router(db, require_user))
+api_router.include_router(make_proactive_router(db, require_user, make_strategic_source(db, cerveau_analytique)))
 api_router.include_router(make_memory_router(db, require_user, resolve_user_id))
 api_router.include_router(make_stub_router())
 api_router.include_router(make_spotify_router())

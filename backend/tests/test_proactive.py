@@ -25,6 +25,31 @@ def _at_hour(hour):
     return now_local.astimezone(timezone.utc)
 
 
+def test_alerte_strategique_ouvre_cortex_et_escalade_traverse_la_sourdine(memory_db):
+    from decimal import Decimal
+    from brain_analytical.schemas import AlerteSuivie, SeveriteAlerte, StatutAlerte, StrategicAlert
+
+    now = _at_hour(14)
+    alert = StrategicAlert(
+        code="TENSION_TRESORERIE", severite=SeveriteAlerte.WARNING, metrique="jours_autonomie",
+        libelle_metrique="Trésorerie", valeur=Decimal("20"), seuil=Decimal("30"), unite="jours",
+        explication="Rupture estimée dans 20 jours.", plan_action=["Actualiser le plan de trésorerie."],
+    )
+    row = AlerteSuivie(id=1, statut=StatutAlerte.OUVERTE, alerte=alert,
+                      premiere_detection=now, derniere_detection=now, occurrences=1)
+    suggestions = proactive.evaluate("u1", now, strategic_alerts=[row])["suggestions"]
+    candidate = next(s for s in suggestions if s["source"] == "strategie")
+    action = proactive.suggestion_action("u1", candidate["id"], "executer", now)
+    assert action["proposed_action"] == {"type": "command", "text": "Ouvre ZEUS CORTEX"}
+    proactive.suggestion_action("u1", candidate["id"], "plus_tard", now)
+    assert not any(s["source"] == "strategie" for s in proactive.evaluate("u1", now, strategic_alerts=[row])["suggestions"])
+    escalated = row.model_copy(update={"alerte": alert.model_copy(update={"severite": SeveriteAlerte.CRITICAL})})
+    suggestions = proactive.evaluate("u1", now, strategic_alerts=[escalated])["suggestions"]
+    assert next(s for s in suggestions if s["source"] == "strategie")["urgency"] == "haute"
+    acknowledged = escalated.model_copy(update={"statut": StatutAlerte.ACQUITTEE})
+    assert not any(s["source"] == "strategie" for s in proactive.evaluate("u1", now, strategic_alerts=[acknowledged])["suggestions"])
+
+
 # ---------- Sources de suggestions ----------
 
 def test_projet_recent_genere_une_suggestion(memory_db):
