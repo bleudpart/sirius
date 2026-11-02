@@ -38,8 +38,11 @@ def _configured_engine() -> Engine:
         connection.exec_driver_sql("BEGIN IMMEDIATE")
         columns = {column["name"] for column in inspect(connection).get_columns("etiquettes_haccp")}
         additions = {
-            "type_operation": "VARCHAR(10) NOT NULL DEFAULT 'reception'",
+            "type_operation": "VARCHAR(16) NOT NULL DEFAULT 'reception'",
             "date_ouverture": "DATETIME",
+            "date_fabrication": "DATETIME",
+            "conditions_conservation": "VARCHAR(500)",
+            "restaurant_name": "VARCHAR(160)",
             "dlc_secondaire": "DATETIME",
             "duree_conservation_heures": "INTEGER",
             "justification_duree": "VARCHAR(500)",

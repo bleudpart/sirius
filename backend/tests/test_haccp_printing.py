@@ -185,6 +185,72 @@ def test_android_direct_needs_no_windows_station_and_has_separate_ack_evidence(a
     assert queue(client, label_id).json()["id"] == job["id"]
 
 
+def make_preparation(label_id):
+    with Session(haccp_database.get_engine()) as db:
+        row = db.get(EtiquetteHaccp, label_id)
+        row.type_operation = "preparation"
+        row.nom_produit = "Soupe TEST"
+        row.date_fabrication = (datetime.utcnow() - timedelta(hours=1)).replace(microsecond=0)
+        row.dlc_secondaire = row.date_fabrication + timedelta(hours=row.duree_conservation_heures)
+        row.date_ouverture = None
+        row.image_path = ""
+        row.conditions_conservation = "Entre 0 et +3 C, en bac ferme."
+        row.restaurant_name = "Cuisine test"
+        db.commit()
+
+
+@pytest.mark.parametrize("transport", ["windows", "android"])
+def test_preparation_prints_fabrication_exact_deadline_and_storage_conditions(api, transport):
+    client, label_id = api
+    make_preparation(label_id)
+    if transport == "windows":
+        relay = configure(client)
+        response = queue(client, label_id)
+        assert response.status_code == 200
+        payload = request(client, "/prochaine", {"relay_id": relay}).json()["job"]
+        assert "PREPARATION" in payload["html"] and "OUVERTURE" not in payload["html"]
+        assert "Fabrication" in payload["html"] and "DLC" in payload["html"]
+        assert "Entre 0 et +3 C, en bac ferme." in payload["html"]
+    else:
+        device = str(uuid.uuid4())
+        response = direct_queue(client, label_id, device)
+        assert response.status_code == 200
+        payload = request(client, f"/android/demandes/{response.json()['id']}/prise", {"device_id": device}).json()["job"]
+        assert payload["operation"] == "preparation"
+        assert payload["product"] == "Soupe TEST"
+        assert payload["prepared"] and payload["deadline"]
+        assert payload["storage"] == "Entre 0 et +3 C, en bac ferme."
+        assert "opened" not in payload
+        assert len(payload["prepared"]) == 25 and len(payload["deadline"]) == 25
+
+
+@pytest.mark.parametrize("field,value", [
+    ("date_fabrication", None), ("conditions_conservation", None),
+    ("conditions_conservation", ""), ("regle_confirmee", False),
+])
+def test_incomplete_preparations_cannot_be_printed_by_either_transport(api, field, value):
+    client, label_id = api
+    make_preparation(label_id)
+    configure(client)
+    with Session(haccp_database.get_engine()) as db:
+        setattr(db.get(EtiquetteHaccp, label_id), field, value)
+        db.commit()
+    assert queue(client, label_id).status_code == 422
+    assert direct_queue(client, label_id, str(uuid.uuid4())).status_code == 422
+
+
+def test_preparation_expiring_before_android_claim_is_cancelled(api):
+    client, label_id = api
+    make_preparation(label_id)
+    device = str(uuid.uuid4())
+    job = direct_queue(client, label_id, device).json()
+    with Session(haccp_database.get_engine()) as db:
+        db.get(EtiquetteHaccp, label_id).dlc_secondaire = datetime(2000, 1, 1)
+        db.commit()
+    response = request(client, f"/android/demandes/{job['id']}/prise", {"device_id": device}).json()
+    assert response["job"] is None and response["state"]["status"] == "cancelled"
+
+
 def test_direct_target_is_never_claimed_or_acknowledged_by_windows_even_with_same_id(api):
     client, label_id = api
     relay = configure(client)

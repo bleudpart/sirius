@@ -1,7 +1,7 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { Capacitor, registerPlugin } from "@capacitor/core";
-import HaccpPrinter, { printHaccpOpening } from "./HaccpPrinter";
+import HaccpPrinter, { printHaccpLabel } from "./HaccpPrinter";
 
 jest.mock("@capacitor/core", () => ({
   Capacitor: { getPlatform: jest.fn(() => "android"), isPluginAvailable: jest.fn(() => true) },
@@ -74,20 +74,20 @@ test.each([false, true])("Windows remains available before opting into native pr
   Capacitor.isPluginAvailable.mockReturnValue(!missing);
   plugin.getConfig.mockResolvedValue({ ...config, enabled: false });
   global.fetch.mockResolvedValue({ ok: true, json: async () => ({ status: "pending", transport: "windows" }) });
-  expect((await printHaccpOpening(8)).transport).toBe("windows");
+  expect((await printHaccpLabel(8)).transport).toBe("windows");
   expect(global.fetch).toHaveBeenCalledTimes(1);
   expect(global.fetch.mock.calls[0][0]).toMatch(/\/impression\/demandes$/);
 });
 
 test("native configuration read failure never silently switches to Windows", async () => {
   plugin.getConfig.mockRejectedValue(new Error("Configuration illisible"));
-  await expect(printHaccpOpening(8)).rejects.toThrow("Configuration illisible");
+  await expect(printHaccpLabel(8)).rejects.toThrow("Configuration illisible");
   expect(global.fetch).not.toHaveBeenCalled();
 });
 
 test("enabled native printing does not fall back to Windows after a server error", async () => {
   global.fetch.mockRejectedValue(new Error("Serveur indisponible"));
-  await expect(printHaccpOpening(8)).rejects.toThrow("Serveur indisponible");
+  await expect(printHaccpLabel(8)).rejects.toThrow("Serveur indisponible");
   expect(global.fetch).toHaveBeenCalledTimes(1);
   expect(global.fetch.mock.calls[0][0]).toMatch(/\/android\/demandes$/);
 });

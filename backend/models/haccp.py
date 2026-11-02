@@ -1,4 +1,4 @@
-"""Registre local des etiquettes originales de reception."""
+"""Registre local des receptions, ouvertures et preparations declarees."""
 from datetime import date, datetime
 
 from sqlalchemy import JSON, Boolean, Date, DateTime, Integer, String, Index
@@ -32,8 +32,11 @@ class EtiquetteHaccp(Base):
     commentaire_anomalie: Mapped[str | None] = mapped_column(String(500))
     image_path: Mapped[str] = mapped_column(String(512), nullable=False)
     operateur: Mapped[str] = mapped_column(String(100), default="Cuisine")
-    type_operation: Mapped[str] = mapped_column(String(10), default="reception", server_default="reception")
+    type_operation: Mapped[str] = mapped_column(String(16), default="reception", server_default="reception")
     date_ouverture: Mapped[datetime | None] = mapped_column(DateTime)
+    date_fabrication: Mapped[datetime | None] = mapped_column(DateTime)
+    conditions_conservation: Mapped[str | None] = mapped_column(String(500))
+    restaurant_name: Mapped[str | None] = mapped_column(String(160))
     dlc_secondaire: Mapped[datetime | None] = mapped_column(DateTime)
     duree_conservation_heures: Mapped[int | None] = mapped_column(Integer)
     justification_duree: Mapped[str | None] = mapped_column(String(500))

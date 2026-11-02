@@ -24,8 +24,8 @@ import cloud_link
 import routers.haccp as routes
 import services.haccp_vision as vision
 from models.haccp import EtiquetteHaccp
-from schemas.haccp import EtiquetteVisionOutput, OperationCapture
-from services.haccp_opening import PARIS, calculer_ouverture
+from schemas.haccp import EtiquetteVisionOutput, OperationCapture, PreparationCreate
+from services.haccp_opening import PARIS, calculer_ouverture, calculer_preparation
 
 
 def extracted(**changes):
@@ -401,6 +401,7 @@ def test_real_server_registration_and_account_company_permissions(monkeypatch):
 
     paths = server.app.openapi()["paths"]
     assert "post" in paths["/api/haccp/etiquettes/scan"]
+    assert "post" in paths["/api/haccp/preparations"]
     assert "get" in paths["/api/haccp/receptions/dossier"]
     assert "get" in paths["/api/haccp/registre/recherche"]
     assert "get" in paths["/api/haccp/registre/export-csv"]
@@ -558,7 +559,8 @@ def test_sqlite_additive_upgrade_keeps_old_receptions(api):
     engine.dispose()
     haccp_database._configured_engine.cache_clear()
     additions = ["type_operation", "date_ouverture", "dlc_secondaire",
-                 "duree_conservation_heures", "justification_duree", "regle_confirmee", "capture_id", "capture_hash", "categorie"]
+                 "duree_conservation_heures", "justification_duree", "regle_confirmee", "capture_id", "capture_hash", "categorie",
+                 "date_fabrication", "conditions_conservation", "restaurant_name"]
     # Reconstruit le schema precedent en gardant les contraintes et la ligne.
     with sqlite3.connect(root / "haccp.sqlite3") as connection:
         connection.execute(
@@ -574,6 +576,8 @@ def test_sqlite_additive_upgrade_keeps_old_receptions(api):
         assert records[0]["id"] == first["id"]
         assert records[0]["type_operation"] == "reception"
         assert records[0]["date_ouverture"] is None and records[0]["dlc_secondaire"] is None
+        assert records[0]["date_fabrication"] is None and records[0]["conditions_conservation"] is None
+        assert records[0]["restaurant_name"] is None
         assert records[0]["categorie"] == "Non classé"
         assert records[0]["chemin_photo"] == "storage/etiquettes_haccp/ancienne-photo.jpg"
         assert_jpeg(legacy.read_bytes())
@@ -581,6 +585,7 @@ def test_sqlite_additive_upgrade_keeps_old_receptions(api):
         haccp_database.get_engine().dispose()
         haccp_database._configured_engine.cache_clear()
     assert scan(client).status_code == 201
+    assert prepare(client, preparation_payload()).status_code == 201
 
 
 @pytest.mark.parametrize("value,expected", [
@@ -737,3 +742,176 @@ def test_concurrent_same_capture_commits_exactly_one_photo_and_record(api, monke
     assert results[0].json()["id"] == results[1].json()["id"]
     assert len(list(root.rglob("*.jpg"))) == 1
     assert len(get(client, "recherche").json()) == 1
+
+
+def preparation_payload(**changes):
+    return {
+        "capture_id": "9582f6d4-d5ba-4607-8772-051912e656cb",
+        "nom_produit": "Soupe TEST", "operateur": "Cuisine", "restaurant_name": "Restaurant test",
+        "date_fabrication": (datetime.now(timezone.utc) - timedelta(hours=1)).replace(microsecond=0).isoformat(),
+        "duree_conservation_heures": 72, "justification_duree": "PMS test, regle specifique au produit",
+        "regle_confirmee": True, "conditions_conservation": "Entre 0 et +3 C, en bac ferme.",
+    } | changes
+
+
+def prepare(client, payload, user="one"):
+    return client.post("/api/haccp/preparations", json=payload, headers={"x-test-user": user} if user else {})
+
+
+@pytest.mark.parametrize("fabrication,hours,expected", [
+    ("2026-11-02T08:15", 72, "2026-11-05T07:15:00+00:00"),
+    ("2026-11-02T08:15", 12, "2026-11-02T19:15:00+00:00"),
+    ("2026-03-28T08:00", 24, "2026-03-29T07:00:00+00:00"),
+    ("2026-10-24T08:00", 24, "2026-10-25T06:00:00+00:00"),
+    ("2028-02-28T08:00", 48, "2028-03-01T07:00:00+00:00"),
+    ("2026-12-31T08:00", 36, "2027-01-01T19:00:00+00:00"),
+])
+def test_preparation_uses_exact_fabrication_and_elapsed_hours(fabrication, hours, expected):
+    body = PreparationCreate(**preparation_payload(date_fabrication=fabrication, duree_conservation_heures=hours))
+    limit = calculer_preparation(body, body.date_fabrication + timedelta(minutes=1))
+    assert limit.isoformat() == expected
+    assert (limit - body.date_fabrication).total_seconds() == hours * 3600
+
+
+@pytest.mark.parametrize("fabrication", [
+    "2026-11-02", "le matin", "2026-02-30T08:00", 1234567890,
+    "2026-03-29T02:30", "2026-10-25T02:30",
+])
+def test_preparation_never_guesses_a_missing_invalid_or_ambiguous_time(fabrication):
+    with pytest.raises(ValidationError):
+        PreparationCreate(**preparation_payload(date_fabrication=fabrication))
+
+
+def test_explicit_dst_offset_disambiguates_fabrication():
+    first = PreparationCreate(**preparation_payload(date_fabrication="2026-10-25T02:30:00+02:00"))
+    second = PreparationCreate(**preparation_payload(date_fabrication="2026-10-25T02:30:00+01:00"))
+    assert second.date_fabrication - first.date_fabrication == timedelta(hours=1)
+
+
+@pytest.mark.parametrize("fabrication", [
+    "2026-03-29T02:30:00+01:00", "2026-03-29T02:30:00+02:00",
+    "2026-11-02T08:00:00+02:00", "2026-06-02T08:00:00+01:00",
+])
+def test_inconsistent_paris_offsets_do_not_silently_change_fabrication(fabrication):
+    with pytest.raises(ValidationError, match="decalage UTC"):
+        PreparationCreate(**preparation_payload(date_fabrication=fabrication))
+
+
+@pytest.mark.parametrize("changes", [
+    {"duree_conservation_heures": None}, {"duree_conservation_heures": 0},
+    {"duree_conservation_heures": 1.5}, {"duree_conservation_heures": "72"},
+    {"duree_conservation_heures": True}, {"justification_duree": ""},
+    {"regle_confirmee": False}, {"regle_confirmee": "true"},
+    {"conditions_conservation": " "}, {"conditions_conservation": "x" * 501},
+    {"nom_produit": " "}, {"operateur": ""}, {"restaurant_name": " "},
+    {"capture_id": "invalid"}, {"type_operation": "ouverture"},
+])
+def test_preparation_requires_a_product_specific_confirmed_rule(api, changes):
+    client, root = api
+    response = prepare(client, preparation_payload(**changes))
+    assert response.status_code == 422, response.text
+    assert get(client, "recherche").json() == []
+    assert list(root.rglob("*.jpg")) == []
+    routes.analyser_etiquette_vision.assert_not_awaited()
+
+
+def test_preparation_without_any_rule_has_no_default_j3(api):
+    client, _ = api
+    payload = preparation_payload()
+    for key in ("duree_conservation_heures", "justification_duree", "regle_confirmee"):
+        payload.pop(key)
+    assert prepare(client, payload).status_code == 422
+    assert get(client, "recherche").json() == []
+
+
+@pytest.mark.parametrize("hours_ago,duration", [(-1, 72), (72, 72), (100, 24), (1, 10**100)])
+def test_future_expired_or_overflowing_preparations_have_no_label(api, hours_ago, duration):
+    client, _ = api
+    payload = preparation_payload(
+        date_fabrication=(datetime.now(timezone.utc) - timedelta(hours=hours_ago)).replace(microsecond=0).isoformat(),
+        duree_conservation_heures=duration,
+    )
+    assert prepare(client, payload).status_code == 422
+    assert get(client, "recherche").json() == []
+
+
+def test_preparation_is_durable_scoped_photo_free_and_prints_all_required_fields(api):
+    client, root = api
+    payload = preparation_payload(nom_produit="Soupe <b>TEST</b>", conditions_conservation="Entre 0 et +3 C.\nBac ferme.")
+    assert prepare(client, payload, user=None).status_code == 401
+    response = prepare(client, payload)
+    assert response.status_code == 201, response.text
+    record = response.json()
+    assert record["type_operation"] == "preparation"
+    assert record["date_fabrication"] == payload["date_fabrication"].replace("+00:00", "Z")
+    assert datetime.fromisoformat(record["dlc_secondaire"]) == datetime.fromisoformat(payload["date_fabrication"]) + timedelta(hours=72)
+    assert record["date_ouverture"] is None and record["date_reception"] is None
+    assert record["image_url"] is None and record["chemin_photo"] is None
+    assert record["restaurant_name"] == "Restaurant test"
+    assert record["numero_lot"].startswith("PREP-") and record["numero_lot"].endswith("9582F6D4")
+    assert record["temperature_conforme"] is None
+    assert list(root.rglob("*.jpg")) == []
+    routes.analyser_etiquette_vision.assert_not_awaited()
+    assert get(client, f"{record['id']}/photo").status_code == 404
+    assert get(client, f"{record['id']}/donnees", user="two").status_code == 404
+    assert get(client, f"{record['id']}/etiquette", user="two").status_code == 404
+    assert get(client, "recherche", user="two").json() == []
+    label = get(client, f"{record['id']}/etiquette")
+    assert label.status_code == 200
+    assert "PREPARATION" in label.text and "Soupe &lt;b&gt;TEST&lt;/b&gt;" in label.text
+    assert "<b>TEST</b>" not in label.text
+    for field in ("Fabrication", "DLC au plus tard", "Entre 0 et +3 C. Bac ferme.", "Restaurant test"):
+        assert field in label.text
+    for key in ("date_fabrication", "dlc_secondaire"):
+        stamp = datetime.fromisoformat(record[key]).astimezone(PARIS).strftime("%d/%m/%Y %H:%M:%S %z")
+        assert stamp in label.text
+    csv_row = next(csv.DictReader(io.StringIO(get(client, "export-csv").text.lstrip("\ufeff")), delimiter=";"))
+    assert csv_row["date_fabrication"] == record["date_fabrication"]
+    assert csv_row["conditions_conservation"] == record["conditions_conservation"]
+    assert csv_row["restaurant_name"] == record["restaurant_name"]
+    haccp_database.get_engine().dispose()
+    haccp_database._configured_engine.cache_clear()
+    assert get(client, f"{record['id']}/donnees").json() == record
+    assert prepare(client, payload).json() == record
+    assert prepare(client, payload | {"nom_produit": "Autre soupe"}).status_code == 409
+    assert len(get(client, "recherche").json()) == 1
+
+
+def test_concurrent_preparations_reuse_the_same_record(api):
+    from concurrent.futures import ThreadPoolExecutor
+    client, _ = api
+    payload = preparation_payload(numero_lot="LOT-PREP-TEST")
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda _: prepare(client, payload), range(2)))
+    assert [response.status_code for response in results] == [201, 201]
+    assert results[0].json() == results[1].json()
+    assert len(get(client, "recherche").json()) == 1
+
+
+def test_preparation_cloud_relay_keeps_the_same_identity_without_local_fallback(api, monkeypatch):
+    client, _ = api
+    payload = preparation_payload()
+    record = prepare(client, payload).json() | {"id": 99}
+    forwarded = AsyncMock(return_value=httpx.Response(201, json=record))
+    monkeypatch.setattr(cloud_link, "relay_allowed", lambda: True)
+    monkeypatch.setattr(cloud_link, "relay_haccp_registry", forwarded)
+    response = prepare(client, payload)
+    assert response.status_code == 201 and response.json()["id"] == 99
+    assert forwarded.call_args.args == ("POST", "/preparations")
+    assert forwarded.call_args.kwargs["json"]["capture_id"] == payload["capture_id"]
+    assert forwarded.call_args.kwargs["json"]["conditions_conservation"] == payload["conditions_conservation"]
+    forwarded.side_effect = HTTPException(502, "Cloud indisponible")
+    assert prepare(client, payload).status_code == 502
+    monkeypatch.setattr(cloud_link, "relay_allowed", lambda: False)
+    assert len(get(client, "recherche").json()) == 1
+
+
+def test_preparation_database_failure_is_explicit(api, monkeypatch):
+    client, _ = api
+    def fail(*args, **kwargs):
+        raise OperationalError("INSERT", {}, Exception("disk full"))
+    monkeypatch.setattr(routes, "_save_record", fail)
+    response = prepare(client, preparation_payload())
+    assert response.status_code == 500
+    assert "archivee" in response.json()["detail"]
+    assert get(client, "recherche").json() == []

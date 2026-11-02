@@ -17,7 +17,7 @@ from haccp_database import get_db
 from models.haccp import EtiquetteHaccp
 from models.haccp_printing import HaccpAndroidPrintTarget, HaccpPrintJob, HaccpPrintStation
 from routers.haccp import _response
-from services.haccp_opening import PARIS, construire_fragment_impression
+from services.haccp_opening import PARIS, construire_fragment_impression, verifier_etiquette_imprimable
 
 logger = logging.getLogger(__name__)
 
@@ -72,12 +72,15 @@ def _actor(request: Request, scope: str) -> str:
 
 def _android_payload(row: EtiquetteHaccp, job_id: str) -> dict:
     record = _response(row, "/api/haccp/registre")
+    preparation = record.type_operation == "preparation"
     def stamp(value: datetime | None) -> str:
-        return value.astimezone(PARIS).strftime("%d/%m/%Y %H:%M") if value else ""
+        return value.astimezone(PARIS).strftime("%d/%m/%Y %H:%M:%S %z" if preparation else "%d/%m/%Y %H:%M") if value else ""
     return {
         "id": job_id, "labelId": row.id,
         "product": record.nom_produit, "lot": record.numero_lot,
-        "opened": stamp(record.date_ouverture), "deadline": stamp(record.dlc_secondaire),
+        **({"operation": "preparation", "prepared": stamp(record.date_fabrication),
+            "storage": record.conditions_conservation} if preparation else {"opened": stamp(record.date_ouverture)}),
+        "deadline": stamp(record.dlc_secondaire),
         "operator": record.operateur,
     }
 
@@ -101,10 +104,11 @@ def _valid_label(db: Session, scope: str, label_id: int) -> EtiquetteHaccp:
         EtiquetteHaccp.id == label_id, EtiquetteHaccp.scope_key == scope,
     ))
     if row is None:
-        raise HTTPException(404, "Ouverture introuvable.")
-    if (row.type_operation != "ouverture" or not row.dlc_secondaire or not row.conforme_reception
-            or not row.regle_confirmee or row.dlc_secondaire <= _now()):
-        raise HTTPException(422, "Ouverture non imprimable : regle, verification ou DLC secondaire invalide.")
+        raise HTTPException(404, "Etiquette introuvable.")
+    try:
+        verifier_etiquette_imprimable(_response(row, "/api/haccp/registre"), _now().replace(tzinfo=timezone.utc))
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
     return row
 
 
@@ -196,7 +200,7 @@ def make_haccp_print_router(
         if forwarded is not None:
             return forwarded
         if not body.reviewed:
-            raise HTTPException(422, "Relisez la photo et les dates puis confirmez l'ouverture avant impression.")
+            raise HTTPException(422, "Relisez le produit, les dates et les conditions puis confirmez avant impression.")
         with database_errors(db):
             row = _valid_label(db, scope, body.label_id)
             existing = db.scalar(select(HaccpPrintJob).where(
@@ -315,7 +319,7 @@ def make_haccp_print_router(
     ) -> dict:
         actor = android_only(request, scope)
         if not body.reviewed:
-            raise HTTPException(422, "Relisez la photo et les dates avant impression.")
+            raise HTTPException(422, "Relisez le produit, les dates et les conditions avant impression.")
         with database_errors(db):
             row = _valid_label(db, scope, body.label_id)
             existing = db.scalar(select(HaccpPrintJob).where(

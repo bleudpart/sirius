@@ -141,6 +141,51 @@ test("camera permission failures stay explicit and can be retried", async () => 
   expect(button("Capturer l’étiquette").disabled).toBe(false);
 });
 
+test("changing operation cannot hide a camera failure or imply a new camera request", async () => {
+  getUserMedia.mockRejectedValueOnce(new Error("Camera permission denied"));
+  await act(async () => root.render(<HaccpLabelCapture />));
+  await click("Ouverture produit");
+  expect(host.querySelector(".haccp-camera-state").textContent).toContain("Camera permission denied");
+  expect(host.querySelector('[role="alert"]').textContent).toContain("Camera permission denied");
+  expect(host.querySelector(".haccp-camera-stage").classList.contains("is-ready")).toBe(false);
+  expect(button("Capturer l’étiquette").disabled).toBe(true);
+  expect(getUserMedia).toHaveBeenCalledTimes(1);
+  expect(global.fetch).not.toHaveBeenCalled();
+});
+
+test.each([
+  [{ sessionReady: false }, "dossier"],
+  [{ establishmentName: "" }, "restaurant"],
+])("camera animation waits for the capture prerequisites %j", async (props, message) => {
+  await act(async () => root.render(<HaccpLabelCapture {...props} />));
+  expect(host.querySelector(".haccp-camera-stage").classList.contains("is-ready")).toBe(false);
+  expect(host.querySelector(".haccp-camera-state").textContent).toContain(message);
+  expect(button("Capturer l’étiquette").disabled).toBe(true);
+  expect(global.fetch).not.toHaveBeenCalled();
+  await act(async () => root.render(<HaccpLabelCapture />));
+  expect(host.querySelector(".haccp-camera-stage").classList.contains("is-ready")).toBe(true);
+  expect(button("Capturer l’étiquette").disabled).toBe(false);
+});
+
+test("scanner readiness follows operator and rule validation, then stops at the result", async () => {
+  await act(async () => root.render(<HaccpLabelCapture />));
+  await change(field("Opérateur"), "");
+  expect(host.querySelector(".haccp-camera-state").textContent).toContain("opérateur");
+  expect(host.querySelector(".haccp-camera-stage").classList.contains("is-ready")).toBe(false);
+  await change(field("Opérateur"), "Cuisine");
+  await click("Ouverture produit");
+  await act(async () => field("Appliquer").click());
+  expect(host.querySelector(".haccp-camera-state").textContent).toContain("durée");
+  expect(host.querySelector(".haccp-camera-stage").classList.contains("is-ready")).toBe(false);
+  await change(field("Durée après"), "72");
+  await change(field("Justification"), "Notice fabricant");
+  await act(async () => field("Je confirme").click());
+  expect(host.querySelector(".haccp-camera-stage").classList.contains("is-ready")).toBe(true);
+  await choosePhoto();
+  expect(host.querySelector(".haccp-camera-stage").classList.contains("is-ready")).toBe(false);
+  expect(button("Capturer l’étiquette").disabled).toBe(true);
+});
+
 test("video playback failure releases the camera and can be retried", async () => {
   HTMLMediaElement.prototype.play.mockRejectedValueOnce(new Error("Playback blocked"));
   await act(async () => root.render(<HaccpLabelCapture />));
@@ -250,7 +295,7 @@ test("simplified kitchen scan archives first and requires an explicit review bef
 
 test("kitchen mode shows temporary accepted-print feedback and resets without reloading", async () => {
   jest.useFakeTimers();
-  const print = jest.spyOn(haccpPrinter, "printHaccpOpening").mockResolvedValue({
+  const print = jest.spyOn(haccpPrinter, "printHaccpLabel").mockResolvedValue({
     status: "accepted", transport: "windows", detail: "Transmis à Windows",
   });
   await act(async () => root.render(<HaccpLabelCapture kitchenMode />));
@@ -259,7 +304,7 @@ test("kitchen mode shows temporary accepted-print feedback and resets without re
   await choosePhoto();
   expect(print).not.toHaveBeenCalled();
   await click("J’ai vérifié le produit, le lot et la DLC");
-  expect(print).toHaveBeenCalledWith(record.id);
+  expect(print).toHaveBeenCalledWith(record.id, "ouverture");
   expect(host.querySelector(".haccp-print-success").textContent).toContain("Demande d’impression envoyée");
   expect(host.querySelector(".haccp-print-success").textContent).toContain("vérifiez la sortie papier");
   await act(async () => { jest.advanceTimersByTime(1500); });

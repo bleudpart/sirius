@@ -30,4 +30,28 @@ public class HaccpPrinterRulesTest {
         try { HaccpPrinterRules.jobId("1-1-1-1-1"); fail(); }
         catch (IllegalArgumentException expected) { }
     }
+
+    @Test public void preparationIncludesExactTimesAndFullStorageInstructions() {
+        String body = HaccpPrinterRules.labelBody(true, "PREP-TEST", "02/11/2026 08:15:00 +0100",
+            "05/11/2026 08:15:00 +0100", "Cuisine", "Entre 0 et +3 C, en bac ferme.");
+        assertTrue(body.contains("Fabrication : 02/11/2026 08:15:00 +0100"));
+        assertTrue(body.contains("DLC : 05/11/2026 08:15:00 +0100"));
+        assertTrue(body.contains("Conservation : Entre 0 et +3 C, en bac ferme."));
+        assertFalse(body.contains("Ouvert"));
+    }
+
+    @Test public void preparationCannotOmitItsStorageConditions() {
+        for (String storage : new String[] {null, "", "line\nbreak"}) {
+            try {
+                HaccpPrinterRules.labelBody(true, "LOT", "02/11/2026 08:00", "05/11/2026 08:00",
+                    "Cuisine", storage);
+                fail();
+            } catch (IllegalArgumentException expected) { }
+        }
+    }
+
+    @Test public void openingKeepsItsExistingTextWithoutPreparationFields() {
+        assertEquals("Lot : LOT\nOuvert : 02/11/2026 08:00\nAu plus tard : 05/11/2026 08:00\nOperateur : Cuisine",
+            HaccpPrinterRules.labelBody(false, "LOT", "02/11/2026 08:00", "05/11/2026 08:00", "Cuisine", null));
+    }
 }

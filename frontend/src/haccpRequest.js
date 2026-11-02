@@ -1,3 +1,17 @@
+export async function checkHaccpResponse(response) {
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    const detail = typeof body?.detail === "string" ? body.detail
+      : Array.isArray(body?.detail) ? body.detail
+        .filter((item) => typeof item?.msg === "string")
+        .map((item) => item.msg.replace(/^Value error,\s*/, "")).join(" ") : "";
+    const error = new Error(detail || `Opération refusée (${response.status}). Vérifiez la saisie et votre connexion.`);
+    error.status = response.status;
+    throw error;
+  }
+  return response;
+}
+
 export async function haccpFetch(url, options = {}, readResponse = (response) => response) {
   const controller = new AbortController();
   const relayAbort = () => controller.abort();

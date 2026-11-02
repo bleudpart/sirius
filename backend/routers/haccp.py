@@ -1,4 +1,4 @@
-"""Scan, consultation privee et export du registre des receptions."""
+"""Scan, preparations declarees, consultation privee et export du registre."""
 import csv
 import io
 import logging
@@ -26,8 +26,12 @@ import cloud_link
 from haccp_database import get_db
 from models.haccp import EtiquetteHaccp
 from runtime_paths import data_dir
-from schemas.haccp import CategorieProduit, EtiquetteResponse, EtiquetteVisionOutput, OperationCapture
-from services.haccp_opening import PARIS, calculer_ouverture, construire_etiquette
+from schemas.haccp import (
+    CategorieProduit, EtiquetteResponse, EtiquetteVisionOutput, OperationCapture, OperationEtiquette, PreparationCreate,
+)
+from services.haccp_opening import (
+    PARIS, calculer_ouverture, calculer_preparation, construire_etiquette, verifier_etiquette_imprimable,
+)
 from services.haccp_vision import (
     VisionAnalysisError,
     VisionConfigurationError,
@@ -136,10 +140,12 @@ def _response(row: EtiquetteHaccp, photo_prefix: str) -> EtiquetteResponse:
     values = {name: getattr(row, name) for name in EtiquetteVisionOutput.model_fields}
     return EtiquetteResponse(
         **values, id=row.id, created_at=row.created_at, operateur=row.operateur,
-        image_url=f"{photo_prefix}/{row.id}/photo",
-        **{name: getattr(row, name) for name in OperationCapture.model_fields},
+        image_url=f"{photo_prefix}/{row.id}/photo" if row.image_path else None,
+        **{name: getattr(row, name) for name in OperationEtiquette.model_fields},
         date_ouverture=row.date_ouverture, dlc_secondaire=row.dlc_secondaire,
-        chemin_photo=row.image_path,
+        date_fabrication=row.date_fabrication, conditions_conservation=row.conditions_conservation,
+        restaurant_name=row.restaurant_name,
+        chemin_photo=row.image_path or None,
         chemin_donnees=f"haccp.sqlite3#etiquettes_haccp/{row.id}",
         donnees_url=f"{photo_prefix}/{row.id}/donnees",
         fournisseur=row.fournisseur_ou_marque,
@@ -151,13 +157,17 @@ def _response(row: EtiquetteHaccp, photo_prefix: str) -> EtiquetteResponse:
 def _save_record(
     db: Session, result: EtiquetteVisionOutput, scope: str, operateur: str,
     relative_path: str, photo_prefix: str,
-    operation: OperationCapture, maintenant: datetime, limite: datetime | None,
+    operation: OperationEtiquette, maintenant: datetime, limite: datetime | None,
     capture_id: str | None, capture_hash: str,
+    *, date_fabrication: datetime | None = None, conditions_conservation: str | None = None,
+    restaurant_name: str | None = None,
 ) -> EtiquetteResponse:
     row = EtiquetteHaccp(
         **result.model_dump(), scope_key=scope, operateur=operateur, image_path=relative_path,
         **operation.model_dump(),
         date_ouverture=maintenant.replace(tzinfo=None) if operation.type_operation == "ouverture" else None,
+        date_fabrication=date_fabrication.replace(tzinfo=None) if date_fabrication else None,
+        conditions_conservation=conditions_conservation, restaurant_name=restaurant_name,
         dlc_secondaire=limite.replace(tzinfo=None) if limite else None,
         capture_id=capture_id, capture_hash=capture_hash,
         created_at=maintenant.replace(tzinfo=None),
@@ -213,7 +223,7 @@ def _existing_capture(db: Session, scope: str, capture_id: str | None, digest: s
         return None
     if row.capture_hash != digest:
         raise HTTPException(409, "Cette capture est deja archivee avec un contenu different. "
-                            "Reprenez une photo pour creer une nouvelle fiche.")
+                            "Creez une nouvelle fiche pour changer son contenu.")
     return _response(row, prefix)
 
 
@@ -224,6 +234,7 @@ CSV_COLUMNS = [
     "type_operation", "date_ouverture", "dlc_secondaire", "duree_conservation_heures",
     "justification_duree", "regle_confirmee",
     "categorie", "date_reception", "temperature_conforme", "chemin_photo", "chemin_donnees",
+    "date_fabrication", "conditions_conservation", "restaurant_name",
 ]
 
 
@@ -269,6 +280,57 @@ def make_haccp_router(resolve_scope: Callable[[Request], Awaitable[str]]) -> API
         except OSError as error:
             logger.exception("[HACCP] Ouverture du dossier de reception impossible")
             raise HTTPException(500, "Le dossier de réception n'a pas pu être ouvert.") from error
+
+    @router.post("/preparations", response_model=EtiquetteResponse, status_code=201)
+    async def preparation(
+        body: PreparationCreate, request: Request,
+        scope: str = Depends(resolve_scope), db: Session = Depends(get_db),
+    ) -> EtiquetteResponse:
+        _restaurant_slug(body.restaurant_name)
+        if cloud_link.relay_allowed():
+            response = await cloud_link.relay_haccp_registry(
+                "POST", "/preparations", json=body.model_dump(mode="json"),
+            )
+            return EtiquetteResponse.model_validate(response.json())
+        prefix = str(request.url_for("haccp_search")).removesuffix("/recherche")
+        capture_key = str(body.capture_id)
+        digest = hashlib.sha256(json.dumps(
+            body.model_dump(mode="json", exclude={"capture_id"}), sort_keys=True, ensure_ascii=False,
+        ).encode("utf-8")).hexdigest()
+        try:
+            previous = await run_in_threadpool(_existing_capture, db, scope, capture_key, digest, prefix)
+            if previous is not None:
+                return previous
+            maintenant = datetime.now(timezone.utc)
+            try:
+                limite = calculer_preparation(body, maintenant)
+            except ValueError as error:
+                raise HTTPException(422, str(error)) from error
+            result = EtiquetteVisionOutput(
+                nom_produit=body.nom_produit,
+                numero_lot=body.numero_lot or (
+                    f"PREP-{body.date_fabrication.astimezone(PARIS):%Y%m%d}-{body.capture_id.hex[:8].upper()}"
+                ),
+                categorie=body.categorie,
+            )
+            operation = OperationEtiquette.model_validate(
+                body.model_dump(include=set(OperationEtiquette.model_fields)),
+            )
+            try:
+                return await run_in_threadpool(
+                    _save_record, db, result, scope, body.operateur, "", prefix,
+                    operation, maintenant, limite, capture_key, digest,
+                    date_fabrication=body.date_fabrication,
+                    conditions_conservation=body.conditions_conservation, restaurant_name=body.restaurant_name,
+                )
+            except IntegrityError:
+                previous = await run_in_threadpool(_existing_capture, db, scope, capture_key, digest, prefix)
+                if previous is None:
+                    raise
+                return previous
+        except SQLAlchemyError as error:
+            logger.exception("[HACCP] Archivage de la preparation impossible")
+            raise HTTPException(500, "La preparation n'a pas pu etre archivee.") from error
 
     @router.post("/etiquettes/scan", response_model=EtiquetteResponse, status_code=201)
     async def scan(
@@ -341,6 +403,7 @@ def make_haccp_router(resolve_scope: Callable[[Request], Awaitable[str]]) -> API
                     _save_record, db, result, scope, operateur.strip(),
                     relative_path, prefix,
                     capture, maintenant, limite, capture_key, digest,
+                    restaurant_name=restaurant_name.strip(),
                 )
             except IntegrityError:
                 previous = await run_in_threadpool(_existing_capture, db, scope, capture_key, digest, prefix)
@@ -436,16 +499,15 @@ def make_haccp_router(resolve_scope: Callable[[Request], Awaitable[str]]) -> API
                 EtiquetteHaccp.id == id, EtiquetteHaccp.scope_key == scope,
             ))
         except SQLAlchemyError as error:
-            logger.exception("[HACCP] Lecture de l'etiquette d'ouverture impossible")
-            raise HTTPException(500, "L'etiquette d'ouverture est indisponible.") from error
+            logger.exception("[HACCP] Lecture de l'etiquette d'utilisation impossible")
+            raise HTTPException(500, "L'etiquette d'utilisation est indisponible.") from error
         if row is None:
             raise HTTPException(404, "Etiquette introuvable.")
-        if row.type_operation != "ouverture" or not row.dlc_secondaire or not row.conforme_reception:
-            raise HTTPException(422, "Aucune etiquette d'utilisation : regle ou verification manquante, "
-                                "ou anomalie sur l'ouverture.")
-        record = _response(row, "/api/haccp/registre")
-        if record.dlc_secondaire is not None and record.dlc_secondaire <= datetime.now(timezone.utc):
-            raise HTTPException(422, "DLC secondaire depassee : impression d'utilisation refusee.")
+        try:
+            record = _response(row, "/api/haccp/registre")
+            verifier_etiquette_imprimable(record, datetime.now(timezone.utc))
+        except ValueError as error:
+            raise HTTPException(422, str(error)) from error
         return HTMLResponse(construire_etiquette(record), headers={
             "Cache-Control": "private, no-store",
             "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'self'",
@@ -471,6 +533,8 @@ def make_haccp_router(resolve_scope: Callable[[Request], Awaitable[str]]) -> API
             raise HTTPException(500, "La lecture du registre a echoue.") from error
         if row is None:
             raise HTTPException(404, "Etiquette introuvable.")
+        if not row.image_path:
+            raise HTTPException(404, "Cette fiche a ete declaree sans photo.")
         roots = (
             image_directory().resolve(),
             reception_directory().resolve(),

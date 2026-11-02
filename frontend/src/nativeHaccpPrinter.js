@@ -18,17 +18,21 @@ export function validateAndroidPrinter(config) {
   return config;
 }
 
-export async function printAndroidOpening(labelId, request) {
+export async function printAndroidLabel(labelId, request, operation = "ouverture") {
   if (!hasAndroidHaccpPrinter()) throw new Error("Pont Brother absent : une nouvelle compilation Android est nécessaire.");
   const config = validateAndroidPrinter(await androidHaccpPrinter.getConfig());
   if (!config.enabled) throw new Error("Configurez et activez d’abord l’imprimante Android.");
+  if (operation === "preparation" && config.preparationLabels !== true) {
+    throw new Error("Cette version Android ne gère pas les étiquettes de préparation. Installez l’APK mis à jour.");
+  }
   if (config.networkGranted === false) throw new Error("Autorisez l’accès au réseau local dans la configuration Android avant impression.");
   const identity = { device_id: config.deviceId };
   const state = await request("/android/demandes", { ...identity, label_id: labelId, reviewed: true });
   if (state.transport !== "android" || state.status !== "pending") return state;
   const claimed = await request(`/android/demandes/${state.id}/prise`, identity);
   if (!claimed.job) return claimed.state || { ...state, status: "uncertain" };
-  if (claimed.job.id !== state.id || claimed.job.labelId !== labelId) {
+  if (claimed.job.id !== state.id || claimed.job.labelId !== labelId
+      || (operation === "preparation" && claimed.job.operation !== "preparation")) {
     throw new Error("Demande serveur incohérente. Aucun envoi à l’imprimante.");
   }
   let result;

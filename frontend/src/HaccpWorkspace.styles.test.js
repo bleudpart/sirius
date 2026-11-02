@@ -22,6 +22,11 @@ test("scanner is a dark module control with a fine gold outline, not a solid gol
   expect(value(".haccp-ui button.haccp-scan", "min-height")).toBe("86px");
 });
 
+test("scanner animation is paused unless capture is actually available", () => {
+  expect(value(".haccp-laser", "animation-play-state")).toBe("paused");
+  expect(value(".haccp-camera-stage.is-ready:not(.is-capturing) .haccp-laser", "animation-play-state")).toBe("running");
+});
+
 test("page uses the actual shared window class and palette instead of a separate theme", () => {
   const capture = fs.readFileSync(path.join(__dirname, "HaccpLabelCapture.jsx"), "utf8");
   const workspace = fs.readFileSync(path.join(__dirname, "HaccpWorkspace.jsx"), "utf8");

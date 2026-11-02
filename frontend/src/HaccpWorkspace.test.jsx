@@ -126,6 +126,36 @@ test("simplified kitchen workspace presents the oversized scan flow without hidi
   expect(host.textContent).not.toContain("J’ai vérifié le produit, le lot et la DLC — imprimer");
 });
 
+test("preparation is accessible in the shared workspace and uses the active establishment dossier", async () => {
+  await act(async () => root.render(<HaccpWorkspace standalone />));
+  await click("Préparation / DLC");
+  expect(host.querySelector('[aria-label="Étiquette de préparation"]')).not.toBeNull();
+  expect(host.querySelector('[aria-label="Dossier de l’établissement"]')).not.toBeNull();
+  expect(host.textContent).toContain("Le Papillon");
+  expect(host.querySelector("video")).toBeNull();
+  expect(field("Durée de conservation").value).toBe("");
+});
+
+test("archived preparations reopen without requesting or inventing a photo", async () => {
+  await renderRegistry();
+  global.fetch.mockResolvedValueOnce(reply([{
+    id: 9, nom_produit: "Soupe TEST", numero_lot: "PREP-TEST", type_operation: "preparation",
+    conforme_reception: true, date_fabrication: "2026-11-02T07:00:00Z",
+    dlc_secondaire: "2026-11-05T07:00:00Z", conditions_conservation: "Entre 0 et +3 °C, bac fermé.",
+    duree_conservation_heures: 72, justification_duree: "PMS test", image_url: null,
+  }]));
+  await search();
+  global.fetch.mockClear();
+  await click("Voir la préparation / imprimer");
+  const dialog = host.querySelector('[role="dialog"]');
+  expect(dialog.getAttribute("aria-label")).toBe("Fiche de préparation");
+  expect(dialog.querySelector("img")).toBeNull();
+  expect(dialog.querySelector("video")).toBeNull();
+  expect(dialog.textContent).toContain("Entre 0 et +3 °C, bac fermé.");
+  expect(dialog.textContent).toContain("DLC exacte");
+  expect(global.fetch).not.toHaveBeenCalled();
+});
+
 test("standalone scan page requests screen wake lock and reacquires it after release on return", async () => {
   let releaseListener;
   const lock = {

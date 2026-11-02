@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE_URL } from "./lib/api";
 import { haccpFetch } from "./haccpRequest";
-import { androidHaccpPrinter, hasAndroidHaccpPrinter, isAndroidHaccp, printAndroidOpening, validateAndroidPrinter } from "./nativeHaccpPrinter";
+import { androidHaccpPrinter, hasAndroidHaccpPrinter, isAndroidHaccp, printAndroidLabel, validateAndroidPrinter } from "./nativeHaccpPrinter";
 
 export function haccpPrintStatus(status, transport = "windows") {
   const labels = {
@@ -22,10 +22,10 @@ export function haccpPrintStatus(status, transport = "windows") {
   return labels[status];
 }
 
-export async function printHaccpOpening(labelId) {
+export async function printHaccpLabel(labelId, operation = "ouverture") {
   if (hasAndroidHaccpPrinter()) {
     const config = await androidHaccpPrinter.getConfig();
-    if (config.enabled) return printAndroidOpening(labelId, haccpPrintRequest);
+    if (config.enabled) return printAndroidLabel(labelId, haccpPrintRequest, operation);
   }
   return haccpPrintRequest("/demandes", { label_id: labelId, reviewed: true });
 }
@@ -155,7 +155,7 @@ function AndroidHaccpPrinter() {
         <label>Adresse IPv4 LAN de l’imprimante<input required inputMode="decimal" placeholder="192.168.1.50" value={config.ip}
           onChange={(e) => setConfig({ ...config, ip: e.target.value })} /></label>
         <p>Modèle : QL-820NWB uniquement · rouleau continu DK-22205 · largeur 62 mm · coupe 50 mm (zone imprimable 58,9 mm).</p>
-        <label><input type="checkbox" checked={config.enabled} onChange={(e) => setConfig({ ...config, enabled: e.target.checked })} /> Utiliser l’impression Android directe après validation d’une ouverture</label>
+        <label><input type="checkbox" checked={config.enabled} onChange={(e) => setConfig({ ...config, enabled: e.target.checked })} /> Utiliser l’impression Android directe après validation d’une ouverture ou préparation</label>
         <button type="submit">Enregistrer l’imprimante Android</button>
       </fieldset></form>
       <button type="button" disabled={busy || !config.enabled} onClick={test}>Imprimer une étiquette TEST — hors registre</button>
@@ -221,7 +221,7 @@ function WindowsHaccpPrinter() {
         </label>
         <label>Largeur étiquette (mm)<input type="number" min="20" max="150" step="1" required value={config.widthMm} onChange={(e) => setConfig({ ...config, widthMm: e.target.value })} /></label>
         <label>Hauteur étiquette (mm)<input type="number" min="20" max="300" step="1" required value={config.heightMm} onChange={(e) => setConfig({ ...config, heightMm: e.target.value })} /></label>
-        <label><input type="checkbox" checked={config.enabled} onChange={(e) => setConfig({ ...config, enabled: e.target.checked })} /> Autoriser l’impression sans dialogue après validation d’une ouverture</label>
+        <label><input type="checkbox" checked={config.enabled} onChange={(e) => setConfig({ ...config, enabled: e.target.checked })} /> Autoriser l’impression sans dialogue après validation d’une ouverture ou préparation</label>
         <button type="submit">Enregistrer l’imprimante</button>
       </fieldset></form>
       <p>Le pilote et les dimensions doivent correspondre au rouleau. Testez le cadrage sur votre matériel ; la compatibilité n’est pas universelle.</p>

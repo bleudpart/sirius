@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Camera, ClipboardList, QrCode, ShieldCheck, Search, Download, Image, X, Utensils } from "lucide-react";
 import HaccpLabelCapture from "./HaccpLabelCapture";
+import HaccpPreparation from "./HaccpPreparation";
 import { API_BASE_URL } from "./lib/api";
 import { haccpFetch } from "./haccpRequest";
 import "./HaccpWorkspace.css";
@@ -247,6 +248,10 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0 
   async function showPhoto(record) {
     setError(""); setBusy(true); clearPhoto(); setPhoto(null);
     try {
+      if (record.type_operation === "preparation") {
+        setPhoto({ src: null, product: record.nom_produit, record });
+        return;
+      }
       // L'URL provient toujours de l'API configuree, jamais d'un lien arbitraire du resultat.
       const blob = await haccpFetch(`${ROOT}/${record.id}/photo`, {}, async (response) => {
         await checked(response);
@@ -260,19 +265,20 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0 
     } catch (failure) { if (mounted.current) setError(failure.message); }
     finally { if (mounted.current) setBusy(false); }
   }
-  return <section aria-label="Registre de réception et ouverture ΣIRIUS" className={`haccp-ui haccp-workspace${standalone ? " haccp-standalone" : ""}`}>
+  return <section aria-label="Registre de réception, ouverture et préparation ΣIRIUS" className={`haccp-ui haccp-workspace${standalone ? " haccp-standalone" : ""}`}>
     <header className="haccp-heading">
       <div className="haccp-emblem" aria-hidden="true"><ShieldCheck size={30} /></div>
-      <div><p className="haccp-kicker">ΣIRIUS · HACCP</p><h2>ΣIRIUS · Étiquettes cuisine</h2><p>De la réception à l’ouverture, gardez la preuve.</p></div>
+      <div><p className="haccp-kicker">ΣIRIUS · HACCP</p><h2>ΣIRIUS · Étiquettes cuisine</h2><p>Réception, ouverture et préparation : gardez la trace.</p></div>
     </header>
     <nav className="haccp-navigation" aria-label="Parcours des étiquettes">
       <button type="button" aria-pressed={tab === "capture"} onClick={() => setTab("capture")}><Camera size={19} aria-hidden="true" />Réception / Ouverture</button>
+      <button type="button" aria-pressed={tab === "preparation"} onClick={() => setTab("preparation")}><Utensils size={19} aria-hidden="true" />Préparation / DLC</button>
       <button type="button" aria-pressed={tab === "kitchen"} onClick={() => setTab("kitchen")}><Utensils size={19} aria-hidden="true" />Cuisine simplifiée</button>
       <button type="button" aria-pressed={tab === "registre"} onClick={() => setTab("registre")}><ClipboardList size={19} aria-hidden="true" />Registre / Contrôle</button>
       <button type="button" aria-pressed={tab === "qr"} onClick={() => setTab("qr")}><QrCode size={19} aria-hidden="true" />QR code réserve</button>
     </nav>
     {standalone && wakeLockStatus && <p className="haccp-wake-lock" role="status">{wakeLockStatus}</p>}
-    {(tab === "capture" || tab === "kitchen") && <section className="haccp-card haccp-establishment" aria-label="Dossier de l’établissement">
+    {(tab === "capture" || tab === "kitchen" || tab === "preparation") && <section className="haccp-card haccp-establishment" aria-label="Dossier de l’établissement">
       <p className="haccp-kicker">Établissement actif</p>
       {establishmentLoading && <p role="status">Recherche de l’établissement…</p>}
       {!establishmentLoading && establishmentOptions.length > 1 && <label>Restaurant actif
@@ -295,10 +301,10 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0 
       {dossier && <>
         <p className="haccp-establishment-name">Dossier en cours : <strong>{dossier.restaurant_slug}</strong></p>
         {dossier.directory_existed && !sessionReady && <div className="haccp-establishment-resume">
-          <p>Un dossier existe déjà. Reprenez-le pour ajouter de nouveaux scans sans écraser les documents.</p>
+          <p>Un dossier existe déjà. Reprenez-le pour ajouter de nouvelles fiches sans écraser les documents.</p>
           <button type="button" disabled={dossierLoading} onClick={() => setSessionReady(true)}>Reprendre / Continuer</button>
         </div>}
-        {!dossier.directory_existed && <p role="status">Nouveau dossier créé et prêt pour les scans.</p>}
+        {!dossier.directory_existed && <p role="status">Nouveau dossier créé et prêt pour les fiches.</p>}
         {!!dossier.items.length && <details className="haccp-establishment-files">
           <summary>Documents du dossier ({dossier.items.length})</summary>
           <ul>{dossier.items.map((item) => <li key={item.name}>{item.name}</li>)}</ul>
@@ -314,6 +320,11 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0 
       establishmentName={activeEstablishment}
       sessionReady={sessionReady}
       onCaptureSaved={refreshDossier}
+    />}
+    {tab === "preparation" && <HaccpPreparation
+      key={activeEstablishment}
+      establishmentName={activeEstablishment}
+      sessionReady={sessionReady}
     />}
     {tab === "qr" && <section className="workspace-surface haccp-card haccp-qr" aria-label="QR code de capture">
       <p className="haccp-kicker">Accès cuisine</p>
@@ -342,17 +353,20 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0 
       {busy && <p role="status">Chargement…</p>}
       {error && <p role="alert">{error}</p>}
       <ul className="haccp-records">{items.map((record) => <li key={record.id}>
-        <strong>{record.nom_produit}</strong> · Lot {record.numero_lot} · {record.type_operation === "ouverture" ? "Ouverture" : "Réception"}
+        <strong>{record.nom_produit}</strong> · Lot {record.numero_lot} · {record.type_operation === "preparation" ? "Préparation" : record.type_operation === "ouverture" ? "Ouverture" : "Réception"}
         <p>Catégorie : {record.categorie || "Non classé"}</p>
-        <p>{record.fournisseur_ou_marque || "Fournisseur non lu"} · {record.type_date} {record.dlc_ou_ddm || "Non lue"} · {record.conforme_reception ? "Étiquette à vérifier" : "Anomalie à vérifier"}</p>
+        {record.type_operation === "preparation"
+          ? <p>Fabrication déclarée : {new Date(record.date_fabrication).toLocaleString("fr-FR", { timeZone: "Europe/Paris", timeZoneName: "shortOffset" })}. Sans photo ni analyse IA.</p>
+          : <p>{record.fournisseur_ou_marque || "Fournisseur non lu"} · {record.type_date} {record.dlc_ou_ddm || "Non lue"} · {record.conforme_reception ? "Étiquette à vérifier" : "Anomalie à vérifier"}</p>}
+        {record.restaurant_name && <p>Établissement : {record.restaurant_name}</p>}
         {record.commentaire_anomalie && <p>{record.commentaire_anomalie}</p>}
-        {record.dlc_secondaire && <p>DLC secondaire : {new Date(record.dlc_secondaire).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })} (Europe/Paris)</p>}
-        <button type="button" disabled={busy} onClick={() => showPhoto(record)}><Image size={18} aria-hidden="true" />Voir la preuve / imprimer — {record.numero_lot}</button>
+        {record.dlc_secondaire && <p>{record.type_operation === "preparation" ? "DLC de préparation" : "DLC secondaire"} : {new Date(record.dlc_secondaire).toLocaleString("fr-FR", { timeZone: "Europe/Paris", timeZoneName: "shortOffset" })} (Europe/Paris)</p>}
+        <button type="button" disabled={busy} onClick={() => showPhoto(record)}><Image size={18} aria-hidden="true" />{record.type_operation === "preparation" ? "Voir la préparation / imprimer" : "Voir la preuve / imprimer"} — {record.numero_lot}</button>
       </li>)}</ul>
       {!busy && items.length === 0 && <p>Aucune fiche affichée. Lancez une recherche ; un résultat vide ne prouve pas une absence de réception.</p>}
-      {photo && <div className="haccp-proof" role="dialog" aria-label="Photo originale de l’étiquette" aria-modal="true">
+      {photo && <div className="haccp-proof" role="dialog" aria-label={photo.record.type_operation === "preparation" ? "Fiche de préparation" : "Photo originale de l’étiquette"} aria-modal="true">
         <button onClick={() => { clearPhoto(); setPhoto(null); }}><X size={18} aria-hidden="true" />Fermer la preuve</button>
-        <img src={photo.src} alt={`Étiquette originale — ${photo.product}`} style={{ maxWidth: "100%", height: "auto" }} />
+        {photo.src && <img src={photo.src} alt={`Étiquette originale — ${photo.product}`} style={{ maxWidth: "100%", height: "auto" }} />}
         <HaccpLabelCapture key={photo.record.id} savedRecord={photo.record} />
       </div>}
     </section>}

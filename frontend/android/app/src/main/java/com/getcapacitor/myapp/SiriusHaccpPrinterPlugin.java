@@ -58,6 +58,7 @@ public class SiriusHaccpPrinterPlugin extends Plugin {
     private volatile boolean foreground;
     private SharedPreferences prefs;
     private static final Set<String> JOB_KEYS = new HashSet<>(Arrays.asList("id", "labelId", "product", "lot", "opened", "deadline", "operator"));
+    private static final Set<String> PREPARATION_KEYS = new HashSet<>(Arrays.asList("id", "labelId", "product", "lot", "operation", "prepared", "deadline", "operator", "storage"));
 
     @Override public void load() {
         prefs = getContext().getSharedPreferences("sirius_haccp_printer", Context.MODE_PRIVATE);
@@ -81,6 +82,7 @@ public class SiriusHaccpPrinterPlugin extends Plugin {
         result.put("widthMm", 62);
         result.put("heightMm", 50);
         result.put("networkGranted", networkGranted());
+        result.put("preparationLabels", true);
         return result;
     }
 
@@ -133,28 +135,31 @@ public class SiriusHaccpPrinterPlugin extends Plugin {
             String header;
             String product;
             String body;
+            boolean preparation = !test && "preparation".equals(job.getString("operation"));
             if (test) {
                 header = "SIRIUS · TEST — HORS REGISTRE";
                 product = "TEST BROTHER QL-820NWB";
                 body = "DK-22205 · 62 x 50 mm\nVerifier marges, lisibilite et coupe.\nAUCUNE DENREE — NE PAS COLLER";
             } else {
                 Iterator<String> keys = job.keys();
-                while (keys.hasNext()) if (!JOB_KEYS.contains(keys.next())) {
+                Set<String> allowedKeys = preparation ? PREPARATION_KEYS : JOB_KEYS;
+                while (keys.hasNext()) if (!allowedKeys.contains(keys.next())) {
                     throw new IllegalArgumentException("Payload d'etiquette non autorise.");
                 }
                 Integer labelId = job.getInteger("labelId");
                 if (labelId == null || labelId <= 0) throw new IllegalArgumentException("Fiche invalide.");
-                header = "ΣIRIUS · OUVERTURE #" + labelId;
+                header = "ΣIRIUS · " + (preparation ? "PREPARATION" : "OUVERTURE") + " #" + labelId;
                 product = HaccpPrinterRules.text(job.getString("product"), 255);
-                body = "Lot : " + HaccpPrinterRules.text(job.getString("lot"), 128)
-                    + "\nOuvert : " + HaccpPrinterRules.text(job.getString("opened"), 40)
-                    + "\nAu plus tard : " + HaccpPrinterRules.text(job.getString("deadline"), 40)
-                    + "\nOperateur : " + HaccpPrinterRules.text(job.getString("operator"), 100);
+                body = HaccpPrinterRules.labelBody(preparation, job.getString("lot"),
+                    job.getString(preparation ? "prepared" : "opened"), job.getString("deadline"),
+                    job.getString("operator"), job.getString("storage"));
             }
             int y = line(canvas, header, 18, 30, true);
             y = line(canvas, product, y + 8, 40, true);
-            y = line(canvas, body, y + 10, 34, false);
-            y = line(canvas, "Europe/Paris · Respecter les consignes fabricant/PMS. Regle et original conserves au registre.",
+            y = line(canvas, body, y + 10, preparation ? 30 : 34, false);
+            y = line(canvas, preparation
+                ? "Europe/Paris · Respecter la duree et les conditions PMS declarees au registre."
+                : "Europe/Paris · Respecter les consignes fabricant/PMS. Regle et original conserves au registre.",
                 y + 12, 28, false);
             if (y > 573) throw new IllegalArgumentException("Etiquette trop longue pour 62 x 50 mm : aucune impression, aucune troncature.");
             return bitmap;

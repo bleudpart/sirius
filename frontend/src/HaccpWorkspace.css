@@ -64,7 +64,7 @@ body:has(.haccp-standalone) {
 .haccp-ui button[aria-pressed="true"] { border-color: var(--haccp-gold); background: rgba(197, 160, 89, .16); color: #f2d99a; }
 .haccp-ui button.haccp-primary { background: linear-gradient(145deg, #102637, #081522); color: #e2c78f; border: 1px solid var(--haccp-border); box-shadow: inset 0 0 8px #c5a0590d; }
 .haccp-ui button.haccp-primary:hover:not(:disabled) { background: #193345; border-color: #f2d99a; }
-.haccp-navigation { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.haccp-navigation { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
 .haccp-navigation button { background: rgba(16, 23, 31, .9); padding: 14px 10px; }
 .haccp-ui .haccp-wake-lock { margin: -8px 0 0; color: var(--haccp-muted); font-size: 13px; }
 .haccp-card {
@@ -74,6 +74,7 @@ body:has(.haccp-standalone) {
   box-shadow: var(--workspace-shadow, 0 14px 32px #0005);
 }
 .haccp-capture { display: grid; gap: 14px; }
+.haccp-preparation { display: grid; gap: 18px; }
 .haccp-capture > :is(h3, p) { margin: 0; }
 .haccp-establishment { display: grid; gap: 12px; }
 .haccp-establishment > p { margin: 0; }
@@ -120,7 +121,9 @@ body:has(.haccp-standalone) {
 .haccp-laser {
   position: absolute; left: 3%; right: 3%; top: 0; height: 2px;
   background: #58ff88; box-shadow: 0 0 9px 3px #39ff7188; animation: haccp-laser-scan 2.4s ease-in-out infinite alternate;
+  animation-play-state: paused;
 }
+.haccp-camera-stage.is-ready:not(.is-capturing) .haccp-laser { animation-play-state: running; }
 .haccp-camera-stage.is-capturing .haccp-laser { animation-play-state: paused; }
 .haccp-ui button.haccp-camera-action { position: relative; z-index: 2; align-self: end; width: 100%; min-height: 92px; }
 .haccp-ui .haccp-camera-state {

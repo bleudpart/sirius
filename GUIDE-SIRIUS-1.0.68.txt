@@ -134,11 +134,18 @@ Le navigateur permet ce parcours sans installer l'APK.
 5. PARCOURS QUOTIDIEN
 ---------------------
 Reception :
-1) Choisir "Reception".
-2) Renseigner l'operateur.
-3) Appuyer sur "Scanner etiquette" et prendre une photo nette.
-4) Le choix de photo lance automatiquement l'analyse et l'archivage.
+1) Choisir l'etablissement et ouvrir son dossier. Si le dossier existe,
+   appuyer sur "Reprendre / Continuer".
+2) Choisir "Reception" et renseigner l'operateur.
+3) Autoriser la camera et cadrer l'etiquette dans l'apercu video.
+4) Appuyer sur "Capturer l'etiquette" : la photo lance l'analyse et l'archivage.
 5) Relire les donnees extraites et l'original.
+
+Le balayage vert est un repere de cadrage, pas une lecture automatique.
+Il reste arrete si la capture est bloquee ; le motif est affiche dans l'apercu.
+Si la camera est refusee, autoriser son acces dans l'application ou le
+navigateur puis choisir "Reessayer l'acces camera". Changer de type
+d'operation ne relance pas la camera et ne masque pas son erreur.
 
 Ouverture :
 1) Scanner immediatement apres l'ouverture reelle du produit.
@@ -156,6 +163,45 @@ La duree ne prolonge jamais une DLC initiale.
 L'heure d'ouverture est l'heure serveur a l'envoi : ne pas utiliser ce
 parcours pour antidater une ouverture.
 La confirmation de regle doit etre renouvelee pour le produit suivant.
+
+Preparation sur place (nouveau parcours "Preparation / DLC") :
+1) Choisir l'etablissement et ouvrir ou reprendre son dossier.
+2) Saisir le produit, son lot de preparation si connu et l'operateur.
+   Sans lot saisi, un identifiant PREP est genere ; il ne remplace pas
+   la tracabilite des lots d'ingredients.
+3) Indiquer la date et l'heure reelles de fabrication en Europe/Paris.
+   "Le matin" ne permet pas de fixer une heure exacte : aucune heure
+   n'est inventee. Ne pas utiliser l'heure d'enregistrement a sa place.
+4) Saisir la duree en heures entieres validee pour ce produit, sa reference
+   PMS et toutes les conditions de conservation (temperature, contenant,
+   precautions). Confirmer cette regle avant de generer l'etiquette.
+5) Choisir "Calculer la DLC et generer l'etiquette", puis relire le resultat.
+   DLC = instant reel de fabrication + duree declaree en heures ecoulees.
+   Si le PMS prevoit 72 heures, saisir 72 ; J+3 n'est pas une valeur par
+   defaut ni une prolongation automatique jusqu'a la fin d'une journee.
+6) Verifier produit, lot, fabrication, DLC et conservation avant d'imprimer
+   avec le relais ou le secours manuel du navigateur.
+
+Ce parcours ne demande aucune photo ni appel OpenAI. Il archive la
+declaration, la regle et les conditions au registre SQLite du meme compte
+ou de la meme entreprise. Le registre et son CSV incluent ces preparations.
+Il ne certifie ni la temperature mesuree, ni une duree microbiologique.
+Un changement de produit, d'heure ou de regle oblige a confirmer a nouveau.
+Une nouvelle preparation ne reutilise pas la duree du produit precedent.
+
+Les changements d'heure conservent une duree reelle de 24/72 heures, meme
+si l'heure locale de DLC differe. En automne, utiliser l'option
+"Changement d'heure" si l'heure de fabrication apparait deux fois.
+Les heures inexistantes, les fabrications futures, les durees non confirmees
+et les DLC deja depassees sont refusees. L'etiquette affiche le decalage UTC.
+Apres une coupure, renvoyer les memes donnees conserve le meme identifiant
+et ne cree pas de doublon. Verifier le registre avant toute nouvelle fiche.
+
+L'impression Android des preparations exige une APK reconstruite avec ce
+nouveau parcours ; les anciennes versions sont refusees avant tout envoi.
+Le format Brother reste 62 x 50 mm : un texte trop long est refuse sans
+troncature. Utiliser alors un format adapte via le navigateur, en verifiant
+l'apercu, et ne jamais raccourcir une consigne sanitaire indispensable.
 
 6. VERIFICATION SANS IMPRIMANTE
 -------------------------------
