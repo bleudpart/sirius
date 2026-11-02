@@ -40,6 +40,20 @@ python -m py_compile server.py sirius_brain.py proactive.py enterprise.py router
 python -m pytest tests/test_proactive.py tests/test_briefing_intent.py tests/test_enterprise.py tests/test_sirius_doctor.py tests/test_auth_api_unit.py tests/test_server_hardening.py -q
 ```
 
+## Deployment
+
+Production runs on Hetzner and deploys itself. A push to `master` that changes `backend/**`, `frontend/**`, `deploy/**` or `.github/workflows/deploy-hetzner.yml` starts `.github/workflows/deploy-hetzner.yml`: it builds the website with `REACT_APP_BACKEND_URL=https://api.sirius-assistant.fr`, copies it to the server over SSH and runs `/opt/sirius/deploy/hetzner/deploy.sh`, which resets the server checkout to `origin/master`, installs changed Python requirements, publishes the site and restarts `sirius.service`. The SSH credentials are GitHub secrets (`HETZNER_HOST`, `HETZNER_USER`, `HETZNER_SSH_KEY`), so a developer PC only needs push access to GitHub. Pushes that only touch other paths (docs, this file) do not deploy.
+
+Deploy automatically (owner's decision): once a backend or frontend change is implemented and its relevant tests pass, run the whole flow below without asking again, unless the user says otherwise. Ask first when the change deletes or migrates stored user data.
+
+1. Run the targeted tests from "Build and test". The deploy workflow does not wait for the "SIRIUS audit and release guard" workflow, so a push with failing tests still reaches production.
+2. Stage only the intended files. Never add local-only files such as `.mcp.json`, and restore `frontend/src/temp_auth_api.txt` with `git checkout -- frontend/src/temp_auth_api.txt` if the Jest suite rewrote it (`patch.test.js`).
+3. Commit and `git push origin master`. Other chats or PCs may push too: if the push is rejected, run `git pull --rebase --autostash` and push again. A newer push cancels a running deploy, and the server aborts any deploy whose commit is no longer `origin/master`.
+4. Watch the run: `gh run list --workflow deploy-hetzner.yml --limit 1`, then `gh run watch <id> --exit-status`.
+5. A green run is not proof of deployment: the deploy job is skipped, and the run still ends green, when the `HETZNER_HOST` secret is empty. Check that `https://sirius-assistant.fr/deploy-sha.txt` equals `git rev-parse HEAD` and that `https://api.sirius-assistant.fr/api/health` returns 200. Test the API on `api.sirius-assistant.fr`, because the site root can return the web page instead.
+
+The Windows installer, the portable build and the Android APK are built locally; this workflow does not build them.
+
 ## Codebase conventions
 
 - HUD modules are code-split in `frontend/src/lazyModules.js`. When adding a module, connect it to the relevant UI/action registry in `moduleRegistry.js`; add aliases in `moduleCommandRouting.js` if voice commands should open it. Shared work-module metadata is in `workModules.js`.
