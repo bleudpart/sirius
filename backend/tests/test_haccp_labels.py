@@ -138,6 +138,8 @@ def api(tmp_path, monkeypatch):
         uid = request.headers.get("x-test-user")
         if not uid:
             raise HTTPException(401, "Authentification requise.")
+        if request.headers.get("x-test-company"):
+            return "company:" + request.headers["x-test-company"]
         return "user:" + uid
 
     monkeypatch.setattr(routes, "analyser_etiquette_vision", AsyncMock(return_value=extracted()))
@@ -403,6 +405,12 @@ def test_real_server_registration_and_account_company_permissions(monkeypatch):
     assert "post" in paths["/api/haccp/etiquettes/scan"]
     assert "post" in paths["/api/haccp/preparations"]
     assert "get" in paths["/api/haccp/receptions/dossier"]
+    assert "get" in paths["/api/haccp/receptions"]
+    assert "get" in paths["/api/haccp/receptions/destinations/{destination}"]
+    assert "post" in paths["/api/haccp/receptions/{id}/reprise"]
+    assert "post" in paths["/api/haccp/receptions/{id}/ouverture"]
+    assert "get" in paths["/api/haccp/receptions/{id}/original"]
+    assert "get" in paths["/api/haccp/receptions/integrite"]
     assert "get" in paths["/api/haccp/registre/recherche"]
     assert "get" in paths["/api/haccp/registre/export-csv"]
     assert "get" in paths["/api/haccp/registre/{id}/photo"]

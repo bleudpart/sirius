@@ -64,7 +64,7 @@ body:has(.haccp-standalone) {
 .haccp-ui button[aria-pressed="true"] { border-color: var(--haccp-gold); background: rgba(197, 160, 89, .16); color: #f2d99a; }
 .haccp-ui button.haccp-primary { background: linear-gradient(145deg, #102637, #081522); color: #e2c78f; border: 1px solid var(--haccp-border); box-shadow: inset 0 0 8px #c5a0590d; }
 .haccp-ui button.haccp-primary:hover:not(:disabled) { background: #193345; border-color: #f2d99a; }
-.haccp-navigation { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.haccp-navigation { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .haccp-navigation button { background: rgba(16, 23, 31, .9); padding: 14px 10px; }
 .haccp-ui .haccp-wake-lock { margin: -8px 0 0; color: var(--haccp-muted); font-size: 13px; }
 .haccp-card {
@@ -75,6 +75,10 @@ body:has(.haccp-standalone) {
 }
 .haccp-capture { display: grid; gap: 14px; }
 .haccp-preparation { display: grid; gap: 18px; }
+.haccp-receptions, .haccp-reception-detail, .haccp-deconditionnement { display: grid; gap: 18px; min-width: 0; }
+.haccp-distribution { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--haccp-border); }
+.haccp-reception-actions { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
+.haccp-receptions pre { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; font-size: 12px; }
 .haccp-capture > :is(h3, p) { margin: 0; }
 .haccp-establishment { display: grid; gap: 12px; }
 .haccp-establishment > p { margin: 0; }

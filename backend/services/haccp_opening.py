@@ -1,7 +1,12 @@
 """Calcul et etiquettes d'ouverture ou de preparation, selon une regle confirmee."""
-from datetime import datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from html import escape
 from schemas.haccp import PARIS, EtiquetteResponse, EtiquetteVisionOutput, OperationCapture, PreparationCreate
+
+
+def fin_de_date(value: date) -> datetime:
+    """Borne inclusive d'une date seule, dans le fuseau metier Europe/Paris."""
+    return datetime.combine(value, time.max, tzinfo=PARIS).astimezone(timezone.utc)
 
 
 def calculer_ouverture(
@@ -26,12 +31,8 @@ def calculer_ouverture(
             if etiquette.dlc_ou_ddm < maintenant.astimezone(PARIS).date():
                 anomalies.append("DLC d'origine depassee : aucune DLC secondaire.")
                 limite = None
-            elif etiquette.dlc_ou_ddm.year < 9999:
-                # Date seule : borne au dernier instant du jour de DLC en France.
-                fin_dlc = datetime.combine(
-                    etiquette.dlc_ou_ddm + timedelta(days=1), time.min, tzinfo=PARIS,
-                ).astimezone(timezone.utc) - timedelta(microseconds=1)
-                limite = min(limite, fin_dlc)
+            else:
+                limite = min(limite, fin_de_date(etiquette.dlc_ou_ddm))
     if anomalies:
         comment = " ".join(anomalies + ([etiquette.commentaire_anomalie] if etiquette.commentaire_anomalie else []))
         etiquette = etiquette.model_copy(update={"conforme_reception": False, "commentaire_anomalie": comment[:500]})

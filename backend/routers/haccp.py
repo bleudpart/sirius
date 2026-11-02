@@ -23,12 +23,14 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 import cloud_link
 
-from haccp_database import get_db
+from haccp_database import get_db, get_engine
 from models.haccp import EtiquetteHaccp
 from runtime_paths import data_dir
 from schemas.haccp import (
     CategorieProduit, EtiquetteResponse, EtiquetteVisionOutput, OperationCapture, OperationEtiquette, PreparationCreate,
 )
+from schemas.haccp_reception import ImageArchivee
+from services.haccp_images import IMAGE_FORMATS, MAX_IMAGE_BYTES, ImageValidationError, validate_source_image
 from services.haccp_opening import (
     PARIS, calculer_ouverture, calculer_preparation, construire_etiquette, verifier_etiquette_imprimable,
 )
@@ -38,10 +40,15 @@ from services.haccp_vision import (
     VisionServiceError,
     analyser_etiquette_vision,
 )
+from services.haccp_records import (
+    existing_capture as _existing_capture, record_response as _response, save_record as _save_record,
+)
+from services.haccp_reception import (
+    ReceptionDispatcher, ReceptionIntegrityError, archiver_image_brute, nettoyer_image_provisoire,
+)
+from routers.haccp_reception import make_haccp_reception_router
 
 logger = logging.getLogger(__name__)
-MAX_IMAGE_BYTES = 20 * 1024 * 1024
-IMAGE_FORMATS = {"image/jpeg": ("JPEG", ".jpg"), "image/png": ("PNG", ".png"), "image/webp": ("WEBP", ".webp")}
 
 
 def image_directory() -> Path:
@@ -118,69 +125,54 @@ def _reception_dossier(scope: str, restaurant_name: str) -> dict:
 
 def validate_image(content: bytes, mime_type: str) -> None:
     try:
-        with Image.open(io.BytesIO(content)) as image:
-            if image.format != IMAGE_FORMATS[mime_type][0]:
-                raise HTTPException(400, "Le format reel de l'image ne correspond pas au type annonce.")
-            if image.width * image.height > 25_000_000:
-                raise HTTPException(400, "Image trop grande : maximum 25 millions de pixels.")
-            image.verify()
-    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError) as error:
-        raise HTTPException(400, "Le fichier ne contient pas une image valide et lisible.") from error
+        validate_source_image(content, mime_type)
+    except ImageValidationError as error:
+        raise HTTPException(400, str(error)) from error
 
 
 def _write_image(path: Path, content: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("xb") as destination:
-        destination.write(content)
-        destination.flush()
-        os.fsync(destination.fileno())
-
-
-def _response(row: EtiquetteHaccp, photo_prefix: str) -> EtiquetteResponse:
-    values = {name: getattr(row, name) for name in EtiquetteVisionOutput.model_fields}
-    return EtiquetteResponse(
-        **values, id=row.id, created_at=row.created_at, operateur=row.operateur,
-        image_url=f"{photo_prefix}/{row.id}/photo" if row.image_path else None,
-        **{name: getattr(row, name) for name in OperationEtiquette.model_fields},
-        date_ouverture=row.date_ouverture, dlc_secondaire=row.dlc_secondaire,
-        date_fabrication=row.date_fabrication, conditions_conservation=row.conditions_conservation,
-        restaurant_name=row.restaurant_name,
-        chemin_photo=row.image_path or None,
-        chemin_donnees=f"haccp.sqlite3#etiquettes_haccp/{row.id}",
-        donnees_url=f"{photo_prefix}/{row.id}/donnees",
-        fournisseur=row.fournisseur_ou_marque,
-        dlc_dluo=row.dlc_ou_ddm,
-        date_reception=row.created_at if row.type_operation == "reception" else None,
-    )
-
-
-def _save_record(
-    db: Session, result: EtiquetteVisionOutput, scope: str, operateur: str,
-    relative_path: str, photo_prefix: str,
-    operation: OperationEtiquette, maintenant: datetime, limite: datetime | None,
-    capture_id: str | None, capture_hash: str,
-    *, date_fabrication: datetime | None = None, conditions_conservation: str | None = None,
-    restaurant_name: str | None = None,
-) -> EtiquetteResponse:
-    row = EtiquetteHaccp(
-        **result.model_dump(), scope_key=scope, operateur=operateur, image_path=relative_path,
-        **operation.model_dump(),
-        date_ouverture=maintenant.replace(tzinfo=None) if operation.type_operation == "ouverture" else None,
-        date_fabrication=date_fabrication.replace(tzinfo=None) if date_fabrication else None,
-        conditions_conservation=conditions_conservation, restaurant_name=restaurant_name,
-        dlc_secondaire=limite.replace(tzinfo=None) if limite else None,
-        capture_id=capture_id, capture_hash=capture_hash,
-        created_at=maintenant.replace(tzinfo=None),
-    )
+    destination = path.open("xb")
     try:
-        db.add(row)
-        db.flush()
-        response = _response(row, photo_prefix)
-        db.commit()
-        return response
-    except SQLAlchemyError:
-        db.rollback()
+        with destination:
+            destination.write(content)
+            destination.flush()
+            os.fsync(destination.fileno())
+    except OSError:
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            logger.exception("[HACCP] Nettoyage de la photo partiellement ecrite impossible")
         raise
+
+
+def _cleanup_failed_capture(scope: str, path: Path | None, raw_image: ImageArchivee | None) -> None:
+    if path is None and raw_image is None:
+        return
+    try:
+        with Session(get_engine()) as db:
+            predicate = (EtiquetteHaccp.raw_image_path == raw_image.chemin) if raw_image else (
+                EtiquetteHaccp.image_path == path.relative_to(data_dir()).as_posix()
+            )
+            referenced = db.scalar(select(EtiquetteHaccp.id).where(
+                EtiquetteHaccp.scope_key == scope, predicate,
+            ).limit(1))
+            if referenced is not None:
+                logger.warning("[HACCP] Commit retrouve : conservation des preuves de la fiche %s", referenced)
+                return
+    except (OSError, SQLAlchemyError):
+        logger.exception("[HACCP] Commit incertain : preuves conservees, nettoyage manuel a verifier")
+        return
+    if path is not None:
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            logger.exception("[HACCP] Nettoyage de la photo non archivee impossible")
+    if raw_image is not None:
+        try:
+            nettoyer_image_provisoire(raw_image, scope)
+        except (OSError, ReceptionIntegrityError):
+            logger.exception("[HACCP] Nettoyage de l'original non archive impossible")
 
 
 def _query(
@@ -213,18 +205,16 @@ def _query(
     return statement.order_by(EtiquetteHaccp.created_at.desc(), EtiquetteHaccp.id.desc())
 
 
-def _existing_capture(db: Session, scope: str, capture_id: str | None, digest: str, prefix: str) -> EtiquetteResponse | None:
-    if capture_id is None:
-        return None
-    row = db.scalar(select(EtiquetteHaccp).where(
-        EtiquetteHaccp.scope_key == scope, EtiquetteHaccp.capture_id == capture_id,
-    ))
-    if row is None:
-        return None
-    if row.capture_hash != digest:
-        raise HTTPException(409, "Cette capture est deja archivee avec un contenu different. "
-                            "Creez une nouvelle fiche pour changer son contenu.")
-    return _response(row, prefix)
+def _distribute_saved(db: Session, scope: str, record: EtiquetteResponse) -> EtiquetteResponse:
+    db.rollback()
+    if record.type_operation == "reception" and record.reception_source_id:
+        try:
+            record.distribution = ReceptionDispatcher(get_engine()).distribuer(scope, record.id)
+        except (SQLAlchemyError, OSError, ValueError) as error:
+            logger.exception("[HACCP] Fiche archivee, distribution interrompue (id=%s)", record.id)
+            raise HTTPException(503, f"Fiche {record.id} archivee, mais distribution interrompue. "
+                                "Reprenez-la depuis le suivi des receptions, sans refaire de photo.") from error
+    return record
 
 
 CSV_COLUMNS = [
@@ -235,6 +225,8 @@ CSV_COLUMNS = [
     "justification_duree", "regle_confirmee",
     "categorie", "date_reception", "temperature_conforme", "chemin_photo", "chemin_donnees",
     "date_fabrication", "conditions_conservation", "restaurant_name",
+    "origines", "poids_net", "traces_allergenes", "mentions_traces", "allergenes_lecture",
+    "champs_incertains", "chemin_image_brute", "empreinte_image_brute", "reception_source_id",
 ]
 
 
@@ -255,6 +247,10 @@ def _csv_lines(records: list[EtiquetteResponse]) -> Iterator[str]:
         buffer.truncate(0)
         values = record.model_dump(mode="json")
         values["allergenes"] = ", ".join(record.allergenes)
+        values["traces_allergenes"] = ", ".join(record.traces_allergenes)
+        values["champs_incertains"] = ", ".join(record.champs_incertains)
+        for field in ("origines", "poids_net"):
+            values[field] = json.dumps(values[field], ensure_ascii=False) if values[field] is not None else ""
         values["conforme_reception"] = "Oui" if record.conforme_reception else "Non"
         writer.writerow([_csv_cell(values[column]) for column in CSV_COLUMNS])
         yield buffer.getvalue()
@@ -374,6 +370,7 @@ def make_haccp_router(resolve_scope: Callable[[Request], Awaitable[str]]) -> API
             )
             return EtiquetteResponse.model_validate(response.json())
         path: Path | None = None
+        raw_image: ImageArchivee | None = None
         saved = False
         prefix = str(request.url_for("haccp_search")).removesuffix("/recherche")
         digest = hashlib.sha256(
@@ -387,46 +384,48 @@ def make_haccp_router(resolve_scope: Callable[[Request], Awaitable[str]]) -> API
         try:
             previous = await run_in_threadpool(_existing_capture, db, scope, capture_key, digest, prefix)
             if previous is not None:
-                return previous
+                return await run_in_threadpool(_distribute_saved, db, scope, previous)
             result = await analyser_etiquette_vision(content, mime_type)
             try:
                 result, limite = calculer_ouverture(result, capture, maintenant)
             except ValueError as error:
                 raise HTTPException(422, str(error)) from error
             directory, _, _ = await run_in_threadpool(_ensure_reception_directory, scope, restaurant_name)
-            path = directory / _reception_filename(restaurant_slug, capture.type_operation, maintenant)
+            candidate_path = directory / _reception_filename(restaurant_slug, capture.type_operation, maintenant)
             stored_image = await run_in_threadpool(_jpeg_bytes, content)
-            await run_in_threadpool(_write_image, path, stored_image)
+            await run_in_threadpool(_write_image, candidate_path, stored_image)
+            path = candidate_path
             relative_path = path.relative_to(data_dir()).as_posix()
+            if capture.type_operation == "reception":
+                raw_image = await run_in_threadpool(archiver_image_brute, content, mime_type, scope, result, maintenant)
             try:
                 response = await run_in_threadpool(
                     _save_record, db, result, scope, operateur.strip(),
                     relative_path, prefix,
                     capture, maintenant, limite, capture_key, digest,
                     restaurant_name=restaurant_name.strip(),
+                    raw_image=raw_image,
                 )
             except IntegrityError:
                 previous = await run_in_threadpool(_existing_capture, db, scope, capture_key, digest, prefix)
                 if previous is None:
                     raise
-                return previous
+                return await run_in_threadpool(_distribute_saved, db, scope, previous)
             saved = True
-            return response
+            return await run_in_threadpool(_distribute_saved, db, scope, response)
         except VisionConfigurationError as error:
             raise HTTPException(500, str(error)) from error
         except VisionServiceError as error:
             raise HTTPException(500, str(error)) from error
         except VisionAnalysisError as error:
             raise HTTPException(422, str(error)) from error
-        except (OSError, SQLAlchemyError) as error:
+        except (OSError, SQLAlchemyError, ReceptionIntegrityError) as error:
             logger.exception("[HACCP] Archivage de l'etiquette impossible")
-            raise HTTPException(500, "L'etiquette n'a pas pu etre archivee. Reessayez.") from error
+            raise HTTPException(500, "L'archivage de l'etiquette n'a pas pu etre confirme. "
+                                "Verifiez le registre et reessayez la meme photo sans doublon.") from error
         finally:
-            if not saved and path is not None:
-                try:
-                    path.unlink(missing_ok=True)
-                except OSError:
-                    logger.exception("[HACCP] Nettoyage de la photo non archivee impossible")
+            if not saved:
+                await run_in_threadpool(_cleanup_failed_capture, scope, path, raw_image)
 
     @router.get("/registre/recherche", response_model=list[EtiquetteResponse], name="haccp_search")
     async def recherche(
@@ -447,10 +446,10 @@ def make_haccp_router(resolve_scope: Callable[[Request], Awaitable[str]]) -> API
             return [EtiquetteResponse.model_validate(record) for record in response.json()]
         try:
             return await run_in_threadpool(lambda: [
-                _response(row, str(request.url_for("haccp_search")).removesuffix("/recherche"))
+                _response(row, str(request.url_for("haccp_search")).removesuffix("/recherche"), db=db)
                 for row in db.scalars(statement)
             ])
-        except SQLAlchemyError as error:
+        except (SQLAlchemyError, ReceptionIntegrityError, ValidationError) as error:
             logger.exception("[HACCP] Recherche impossible")
             raise HTTPException(500, "La recherche dans le registre a echoue.") from error
 
@@ -472,10 +471,10 @@ def make_haccp_router(resolve_scope: Callable[[Request], Awaitable[str]]) -> API
                                               "Cache-Control": "private, no-store"})
         try:
             records = await run_in_threadpool(lambda: [
-                _response(row, str(request.url_for("haccp_search")).removesuffix("/recherche"))
+                _response(row, str(request.url_for("haccp_search")).removesuffix("/recherche"), db=db)
                 for row in db.scalars(statement)
             ])
-        except SQLAlchemyError as error:
+        except (SQLAlchemyError, ReceptionIntegrityError, ValidationError) as error:
             logger.exception("[HACCP] Export impossible")
             raise HTTPException(500, "L'export du registre a echoue.") from error
         return StreamingResponse(
@@ -568,6 +567,13 @@ def make_haccp_router(resolve_scope: Callable[[Request], Awaitable[str]]) -> API
             raise HTTPException(500, "Les metadonnees de reception sont indisponibles.") from error
         if row is None:
             raise HTTPException(404, "Etiquette introuvable.")
-        return _response(row, str(request.url_for("haccp_search")).removesuffix("/recherche"))
+        try:
+            return await run_in_threadpool(
+                _response, row, str(request.url_for("haccp_search")).removesuffix("/recherche"), db=db,
+            )
+        except (SQLAlchemyError, ReceptionIntegrityError, ValidationError) as error:
+            logger.exception("[HACCP] Lecture de la distribution impossible")
+            raise HTTPException(503, "L'etat de distribution de cette fiche est indisponible.") from error
 
+    router.include_router(make_haccp_reception_router(resolve_scope))
     return router

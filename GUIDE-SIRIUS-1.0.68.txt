@@ -141,6 +141,23 @@ Reception :
 4) Appuyer sur "Capturer l'etiquette" : la photo lance l'analyse et l'archivage.
 5) Relire les donnees extraites et l'original.
 
+Distribution fournisseur (mise a jour des sources, a publier dans les applis) :
+- Les nouvelles receptions alimentent quatre destinations : journal de
+  tracabilite, lots / alertes DLC, observations allergenes, achats / BL.
+- L'onglet "Receptions / Lots" affiche les etats et permet "Reprendre sans
+  doublon" apres une panne. Ne pas refaire une photo pour une simple reprise.
+- Le stock de lots HACCP est distinct de THEMIS : FEFO puis FIFO a echeance
+  egale, alerte 48 h avant l'echeance. Poids net declare et quantite reellement
+  recue ne sont pas equivalents ; le controle physique reste a effectuer.
+- Presences et traces d'allergenes sont separees. Aucune absence n'est
+  certifiee et la matrice des plats n'est jamais modifiee automatiquement.
+- L'original recu est conserve en plus de l'apercu JPEG ; son telechargement
+  prive verifie son SHA-256. "Verifier journal et originaux" controle les
+  nouvelles receptions, pas les anciennes archives.
+- Append-only et empreintes ne signifient pas archivage WORM certifie.
+  Sauvegarder la base ET ses images sur un support protege.
+Architecture, limites et exemple fictif executable : docs/haccp-reception.md.
+
 Le balayage vert est un repere de cadrage, pas une lecture automatique.
 Il reste arrete si la capture est bloquee ; le motif est affiche dans l'apercu.
 Si la camera est refusee, autoriser son acces dans l'application ou le
@@ -157,6 +174,12 @@ Ouverture :
    "J'ai verifie : valider et imprimer".
 
 Aucune duree J+3 universelle n'est appliquee.
+Depuis une reception deja archivee, "Receptions / Lots" puis
+"Verifier / deconditionner" permet une ouverture sans nouvelle analyse.
+72 h est une suggestion non confirmee, a adapter au produit et au PMS.
+Declarer l'ouverture reelle maintenant, renseigner la regle et ses conditions,
+puis verifier l'etiquette avant de demander l'impression. Cette action ne
+cree pas une deuxieme reception de stock.
 Sans regle confirmee, l'ouverture est archivee avec alerte et sans DLC
 secondaire. Une anomalie ou une date incertaine peut aussi bloquer le calcul.
 La duree ne prolonge jamais une DLC initiale.

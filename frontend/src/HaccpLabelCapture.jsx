@@ -4,6 +4,7 @@ import { API_BASE_URL } from "./lib/api";
 import { printHaccpDocument } from "./haccpDocuments";
 import HaccpPrinter, { haccpPrintRequest, haccpPrintStatus, printHaccpLabel } from "./HaccpPrinter";
 import { checkHaccpResponse, haccpFetch } from "./haccpRequest";
+import HaccpReceptionStatus from "./HaccpReceptionStatus";
 import "./HaccpWorkspace.css";
 
 const API = `${API_BASE_URL}/haccp`;
@@ -18,6 +19,7 @@ export default function HaccpLabelCapture({
   establishmentName = "Restaurant",
   sessionReady = true,
   onCaptureSaved = noop,
+  onDistributionChange,
 }) {
   const [mode, setMode] = useState("reception");
   const [operator, setOperator] = useState("Cuisine");
@@ -369,6 +371,21 @@ export default function HaccpLabelCapture({
           {result.date_reception && <p>Réception enregistrée : {displayTime(result.date_reception)} (Europe/Paris)</p>}
         </details>}
         {result.commentaire_anomalie && <p>{result.commentaire_anomalie}</p>}
+        {result.reception_source_id && <details>
+          <summary>Traçabilité fournisseur et lecture des allergènes</summary>
+          <p>Fournisseur / marque lu : {result.fournisseur_ou_marque || "Non lu"} · Estampille : {result.agrement_sanitaire || "Non lue"}</p>
+          <p>Origines — naissance : {result.origines?.naissance || "Non lue"} ; élevage : {result.origines?.elevage?.join(", ") || "Non lu"} ;
+            abattage : {result.origines?.abattage || "Non lu"} ; découpe : {result.origines?.decoupe || "Non lue"}.</p>
+          <p>Poids net déclaré : {result.poids_net ? `${result.poids_net.valeur} ${result.poids_net.unite}` : "Non lu"} · Consigne d’origine : {result.temperature_stockage || "Non lue"}.</p>
+          <p>Allergènes présents détectés : {result.allergenes?.join(", ") || "Non détectés"} · Traces possibles : {result.traces_allergenes?.join(", ") || "Non détectées"}.</p>
+          {result.mentions_traces && <p>Mention de traces : {result.mentions_traces}</p>}
+          <p>Lecture allergènes : {result.allergenes_lecture} ; aucune absence d’allergène n’est certifiée.</p>
+          {!!result.champs_incertains?.length && <p role="alert">Champs à relire : {result.champs_incertains.join(", ")}</p>}
+          {result.chemin_image_brute && <p>Original brut : <code>{result.chemin_image_brute}</code><br />SHA-256 : <code>{result.empreinte_image_brute}</code></p>}
+        </details>}
+        {result.type_operation === "reception" && Number.isSafeInteger(result.reception_source_id)
+          && result.reception_source_id > 0 && result.reception_source_id === result.id
+          && <HaccpReceptionStatus key={result.id} record={result} onDistributionChange={onDistributionChange} />}
         {(result.type_operation === "ouverture" || isPreparation) && <>
           {isPreparation ? <>
             <p>Fabrication : {displayTime(result.date_fabrication, true)}</p>

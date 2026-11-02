@@ -2,6 +2,7 @@
 import re
 import uuid
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
@@ -18,6 +19,29 @@ Allergene = Literal[
     "Gluten", "Crustacés", "Œufs", "Poissons", "Arachides", "Soja", "Lait",
     "Fruits à coque", "Céleri", "Moutarde", "Sésame", "Sulfites", "Lupin", "Mollusques",
 ]
+ChampLecture = Literal[
+    "nom_produit", "fournisseur_ou_marque", "numero_lot", "dlc_ou_ddm", "type_date",
+    "agrement_sanitaire", "temperature_stockage", "origines", "poids_net",
+    "allergenes", "traces_allergenes", "mentions_traces", "allergenes_lecture",
+]
+
+
+class OriginesProduit(BaseModel):
+    """Pays recopies sur l'etiquette, jamais deduits de l'estampille sanitaire."""
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    naissance: Texte255 | None = None
+    elevage: list[Texte255] = Field(default_factory=list, max_length=10)
+    abattage: Texte255 | None = None
+    decoupe: Texte255 | None = None
+
+
+class PoidsNet(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    valeur: Annotated[Decimal, Field(gt=0, max_digits=12, decimal_places=6, allow_inf_nan=False)]
+    unite: Literal["kg", "g"]
+
+    def en_kilogrammes(self) -> Decimal:
+        return self.valeur / Decimal(1000) if self.unite == "g" else self.valeur
 
 
 class EtiquetteVisionOutput(BaseModel):
@@ -30,7 +54,13 @@ class EtiquetteVisionOutput(BaseModel):
     type_date: Literal["DLC", "DDM", "inconnue"] = "inconnue"
     agrement_sanitaire: Annotated[str, StringConstraints(strict=True, max_length=64)] | None = None
     temperature_stockage: Annotated[str, StringConstraints(strict=True, max_length=64)] | None = None
+    origines: OriginesProduit | None = None
+    poids_net: PoidsNet | None = None
     allergenes: list[Allergene] = Field(default_factory=list, max_length=14)
+    traces_allergenes: list[Allergene] = Field(default_factory=list, max_length=14)
+    mentions_traces: Annotated[str, StringConstraints(strict=True, max_length=500)] | None = None
+    allergenes_lecture: Literal["non_verifiee", "partielle", "complete"] = "non_verifiee"
+    champs_incertains: list[ChampLecture] = Field(default_factory=list, max_length=14)
     conforme_reception: StrictBool = True
     commentaire_anomalie: Annotated[str, StringConstraints(strict=True, max_length=500)] | None = None
     categorie: CategorieProduit = "Non classé"
@@ -123,11 +153,45 @@ class PreparationCreate(OperationEtiquette):
         return " ".join(value.split())
 
 
+Destination = Literal["traceabilite", "stock", "allergenes", "achats"]
+
+
+class EtatDestination(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    destination: Destination
+    statut: Literal["pending", "done", "error"]
+    tentatives: Annotated[int, Field(strict=True, ge=0)]
+    erreur: str | None = None
+
+
+class ObservationAllergenesEtat(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    lecture: Literal["non_verifiee", "partielle", "complete"]
+    verification_requise: StrictBool
+    reference_reception_id: int | None
+    nouveaux_allergenes: list[Allergene]
+    nouvelles_traces: list[Allergene]
+
+
+class EtatDistribution(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    reception_id: int
+    statut: Literal["complete", "partial", "pending"]
+    destinations: list[EtatDestination]
+    controle_physique_effectue: Literal[False] = False
+    observation_allergenes: ObservationAllergenesEtat | None = None
+
+
 class EtiquetteResponse(EtiquetteVisionOutput, OperationEtiquette):
     id: int
     created_at: datetime
     operateur: str
     image_url: str | None
+    chemin_image_brute: str | None = None
+    empreinte_image_brute: str | None = None
+    image_brute_url: str | None = None
+    reception_source_id: int | None = None
+    distribution: EtatDistribution | None = None
     date_ouverture: datetime | None = None
     date_fabrication: datetime | None = None
     conditions_conservation: str | None = None

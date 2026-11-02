@@ -3,6 +3,8 @@ import { QRCodeSVG } from "qrcode.react";
 import { Camera, ClipboardList, QrCode, ShieldCheck, Search, Download, Image, X, Utensils } from "lucide-react";
 import HaccpLabelCapture from "./HaccpLabelCapture";
 import HaccpPreparation from "./HaccpPreparation";
+import HaccpReceptions from "./HaccpReceptions";
+import { downloadHaccpBlob } from "./haccpDocuments";
 import { API_BASE_URL } from "./lib/api";
 import { haccpFetch } from "./haccpRequest";
 import "./HaccpWorkspace.css";
@@ -237,11 +239,7 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0 
     try {
       const blob = await haccpFetch(`${ROOT}/export-csv?${params(true)}`, {},
         async (response) => (await checked(response)).blob());
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url; link.download = `registre-haccp-${new Date().toISOString().replace(/[:.]/g, "-")}.csv`;
-      document.body.appendChild(link); link.click(); link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      downloadHaccpBlob(blob, `registre-haccp-${new Date().toISOString().replace(/[:.]/g, "-")}.csv`);
     } catch (failure) { if (mounted.current) setError(failure.message); }
     finally { if (mounted.current) setBusy(false); }
   }
@@ -275,10 +273,11 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0 
       <button type="button" aria-pressed={tab === "preparation"} onClick={() => setTab("preparation")}><Utensils size={19} aria-hidden="true" />Préparation / DLC</button>
       <button type="button" aria-pressed={tab === "kitchen"} onClick={() => setTab("kitchen")}><Utensils size={19} aria-hidden="true" />Cuisine simplifiée</button>
       <button type="button" aria-pressed={tab === "registre"} onClick={() => setTab("registre")}><ClipboardList size={19} aria-hidden="true" />Registre / Contrôle</button>
+      <button type="button" aria-pressed={tab === "receptions"} onClick={() => setTab("receptions")}><ClipboardList size={19} aria-hidden="true" />Réceptions / Lots</button>
       <button type="button" aria-pressed={tab === "qr"} onClick={() => setTab("qr")}><QrCode size={19} aria-hidden="true" />QR code réserve</button>
     </nav>
     {standalone && wakeLockStatus && <p className="haccp-wake-lock" role="status">{wakeLockStatus}</p>}
-    {(tab === "capture" || tab === "kitchen" || tab === "preparation") && <section className="haccp-card haccp-establishment" aria-label="Dossier de l’établissement">
+    {(tab === "capture" || tab === "kitchen" || tab === "preparation" || tab === "receptions") && <section className="haccp-card haccp-establishment" aria-label="Dossier de l’établissement">
       <p className="haccp-kicker">Établissement actif</p>
       {establishmentLoading && <p role="status">Recherche de l’établissement…</p>}
       {!establishmentLoading && establishmentOptions.length > 1 && <label>Restaurant actif
@@ -326,6 +325,7 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0 
       establishmentName={activeEstablishment}
       sessionReady={sessionReady}
     />}
+    {tab === "receptions" && <HaccpReceptions key={activeEstablishment} establishmentName={activeEstablishment} />}
     {tab === "qr" && <section className="workspace-surface haccp-card haccp-qr" aria-label="QR code de capture">
       <p className="haccp-kicker">Accès cuisine</p>
       <h3>Ouvrir la capture sur le téléphone</h3>

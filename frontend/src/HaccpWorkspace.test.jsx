@@ -156,6 +156,18 @@ test("archived preparations reopen without requesting or inventing a photo", asy
   expect(global.fetch).not.toHaveBeenCalled();
 });
 
+test("receipt destinations are connected to the workspace and its active establishment", async () => {
+  await act(async () => root.render(<HaccpWorkspace standalone />));
+  global.fetch.mockResolvedValueOnce(reply({ items: [], total: 0, offset: 0, limit: 25 }));
+  await click("Réceptions / Lots");
+  expect(host.querySelector('[aria-label="Suivi des réceptions fournisseurs"]')).not.toBeNull();
+  expect(host.querySelector('[aria-label="Dossier de l’établissement"]')).not.toBeNull();
+  expect(host.querySelector("video")).toBeNull();
+  expect(global.fetch).toHaveBeenLastCalledWith(
+    expect.stringMatching(/\/receptions\?offset=0&limit=25&restaurant_name=Le\+Papillon$/), expect.any(Object),
+  );
+});
+
 test("standalone scan page requests screen wake lock and reacquires it after release on return", async () => {
   let releaseListener;
   const lock = {

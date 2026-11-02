@@ -4,6 +4,20 @@ export const escapeDocumentText = (value) => String(value ?? "").replace(/[&<>"'
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
 }[char]));
 
+export function downloadHaccpBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  try {
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+  } finally {
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+}
+
 export async function haccpDocumentRequest(resource, path = "", body) {
   const response = await fetch(`${API_BASE_URL}/haccp/${resource}${path}`, {
     credentials: "include",
