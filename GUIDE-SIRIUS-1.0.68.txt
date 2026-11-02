@@ -1,12 +1,22 @@
-ΣIRIUS 1.0.67 - GUIDE D'INSTALLATION ET DE TRACABILITE HACCP
+ΣIRIUS 1.0.68 - GUIDE D'INSTALLATION ET DE TRACABILITE HACCP
 ========================================================
 
-Ce guide accompagne la preparation des applications 1.0.67.
+Ce guide accompagne la preparation des applications 1.0.68.
 La presence de ce document ne prouve pas qu'un installateur a deja ete
 construit, publie ou installe. Se reporter au bilan de livraison pour ces etats.
 
 1. NOUVEAUTES
 ------------
+Nouveautes 1.0.68 :
+- Finance NUMMARIUS : saisies, imports financiers, indicateurs de gestion
+  et simulations de tresorerie sans modification des donnees reelles.
+- Second cerveau analytique raccorde a ZEUS CORTEX : surveillance en
+  arriere-plan, alertes acquittables, projections et syntheses persistantes.
+- Repartition des taches entre les deux cerveaux, declenchement apres
+  les ecritures et suggestions proactives selon les droits de l'entreprise.
+- Preparation des trois paquets : installateur Windows, portable Windows
+  et APK Diagnostic. Aucune publication automatique n'est effectuee.
+
 Nouveautes 1.0.67 :
 - Camera integree dans la page de scan HACCP (web, Windows et Android) :
   apercu video plein cadre, viseur avec balayage, grand bouton
@@ -74,8 +84,8 @@ Un resultat sans anomalie detectee n'est pas une attestation sanitaire.
 Fermer completement ΣIRIUS avant la mise a jour.
 Sauvegarder les donnees utiles avant toute intervention.
 
-Installateur attendu : sirius-setup-1.0.67.exe
-Version portable attendue : SIRIUS-Portable-1.0.67.exe
+Installateur attendu : sirius-setup-1.0.68.exe
+Version portable attendue : SIRIUS-Portable-1.0.68.exe
 
 Choisir un seul mode d'execution a la fois.
 Avec l'installateur, suivre les etapes puis lancer l'application.
@@ -90,7 +100,7 @@ Ne pas exposer le backend local ou l'imprimante sur Internet.
 
 3. INSTALLATION ANDROID DIAGNOSTIC
 ---------------------------------
-Fichier attendu : SIRIUS-Diagnostic-1.0.67.apk
+Fichier attendu : SIRIUS-Diagnostic-1.0.68.apk
 
 Il s'agit d'une application de diagnostic, pas d'une mise a jour Google Play.
 Son identifiant est fr.sirius_assistant.app.diagnostic.
@@ -101,7 +111,7 @@ signature, arreter et demander une verification plutot que desinstaller.
 Ouvrir l'APK sur le telephone et autoriser ponctuellement l'installation
 depuis cette source si Android le demande. N'utiliser qu'un fichier provenant
 de la livraison ΣIRIUS verifiee. Desactiver cette autorisation apres usage.
-Verifier la version 1.0.67-diagnostic dans les informations de l'application.
+Verifier la version 1.0.68-diagnostic dans les informations de l'application.
 La version Google Play reste une application separee.
 
 4. QR CODE ET ACCES DIRECT
