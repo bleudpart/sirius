@@ -61,20 +61,22 @@ def test_chaque_tache_est_attribuee_a_un_seul_cerveau_et_au_bon_mode():
     assert all(
         item.mode == (
             ModeExecution.TEMPS_REEL
-            if item.cerveau == Cerveau.OPERATIONNEL
+            if item.cerveau != Cerveau.SENTINEL
             else ModeExecution.ARRIERE_PLAN
         )
         for item in REPARTITION
     )
-    assert responsable("saisie") == Cerveau.OPERATIONNEL
-    assert responsable("surveillance") == Cerveau.ANALYTIQUE
+    assert responsable("saisie") == Cerveau.ANALYTIQUE
+    assert responsable("surveillance") == Cerveau.SENTINEL
+    assert responsable("ocr") == Cerveau.SENTINEL
     with pytest.raises(KeyError):
         responsable("tache_inconnue")
 
 
 def test_echanges_limites_aux_signaux_valides_et_a_etat_publie():
     assert [(item.de, item.vers) for item in ECHANGES] == [
-        (Cerveau.OPERATIONNEL, Cerveau.ANALYTIQUE),
+        (Cerveau.OPERATIONNEL, Cerveau.SENTINEL),
+        (Cerveau.SENTINEL, Cerveau.ANALYTIQUE),
         (Cerveau.ANALYTIQUE, Cerveau.OPERATIONNEL),
     ]
 
@@ -308,7 +310,7 @@ def test_routes_droits_et_signal_finance_jusqua_cortex(connected):
     assert state["synthese"]["source"] == "DETERMINISTE"
     assert state["synthese_a_jour"]
     assert not worker._counts["a"]["echecs"]
-    assert len(response.json()["repartition"]) == 12
+    assert len(response.json()["repartition"]) == 13
     alert = state["alertes"][0]
     ack = client.post(f"{uri}/alertes/{alert['id']}/acquitter", headers=headers, json={"commentaire": "Vérifié"})
     assert ack.status_code == 200, ack.text
@@ -325,6 +327,8 @@ def test_fixture_frontend_identique_au_moteur_et_au_contrat():
     view = VueCortexAnalytique.model_validate_json(path.read_text(encoding="utf-8"))
     assert view.etat.snapshot == snapshot()
     assert view.etat.synthese_a_jour
+    assert view.repartition == list(REPARTITION)
+    assert view.echanges == list(ECHANGES)
 
 
 def test_flux_bancaire_plus_prudent_et_jour_sans_projection_invente():

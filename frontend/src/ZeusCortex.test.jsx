@@ -6,6 +6,7 @@ import { API_BASE_URL } from "./lib/api";
 import { formatFinanceValue } from "./companyFinance";
 import fixture from "./__fixtures__/brainAnalytical.json";
 
+jest.mock("./ZeusTriCortex", () => () => null);
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 let root;
@@ -63,13 +64,14 @@ afterEach(async () => {
   jest.useRealTimers();
 });
 
-test("le contrat réel du backend affiche les deux cerveaux, les chiffres et la télémétrie existante", async () => {
+test("le contrat réel du backend affiche les trois cerveaux, les chiffres et la télémétrie existante", async () => {
   expect(validateAnalyticalView(fixture)).toBe(fixture);
   await mount();
   expect(host.querySelector('[data-testid="zeus-analytical"]')).not.toBeNull();
-  expect(host.textContent).toContain("CERVEAU ANALYTIQUE & STRATÉGIQUE");
-  expect(host.textContent).toContain("Cerveau opérationnel · temps réel");
-  expect(host.textContent).toContain("Cerveau analytique · arrière-plan");
+  expect(host.textContent).toContain("AUDIT FINANCIER · SENTINEL");
+  expect(host.textContent).toContain("Brain 1 · dialogue direct");
+  expect(host.textContent).toContain("Brain 2 · logique métier directe");
+  expect(host.textContent).toContain("Brain 3 · Sentinel Master");
   expect(host.textContent).toContain("Entreprise A");
   expect(host.textContent).toContain(formatFinanceValue("-3000.00"));
   expect(host.textContent).toContain("J+15");

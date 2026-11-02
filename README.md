@@ -1958,12 +1958,14 @@ enregistrées, dans un registre SQLAlchemy distinct du portefeuille personnel.
 [Le guide backend](backend/FINANCE.md) fait référence : parcours de test
 bancaire et grille de recette, formules, seuils, limites, API et exploitation.
 
-**ZEUS CORTEX** expose aussi le cerveau analytique de ΣIRIUS : santé financière,
-alertes suivies et acquittables, trésorerie glissante et synthèses traçables.
-Un worker asynchrone reçoit les écritures validées et consolide les données ;
-le cerveau opérationnel reste disponible et consulte seulement l'état publié.
-La répartition des tâches, les déclencheurs, les droits et les limites sont
-détaillés dans [le guide des deux cerveaux](backend/FINANCE.md#cerveau-analytique-dans-zeus-cortex).
+**ZEUS CORTEX** expose aussi l'architecture Tri-Cortex de ΣIRIUS : Brain 1
+(dialogue et HUD) et Brain 2 (contrôles HACCP, TVA, marges) répondent
+directement, tandis que Brain 3, le Sentinel Master, supervise quatre subagents
+d'arrière-plan (Vision, SanitaryGuard, MarginAudit, Archivist) sur une file
+durable. Un graphe 3D affiche leur activité réelle, sans animation simulée ;
+l'audit financier y montre santé, alertes acquittables, trésorerie glissante et
+synthèses traçables. Voir [Tri-Cortex](docs/tri-cortex.md) et
+[la répartition financière](backend/FINANCE.md#cerveau-analytique-dans-zeus-cortex).
 
 L'onglet **Finance d’entreprise** de NUMMARIUS s'ouvre dans la même fenêtre et
 avec les mêmes cartes bleu nuit/doré que les autres espaces financiers :

@@ -18,11 +18,18 @@ const timestamp = (v) => text(v) && !Number.isNaN(Date.parse(v));
 const known = (map, key) => Object.prototype.hasOwnProperty.call(map, key);
 const strings = (v) => Array.isArray(v) && v.every(text);
 const nullableTimestamp = (v) => v === null || timestamp(v);
+const BRAINS = {
+  OPERATIONNEL: "Brain 1 · dialogue direct",
+  ANALYTIQUE: "Brain 2 · logique métier directe",
+  SENTINEL: "Brain 3 · Sentinel Master",
+};
 
 export function validateAnalyticalView(view) {
   let valid = view && Array.isArray(view.repartition) && Array.isArray(view.echanges)
     && view.repartition.every((r) => text(r.cle) && text(r.libelle) && text(r.detail)
-      && ["OPERATIONNEL", "ANALYTIQUE"].includes(r.cerveau))
+      && known(BRAINS, r.cerveau)
+      && r.mode === (r.cerveau === "SENTINEL" ? "ARRIERE_PLAN" : "TEMPS_REEL"))
+    && new Set(view.repartition.map((r) => r.cerveau)).size === 3
     && view.echanges.every((r) => text(r.canal) && text(r.detail))
     && (view.message === null || text(view.message));
   const state = view?.etat;
@@ -146,11 +153,11 @@ export default function ZeusAnalyticalBrain() {
   };
 
   return (
-    <section className="zcx-analytical" aria-label="Les deux cerveaux de ΣIRIUS" data-testid="zeus-analytical">
+    <section className="zcx-analytical" aria-label="Audit financier de Sentinel" data-testid="zeus-analytical">
       <div className="zcx-brain-head">
         <div>
-          <h2>CERVEAU ANALYTIQUE & STRATÉGIQUE</h2>
-          <p>ΣIRIUS · surveillance en arrière-plan · calculs déterministes</p>
+          <h2>AUDIT FINANCIER · SENTINEL</h2>
+          <p>Brain 3 supervise · Brain 2 calcule · Brain 1 restitue</p>
         </div>
         {worker && <span className={`zcx-brain-badge ${worker.actif ? "" : "warning"}`}>
           {worker.actif ? worker.en_attente ? "Analyse en cours ou en attente" : "Moteur actif" : "Moteur arrêté"}
@@ -165,10 +172,10 @@ export default function ZeusAnalyticalBrain() {
       {view?.message && <p className="zcx-brain-notice">{view.message}</p>}
       {!view && !error && <p role="status" className="zcx-brain-notice">Chargement de l’état analytique…</p>}
       {view && <details className="zcx-brain-roles">
-        <summary>Répartition des tâches entre les deux cerveaux</summary>
+        <summary>Répartition des tâches entre les trois cerveaux</summary>
         <div className="zcx-row zcx-rE">
-          {["OPERATIONNEL", "ANALYTIQUE"].map((brain) => <div className="zcx-cell" key={brain}>
-            <h3>{brain === "OPERATIONNEL" ? "Cerveau opérationnel · temps réel" : "Cerveau analytique · arrière-plan"}</h3>
+          {Object.keys(BRAINS).map((brain) => <div className="zcx-cell" key={brain}>
+            <h3>{BRAINS[brain]}</h3>
             <ul>{view.repartition.filter((r) => r.cerveau === brain).map((r) =>
               <li key={r.cle}><b>{r.libelle}</b><p>{r.detail}</p></li>)}</ul>
           </div>)}

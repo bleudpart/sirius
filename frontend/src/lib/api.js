@@ -10,6 +10,13 @@ export const BACKEND_BASE_URL = (process.env.REACT_APP_BACKEND_URL || defaultBac
   .replace(/\/+$/, "");
 export const API_BASE_URL = `${BACKEND_BASE_URL}/api`;
 
+export const websocketUrl = (apiPath) => {
+  const url = new URL(`${API_BASE_URL}${apiPath}`, typeof window === "undefined" ? undefined : window.location.href);
+  if (!["http:", "https:"].includes(url.protocol)) throw new Error("Protocole API incompatible avec WebSocket.");
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  return url.toString();
+};
+
 export const resolveBackendUrl = (url) => {
   if (typeof url !== "string") return url;
   if (isNativeApp && /^http:\/\/(?:127\.0\.0\.1|localhost):8001(?=\/|$)/.test(url)) {

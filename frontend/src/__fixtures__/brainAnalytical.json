@@ -353,29 +353,29 @@
     },
     {
       "cle": "ocr",
-      "libelle": "OCR d'étiquettes et de factures",
-      "cerveau": "OPERATIONNEL",
-      "mode": "TEMPS_REEL",
-      "detail": "Lit le document à la capture et le fait vérifier avant tout enregistrement."
+      "libelle": "SubagentVision · étiquettes et factures",
+      "cerveau": "SENTINEL",
+      "mode": "ARRIERE_PLAN",
+      "detail": "Extraction structurée et confiance par champ non calibrée ; Brain 2 contrôle, Brain 1 restitue."
     },
     {
       "cle": "conformite",
-      "libelle": "Conformité immédiate (HACCP, traçabilité)",
-      "cerveau": "OPERATIONNEL",
+      "libelle": "Contrôles HACCP et traçabilité",
+      "cerveau": "ANALYTIQUE",
       "mode": "TEMPS_REEL",
-      "detail": "Contrôles, relevés et non-conformités au fil du service, sans attendre le cerveau analytique."
+      "detail": "Validation directe des lectures et des règles PMS ; aucune certification sanitaire automatique."
     },
     {
       "cle": "saisie",
       "libelle": "Saisie, imports et tickets de caisse",
-      "cerveau": "OPERATIONNEL",
+      "cerveau": "ANALYTIQUE",
       "mode": "TEMPS_REEL",
       "detail": "Valide chaque écriture dans sa transaction, répond, puis signale le changement en tâche de fond."
     },
     {
       "cle": "tableau_de_bord",
       "libelle": "Tableau de bord et stress test à la demande",
-      "cerveau": "OPERATIONNEL",
+      "cerveau": "ANALYTIQUE",
       "mode": "TEMPS_REEL",
       "detail": "Calcul déterministe immédiat sur la période choisie par l'utilisateur."
     },
@@ -384,57 +384,70 @@
       "libelle": "Réponses sur la santé de l'entreprise",
       "cerveau": "OPERATIONNEL",
       "mode": "TEMPS_REEL",
-      "detail": "Lit le dernier état publié par le cerveau analytique, sans recalcul ; demande une analyse si cet état manque ou date de plus de 24 h."
+      "detail": "Lit le dernier état publié par Sentinel, sans recalcul ; demande une analyse si cet état manque ou date de plus de 24 h."
     },
     {
       "cle": "surveillance",
-      "libelle": "Surveillance des constantes vitales",
-      "cerveau": "ANALYTIQUE",
+      "libelle": "SubagentSanitaryGuard · DLC et allergènes",
+      "cerveau": "SENTINEL",
       "mode": "ARRIERE_PLAN",
-      "detail": "Fenêtre glissante de 3 mois comparée à la précédente : CA, marges, EBE, point mort, trésorerie, dette."
+      "detail": "Surveillance J-2, FEFO puis FIFO ; observations à vérifier, pas un inventaire physique."
     },
     {
       "cle": "seuils",
       "libelle": "Détection des seuils et des dérives",
       "cerveau": "ANALYTIQUE",
-      "mode": "ARRIERE_PLAN",
+      "mode": "TEMPS_REEL",
       "detail": "Coût matière, prime cost, dérive de marge, baisse d'activité, couverture des annuités, capitaux propres."
     },
     {
       "cle": "projection",
       "libelle": "Projection de trésorerie J+15 à J+90",
       "cerveau": "ANALYTIQUE",
-      "mode": "ARRIERE_PLAN",
+      "mode": "TEMPS_REEL",
       "detail": "Solde reconstitué prolongé du flux mensuel le plus prudent entre gestion et banque."
     },
     {
       "cle": "synthese",
       "libelle": "Synthèse stratégique par IA",
       "cerveau": "ANALYTIQUE",
-      "mode": "ARRIERE_PLAN",
+      "mode": "TEMPS_REEL",
       "detail": "Le modèle n'explique que des chiffres déjà calculés ; un chiffre non fourni impose le repli déterministe."
     },
     {
       "cle": "consolidation",
-      "libelle": "Consolidation périodique",
-      "cerveau": "ANALYTIQUE",
+      "libelle": "SubagentMarginAudit · consolidation et prix",
+      "cerveau": "SENTINEL",
       "mode": "ARRIERE_PLAN",
-      "detail": "Vérification horaire, point quotidien conservé, synthèse IA au moins hebdomadaire."
+      "detail": "Ordonnanceur financier unique supervisé ; calculs confiés à Brain 2, aucune écriture comptable automatique."
     },
     {
       "cle": "alertes",
       "libelle": "Alertes suivies et dossier banque",
-      "cerveau": "ANALYTIQUE",
+      "cerveau": "SENTINEL",
       "mode": "ARRIERE_PLAN",
       "detail": "Nouvelle, aggravée, atténuée ou résolue ; acquittement tracé ; notification des alertes critiques."
+    },
+    {
+      "cle": "archivage",
+      "libelle": "SubagentArchivist · copies et file hors ligne",
+      "cerveau": "SENTINEL",
+      "mode": "ARRIERE_PLAN",
+      "detail": "Compression de copies, purge des caches, reprise bornée des analyses autorisées ; originaux conservés."
     }
   ],
   "echanges": [
     {
       "de": "OPERATIONNEL",
-      "vers": "ANALYTIQUE",
+      "vers": "SENTINEL",
       "canal": "Signal d'écriture validée",
       "detail": "Entreprise, nature et auteur, jamais de montant ; signaux regroupés entre 20 s et 2 min."
+    },
+    {
+      "de": "SENTINEL",
+      "vers": "ANALYTIQUE",
+      "canal": "Validation et calcul directs",
+      "detail": "Vision et audit appellent Brain 2 ; aucune file ni boucle de surveillance dans Brain 2."
     },
     {
       "de": "ANALYTIQUE",

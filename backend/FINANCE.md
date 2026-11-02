@@ -8,22 +8,23 @@ produit par un modèle d’IA : tout est calculé de façon déterministe, en `D
 à partir des pièces enregistrées. Le portefeuille personnel de NUMMARIUS est un
 registre distinct que ce module ne lit ni ne modifie.
 
-## Répartition entre les deux cerveaux de ΣIRIUS
+## Répartition entre les trois cerveaux de ΣIRIUS (Tri-Cortex)
 
-Les deux cerveaux ont des responsabilités distinctes et ne se bloquent pas :
+Brain 1 et Brain 2 sont des appels directs ; Brain 3, le Sentinel Master,
+supervise quatre subagents en arrière-plan. Aucun ne bloque les autres
+(architecture détaillée dans [Tri-Cortex](../docs/tri-cortex.md)) :
 
-| Cerveau opérationnel — temps réel | Cerveau analytique & stratégique — arrière-plan |
-|---|---|
-| Comprendre et exécuter les commandes ; lire les étiquettes et factures par OCR ; contrôler la conformité et la traçabilité pendant l’activité. | Agréger les écritures validées, suivre les indicateurs sur une fenêtre glissante de trois mois et les comparer aux périodes de référence. |
-| Valider une saisie ou un import dans sa transaction, puis répondre sans attendre l’analyse stratégique. | Calculer les ratios, détecter les dérives et seuils, projeter la trésorerie et conserver les alertes et synthèses. |
-| Calculer à la demande un tableau de bord ou un stress test sur la période choisie. | Rédiger la synthèse IA en étape finale, seulement à partir de chiffres déjà calculés et vérifiables ; sinon, utiliser une synthèse déterministe. |
-| Pour une question stratégique, lire l’état publié. Si celui-ci manque ou date de plus de 24 heures, demander son actualisation sans retarder la réponse. | Consolider périodiquement et publier un nouvel état, les alertes suivies et les recommandations dans ZEUS CORTEX. |
+| Brain 1 — opérationnel, temps réel | Brain 2 — analytique, direct | Brain 3 — Sentinel, arrière-plan |
+|---|---|---|
+| Comprendre et exécuter les commandes ; répondre en flux sans attendre une analyse de fond. | Valider une saisie ou un import dans sa transaction ; contrôler les lectures HACCP et la cohérence des factures. | `SubagentVision` lit les étiquettes et factures par OCR ; `SubagentSanitaryGuard` surveille DLC et allergènes. |
+| Pour une question stratégique, lire l’état publié. Si celui-ci manque ou date de plus de 24 heures, demander son actualisation sans retarder la réponse. | Calculer à la demande un tableau de bord ou un stress test ; agréger les écritures validées sur trois mois, calculer ratios, seuils et projection de trésorerie. | `SubagentMarginAudit` héberge l’ordonnanceur financier unique : il regroupe les signaux, planifie la consolidation et confie chaque analyse à Brain 2 via la file durable. |
+| Restituer sur le HUD et dans ZEUS CORTEX les résultats validés par Brain 2. | Rédiger la synthèse IA en étape finale, seulement à partir de chiffres déjà calculés et vérifiables ; sinon, utiliser une synthèse déterministe. | Publier les alertes suivies ; `SubagentArchivist` gère les copies, la purge des caches et la reprise hors ligne bornée. |
 
-Le seul échange opérationnel → analytique est un signal après validation :
+Le seul échange de Brain 1 vers Sentinel est un signal après validation :
 entreprise, type d’opération, source, référence facultative, auteur, nombre
-d’écritures quand il est connu et date. Il ne contient aucun montant ni ligne financière. Le cerveau
-analytique ne valide, ne modifie et ne supprime jamais les écritures ; le cerveau
-opérationnel n’exécute pas de calcul stratégique de fond dans le temps de réponse.
+d’écritures quand il est connu et date. Il ne contient aucun montant ni ligne financière.
+Sentinel et l’analyse de fond ne valident, ne modifient et ne suppriment jamais les écritures ;
+Brain 1 n’exécute pas de calcul stratégique de fond dans le temps de réponse.
 Les seuils sont des repères de gestion, pas une notation bancaire ni un conseil
 juridique, fiscal ou comptable.
 
@@ -40,8 +41,8 @@ Chaque espace propose trois vues : **Tableau de bord**, **Saisie & imports** et
 
 ### Cerveau analytique dans ZEUS CORTEX
 
-La section **CERVEAU ANALYTIQUE & STRATÉGIQUE** de ZEUS CORTEX affiche les
-responsabilités des deux cerveaux, l'entreprise, la période réellement analysée,
+La section **AUDIT FINANCIER · SENTINEL** de ZEUS CORTEX affiche les
+responsabilités des trois cerveaux, l'entreprise, la période réellement analysée,
 les indicateurs, un indice interne, les alertes et leurs plans d'action, les
 projections J+0/J+15/J+30/J+60/J+90, la synthèse et le journal d'exécution.
 La télémétrie opérationnelle existante reste indépendante : une erreur de lecture
@@ -54,9 +55,11 @@ financière ne masque pas les commandes, les services et les ressources.
   et webhook POS accepté signalent leur succès via `BackgroundTasks`. Un import
   rejoué ou sans nouvelle écriture ne déclenche rien. Le callback ne fait
   qu'alimenter la file ; il n'appelle ni le moteur financier ni l'IA.
-- **Ordonnancement** : un worker `asyncio` unique, file bornée à 256 signaux et
+- **Ordonnancement** : un ordonnanceur `asyncio` unique, exécuté comme tâche
+  enfant supervisée de `SubagentMarginAudit` ; file bornée à 256 signaux et
   entreprises en attente, regroupement après 20 secondes de calme, au plus
-  120 secondes de regroupement. « Relancer l'analyse » est immédiat dans la file,
+  120 secondes de regroupement. Chaque analyse prête devient une tâche durable de
+  la file Sentinel, calculée sous Brain 2. « Relancer l'analyse » est immédiat dans la file,
   sans interrompre l'analyse déjà en cours. Les calculs et accès SQL passent par
   `asyncio.to_thread` ; aucune transaction ne reste ouverte pendant la rédaction IA.
 - **Consolidation** : première vérification cinq minutes après démarrage, puis
@@ -107,23 +110,28 @@ sous 90 jours une information (bornes incluses).
 Les tables `brain_snapshots`, `brain_alerts`, `brain_syntheses` et `brain_runs`
 sont dans le même `finance.sqlite3`, sans écriture dans les tables des pièces.
 Rétention par entreprise : 400 états, 100 synthèses, 200 exécutions et 300 alertes
-résolues ; les alertes non résolues sont conservées. La file est **en mémoire** :
-un arrêt peut perdre des signaux en attente ; la vérification périodique rattrape
-les états anciens. Un échec d'analyse est journalisé et réessayé deux fois,
+résolues ; les alertes non résolues sont conservées. Le regroupement des signaux
+est **en mémoire** : un arrêt peut perdre des signaux pas encore confiés à
+Sentinel ; la vérification périodique rattrape les états anciens. Une analyse déjà
+confiée est conservée dans `tri_cortex.sqlite3` et reprise au redémarrage, au plus
+trois tentatives. Un échec d'analyse est journalisé et réessayé deux fois,
 puis reste visible. Une file pleine refuse explicitement les nouvelles demandes.
 
 Cette implantation vise **un seul processus Uvicorn**, comme le service Hetzner
-et l'application locale actuels. Elle ne fournit pas une livraison « exactement
+et l'application locale actuels. Les leases SQLite empêchent deux workers de
+traiter la même tâche, mais l'ordonnanceur, le regroupement et la télémétrie
+restent propres à chaque processus. Elle ne fournit pas une livraison « exactement
 une fois », un traitement distribué ni une garantie de latence sous saturation
-CPU/disque. Avant un déploiement multi-workers, prévoir une file durable partagée
-et un verrou/lease d'exécution par entreprise.
+CPU/disque. Avant un déploiement multi-workers, prévoir une file partagée entre
+serveurs et un ordonnanceur unique par entreprise.
 
 Implémentation : [contrats](brain_analytical/schemas.py),
 [répartition](brain_analytical/repartition.py), [collecte](brain_analytical/collecte.py),
 [règles](brain_analytical/regles.py), [stockage](brain_analytical/store.py),
 [conseiller](brain_analytical/strategic_advisor.py),
 [orchestrateur](brain_analytical/orchestrator.py),
-[routes](brain_analytical/routes.py) et [conversation](brain_analytical/conversation.py).
+[routes](brain_analytical/routes.py), [conversation](brain_analytical/conversation.py)
+et [Sentinel Tri-Cortex](tri_cortex/services.py).
 
 ## Démarrage pour un test bancaire
 
@@ -785,7 +793,8 @@ Résultats :
 | POST | `/api/finance/{company_id}/ingestions/{source}` | Import |
 | DELETE | `/api/finance/{company_id}/ingestions/{batch_id}` | Annulation d’un import |
 | POST | `/api/finance/{company_id}/webhooks/pos` | Webhook POS signé |
-| GET | `/api/cortex/analytique` | État autorisé de l'entreprise courante et répartition des deux cerveaux |
+| GET | `/api/cortex/analytique` | État autorisé de l'entreprise courante et répartition Tri-Cortex |
+| GET, WS | `/api/cortex/tri`, `/api/cortex/tri/stream` | Télémétrie Tri-Cortex et file Sentinel ; voir [Tri-Cortex](../docs/tri-cortex.md#api) |
 | GET | `/api/finance/{company_id}/cerveau` | Dernier état publié, alertes suivies, synthèse et journal |
 | POST | `/api/finance/{company_id}/cerveau/analyse` | Planifier l'analyse ; corps `{}`, réponse 202, ou 503 si non planifiée |
 | POST | `/api/finance/{company_id}/cerveau/alertes/{alert_id}/acquitter` | Acquitter une alerte ; corps `{}` ou `{"commentaire":"..."}` (300 caractères) |

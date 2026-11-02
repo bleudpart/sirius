@@ -4,7 +4,7 @@ import logging
 import sqlite3
 import time
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
@@ -67,12 +67,19 @@ class AnalyticalOrchestrator:
         self._last_ia: dict[str, datetime] = {}
         self._periodic: datetime | None = None
         self._current: str | None = None
+        self._delegated_company: str | None = None
+        self.execution_delegate: Callable[[Signal, int], Awaitable[None]] | None = None
+        self.executor_available: Callable[[], bool] | None = None
+
+    def disponible(self) -> bool:
+        return self._queue is not None and (self.executor_available is None or self.executor_available())
 
     def statut(self, company_id: str) -> EtatOrchestrateur:
         counts = self._counts[company_id]
         return EtatOrchestrateur(
-            actif=self._queue is not None,
-            en_attente=self._queued[company_id] + int(company_id in self._pending) + int(self._current == company_id),
+            actif=self.disponible(),
+            en_attente=self._queued[company_id] + int(company_id in self._pending)
+            + int(company_id in (self._current, self._delegated_company)),
             evenements_recus=counts["recus"], evenements_rejetes=counts["rejetes"],
             analyses_terminees=counts["terminees"], analyses_en_echec=counts["echecs"],
             syntheses_ia=counts["ia"], derniere_analyse=self._last.get(company_id),
@@ -81,7 +88,7 @@ class AnalyticalOrchestrator:
 
     def notify(self, company_id: str, acteur: str | None, declencheur: TypeDeclencheur = TypeDeclencheur.EVENEMENT,
                *, delai: float | None = None, essai: int = 0) -> bool:
-        if self._queue is None or self._queue.qsize() + len(self._pending) >= 256:
+        if not self.disponible() or self._queue is None or self._queue.qsize() + len(self._pending) >= 256:
             self._counts[company_id]["rejetes"] += 1
             logger.warning("[CERVEAU] Signal refusé : worker arrêté ou file pleine ; reprise périodique prévue")
             return False
@@ -131,7 +138,7 @@ class AnalyticalOrchestrator:
             donnees = collecter(session, company_id, now.date())
         return analyser(donnees, now, declencheur)
 
-    async def executer(self, signal: Signal, nombre: int = 1) -> None:
+    async def executer(self, signal: Signal, nombre: int = 1) -> bool:
         start, now = time.monotonic(), self.clock()
         self._current = signal.company_id
         engine = None
@@ -172,6 +179,7 @@ class AnalyticalOrchestrator:
                                    now, int((time.monotonic() - start) * 1000), detail)
             self._counts[signal.company_id]["terminees"] += 1
             self._last[signal.company_id] = now
+            return True
         except (SQLAlchemyError, sqlite3.Error, PyMongoError, OSError, ValueError):
             self._counts[signal.company_id]["echecs"] += 1
             logger.exception("[CERVEAU] Analyse non aboutie")
@@ -184,6 +192,7 @@ class AnalyticalOrchestrator:
                     logger.exception("[CERVEAU] Journal d'échec indisponible")
             if signal.essai < 2:
                 self.notify(signal.company_id, signal.acteur, mode, delai=60, essai=signal.essai + 1)
+            return False
         finally:
             self._current = None
 
@@ -216,7 +225,14 @@ class AnalyticalOrchestrator:
                     ready = min(self._pending.values(), key=lambda item: item.echeance, default=None)
                     if ready is not None and ready.echeance <= time.monotonic():
                         self._pending.pop(ready.signal.company_id)
-                        await self.executer(ready.signal, ready.nombre)
+                        if self.execution_delegate is None:
+                            await self.executer(ready.signal, ready.nombre)
+                        else:
+                            self._delegated_company = ready.signal.company_id
+                            try:
+                                await self.execution_delegate(ready.signal, ready.nombre)
+                            finally:
+                                self._delegated_company = None
                         continue
                     timeout = max(0.01, min(next_periodic, ready.echeance if ready else next_periodic) - time.monotonic())
                     try:
@@ -230,6 +246,7 @@ class AnalyticalOrchestrator:
                     next_periodic = time.monotonic() + 60
                     await asyncio.sleep(1)
         finally:
+            self._delegated_company = None
             self._queue = None
             self._pending.clear()
             self._queued.clear()

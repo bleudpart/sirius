@@ -1,4 +1,5 @@
 """Lecture d'etiquettes sans invention de lots ni certification sanitaire."""
+import asyncio
 import base64
 import json
 import logging
@@ -74,7 +75,7 @@ _PARTIAL_DEFAULTS = {
 }
 
 
-def valider_lecture_vision(parsed: object) -> EtiquetteVisionOutput:
+def valider_lecture_vision(parsed: object, *, check_reception: bool = True) -> EtiquetteVisionOutput:
     """Conserve les champs valides d'une lecture partielle, sans cacher ses lacunes."""
     if not isinstance(parsed, dict) or not parsed or not any(name in parsed for name in _PARTIAL_DEFAULTS):
         raise VisionAnalysisError("Aucune donnee exploitable dans la reponse Vision.")
@@ -120,7 +121,7 @@ def valider_lecture_vision(parsed: object) -> EtiquetteVisionOutput:
         except ValidationError as nested:
             raise VisionAnalysisError("La lecture partielle ne respecte pas le schema.") from nested
         logger.warning("[HACCP] Lecture partielle, champs a verifier : %s", ", ".join(sorted(invalid)))
-    return verifier_reception(result)
+    return verifier_reception(result) if check_reception else result
 
 
 def verifier_reception(result: EtiquetteVisionOutput) -> EtiquetteVisionOutput:
@@ -141,18 +142,23 @@ def verifier_reception(result: EtiquetteVisionOutput) -> EtiquetteVisionOutput:
         anomalies.append("Etiquette signalee non conforme par l'analyse : verification humaine requise.")
     if not anomalies:
         return result
-    comment = " ".join(anomalies + ([result.commentaire_anomalie] if result.commentaire_anomalie else []))
+    prefix = " ".join(anomalies)
+    previous = result.commentaire_anomalie or ""
+    comment = previous if previous.startswith(prefix[:500]) else " ".join(anomalies + ([previous] if previous else []))
     return result.model_copy(update={"conforme_reception": False, "commentaire_anomalie": comment[:500]})
 
 
-async def analyser_etiquette_vision(image_bytes: bytes, mime_type: str) -> EtiquetteVisionOutput:
+async def demander_document_vision(
+    image_bytes: bytes, mime_type: str, *, system_prompt: str, schema: dict,
+    instruction: str = "Lis cette etiquette.", max_tokens: int = 3000,
+) -> object:
     if mime_type not in {"image/jpeg", "image/png", "image/webp"} or not image_bytes:
         raise VisionAnalysisError("Image d'etiquette absente ou format non pris en charge.")
     key = os.getenv("OPENAI_API_KEY", "").strip()
     if not key:
         logger.error("[HACCP] OPENAI_API_KEY absente")
         raise VisionConfigurationError("L'analyse Vision n'est pas configuree (OPENAI_API_KEY).")
-    encoded = base64.b64encode(image_bytes).decode("ascii")
+    encoded = await asyncio.to_thread(lambda: base64.b64encode(image_bytes).decode("ascii"))
     today = datetime.now(ZoneInfo("Europe/Paris")).date().isoformat()
     try:
         async with AsyncOpenAI(api_key=key, timeout=30.0, max_retries=0) as client:
@@ -160,12 +166,12 @@ async def analyser_etiquette_vision(image_bytes: bytes, mime_type: str) -> Etiqu
                 model="gpt-4o-mini",
                 response_format={"type": "json_object"},
                 temperature=0,
-                max_tokens=3000,
+                max_tokens=max_tokens,
                 messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT + "\nSchema JSON : "
-                     + json.dumps(EtiquetteVisionOutput.model_json_schema(), ensure_ascii=False)},
+                    {"role": "system", "content": system_prompt + "\nSchema JSON : "
+                     + json.dumps(schema, ensure_ascii=False)},
                     {"role": "user", "content": [
-                        {"type": "text", "text": f"Date de reception en France : {today}. Lis cette etiquette."},
+                        {"type": "text", "text": f"Date de reception en France : {today}. {instruction}"},
                         {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{encoded}"}},
                     ]},
                 ],
@@ -181,8 +187,14 @@ async def analyser_etiquette_vision(image_bytes: bytes, mime_type: str) -> Etiqu
         if not content:
             raise ValueError("Reponse vide")
         parsed = json.loads(content)
-        result = valider_lecture_vision(parsed)
     except (ValueError, ValidationError) as error:
         logger.error("[HACCP] Sortie Vision invalide (%s)", type(error).__name__)
         raise VisionAnalysisError("Les donnees Vision sont invalides. Reprenez une photo lisible.") from error
-    return result
+    return parsed
+
+
+async def analyser_etiquette_vision(image_bytes: bytes, mime_type: str) -> EtiquetteVisionOutput:
+    parsed = await demander_document_vision(
+        image_bytes, mime_type, system_prompt=SYSTEM_PROMPT, schema=EtiquetteVisionOutput.model_json_schema(),
+    )
+    return valider_lecture_vision(parsed)

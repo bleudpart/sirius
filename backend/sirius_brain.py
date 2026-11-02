@@ -1632,8 +1632,8 @@ async def summarize_episode(history):
 # ==========================================
 async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="normal", keys=None, mood=None, environment=None):
     """
-    Cerveau opérationnel de ΣIRIUS, consacré aux réponses utilisateur.
-    Le cerveau analytique d'entreprise publie ses états séparément, en arrière-plan.
+    Processeurs directs de ΣIRIUS : Brain 1 pour le dialogue, Brain 2 en mode profond.
+    Sentinel (Brain 3) supervise séparément les analyses de fond.
     Cerebras/Groq répondent en mode normal ; Kimi rédige les réponses en mode profond.
     """
     keys = keys or {}

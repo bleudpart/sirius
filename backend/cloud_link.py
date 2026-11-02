@@ -197,6 +197,19 @@ async def relay_haccp_registry(method: str, path: str, **kwargs) -> httpx.Respon
     return response
 
 
+async def relay_cortex(method: str, path: str = "", **kwargs) -> dict:
+    response = await _send(method, "/api/cortex/tri" + path, **kwargs)
+    if not response.is_success:
+        raise HTTPException(response.status_code, _detail(response, "Sentinel Cloud est indisponible."))
+    try:
+        data = response.json()
+    except ValueError as error:
+        raise HTTPException(502, "Reponse Sentinel Cloud illisible.") from error
+    if not isinstance(data, dict):
+        raise HTTPException(502, "Reponse Sentinel Cloud invalide.")
+    return data
+
+
 async def relay_stt(filename: str, data: bytes, content_type: str, *, vocabulary: list[str] | None = None) -> dict:
     # Explicit per-request text hints only; never upload a stored voice profile.
     from speech_vocabulary import confirmed_vocabulary

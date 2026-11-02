@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import re
+import sqlite3
 import unicodedata
 from collections.abc import Awaitable, Callable, Iterator
 from datetime import date, datetime, time, timedelta, timezone
@@ -47,6 +48,7 @@ from services.haccp_reception import (
     ReceptionDispatcher, ReceptionIntegrityError, archiver_image_brute, nettoyer_image_provisoire,
 )
 from routers.haccp_reception import make_haccp_reception_router
+from tri_cortex.schemas import QueueUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -256,7 +258,11 @@ def _csv_lines(records: list[EtiquetteResponse]) -> Iterator[str]:
         yield buffer.getvalue()
 
 
-def make_haccp_router(resolve_scope: Callable[[Request], Awaitable[str]]) -> APIRouter:
+def make_haccp_router(
+    resolve_scope: Callable[[Request], Awaitable[str]], *,
+    vision_analyser: Callable[[bytes, str, str, str, str | None], Awaitable[EtiquetteVisionOutput]] | None = None,
+    on_received: Callable[[str, int], Awaitable[None]] | None = None,
+) -> APIRouter:
     router = APIRouter(prefix="/haccp", tags=["haccp-etiquettes"])
 
     @router.get("/receptions/dossier")
@@ -385,7 +391,11 @@ def make_haccp_router(resolve_scope: Callable[[Request], Awaitable[str]]) -> API
             previous = await run_in_threadpool(_existing_capture, db, scope, capture_key, digest, prefix)
             if previous is not None:
                 return await run_in_threadpool(_distribute_saved, db, scope, previous)
-            result = await analyser_etiquette_vision(content, mime_type)
+            result = (
+                await vision_analyser(content, mime_type, scope, capture_key or uuid.uuid4().hex,
+                                      getattr(request.state, "haccp_actor", None))
+                if vision_analyser is not None else await analyser_etiquette_vision(content, mime_type)
+            )
             try:
                 result, limite = calculer_ouverture(result, capture, maintenant)
             except ValueError as error:
@@ -412,7 +422,14 @@ def make_haccp_router(resolve_scope: Callable[[Request], Awaitable[str]]) -> API
                     raise
                 return await run_in_threadpool(_distribute_saved, db, scope, previous)
             saved = True
-            return await run_in_threadpool(_distribute_saved, db, scope, response)
+            response = await run_in_threadpool(_distribute_saved, db, scope, response)
+            if on_received is not None and capture.type_operation == "reception":
+                try:
+                    await on_received(scope, response.id)
+                except (QueueUnavailable, OSError, SQLAlchemyError, sqlite3.Error) as error:
+                    logger.error("[HACCP] Reception enregistree ; controles Sentinel differes (%s)",
+                                 type(error).__name__)
+            return response
         except VisionConfigurationError as error:
             raise HTTPException(500, str(error)) from error
         except VisionServiceError as error:

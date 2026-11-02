@@ -7,7 +7,8 @@ import os
 import re
 import sqlite3
 import time
-from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
@@ -19,6 +20,7 @@ from pymongo.errors import PyMongoError
 from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from finance_database import get_db
 from finance_connectors import (
@@ -268,6 +270,7 @@ def simulation_request(payload: Mapping[str, object], company_id: str) -> Simula
 def make_company_finance_router(
     db: MembershipDatabase, require_user: AuthResolver,
     on_change: Callable[[FinanceChange], Awaitable[None]] | None = None,
+    *, business_activity: Callable[[str, str], AbstractContextManager[None]] | None = None,
 ) -> APIRouter:
     router = APIRouter(prefix="/finance", tags=["finance-entreprise"])
 
@@ -312,11 +315,14 @@ def make_company_finance_router(
             raise HTTPException(422, "La date de fin précède la date de début.")
         return list_demo_entries(demo_company(sector).dataset, kind, start_date, end_date, limit)
 
-    async def membership(request: Request, company_id: str) -> FinanceMember:
-        return await resolve_finance_member(db, require_user, request, company_id)
+    async def membership(request: Request, company_id: str) -> AsyncIterator[FinanceMember]:
+        member = await resolve_finance_member(db, require_user, request, company_id)
+        activity = business_activity(f"finance:{member.company_id}", "finance_direct") if business_activity else nullcontext()
+        with activity:
+            yield member
 
-    async def authorize(request: Request, company_id: str) -> str:
-        return (await membership(request, company_id)).company_id
+    async def authorize(member: Annotated[FinanceMember, Depends(membership)]) -> str:
+        return member.company_id
 
     async def json_object(request: Request) -> dict[str, object]:
         return await read_json_object(request)
@@ -433,7 +439,9 @@ def make_company_finance_router(
             raise HTTPException(422, "Clé d’idempotence invalide.")
         content_type(request, source)
         raw_data = await read_bounded_body(request)
-        result = persist_ingestion(session, member.company_id, source, raw_data, idempotency_key, member.user_id)
+        result = await run_in_threadpool(
+            persist_ingestion, session, member.company_id, source, raw_data, idempotency_key, member.user_id,
+        )
         if not result.replayed and result.record_count:
             changed(background_tasks, company_id, "IMPORT_VALIDE", source.value, result.batch_id, member.user_id, result.record_count)
         return result
@@ -562,7 +570,11 @@ def make_company_finance_router(
         expected = "sha256=" + hmac.new(secret.encode("utf-8"), signed, hashlib.sha256).hexdigest()
         if not hmac.compare_digest(signature, expected):
             raise HTTPException(401, "Signature du webhook POS invalide.")
-        result = persist_ingestion(session, company_id, FinanceIngestionSource.POS_WEBHOOK, raw_data, None, "pos_webhook")
+        activity = business_activity(f"finance:{company_id}", "ticket_caisse") if business_activity else nullcontext()
+        with activity:
+            result = await run_in_threadpool(
+                persist_ingestion, session, company_id, FinanceIngestionSource.POS_WEBHOOK, raw_data, None, "pos_webhook",
+            )
         if not result.replayed and result.record_count:
             changed(background_tasks, company_id, "TICKET_CAISSE", "pos_webhook", result.batch_id, None, result.record_count)
         return result

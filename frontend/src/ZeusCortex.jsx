@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { X, Send } from "lucide-react";
 import { BACKEND_BASE_URL } from "./lib/api";
 import ZeusAnalyticalBrain from "./ZeusAnalyticalBrain";
+import ZeusTriCortex from "./ZeusTriCortex";
 import "./ZeusCortex.css";
 
 const API = BACKEND_BASE_URL;
@@ -314,6 +315,7 @@ export default function ZeusCortex({ onClose, onAsk, answer }) {
         <Kpi label="MÉMOIRE SYSTÈME" value={stats?.ram} suffix=" %" delay={335} />
       </div>
 
+      <ZeusTriCortex />
       <ZeusAnalyticalBrain />
 
       <div className="zcx-row zcx-rA">

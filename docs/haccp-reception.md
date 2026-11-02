@@ -54,6 +54,17 @@ flowchart TD
 | [routers/haccp_reception.py](../backend/routers/haccp_reception.py) | Consultation privee, original, reprise et ouverture explicite |
 | [HaccpReceptions.jsx](../frontend/src/HaccpReceptions.jsx) | Parcours **Receptions / Lots**, quatre vues et deconditionnement |
 
+### Supervision Sentinel (Tri-Cortex)
+
+Dans le serveur, la lecture du scanner passe par `SubagentVision` de
+[Tri-Cortex](tri-cortex.md), puis Brain 2 la revalide avant l'enregistrement
+decrit ici. Apres une nouvelle reception, Sentinel programme un controle DLC /
+allergenes et une copie compressee. Ces traitements secondaires ne modifient ni
+la source canonique v1, ni l'original SHA-256, ni les quatre destinations. Les
+scores de confiance Vision restent dans le resultat Cortex. Si leur
+planification echoue, la reception deja enregistree reste valide et la
+verification periodique reprend plus tard.
+
 ### Contrat de lecture
 
 `EtiquetteVisionOutput` contient :

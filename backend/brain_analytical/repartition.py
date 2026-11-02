@@ -1,9 +1,4 @@
-"""Répartition des tâches entre les deux cerveaux de ΣIRIUS : source unique pour l'API, ZEUS CORTEX et la doc.
-
-Principe : le cerveau opérationnel ne fait jamais attendre l'utilisateur ; tout ce qui demande d'agréger
-l'historique, de comparer des périodes ou d'appeler un modèle de raisonnement part au cerveau analytique,
-en arrière-plan. Les deux ne partagent que des signaux sans montant et un état publié en base.
-"""
+"""Répartition TriCortex : B1 dialogue, B2 logique directe, B3 supervise les quatre satellites."""
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 
@@ -18,6 +13,7 @@ ETAT_PERIME_APRES = timedelta(hours=24)
 class Cerveau(str, Enum):
     OPERATIONNEL = "OPERATIONNEL"
     ANALYTIQUE = "ANALYTIQUE"
+    SENTINEL = "SENTINEL"
 
 
 class ModeExecution(str, Enum):
@@ -45,40 +41,48 @@ def _operationnel(cle: str, libelle: str, detail: str) -> Attribution:
 
 
 def _analytique(cle: str, libelle: str, detail: str) -> Attribution:
-    return Attribution(cle=cle, libelle=libelle, cerveau=Cerveau.ANALYTIQUE, mode=ModeExecution.ARRIERE_PLAN, detail=detail)
+    return Attribution(cle=cle, libelle=libelle, cerveau=Cerveau.ANALYTIQUE, mode=ModeExecution.TEMPS_REEL, detail=detail)
+
+
+def _sentinel(cle: str, libelle: str, detail: str) -> Attribution:
+    return Attribution(cle=cle, libelle=libelle, cerveau=Cerveau.SENTINEL, mode=ModeExecution.ARRIERE_PLAN, detail=detail)
 
 
 REPARTITION: tuple[Attribution, ...] = (
     _operationnel("commandes", "Commandes vocales et écrites",
                   "Comprend et exécute la demande sur-le-champ ; aucune analyse de fond dans le temps de réponse."),
-    _operationnel("ocr", "OCR d'étiquettes et de factures",
-                  "Lit le document à la capture et le fait vérifier avant tout enregistrement."),
-    _operationnel("conformite", "Conformité immédiate (HACCP, traçabilité)",
-                  "Contrôles, relevés et non-conformités au fil du service, sans attendre le cerveau analytique."),
-    _operationnel("saisie", "Saisie, imports et tickets de caisse",
+    _sentinel("ocr", "SubagentVision · étiquettes et factures",
+              "Extraction structurée et confiance par champ non calibrée ; Brain 2 contrôle, Brain 1 restitue."),
+    _analytique("conformite", "Contrôles HACCP et traçabilité",
+                "Validation directe des lectures et des règles PMS ; aucune certification sanitaire automatique."),
+    _analytique("saisie", "Saisie, imports et tickets de caisse",
                   "Valide chaque écriture dans sa transaction, répond, puis signale le changement en tâche de fond."),
-    _operationnel("tableau_de_bord", "Tableau de bord et stress test à la demande",
+    _analytique("tableau_de_bord", "Tableau de bord et stress test à la demande",
                   "Calcul déterministe immédiat sur la période choisie par l'utilisateur."),
     _operationnel("questions_strategiques", "Réponses sur la santé de l'entreprise",
-                  "Lit le dernier état publié par le cerveau analytique, sans recalcul ; "
+                  "Lit le dernier état publié par Sentinel, sans recalcul ; "
                   "demande une analyse si cet état manque ou date de plus de 24 h."),
-    _analytique("surveillance", "Surveillance des constantes vitales",
-                "Fenêtre glissante de 3 mois comparée à la précédente : CA, marges, EBE, point mort, trésorerie, dette."),
+    _sentinel("surveillance", "SubagentSanitaryGuard · DLC et allergènes",
+              "Surveillance J-2, FEFO puis FIFO ; observations à vérifier, pas un inventaire physique."),
     _analytique("seuils", "Détection des seuils et des dérives",
                 "Coût matière, prime cost, dérive de marge, baisse d'activité, couverture des annuités, capitaux propres."),
     _analytique("projection", "Projection de trésorerie J+15 à J+90",
                 "Solde reconstitué prolongé du flux mensuel le plus prudent entre gestion et banque."),
     _analytique("synthese", "Synthèse stratégique par IA",
                 "Le modèle n'explique que des chiffres déjà calculés ; un chiffre non fourni impose le repli déterministe."),
-    _analytique("consolidation", "Consolidation périodique",
-                "Vérification horaire, point quotidien conservé, synthèse IA au moins hebdomadaire."),
-    _analytique("alertes", "Alertes suivies et dossier banque",
-                "Nouvelle, aggravée, atténuée ou résolue ; acquittement tracé ; notification des alertes critiques."),
+    _sentinel("consolidation", "SubagentMarginAudit · consolidation et prix",
+              "Ordonnanceur financier unique supervisé ; calculs confiés à Brain 2, aucune écriture comptable automatique."),
+    _sentinel("alertes", "Alertes suivies et dossier banque",
+              "Nouvelle, aggravée, atténuée ou résolue ; acquittement tracé ; notification des alertes critiques."),
+    _sentinel("archivage", "SubagentArchivist · copies et file hors ligne",
+              "Compression de copies, purge des caches, reprise bornée des analyses autorisées ; originaux conservés."),
 )
 
 ECHANGES: tuple[Echange, ...] = (
-    Echange(de=Cerveau.OPERATIONNEL, vers=Cerveau.ANALYTIQUE, canal="Signal d'écriture validée",
+    Echange(de=Cerveau.OPERATIONNEL, vers=Cerveau.SENTINEL, canal="Signal d'écriture validée",
             detail="Entreprise, nature et auteur, jamais de montant ; signaux regroupés entre 20 s et 2 min."),
+    Echange(de=Cerveau.SENTINEL, vers=Cerveau.ANALYTIQUE, canal="Validation et calcul directs",
+            detail="Vision et audit appellent Brain 2 ; aucune file ni boucle de surveillance dans Brain 2."),
     Echange(de=Cerveau.ANALYTIQUE, vers=Cerveau.OPERATIONNEL, canal="État publié",
             detail="Alertes, projection et synthèse lues par les suggestions proactives, la conversation et ZEUS CORTEX."),
 )

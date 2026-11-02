@@ -233,7 +233,7 @@ async def _lifespan(_app):
     from sirius_brain import warm_cerebras_connection, close_cerebras_connections
     _connection_task = asyncio.create_task(warm_cerebras_connection())
     finance_task = asyncio.create_task(finance_workspace.loop())
-    analytical_task = asyncio.create_task(cerveau_analytique.loop())
+    await tri_cortex.start()
     work_reminders_task = asyncio.create_task(operational_work.loop())
     shadow_task = asyncio.create_task(budget_lab.shadow_loop())
     initiative_task = asyncio.create_task(action_initiatives.loop())
@@ -250,8 +250,9 @@ async def _lifespan(_app):
     finally:
         # --- Arrêt ---
         finance_demo_stop.set()
+        await tri_cortex.stop()
         tasks = []
-        for task in (_watch_task, _omega_task, _episodic_task, _vector_task, _connection_task, finance_task, analytical_task, work_reminders_task, shadow_task, initiative_task, autonomy_task, zapier_task, workspace_task, finance_demo_task):
+        for task in (_watch_task, _omega_task, _episodic_task, _vector_task, _connection_task, finance_task, work_reminders_task, shadow_task, initiative_task, autonomy_task, zapier_task, workspace_task, finance_demo_task):
             if task:
                 task.cancel()
                 tasks.append(task)
@@ -457,6 +458,9 @@ from brain_analytical.conversation import repondre as repondre_analyse
 from brain_analytical.routes import make_analytical_router, make_strategic_source
 
 cerveau_analytique = AnalyticalOrchestrator(db)
+from tri_cortex.services import create_runtime
+
+tri_cortex, tri_cortex_services = create_runtime(db, cerveau_analytique)
 budget_lab = BudgetLab(db)
 finance_registry = make_finance_actions(finance_workspace)
 budget_lab.register(finance_registry)
@@ -593,16 +597,23 @@ async def chat(req: ChatRequest, request: Request):
             popups = []
             used_search = False
         else:
-            # ⚡ Appel direct à ask_sirius (cerveau unique)
-            result = await ask_sirius(
-                prompt=texte,
-                history=history,
-                profile=req.profile or {},
-                memory=merged_memory,
-                mode=effective_mode,
-                keys=req.keys or {},
-                mood=req.mood or {},
-                environment=req.environment or {},
+            async def direct_answer():
+                return await ask_sirius(
+                    prompt=texte,
+                    history=history,
+                    profile=req.profile or {},
+                    memory=merged_memory,
+                    mode=effective_mode,
+                    keys=req.keys or {},
+                    mood=req.mood or {},
+                    environment=req.environment or {},
+                )
+            async def reasoning_answer():
+                result = await tri_cortex.brain2.run(f"user:{uid}", "raisonnement", direct_answer)
+                tri_cortex.telemetry.flow(f"user:{uid}", "brain_2", "brain_1")
+                return result
+            result = await tri_cortex.brain1.answer(
+                f"user:{uid}", reasoning_answer if effective_mode == "profond" else direct_answer,
             )
             answer = result.get("reponse", "")
             memories = result.get("memoire", [])
@@ -714,7 +725,7 @@ async def chat_stream(req: ChatRequest, request: Request):
                 from sirius_brain import ask_sirius_stream, could_become_ignored_marker, is_ignored_answer
                 parts = []
                 held = True
-                async for delta in ask_sirius_stream(
+                source = ask_sirius_stream(
                     prompt=texte,
                     history=history,
                     profile=req.profile or {},
@@ -723,7 +734,8 @@ async def chat_stream(req: ChatRequest, request: Request):
                     keys=req.keys or {},
                     mood=req.mood or {},
                     environment=req.environment or {},
-                ):
+                )
+                async for delta in tri_cortex.stream(f"user:{uid}", source, deep=effective_mode == "profond"):
                     parts.append(delta)
                     if held:
                         # Tant que le début peut être le marqueur silencieux, rien n'est envoyé.
@@ -2343,7 +2355,9 @@ async def _haccp_labels_scope(request: Request) -> str:
     return f"user:{user['user_id']}"
 
 
-api_router.include_router(make_haccp_labels_router(_haccp_labels_scope))
+api_router.include_router(make_haccp_labels_router(
+    _haccp_labels_scope, vision_analyser=tri_cortex_services.analyse_label, on_received=tri_cortex_services.received,
+))
 from routers.haccp_printing import make_haccp_print_router
 api_router.include_router(make_haccp_print_router(_haccp_labels_scope, is_direct_local_request))
 
@@ -2378,7 +2392,9 @@ from ariane_market_runs import make_ariane_market_router
 api_router.include_router(make_ariane_market_router(db, require_user))
 api_router.include_router(make_finance_router(finance_workspace, require_user))
 from routers.finance import make_company_finance_router
-api_router.include_router(make_company_finance_router(db, require_user, cerveau_analytique.on_finance_change))
+api_router.include_router(make_company_finance_router(
+    db, require_user, cerveau_analytique.on_finance_change, business_activity=tri_cortex.brain2.activity,
+))
 api_router.include_router(make_analytical_router(db, require_user, cerveau_analytique))
 api_router.include_router(make_budget_lab_router(budget_lab, require_user))
 api_router.include_router(make_action_router(action_runs, require_user))
@@ -3082,6 +3098,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(ProviderAccessMiddleware, db=db)
+
+from tri_cortex.routes import make_cortex_router
+
+
+async def _cortex_user(connection, database):
+    from access_gate import access_status
+    user = await require_user(connection, database)
+    status = await access_status(database, user)
+    if not status.get("allowed"):
+        raise HTTPException(402, "Acces au logiciel indisponible.")
+    return user
+
+
+api_router.include_router(make_cortex_router(
+    db, _cortex_user, tri_cortex, allowed_origins=frozenset(_DEFAULT_DEV_ORIGINS + _extra_origins),
+))
 
 # Rattachement final du routeur /api à l'application (une seule fois, après les middlewares)
 app.include_router(api_router)
