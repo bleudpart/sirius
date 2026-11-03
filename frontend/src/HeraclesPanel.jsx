@@ -5,6 +5,7 @@ import "./Heracles.css";
 import MythosBackdrop from "@/MythosBackdrop";
 import useDraggableCards from "@/useDraggableCards";
 import Analysis3D from "@/Analysis3D";
+import { buildDomainSearches, normalizeAuthorizedDomain, OSIRIS_MAP_URL } from "./domainOsint";
 
 const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
 
@@ -16,6 +17,7 @@ const TYPE_META = {
 };
 
 export default function HeraclesPanel({ onClose, onSpeak, initialInput }) {
+  const isDomainRequest = String(initialInput || "").startsWith("domain:");
   const [char, setChar] = useState(null);
   useEffect(() => {
     fetch((process.env.REACT_APP_BACKEND_URL || "") + "/api/mythos/characters")
@@ -25,7 +27,13 @@ export default function HeraclesPanel({ onClose, onSpeak, initialInput }) {
         setChar(p);
       });
   }, []);
-  const [input, setInput] = useState(initialInput || "");
+  const [input, setInput] = useState(isDomainRequest ? "" : initialInput || "");
+  const [domain, setDomain] = useState(isDomainRequest ? initialInput.slice("domain:".length) : "");
+  const [domainAuthorized, setDomainAuthorized] = useState(false);
+  const [domainSources, setDomainSources] = useState({ crtsh: true, shodan: true, censys: true, hibp: false });
+  const [domainLinks, setDomainLinks] = useState([]);
+  const [domainError, setDomainError] = useState("");
+  const [domainStatus, setDomainStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const [out, setOut] = useState(null);
   const [error, setError] = useState("");
@@ -52,8 +60,33 @@ export default function HeraclesPanel({ onClose, onSpeak, initialInput }) {
   }, [onSpeak]);
 
   useEffect(() => {
-    if (initialInput && !ranRef.current) { ranRef.current = true; investigate(initialInput); }
-  }, [initialInput, investigate]);
+    if (initialInput && !isDomainRequest && !ranRef.current) { ranRef.current = true; investigate(initialInput); }
+  }, [initialInput, isDomainRequest, investigate]);
+
+  const openDomainSources = (event) => {
+    event.preventDefault();
+    setDomainError("");
+    setDomainStatus("");
+    setDomainLinks([]);
+    if (!domainAuthorized) {
+      setDomainError("Confirme que tu possèdes ce domaine ou que tu es autorisé à le vérifier.");
+      return;
+    }
+    const normalized = normalizeAuthorizedDomain(domain);
+    if (!normalized) {
+      setDomainError("Indique un nom de domaine public valide, sans chemin ni adresse IP.");
+      return;
+    }
+    const selected = buildDomainSearches(normalized).filter((source) => domainSources[source.id]);
+    if (!selected.length) {
+      setDomainError("Sélectionne au moins une source.");
+      return;
+    }
+    setDomain(normalized);
+    setDomainLinks(selected);
+    setDomainStatus(`Recherches préparées pour ${normalized}. Chaque source sélectionnée recevra ce domaine à l’ouverture.`);
+    selected.forEach((source) => window.open(source.url, "_blank", "noopener,noreferrer"));
+  };
 
   const exportPdf = useCallback(async () => {
     if (!out) return;
@@ -97,9 +130,53 @@ export default function HeraclesPanel({ onClose, onSpeak, initialInput }) {
           className="mythos-avatar"
         />
       )}
-      <div className="prime-sub">DONNÉES PUBLIQUES · PSEUDO / EMAIL / TÉLÉPHONE / NOM · RIEN N'EST STOCKÉ</div>
+      <div className="prime-sub">DONNÉES PUBLIQUES · DOMAINE / PSEUDO / EMAIL / TÉLÉPHONE / NOM</div>
 
       <div className="argus-body">
+        <section className="prime-card argus-wide her-domain" aria-label="Analyse passive d’un domaine">
+          <h3>ANALYSE PASSIVE D’UN DOMAINE</h3>
+          <p>Prépare des recherches publiques en lecture seule. ΣIRIUS ne scanne pas le domaine et ne vérifie pas les résultats à ta place.</p>
+          <form onSubmit={openDomainSources}>
+            <label htmlFor="heracles-domain">DOMAINE QUE TU ES AUTORISÉ À VÉRIFIER</label>
+            <div className="her-searchrow">
+              <input id="heracles-domain" className="vision-question her-input" value={domain} maxLength={253}
+                onChange={(event) => setDomain(event.target.value)} placeholder="exemple.fr" data-testid="heracles-domain-input" />
+              <button className="her-go" type="submit" disabled={!domainAuthorized} data-testid="heracles-domain-open">
+                <Search size={14} /> PRÉPARER LES RECHERCHES
+              </button>
+            </div>
+            <div className="her-domain-sources">
+              {[
+                ["crtsh", "crt.sh — certificats publics"],
+                ["shodan", "Shodan — hôtes indexés"],
+                ["censys", "Censys — hôtes et certificats"],
+                ["hibp", "Have I Been Pwned — domaine vérifié"],
+              ].map(([id, label]) => (
+                <label key={id}><input type="checkbox" checked={domainSources[id]}
+                  onChange={(event) => setDomainSources((current) => ({ ...current, [id]: event.target.checked }))}
+                  data-testid={`heracles-source-${id}`} />{label}</label>
+              ))}
+            </div>
+            <label className="her-domain-consent">
+              <input type="checkbox" checked={domainAuthorized}
+                onChange={(event) => setDomainAuthorized(event.target.checked)} data-testid="heracles-domain-authorized" />
+              Je possède ce domaine ou j’ai l’autorisation de le vérifier. Je comprends que les sources cochées recevront son nom.
+            </label>
+            <p className="her-domain-note">HIBP exige que le domaine soit vérifié par son propriétaire. Shodan et Censys peuvent demander un compte ou limiter les résultats. Ces recherches passives ne sont ni un audit de sécurité ni un test d’intrusion.</p>
+            {domainError && <p className="her-error" role="alert" data-testid="heracles-domain-error">{domainError}</p>}
+            {domainStatus && <p className="her-domain-status" role="status" data-testid="heracles-domain-status">{domainStatus}</p>}
+            {domainLinks.length > 0 && <ul className="her-domain-links">
+              {domainLinks.map((source) => <li key={source.id}>
+                <a href={source.url} target="_blank" rel="noopener noreferrer">{source.label}<ExternalLink size={12} /></a>
+                <span>{source.note}</span>
+              </li>)}
+            </ul>}
+          </form>
+          <a className="her-domain-map" href={OSIRIS_MAP_URL} target="_blank" rel="noopener noreferrer">
+            Ouvrir la carte OSIRIS dans un onglet séparé <ExternalLink size={13} />
+          </a>
+        </section>
+
         <section className="prime-card argus-wide">
           <div className="her-searchrow">
             <input

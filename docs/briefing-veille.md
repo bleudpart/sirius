@@ -68,3 +68,20 @@ anciennes que 6 heures (5 jours pour les cours) sont refusées.
 `OSIRIS_BASE_URL` (facultatif) remplace `https://www.osirisai.live`, par exemple
 pour une instance OSIRIS auto-hébergée. Seul `https` est accepté, ou `http`
 vers `localhost`/`127.0.0.1`.
+
+## HERACLES : recherches passives de domaine
+
+La commande vocale « Zirius, analyse ce domaine » ouvre HERACLES ; un domaine
+prononcé à la suite est prérempli. L’utilisateur doit confirmer qu’il possède
+le domaine ou est autorisé à le vérifier avant d’ouvrir les sources choisies.
+La première version prépare des recherches sur crt.sh, Shodan, Censys et,
+facultativement, le tableau de bord Have I Been Pwned. Le domaine est transmis
+directement aux fournisseurs sélectionnés dans leur URL, pas à l’API ΣIRIUS.
+HIBP n’accepte que les domaines dont le contrôle a été vérifié par leur
+propriétaire ; Shodan/Censys peuvent imposer une connexion ou des limites.
+
+ΣIRIUS ne lance pas de scan actif, n’exécute pas theHarvester et ne présente
+pas l’ouverture d’un lien comme un résultat d’analyse. Roso.info et
+Fingerprint.to ciblent des identifiants de personnes, pas la recherche de
+domaine : ils ne sont pas inclus dans ce parcours. La carte OSIRIS s’ouvre
+dans un onglet séparé (le site interdit actuellement l’intégration en iframe).

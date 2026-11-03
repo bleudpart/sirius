@@ -72,6 +72,9 @@ jest.mock("./lazyModules", () => new Proxy({}, { get: (_, key) => {
   if (key === "SiriusSetup") return ({ onCancel, initialTab }) => (
     <div data-testid="workspace-SiriusSetup" data-tab={initialTab}><button onClick={onCancel}>Fermer</button></div>
   );
+  if (key === "HeraclesPanel") return ({ initialInput }) => (
+    <div data-testid="workspace-HeraclesPanel" data-input={initialInput || ""} />
+  );
   if (key === "WorkspaceSearch") return ({ initialQuery, onClose, onDossier }) => (
     <div data-testid="workspace-WorkspaceSearch" data-query={initialQuery}><button onClick={onClose}>Fermer la recherche</button>
       <button onClick={() => { onClose(); onDossier("search-dossier"); }}>Ouvrir ce dossier</button></div>
@@ -291,6 +294,14 @@ async function send(command) {
   });
   await act(async () => host.querySelector('[data-testid="sirius-cmd-form"]').dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
 }
+
+test("domain analysis voice command opens HÉRACLÈS without calling the investigation stub", async () => {
+  await mount();
+  await send("Zirius, analyse le domaine example.com");
+  expect(host.querySelector('[data-testid="workspace-HeraclesPanel"]')?.getAttribute("data-input")).toBe("domain:example.com");
+  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/api/heracles/check"))).toBe(false);
+  expect(global.fetch.mock.calls.some(([url]) => /\/(?:intent|chat)(?:\/stream)?$/.test(String(url)))).toBe(false);
+});
 
 test("Chronos appointment requests bypass Outlook and confirm only the issued proposal", async () => {
   const original = global.fetch.getMockImplementation();

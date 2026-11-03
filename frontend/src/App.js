@@ -60,6 +60,7 @@ import { bulletinFollowUp, createBulletinContext, markSegmentCompleted, markSegm
 import { AUDIO_DIAGNOSTICS_EVENT, loadShowAudioDiagnostics } from "./audioDiagnosticsSetting";
 import { buildNewsBulletin, weatherBulletinText } from "./newsBulletin";
 import { fetchWeatherDirect } from "./weatherDirect";
+import { parseDomainAnalysisCommand } from "./domainOsint";
 import { connectStreamingStt } from "@/services/streamingStt";
 import { enabledVoiceVocabulary } from "@/voiceVocabulary";
 import { requireVoiceIdentity, verifyVoiceIdentity } from "@/voiceIdentity";
@@ -5231,6 +5232,18 @@ function App() {
       return;
     }
     // 0quindecies) HERACLES# : investigation OSINT « enquête sur X », « vérifie l'email X », « analyse le numéro X », « qui est X »
+    const domainAnalysis = parseDomainAnalysisCommand(command);
+    if (domainAnalysis) {
+      mark("heracles · analyse passive de domaine");
+      setHeraclesInput(`domain:${domainAnalysis.domain}`);
+      setShowHeracles(true);
+      const message = domainAnalysis.domain
+        ? `J'ouvre HÉRACLÈS pour préparer des recherches passives sur ${domainAnalysis.domain}. Confirme ton autorisation avant de les ouvrir.`
+        : "J'ouvre HÉRACLÈS. Indique un domaine que tu possèdes ou que tu es autorisé à vérifier.";
+      setText(message);
+      speakOut(message);
+      return;
+    }
     const herM = low.match(/(?:enqu[êe]te|investigue|osint)\s+(?:sur\s+|à propos de\s+)?(.+)/) ||
       low.match(/(?:v[ée]rifie|analyse|contr[ôo]le)\s+(?:l['e]\s*)?(?:email|adresse|mail|pseudo|compte|num[ée]ro|t[ée]l[ée]phone|identit[ée])\s+(?:de\s+)?(.+)/) ||
       low.match(/qui\s+(?:est|se cache derri[èe]re)\s+(.+)/);

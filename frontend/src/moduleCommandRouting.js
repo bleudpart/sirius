@@ -26,7 +26,7 @@ export const MODULE_ALIASES = {
   mythos: "galerie personnages dieux pantheon",
   argus: "surveillance systeme moniteur",
   atlas: "cartes navigation itineraire",
-  heracles: "enquete investigation osint",
+  heracles: "enquete investigation osint domaine analyse ce domaine",
   hephaistos: "diagnostic maintenance technique",
   locus: "localisation position geolocalisation",
   promethee: "projet taches planning",
