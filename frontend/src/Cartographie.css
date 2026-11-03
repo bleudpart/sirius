@@ -1,5 +1,5 @@
 /* © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France). */
-/* ΣIRIUS CARTOGRAPHIE — événements OSIRIS */
+/* ΣIRIUS CARTOGRAPHIE — flux OSIRIS */
 .carto-screen { display: flex; flex-direction: column; gap: 10px; }
 .carto-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; color: #fff; font-size: 11px; letter-spacing: 1px; }
 .carto-toolbar label { display: inline-flex; align-items: center; gap: 7px; }
@@ -9,6 +9,16 @@
 }
 .carto-toolbar select:disabled { opacity: 0.5; }
 .carto-check input { accent-color: #91e6f2; }
+.carto-layer-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 16px; color: #fff; font-size: 11px; }
+.carto-layer-toolbar > span { color: #b8f4fc; letter-spacing: 1px; }
+.carto-layer-toolbar label { display: inline-flex; align-items: center; gap: 5px; }
+.carto-layer-toolbar .carto-dot { margin-top: 0; }
+.carto-layer-status {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 2.7em;
+  align-content: start; gap: 4px 16px; color: rgba(255, 255, 255, 0.8); font-size: 10.5px;
+}
+.carto-layer-status > span { display: block; min-width: 0; height: 2.7em; overflow: auto; }
+.carto-layer-error { color: #ffc078; }
 .carto-toolbar .her-go { min-height: 30px; }
 .carto-osiris { display: inline-flex; align-items: center; gap: 6px; color: #b8f4fc; text-decoration: none; margin-left: auto; }
 .carto-osiris:hover { text-decoration: underline; }
@@ -34,11 +44,16 @@
 .carto-float li small { display: block; color: rgba(255, 255, 255, 0.7); font-size: 10.5px; line-height: 1.4; }
 .carto-dot { flex: 0 0 auto; width: 9px; height: 9px; margin-top: 4px; border-radius: 50%; background: #91e6f2; }
 .carto-dot.seisme { background: #ffb347; }
+.carto-dot.avion { background: #69d8ff; }
+.carto-dot.satellite { background: #c89cff; }
+.carto-dot.conflit { background: #ff6d74; }
+.carto-dot.actualite { background: #ffbf69; }
 .carto-empty { margin: 0; padding: 8px 12px; color: rgba(255, 255, 255, 0.7); font-size: 11px; }
 .carto-legal { margin: 0; color: rgba(255, 255, 255, 0.65); font-size: 10.5px; line-height: 1.5; }
 .carto-popup { display: grid; gap: 4px; font-size: 12px; }
 .carto-popup span { color: #444; }
 @media (max-width: 640px) {
+  .carto-layer-status { grid-template-columns: minmax(0, 1fr); }
   .carto-stage { min-height: 60vh; }
   .carto-float { top: auto; bottom: 10px; right: 10px; left: 10px; width: auto; max-height: 45%; }
   .carto-osiris { margin-left: 0; }

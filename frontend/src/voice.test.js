@@ -217,6 +217,14 @@ test.each(["jusqu'à", "jusqu’à", "jusqu ’ à"])(
   },
 );
 
+test("pronounces OSIRIS with its final s in remote and native speech", async () => {
+  speakFr("J'ouvre la carte OSIRIS.");
+  await flush();
+  const request = global.fetch.mock.calls.find(([url]) => String(url).includes("/tts/gemini"));
+  expect(JSON.parse(request[1].body).text).toBe("J'ouvre la carte Osirisse.");
+  expect(speakNative.mock.calls[0][0]).toBe("J'ouvre la carte Osirisse.");
+});
+
 test("the native bulletin receives the same jusqu'à pronunciation guide", async () => {
   hasNativeRemoteVoice.mockReturnValue(true);
   playNativeRemoteVoice.mockResolvedValueOnce();

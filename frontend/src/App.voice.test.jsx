@@ -308,6 +308,10 @@ test("map voice command opens the OSIRIS cartography without asking the model", 
   await mount();
   await send("Zirius, ouvre la carte OSIRIS");
   expect(host.querySelector('[data-testid="workspace-CartographiePanel"]')).not.toBeNull();
+  expect(speakFr).toHaveBeenCalledWith(
+    "J'ouvre la cartographie des événements OSIRIS autour de Zirius.",
+    expect.any(Object),
+  );
   expect(global.fetch.mock.calls.some(([url]) => /\/(?:intent|chat)(?:\/stream)?$/.test(String(url)))).toBe(false);
 });
 

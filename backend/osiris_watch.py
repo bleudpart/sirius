@@ -16,6 +16,7 @@ import os
 import re
 import time
 from datetime import datetime, timedelta, timezone
+from itertools import chain
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
@@ -39,6 +40,27 @@ QUAKE_WINDOW = timedelta(days=7)
 MAX_LISTED_EVENTS = 5
 MAP_RADII_KM = (50, 100, 300, 1000)
 MAP_MAX_EVENTS = 2000
+MAP_LAYER_LIMIT = 500
+MAP_LAYER_MAX_ROWS = 60_000
+MAP_LAYER_MAX_BYTES = 12 * 1024 * 1024
+MAP_LAYERS = {
+    "avion": {
+        "path": "/api/flights", "label": "Avions", "provider": "OSIRIS — OpenSky / ADS-B",
+        "ttl": 60, "max_age": timedelta(minutes=10), "max_bytes": MAP_LAYER_MAX_BYTES,
+    },
+    "satellite": {
+        "path": "/api/satellites", "label": "Satellites", "provider": "OSIRIS — données orbitales",
+        "ttl": 120, "max_age": timedelta(hours=2), "max_bytes": MAP_LAYER_MAX_BYTES,
+    },
+    "conflit": {
+        "path": "/api/conflicts", "label": "Zones de conflit", "provider": "OSIRIS — sélection éditoriale",
+        "ttl": 300, "max_age": timedelta(hours=6), "max_bytes": MAX_PAYLOAD_BYTES,
+    },
+    "actualite": {
+        "path": "/api/news", "label": "Actualités internationales", "provider": "OSIRIS — sources de presse et OSINT",
+        "ttl": 120, "max_age": timedelta(hours=2), "max_bytes": MAX_PAYLOAD_BYTES,
+    },
+}
 HEAT_THRESHOLD_C = 30
 TIMEOUT = httpx.Timeout(6.0, connect=3.0)
 HEADERS = {"Accept": "application/json", "User-Agent": "SIRIUS-Veille/1.0 (+https://sirius-assistant.fr)"}
@@ -139,18 +161,20 @@ def valid_location(value):
         return None
 
 
-async def _download(client, url) -> dict:
+async def _download(client, url, *, max_bytes=None) -> dict:
+    if max_bytes is None:
+        max_bytes = MAX_PAYLOAD_BYTES
     try:
         async with client.stream("GET", url, headers=HEADERS) as response:
             if response.status_code != 200:
                 raise FeedUnavailable(f"OSIRIS a répondu HTTP {response.status_code}.")
             declared = response.headers.get("content-length", "")
-            if declared.isdigit() and int(declared) > MAX_PAYLOAD_BYTES:
+            if declared.isdigit() and int(declared) > max_bytes:
                 raise FeedUnavailable("Réponse OSIRIS trop volumineuse.")
             body = bytearray()
             async for chunk in response.aiter_bytes():
                 body.extend(chunk)
-                if len(body) > MAX_PAYLOAD_BYTES:
+                if len(body) > max_bytes:
                     raise FeedUnavailable("Réponse OSIRIS trop volumineuse.")
     except httpx.HTTPError as error:
         logger.warning("[VEILLE] OSIRIS injoignable (%s) : %s", url, type(error).__name__)
@@ -176,7 +200,7 @@ def _feed_time(payload, now):
     return stamp
 
 
-async def _read_feed(client, path, now):
+async def _read_feed(client, path, now, *, ttl=None, max_bytes=None):
     url = base_url() + path
     entry = _cache.get(url)
     if entry and time.monotonic() - entry[0] < entry[1]:
@@ -184,12 +208,12 @@ async def _read_feed(client, path, now):
             raise FeedUnavailable(entry[2])
         return entry[2]
     try:
-        payload = await _download(client, url)
+        payload = await _download(client, url, max_bytes=max_bytes)
         result = (payload, _feed_time(payload, now))
     except FeedUnavailable as error:
         _cache[url] = (time.monotonic(), FAILURE_TTL, str(error))
         raise
-    _cache[url] = (time.monotonic(), FEED_TTL, result)
+    _cache[url] = (time.monotonic(), FEED_TTL if ttl is None else ttl, result)
     return result
 
 
@@ -439,6 +463,159 @@ async def build_map(settings, *, now=None, transport=None) -> dict:
         "sources": sources,
         "status": "ok" if not failed else "unavailable" if failed == len(sources) else "partial",
     }
+
+
+def _layer_rows(kind, payload):
+    keys = {
+        "avion": ("commercial_flights", "private_flights", "private_jets", "military_flights"),
+        "satellite": ("satellites",),
+        "conflit": ("zones",),
+        "actualite": ("news",),
+    }[kind]
+    groups = [payload.get(key) for key in keys]
+    if any(not isinstance(group, list) for group in groups):
+        raise FeedUnavailable("Flux OSIRIS sans liste exploitable.")
+    count = sum(len(group) for group in groups)
+    if not count:
+        raise FeedUnavailable("OSIRIS ne fournit actuellement aucune donnée pour ce calque.")
+    if count > MAP_LAYER_MAX_ROWS:
+        raise FeedUnavailable("Flux OSIRIS trop volumineux pour la carte.")
+    return chain.from_iterable(groups)
+
+
+def _optional_number(value, low, high):
+    try:
+        return _number(value, low, high)
+    except ValueError:
+        return None
+
+
+def _layer_point(kind, row, stamp, now):
+    if not isinstance(row, dict):
+        raise ValueError("Entrée invalide.")
+    provider = MAP_LAYERS[kind]["provider"]
+    date = stamp
+    details = {}
+    if kind == "avion":
+        identifier = _text(row.get("icao24") or row.get("callsign"), 40)
+        callsign = row.get("callsign")
+        name = _text(callsign if callsign and callsign != "UNKNOWN" else identifier, 40)
+        title = f"Avion {name}"
+        latitude, longitude = row["lat"], row["lng"]
+        details = {
+            "altitude_m": _optional_number(row.get("alt"), 1, 100_000),
+            "speed_knots": _optional_number(row.get("speed_knots"), 0, 2_000),
+        }
+        url = None
+    elif kind == "satellite":
+        name = _text(row["name"], 120)
+        identifier = _text(str(row.get("noradId") or name), 120)
+        title = f"Satellite {name}"
+        latitude, longitude = row["lat"], row["lng"]
+        details = {"altitude_km": _optional_number(row.get("alt"), 0, 100_000)}
+        url = None
+    elif kind == "conflit":
+        identifier = _text(row["id"], 120)
+        title = f"Zone de conflit : {_text(row['label'], 120)}"
+        latitude, longitude = row["lat"], row["lng"]
+        url = _link(row.get("sourceUrl"))
+    else:
+        if row.get("coords_default") is not False:
+            raise ValueError("Actualité non localisée.")
+        coordinates = row["coords"]
+        if not isinstance(coordinates, list) or len(coordinates) != 2:
+            raise ValueError("Localisation absente.")
+        latitude, longitude = coordinates
+        date = _instant(row["published"])
+        if not now - timedelta(days=7) <= date <= now + timedelta(minutes=15):
+            raise ValueError("Publication périmée ou future.")
+        identifier = _text(row["id"], 120)
+        title = _text(row["title"], 180)
+        provider = _text(row.get("source_name") or row.get("source"), 100)
+        url = _link(row.get("link"))
+        if url is None:
+            raise ValueError("Lien source absent.")
+        precision = row.get("location_precision")
+        details = {"location_precision": precision if precision in ("settlement", "region", "country-anchor") else "unknown"}
+
+    return {
+        "kind": kind, "id": identifier, "title": title,
+        "latitude": _number(latitude, -90, 90), "longitude": _number(longitude, -180, 180),
+        "date": date.isoformat(), "provider": provider, "url": url, **details,
+    }
+
+
+def _inside_map_bounds(bounds, latitude, longitude):
+    if not bounds["south"] <= latitude <= bounds["north"]:
+        return False
+    width = bounds["east"] - bounds["west"]
+    return width >= 360 or (longitude - bounds["west"]) % 360 <= width
+
+
+async def build_map_layer(settings, kind, bounds, radius_km=None, *, now=None, transport=None) -> dict:
+    """Calque borné à la zone visible ; aucune coordonnée n'est transmise à OSIRIS."""
+    now = now or datetime.now(timezone.utc)
+    spec = MAP_LAYERS[kind]
+    origin = valid_location((settings or {}).get("location"))
+    source = {
+        "id": kind, "label": spec["label"], "provider": spec["provider"],
+        "ok": False, "updated_at": None, "detail": None,
+    }
+    report = {
+        "kind": kind, "read_only": True, "generated_at": now.isoformat(),
+        "items": [], "total": 0, "truncated": 0, "ignored": 0, "source": source,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT, transport=transport, follow_redirects=False) as client:
+            payload, stamp = await _read_feed(
+                client, spec["path"], now, ttl=spec["ttl"], max_bytes=spec["max_bytes"],
+            )
+        if stamp is None:
+            raise FeedUnavailable("Flux OSIRIS sans date exploitable.")
+        source["updated_at"] = stamp.isoformat()
+        if now - stamp > spec["max_age"]:
+            raise FeedUnavailable("Flux OSIRIS trop ancien pour ce calque.")
+        if payload.get("simulated") is True or "simulat" in str(payload.get("source", "")).lower():
+            raise FeedUnavailable("OSIRIS signale des données simulées, non affichées.")
+        if kind == "satellite" and payload.get("source") == "emergency-fallback":
+            raise FeedUnavailable("OSIRIS ne dispose que de données orbitales de secours non vérifiables.")
+
+        points, seen, usable = [], set(), 0
+        for row in _layer_rows(kind, payload):
+            try:
+                item = _layer_point(kind, row, stamp, now)
+            except (AttributeError, KeyError, TypeError, ValueError, OverflowError):
+                report["ignored"] += 1
+                continue
+            if item["id"] in seen:
+                continue
+            seen.add(item["id"])
+            usable += 1
+            latitude, longitude = item["latitude"], item["longitude"]
+            if not _inside_map_bounds(bounds, latitude, longitude):
+                continue
+            distance = _distance_from(origin, latitude, longitude)
+            if _outside(distance, radius_km):
+                continue
+            item["distance_km"] = round(distance) if distance is not None else None
+            points.append(item)
+        if not usable:
+            raise FeedUnavailable("Aucune donnée géolocalisée exploitable dans ce flux OSIRIS.")
+
+        if origin:
+            points.sort(key=lambda item: (item["distance_km"], item["title"], item["id"]))
+        else:
+            points.sort(key=lambda item: (item["latitude"], item["longitude"], item["id"]))
+        report["total"] = len(points)
+        report["truncated"] = max(0, len(points) - MAP_LAYER_LIMIT)
+        if report["truncated"] and not origin:
+            report["items"] = [points[index * len(points) // MAP_LAYER_LIMIT] for index in range(MAP_LAYER_LIMIT)]
+        else:
+            report["items"] = points[:MAP_LAYER_LIMIT]
+        source["ok"] = True
+    except FeedUnavailable as error:
+        source["detail"] = str(error)
+    return report
 
 
 def _fr(value, digits) -> str:

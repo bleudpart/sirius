@@ -54,6 +54,49 @@ def markets_payload():
             "fx": {}}
 
 
+def flights_payload():
+    return {
+        "timestamp": iso(-timedelta(minutes=1)),
+        "commercial_flights": [
+            {"icao24": "abc123", "callsign": "AF123", "lat": 48.9, "lng": 2.4, "alt": 9000, "speed_knots": 420},
+            {"icao24": "def456", "callsign": "FAR1", "lat": 40.7, "lng": -74.0, "alt": 11000, "speed_knots": 450},
+            {"icao24": "bad", "callsign": "INVALID", "lat": "bad", "lng": 2.0},
+        ],
+        "private_flights": [{"icao24": "abc123", "callsign": "AF123", "lat": 48.9, "lng": 2.4}],
+        "private_jets": [{"icao24": "ghi789", "callsign": "PAC1", "lat": -17.8, "lng": -175.0}],
+        "military_flights": [],
+    }
+
+
+def satellites_payload():
+    return {"timestamp": iso(-timedelta(minutes=2)), "source": "memory-cache", "satellites": [
+        {"name": "Satellite A", "noradId": "12345", "lat": 49.0, "lng": 2.5, "alt": 550},
+        {"name": "Satellite B", "noradId": "23456", "lat": 1.0, "lng": 120.0, "alt": 1000},
+    ]}
+
+
+def conflicts_payload():
+    return {"timestamp": iso(-timedelta(minutes=2)), "zoneSource": "curated", "zones": [
+        {"id": "z1", "label": "Zone A", "lat": 49.0, "lng": 2.5, "sourceUrl": "https://example.org/zone"},
+        {"id": "z2", "label": "Zone B", "lat": 35.0, "lng": 45.0, "sourceUrl": "javascript:alert(1)"},
+    ]}
+
+
+def news_payload():
+    return {"timestamp": iso(-timedelta(minutes=2)), "news": [
+        {"id": "n1", "title": "Signalement A", "source_name": "Agence A", "link": "https://example.org/a",
+         "published": iso(-timedelta(hours=1)), "coords": [49.0, 2.5], "coords_default": False,
+         "location_precision": "settlement"},
+        {"id": "n2", "title": "Signalement B", "source_name": "Agence B", "link": "https://example.org/b",
+         "published": iso(-timedelta(hours=2)), "coords": [35.0, 45.0], "coords_default": False,
+         "location_precision": "country-anchor"},
+        {"id": "n3", "title": "Lieu inconnu", "source_name": "Agence C", "link": "https://example.org/c",
+         "published": iso(), "coords": [0, 0], "coords_default": True},
+        {"id": "n4", "title": "Lien invalide", "source_name": "Agence D", "link": "javascript:alert(1)",
+         "published": iso(), "coords": [49.0, 2.5], "coords_default": False},
+    ]}
+
+
 def bulletin(max_c=24.0):
     return {"timezone": "Europe/Paris", "current": {"time": "2026-05-02T08:00"},
             "days": [{"date": "2026-05-02", "temperature_2m_min": 11.4, "temperature_2m_max": max_c,
@@ -76,7 +119,11 @@ def isolated(monkeypatch):
 
 
 def transport(overrides=None, hits=None):
-    payloads = {"/api/weather": events_payload(), "/api/earthquakes": quakes_payload(), "/api/markets": markets_payload()}
+    payloads = {
+        "/api/weather": events_payload(), "/api/earthquakes": quakes_payload(), "/api/markets": markets_payload(),
+        "/api/flights": flights_payload(), "/api/satellites": satellites_payload(),
+        "/api/conflicts": conflicts_payload(), "/api/news": news_payload(),
+    }
 
     def handler(request):
         assert request.url.host == "www.osirisai.live"
@@ -278,3 +325,84 @@ def test_map_caps_points_and_reports_partial_sources(monkeypatch):
     assert [item["title"] for item in report["events"]] == ["Orage violent", "Crue de la Seine"]
     assert report["truncated"] == 1
     assert {item["id"]: item["detail"] for item in report["sources"]}["seismes"] == "OSIRIS a répondu HTTP 503."
+
+
+WORLD_BOUNDS = {"south": -90, "west": -180, "north": 90, "east": 180}
+FRANCE_BOUNDS = {"south": 41, "west": -5, "north": 51.5, "east": 10}
+
+
+def build_layer(kind, settings=SETTINGS, bounds=WORLD_BOUNDS, radius_km=None, **kwargs):
+    return asyncio.run(watch.build_map_layer(
+        settings, kind, bounds, radius_km, now=NOW, transport=transport(**kwargs),
+    ))
+
+
+@pytest.mark.parametrize("kind, title", [
+    ("avion", "Avion AF123"),
+    ("satellite", "Satellite Satellite A"),
+    ("conflit", "Zone de conflit : Zone A"),
+    ("actualite", "Signalement A"),
+])
+def test_map_layers_filter_the_view_and_radius_without_sending_the_position(kind, title):
+    report = build_layer(kind, bounds=FRANCE_BOUNDS, radius_km=300)
+    assert report["source"]["ok"] is True and report["read_only"] is True
+    assert report["source"]["updated_at"] is not None
+    assert report["total"] == 1 and report["truncated"] == 0
+    assert report["items"][0]["title"] == title
+    assert report["items"][0]["distance_km"] < 300
+
+
+def test_transport_details_and_publication_precision_are_preserved():
+    flight = build_layer("avion", bounds=FRANCE_BOUNDS)["items"][0]
+    assert flight["altitude_m"] == 9000 and flight["speed_knots"] == 420
+    satellite = build_layer("satellite", bounds=FRANCE_BOUNDS)["items"][0]
+    assert satellite["altitude_km"] == 550
+    news = build_layer("actualite")
+    assert news["ignored"] == 2
+    assert news["items"][0]["date"] == iso(-timedelta(hours=1)).replace("Z", "+00:00")
+    assert news["items"][0]["provider"] == "Agence A"
+    assert news["items"][1]["location_precision"] == "country-anchor"
+    assert news["items"][1]["url"] == "https://example.org/b"
+    zones = build_layer("conflit")
+    assert zones["items"][1]["url"] is None
+
+
+def test_layer_wraps_the_antimeridian_and_works_without_a_city():
+    pacific = {"south": -30, "west": 170, "north": 0, "east": 190}
+    report = build_layer("avion", settings=None, bounds=pacific)
+    assert [item["title"] for item in report["items"]] == ["Avion PAC1"]
+    assert report["items"][0]["distance_km"] is None
+
+
+def test_layer_caps_points_and_reuses_only_global_feed_cache(monkeypatch):
+    monkeypatch.setattr(watch, "MAP_LAYER_LIMIT", 1)
+    hits = []
+    paris = build_layer("avion", hits=hits)
+    assert paris["total"] == 3 and paris["truncated"] == 2
+    assert paris["items"][0]["title"] == "Avion AF123"
+    pacific_settings = {"location": {"name": "Fidji", "country": "", "latitude": -17.8, "longitude": -175.0}}
+    pacific = build_layer("avion", settings=pacific_settings, hits=hits)
+    assert pacific["items"][0]["title"] == "Avion PAC1"
+    assert hits == ["/api/flights"]
+
+
+@pytest.mark.parametrize("kind, payload, detail", [
+    ("avion", {**flights_payload(), "timestamp": iso(-timedelta(minutes=11))}, "trop ancien"),
+    ("satellite", {**satellites_payload(), "source": "emergency-fallback"}, "secours non vérifiables"),
+    ("conflit", {**conflicts_payload(), "source": "simulated"}, "données simulées"),
+    ("actualite", {**news_payload(), "news": []}, "aucune donnée"),
+])
+def test_map_layers_report_stale_simulated_and_empty_sources(kind, payload, detail):
+    path = watch.MAP_LAYERS[kind]["path"]
+    report = build_layer(kind, overrides={path: lambda _r: httpx.Response(200, json=payload)})
+    assert report["source"]["ok"] is False
+    assert detail in report["source"]["detail"]
+    assert report["items"] == [] and report["total"] == 0
+
+
+def test_map_layer_rejects_oversized_and_unusable_data(monkeypatch):
+    monkeypatch.setitem(watch.MAP_LAYERS, "avion", {**watch.MAP_LAYERS["avion"], "max_bytes": 100})
+    assert "trop volumineuse" in build_layer("avion")["source"]["detail"]
+    invalid = {**news_payload(), "news": news_payload()["news"][2:]}
+    report = build_layer("actualite", overrides={"/api/news": lambda _r: httpx.Response(200, json=invalid)})
+    assert report["source"]["ok"] is False and "géolocalisée exploitable" in report["source"]["detail"]

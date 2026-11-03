@@ -1,4 +1,4 @@
-import { WORLD, eventSubtitle, filterMapEvents, inBounds, nearbyList } from "./cartographie";
+import { WORLD, eventSubtitle, filterMapEvents, inBounds, layerQuery, markerStyle, nearbyList } from "./cartographie";
 
 const ORIGIN = { name: "Paris", country: "France", latitude: 48.86, longitude: 2.35 };
 const EVENTS = [
@@ -41,4 +41,23 @@ test("nearby list keeps only the visible area when requested and sorts by distan
 
 test("subtitle shows place, distance, Paris time and provider", () => {
   expect(eventSubtitle(EVENTS[1])).toBe("Près de Reims · 130 km · 02/05 06:00 · USGS");
+});
+
+test("layer queries round outward, handle the antimeridian and keep a world view bounded", () => {
+  const pacific = new URLSearchParams(layerQuery({ south: -30.0002, west: 170, north: 0.0002, east: 190 }, ORIGIN, 300));
+  expect(Object.fromEntries(pacific)).toEqual({ south: "-30.001", west: "170", north: "0.001", east: "190", radius_km: "300" });
+  const world = new URLSearchParams(layerQuery({ south: -90, west: -400, north: 90, east: 400 }, null, WORLD));
+  expect(Object.fromEntries(world)).toEqual({ south: "-90", west: "-180", north: "90", east: "180" });
+});
+
+test("transport and geopolitical details distinguish estimates from published reports", () => {
+  expect(eventSubtitle({
+    kind: "satellite", altitude_km: 550, distance_km: 30, date: "2026-05-02T05:00:00Z", provider: "OSIRIS",
+  })).toContain("Position calculée · environ 550 km d’altitude · Point au sol à 30 km · Flux");
+  expect(eventSubtitle({
+    kind: "actualite", location_precision: "country-anchor", distance_km: 12,
+    date: "2026-05-02T05:00:00Z", provider: "Agence",
+  })).toContain("Point indicatif du pays · Repère à 12 km · Publication");
+  expect(eventSubtitle({ kind: "conflit", date: null, provider: "OSIRIS" })).toBe("Repère indicatif, pas une frontière · OSIRIS");
+  expect(markerStyle({ kind: "avion" }).color).not.toBe(markerStyle({ kind: "satellite" }).color);
 });

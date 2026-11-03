@@ -2,10 +2,10 @@
 """Réglages et aperçu de la veille locale, propres à chaque compte."""
 
 from datetime import datetime, timezone
-from typing import Annotated
+from typing import Annotated, Literal
 
 import httpx
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, StrictBool, StringConstraints
 
 import osiris_watch
@@ -87,6 +87,27 @@ def make_veille_router(db, require_user):
     async def map_points(request: Request):
         user = await require_user(request, db)
         return await osiris_watch.build_map(await load_veille_settings(db, user["user_id"]))
+
+    @router.get("/carte/calques/{kind}")
+    async def map_layer(
+        kind: Literal["avion", "satellite", "conflit", "actualite"],
+        request: Request,
+        south: float = Query(..., ge=-90, le=90),
+        west: float = Query(..., ge=-540, le=540),
+        north: float = Query(..., ge=-90, le=90),
+        east: float = Query(..., ge=-540, le=540),
+        radius_km: int | None = None,
+    ):
+        user = await require_user(request, db)
+        if south >= north or west >= east or east - west > 360:
+            raise HTTPException(422, "Zone de carte invalide.")
+        if radius_km is not None and radius_km not in osiris_watch.MAP_RADII_KM:
+            raise HTTPException(422, "Rayon de carte invalide.")
+        settings = await load_veille_settings(db, user["user_id"])
+        if radius_km is not None and not osiris_watch.valid_location((settings or {}).get("location")):
+            raise HTTPException(422, "Renseignez une ville pour utiliser le filtre par rayon.")
+        bounds = {"south": south, "west": west, "north": north, "east": east}
+        return await osiris_watch.build_map_layer(settings, kind, bounds, radius_km)
 
     @router.get("")
     async def preview(request: Request):

@@ -52,6 +52,7 @@ export const FR_NAMES = {
   "Zirius Display": "Siriusse displé",
   Roger: "Rojé",
   Sirius: "Siriusse",
+  OSIRIS: "Osirisse",
   "Panthéon": "pantéon",
   Pantheon: "pantéon",
   cortex: "cortèxe",

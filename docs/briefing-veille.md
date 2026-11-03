@@ -95,6 +95,43 @@ dans un onglet séparé.
 - Mêmes limites que le briefing : NOAA/NWS couvre les États-Unis et la
   vigilance Météo-France n'est pas incluse.
 
+### Calques complémentaires : aviation, espace et géopolitique
+
+Les calques **Avions**, **Satellites**, **Zones de conflit** et **Actualités
+internationales** sont désactivés à l'ouverture. Les activer charge les flux
+publics OSIRIS correspondants uniquement pour la zone visible et le rayon
+choisi. Sans ville, seul le filtre de zone visible s'applique.
+
+- Les avions proviennent des données OpenSky / ADS-B agrégées par OSIRIS.
+  Leur couverture et leur fraîcheur varient ; l'heure affichée est celle du
+  flux, pas nécessairement celle de la dernière position de chaque avion.
+- Les positions des satellites sont **calculées et approximatives**. Le rayon
+  et la distance correspondent au point situé sous le satellite sur Terre,
+  pas à la distance jusqu'au satellite.
+- Les zones de conflit sont des **repères indicatifs** sélectionnés par OSIRIS :
+  ce ne sont ni des frontières ni des délimitations précises. Leur présence,
+  leur absence et la date du flux ne certifient pas la situation actuelle.
+- Les actualités sont des publications de presse et de sources OSINT ; elles
+  ne sont pas vérifiées par ΣIRIUS. La localisation peut être approximative,
+  notamment un simple point associé à un pays. Les publications sans lien
+  HTTPS ou sans localisation exploitable, et celles de plus de sept jours, ne
+  sont pas affichées. Les titres peuvent rester dans la langue de la source.
+- La carte est informative et **ne doit pas être utilisée pour la navigation,
+  la sécurité ou une décision opérationnelle**. Consulter et recouper les
+  sources officielles.
+- Chaque calque affiche au maximum 500 points dans la zone et le rayon
+  sélectionnés, avec le nombre total et une mention en cas de limitation.
+  Zoomer permet d'explorer une zone plus petite. Les calques actifs sont
+  actualisés toutes les minutes lorsque la page est visible ; les caches
+  OSIRIS et ΣIRIUS peuvent conserver un même instantané plus longtemps.
+  Toute source vide, périmée ou indisponible est signalée, sans donnée inventée.
+- Pour filtrer les nouveaux calques, la zone visible et le rayon sont envoyés
+  à l'API ΣIRIUS, locale ou distante selon la configuration. Aucune ville,
+  position ou zone visible n'est envoyée à OSIRIS ; le fond OpenStreetMap
+  reçoit toujours l'adresse IP et la zone affichée.
+- Les navires sont reportés : lors de la vérification du 3 novembre 2026,
+  le flux maritime public d'OSIRIS ne renvoyait aucune position AIS.
+
 ## HERACLES : recherches passives de domaine
 
 La commande vocale « Zirius, analyse ce domaine » ouvre HERACLES ; un domaine

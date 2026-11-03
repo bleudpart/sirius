@@ -128,11 +128,42 @@ def test_veille_map_requires_login_and_uses_only_the_callers_city(veille_client,
     assert seen[-1]["user_id"] == "u1" and seen[-1]["location"]["name"] == "Lyon"
 
 
+def test_map_layers_validate_bounds_and_use_only_the_callers_city(veille_client, geocoder, monkeypatch):
+    client, _ = veille_client
+    seen = []
+
+    async def fake_layer(settings, kind, bounds, radius_km):
+        seen.append((settings, kind, bounds, radius_km))
+        return {"source": {"ok": True}, "items": []}
+
+    monkeypatch.setattr(osiris_watch, "build_map_layer", fake_layer)
+    params = {"south": 41, "west": -5, "north": 52, "east": 10}
+    path = "/api/veille/carte/calques/avion"
+    assert client.get(path, params=params).status_code == 401
+    client.put("/api/veille/settings", headers=OWNER, json={"enabled": False, "city": "Lyon"})
+    assert client.get(path, params={**params, "radius_km": 300}, headers=OWNER).status_code == 200
+    settings, kind, bounds, radius = seen[-1]
+    assert settings["user_id"] == "u1" and kind == "avion" and radius == 300
+    assert bounds == {"south": 41, "west": -5, "north": 52, "east": 10}
+    assert client.get(path, params=params, headers=OTHER).status_code == 200
+    assert seen[-1][0] is None
+    assert client.get(path, params={**params, "radius_km": 300}, headers=OTHER).status_code == 422
+    assert client.get(path, params={**params, "radius_km": 25}, headers=OWNER).status_code == 422
+    assert client.get(path, params={**params, "south": 60}, headers=OWNER).status_code == 422
+    assert client.get(path, params={**params, "west": 20}, headers=OWNER).status_code == 422
+    assert client.get(path, params={**params, "east": "nan"}, headers=OWNER).status_code == 422
+    assert client.get("/api/veille/carte/calques/navire", params=params, headers=OWNER).status_code == 422
+
+
 def test_production_app_exposes_the_map_route_behind_login():
     import server
     routes = {(route.path, method) for route in server.app.routes for method in getattr(route, "methods", ())}
     assert ("/api/veille/carte", "GET") in routes
+    assert ("/api/veille/carte/calques/{kind}", "GET") in routes
     assert TestClient(server.app).get("/api/veille/carte").status_code == 401
+    assert TestClient(server.app).get(
+        "/api/veille/carte/calques/avion?south=41&west=-5&north=52&east=10",
+    ).status_code == 401
 
 
 def priority(titre, total, code="dates", niveau="urgent"):

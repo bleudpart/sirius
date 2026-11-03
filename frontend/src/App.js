@@ -5237,7 +5237,7 @@ function App() {
     if (/^(?:(?:ouvre|affiche|montre)(?:[- ]moi)?\s+)?(?:la\s+)?(?:carte\s+(?:osiris|des\s+[ée]v[ée]nements)|cartographie(?:\s+osiris)?|(?:les\s+)?[ée]v[ée]nements\s+proches)\s*[?!.]*$/.test(low.replace(/^(?:sirius|zirius|σirius)[,\s]+/, ""))) {
       mark("cartographie · événements OSIRIS");
       setShowCartographie(true);
-      const message = "J'ouvre la cartographie des événements OSIRIS autour de l'établissement.";
+      const message = "J'ouvre la cartographie des événements OSIRIS autour de Zirius.";
       setText(message);
       speakOut(message);
       return;
