@@ -318,30 +318,6 @@ def make_payments_router(db):
         except stripe.error.StripeError as error:
             raise HTTPException(status_code=502, detail=f"Portail Stripe indisponible : {str(error)[:120]}") from error
         return {"portal_url": portal.url}
-    @r.post("/public/license-portal")
-    async def public_license_portal(body: PublicLicensePortalIn):
-        origin = _checkout_origin(body.origin_url)
-        transaction = await db.payment_transactions.find_one(
-            {"session_id": body.session_id, "kind": "license", "tier": "monthly"},
-            {"_id": 0},
-        )
-        if not transaction:
-            raise HTTPException(status_code=404, detail="Abonnement introuvable.")
-        try:
-            checkout = await asyncio.to_thread(stripe.checkout.Session.retrieve, body.session_id)
-            customer_id = checkout.get("customer")
-            if not customer_id:
-                raise HTTPException(status_code=400, detail="Le client Stripe est indisponible.")
-            kwargs = {"customer": customer_id, "return_url": f"{origin}/?payment=managed"}
-            configuration = (os.getenv("STRIPE_BILLING_PORTAL_CONFIGURATION") or "").strip()
-            if configuration:
-                kwargs["configuration"] = configuration
-            portal = await asyncio.to_thread(stripe.billing_portal.Session.create, **kwargs)
-        except HTTPException:
-            raise
-        except stripe.error.StripeError as error:
-            raise HTTPException(status_code=502, detail=f"Portail Stripe indisponible : {str(error)[:120]}") from error
-        return {"portal_url": portal.url}
 
     @r.get("/licenses/me")
     async def license_status(request: Request):

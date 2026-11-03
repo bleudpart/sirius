@@ -45,7 +45,7 @@ export default function CalendarPanel({ onClose }) {
   };
 
   const disconnect = async () => {
-    await fetch(`${API}/api/calendar/disconnect`, { method: "DELETE", credentials: "include" });
+    await fetch(`${API}/api/calendar/disconnect`, { method: "POST", credentials: "include" });
     setStatus({ connected: false }); setEvents([]);
   };
 

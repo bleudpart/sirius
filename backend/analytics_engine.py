@@ -448,7 +448,7 @@ class AnalyticsEngine:
         self, request: BreakEvenRequest, *, sort_by: str = "date", descending: bool = False,
     ) -> HudPayload:
         with localcontext(FINANCE_CONTEXT):
-            start, end = request.period.start_date, request.period.end_date
+            start = request.period.start_date
             month_days = calendar.monthrange(start.year, start.month)[1]
             as_of = request.as_of or max((item.date for item in request.daily), default=start)
             elapsed = (as_of - start).days + 1

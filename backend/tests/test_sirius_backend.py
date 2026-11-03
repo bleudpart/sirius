@@ -81,7 +81,7 @@ class TestSpotify:
         assert data["auth_url"].startswith("https://accounts.spotify.com/authorize")
 
     def test_now_playing_no_token_401(self, api):
-        r = api.post(f"{BASE_URL}/api/spotify/now-playing", json={"access_token": "", "refresh_token": ""}, timeout=10)
+        r = api.post(f"{BASE_URL}/api/spotify/current", json={"access_token": "", "refresh_token": ""}, timeout=10)
         assert r.status_code == 401
 
 

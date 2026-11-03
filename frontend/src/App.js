@@ -3964,7 +3964,7 @@ function App() {
     setStatus("thinking");
     setText("Je vérifie ce qui joue sur Spotify...");
     try {
-      const resp = await fetch(`${API}/spotify/now-playing`, {
+      const resp = await fetch(`${API}/spotify/current`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(tok),
@@ -4001,7 +4001,7 @@ function App() {
     const tok = spotifyRef.current;
     if (!tok || !tok.access_token) return;
     try {
-      const resp = await fetch(`${API}/spotify/now-playing`, {
+      const resp = await fetch(`${API}/spotify/current`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(tok),
