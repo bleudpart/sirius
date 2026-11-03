@@ -2395,6 +2395,8 @@ from routers.finance import make_company_finance_router
 api_router.include_router(make_company_finance_router(
     db, require_user, cerveau_analytique.on_finance_change, business_activity=tri_cortex.brain2.activity,
 ))
+from routers.finance_analytics import make_finance_analytics_router
+api_router.include_router(make_finance_analytics_router(db, require_user, business_activity=tri_cortex.brain2.activity))
 api_router.include_router(make_analytical_router(db, require_user, cerveau_analytique))
 api_router.include_router(make_budget_lab_router(budget_lab, require_user))
 api_router.include_router(make_action_router(action_runs, require_user))

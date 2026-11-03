@@ -757,7 +757,100 @@ Résultats :
   `CASH_FLOW_GAP`. Ce dernier s’explique ainsi : seuls 5 000 € d’encaissements
   ont été saisis en mouvements bancaires sur le trimestre.
 
+## Tableaux analytiques décisionnels
+
+Quatre tableaux d’aide à la décision pour la restauration, calculés par
+`AnalyticsEngine` ([analytics_engine.py](analytics_engine.py)) sur les données
+transmises dans la requête : le moteur ne lit ni n’écrit aucune base, et les
+fiches techniques ne sont pas encore enregistrées par SIRIUS. Chaque tableau est
+une enveloppe `HudPayload` commune (`schema_version` `1`) :
+
+- `kind`, `title`, `speech` (phrase française prête à être dite par le cerveau
+  logique ou affichée en bandeau par le HUD) ;
+- `columns` (`key`, `label`, `type`, `sortable`, `order`), `rows` et `sort`
+  (`key`, `descending`) : tableau triable par colonne ;
+- `summary`, `gauge` (point mort seulement) et `alerts` (`code`, `severity`,
+  `message`).
+
+Montants, pourcentages et coefficients sont des chaînes décimales exactes,
+calculées en `Decimal` et arrondies à la sortie seulement ; les nombres JSON à
+virgule de la requête sont lus sans passer par un flottant.
+
+| Tableau | Route (POST) | Tri par défaut |
+|---|---|---|
+| Menu engineering | `/api/finance/{company_id}/analytics/menu-engineering` | `total_margin_ht`, décroissant |
+| Food cost réel et théorique | `/api/finance/{company_id}/analytics/food-cost-variance` | `variance_ht`, décroissant |
+| Impact d’une hausse fournisseur | `/api/finance/{company_id}/analytics/supplier-impact` | `erosion_ht`, décroissant |
+| Seuil de rentabilité | `/api/finance/{company_id}/analytics/break-even` | `date`, croissant |
+
+Droits admin/manager sur l’entreprise, `application/json` et corps de 512 Kio
+au plus. `sort_by` choisit une colonne triable (croissant sans `descending`) ;
+une colonne inconnue ou non triable donne 422. Les données invalides, incohérentes
+ou insuffisantes donnent aussi un 422 au message français. Un `HudPayload` se
+diffuse ligne à ligne avec `AnalyticsEngine.ndjson()` : en-tête, une ligne par
+ligne de tableau, marqueur de fin.
+
+**Menu engineering.** Coût matière d’un plat = Σ quantité nette ÷ (1 − perte %)
+× coût unitaire HT. Marge unitaire = prix HT − coût matière (prix TTC converti
+avec la TVA de la fiche). Médianes de marge unitaire et de volume ; « fort »
+signifie supérieur ou égal à la médiane, et un volume nul n’est jamais fort :
+
+| Quadrant | Marge | Volume | Préconisation |
+|---|---|---|---|
+| `STAR` | forte | fort | Sanctuariser et promouvoir. |
+| `PLOWHORSE` | faible | fort | Augmenter le prix ou réduire le grammage. |
+| `PUZZLE` | forte | faible | Repositionner, inciter en salle. |
+| `DOG` | faible | faible | Éliminer de la carte. |
+
+Pour un `PLOWHORSE`, `target_price_ttc` est le prix qui atteindrait la marge
+médiane, arrondi au pas de prix supérieur (0,10 € par défaut).
+
+**Food cost réel et théorique.** Théorique = Σ fiches techniques × volumes
+vendus. Réel, par ingrédient = stock d’ouverture + achats réceptionnés (avoirs
+en négatif) − stock de clôture ; un ingrédient mouvementé exige les deux
+inventaires (0 si le stock est vide). L’écart se lit en euros et en **points du
+chiffre d’affaires** (food cost réel % − théorique %) : `GREEN` jusqu’à 1,5
+point inclus, `ORANGE` jusqu’à 3 points inclus, `RED` au-delà (suspicion de
+coulage, de sur-portionnage ou de perte non enregistrée). Les seuils se règlent
+avec `VarianceThresholds`.
+
+**Hausse fournisseur.** Pour chaque fiche utilisant l’ingrédient : coût avant et
+après (référence : `previous_unit_cost_ht`, sinon le catalogue), érosion de marge
+en euros et en % de la marge, à prix de vente inchangé. Prix TTC recommandé =
+nouveau coût × coefficient cible × (1 + TVA), arrondi au pas supérieur et jamais
+inférieur au prix actuel. Le coefficient est HT : prix HT ÷ coût matière ; la
+cible est `target_coefficient` de la fiche, sinon le coefficient actuel. Avec les
+ventes, `monthly_impact_ht` = érosion × volumes. Un plat qui passe à marge nulle
+ou négative lève `SOLD_AT_A_LOSS`. `increase_from_price_audit()` convertit une
+alerte `PriceAuditInput` de `SubagentMarginAudit` en hausse analysable, à
+condition que l’unité corresponde à celle du catalogue ; ce lien n’est pas
+automatique, car aucune fiche technique n’est stockée.
+
+**Seuil de rentabilité.** Mois civil entier. Charges fixes mensuelles (loyer,
+assurances, abonnements, masse salariale…) ; charges variables = matières
+premières et consommables achetés chaque jour. Taux de marge sur coûts variables
+= (CA − charges variables) ÷ CA. CA critique = charges fixes ÷ taux. La jauge
+suit la marge cumulée sur les charges fixes du mois (`progress_pct`) en mode
+`SURVIVAL` ; elle bascule en `PROFIT`, avec bénéfice net (marge cumulée −
+charges fixes), dès que le seuil est franchi (`break_even_reached_on`). Point
+mort en jours = CA critique ÷ CA moyen par jour d’activité ; avec
+`planned_open_days`, `required_daily_revenue_ht` et `on_track` indiquent le
+rythme à tenir sur les jours restants.
+
+Démonstration sans clé ni réseau, depuis `backend/` :
+
+```sh
+python -m analytics_demo          # quatre tableaux d’un bistrot fictif, en texte
+python -m analytics_demo --json   # payloads HUD, un par ligne
+```
+
 ## Limites connues
+
+- Tableaux analytiques : calcul à la demande sur les données de la requête, sans
+  stockage des fiches techniques, des ventes ni des inventaires, et sans panneau
+  HUD dédié. Pas d’auto-déclenchement depuis `SubagentMarginAudit`. Le
+  coefficient multiplicateur est calculé hors TVA, et le point mort suppose un
+  taux de marge constant sur le mois.
 
 - Pas d’amortissements, d’impôt sur les sociétés ni de résultat net : EBE et CAF
   sont des approximations de gestion, avant IS et éléments exceptionnels.
@@ -785,6 +878,7 @@ Résultats :
 | POST | `/api/finance/demo/{sector}/stress-test` | Simulation sur une démonstration |
 | GET | `/api/finance/{company_id}/dashboard` | Tableau de bord |
 | POST | `/api/finance/{company_id}/stress-test` | Simulation, sans écriture |
+| POST | `/api/finance/{company_id}/analytics/{table}` | Tableaux analytiques (`menu-engineering`, `food-cost-variance`, `supplier-impact`, `break-even`), sans écriture ; voir [Tableaux analytiques décisionnels](#tableaux-analytiques-décisionnels) |
 | GET, PUT | `/api/finance/{company_id}/profile` | Profil financier |
 | GET, POST | `/api/finance/{company_id}/entries/{kind}` | Liste et saisie |
 | DELETE | `/api/finance/{company_id}/entries/{kind}/{entry_id}` | Suppression |
