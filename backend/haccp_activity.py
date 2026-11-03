@@ -170,6 +170,29 @@ _PERIOD_HELP = (
     "Précise une période pour les deux compteurs HACCP : aujourd'hui, hier, cette semaine, "
     "ce mois-ci, les 7 derniers jours, ou du JJ/MM/AAAA au JJ/MM/AAAA."
 )
+_PERIOD_REPLY_WORDS = set("pour sur et le la les merci svp s il te vous plait".split())
+
+
+def activity_question(text: str, history: list[dict]) -> str | None:
+    if is_haccp_activity_request(text):
+        return text
+    if len(history) < 2:
+        return None
+    question, answer = history[-2:]
+    previous = question.get("content", "")
+    if (question.get("role") != "user" or answer.get("role") != "assistant"
+            or answer.get("content") != _PERIOD_HELP
+            or not is_haccp_activity_request(previous) or _PERIOD.search(_normalized(previous))):
+        return None
+    value = _normalized(text)
+    periods = list(_PERIOD.finditer(value))
+    if len(periods) != 1:
+        return None
+    period = periods[0]
+    remaining = value[:period.start()] + " " + value[period.end():]
+    if set(re.findall(r"[a-z0-9]+", remaining)) - _PERIOD_REPLY_WORDS:
+        return None
+    return f"{previous} {text}"
 
 
 def _date(value: str) -> date:
@@ -244,6 +267,9 @@ async def answer_activity_question(text: str, scope: str) -> dict:
     try:
         start, end = activity_period(text)
     except ValueError as error:
-        return {"answer": str(error), "state": "CLARIFICATION_REQUIRED"}
+        result = {"answer": str(error), "state": "CLARIFICATION_REQUIRED"}
+        if str(error) == _PERIOD_HELP and not _PERIOD.search(_normalized(text)):
+            result["haccp_activity_pending"] = text
+        return result
     report = await load_activity(scope, start, end)
     return {"answer": activity_answer(report), "state": "READ_ONLY", "haccp_activity": report.model_dump(mode="json")}

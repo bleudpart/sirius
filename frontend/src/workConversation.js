@@ -11,6 +11,18 @@ export function isHaccpActivityCommand(command) {
     && !/\b(?:prix|couts?|coute\w*)\b|\bcombien\s+(?:de\s+)?(?:temps|jours?|heures?)\b/.test(text);
 }
 
+const HACCP_ACTIVITY_DATE = "(?:\\d{4}-\\d{2}-\\d{2}|\\d{1,2}/\\d{1,2}/\\d{4})";
+const HACCP_ACTIVITY_PERIOD_REPLY = new RegExp(
+  `^(?:(?:pour|sur|et)\\s+)?(?:aujourd[' ]?hui|hier|avant[- ]hier|ce jour|du jour|cette semaine|(?:la\\s+)?semaine derniere|ce mois(?:[- ]ci)?|(?:le\\s+)?mois dernier|(?:les?\\s+)?(?:\\d+|sept|quatorze|quinze|trente)\\s+derniers?\\s+jours?|du\\s+${HACCP_ACTIVITY_DATE}\\s+au\\s+${HACCP_ACTIVITY_DATE}|(?:le\\s+)?${HACCP_ACTIVITY_DATE})(?:\\s+(?:merci|svp|s[' ]il (?:te|vous) plait))?[\\s.!?]*$`,
+);
+
+export function haccpActivityFollowup(command, pending) {
+  if (typeof pending !== "string" || !pending.trim()) return null;
+  const text = String(command || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/’/g, "'").toLowerCase().trim();
+  return HACCP_ACTIVITY_PERIOD_REPLY.test(text) ? `${pending} ${String(command).trim()}` : null;
+}
+
 export function isFinanceConversationCommand(command) {
   const text = String(command || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .replace(/’/g, "'").toLowerCase().trim();

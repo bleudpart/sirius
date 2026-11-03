@@ -1,4 +1,26 @@
-import { isFinanceConversationCommand, isHaccpActivityCommand, isOperationalCommand, isWorkConversationCommand, workPreviewFollowup } from "./workConversation";
+import { haccpActivityFollowup, isFinanceConversationCommand, isHaccpActivityCommand, isOperationalCommand, isWorkConversationCommand, workPreviewFollowup } from "./workConversation";
+
+test.each([
+  "hier", "aujourd’hui", "pour cette semaine", "la semaine dernière", "le mois dernier",
+  "les 7 derniers jours", "sur les trente derniers jours", "le 03/11/2026",
+  "du 01/11/2026 au 03/11/2026", "hier s'il te plaît",
+])("complète la demande HACCP avec une réponse de période, y compris les protections hors ligne : %s", (text) => {
+  const pending = "Nombre d'étiquettes par jour";
+  const result = haccpActivityFollowup(text, pending);
+  expect(result).toBe(`${pending} ${text}`);
+  expect(isHaccpActivityCommand(result)).toBe(true);
+  expect(isOperationalCommand(result)).toBe(true);
+});
+
+test.each(["Ouvre HACCP", "Imprime une étiquette aujourd'hui", "Quel temps demain ?", "hier pour le restaurant A"])(
+  "ne traite pas un nouveau sujet comme une simple précision de période : %s", (text) => {
+    expect(haccpActivityFollowup(text, "Nombre d'étiquettes par jour")).toBeNull();
+  },
+);
+
+test("ne réinterprète pas les périodes sans demande HACCP en attente", () => {
+  expect(haccpActivityFollowup("hier", null)).toBeNull();
+});
 
 test.each([
   "ΣIRIUS, combien d’étiquettes ont été éditées aujourd’hui ?",

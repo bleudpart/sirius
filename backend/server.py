@@ -41,7 +41,7 @@ DATA_DIR = data_dir()
 if DATA_DIR != ROOT_DIR:
     load_dotenv(DATA_DIR / ".env", override=True)
 
-from haccp_activity import answer_activity_question, is_haccp_activity_request
+from haccp_activity import activity_question, answer_activity_question, is_haccp_activity_request
 from sirius_brain import (
     ask_sirius,
     parse_intent,
@@ -501,8 +501,9 @@ operational_work.register()
 
 
 async def _work_chat_response(req, user, request, session_id, history):
-    if is_haccp_activity_request(req.text):
-        result = await answer_activity_question(req.text, await _haccp_labels_scope(request))
+    label_question = activity_question(req.text, history)
+    if label_question is not None:
+        result = await answer_activity_question(label_question, await _haccp_labels_scope(request))
     else:
         result = await repondre_analyse(req, user, db, cerveau_analytique)
     if result is None:

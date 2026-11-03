@@ -280,6 +280,22 @@ def test_label_statistics_intent_never_calls_an_ai_provider(monkeypatch):
     assert asyncio.run(sirius_brain.parse_intent(text)) == {"action": "general", "query": text}
 
 
+def test_period_reply_preserves_filters_and_does_not_hijack_other_questions():
+    question = "Nombre d'étiquettes de saumon par jour"
+    clarification = asyncio.run(activity.answer_activity_question(question, "user:one"))
+    assert clarification["haccp_activity_pending"] == question
+    history = [{"role": "user", "content": question}, {"role": "assistant", "content": clarification["answer"]}]
+    resolved = activity.activity_question("hier", history)
+    assert resolved == question + " hier"
+    result = asyncio.run(activity.answer_activity_question(resolved, "user:one"))
+    assert result["state"] == "CLARIFICATION_REQUIRED" and "sans filtre produit" in result["answer"]
+    assert "haccp_activity" not in result and "haccp_activity_pending" not in result
+    for text in ("Ouvre HACCP", "Imprime une étiquette aujourd'hui", "Quel temps demain ?", "hier pour le restaurant A"):
+        assert activity.activity_question(text, history) is None
+    assert activity.activity_question("hier", []) is None
+    assert activity.activity_question("hier", history + [{"role": "user", "content": "Autre sujet"}]) is None
+
+
 @pytest.mark.parametrize("endpoint", ["/api/chat", "/api/chat/stream"])
 def test_real_chat_and_sse_use_scoped_counts_without_ai(store, monkeypatch, endpoint):
     import server
@@ -322,7 +338,10 @@ def test_real_chat_and_sse_use_scoped_counts_without_ai(store, monkeypatch, endp
         assert data["haccp_activity"]["impressions_confirmees"] == 1
         assert data["work_state"] == "READ_ONLY" and data["used_search"] is False
         assert result("two")["haccp_activity"]["etiquettes_enregistrees"] == 0
-        assert result("one", "Bilan des étiquettes par jour")["work_state"] == "CLARIFICATION_REQUIRED"
+        clarification = result("one", "Bilan des étiquettes par jour")
+        assert clarification["work_state"] == "CLARIFICATION_REQUIRED"
+        assert clarification["haccp_activity_pending"] == "Bilan des étiquettes par jour"
+        assert result("one", "le 03/11/2026")["haccp_activity"]["etiquettes_enregistrees"] == 1
         assert client.post(endpoint, json=body, headers={"x-user": "member"}).status_code == 403
         asyncio.run(db.enterprise_members.insert_one({
             "company_id": "kitchen", "user_id": "member", "permissions": ["haccp"],

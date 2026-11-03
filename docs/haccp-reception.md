@@ -319,6 +319,8 @@ periode, sans la pagination des listes du registre ou de la file.
 Une periode manquante, ambigue, invalide ou un filtre produit/operateur/
 restaurant non pris en charge donne une demande de precision, jamais
 un total global presente comme un total filtre.
+Apres une demande sans periode, une reponse courte comme « hier » suffit :
+le contexte de la question est conserve, sans supprimer un filtre refuse.
 
 L'API privee `GET /api/haccp/registre/activite?date_debut=2026-11-01&date_fin=2026-11-03`
 renvoie les deux totaux, le detail de chaque jour et `impressions_sans_date`.

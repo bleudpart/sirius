@@ -55,7 +55,7 @@ import { streamConversation, requestConversation, requestAssistantIntent, reques
 import { newsBulletinScope } from "./newsCommandRouting";
 import { isResumeWorkCommand, isWorkBriefingCommand } from "./workBriefing";
 import { chronosConfirmation } from "./chronos";
-import { isOperationalCommand, isWorkConversationCommand, workPreviewFollowup } from "./workConversation";
+import { haccpActivityFollowup, isHaccpActivityCommand, isOperationalCommand, isWorkConversationCommand, workPreviewFollowup } from "./workConversation";
 import { bulletinFollowUp, createBulletinContext, markSegmentCompleted, markSegmentStarted, prepareBulletinReading, releaseBulletinFocus } from "./bulletinDialogue";
 import { AUDIO_DIAGNOSTICS_EVENT, loadShowAudioDiagnostics } from "./audioDiagnosticsSetting";
 import { buildNewsBulletin, weatherBulletinText } from "./newsBulletin";
@@ -595,6 +595,7 @@ function App() {
   const handleCommandRef = useRef(null);
   const chronosConfirmationRef = useRef(null);
   const workPreviewPendingRef = useRef(false);
+  const haccpActivityPendingRef = useRef(null);
   const workConversationContextRef = useRef({ work_context_clear: true });
   const updateWorkConversationContext = useCallback((dossierId, expiresAt, origin = "conversation") => {
     workPreviewPendingRef.current = false;
@@ -1623,6 +1624,7 @@ function App() {
   const cloudAnswer = useCallback(async (command, { signal: externalSignal, mode: requestedMode } = {}) => {
     externalSignal = externalSignal || renderVoiceSignal;
     if (externalSignal.aborted) return;
+    command = haccpActivityFollowup(command, haccpActivityPendingRef.current) || command;
     setVoicePhase("thinking");
     setStatus("thinking");
 
@@ -1656,6 +1658,7 @@ function App() {
         };
       }
       workPreviewPendingRef.current = !!(data.work_preview || data.work_batch || data.work_recording || data.work_recording_pending);
+      haccpActivityPendingRef.current = data.haccp_activity_pending || null;
     };
     const payload = JSON.stringify({
       text: command,
@@ -1693,7 +1696,7 @@ function App() {
       setText(message);
       setVoiceMessage(message);
       showOnDisplay({ type: "message", titre: "ΣIRIUS — ACCÈS AU SERVICE", contenu: message });
-      if (isWorkConversationCommand(command)) speakOut(message);
+      if (isWorkConversationCommand(command) || isHaccpActivityCommand(command)) speakOut(message);
       if (pid && progress?.error) progress.error(pid, message);
       return true;
     };
@@ -1913,7 +1916,9 @@ function App() {
     if (externalSignal?.aborted) return;
 
     if (isOperationalCommand(command)) {
-      const message = isWorkConversationCommand(command)
+      const message = isHaccpActivityCommand(command)
+        ? "Bilan HACCP indisponible : le backend ne répond pas. Aucun nombre d'étiquettes ou d'envois d'impression ne peut être confirmé."
+        : isWorkConversationCommand(command)
         ? "Lecture métier indisponible : le backend ne répond pas. Aucun résultat à jour ne peut être vérifié ; aucune action métier n'est annoncée comme effectuée."
         : "CHRONOS — résultat non vérifiable : le backend ne répond pas. Actualisez l’agenda avant de recommencer pour vérifier si une opération a été enregistrée.";
       setText(message);
