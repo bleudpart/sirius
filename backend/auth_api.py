@@ -619,7 +619,7 @@ def make_auth_router(db):
                                 "haccp_duerp",
                                 "haccp_safety",
                                 "haccp_sheets",
-                                "sirius_work_dossiers", "sirius_work_entries"):
+                                "sirius_work_dossiers", "sirius_work_entries", "sirius_veille_settings"):
             collection = getattr(db, collection_name, None)
             if collection is not None:
                 projection = {"_id": 0, "control_url": 0} if collection_name == "sirius_phone_calls" else {"_id": 0}

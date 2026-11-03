@@ -90,6 +90,39 @@ class GmailReplyReq(BaseModel):
     body: str = ""
 
 
+async def google_today_events(db, uid: str, tz_name: str = "Europe/Paris", transport=None) -> list[dict]:
+    """Événements Google Agenda du jour, en lecture seule, pour le briefing."""
+    from zoneinfo import ZoneInfo
+
+    start = datetime.now(ZoneInfo(tz_name)).replace(hour=0, minute=0, second=0, microsecond=0)
+    token = await get_google_token(db, uid, _client_conf, scope="https://www.googleapis.com/auth/calendar.events.readonly")
+    async with httpx.AsyncClient(timeout=10, transport=transport) as cx:
+        r = await cx.get(
+            CAL_API,
+            params={
+                "timeMin": start.isoformat(), "timeMax": (start + timedelta(days=1)).isoformat(),
+                "maxResults": 20, "singleEvents": "true", "orderBy": "startTime",
+            },
+            headers={"Authorization": "Bearer " + token},
+        )
+    if r.status_code == 401:
+        raise HTTPException(status_code=401, detail="Session Google expirée, reconnectez-vous.")
+    if r.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"Google Agenda a répondu {r.status_code}.")
+    events = []
+    for ev in r.json().get("items", []):
+        if ev.get("status") == "cancelled":
+            continue
+        start_info = ev.get("start") or {}
+        events.append({
+            "title": ev.get("summary") or "(sans titre)",
+            "start": start_info.get("dateTime") or start_info.get("date", ""),
+            "all_day": "dateTime" not in start_info,
+            "location": ev.get("location", ""),
+        })
+    return events
+
+
 def make_gcal_router(db):
     router = APIRouter()
 

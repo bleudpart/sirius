@@ -40,7 +40,7 @@ PERSONAL_COLLECTIONS = (
     "sirius_action_attempts", "sirius_action_events",
     "sirius_work_dispatches", "sirius_work_receipts", "sirius_work_reminders",
     "sirius_work_reminder_controls", "sirius_work_reminder_outcomes",
-    "sirius_work_notifications", "sirius_work_hubs",
+    "sirius_work_notifications", "sirius_work_hubs", "sirius_veille_settings",
     "microsoft_oauth",
 )
 REVIEW_COLLECTIONS = (

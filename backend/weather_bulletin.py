@@ -198,33 +198,57 @@ async def _locate(client, city):
     return result
 
 
-async def fetch_weather_bulletin(city: str) -> dict:
+def _clean_city(city) -> str:
     if (not isinstance(city, str) or not city.strip() or len(city) > 120
             or re.search(r"[\x00-\x1f\x7f]", city) or not _city_key(city)):
         raise ValueError("Ville météo invalide.")
-    city = city.strip()
+    return city.strip()
+
+
+async def locate_city(city: str) -> tuple[str, str, float, float]:
+    """Nom, pays, latitude et longitude d'une commune, sans valeur par défaut."""
+    city = _clean_city(city)
     async with httpx.AsyncClient(timeout=5.0) as client:
-        name, country, latitude, longitude = await _locate(client, city)
-        coordinates = (round(latitude, 4), round(longitude, 4))
-        data = _cache_get(_forecast_cache, coordinates)
-        validated = None
-        if data is not None:
-            try:
-                validated = _validate_forecast(data)
-            except (ValueError, KeyError, TypeError, IndexError):
-                _forecast_cache.pop(coordinates, None)
-        if validated is None:
-            data = await _get(client, "https://api.open-meteo.com/v1/forecast", {
-                "latitude": latitude, "longitude": longitude,
-                "timezone": "auto", "forecast_days": 2,
-                "temperature_unit": "celsius", "wind_speed_unit": "kmh",
-                "current": "temperature_2m,apparent_temperature,weather_code,wind_speed_10m",
-                "daily": "weather_code,temperature_2m_min,temperature_2m_max,precipitation_probability_max,wind_speed_10m_max",
-            })
+        return await _locate(client, city)
+
+
+async def _bulletin_at(client, name, country, latitude, longitude) -> dict:
+    coordinates = (round(latitude, 4), round(longitude, 4))
+    data = _cache_get(_forecast_cache, coordinates)
+    validated = None
+    if data is not None:
+        try:
             validated = _validate_forecast(data)
-            _cache_put(_forecast_cache, coordinates, data, FORECAST_TTL)
+        except (ValueError, KeyError, TypeError, IndexError):
+            _forecast_cache.pop(coordinates, None)
+    if validated is None:
+        data = await _get(client, "https://api.open-meteo.com/v1/forecast", {
+            "latitude": latitude, "longitude": longitude,
+            "timezone": "auto", "forecast_days": 2,
+            "temperature_unit": "celsius", "wind_speed_unit": "kmh",
+            "current": "temperature_2m,apparent_temperature,weather_code,wind_speed_10m",
+            "daily": "weather_code,temperature_2m_min,temperature_2m_max,precipitation_probability_max,wind_speed_10m_max",
+        })
+        validated = _validate_forecast(data)
+        _cache_put(_forecast_cache, coordinates, data, FORECAST_TTL)
     return {
         "city": name, "country": country, "source": "Open-Meteo",
         "url": "https://open-meteo.com/",
         **validated,
     }
+
+
+async def fetch_weather_bulletin(city: str) -> dict:
+    city = _clean_city(city)
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        name, country, latitude, longitude = await _locate(client, city)
+        return await _bulletin_at(client, name, country, latitude, longitude)
+
+
+async def fetch_weather_at(name: str, country: str, latitude: float, longitude: float) -> dict:
+    """Bulletin pour un lieu déjà géocodé, sans nouvelle recherche par nom."""
+    latitude, longitude = _number(latitude), _number(longitude)
+    if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
+        raise ValueError("Coordonnées météo invalides.")
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        return await _bulletin_at(client, name, country, latitude, longitude)

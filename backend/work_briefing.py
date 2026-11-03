@@ -3,15 +3,20 @@
 from datetime import date
 
 
-def work_briefing_text(day: dict) -> str:
+def work_briefing_text(day: dict, *, lead=(), tail=()) -> str:
     today = day["on"]
     dossiers = day["dossiers"]
     names = {item["id"]: item["title"] for item in dossiers}
     lines = [
         f"Briefing de travail du {date.fromisoformat(today):%d/%m/%Y}.",
-        "Sources : vos dossiers privés et les données métier autorisées, vérifiés à cette demande.",
-        f"Dossiers enregistrés : {len(dossiers)}.",
+        "Sources : vos dossiers privés et les données métier autorisées, vérifiés à cette demande."
+        if not (lead or tail) else
+        "Sources : vos dossiers privés, les données métier autorisées et les sources citées dans chaque section, vérifiées à cette demande.",
     ]
+    if lead:
+        lines.extend(lead)
+        lines.append("")
+    lines.append(f"Dossiers enregistrés : {len(dossiers)}.")
     if dossiers:
         lines.append("À reprendre dans Mes dossiers : " + ", ".join(item["title"] for item in dossiers[:6]) + ".")
         if len(dossiers) > 6:
@@ -51,6 +56,9 @@ def work_briefing_text(day: dict) -> str:
         lines.append("Attention : la limite de lecture a été atteinte ; ce rapport est partiel.")
     for missing in day["missing_info"]:
         lines.append(missing)
+    if tail:
+        lines.extend(tail)
+        lines.append("")
     lines.append(
         "Pour continuer, choisissez un dossier dans Mes dossiers, puis l'engagement à reprendre. "
         "Aucune tâche terminée, aucun message envoyé et aucune action métier exécutée par ce briefing."

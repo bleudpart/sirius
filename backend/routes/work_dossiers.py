@@ -35,6 +35,7 @@ Outlook reads one encoded /me/mailFolders/inbox/messages ID, never lists,
 marks read or sends. Messages outside the inbox must be handled in Outlook.
 """
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -419,7 +420,7 @@ async def _proposals(db, uid, haccp_scope):
     return result
 
 
-def make_work_dossiers_router(db, require_user, *, conversation=None):
+def make_work_dossiers_router(db, require_user, *, conversation=None, briefing_extras=None):
     router = APIRouter(prefix="/work-dossiers", tags=["work-dossiers"])
 
     async def context(request):
@@ -693,8 +694,18 @@ def make_work_dossiers_router(db, require_user, *, conversation=None):
     @router.get("/briefing")
     async def work_briefing(request: Request):
         today = datetime.now(ZoneInfo("Europe/Paris")).date()
-        day = await day_view(request, on=today, include_upcoming=True)
-        return {**day, "briefing": work_briefing_text(day), "kind": "work"}
+        if briefing_extras is None:
+            day = await day_view(request, on=today, include_upcoming=True)
+            return {**day, "briefing": work_briefing_text(day), "kind": "work"}
+        user = await require_user(request, db)
+        day, extras = await asyncio.gather(
+            day_view(request, on=today, include_upcoming=True),
+            briefing_extras(request, user["user_id"], today),
+        )
+        return {
+            **day, "daily": extras.payload, "kind": "work",
+            "briefing": work_briefing_text(day, lead=extras.lead, tail=extras.tail),
+        }
 
     @router.post("/{dossier_id}/proposals/{proposal_id}")
     async def attach_proposal(dossier_id: str, proposal_id: str, request: Request):

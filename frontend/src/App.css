@@ -7444,6 +7444,31 @@ body[data-phase] .center-stage::before { content: none !important; }
   box-shadow: 0 0 12px rgba(216, 184, 117, 0.18);
 }
 .reveil-hint { margin: 0; font-size: 11px; font-style: italic; color: #7c98a2; }
+.reveil-veille {
+  display: flex; flex-direction: column; gap: 12px;
+  border-top: 1px solid rgba(216, 184, 117, 0.25); padding-top: 16px;
+}
+.reveil-veille h3 {
+  margin: 0; font-family: "Orbitron", sans-serif;
+  font-size: 11px; letter-spacing: 0.14em; color: #d8b875;
+}
+.reveil-row input[type="text"] {
+  flex: 1; min-width: 0; font-size: 14px;
+  color: #f2d99a; background: rgba(6, 4, 1, 0.8);
+  border: 1px solid rgba(216, 184, 117, 0.55); border-radius: 8px;
+  padding: 7px 12px; outline: none;
+}
+.reveil-row input[type="text"]:focus { border-color: #d8b875; box-shadow: 0 0 12px rgba(216, 184, 117, 0.3); }
+.reveil-check { display: flex; align-items: center; gap: 10px; font-size: 12px; color: #ffffff; cursor: pointer; }
+.reveil-check input { accent-color: #d8b875; }
+.reveil-veille-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.reveil-error { margin: 0; font-size: 12px; color: #ff9b8a; }
+.reveil-preview {
+  margin: 0; max-height: 260px; overflow: auto; white-space: pre-wrap;
+  font-size: 12px; line-height: 1.5; color: #e7eef0;
+  background: rgba(6, 4, 1, 0.65); border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px; padding: 10px 12px;
+}
 
 /* ===== SPOTIFY — lecteur intégré ===== */
 .spotify-screen.prime-screen { max-width: 560px; }

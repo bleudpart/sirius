@@ -1,7 +1,8 @@
 // © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés.
-// Réveil matinal : briefing de travail puis lecture des mails.
+// Réveil matinal : briefing du jour puis lecture des mails.
 import { useState } from "react";
 import { X, AlarmClock, BellRing, BellOff } from "lucide-react";
+import VeilleSettings from "./VeilleSettings";
 
 const KEY = "sirius_reveil";
 const load = () => {
@@ -38,9 +39,9 @@ export default function ReveilPanel({ onClose, onSpeak }) {
       </header>
       <div className="reveil-body">
         <p className="reveil-desc">
-          À l'heure choisie, ΣIRIUS te salue, lance ton <b>briefing de travail</b> (dossiers, engagements et échéances)
-          puis lit tes <b>derniers mails Outlook</b> à voix haute. L'onglet ΣIRIUS doit rester ouvert.
-          Pour le journal d'informations, demande « les actualités ».
+          À l'heure choisie, ΣIRIUS te salue, lance ton <b>briefing du jour</b> (registre HACCP, agenda,
+          dossiers, engagements, échéances et veille locale) puis lit tes <b>derniers mails Outlook</b> à voix haute.
+          L'onglet ΣIRIUS doit rester ouvert. Pour le journal d'informations, demande « les actualités ».
         </p>
         <div className="reveil-row">
           <label htmlFor="reveil-time">HEURE DU RÉVEIL</label>
@@ -59,6 +60,7 @@ export default function ReveilPanel({ onClose, onSpeak }) {
           {cfg.on ? `Réveil armé — ${nextLabel(cfg.time)}` : "Réveil désactivé"}
         </div>
         <p className="reveil-hint">Commandes vocales : « réveille-moi à 7 h 30 », « active le réveil », « désactive le réveil ».</p>
+        <VeilleSettings />
       </div>
     </div>
   );

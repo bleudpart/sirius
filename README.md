@@ -254,6 +254,14 @@ document n'est envoyé et aucune tâche n'est terminée automatiquement.
 ce même rapport ; « actualités » et « quoi de neuf aujourd'hui » gardent le journal.
 Le frontend doit être mis à jour avec le backend pour ce nouveau routage.
 
+Ce rapport est devenu le **briefing du jour** : il ajoute, quand ces sources sont
+autorisées, le registre HACCP des étiquettes (aujourd'hui et bilan d'hier),
+l'agenda Google ou Outlook du jour et une **veille locale** facultative
+(météo Open-Meteo, événements naturels, séismes et repères de marché lus sur
+OSIRIS). Chaque section a un délai maximal et une source en panne est signalée
+sans valeur de remplacement. La veille se règle dans Réveil matinal ; voir
+[Briefing du jour et veille locale](docs/briefing-veille.md).
+
 Le tableau de bord ORACLE garde `POST /api/oracle/overview` pour transmettre les
 clés personnelles au moteur d'enrichissement sans les placer dans l'URL ni dans
 la réponse ; sa consultation GET reste disponible. Les marchés sans cours réel

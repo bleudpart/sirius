@@ -324,7 +324,7 @@ function App() {
     if (act === "web_agent" && target) { launchWebAgent(d.target.trim()); return true; }
     if (act === "daily_briefing") {
       setStatus("thinking");
-      setText("Je consulte tes dossiers de travail.");
+      setText("Je prépare ton briefing du jour.");
       if (runBriefingRef.current) runBriefingRef.current(true);
       return true;
     }
@@ -6765,11 +6765,11 @@ function App() {
     const signal = voiceSessionRef.current.signal;
     if (briefingInFlightRef.current === signal) return;
     briefingInFlightRef.current = signal;
-    const pid = progress.start("Briefing de travail", { silent: true });
-    progress.log(pid, "Lecture des dossiers, engagements et échéances…", 25);
+    const pid = progress.start("Briefing du jour", { silent: true });
+    progress.log(pid, "Lecture du registre HACCP, de l'agenda, des dossiers et de la veille…", 25);
     setStatus("thinking");
     setVoicePhase("thinking");
-    setText("Je consulte tes dossiers de travail.");
+    setText("Je prépare ton briefing du jour.");
     try {
       const r = await fetch(`${API}/work-dossiers/briefing`, {
         credentials: "include", signal,
@@ -6781,19 +6781,19 @@ function App() {
         throw new Error("Le rapport de travail reçu est incomplet.");
       }
       beginDisplayResponse();
-      streamOnDisplay(d.briefing, true, "BRIEFING DE TRAVAIL");
+      streamOnDisplay(d.briefing, true, "BRIEFING DU JOUR");
       setStatus("speaking");
       setText(d.briefing);
       briefingSpeakRef.current(d.briefing);
-      progress.done(pid, "Briefing de travail délivré");
+      progress.done(pid, "Briefing du jour délivré");
     } catch (e) {
       if (signal.aborted) return;
-      console.error("Briefing de travail :", e);
-      const message = e.message || "Le briefing de travail est indisponible.";
+      console.error("Briefing du jour :", e);
+      const message = e.message || "Le briefing du jour est indisponible.";
       setVoiceMessage(message);
       setText(message);
       beginDisplayResponse();
-      streamOnDisplay(message, true, "BRIEFING DE TRAVAIL");
+      streamOnDisplay(message, true, "BRIEFING DU JOUR");
       briefingSpeakRef.current(message);
       progress.error(pid, message);
     } finally {

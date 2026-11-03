@@ -2697,7 +2697,14 @@ async def setup_test_chat(body: SetupTestChatIn, request: Request):
 
 api_router.include_router(make_hephaistos_router(db))
 api_router.include_router(make_feedback_router())
-api_router.include_router(make_work_dossiers_router(db, require_user, conversation=work_conversation))
+from daily_briefing import make_briefing_extras  # noqa: E402
+from haccp_closing import load_closing_report  # noqa: E402
+from routes.veille import make_veille_router  # noqa: E402
+api_router.include_router(make_veille_router(db, require_user))
+api_router.include_router(make_work_dossiers_router(
+    db, require_user, conversation=work_conversation,
+    briefing_extras=make_briefing_extras(db, haccp_scope=_haccp_labels_scope, load_closing=load_closing_report),
+))
 from routes.chronos import make_chronos_router  # noqa: E402
 api_router.include_router(make_chronos_router(require_user, db))
 
