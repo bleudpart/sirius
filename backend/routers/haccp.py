@@ -26,6 +26,9 @@ import cloud_link
 
 from haccp_database import get_db, get_engine
 from haccp_activity import HaccpActivity, load_activity
+from haccp_closing import (
+    ClosingPdfRequest, ClosingReport, generate_closing_pdf, load_closing_report,
+)
 from models.haccp import EtiquetteHaccp
 from runtime_paths import data_dir
 from schemas.haccp import (
@@ -450,6 +453,27 @@ def make_haccp_router(
         date_debut: date, date_fin: date, scope: str = Depends(resolve_scope),
     ) -> HaccpActivity:
         return await load_activity(scope, date_debut, date_fin)
+
+    @router.get("/registre/cloture", response_model=ClosingReport)
+    async def closing_report(
+        date: date, scope: str = Depends(resolve_scope),
+    ) -> ClosingReport:
+        return await load_closing_report(scope, date)
+
+    @router.post("/registre/cloture/pdf")
+    async def closing_pdf(
+        body: ClosingPdfRequest, scope: str = Depends(resolve_scope),
+    ) -> Response:
+        pdf = await generate_closing_pdf(scope, body)
+        return Response(
+            content=pdf,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="bilan-cloture-haccp-{body.date.isoformat()}.pdf"',
+                "Cache-Control": "private, no-store",
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
 
     @router.get("/registre/recherche", response_model=list[EtiquetteResponse], name="haccp_search")
     async def recherche(

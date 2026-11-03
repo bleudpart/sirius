@@ -1,4 +1,4 @@
-import { haccpActivityFollowup, isFinanceConversationCommand, isHaccpActivityCommand, isOperationalCommand, isWorkConversationCommand, workPreviewFollowup } from "./workConversation";
+import { haccpActivityFollowup, isFinanceConversationCommand, isHaccpActivityCommand, isHaccpClosingCommand, isOperationalCommand, isWorkConversationCommand, workPreviewFollowup } from "./workConversation";
 
 test.each([
   "hier", "aujourd’hui", "pour cette semaine", "la semaine dernière", "le mois dernier",
@@ -21,6 +21,22 @@ test.each(["Ouvre HACCP", "Imprime une étiquette aujourd'hui", "Quel temps dema
 test("ne réinterprète pas les périodes sans demande HACCP en attente", () => {
   expect(haccpActivityFollowup("hier", null)).toBeNull();
 });
+
+test.each([
+  "ΣIRIUS, fais le point avant la fermeture",
+  "Bilan de fin de service",
+  "Rapport de clôture HACCP aujourd’hui",
+  "Bilan HACCP du jour",
+])("route le bilan de clôture aux données HACCP, sans ouverture forcée : %s", (text) => {
+  expect(isHaccpClosingCommand(text)).toBe(true);
+  expect(isOperationalCommand(text)).toBe(true);
+});
+
+test.each(["Ouvre le module HACCP", "Bilan financier du mois", "Combien d'étiquettes aujourd'hui ?"])(
+  "ne confond pas une commande sans rapport avec le bilan de clôture : %s", (text) => {
+    expect(isHaccpClosingCommand(text)).toBe(false);
+  },
+);
 
 test.each([
   "ΣIRIUS, combien d’étiquettes ont été éditées aujourd’hui ?",

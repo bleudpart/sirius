@@ -322,6 +322,29 @@ un total global presente comme un total filtre.
 Apres une demande sans periode, une reponse courte comme « hier » suffit :
 le contexte de la question est conserve, sans supprimer un filtre refuse.
 
+## Bilan de fin de service
+
+Dans le module HACCP, l'onglet **Fin de service** et les demandes « Fais le
+point avant la fermeture », « Bilan de fin de service » ou « Bilan HACCP du
+jour » affichent les compteurs quotidiens et les priorités issues des fiches
+de cette journée. Les dates proches incluent les trois jours calendaires
+suivants, dans Europe/Paris. Les fiches de réception, d'ouverture et de
+préparation sont accessibles depuis chaque alerte.
+
+Le registre est une archive d'étiquettes, pas un inventaire : le rapport ne
+déduit jamais qu'un produit est encore en stock, qu'il a été retiré, ni qu'une
+action corrective a été réalisée. Il ne voit que les alertes et états
+enregistrés; zéro alerte ne signifie pas conformité. Les impressions en
+attente, prises en charge ou incertaines restent à vérifier; le statut
+technique accepté n'atteste pas la sortie papier.
+
+Le PDF est créé à la demande, après affichage du bilan, saisie du nom du
+responsable et confirmation de la vérification humaine. La révision du
+registre est recontrôlée au téléchargement : si elle a changé, le responsable
+doit recharger et revoir le bilan. Cette mention est une déclaration
+nominative, pas une signature électronique ni une certification. La période
+est un jour unique; sans date, le jour courant de Paris est utilisé.
+
 L'API privee `GET /api/haccp/registre/activite?date_debut=2026-11-01&date_fin=2026-11-03`
 renvoie les deux totaux, le detail de chaque jour et `impressions_sans_date`.
 La periode est inclusive et limitee a 366 jours par demande. Le compte ou

@@ -59,6 +59,94 @@ test("QR points to the authenticated standalone capture and loads its active est
   expect(global.fetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/enterprise\/context$/), expect.any(Object));
 });
 
+test("closing report shows scoped priorities, opens the exact source record and requires human PDF confirmation", async () => {
+  const day = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date());
+  const report = {
+    date: day, fuseau: "Europe/Paris", genere_le: `${day}T16:00:00+00:00`,
+    etiquettes_enregistrees: 2, impressions_confirmees: 1, impressions_sans_date: 1,
+    statut: "attention",
+    revision: "a".repeat(64),
+    limites: ["Le registre ne confirme pas le stock réel."],
+    priorites: [{
+      code: "dates", niveau: "urgent", titre: "Dates proches ou dépassées",
+      action: "Vérifier physiquement le produit.", total: 1, autres_fiches: 0,
+      fiches: [{
+        etiquette_id: 73, produit: "Soupe TEST", lot: "LOT-73", type_operation: "preparation",
+        motif: "Date à vérifier aujourd'hui.", date_cible: day, statut_impression: null,
+      }],
+    }],
+  };
+  global.fetch.mockImplementation(async (url, options = {}) => {
+    if (url.includes("/registre/cloture?")) return reply(report);
+    if (url.endsWith("/registre/73/donnees")) return reply({
+      id: 73, nom_produit: "Soupe TEST", numero_lot: "LOT-73", type_operation: "preparation",
+      date_fabrication: `${day}T07:00:00Z`, dlc_secondaire: `${day}T22:00:00Z`,
+      conditions_conservation: "Entre 0 et +3 °C.", image_url: null,
+    });
+    if (url.endsWith("/registre/cloture/pdf") && options.method === "POST") {
+      return {
+        ok: true, status: 200, headers: { get: () => "application/pdf" },
+        blob: async () => new Blob(["%PDF-1.7"], { type: "application/pdf" }),
+      };
+    }
+    return reply([]);
+  });
+  const anchorClick = jest.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+  await act(async () => root.render(<HaccpWorkspace initialTab="closing" />));
+  expect(host.querySelector('[aria-label="Bilan HACCP de fin de service"]')).not.toBeNull();
+  expect(host.textContent).toContain("2Étiquettes enregistrées");
+  expect(host.textContent).toContain("Le registre ne confirme pas le stock réel.");
+  expect(button("Valider et télécharger le PDF").disabled).toBe(true);
+
+  expect(button("Ouvrir la fiche").disabled).toBe(false);
+  await click("Ouvrir la fiche");
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+  expect(global.fetch.mock.calls.some(([url]) => url.endsWith("/registre/73/donnees"))).toBe(true);
+  expect(host.querySelector('[role="dialog"]').textContent).toContain("Soupe TEST");
+  expect(host.querySelector('[role="dialog"]').textContent).toContain("Entre 0 et +3 °C.");
+  await act(async () => host.querySelector('[role="dialog"] button').click());
+  await click("Fin de service");
+
+  await change(field("Nom du responsable"), "Responsable Test");
+  const checkbox = host.querySelector('.haccp-closing-validation input[type="checkbox"]');
+  await act(async () => checkbox.click());
+  expect(button("Valider et télécharger le PDF").disabled).toBe(false);
+  await click("Valider et télécharger le PDF");
+  const pdfCall = global.fetch.mock.calls.find(([url]) => url.endsWith("/registre/cloture/pdf"));
+  expect(JSON.parse(pdfCall[1].body)).toEqual({
+    date: day, revision: "a".repeat(64), nom_responsable: "Responsable Test",
+    confirme_verification_humaine: true,
+  });
+  expect(anchorClick).toHaveBeenCalledTimes(1);
+  expect(host.textContent).toContain("PDF téléchargé après votre validation nominative.");
+});
+
+test("closing PDF does not download when the registry changed after manager review", async () => {
+  const day = "2026-11-03";
+  global.fetch.mockImplementation(async (url, options = {}) => {
+    if (url.includes("/registre/cloture?")) return reply({
+      date: day, fuseau: "Europe/Paris", genere_le: `${day}T16:00:00+00:00`,
+      etiquettes_enregistrees: 0, impressions_confirmees: 0, impressions_sans_date: 0,
+      statut: "aucune_alerte_enregistree", revision: "b".repeat(64), priorites: [], limites: [],
+    });
+    if (url.endsWith("/registre/cloture/pdf") && options.method === "POST") {
+      return reply({ detail: "Le registre a changé depuis le bilan." }, false);
+    }
+    return reply([]);
+  });
+  const anchorClick = jest.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+  await act(async () => root.render(<HaccpWorkspace initialTab="closing" />));
+  await change(field("Nom du responsable"), "Responsable Test");
+  const checkbox = host.querySelector('.haccp-closing-validation input[type="checkbox"]');
+  await act(async () => checkbox.click());
+  expect(button("Valider et télécharger le PDF").disabled).toBe(false);
+  await click("Valider et télécharger le PDF");
+  expect(host.querySelector('[role="alert"]').textContent).toContain("Le registre a changé");
+  expect(anchorClick).not.toHaveBeenCalled();
+});
+
 test("existing restaurant folders require resuming before scans and show saved documents", async () => {
   global.fetch.mockImplementation(async (url) => {
     if (url.endsWith("/enterprise/context")) return reply({ company: { id: "company-1", name: "Le Groupe" } });

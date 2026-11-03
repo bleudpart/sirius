@@ -55,7 +55,7 @@ import { streamConversation, requestConversation, requestAssistantIntent, reques
 import { newsBulletinScope } from "./newsCommandRouting";
 import { isResumeWorkCommand, isWorkBriefingCommand } from "./workBriefing";
 import { chronosConfirmation } from "./chronos";
-import { haccpActivityFollowup, isHaccpActivityCommand, isOperationalCommand, isWorkConversationCommand, workPreviewFollowup } from "./workConversation";
+import { haccpActivityFollowup, isHaccpActivityCommand, isHaccpClosingCommand, isOperationalCommand, isWorkConversationCommand, workPreviewFollowup } from "./workConversation";
 import { bulletinFollowUp, createBulletinContext, markSegmentCompleted, markSegmentStarted, prepareBulletinReading, releaseBulletinFocus } from "./bulletinDialogue";
 import { AUDIO_DIAGNOSTICS_EVENT, loadShowAudioDiagnostics } from "./audioDiagnosticsSetting";
 import { buildNewsBulletin, weatherBulletinText } from "./newsBulletin";
@@ -1696,7 +1696,7 @@ function App() {
       setText(message);
       setVoiceMessage(message);
       showOnDisplay({ type: "message", titre: "ΣIRIUS — ACCÈS AU SERVICE", contenu: message });
-      if (isWorkConversationCommand(command) || isHaccpActivityCommand(command)) speakOut(message);
+      if (isWorkConversationCommand(command) || isHaccpActivityCommand(command) || isHaccpClosingCommand(command)) speakOut(message);
       if (pid && progress?.error) progress.error(pid, message);
       return true;
     };
@@ -1916,7 +1916,9 @@ function App() {
     if (externalSignal?.aborted) return;
 
     if (isOperationalCommand(command)) {
-      const message = isHaccpActivityCommand(command)
+      const message = isHaccpClosingCommand(command)
+        ? "Bilan de clôture HACCP indisponible : le backend ne répond pas. Aucun résultat de service ne peut être confirmé."
+        : isHaccpActivityCommand(command)
         ? "Bilan HACCP indisponible : le backend ne répond pas. Aucun nombre d'étiquettes ou d'envois d'impression ne peut être confirmé."
         : isWorkConversationCommand(command)
         ? "Lecture métier indisponible : le backend ne répond pas. Aucun résultat à jour ne peut être vérifié ; aucune action métier n'est annoncée comme effectuée."

@@ -11,6 +11,14 @@ export function isHaccpActivityCommand(command) {
     && !/\b(?:prix|couts?|coute\w*)\b|\bcombien\s+(?:de\s+)?(?:temps|jours?|heures?)\b/.test(text);
 }
 
+export function isHaccpClosingCommand(command) {
+  const text = String(command || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/’/g, "'").toLowerCase().trim();
+  return /\b(?:bilan|rapport|point|cloture)\b.*\b(?:fin de service|fermeture|cloture)\b/.test(text)
+    || /\b(?:fais|faites|faire|prepare|preparer)\s+(?:le\s+)?point\s+(?:avant|de)\s+(?:la\s+)?(?:fermeture|fin de service)\b/.test(text)
+    || /\b(?:bilan|rapport)\s+haccp\s+(?:du jour|journalier|quotidien)\b/.test(text);
+}
+
 const HACCP_ACTIVITY_DATE = "(?:\\d{4}-\\d{2}-\\d{2}|\\d{1,2}/\\d{1,2}/\\d{4})";
 const HACCP_ACTIVITY_PERIOD_REPLY = new RegExp(
   `^(?:(?:pour|sur|et)\\s+)?(?:aujourd[' ]?hui|hier|avant[- ]hier|ce jour|du jour|cette semaine|(?:la\\s+)?semaine derniere|ce mois(?:[- ]ci)?|(?:le\\s+)?mois dernier|(?:les?\\s+)?(?:\\d+|sept|quatorze|quinze|trente)\\s+derniers?\\s+jours?|du\\s+${HACCP_ACTIVITY_DATE}\\s+au\\s+${HACCP_ACTIVITY_DATE}|(?:le\\s+)?${HACCP_ACTIVITY_DATE})(?:\\s+(?:merci|svp|s[' ]il (?:te|vous) plait))?[\\s.!?]*$`,
@@ -66,4 +74,4 @@ export function workPreviewFollowup(command, pending) {
   return null;
 }
 
-export const isOperationalCommand = (command) => isHaccpActivityCommand(command) || isChronosCommand(command) || isWorkConversationCommand(command);
+export const isOperationalCommand = (command) => isHaccpClosingCommand(command) || isHaccpActivityCommand(command) || isChronosCommand(command) || isWorkConversationCommand(command);

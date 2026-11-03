@@ -36,6 +36,7 @@ const fmtDT = (s) => (s ? `${fmtDate(s)} ${s.slice(11, 16)}` : "—");
 
 const TABS = [
   { key: "trace", label: "TRAÇABILITÉ", Icon: Tag },
+  { key: "closing", label: "FIN DE SERVICE", Icon: ClipboardCheck },
   { key: "temp", label: "TEMPÉRATURES", Icon: Thermometer },
   { key: "pms", label: "PMS", Icon: ShieldCheck },
   { key: "nc", label: "NON-CONFORMITÉS", Icon: AlertTriangle },
@@ -518,9 +519,17 @@ function SectionAudit() {
   );
 }
 
-const SECTIONS = { trace: SectionTrace, temp: SectionTemp, pms: SectionPms, nc: SectionNc, clean: SectionClean, allerg: SectionAllerg, docs: SectionDocs, controls: SectionControls, sheets: SectionSheets, audit: SectionAudit, duerp: DuerpSection, safety: SafetyDocumentation };
+function SectionClosing() {
+  return <HaccpWorkspace initialTab="closing" />;
+}
 
-const SOURCE_TABS = { haccp_trace: "trace", haccp_nonconformity: "nc", haccp_document: "docs", duerp: "duerp", safety: "safety" };
+const SECTIONS = {
+  trace: SectionTrace, temp: SectionTemp, pms: SectionPms, nc: SectionNc, clean: SectionClean,
+  allerg: SectionAllerg, docs: SectionDocs, controls: SectionControls, sheets: SectionSheets,
+  audit: SectionAudit, closing: SectionClosing, duerp: DuerpSection, safety: SafetyDocumentation,
+};
+
+const SOURCE_TABS = { haccp_trace: "trace", haccp_nonconformity: "nc", haccp_document: "docs", closing: "closing", duerp: "duerp", safety: "safety" };
 
 export default function HaccpModule({ onClose, initialSource }) {
   const [tab, setTab] = useState(() => SOURCE_TABS[initialSource?.kind] || "trace");

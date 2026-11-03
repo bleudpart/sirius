@@ -42,6 +42,7 @@ if DATA_DIR != ROOT_DIR:
     load_dotenv(DATA_DIR / ".env", override=True)
 
 from haccp_activity import activity_question, answer_activity_question, is_haccp_activity_request
+from haccp_closing import answer_closing_question, is_haccp_closing_request
 from sirius_brain import (
     ask_sirius,
     parse_intent,
@@ -428,7 +429,7 @@ async def ui_intent(req: IntentRequest, request: Request):
         logger.warning("Intent rate limit exceeded", extra={"client_ip": ip})
         return {"action": "none"}
 
-    if is_haccp_activity_request(req.text):
+    if is_haccp_closing_request(req.text) or is_haccp_activity_request(req.text):
         return {"action": "general", "query": req.text.strip()}
 
     if cloud_link.should_relay_chat(req.keys):
@@ -501,11 +502,14 @@ operational_work.register()
 
 
 async def _work_chat_response(req, user, request, session_id, history):
-    label_question = activity_question(req.text, history)
-    if label_question is not None:
-        result = await answer_activity_question(label_question, await _haccp_labels_scope(request))
+    if is_haccp_closing_request(req.text):
+        result = await answer_closing_question(req.text, await _haccp_labels_scope(request))
     else:
-        result = await repondre_analyse(req, user, db, cerveau_analytique)
+        label_question = activity_question(req.text, history)
+        if label_question is not None:
+            result = await answer_activity_question(label_question, await _haccp_labels_scope(request))
+        else:
+            result = await repondre_analyse(req, user, db, cerveau_analytique)
     if result is None:
         result = await operational_work.handle(req, user)
     if result is None:

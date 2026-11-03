@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { Camera, ClipboardList, QrCode, ShieldCheck, Search, Download, Image, X, Utensils } from "lucide-react";
+import { AlertTriangle, Camera, ClipboardCheck, ClipboardList, QrCode, ShieldCheck, Search, Download, FileDown, Image, X, Utensils } from "lucide-react";
 import HaccpLabelCapture from "./HaccpLabelCapture";
 import HaccpPreparation from "./HaccpPreparation";
 import HaccpReceptions from "./HaccpReceptions";
@@ -12,6 +12,12 @@ import "./HaccpWorkspace.css";
 const ROOT = `${API_BASE_URL}/haccp/registre`;
 export const HACCP_CAPTURE_URL = "https://sirius-assistant.fr/haccp";
 const CATEGORIES = ["Viandes", "Poissons", "Produits Laitiers", "Fruits & Légumes", "Épicerie", "Non classé"];
+const parisToday = () => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date());
+  return `${parts.find((part) => part.type === "year")?.value}-${parts.find((part) => part.type === "month")?.value}-${parts.find((part) => part.type === "day")?.value}`;
+};
 
 async function checked(response) {
   if (!response.ok) {
@@ -21,11 +27,14 @@ async function checked(response) {
   return response;
 }
 
-export default function HaccpWorkspace({ standalone = false, captureRequest = 0 }) {
-  const [tab, setTab] = useState("capture");
+export default function HaccpWorkspace({ standalone = false, captureRequest = 0, initialTab = "capture" }) {
+  const [tab, setTab] = useState(initialTab);
   useEffect(() => {
     if (captureRequest > 0) setTab("capture");
   }, [captureRequest]);
+  useEffect(() => {
+    if (initialTab) setTab(initialTab);
+  }, [initialTab]);
   const [filters, setFilters] = useState({ terme: "", categorie: "", date_debut: "", date_fin: "", non_conforme_seul: false });
   const [items, setItems] = useState([]);
   const [error, setError] = useState("");
@@ -41,10 +50,18 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0 
   const [dossierLoading, setDossierLoading] = useState(false);
   const [dossierError, setDossierError] = useState("");
   const [sessionReady, setSessionReady] = useState(false);
+  const [closingDate, setClosingDate] = useState(parisToday);
+  const [closingReport, setClosingReport] = useState(null);
+  const [closingError, setClosingError] = useState("");
+  const [closingNotice, setClosingNotice] = useState("");
+  const [closingManager, setClosingManager] = useState("");
+  const [closingConfirmed, setClosingConfirmed] = useState(false);
+  const [closingBusy, setClosingBusy] = useState(false);
   const photoRef = useRef(null);
   const controller = useRef(null);
   const dossierRequest = useRef(0);
   const requestNumber = useRef(0);
+  const closingRequest = useRef(0);
   const activeEstablishmentRef = useRef(activeEstablishment);
   activeEstablishmentRef.current = activeEstablishment;
   const mounted = useRef(true);
@@ -263,6 +280,78 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0 
     } catch (failure) { if (mounted.current) setError(failure.message); }
     finally { if (mounted.current) setBusy(false); }
   }
+  const loadClosingReport = useCallback(async () => {
+    const request = ++closingRequest.current;
+    setClosingBusy(true);
+    setClosingError("");
+    setClosingNotice("");
+    try {
+      const params = new URLSearchParams({ date: closingDate });
+      const report = await haccpFetch(`${ROOT}/cloture?${params}`, {},
+        async (response) => (await checked(response)).json());
+      if (!report || report.date !== closingDate || !/^[a-f0-9]{64}$/.test(report.revision)
+        || !Array.isArray(report.priorites) || !Array.isArray(report.limites)) {
+        throw new Error("La réponse du bilan de clôture est invalide.");
+      }
+      if (mounted.current && request === closingRequest.current) {
+        setClosingReport(report);
+        setClosingConfirmed(false);
+      }
+    } catch (failure) {
+      if (mounted.current && request === closingRequest.current) {
+        setClosingReport(null);
+        setClosingError(failure.message);
+      }
+    } finally {
+      if (mounted.current && request === closingRequest.current) setClosingBusy(false);
+    }
+  }, [closingDate]);
+  useEffect(() => {
+    if (tab === "closing") void loadClosingReport();
+  }, [tab, loadClosingReport]);
+  async function openClosingRecord(id) {
+    setClosingError("");
+    try {
+      const record = await haccpFetch(`${ROOT}/${encodeURIComponent(id)}/donnees`, {},
+        async (response) => (await checked(response)).json());
+      if (!record || String(record.id) !== String(id)) throw new Error("La fiche demandée n'est pas disponible dans ce registre.");
+      setTab("registre");
+      await showPhoto(record);
+    } catch (failure) {
+      if (mounted.current) setClosingError(failure.message);
+    }
+  }
+  async function downloadClosingPdf(event) {
+    event.preventDefault();
+    if (!closingReport || !closingConfirmed || closingManager.trim().length < 2) return;
+    setClosingBusy(true);
+    setClosingError("");
+    setClosingNotice("");
+    try {
+      const blob = await haccpFetch(`${ROOT}/cloture/pdf`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: closingReport.date,
+          revision: closingReport.revision,
+          nom_responsable: closingManager.trim(),
+          confirme_verification_humaine: true,
+        }),
+      }, async (response) => {
+        await checked(response);
+        if (response.headers.get("content-type")?.split(";", 1)[0].trim() !== "application/pdf") {
+          throw new Error("Le document reçu n'est pas un PDF.");
+        }
+        return response.blob();
+      });
+      downloadHaccpBlob(blob, `bilan-cloture-haccp-${closingReport.date}.pdf`);
+      if (mounted.current) setClosingNotice("PDF téléchargé après votre validation nominative.");
+    } catch (failure) {
+      if (mounted.current) setClosingError(failure.message);
+    } finally {
+      if (mounted.current) setClosingBusy(false);
+    }
+  }
   return <section aria-label="Registre de réception, ouverture et préparation ΣIRIUS" className={`haccp-ui haccp-workspace${standalone ? " haccp-standalone" : ""}`}>
     <header className="haccp-heading">
       <div className="haccp-emblem" aria-hidden="true"><ShieldCheck size={30} /></div>
@@ -274,6 +363,7 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0 
       <button type="button" aria-pressed={tab === "kitchen"} onClick={() => setTab("kitchen")}><Utensils size={19} aria-hidden="true" />Cuisine simplifiée</button>
       <button type="button" aria-pressed={tab === "registre"} onClick={() => setTab("registre")}><ClipboardList size={19} aria-hidden="true" />Registre / Contrôle</button>
       <button type="button" aria-pressed={tab === "receptions"} onClick={() => setTab("receptions")}><ClipboardList size={19} aria-hidden="true" />Réceptions / Lots</button>
+      <button type="button" aria-pressed={tab === "closing"} onClick={() => setTab("closing")}><ClipboardCheck size={19} aria-hidden="true" />Fin de service</button>
       <button type="button" aria-pressed={tab === "qr"} onClick={() => setTab("qr")}><QrCode size={19} aria-hidden="true" />QR code réserve</button>
     </nav>
     {standalone && wakeLockStatus && <p className="haccp-wake-lock" role="status">{wakeLockStatus}</p>}
@@ -333,6 +423,64 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0 
       <p><a href={HACCP_CAPTURE_URL}>{HACCP_CAPTURE_URL}</a></p>
       <p>À afficher dans la réserve. Ce QR code ne contient aucun secret et ne donne aucun accès sans connexion. Utiliser un compte autorisé du même établissement.</p>
       <p>Il ouvre le registre du serveur Internet, pas les archives locales d’un PC. Connexion Internet requise.</p>
+    </section>}
+    {tab === "closing" && <section className="workspace-surface haccp-card haccp-closing" aria-label="Bilan HACCP de fin de service">
+      <p className="haccp-kicker">Revue opérationnelle · Responsable</p>
+      <h3>Bilan de fin de service</h3>
+      <p>Le bilan rassemble les fiches enregistrées et les états d'impression de la journée. Il ne remplace ni le contrôle physique du stock ni les vérifications HACCP du responsable.</p>
+      <form className="haccp-closing-date" onSubmit={(event) => { event.preventDefault(); void loadClosingReport(); }}>
+        <label>Date du service
+          <input type="date" value={closingDate} max={parisToday()} onChange={(event) => setClosingDate(event.target.value)} />
+        </label>
+        <button className="haccp-primary" type="submit" disabled={closingBusy || !closingDate}><Search size={18} aria-hidden="true" />Actualiser le bilan</button>
+      </form>
+      {closingBusy && <p role="status">Lecture du registre HACCP…</p>}
+      {closingError && <p className="haccp-closing-error" role="alert">{closingError}</p>}
+      {closingNotice && <p className="haccp-closing-notice" role="status">{closingNotice}</p>}
+      {closingReport && <>
+        <p className="haccp-closing-generated">État du registre au {new Date(closingReport.genere_le).toLocaleString("fr-FR", { timeZone: "Europe/Paris", timeZoneName: "short" })}.</p>
+        <div className="haccp-closing-metrics" aria-label="Compteurs du service">
+          <div><strong>{closingReport.etiquettes_enregistrees}</strong><span>Étiquettes enregistrées</span></div>
+          <div><strong>{closingReport.impressions_confirmees}</strong><span>Envois confirmés au poste / SDK</span></div>
+          {closingReport.impressions_sans_date > 0 && <div><strong>{closingReport.impressions_sans_date}</strong><span>Anciennes confirmations sans date</span></div>}
+        </div>
+        {closingReport.priorites.length > 0 ? <div className="haccp-closing-priorities">
+          <h4><AlertTriangle size={18} aria-hidden="true" />Points à vérifier ({closingReport.priorites.length})</h4>
+          {closingReport.priorites.map((priority, index) => <article className={`haccp-closing-priority haccp-closing-${priority.niveau}`} key={priority.code}>
+            <p className="haccp-kicker">Priorité {index + 1} · {priority.niveau === "urgent" ? "À examiner en premier" : priority.niveau === "attention" ? "À vérifier" : "Lecture à compléter"} · {priority.total} fiche(s)</p>
+            <h4>{priority.titre}</h4>
+            <p>{priority.action}</p>
+            <ul>{priority.fiches.map((record) => <li key={`${priority.code}-${record.etiquette_id}`}>
+              <span><strong>{record.produit}</strong> · Lot {record.lot} · Fiche {record.etiquette_id}
+                {record.date_cible ? ` · Date ${new Date(`${record.date_cible}T12:00:00`).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}` : ""}
+                {record.statut_impression ? ` · ${record.statut_impression}` : ""}
+                <br />{record.motif}
+              </span>
+              <button type="button" disabled={busy || closingBusy} onClick={() => void openClosingRecord(record.etiquette_id)}>
+                <Image size={16} aria-hidden="true" />Ouvrir la fiche
+              </button>
+            </li>)}</ul>
+            {priority.autres_fiches > 0 && <p>{priority.autres_fiches} autre(s) fiche(s) du même type sont à vérifier dans le registre.</p>}
+          </article>)}
+        </div> : <p className="haccp-closing-notice">Aucune alerte n’est enregistrée pour cette journée. Cela ne prouve pas l’absence de problème ni l’exécution des contrôles physiques.</p>}
+        <ul className="haccp-closing-limits">{closingReport.limites.map((limit) => <li key={limit}>{limit}</li>)}</ul>
+        <form className="haccp-closing-validation" onSubmit={downloadClosingPdf}>
+          <h4><FileDown size={18} aria-hidden="true" />PDF après validation humaine</h4>
+          <label>Nom du responsable qui vérifie ce bilan
+            <input autoComplete="name" maxLength={100} minLength={2} required value={closingManager}
+              onChange={(event) => setClosingManager(event.target.value)} />
+          </label>
+          <label className="haccp-check">
+            <input type="checkbox" required checked={closingConfirmed} onChange={(event) => setClosingConfirmed(event.target.checked)} />
+            J’ai vérifié les points affichés et les contrôles physiques avant de valider ce document.
+          </label>
+          <button className="haccp-primary" type="submit"
+            disabled={closingBusy || !closingReport.revision || !closingConfirmed || closingManager.trim().length < 2}>
+            <FileDown size={18} aria-hidden="true" />Valider et télécharger le PDF
+          </button>
+          <p>La validation est une déclaration nominative, pas une signature électronique ou une certification officielle. Toute modification du registre impose de recharger et vérifier le bilan avant le téléchargement.</p>
+        </form>
+      </>}
     </section>}
     {tab === "registre" && <section className="workspace-surface haccp-card" aria-label="Contrôle sanitaire">
       <p className="haccp-kicker">Archives & preuves</p>
