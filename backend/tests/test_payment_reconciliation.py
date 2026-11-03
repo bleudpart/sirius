@@ -78,3 +78,20 @@ def test_unpaid_checkout_does_not_grant_license(tmp_path, monkeypatch):
     assert (license_doc["tier"], license_doc["status"]) == ("standard", "active")
     transaction = asyncio.run(db.payment_transactions.find_one({"session_id": "cs_unpaid"}))
     assert (transaction["status"], transaction["payment_status"]) == ("completed", "paid")
+
+
+def test_older_subscription_webhook_cannot_restore_previous_license_state(tmp_path, monkeypatch):
+    db = LocalDocStore(tmp_path / "ordered-webhook.db")
+    current = {"id": "evt_current", "created": 200, "type": "customer.subscription.updated", "data": {"object": {
+        "id": "sub_ordered", "status": "active", "current_period_end": 1794441600,
+        "metadata": {"user_id": "u1", "tier": "monthly"},
+    }}}
+    monkeypatch.setattr(payments_api.stripe.Webhook, "construct_event", lambda *args: current)
+    client = client_for(db)
+    assert client.post("/api/stripe/webhook", content="{}").status_code == 200
+
+    current.update(id="evt_old", created=100, type="customer.subscription.deleted")
+    assert client.post("/api/stripe/webhook", content="{}").status_code == 200
+    license_doc = asyncio.run(db.user_licenses.find_one({"user_id": "u1"}))
+    assert license_doc["status"] == "active"
+    assert license_doc["stripe_event_created"] == 200

@@ -3,15 +3,19 @@ import asyncio
 import csv
 import io
 import os
+import re
+import sqlite3
 import smtplib
 import uuid
 import zipfile
 from datetime import date, datetime, timezone
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from email.message import EmailMessage
 from typing import List, Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, Response
+from pymongo.errors import DuplicateKeyError
 from pydantic import BaseModel, Field, field_validator
 
 from email_signature import (
@@ -45,6 +49,12 @@ class Line(BaseModel):
     label: str = ""
     qty: float = Field(default=1, ge=0)
     unit_price: float = Field(default=0)
+    vat_rate: Optional[float] = Field(default=None, ge=0, le=100)
+
+    @field_validator("unit_price")
+    @classmethod
+    def price_to_cents(cls, value):
+        return float(_money(value))
 
 
 class ClientIn(BaseModel):
@@ -113,9 +123,10 @@ class PaymentIn(BaseModel):
     @field_validator("amount")
     @classmethod
     def amount_positive(cls, v):
-        if v <= 0:
+        amount = _money(v)
+        if amount <= 0:
             raise ValueError("Le montant du paiement doit être supérieur à zéro.")
-        return v
+        return float(amount)
 
 
 class JournalIn(BaseModel):
@@ -175,11 +186,11 @@ def parse_statement_csv(raw: bytes) -> List[dict]:
             continue
         amount_text = (row.get(amount_key) or "").strip().replace(" ", "").replace(",", ".")
         try:
-            amount = float(amount_text)
+            amount = Decimal(amount_text)
             parsed_date = parse_statement_date(row.get(date_key, ""))
-        except ValueError as error:
+        except (ValueError, InvalidOperation) as error:
             raise ValueError(str(error)) from error
-        rows.append({"date": parsed_date, "libelle": (row.get(label_key) or "").strip() if label_key else "", "montant": round(amount, 2), "reference": (row.get(ref_key) or "").strip() if ref_key else ""})
+        rows.append({"date": parsed_date, "libelle": (row.get(label_key) or "").strip() if label_key else "", "montant": float(_money(amount)), "reference": (row.get(ref_key) or "").strip() if ref_key else ""})
     if not rows:
         raise ValueError("Aucune opération exploitable dans le relevé.")
     return rows
@@ -365,10 +376,38 @@ def build_accounting_export_zip(
     return archive_buffer.getvalue()
 
 
+def _money(value) -> Decimal:
+    return Decimal(str(value or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def _sum_money(values) -> float:
+    return float(_money(sum((_money(value) for value in values), Decimal("0.00"))))
+
+
+def _remaining(total, paid) -> float:
+    return float(max(Decimal("0.00"), _money(total) - _money(paid)))
+
+
+def _tax_summary(lines, default_rate):
+    bases = {}
+    for line in lines:
+        get = line.get if isinstance(line, dict) else lambda key, fallback=None: getattr(line, key, fallback)
+        rate = Decimal(str(get("vat_rate", None) if get("vat_rate", None) is not None else default_rate))
+        base = _money(Decimal(str(get("qty", 0) or 0)) * Decimal(str(get("unit_price", 0) or 0)))
+        bases[rate] = bases.get(rate, Decimal("0.00")) + base
+    breakdown = []
+    for rate, base in sorted(bases.items()):
+        vat = _money(base * rate / Decimal("100"))
+        breakdown.append({"rate": float(rate), "base_ht": float(base), "tva": float(vat)})
+    ht = sum((item["base_ht"] for item in breakdown), 0.0)
+    vat = sum((item["tva"] for item in breakdown), 0.0)
+    ht, vat = float(_money(ht)), float(_money(vat))
+    return ht, vat, float(_money(Decimal(str(ht)) + Decimal(str(vat)))), breakdown
+
+
 def _totals(lines: List[Line], tva: float):
-    ht = sum(l.qty * l.unit_price for l in lines)
-    tva_amount = ht * float(tva) / 100.0
-    return round(ht, 2), round(tva_amount, 2), round(ht + tva_amount, 2)
+    ht, vat, ttc, _breakdown = _tax_summary(lines, tva)
+    return ht, vat, ttc
 
 
 def make_themis_router(db):
@@ -385,12 +424,74 @@ def make_themis_router(db):
                 await db[coll].update_many({"user_id": {"$exists": False}}, {"$set": {"user_id": uid}})
         return uid
 
-    async def next_number(prefix):
+    async def next_number(prefix, uid):
         year = datetime.now().year
         c = await db.themis_counters.find_one_and_update(
-            {"key": f"{prefix}-{year}"}, {"$inc": {"seq": 1}}, upsert=True, return_document=True)
+            {"key": f"{prefix}-{year}-{uid}"}, {"$inc": {"seq": 1}}, upsert=True, return_document=True)
         seq = (c or {}).get("seq", 1)
         return f"{prefix}-{year}-{seq:04d}"
+
+    async def issue_invoice(uid: str, did: str):
+        async def sync_source_deal(invoice):
+            if invoice.get("source_deal_id"):
+                await db.agora_deals.update_one(
+                    {"id": invoice["source_deal_id"], "user_id": uid},
+                    {"$set": {"themis_doc_number": invoice.get("number", ""), "updated_at": now_iso()}},
+                )
+            return invoice
+
+        try:
+            await db.themis_docs.create_index([("user_id", 1), ("number", 1)], unique=True)
+        except (DuplicateKeyError, sqlite3.IntegrityError) as error:
+            raise HTTPException(
+                status_code=409,
+                detail="Des numéros de documents existants sont en doublon ; corrigez-les avant d'émettre une facture.",
+            ) from error
+        existing = await db.themis_docs.find_one({"id": did, "user_id": uid, "kind": "facture"}, NO_ID)
+        if not existing:
+            raise HTTPException(status_code=404, detail="Facture introuvable")
+        if existing.get("status") != "brouillon":
+            if existing.get("number") and existing.get("issued_at"):
+                return await sync_source_deal(existing)
+            raise HTTPException(status_code=409, detail="La facture ne peut plus être émise depuis son statut actuel.")
+
+        # A legacy draft may already hold a number; preserve it rather than creating a gap.
+        if existing.get("number"):
+            result = await db.themis_docs.update_one(
+                {"id": did, "user_id": uid, "kind": "facture", "status": "brouillon"},
+                {"$set": {"status": "envoyé", "issued_at": now_iso(), "updated_at": now_iso()}},
+            )
+            if result.matched_count:
+                return await sync_source_deal(await db.themis_docs.find_one({"id": did, "user_id": uid}, NO_ID))
+
+        year = datetime.now().year
+        pattern = rf"^FAC-{year}-(\d+)$"
+        for _attempt in range(100):
+            issued = await db.themis_docs.find(
+                {"user_id": uid, "kind": "facture", "number": {"$regex": rf"^FAC-{year}-\d+$"}},
+                NO_ID,
+            ).to_list(None)
+            highest = max(
+                (int(match.group(1)) for document in issued
+                 if (match := re.fullmatch(pattern, str(document.get("number", ""))))),
+                default=0,
+            )
+            number = f"FAC-{year}-{highest + 1:04d}"
+            issued_at = now_iso()
+            try:
+                result = await db.themis_docs.update_one(
+                    {"id": did, "user_id": uid, "kind": "facture", "status": "brouillon", "number": {"$exists": False}},
+                    {"$set": {"number": number, "status": "envoyé", "issued_at": issued_at, "updated_at": issued_at}},
+                )
+            except (DuplicateKeyError, sqlite3.IntegrityError):
+                continue
+            if result.matched_count:
+                return await sync_source_deal(await db.themis_docs.find_one({"id": did, "user_id": uid}, NO_ID))
+            latest = await db.themis_docs.find_one({"id": did, "user_id": uid}, NO_ID)
+            if latest and latest.get("status") == "envoyé" and latest.get("number"):
+                return await sync_source_deal(latest)
+            raise HTTPException(status_code=409, detail="Cette facture a été modifiée pendant son émission.")
+        raise HTTPException(status_code=503, detail="Impossible d'attribuer un numéro de facture sans collision.")
 
     # ---------- CLIENTS ----------
     @r.get("/clients")
@@ -474,14 +575,16 @@ def make_themis_router(db):
         uid = await _uid(request)
         if body.kind not in ("devis", "facture"):
             raise HTTPException(status_code=400, detail="kind doit être devis ou facture")
-        ht, tva_amount, ttc = _totals(body.lines, body.tva)
-        number = await next_number("DEV" if body.kind == "devis" else "FAC")
-        doc = body.dict()
+        number = await next_number("DEV", uid) if body.kind == "devis" else None
+        ht, tva_amount, ttc, vat_breakdown = _tax_summary(body.lines, body.tva)
+        doc = body.model_dump()
         doc.update({
-            "id": str(uuid.uuid4()), "user_id": uid, "number": number, "total_ht": ht,
+            "id": str(uuid.uuid4()), "user_id": uid, "total_ht": ht,
             "tva_amount": tva_amount, "total_ttc": ttc, "paid": 0.0,
-            "status": "brouillon", "created_at": now_iso(),
+            "vat_breakdown": vat_breakdown, "status": "brouillon", "created_at": now_iso(),
         })
+        if number:
+            doc["number"] = number
         await db.themis_docs.insert_one(dict(doc))
         return {"ok": True, "doc": doc}
 
@@ -504,27 +607,49 @@ def make_themis_router(db):
             await db.themis_clients.insert_one(dict(client))
         label = (deal.get("note") or "").strip() or f"Prestation — {deal['nom']}"
         lines = [Line(label=label[:120], qty=1, unit_price=float(deal.get("valeur", 0)))]
-        ht, tva_amount, ttc = _totals(lines, 20.0)
-        number = await next_number("DEV" if body.kind == "devis" else "FAC")
+        ht, tva_amount, ttc, vat_breakdown = _tax_summary(lines, 20.0)
+        number = await next_number("DEV", uid) if body.kind == "devis" else None
         doc = {
             "kind": body.kind, "client_id": client["id"], "client_name": client["name"],
+            "source_deal_id": body.deal_id,
             "lines": [l.dict() for l in lines], "tva": 20.0, "template": "antique",
             "due_date": "", "notes": f"Généré depuis le deal HERMÈS AGORA# ({deal.get('etape', '')})",
-            "id": str(uuid.uuid4()), "user_id": uid, "number": number, "total_ht": ht,
-            "tva_amount": tva_amount, "total_ttc": ttc, "paid": 0.0,
+            "id": str(uuid.uuid4()), "user_id": uid, "total_ht": ht,
+            "tva_amount": tva_amount, "total_ttc": ttc, "vat_breakdown": vat_breakdown, "paid": 0.0,
             "status": "brouillon", "created_at": now_iso(),
         }
+        if number:
+            doc["number"] = number
         await db.themis_docs.insert_one(dict(doc))
         doc.pop("_id", None)
         await db.agora_deals.update_one({"id": body.deal_id, "user_id": uid}, {"$set": {
-            "themis_doc_id": doc["id"], "themis_doc_number": number, "themis_doc_kind": body.kind,
+            "themis_doc_id": doc["id"], "themis_doc_number": number or "", "themis_doc_kind": body.kind,
             "updated_at": now_iso()}})
         return {"ok": True, "doc": doc, "client": client}
 
     @r.put("/docs/{did}/status")
     async def doc_status(did: str, body: StatusIn, request: Request):
         uid = await _uid(request)
-        await db.themis_docs.update_one({"id": did, "user_id": uid}, {"$set": {"status": body.status}})
+        doc = await db.themis_docs.find_one({"id": did, "user_id": uid}, NO_ID)
+        if not doc:
+            raise HTTPException(status_code=404, detail="Document introuvable")
+        if doc.get("kind") == "facture":
+            if body.status != "envoyé":
+                raise HTTPException(status_code=409, detail="Une facture est émise via son envoi ou sa conversion depuis un devis ; les règlements passent par Paiements.")
+            issued = await issue_invoice(uid, did)
+            return {"ok": True, "doc": issued}
+        allowed = {
+            "brouillon": {"envoyé", "refusé"},
+            "envoyé": {"accepté", "refusé"},
+        }
+        if body.status not in allowed.get(doc.get("status"), set()):
+            raise HTTPException(status_code=409, detail="Transition de statut du devis interdite.")
+        result = await db.themis_docs.update_one(
+            {"id": did, "user_id": uid, "status": doc["status"]},
+            {"$set": {"status": body.status, "updated_at": now_iso()}},
+        )
+        if not result.matched_count:
+            raise HTTPException(status_code=409, detail="Le document a été modifié simultanément.")
         return {"ok": True}
 
     @r.post("/docs/{did}/convert")
@@ -533,13 +658,56 @@ def make_themis_router(db):
         d = await db.themis_docs.find_one({"id": did, "user_id": uid}, NO_ID)
         if not d or d.get("kind") != "devis":
             raise HTTPException(status_code=404, detail="Devis introuvable")
-        number = await next_number("FAC")
+        try:
+            await db.themis_docs.create_index(
+                [("user_id", 1), ("source_devis", 1)],
+                unique=True,
+                partialFilterExpression={"source_devis": {"$exists": True}},
+            )
+        except (DuplicateKeyError, sqlite3.IntegrityError) as error:
+            raise HTTPException(
+                status_code=409,
+                detail="Plusieurs factures sont déjà liées à ce devis ; vérifiez-les avant toute nouvelle conversion.",
+            ) from error
+        if d.get("status") not in ("envoyé", "accepté"):
+            raise HTTPException(status_code=409, detail="Le devis doit être envoyé avant sa conversion en facture.")
+        existing = await db.themis_docs.find_one(
+            {"user_id": uid, "kind": "facture", "source_devis": d["number"]}, NO_ID
+        )
+        if existing:
+            if existing.get("status") == "brouillon":
+                existing = await issue_invoice(uid, existing["id"])
+            await db.themis_docs.update_one(
+                {"id": did, "user_id": uid, "status": {"$in": ["envoyé", "accepté"]}},
+                {"$set": {"status": "accepté", "updated_at": now_iso()}},
+            )
+            return {"ok": True, "doc": existing}
         f = dict(d)
-        f.update({"id": str(uuid.uuid4()), "kind": "facture", "number": number,
-                  "status": "envoyé", "paid": 0.0, "created_at": now_iso(),
+        f.update({"id": str(uuid.uuid4()), "kind": "facture",
+                  "status": "brouillon", "paid": 0.0, "created_at": now_iso(),
                   "source_devis": d["number"]})
-        await db.themis_docs.insert_one(dict(f))
-        await db.themis_docs.update_one({"id": did, "user_id": uid}, {"$set": {"status": "accepté"}})
+        f.pop("number", None)
+        f.pop("issued_at", None)
+        try:
+            await db.themis_docs.insert_one(dict(f))
+        except (DuplicateKeyError, sqlite3.IntegrityError):
+            existing = await db.themis_docs.find_one(
+                {"user_id": uid, "kind": "facture", "source_devis": d["number"]}, NO_ID
+            )
+            if not existing:
+                raise
+            if existing.get("status") == "brouillon":
+                existing = await issue_invoice(uid, existing["id"])
+            await db.themis_docs.update_one(
+                {"id": did, "user_id": uid, "status": {"$in": ["envoyé", "accepté"]}},
+                {"$set": {"status": "accepté", "updated_at": now_iso()}},
+            )
+            return {"ok": True, "doc": existing}
+        f = await issue_invoice(uid, f["id"])
+        await db.themis_docs.update_one(
+            {"id": did, "user_id": uid, "status": {"$in": ["envoyé", "accepté"]}},
+            {"$set": {"status": "accepté", "updated_at": now_iso()}},
+        )
         return {"ok": True, "doc": f}
 
     @r.get("/docs/{did}/pdf")
@@ -551,7 +719,7 @@ def make_themis_router(db):
             raise HTTPException(status_code=404, detail="Document introuvable")
         pdf = build_doc_pdf(d, emetteur=emetteur, **identity)
         return Response(content=pdf, media_type="application/pdf",
-                        headers={"Content-Disposition": f'inline; filename="{d["number"]}.pdf"'})
+                        headers={"Content-Disposition": f'inline; filename="{d.get("number") or f"BROUILLON-{did[:8]}"}.pdf"'})
 
     @r.post("/docs/{did}/email")
     async def email_doc(did: str, body: EmailIn, request: Request):
@@ -560,10 +728,20 @@ def make_themis_router(db):
         d = await db.themis_docs.find_one({"id": did, "user_id": uid}, NO_ID)
         if not d:
             raise HTTPException(status_code=404, detail="Document introuvable")
+        was_draft_invoice = d.get("kind") == "facture" and d.get("status") == "brouillon"
+        if d.get("kind") == "facture" and d.get("status") == "brouillon":
+            if body.mail_type == "relance":
+                raise HTTPException(status_code=409, detail="Une facture brouillon ne peut pas faire l'objet d'une relance.")
+            d = await issue_invoice(uid, did)
         pdf = build_doc_pdf(d, emetteur=body.emetteur, **identity)
         kind = "Facture" if d["kind"] == "facture" else "Devis"
         subject = body.subject.strip() or f"{kind} {d['number']}"
-        message = body.message.strip() or (
+        message = body.message.strip()
+        if was_draft_invoice:
+            message = message.replace("attribuée lors de l’émission", d["number"])
+            if subject.startswith("Facture ") and "attribuée lors de l’émission" in subject:
+                subject = f"Facture {d['number']}"
+        message = message or (
             f"Bonjour,\n\nVeuillez trouver ci-joint votre {kind.lower()} {d['number']} "
             f"d'un montant de {float(d.get('total_ttc', 0)):.2f} € TTC.\n\nCordialement.")
         try:
@@ -588,7 +766,7 @@ def make_themis_router(db):
         entry = {"to": body.to, "subject": subject, "type": body.mail_type, "date": now_iso()}
         upd = {"$push": {"emails": entry}}
         if d.get("status") == "brouillon":
-            upd["$set"] = {"status": "envoyé"}
+            upd["$set"] = {"status": "envoyé", "updated_at": now_iso()}
         await db.themis_docs.update_one({"id": did, "user_id": uid}, upd)
         return {"ok": True, "sent_to": body.to}
 
@@ -601,7 +779,7 @@ def make_themis_router(db):
         clients = {c["id"]: c for c in await db.themis_clients.find({"user_id": uid}, NO_ID).to_list(2000)}
         candidates = []
         for doc in docs:
-            if doc.get("status") in ("payé", "refusé") or not doc.get("due_date"):
+            if doc.get("status") != "envoyé" or not doc.get("due_date"):
                 continue
             try:
                 due = date.fromisoformat(str(doc["due_date"])[:10])
@@ -612,7 +790,7 @@ def make_themis_router(db):
             email = client.get("email") or doc.get("email") or ""
             if days_late < body.days_threshold:
                 continue
-            candidates.append({"id": doc["id"], "number": doc.get("number", ""), "client": doc.get("client_name") or client.get("name", ""), "email": email, "remaining": round(float(doc.get("total_ttc") or 0) - float(doc.get("paid") or 0), 2), "days_late": days_late})
+            candidates.append({"id": doc["id"], "number": doc.get("number", ""), "client": doc.get("client_name") or client.get("name", ""), "email": email, "remaining": _remaining(doc.get("total_ttc"), doc.get("paid")), "days_late": days_late})
         if not body.confirm:
             return {"ok": True, "preview": True, "candidates": candidates}
         if not body.smtp:
@@ -646,7 +824,17 @@ def make_themis_router(db):
     @r.delete("/docs/{did}")
     async def del_doc(did: str, request: Request):
         uid = await _uid(request)
-        await db.themis_docs.delete_one({"id": did, "user_id": uid})
+        doc = await db.themis_docs.find_one({"id": did, "user_id": uid}, NO_ID)
+        if not doc:
+            raise HTTPException(status_code=404, detail="Document introuvable")
+        if doc.get("kind") == "facture" and doc.get("status") != "brouillon":
+            raise HTTPException(status_code=409, detail="Une facture émise ne peut pas être supprimée ; utilisez une procédure d'avoir.")
+        query = {"id": did, "user_id": uid}
+        if doc.get("kind") == "facture":
+            query["status"] = "brouillon"
+        result = await db.themis_docs.delete_one(query)
+        if not result.deleted_count:
+            raise HTTPException(status_code=409, detail="Le document a été modifié avant sa suppression.")
         return {"ok": True}
 
     # ---------- COMMANDES ----------
@@ -660,7 +848,7 @@ def make_themis_router(db):
         uid = await _uid(request)
         ht, _, ttc = _totals(body.lines, 20.0)
         doc = body.dict()
-        doc.update({"id": str(uuid.uuid4()), "user_id": uid, "number": await next_number("CMD"),
+        doc.update({"id": str(uuid.uuid4()), "user_id": uid, "number": await next_number("CMD", uid),
                     "total": ttc, "status": "en_attente", "created_at": now_iso()})
         await db.themis_orders.insert_one(dict(doc))
         return {"ok": True, "order": doc}
@@ -686,17 +874,30 @@ def make_themis_router(db):
     @r.post("/payments")
     async def add_payment(body: PaymentIn, request: Request):
         uid = await _uid(request)
-        doc = body.dict()
+        doc = body.model_dump()
         doc.update({"id": str(uuid.uuid4()), "user_id": uid, "created_at": now_iso()})
         if body.doc_id:
             d = await db.themis_docs.find_one({"id": body.doc_id, "user_id": uid}, NO_ID)
-            if not d or d.get("kind") != "facture":
-                raise HTTPException(status_code=400, detail="Un paiement ne peut être rattaché qu'à une facture.")
-            paid = round(float(d.get("paid", 0)) + body.amount, 2)
-            upd = {"paid": paid}
-            if paid >= float(d.get("total_ttc", 0)) - 0.001:
-                upd["status"] = "payé"
-            await db.themis_docs.update_one({"id": body.doc_id, "user_id": uid}, {"$set": upd})
+            if not d or d.get("kind") != "facture" or d.get("status") not in ("envoyé", "payé"):
+                raise HTTPException(status_code=400, detail="Un paiement ne peut être rattaché qu'à une facture émise.")
+            previous = _money(d.get("paid", 0))
+            amount = _money(body.amount)
+            total = _money(d.get("total_ttc", 0))
+            paid = previous + amount
+            if paid > total:
+                raise HTTPException(status_code=409, detail="Le paiement dépasse le solde restant de la facture.")
+            update = {"paid": float(paid), "updated_at": now_iso()}
+            if paid == total:
+                update["status"] = "payé"
+            previous_paid_filter = (
+                {"paid": d["paid"]} if "paid" in d else {"paid": {"$exists": False}}
+            )
+            result = await db.themis_docs.update_one(
+                {"id": body.doc_id, "user_id": uid, "status": d.get("status"), **previous_paid_filter},
+                {"$set": update},
+            )
+            if not result.matched_count:
+                raise HTTPException(status_code=409, detail="La facture a été réglée simultanément ; rechargez-la avant d'enregistrer ce paiement.")
         await db.themis_payments.insert_one(dict(doc))
         return {"ok": True, "payment": doc}
 
@@ -707,9 +908,9 @@ def make_themis_router(db):
         if p and p.get("doc_id"):
             d = await db.themis_docs.find_one({"id": p["doc_id"], "user_id": uid}, NO_ID)
             if d:
-                paid = max(0.0, round(float(d.get("paid", 0)) - float(p.get("amount", 0)), 2))
+                paid = max(0.0, _sum_money([d.get("paid", 0), -_money(p.get("amount", 0))]))
                 upd = {"paid": paid}
-                if paid < float(d.get("total_ttc", 0)) - 0.001 and d.get("status") == "payé":
+                if _money(paid) < _money(d.get("total_ttc", 0)) and d.get("status") == "payé":
                     upd["status"] = "envoyé"
                 await db.themis_docs.update_one({"id": p["doc_id"], "user_id": uid}, {"$set": upd})
         await db.themis_payments.delete_one({"id": pid, "user_id": uid})
@@ -807,9 +1008,9 @@ def make_themis_router(db):
         payments = await db.themis_payments.find({"user_id": uid}, NO_ID).to_list(2000)
         pieces = await db.themis_pieces.find({"user_id": uid}, NO_ID).to_list(1000)
         factures = [d for d in docs if d["kind"] == "facture"]
-        encaisse = round(sum(p["amount"] for p in payments), 2)
-        impayees = [d for d in factures if d.get("status") not in ("payé", "refusé")]
-        a_encaisser = round(sum(max(0, d.get("total_ttc", 0) - d.get("paid", 0)) for d in impayees), 2)
+        encaisse = _sum_money(p["amount"] for p in payments)
+        impayees = [d for d in factures if d.get("status") == "envoyé"]
+        a_encaisser = _sum_money(_remaining(d.get("total_ttc"), d.get("paid")) for d in impayees)
         today = datetime.now(timezone.utc).date()
         echeances = []
         for d in impayees:
@@ -821,12 +1022,12 @@ def make_themis_router(db):
                 continue
             echeances.append({
                 "number": d["number"], "client": d.get("client_name", ""),
-                "restant": round(max(0, d.get("total_ttc", 0) - d.get("paid", 0)), 2),
+                "restant": _remaining(d.get("total_ttc"), d.get("paid")),
                 "due_date": d["due_date"][:10], "days": (due - today).days,
             })
         echeances.sort(key=lambda e: e["days"])
         a_payer = [p for p in pieces if p.get("status") == "à_payer"]
-        total_a_payer = round(sum(float(p.get("total_ttc", 0) or 0) for p in a_payer), 2)
+        total_a_payer = _sum_money(p.get("total_ttc", 0) for p in a_payer)
 
         phrases = [f"Bilan financier. Tu as encaissé {encaisse:g} euros."]
         if impayees:
@@ -881,15 +1082,16 @@ def make_themis_router(db):
         docs = await db.themis_docs.find({"user_id": uid, "kind": "facture"}, NO_ID).to_list(2000)
         pieces = await db.themis_pieces.find({"user_id": uid}, NO_ID).to_list(2000)
         in_period = lambda item, key="created_at": from_date <= str(item.get(key) or item.get("created_at") or "")[:10] <= to_date
-        sales = [d for d in docs if in_period(d)]
+        sales = [d for d in docs if in_period(d, "issued_at")]
         purchases = [p for p in pieces if in_period(p, "date")]
-        ca_ht = round(sum(float(d.get("total_ht") or 0) for d in sales), 2)
-        collected = round(sum(float(d.get("tva_amount") or 0) for d in sales), 2)
-        deductible = round(sum(float(p.get("tva") or 0) for p in purchases), 2)
+        sales = [d for d in sales if d.get("status") in ("envoyé", "payé")]
+        ca_ht = float(_money(sum((Decimal(str(d.get("total_ht") or 0)) for d in sales), Decimal("0.00"))))
+        collected = float(_money(sum((Decimal(str(d.get("tva_amount") or 0)) for d in sales), Decimal("0.00"))))
+        deductible = float(_money(sum((Decimal(str(p.get("tva") or 0)) for p in purchases), Decimal("0.00"))))
         return {"from": from_date, "to": to_date, "ca_ht": ca_ht, "tva_collectee": collected,
-                "achats_ht": round(sum(float(p.get("total_ht") or 0) for p in purchases), 2),
-                "tva_deductible": deductible, "tva_nette": round(collected - deductible, 2),
-                "a_payer": round(collected - deductible, 2)}
+                "achats_ht": float(_money(sum((Decimal(str(p.get("total_ht") or 0)) for p in purchases), Decimal("0.00")))),
+                "tva_deductible": deductible, "tva_nette": float(_money(Decimal(str(collected)) - Decimal(str(deductible)))),
+                "a_payer": float(_money(Decimal(str(collected)) - Decimal(str(deductible))))}
 
     @r.get("/reconciliations")
     async def list_reconciliations(request: Request):
@@ -900,8 +1102,8 @@ def make_themis_router(db):
     async def add_reconciliation(body: ReconciliationIn, request: Request):
         uid = await _uid(request)
         payments = await db.themis_payments.find({"user_id": uid}, NO_ID).to_list(2000)
-        solde_comptable = round(sum(float(p.get("amount") or 0) for p in payments), 2)
-        difference = round(float(body.solde_releve) - solde_comptable, 2)
+        solde_comptable = _sum_money(p.get("amount", 0) for p in payments)
+        difference = float(_money(Decimal(str(body.solde_releve)) - Decimal(str(solde_comptable))))
         item = {**body.dict(), "id": str(uuid.uuid4()), "user_id": uid, "solde_comptable": solde_comptable,
                 "difference": difference, "status": "reconcilie" if abs(difference) < 0.01 else "en_cours", "created_at": now_iso()}
         await db.themis_reconciliations.insert_one(item)
@@ -916,7 +1118,7 @@ def make_themis_router(db):
             rows = parse_statement_csv(await file.read())
         except (UnicodeDecodeError, ValueError) as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
-        return {"ok": True, "count": len(rows), "total": round(sum(row["montant"] for row in rows), 2), "rows": rows[:2000]}
+        return {"ok": True, "count": len(rows), "total": _sum_money(row["montant"] for row in rows), "rows": rows[:2000]}
 
     @r.post("/bank-statements/import")
     async def import_bank_statement(body: BankStatementImport, request: Request):
@@ -927,14 +1129,14 @@ def make_themis_router(db):
         payments = await db.themis_payments.find({"user_id": uid}, NO_ID).to_list(2000)
         for row in body.rows:
             row_date = parse_statement_date(row.date)
-            duplicate_query = {"user_id": uid, "date": row_date, "montant": round(row.montant, 2), "reference": row.reference}
+            duplicate_query = {"user_id": uid, "date": row_date, "montant": float(_money(row.montant)), "reference": row.reference}
             if await db.themis_bank_transactions.find_one(duplicate_query):
                 duplicates += 1
                 continue
             match_id = None
             if row.montant > 0:
                 for payment in payments:
-                    if abs(float(payment.get("amount") or 0) - row.montant) < 0.01 and str(payment.get("created_at", ""))[:10] == row_date:
+                    if _money(payment.get("amount", 0)) == _money(row.montant) and str(payment.get("created_at", ""))[:10] == row_date:
                         match_id = payment.get("id")
                         matched += 1
                         break
@@ -962,20 +1164,22 @@ def make_themis_router(db):
             year = now.year + (month - 1) // 12
             month = (month - 1) % 12 + 1
             key = f"{year:04d}-{month:02d}"
-            incoming = sum(float(p.get("amount") or 0) for p in payments if str(p.get("created_at", ""))[:7] == key)
-            outgoing = sum(float(p.get("total_ttc") or 0) for p in pieces if (str(p.get("date") or p.get("created_at", ""))[:7] == key))
+            incoming = _sum_money(p.get("amount", 0) for p in payments if str(p.get("created_at", ""))[:7] == key)
+            outgoing = _sum_money(p.get("total_ttc", 0) for p in pieces if (str(p.get("date") or p.get("created_at", ""))[:7] == key))
             history.append((incoming, outgoing))
-        avg_in = sum(pair[0] for pair in history) / 3
-        avg_out = sum(pair[1] for pair in history) / 3
-        outstanding = sum(max(0, float(d.get("total_ttc") or 0) - float(d.get("paid") or 0)) for d in docs if d.get("status") not in ("payé", "refusé"))
+        avg_in = float(_money(_sum_money(pair[0] for pair in history) / 3))
+        avg_out = float(_money(_sum_money(pair[1] for pair in history) / 3))
+        outstanding = _sum_money(
+            _remaining(d.get("total_ttc"), d.get("paid")) for d in docs if d.get("status") == "envoyé"
+        )
         result = []
         for offset in range(1, max(1, min(months, 12)) + 1):
             month = now.month + offset
             year = now.year + (month - 1) // 12
             month = (month - 1) % 12 + 1
             incoming = avg_in + (outstanding if offset == 1 else 0)
-            result.append({"month": f"{year:04d}-{month:02d}", "in": round(incoming, 2), "out": round(avg_out, 2), "solde": round(incoming - avg_out, 2)})
-        return {"history": [{"in": round(i, 2), "out": round(o, 2)} for i, o in history], "projections": result,
+            result.append({"month": f"{year:04d}-{month:02d}", "in": float(_money(incoming)), "out": float(_money(avg_out)), "solde": float(_money(Decimal(str(incoming)) - Decimal(str(avg_out))))})
+        return {"history": [{"in": float(_money(i)), "out": float(_money(o))} for i, o in history], "projections": result,
                 "method": "moyenne des trois derniers mois + créances à encaisser le premier mois"}
 
     # ---------- TABLEAU DE BORD ----------
@@ -988,13 +1192,15 @@ def make_themis_router(db):
         payments = await db.themis_payments.find({"user_id": uid}, NO_ID).to_list(2000)
         factures = [d for d in docs if d["kind"] == "facture"]
         devis = [d for d in docs if d["kind"] == "devis"]
-        encaisse = round(sum(p["amount"] for p in payments), 2)
-        a_encaisser = round(sum(max(0, d.get("total_ttc", 0) - d.get("paid", 0))
-                                for d in factures if d.get("status") not in ("payé", "refusé")), 2)
+        encaisse = _sum_money(p["amount"] for p in payments)
+        a_encaisser = _sum_money(
+            _remaining(d.get("total_ttc"), d.get("paid")) for d in factures if d.get("status") == "envoyé"
+        )
         alerts = [i for i in items if int(i.get("stock", 0)) <= int(i.get("alert", 5))]
         by_method = {}
         for p in payments:
-            by_method[p.get("method", "autre")] = round(by_method.get(p.get("method", "autre"), 0) + p["amount"], 2)
+            method = p.get("method", "autre")
+            by_method[method] = _sum_money([by_method.get(method, 0), p["amount"]])
         pieces = await db.themis_pieces.find({"user_id": uid}, NO_ID).to_list(2000)
         now = datetime.now(timezone.utc)
         keys = []
@@ -1007,15 +1213,15 @@ def make_themis_router(db):
         for p in payments:
             k = str(p.get("created_at", ""))[:7]
             if k in series:
-                series[k]["in"] = round(series[k]["in"] + float(p.get("amount", 0) or 0), 2)
+                series[k]["in"] = _sum_money([series[k]["in"], p.get("amount", 0)])
         for p in pieces:
             k = (str(p.get("date") or "")[:7]) or str(p.get("created_at", ""))[:7]
             if k in series:
-                series[k]["out"] = round(series[k]["out"] + float(p.get("total_ttc", 0) or 0), 2)
+                series[k]["out"] = _sum_money([series[k]["out"], p.get("total_ttc", 0)])
         return {
             "encaisse": encaisse, "a_encaisser": a_encaisser,
             "devis_en_cours": len([d for d in devis if d.get("status") in ("brouillon", "envoyé")]),
-            "factures_impayees": len([d for d in factures if d.get("status") not in ("payé", "refusé")]),
+            "factures_impayees": len([d for d in factures if d.get("status") == "envoyé"]),
             "nb_clients": await db.themis_clients.count_documents({"user_id": uid}),
             "commandes_actives": len([o for o in orders if o.get("status") in ("en_attente", "en_cours", "expédiée")]),
             "stock_alerts": alerts, "by_method": by_method,

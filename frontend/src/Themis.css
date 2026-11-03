@@ -63,6 +63,7 @@
 }
 .th-input:focus { outline: none; border-color: #d8b875; box-shadow: 0 0 0 2px rgba(216, 184, 117, 0.15); }
 .th-input.th-qty { width: 84px; flex: none; }
+.th-input.th-vat { width: 128px; }
 .th-input.th-status { width: auto; padding: 4px 6px; font-size: 12px; }
 select.th-input option { background: #0a1420; }
 .th-lines { display: flex; flex-direction: column; gap: 6px; }
@@ -104,6 +105,7 @@ select.th-input option { background: #0a1420; }
   .th-line { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 36px; }
   .th-line > .th-input:first-child { grid-column: 1 / -1; }
   .th-line .th-input.th-qty { width: 100%; }
+  .th-line .th-input.th-vat { grid-column: 1 / -1; }
   .th-line .th-icon-btn { justify-content: center; min-height: 36px; }
   .th-input.th-qty { width: 64px; }
   .th-table, .th-table tbody { display: block; }

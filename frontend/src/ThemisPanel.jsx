@@ -11,7 +11,6 @@ import { formatDocumentDate as isoToFr } from "./dateTime";
 
 const API = (process.env.REACT_APP_BACKEND_URL || "") + "/api/themis";
 const EUR = (n) => `${Number(n || 0).toFixed(2)} €`;
-const DOC_STATUSES = ["brouillon", "envoyé", "accepté", "payé", "refusé"];
 const ORDER_STATUSES = ["en_attente", "en_cours", "expédiée", "livrée", "annulée"];
 const frToIso = (s) => {
   const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec((s || "").trim());
@@ -75,6 +74,9 @@ function Lines({ lines, setLines }) {
           <input className="th-input" placeholder="Désignation" value={l.label} onChange={(e) => upd(i, "label", e.target.value)} data-testid={`themis-line-label-${i}`} />
           <input className="th-input th-qty" type="number" min="0" value={l.qty} onChange={(e) => upd(i, "qty", e.target.value)} title="Quantité" data-testid={`themis-line-qty-${i}`} />
           <input className="th-input th-qty" type="number" step="0.01" value={l.unit_price} onChange={(e) => upd(i, "unit_price", e.target.value)} title="Prix unitaire HT" data-testid={`themis-line-price-${i}`} />
+          <select className="th-input th-qty th-vat" value={l.vat_rate ?? ""} onChange={(e) => upd(i, "vat_rate", e.target.value === "" ? null : Number(e.target.value))} title="TVA de la ligne" aria-label={`TVA de la ligne ${i + 1}`}>
+            <option value="">TVA du document</option><option value="0">0 %</option><option value="5.5">5,5 %</option><option value="10">10 %</option><option value="20">20 %</option>
+          </select>
           <button className="th-icon-btn" onClick={() => setLines(lines.filter((_, j) => j !== i))} data-testid={`themis-line-del-${i}`}><Trash2 size={12} /></button>
         </div>
       ))}
@@ -283,10 +285,11 @@ export default function ThemisPanel({ onClose, initialSource }) {
   const openEmail = (d, relance = false) => {
     const cl = clients.find((c) => c.id === d.client_id) || {};
     const restant = Number(d.total_ttc || 0) - Number(d.paid || 0);
+    const number = d.number || "attribuée lors de l’émission";
     if (relance) {
       setEmailForm({
         to: cl.email || "",
-        subject: `Relance — Facture ${d.number}`,
+        subject: `Relance — Facture ${number}`,
         message: `Bonjour${cl.name ? " " + cl.name : ""},\n\nSauf erreur de notre part, la facture ${d.number} d’un montant restant de ${restant.toFixed(2)} € TTC${d.due_date ? `, arrivée à échéance le ${isoToFr(d.due_date)}` : ""}, demeure impayée à ce jour.\n\nNous vous serions reconnaissants de bien vouloir procéder à son règlement dans les meilleurs délais. Si votre paiement nous est déjà parvenu, veuillez ne pas tenir compte de ce message.\n\nCordialement,\n${emetteur || "ΣIRIUS"}`,
         mail_type: "relance",
       });
@@ -294,8 +297,8 @@ export default function ThemisPanel({ onClose, initialSource }) {
       const kind = d.kind === "facture" ? "la facture" : "le devis";
       setEmailForm({
         to: cl.email || "",
-        subject: `${d.kind === "facture" ? "Facture" : "Devis"} ${d.number}`,
-        message: `Bonjour${cl.name ? " " + cl.name : ""},\n\nVeuillez trouver ci-joint ${kind} ${d.number} d’un montant de ${Number(d.total_ttc || 0).toFixed(2)} € TTC${d.due_date ? `, à régler avant le ${isoToFr(d.due_date)}` : ""}.\n\nCordialement,\n${emetteur || "ΣIRIUS"}`,
+        subject: d.kind === "facture" && d.status === "brouillon" ? "" : `${d.kind === "facture" ? "Facture" : "Devis"} ${number}`,
+        message: `Bonjour${cl.name ? " " + cl.name : ""},\n\nVeuillez trouver ci-joint ${kind} ${number} d’un montant de ${Number(d.total_ttc || 0).toFixed(2)} € TTC${d.due_date ? `, à régler avant le ${isoToFr(d.due_date)}` : ""}.\n\nCordialement,\n${emetteur || "ΣIRIUS"}`,
         mail_type: "envoi",
       });
     }
@@ -306,18 +309,27 @@ export default function ThemisPanel({ onClose, initialSource }) {
     const ok = await post(`docs/${emailDoc.id}/email`, { ...emailForm, emetteur, smtp: smtpConf() });
     setSending(false);
     if (ok) {
-      const num = emailDoc.number;
+      const num = emailDoc.number || "la facture émise";
       setEmailDoc(null);
       speakAsCharacter(`Le document ${num} a été transmis par e-mail.`, { pitch: 0.95, rate: 0.9 });
     }
   };
   const totalOf = (lines, tva = 0) => {
-    const ht = lines.reduce((s, l) => s + Number(l.qty || 0) * Number(l.unit_price || 0), 0);
-    return ht * (1 + Number(tva) / 100);
+    const roundCents = (value) => Math.sign(value) * Math.round(Math.abs(value) + Number.EPSILON);
+    const basesByRate = new Map();
+    for (const line of lines) {
+      const baseCents = roundCents(Number(line.qty || 0) * Number(line.unit_price || 0) * 100);
+      const rate = line.vat_rate == null ? Number(tva) : Number(line.vat_rate);
+      basesByRate.set(rate, (basesByRate.get(rate) || 0) + baseCents);
+    }
+    const htCents = [...basesByRate.values()].reduce((sum, base) => sum + base, 0);
+    const vatCents = [...basesByRate].reduce((sum, [rate, base]) => sum + roundCents(base * rate / 100), 0);
+    return (htCents + vatCents) / 100;
   };
   const factures = docs.filter((d) => d.kind === "facture");
+  const documentLabel = (d) => d.number || `BROUILLON-${String(d.id).slice(0, 8)}`;
   const todayIso = new Date().toISOString().slice(0, 10);
-  const isLate = (d) => d.kind === "facture" && d.due_date && !["payé", "refusé"].includes(d.status) && d.due_date.slice(0, 10) < todayIso;
+  const isLate = (d) => d.kind === "facture" && d.status === "envoyé" && d.due_date && d.due_date.slice(0, 10) < todayIso;
   const lastMail = (d) => (d.emails || [])[(d.emails || []).length - 1];
   const emetteur = (() => { try { const p = JSON.parse(localStorage.getItem("sirius_profile")) || {}; return p.company || p.name || ""; } catch (e) { return ""; } })();
   const pdfUrl = (d) => `${API}/docs/${d.id}/pdf?emetteur=${encodeURIComponent(emetteur)}`;
@@ -431,9 +443,9 @@ export default function ThemisPanel({ onClose, initialSource }) {
                 {docs.map((d) => (
                   <tr key={d.id} id={`themis-source-${d.id}`} className={initialSource?.kind === "facture" && initialSource.id === d.id ? "th-source-focus" : ""}>
                     <td data-label="Document">
-                      <b className={d.kind === "facture" ? "th-gold" : "th-cyan"}>{d.number}</b>
+                      <b className={d.kind === "facture" ? "th-gold" : "th-cyan"}>{documentLabel(d)}</b>
                       {lastMail(d) && (
-                        <><br /><span className="th-mailtrace" data-testid={`themis-mails-${d.number}`} title={(d.emails || []).map((m) => `${m.type === "relance" ? "Relance" : "Envoi"} le ${isoToFr(m.date.slice(0, 10))} → ${m.to}`).join("\n")}>
+                        <><br /><span className="th-mailtrace" data-testid={`themis-mails-${documentLabel(d)}`} title={(d.emails || []).map((m) => `${m.type === "relance" ? "Relance" : "Envoi"} le ${isoToFr(m.date.slice(0, 10))} → ${m.to}`).join("\n")}>
                           <Mail size={9} /> {(d.emails || []).length} envoi{(d.emails || []).length > 1 ? "s" : ""} · {isoToFr(lastMail(d).date.slice(0, 10))} → {lastMail(d).to}
                         </span></>
                       )}
@@ -441,16 +453,16 @@ export default function ThemisPanel({ onClose, initialSource }) {
                     <td data-label="Client">{d.client_name || clientName(d.client_id)}</td>
                     <td data-label="Montant TTC">{EUR(d.total_ttc)}{d.kind === "facture" && d.paid > 0 && <small> ({EUR(d.paid)} reçu)</small>}</td>
                     <td data-label="Statut">
-                      <select className="th-input th-status" aria-label={`Statut de ${d.number}`} value={d.status} onChange={(e) => post(`docs/${d.id}/status`, { status: e.target.value }, "PUT")} data-testid={`themis-doc-status-${d.number}`}>
-                        {DOC_STATUSES.map((s) => <option key={s}>{s}</option>)}
+                      <select className="th-input th-status" aria-label={`Statut de ${documentLabel(d)}`} value={d.status} disabled={d.kind === "facture" ? d.status !== "brouillon" : !["brouillon", "envoyé"].includes(d.status)} onChange={(e) => post(`docs/${d.id}/status`, { status: e.target.value }, "PUT")} data-testid={`themis-doc-status-${documentLabel(d)}`}>
+                        {(d.kind === "facture" ? d.status === "brouillon" ? ["brouillon", "envoyé"] : [d.status] : d.status === "brouillon" ? ["brouillon", "envoyé", "refusé"] : d.status === "envoyé" ? ["envoyé", "accepté", "refusé"] : [d.status]).map((s) => <option key={s}>{s}</option>)}
                       </select>
                     </td>
                     <td className="th-actions" data-label="Actions">
-                      <a className="th-icon-btn" href={pdfUrl(d)} target="_blank" rel="noreferrer" title="Télécharger le PDF" data-testid={`themis-pdf-${d.number}`}><FileDown size={12} /></a>
-                      <button className="th-icon-btn" title="Envoyer par e-mail" onClick={() => openEmail(d)} data-testid={`themis-email-${d.number}`}><Mail size={12} /></button>
-                      {isLate(d) && <button className="th-icon-btn th-late-btn" title="Relancer le client (facture en retard)" onClick={() => openEmail(d, true)} data-testid={`themis-relance-${d.number}`}><Bell size={12} /></button>}
-                      {d.kind === "devis" && <button className="th-icon-btn" title="Convertir en facture" onClick={() => post(`docs/${d.id}/convert`)} data-testid={`themis-convert-${d.number}`}><ArrowRightLeft size={12} /></button>}
-                      <ConfirmButton className="th-icon-btn" onConfirm={() => post(`docs/${d.id}`, null, "DELETE")} testId={`themis-doc-del-${d.number}`}><Trash2 size={12} /></ConfirmButton>
+                      <a className="th-icon-btn" href={pdfUrl(d)} target="_blank" rel="noreferrer" title="Télécharger le PDF" data-testid={`themis-pdf-${documentLabel(d)}`}><FileDown size={12} /></a>
+                      <button className="th-icon-btn" title="Envoyer par e-mail" onClick={() => openEmail(d)} data-testid={`themis-email-${documentLabel(d)}`}><Mail size={12} /></button>
+                      {isLate(d) && <button className="th-icon-btn th-late-btn" title="Relancer le client (facture en retard)" onClick={() => openEmail(d, true)} data-testid={`themis-relance-${documentLabel(d)}`}><Bell size={12} /></button>}
+                      {d.kind === "devis" && ["envoyé", "accepté"].includes(d.status) && <button className="th-icon-btn" title="Convertir en facture" onClick={() => post(`docs/${d.id}/convert`)} data-testid={`themis-convert-${documentLabel(d)}`}><ArrowRightLeft size={12} /></button>}
+                      {!(d.kind === "facture" && d.status !== "brouillon") && <ConfirmButton className="th-icon-btn" onConfirm={() => post(`docs/${d.id}`, null, "DELETE")} testId={`themis-doc-del-${documentLabel(d)}`}><Trash2 size={12} /></ConfirmButton>}
                     </td>
                   </tr>
                 ))}
@@ -521,7 +533,7 @@ export default function ThemisPanel({ onClose, initialSource }) {
               <div className="th-section-title">ENREGISTRER UN PAIEMENT</div>
               <select className="th-input" value={payForm.doc_id} onChange={(e) => setPayForm({ ...payForm, doc_id: e.target.value })} data-testid="themis-pay-doc">
                 <option value="">— Facture —</option>
-                {factures.filter((f) => f.status !== "payé").map((f) => <option key={f.id} value={f.id}>{f.number} · {EUR(f.total_ttc - (f.paid || 0))} restant</option>)}
+                {factures.filter((f) => f.status === "envoyé").map((f) => <option key={f.id} value={f.id}>{f.number} · {EUR(f.total_ttc - (f.paid || 0))} restant</option>)}
               </select>
               <div className="th-row">
                 <input className="th-input" type="number" step="0.01" placeholder="Montant €" value={payForm.amount} onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })} data-testid="themis-pay-amount" />
@@ -726,7 +738,7 @@ export default function ThemisPanel({ onClose, initialSource }) {
       {emailDoc && createPortal(
         <div className="th-modal-back" data-testid="themis-email-modal">
           <div className="th-modal">
-            <div className="th-section-title"><Mail size={12} /> {emailForm.mail_type === "relance" ? "RELANCE — FACTURE" : `ENVOYER ${emailDoc.kind === "facture" ? "LA FACTURE" : "LE DEVIS"}`} {emailDoc.number} PAR E-MAIL</div>
+            <div className="th-section-title"><Mail size={12} /> {emailForm.mail_type === "relance" ? "RELANCE — FACTURE" : `ENVOYER ${emailDoc.kind === "facture" ? "LA FACTURE" : "LE DEVIS"}`} {documentLabel(emailDoc)} PAR E-MAIL</div>
             {!smtpConf() && <p className="th-note" data-testid="themis-email-nosmtp">Configurez d’abord votre serveur SMTP dans l’onglet CLÉS API, puis revenez ici.</p>}
             {err && (
               <div className="th-error" style={{ margin: 0 }} data-testid="themis-email-error">
@@ -737,7 +749,7 @@ export default function ThemisPanel({ onClose, initialSource }) {
             <input className="th-input" placeholder="Destinataire (e-mail du client)" value={emailForm.to} onChange={(e) => setEmailForm({ ...emailForm, to: e.target.value })} data-testid="themis-email-to" />
             <input className="th-input" placeholder="Objet" value={emailForm.subject} onChange={(e) => setEmailForm({ ...emailForm, subject: e.target.value })} data-testid="themis-email-subject" />
             <textarea className="th-input" rows={6} value={emailForm.message} onChange={(e) => setEmailForm({ ...emailForm, message: e.target.value })} data-testid="themis-email-message" />
-            <p className="th-note">Le PDF {emailDoc.number} sera joint automatiquement.</p>
+            <p className="th-note">Le PDF {documentLabel(emailDoc)} sera joint automatiquement.</p>
             <div className="th-row">
               <button className="th-btn gold" disabled={!smtpConf() || sending || !emailForm.to.trim()} onClick={sendEmail} data-testid="themis-email-send">{sending ? "ENVOI EN COURS…" : "ENVOYER"}</button>
               <button className="th-btn" onClick={() => setEmailDoc(null)} data-testid="themis-email-cancel">ANNULER</button>

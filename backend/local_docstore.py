@@ -14,7 +14,8 @@ API couverte (celle réellement utilisée par le backend) :
   $nin, $exists, $regex, $or, $and
 - mises à jour : $set, $unset, $inc, $push, $addToSet (+ $each)
 - insert_once(document, identity) : insertion atomique par identité explicite
-- create_index / create_indexes : no-op (SQLite locale, volumétrie personnelle)
+- create_index : index d'unicité pour factures THÉMIS et événements Stripe ; autres index no-op
+- create_indexes : no-op (SQLite locale, volumétrie personnelle)
 """
 
 import json
@@ -40,7 +41,7 @@ def _dumps(doc: dict) -> str:
     return json.dumps(doc, ensure_ascii=False, default=_json_default)
 
 
-_INDEXED_FIELDS = ("user_id", "session_id", "created_at", "updated_at")
+_INDEXED_FIELDS = ("user_id", "session_id", "created_at", "updated_at", "number")
 
 
 def _indexed_values(doc: dict) -> tuple:
@@ -290,9 +291,18 @@ class LocalCollection:
             return _project(doc, projection)
         return None
 
-    # --- index : no-op en SQLite locale ---
+    # --- index d'unicité requis par les flux financiers ---
 
     async def create_index(self, *args, **kwargs):
+        if kwargs.get("unique"):
+            keys = args[0] if args else None
+            fields = [name for name, _direction in keys] if isinstance(keys, list) else [keys]
+            if self._name == "themis_docs" and fields == ["user_id", "number"]:
+                self._store._create_unique_themis_number_index()
+            elif self._name == "themis_docs" and fields == ["user_id", "source_devis"]:
+                self._store._create_unique_themis_source_index()
+            elif self._name == "stripe_events" and fields == ["event_id"]:
+                self._store._create_unique_stripe_event_index()
         return "local"
 
     async def create_indexes(self, *args, **kwargs):
@@ -348,10 +358,45 @@ class LocalDocStore:
                     continue
                 values = _indexed_values(doc)
                 con.execute(
-                    "UPDATE documents SET user_id = ?, session_id = ?, created_at = ?, updated_at = ? "
+                    "UPDATE documents SET user_id = ?, session_id = ?, created_at = ?, updated_at = ?, number = ? "
                     "WHERE pk = ? AND collection = ?",
                     (*values, row["pk"], row["collection"]),
                 )
+            rows = con.execute(
+                "SELECT pk, doc FROM documents WHERE collection = 'themis_docs' AND number IS NULL LIMIT ?",
+                (limit,),
+            ).fetchall()
+            for row in rows:
+                try:
+                    number = json.loads(row["doc"]).get("number")
+                except (TypeError, ValueError):
+                    continue
+                if number is not None:
+                    con.execute("UPDATE documents SET number = ? WHERE pk = ?", (str(number), row["pk"]))
+
+    def _create_unique_themis_number_index(self):
+        with _lock, closing(self._conn()) as con, con:
+            con.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_themis_user_number "
+                "ON documents(user_id, number) "
+                "WHERE collection = 'themis_docs' AND user_id IS NOT NULL AND number IS NOT NULL"
+            )
+
+    def _create_unique_themis_source_index(self):
+        with _lock, closing(self._conn()) as con, con:
+            con.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_themis_user_source_quote "
+                "ON documents(json_extract(doc, '$.user_id'), json_extract(doc, '$.source_devis')) "
+                "WHERE collection = 'themis_docs' AND json_extract(doc, '$.source_devis') IS NOT NULL"
+            )
+
+    def _create_unique_stripe_event_index(self):
+        with _lock, closing(self._conn()) as con, con:
+            con.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_stripe_event_id "
+                "ON documents(json_extract(doc, '$.event_id')) "
+                "WHERE collection = 'stripe_events' AND json_extract(doc, '$.event_id') IS NOT NULL"
+            )
 
     def __getattr__(self, name: str) -> LocalCollection:
         if name.startswith("_"):
@@ -410,8 +455,8 @@ class LocalDocStore:
         values = _indexed_values(document)
         with _lock, closing(self._conn()) as con, con:
             cur = con.execute(
-                "INSERT INTO documents (collection, doc, user_id, session_id, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT INTO documents (collection, doc, user_id, session_id, created_at, updated_at, number) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (collection, _dumps(document), *values),
             )
         return cur.lastrowid
@@ -420,7 +465,7 @@ class LocalDocStore:
         values = _indexed_values(document)
         with _lock, closing(self._conn()) as con, con:
             con.execute(
-                "UPDATE documents SET doc = ?, user_id = ?, session_id = ?, created_at = ?, updated_at = ? "
+                "UPDATE documents SET doc = ?, user_id = ?, session_id = ?, created_at = ?, updated_at = ?, number = ? "
                 "WHERE pk = ? AND collection = ?",
                 (_dumps(document), *values, pk, collection),
             )
@@ -438,8 +483,8 @@ class LocalDocStore:
                 if _matches(existing, identity):
                     return existing, False
             con.execute(
-                "INSERT INTO documents (collection, doc, user_id, session_id, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT INTO documents (collection, doc, user_id, session_id, created_at, updated_at, number) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (collection, _dumps(document), *_indexed_values(document)),
             )
             return document, True

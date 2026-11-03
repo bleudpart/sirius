@@ -145,7 +145,7 @@ def test_invoice_ocr_canonical_checksum_and_optional_checksum():
         adapter = InvoiceOCRAdapter("a", "EUR")
         records = adapter.parse_payload(_raw(payload))
         assert adapter.validate_checksum_and_totals(records)
-        assert adapter.idempotency_key == "ocr-" + hashlib.sha256(b"invoice-1").hexdigest()
+        assert adapter.idempotency_key == "ocr-" + hashlib.sha256(b"a:fournisseur:invoice-1:2026-03-10").hexdigest()
         assert records[0].deductible_vat == D("0")
         assert len(records[0].source_transaction_id) <= 160
 
@@ -161,6 +161,19 @@ def test_invoice_ocr_canonical_checksum_and_optional_checksum():
     adapter = InvoiceOCRAdapter("a", "EUR")
     records = adapter.parse_payload(_raw(mismatch))
     assert not adapter.validate_checksum_and_totals(records)
+
+
+def test_invoice_ocr_identity_includes_normalized_supplier():
+    first = InvoiceOCRAdapter("a", "EUR")
+    first_records = first.parse_payload(_raw(_ocr_payload()))
+    second_payload = _ocr_payload()
+    second_payload["supplier"] = "Autre Fournisseur"
+    second_canonical = {key: value for key, value in second_payload.items() if key != "checksum"}
+    second_payload["checksum"] = hashlib.sha256(_canonical_json(second_canonical)).hexdigest()
+    second = InvoiceOCRAdapter("a", "EUR")
+    second_records = second.parse_payload(_raw(second_payload))
+    assert first.idempotency_key != second.idempotency_key
+    assert first_records[0].source_transaction_id != second_records[0].source_transaction_id
 
 
 def test_json_duplicate_keys_and_invalid_calendar_dates_are_rejected():

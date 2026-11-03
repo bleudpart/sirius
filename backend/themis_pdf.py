@@ -69,48 +69,76 @@ def build_doc_pdf(doc, emetteur="", signature_name=None, signature_email=None):
     w, h = A4
 
     kind = "FACTURE" if doc.get("kind") == "facture" else "DEVIS"
-    c.setFillColor(band)
-    c.rect(0, h - 96, w, 96, stroke=0, fill=1)
-    c.setFillColor(accent)
-    c.rect(0, h - 100, w, 4, stroke=0, fill=1)
-    c.setFillColor(white)
-    brand_x = _draw_workspace_logo(c, 34, h - 78)
-    _draw_header_text(c, emetteur or "ΣIRIUS ENTERPRISE", brand_x, h - 52, w - brand_x - 190, size=20)
-    c.setFillColor(accent)
-    c.setFont("Helvetica-Bold", 16)
-    c.drawRightString(w - 40, h - 44, f"{kind} {doc.get('number', '')}")
-    c.setFillColor(white)
-    c.setFont("Helvetica", 9)
-    c.drawRightString(w - 40, h - 62, f"Émise le {str(doc.get('created_at', ''))[:10]}")
-    if doc.get("due_date"):
-        c.drawRightString(w - 40, h - 76, f"Échéance : {doc['due_date']}")
-    c.setFont("Helvetica-Oblique", 8)
-    c.drawString(brand_x, h - 76, f"Modèle {style['label']} — généré par ΣIRIUS · THÉMIS")
+    number = doc.get("number") or "BROUILLON — NON ÉMISE"
+    issued_at = doc.get("issued_at")
+    document_date = str(issued_at or doc.get("created_at", ""))[:10]
 
-    y = h - 140
-    c.setFillColor(accent)
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(40, y, "ADRESSÉ À")
-    c.setFillColor(dark)
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(40, y - 18, doc.get("client_name") or "Client")
-    if doc.get("notes"):
+    def draw_header(page_number):
+        c.setFillColor(band)
+        c.rect(0, h - 96, w, 96, stroke=0, fill=1)
+        c.setFillColor(accent)
+        c.rect(0, h - 100, w, 4, stroke=0, fill=1)
+        c.setFillColor(white)
+        brand_x = _draw_workspace_logo(c, 34, h - 78)
+        _draw_header_text(c, emetteur or "ΣIRIUS ENTERPRISE", brand_x, h - 52, w - brand_x - 190, size=20)
+        c.setFillColor(accent)
+        c.setFont("Helvetica-Bold", 14)
+        c.drawRightString(w - 40, h - 44, f"{kind} {number}")
+        c.setFillColor(white)
         c.setFont("Helvetica", 9)
-        c.setFillColor(grey)
-        c.drawString(40, y - 34, str(doc["notes"])[:110])
+        c.drawRightString(w - 40, h - 62, f"{'Émise' if issued_at else 'Brouillon créé'} le {document_date}")
+        if doc.get("due_date"):
+            c.drawRightString(w - 40, h - 76, f"Échéance : {doc['due_date']}")
+        c.setFont("Helvetica-Oblique", 8)
+        c.drawString(brand_x, h - 76, f"Modèle {style['label']} — généré par ΣIRIUS · THÉMIS")
 
-    y -= 70
-    c.setFillColor(accent)
-    c.rect(40, y - 6, w - 80, 22, stroke=0, fill=1)
-    c.setFillColor(white)
-    c.setFont("Helvetica-Bold", 9)
-    c.drawString(48, y, "DÉSIGNATION")
-    c.drawRightString(w - 220, y, "QTÉ")
-    c.drawRightString(w - 140, y, "P.U. HT")
-    c.drawRightString(w - 48, y, "TOTAL HT")
-    y -= 26
-    c.setFont("Helvetica", 10)
-    for line in (doc.get("lines") or [])[:28]:
+        y = h - 140
+        if page_number == 1:
+            c.setFillColor(accent)
+            c.setFont("Helvetica-Bold", 10)
+            c.drawString(40, y, "ADRESSÉ À")
+            c.setFillColor(dark)
+            c.setFont("Helvetica-Bold", 12)
+            c.drawString(40, y - 18, doc.get("client_name") or "Client")
+            if doc.get("notes"):
+                c.setFont("Helvetica", 9)
+                c.setFillColor(grey)
+                c.drawString(40, y - 34, str(doc["notes"])[:110])
+            y -= 70
+        else:
+            c.setFillColor(grey)
+            c.setFont("Helvetica-Oblique", 9)
+            c.drawString(40, y - 12, f"Suite du document {number}")
+            y -= 35
+
+        c.setFillColor(accent)
+        c.rect(40, y - 6, w - 80, 22, stroke=0, fill=1)
+        c.setFillColor(white)
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(48, y, "DÉSIGNATION")
+        c.drawRightString(w - 220, y, "QTÉ")
+        c.drawRightString(w - 140, y, "P.U. HT")
+        c.drawRightString(w - 48, y, "TOTAL HT")
+        return y - 26
+
+    def draw_footer():
+        c.setFillColor(accent)
+        c.rect(0, 40, w, 3, stroke=0, fill=1)
+        c.setFillColor(grey)
+        c.setFont("Helvetica", 8)
+        c.drawCentredString(w / 2, 26, f"{kind} {number} — statut : {doc.get('status', '')} — document généré par ΣIRIUS · module THÉMIS")
+        contact_email = signature_lines(signature_name, signature_email)[3]
+        c.setFont("Helvetica", 7)
+        c.drawCentredString(w / 2, 13, contact_email)
+
+    page_number = 1
+    y = draw_header(page_number)
+    for line in doc.get("lines") or []:
+        if y < 190:
+            draw_footer()
+            c.showPage()
+            page_number += 1
+            y = draw_header(page_number)
         qty = float(line.get("qty", 1) or 0)
         pu = float(line.get("unit_price", 0) or 0)
         c.setFillColor(dark)
@@ -122,19 +150,35 @@ def build_doc_pdf(doc, emetteur="", signature_name=None, signature_email=None):
         c.setLineWidth(0.5)
         c.line(40, y - 7, w - 40, y - 7)
         y -= 22
-        if y < 180:
-            break
 
     y -= 14
+    breakdown = doc.get("vat_breakdown") or []
+    if y < 245:
+        draw_footer()
+        c.showPage()
+        page_number += 1
+        y = draw_header(page_number) - 14
     box_x = w - 250
     c.setFillColor(dark)
     c.setFont("Helvetica", 10)
     c.drawString(box_x, y, "Total HT")
     c.drawRightString(w - 48, y, _eur(doc.get("total_ht")))
     y -= 18
-    c.drawString(box_x, y, f"TVA ({float(doc.get('tva', 20) or 0):g} %)")
-    c.drawRightString(w - 48, y, _eur(doc.get("tva_amount")))
-    y -= 8
+    if breakdown:
+        for tax in breakdown:
+            if y < 100:
+                draw_footer()
+                c.showPage()
+                page_number += 1
+                y = draw_header(page_number) - 14
+            c.drawString(box_x, y, f"TVA ({float(tax.get('rate', 0)):g} %)")
+            c.drawRightString(w - 48, y, _eur(tax.get("tva")))
+            y -= 16
+    else:
+        c.drawString(box_x, y, f"TVA ({float(doc.get('tva', 20) or 0):g} %)")
+        c.drawRightString(w - 48, y, _eur(doc.get("tva_amount")))
+        y -= 16
+    y -= 4
     c.setStrokeColor(accent)
     c.setLineWidth(1.2)
     c.line(box_x, y, w - 40, y)
@@ -155,14 +199,7 @@ def build_doc_pdf(doc, emetteur="", signature_name=None, signature_email=None):
         c.drawString(box_x, y, "Reste à payer")
         c.drawRightString(w - 48, y, _eur(float(doc.get("total_ttc", 0)) - float(doc.get("paid", 0))))
 
-    c.setFillColor(accent)
-    c.rect(0, 40, w, 3, stroke=0, fill=1)
-    c.setFillColor(grey)
-    c.setFont("Helvetica", 8)
-    c.drawCentredString(w / 2, 26, f"{kind} {doc.get('number', '')} — statut : {doc.get('status', '')} — document généré par ΣIRIUS · module THÉMIS")
-    contact_email = signature_lines(signature_name, signature_email)[3]
-    c.setFont("Helvetica", 7)
-    c.drawCentredString(w / 2, 13, contact_email)
+    draw_footer()
     c.showPage()
     c.save()
     return buf.getvalue()

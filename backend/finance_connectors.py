@@ -945,6 +945,11 @@ class InvoiceOCRAdapter(BaseDataConnector):
         ids = [line.line_id for line in payload.lines]
         if len(set(ids)) != len(ids):
             raise ConnectorValidationError("Identifiants de lignes de facture dupliqués.")
+        supplier_identity = _folded(payload.supplier) or payload.supplier.casefold().strip()
+        invoice_identity = " ".join(payload.invoice_id.casefold().split())
+        invoice_identity_hash = hashlib.sha256(
+            f"{self.company_id}:{supplier_identity}:{invoice_identity}:{payload.date}".encode("utf-8")
+        ).hexdigest()
         transactions = _validated_transactions([
             PurchaseExpenseIn(
                 company_id=self.company_id, date=payload.date, supplier=payload.supplier,
@@ -953,7 +958,7 @@ class InvoiceOCRAdapter(BaseDataConnector):
                 deductible_vat=line.deductible_vat, category=line.category,
                 allocation=line.allocation, business_reference=line.business_reference,
                 source_transaction_id="ocr-" + hashlib.sha256(
-                    f"{payload.invoice_id}:{line.line_id}".encode("utf-8")
+                    f"{invoice_identity_hash}:{line.line_id}".encode("utf-8")
                 ).hexdigest(),
             )
             for line in payload.lines
@@ -961,7 +966,7 @@ class InvoiceOCRAdapter(BaseDataConnector):
         self._declared_totals = payload.totals
         self._warning_checksum = payload.checksum
         self._expected_payload_checksum = expected
-        self._idempotency_key = "ocr-" + hashlib.sha256(payload.invoice_id.encode("utf-8")).hexdigest()
+        self._idempotency_key = "ocr-" + invoice_identity_hash
         self._remember(transactions, payload.checksum)
         return transactions
 

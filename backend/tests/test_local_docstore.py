@@ -74,6 +74,39 @@ def test_insert_once_validates_identity_and_keeps_accounts_independent(store):
             run(store.once.insert_once(document, identity))
 
 
+def test_themis_numbers_are_unique_per_account_and_update_atomically(store):
+    run(store.themis_docs.create_index([("user_id", 1), ("number", 1)], unique=True))
+    run(store.themis_docs.insert_one({"id": "a", "user_id": "u1", "number": "FAC-2026-0001"}))
+    run(store.themis_docs.insert_one({"id": "b", "user_id": "u2", "number": "FAC-2026-0001"}))
+    with pytest.raises(sqlite3.IntegrityError):
+        run(store.themis_docs.insert_one({"id": "duplicate", "user_id": "u1", "number": "FAC-2026-0001"}))
+    with pytest.raises(sqlite3.IntegrityError):
+        run(store.themis_docs.update_one({"id": "b"}, {"$set": {"user_id": "u1"}}))
+    assert run(store.themis_docs.find_one({"id": "b"}))["user_id"] == "u2"
+
+
+def test_stripe_event_ids_are_unique_in_local_store(store):
+    run(store.stripe_events.create_index([("event_id", 1)], unique=True))
+    run(store.stripe_events.insert_one({"event_id": "evt_one"}))
+    with pytest.raises(sqlite3.IntegrityError):
+        run(store.stripe_events.insert_one({"event_id": "evt_one"}))
+
+
+def test_quote_conversion_source_is_unique_per_account(store):
+    run(store.themis_docs.create_index(
+        [("user_id", 1), ("source_devis", 1)],
+        unique=True,
+        partialFilterExpression={"source_devis": {"$exists": True}},
+    ))
+    run(store.themis_docs.insert_one({
+        "id": "invoice-one", "user_id": "u1", "source_devis": "DEV-2026-0001",
+    }))
+    with pytest.raises(sqlite3.IntegrityError):
+        run(store.themis_docs.insert_one({
+            "id": "invoice-two", "user_id": "u1", "source_devis": "DEV-2026-0001",
+        }))
+
+
 # ---------- CRUD de base ----------
 
 def test_insert_et_find_one(store):

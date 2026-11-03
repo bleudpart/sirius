@@ -230,8 +230,8 @@ def test_webhook_uses_stripe_billing_period_not_account_trial(monkeypatch, subsc
     }}}
     monkeypatch.setattr(payments_api.stripe.Webhook, "construct_event", lambda *args: event)
     db = SimpleNamespace(
-        stripe_events=SimpleNamespace(find_one=AsyncMock(return_value=None), insert_one=AsyncMock()),
-        user_licenses=SimpleNamespace(update_one=AsyncMock()),
+        stripe_events=SimpleNamespace(create_index=AsyncMock(), find_one=AsyncMock(return_value=None), insert_one=AsyncMock()),
+        user_licenses=SimpleNamespace(find_one=AsyncMock(return_value=None), update_one=AsyncMock()),
     )
     app = FastAPI()
     app.include_router(payments_api.make_payments_router(db), prefix="/api")
@@ -247,10 +247,10 @@ def test_checkout_completion_preserves_subscription_period(monkeypatch):
     }}}
     monkeypatch.setattr(payments_api.stripe.Webhook, "construct_event", lambda *args: event)
     db = SimpleNamespace(
-        stripe_events=SimpleNamespace(find_one=AsyncMock(return_value=None), insert_one=AsyncMock()),
+        stripe_events=SimpleNamespace(create_index=AsyncMock(), find_one=AsyncMock(return_value=None), insert_one=AsyncMock()),
         payment_transactions=SimpleNamespace(update_one=AsyncMock(), find_one=AsyncMock(
             return_value={"tier": "monthly", "user_id": "buyer@example.com"})),
-        user_licenses=SimpleNamespace(update_one=AsyncMock()),
+        user_licenses=SimpleNamespace(find_one=AsyncMock(return_value=None), update_one=AsyncMock()),
     )
     app = FastAPI()
     app.include_router(payments_api.make_payments_router(db), prefix="/api")
@@ -264,7 +264,7 @@ def _refund_app(monkeypatch, charge, transaction=None, license_doc=None):
     cancel = SimpleNamespace(calls=[])
     monkeypatch.setattr(payments_api.stripe.Subscription, "cancel", lambda sub_id: cancel.calls.append(sub_id))
     db = SimpleNamespace(
-        stripe_events=SimpleNamespace(find_one=AsyncMock(return_value=None), insert_one=AsyncMock()),
+        stripe_events=SimpleNamespace(create_index=AsyncMock(), find_one=AsyncMock(return_value=None), insert_one=AsyncMock()),
         payment_transactions=SimpleNamespace(update_one=AsyncMock(), find_one=AsyncMock(return_value=transaction)),
         user_licenses=SimpleNamespace(update_one=AsyncMock(), find_one=AsyncMock(return_value=license_doc)),
     )
@@ -279,7 +279,7 @@ def test_full_refund_revokes_perpetual_license(monkeypatch, tier):
     db, cancel = _refund_app(monkeypatch, {"payment_intent": "pi_1", "refunded": True},
                              transaction={"user_id": "buyer@example.com", "tier": tier})
     query, update = db.user_licenses.update_one.call_args.args
-    assert query == {"user_id": "buyer@example.com", "tier": tier}
+    assert query == {"user_id": "buyer@example.com", "tier": tier, "stripe_event_created": {"$exists": False}}
     assert update["$set"]["status"] == "refunded"
     assert cancel.calls == []
 
@@ -296,7 +296,7 @@ def test_full_refund_of_rental_cancels_subscription(monkeypatch):
                                           "stripe_subscription_id": "sub_1"})
     assert cancel.calls == ["sub_1"]
     query, update = db.user_licenses.update_one.call_args.args
-    assert query == {"stripe_customer_id": "cus_1", "tier": "monthly"}
+    assert query == {"stripe_customer_id": "cus_1", "tier": "monthly", "stripe_event_created": {"$exists": False}}
     assert update["$set"]["status"] == "canceled"
 
 

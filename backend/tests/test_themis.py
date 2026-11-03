@@ -153,6 +153,41 @@ class TestThemisInventory:
 
 # Quote totals, status persistence, invoice conversion/filtering, and cleanup contracts.
 class TestThemisDocuments:
+    def test_invoice_is_numbered_on_issue_and_cannot_be_deleted_or_overpaid(self, api, created):
+        client_name = f"TEST_Issue_Client_{uuid.uuid4().hex[:6]}"
+        client = assert_ok(api.post(f"{API}/clients", json={"name": client_name}, timeout=20))["client"]
+        created["clients"].append(client["id"])
+        invoice = assert_ok(api.post(f"{API}/docs", json={
+            "kind": "facture",
+            "client_id": client["id"],
+            "client_name": client_name,
+            "lines": [{"label": "TEST_Rounding", "qty": 1, "unit_price": 0.01, "vat_rate": 20}],
+            "tva": 20,
+        }, timeout=20))["doc"]
+        created["docs"].append(invoice["id"])
+        assert "number" not in invoice
+        assert (invoice["total_ht"], invoice["tva_amount"], invoice["total_ttc"]) == (0.01, 0.0, 0.01)
+
+        issued = assert_ok(api.put(
+            f"{API}/docs/{invoice['id']}/status", json={"status": "envoyé"}, timeout=20,
+        ))["doc"]
+        assert re.fullmatch(rf"FAC-{YEAR}-\d{{4,}}", issued["number"])
+        assert issued["issued_at"]
+        retry = assert_ok(api.put(
+            f"{API}/docs/{invoice['id']}/status", json={"status": "envoyé"}, timeout=20,
+        ))["doc"]
+        assert retry["number"] == issued["number"]
+        assert api.delete(f"{API}/docs/{invoice['id']}", timeout=20).status_code == 409
+        assert api.put(
+            f"{API}/docs/{invoice['id']}/status", json={"status": "payé"}, timeout=20,
+        ).status_code == 409
+        assert api.post(
+            f"{API}/payments",
+            json={"doc_id": invoice["id"], "amount": 0.02, "method": "test"},
+            timeout=20,
+        ).status_code == 409
+
+
     def test_quote_totals_status_conversion_and_invoice_filter(self, api, created):
         client_name = f"TEST_Doc_Client_{uuid.uuid4().hex[:6]}"
         client = assert_ok(api.post(f"{API}/clients", json={"name": client_name}, timeout=20))["client"]
@@ -415,6 +450,9 @@ class TestThemisBilan:
                 timeout=20,
             ))["doc"]
             created["docs"].append(invoice["id"])
+            invoice = assert_ok(api.put(
+                f"{API}/docs/{invoice['id']}/status", json={"status": "envoyé"}, timeout=20,
+            ))["doc"]
             expected.append((invoice, day_delta, due_date))
 
         piece_response = upload_piece(api, "TEST_bilan_piece.pdf", make_test_pdf("TEST bilan"), "application/pdf")
@@ -469,6 +507,7 @@ class TestThemisDashboard:
         created["docs"].append(quote["id"])
         invoice = assert_ok(api.post(f"{API}/docs", json={"kind": "facture", "client_name": client["name"], "lines": [{"label": "TEST_F", "qty": 1, "unit_price": 100}], "tva": 20}, timeout=20))["doc"]
         created["docs"].append(invoice["id"])
+        invoice = assert_ok(api.put(f"{API}/docs/{invoice['id']}/status", json={"status": "envoyé"}, timeout=20))["doc"]
         order = assert_ok(api.post(f"{API}/orders", json={"client_name": client["name"], "lines": [{"label": "TEST_O", "qty": 1, "unit_price": 10}]}, timeout=20))["order"]
         created["orders"].append(order["id"])
 
@@ -707,4 +746,3 @@ class TestThemisMonthlyAndExport:
         assert ";;73.21" in csv_text["ecritures.csv"]
         assert supplier in csv_text["ecritures.csv"]
         assert ";48.00;" in csv_text["ecritures.csv"]
-
