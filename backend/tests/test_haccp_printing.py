@@ -1,7 +1,7 @@
 import asyncio
 import json
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock
 
 import httpx
@@ -12,6 +12,8 @@ from sqlalchemy.orm import Session
 
 import cloud_link
 import haccp_database
+import routers.haccp_printing as printing_routes
+from haccp_activity import read_activity
 from models.haccp import EtiquetteHaccp
 from models.haccp_printing import HaccpPrintJob, HaccpPrintStation
 from routers.haccp_printing import make_haccp_print_router
@@ -162,6 +164,92 @@ def direct_queue(client, label_id, device, user="one"):
     return request(client, "/android/demandes", {
         "device_id": device, "label_id": label_id, "reviewed": True,
     }, user=user)
+
+
+def claimed_job(client, label_id, transport):
+    if transport == "windows":
+        identity = {"relay_id": configure(client)}
+        job = queue(client, label_id).json()
+        assert request(client, "/prochaine", identity).json()["job"]["id"] == job["id"]
+        return job, identity, f"/demandes/{job['id']}/confirmation"
+    identity = {"device_id": str(uuid.uuid4())}
+    job = direct_queue(client, label_id, identity["device_id"]).json()
+    assert request(client, f"/android/demandes/{job['id']}/prise", identity).json()["job"]["id"] == job["id"]
+    return job, identity, f"/android/demandes/{job['id']}/confirmation"
+
+
+@pytest.mark.parametrize("transport", ["windows", "android"])
+@pytest.mark.parametrize("status", ["accepted", "uncertain"])
+def test_confirmation_is_timestamped_once_and_never_redated(api, monkeypatch, transport, status):
+    client, label_id = api
+    job, identity, path = claimed_job(client, label_id, transport)
+    assert job["accepted_at"] is None
+    confirmed_at = datetime.utcnow().replace(microsecond=0) + timedelta(seconds=30)
+    monkeypatch.setattr(printing_routes, "_now", lambda: confirmed_at)
+    result = request(client, path, {**identity, "status": status}).json()
+    expected = confirmed_at.replace(tzinfo=timezone.utc).isoformat() if status == "accepted" else None
+    assert result["accepted_at"] == expected
+    monkeypatch.setattr(printing_routes, "_now", lambda: confirmed_at + timedelta(days=1))
+    repeated = request(client, path, {**identity, "status": "accepted"}).json()
+    assert repeated["status"] == status and repeated["accepted_at"] == expected
+    day = confirmed_at.replace(tzinfo=timezone.utc).astimezone(printing_routes.PARIS).date()
+    report = read_activity("user:one", day, day + timedelta(days=1))
+    assert [item.impressions_confirmees for item in report.jours] == [int(status == "accepted"), 0]
+
+
+@pytest.mark.parametrize("transport", ["windows", "android"])
+def test_repeated_legacy_confirmation_does_not_invent_a_historical_date(api, transport):
+    client, label_id = api
+    job, identity, path = claimed_job(client, label_id, transport)
+    with Session(haccp_database.get_engine()) as db:
+        db.get(HaccpPrintJob, job["id"]).status = "accepted"
+        db.commit()
+    response = request(client, path, {**identity, "status": "accepted"})
+    assert response.status_code == 200 and response.json()["accepted_at"] is None
+
+
+@pytest.mark.parametrize("transport", ["windows", "android"])
+def test_concurrent_confirmations_count_only_one_submission(api, monkeypatch, transport):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    client, label_id = api
+    _job, identity, path = claimed_job(client, label_id, transport)
+    barrier = Barrier(2)
+    confirmed_at = datetime.utcnow() + timedelta(seconds=30)
+    def clock():
+        barrier.wait(timeout=10)
+        return confirmed_at
+    monkeypatch.setattr(printing_routes, "_now", clock)
+    def confirm(_):
+        with TestClient(client.app) as worker:
+            return request(worker, path, {**identity, "status": "accepted"})
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(confirm, range(2)))
+    assert [result.status_code for result in results] == [200, 200]
+    assert results[0].json()["accepted_at"] == results[1].json()["accepted_at"]
+    day = confirmed_at.replace(tzinfo=timezone.utc).astimezone(printing_routes.PARIS).date()
+    assert read_activity("user:one", day, day).impressions_confirmees == 1
+
+
+@pytest.mark.parametrize("transport", ["windows", "android"])
+@pytest.mark.parametrize("winner", ["accepted", "uncertain"])
+def test_stale_confirmation_cannot_overwrite_another_worker_result(api, monkeypatch, transport, winner):
+    client, label_id = api
+    job, identity, path = claimed_job(client, label_id, transport)
+    first_time = datetime.utcnow()
+    def other_worker_finished():
+        with Session(haccp_database.get_engine()) as db:
+            other = db.get(HaccpPrintJob, job["id"])
+            other.status = winner
+            other.accepted_at = first_time if winner == "accepted" else None
+            db.commit()
+        return first_time + timedelta(days=1)
+    monkeypatch.setattr(printing_routes, "_now", other_worker_finished)
+    response = request(client, path, {**identity, "status": "accepted"})
+    assert response.status_code == 200 and response.json()["status"] == winner
+    assert response.json()["accepted_at"] == (
+        first_time.replace(tzinfo=timezone.utc).isoformat() if winner == "accepted" else None
+    )
 
 
 def test_android_direct_needs_no_windows_station_and_has_separate_ack_evidence(api):

@@ -41,6 +41,7 @@ DATA_DIR = data_dir()
 if DATA_DIR != ROOT_DIR:
     load_dotenv(DATA_DIR / ".env", override=True)
 
+from haccp_activity import answer_activity_question, is_haccp_activity_request
 from sirius_brain import (
     ask_sirius,
     parse_intent,
@@ -427,6 +428,9 @@ async def ui_intent(req: IntentRequest, request: Request):
         logger.warning("Intent rate limit exceeded", extra={"client_ip": ip})
         return {"action": "none"}
 
+    if is_haccp_activity_request(req.text):
+        return {"action": "general", "query": req.text.strip()}
+
     if cloud_link.should_relay_chat(req.keys):
         try:
             return await cloud_link.relay_json("/api/intent", req.model_dump())
@@ -497,7 +501,10 @@ operational_work.register()
 
 
 async def _work_chat_response(req, user, request, session_id, history):
-    result = await repondre_analyse(req, user, db, cerveau_analytique)
+    if is_haccp_activity_request(req.text):
+        result = await answer_activity_question(req.text, await _haccp_labels_scope(request))
+    else:
+        result = await repondre_analyse(req, user, db, cerveau_analytique)
     if result is None:
         result = await operational_work.handle(req, user)
     if result is None:

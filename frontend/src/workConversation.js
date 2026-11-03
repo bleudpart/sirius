@@ -1,5 +1,16 @@
 import { isChronosCommand } from "./chronos";
 
+export function isHaccpActivityCommand(command) {
+  const text = String(command || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/’/g, "'").toLowerCase().trim();
+  return /\betiquettes?\b/.test(text)
+    && (/\b(?:combien|nombre|total)(?:\s+total)?\s+(?:(?:d[' ]|des?\s+)(?:(?:mes|nos|les)\s+)?)?etiquettes?\b/.test(text)
+      || /\b(?:compteurs?|comptage|statistiques?|stats|bilan|rapport)\b/.test(text)
+      || /\bcombien\b.*\b(?:edite\w*|imprime\w*|enregistre\w*|cree\w*)\b.*\betiquettes?\b/.test(text)
+      || /\bcompte\s+(?:les|mes|nos|toutes les)\s+etiquettes?\b/.test(text))
+    && !/\b(?:prix|couts?|coute\w*)\b|\bcombien\s+(?:de\s+)?(?:temps|jours?|heures?)\b/.test(text);
+}
+
 export function isFinanceConversationCommand(command) {
   const text = String(command || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .replace(/’/g, "'").toLowerCase().trim();
@@ -43,4 +54,4 @@ export function workPreviewFollowup(command, pending) {
   return null;
 }
 
-export const isOperationalCommand = (command) => isChronosCommand(command) || isWorkConversationCommand(command);
+export const isOperationalCommand = (command) => isHaccpActivityCommand(command) || isChronosCommand(command) || isWorkConversationCommand(command);

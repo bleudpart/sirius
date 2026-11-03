@@ -25,6 +25,7 @@ from starlette.concurrency import run_in_threadpool
 import cloud_link
 
 from haccp_database import get_db, get_engine
+from haccp_activity import HaccpActivity, load_activity
 from models.haccp import EtiquetteHaccp
 from runtime_paths import data_dir
 from schemas.haccp import (
@@ -443,6 +444,12 @@ def make_haccp_router(
         finally:
             if not saved:
                 await run_in_threadpool(_cleanup_failed_capture, scope, path, raw_image)
+
+    @router.get("/registre/activite", response_model=HaccpActivity)
+    async def activity(
+        date_debut: date, date_fin: date, scope: str = Depends(resolve_scope),
+    ) -> HaccpActivity:
+        return await load_activity(scope, date_debut, date_fin)
 
     @router.get("/registre/recherche", response_model=list[EtiquetteResponse], name="haccp_search")
     async def recherche(

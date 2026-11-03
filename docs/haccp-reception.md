@@ -281,3 +281,49 @@ FEFO/FIFO, la concurrence entre processus, les reprises apres panne,
 les permissions, le relais, les migrations et le parcours de deconditionnement.
 Un essai camera/IA/imprimante reel et une validation PMS restent necessaires
 avant usage en service.
+
+## Compteurs quotidiens, a la voix ou au clavier
+
+Exemples de demandes a Sirius :
+
+- « Combien d'etiquettes ont ete editees aujourd'hui ? »
+- « Affiche les statistiques HACCP des etiquettes par jour cette semaine. »
+- « Bilan des etiquettes du 01/11/2026 au 03/11/2026. »
+
+La reponse distingue **etiquettes enregistrees** et **envois d'impression
+confirmes et dates**. Elle provient du registre autorise, sans appel a un
+modele IA ni consommation de quota de conversation. Les deux parcours
+`/api/chat` et `/api/chat/stream` utilisent le meme calcul.
+
+- Les receptions, ouvertures et preparations sont comptees a leur date
+  d'enregistrement (`created_at`), pas a leur DLC ou a leur fabrication.
+- L'impression est comptee a la premiere confirmation `accepted` recue par
+  le serveur (`accepted_at`). La date de mise en file ne la remplace pas.
+  Windows confirme l'acceptation par le spouleur ; Android confirme le retour
+  du SDK Brother sans erreur. **Ce n'est pas une preuve de sortie papier.**
+- Un nouvel appel identique ne cree pas de doublon et ne change pas la date
+  de confirmation. Les demandes en attente, incertaines ou annulees, les
+  apercus, les impressions libres du navigateur et les tests hors registre
+  ne sont pas comptes comme impressions confirmees.
+- La migration ajoute une date nullable, sans reecrire les anciennes
+  impressions. Les confirmations historiques sans date restent signalees
+  separement pour l'ensemble du registre : impossible de les attribuer
+  honnetement a une journee.
+
+Les jours sont ceux du fuseau **Europe/Paris**, changements d'heure inclus.
+Aujourd'hui, hier, avant-hier, semaine/mois en cours ou precedent, derniers
+jours et dates `JJ/MM/AAAA` ou ISO sont pris en charge. Une semaine commence
+le lundi ; une periode en cours s'arrete au jour de la demande. Les jours
+sans activite sont affiches avec zero, et les totaux portent sur toute la
+periode, sans la pagination des listes du registre ou de la file.
+Une periode manquante, ambigue, invalide ou un filtre produit/operateur/
+restaurant non pris en charge donne une demande de precision, jamais
+un total global presente comme un total filtre.
+
+L'API privee `GET /api/haccp/registre/activite?date_debut=2026-11-01&date_fin=2026-11-03`
+renvoie les deux totaux, le detail de chaque jour et `impressions_sans_date`.
+La periode est inclusive et limitee a 366 jours par demande. Le compte ou
+l'entreprise et la permission `haccp` sont resolus comme pour le registre.
+Un PC relie utilise les donnees Cloud du registre, meme avec ses propres
+cles IA ; une erreur Cloud ne provoque jamais un repli vers des chiffres
+locaux ni vers une estimation IA.

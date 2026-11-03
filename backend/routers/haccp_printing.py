@@ -124,7 +124,8 @@ def _station(db: Session, scope: str, relay_id: str | None = None) -> HaccpPrint
 def _job_response(job: HaccpPrintJob, transport: str = "windows") -> dict[str, object]:
     return {"id": job.id, "label_id": job.label_id, "status": job.status, "detail": job.detail,
             "transport": transport,
-            "created_at": job.created_at.replace(tzinfo=timezone.utc).isoformat()}
+            "created_at": job.created_at.replace(tzinfo=timezone.utc).isoformat(),
+            "accepted_at": job.accepted_at.replace(tzinfo=timezone.utc).isoformat() if job.accepted_at else None}
 
 
 def make_haccp_print_router(
@@ -289,10 +290,14 @@ def make_haccp_print_router(
                 return _job_response(job)
             if job.status != "claimed":
                 raise HTTPException(409, "Cette demande n'a pas ete prise en charge par le poste.")
-            job.status = body.status
-            job.detail = ("Acceptee par le spouleur Windows ; sortie papier a verifier."
-                          if body.status == "accepted" else "Impression incertaine. Verifiez le papier et le poste ; aucun nouvel essai automatique.")
+            detail = ("Acceptee par le spouleur Windows ; sortie papier a verifier."
+                      if body.status == "accepted" else "Impression incertaine. Verifiez le papier et le poste ; aucun nouvel essai automatique.")
+            db.execute(update(HaccpPrintJob).where(
+                HaccpPrintJob.id == job.id, HaccpPrintJob.status == "claimed",
+            ).values(status=body.status, detail=detail,
+                     accepted_at=_now() if body.status == "accepted" else None))
             db.commit()
+            db.refresh(job)
             return _job_response(job)
 
     def android_only(request: Request, scope: str) -> str:
@@ -393,7 +398,8 @@ def make_haccp_print_router(
                 detail += " " + body.detail[:250]
             db.execute(update(HaccpPrintJob).where(
                 HaccpPrintJob.id == job.id, HaccpPrintJob.status == "claimed",
-            ).values(status=body.status, detail=detail[:500]))
+            ).values(status=body.status, detail=detail[:500],
+                     accepted_at=_now() if body.status == "accepted" else None))
             db.commit()
             db.refresh(job)
             return _job_response(job, "android")

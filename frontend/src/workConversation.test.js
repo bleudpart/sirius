@@ -1,4 +1,33 @@
-import { isFinanceConversationCommand, isOperationalCommand, isWorkConversationCommand, workPreviewFollowup } from "./workConversation";
+import { isFinanceConversationCommand, isHaccpActivityCommand, isOperationalCommand, isWorkConversationCommand, workPreviewFollowup } from "./workConversation";
+
+test.each([
+  "ΣIRIUS, combien d’étiquettes ont été éditées aujourd’hui ?",
+  "Combien d'etiquettes on a imprime hier ?",
+  "Donne-moi le nombre d'étiquettes avant-hier",
+  "Affiche les statistiques HACCP des étiquettes par jour cette semaine",
+  "Bilan des étiquettes de la semaine dernière",
+  "Nombre d'étiquettes ce mois-ci",
+  "Nombre d'étiquettes le mois dernier",
+  "Nombre d'étiquettes sur les sept derniers jours",
+  "Compte toutes les étiquettes sur les 30 derniers jours",
+  "Nombre d'étiquettes le 01/11/2026",
+  "Bilan des étiquettes du 1/11/2026 au 3/11/2026",
+  "Bilan des étiquettes du 2026-11-01 au 2026-11-03",
+  "Combien avons-nous imprimé d'étiquettes aujourd'hui",
+  "Nombre d'étiquettes par jour",
+])("envoie les compteurs HACCP vers les données autorisées, pas un raccourci de fenêtre : %s", (text) => {
+  expect(isHaccpActivityCommand(text)).toBe(true);
+  expect(isOperationalCommand(text)).toBe(true);
+});
+
+test.each([
+  "Ouvre HACCP", "Imprime une étiquette", "Crée une étiquette de préparation",
+  "Combien de jours peut-on conserver le produit de cette étiquette ?",
+  "Combien coûte une imprimante à étiquettes ?", "Nombre de calories sur cette étiquette",
+  "Quels allergènes sur cette étiquette ?", "Combien de factures aujourd'hui ?",
+])("ne détourne pas les autres demandes en comptage HACCP : %s", (text) => {
+  expect(isHaccpActivityCommand(text)).toBe(false);
+});
 
 test.each(["Compare Apple et Microsoft sur cinq ans", "Quels sont les risques de mon portefeuille ?",
   "Alerte-moi si AAPL dépasse 200 dollars", "Chaque matin à 9 h analyse AAPL",

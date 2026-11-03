@@ -15,6 +15,7 @@ from motorsport_results import is_motorsport_question, motorsport_context
 from sports_results import is_sports_results_question, sports_question, sports_results_context
 from productivite.intent_productivite import parse_productivity_intent
 from provider_access import provider_key, personal_key
+from haccp_activity import is_haccp_activity_request
 
 logger = logging.getLogger(__name__)
 
@@ -449,6 +450,9 @@ async def parse_intent(prompt: str):
 
     if not prompt_lower:
         return {"action": "general", "query": ""}
+
+    if is_haccp_activity_request(prompt):
+        return {"action": "general", "query": prompt}
 
     if _BRIEFING_INTENT_PATTERN.fullmatch(prompt_lower):
         return {

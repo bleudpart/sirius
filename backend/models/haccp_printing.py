@@ -1,7 +1,7 @@
 """Poste d'impression et file durable : jamais de reemission automatique."""
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, UniqueConstraint
+from sqlalchemy import DateTime, Index, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from models.haccp import Base
@@ -20,7 +20,10 @@ class HaccpPrintStation(Base):
 
 class HaccpPrintJob(Base):
     __tablename__ = "haccp_print_jobs"
-    __table_args__ = (UniqueConstraint("scope_key", "label_id", name="uq_haccp_print_label"),)
+    __table_args__ = (
+        UniqueConstraint("scope_key", "label_id", name="uq_haccp_print_label"),
+        Index("ix_haccp_print_activity", "scope_key", "status", "accepted_at"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     scope_key: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
@@ -28,6 +31,7 @@ class HaccpPrintJob(Base):
     relay_id: Mapped[str] = mapped_column(String(36), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     claimed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime)
     status: Mapped[str] = mapped_column(String(16), default="pending", nullable=False)
     detail: Mapped[str | None] = mapped_column(String(500))
 

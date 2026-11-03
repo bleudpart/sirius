@@ -2,6 +2,7 @@
 import logging
 import sqlite3
 from collections.abc import Iterator
+from datetime import datetime, timezone
 from functools import lru_cache
 from threading import Lock
 
@@ -14,9 +15,19 @@ from sqlalchemy.pool import ConnectionPoolEntry
 from models.haccp import Base
 from models import haccp_printing, haccp_reception  # Enregistre les tables des files et projections.
 from runtime_paths import data_file
+from schemas.haccp import PARIS
 
 logger = logging.getLogger(__name__)
 _engine_lock = Lock()
+
+
+def _paris_day(value: str | None) -> str | None:
+    if value is None:
+        return None
+    stamp = datetime.fromisoformat(value)
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=timezone.utc)
+    return stamp.astimezone(PARIS).date().isoformat()
 
 
 @lru_cache(maxsize=1)
@@ -32,6 +43,7 @@ def _configured_engine() -> Engine:
             "haccp_casefold", 1, lambda value: value.casefold() if value is not None else None,
             deterministic=True,
         )
+        connection.create_function("haccp_paris_day", 1, _paris_day, deterministic=True)
 
     # create_all ne met pas a jour une table existante. Les archives restent intactes.
     with engine.begin() as connection:
@@ -64,6 +76,13 @@ def _configured_engine() -> Engine:
         for name, definition in additions.items():
             if name not in columns:
                 connection.exec_driver_sql(f"ALTER TABLE etiquettes_haccp ADD COLUMN {name} {definition}")
+        print_columns = {column["name"] for column in inspect(connection).get_columns("haccp_print_jobs")}
+        if "accepted_at" not in print_columns:
+            connection.exec_driver_sql("ALTER TABLE haccp_print_jobs ADD COLUMN accepted_at DATETIME")
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_haccp_print_activity "
+            "ON haccp_print_jobs(scope_key, status, accepted_at)",
+        )
         connection.exec_driver_sql(
             "CREATE UNIQUE INDEX IF NOT EXISTS uq_haccp_capture "
             "ON etiquettes_haccp(scope_key, capture_id)",
