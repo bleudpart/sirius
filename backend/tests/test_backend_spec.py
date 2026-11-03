@@ -36,7 +36,21 @@ def _declare_playwright(monkeypatch, tmp_path, revision):
     monkeypatch.setitem(sys.modules, "playwright", module)
 
 
-def _run_spec(monkeypatch, tmp_path, runtimes, chromium=("1234",), playwright_revision="1234"):
+def _fake_project(tmp_path, with_frontend=True):
+    """Projet minimal : backend/ (SPECPATH) et un build React avec ses source maps."""
+    project = tmp_path / "project"
+    (project / "backend").mkdir(parents=True)
+    if with_frontend:
+        js = project / "frontend" / "build" / "static" / "js"
+        js.mkdir(parents=True)
+        (project / "frontend" / "build" / "index.html").write_text("<html></html>", encoding="utf-8")
+        (js / "main.abc.js").write_text("app()\n//# sourceMappingURL=main.abc.js.map", encoding="utf-8")
+        (js / "main.abc.js.map").write_text("{}", encoding="utf-8")
+    return project
+
+
+def _run_spec(monkeypatch, tmp_path, runtimes, chromium=("1234",), playwright_revision="1234", project=None):
+    project = project or _fake_project(tmp_path)
     system_root = tmp_path / "Windows"
     runtime_dir = system_root / "System32"
     runtime_dir.mkdir(parents=True)
@@ -64,7 +78,7 @@ def _run_spec(monkeypatch, tmp_path, runtimes, chromium=("1234",), playwright_re
     try:
         runpy.run_path(
             str(SPEC),
-            init_globals={"SPECPATH": str(SPEC.parent), "Analysis": analysis},
+            init_globals={"SPECPATH": str(project / "backend"), "Analysis": analysis},
         )
     except AnalysisReached:
         pass
@@ -116,3 +130,19 @@ def test_spec_accepts_any_installed_chromium_when_playwright_is_unreadable(monke
 
     cache = tmp_path / "ms-playwright"
     assert (str(cache / "chromium-1100"), "playwright-browsers/chromium-1100") in captured["datas"]
+
+
+def test_spec_bundles_the_react_build_without_source_maps(monkeypatch, tmp_path):
+    captured, _ = _run_spec(monkeypatch, tmp_path, RUNTIMES)
+
+    build = tmp_path / "project" / "frontend" / "build"
+    assert (str(build / "index.html"), "frontend/build") in captured["datas"]
+    assert (str(build / "static" / "js" / "main.abc.js"), "frontend/build/static/js") in captured["datas"]
+    assert not any(source.endswith(".map") for source, _target in captured["datas"])
+
+
+def test_spec_refuses_to_build_without_the_react_build(monkeypatch, tmp_path):
+    project = _fake_project(tmp_path, with_frontend=False)
+
+    with pytest.raises(SystemExit, match="npm run build"):
+        _run_spec(monkeypatch, tmp_path, RUNTIMES, project=project)

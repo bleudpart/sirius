@@ -1,0 +1,22 @@
+diff --git a/node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js b/node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js
+index 6d1de94..435c341 100644
+--- a/node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js
++++ b/node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js
+@@ -343,6 +343,17 @@ class NsisTarget extends core_1.Target {
+                 }
+             }
+         }
++        else if (isWin) {
++            // SIRIUS : Smart App Control bloque l'execution de ce stub non signe ("spawn UNKNOWN").
++            // On extrait le desinstalleur sans l'executer, comme electron-builder le fait deja sous macOS.
++            try {
++                await nsisUtil_1.UninstallerReader.exec(installerPath, uninstallerPath);
++            }
++            catch (error) {
++                builder_util_1.log.warn({ reason: error.message }, "uninstaller reader failed, executing the NSIS stub");
++                await (0, wine_1.execWine)(installerPath, null, [], { env: { __COMPAT_LAYER: "RunAsInvoker" } });
++            }
++        }
+         else {
+             await (0, wine_1.execWine)(installerPath, null, [], { env: { __COMPAT_LAYER: "RunAsInvoker" } });
+         }

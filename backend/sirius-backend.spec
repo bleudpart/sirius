@@ -79,8 +79,15 @@ hiddenimports.extend(
     )
 )
 
+frontend_build = project_dir / "frontend" / "build"
+if not (frontend_build / "index.html").is_file():
+    raise SystemExit(f"Build React introuvable ({frontend_build}) : lancer 'npm run build' avant le build backend.")
+# Fichier par fichier, sans les source maps (.map, ~17 Mo) : elles ne servent qu'aux outils de
+# développement. Le JavaScript embarqué reste identique octet pour octet au build React.
 datas = [
-    (str(project_dir / "frontend" / "build"), "frontend/build"),
+    (str(path), (Path("frontend/build") / path.relative_to(frontend_build).parent).as_posix())
+    for path in sorted(frontend_build.rglob("*"))
+    if path.is_file() and path.suffix != ".map"
 ]
 datas.extend(collect_data_files("fastembed"))
 datas.extend(collect_data_files("ezdxf"))
