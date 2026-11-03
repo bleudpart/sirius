@@ -90,6 +90,8 @@ def test_consult_uses_the_character_prompt_and_is_saved_in_the_history(env):
     assert response.json() == {"ok": True, "reponse": ANSWER}
     request = FakeLLM.requests[0]
     assert request["max_tokens"] == modules_api.CONSULT_MAX_TOKENS
+    assert request["extra_body"] == {"thinking": {"type": "disabled"}}
+    assert request["timeout"] == modules_api.LLM_TIMEOUT
     assert "SOLON" in request["messages"][0]["content"] and "DROIT FRANÇAIS" in request["messages"][0]["content"]
     assert request["messages"][1]["content"] == "Mon bailleur peut-il résilier le bail ?"
     [entry] = history(env, headers, module="SOLON#")
@@ -140,6 +142,56 @@ def test_consult_model_failure_is_explicit_and_leaves_no_history(env):
     FakeLLM.failure = None
     FakeLLM.content = json.dumps({"reponse": "   "})
     assert consult(env, headers).status_code == 502
+    assert history(env, headers) == []
+
+
+@pytest.mark.parametrize("content", [
+    "", "   ", json.dumps({"reponse": ""}), json.dumps({"reponse": "", "popups": []}), json.dumps({"plan": " "}),
+])
+def test_consult_empty_model_output_is_a_502_and_never_shown_as_json(env, content):
+    headers = login(env.db, "admin-user")
+    FakeLLM.content = content
+    response = consult(env, headers)
+    assert response.status_code == 502 and "aucune réponse" in response.json()["detail"]
+    assert history(env, headers) == []
+
+
+def test_consult_answer_takes_the_first_non_empty_text():
+    assert modules_api._consult_answer(json.dumps({"reponse": "", "plan": " Étape 1 "})) == "Étape 1"
+    assert modules_api._consult_answer(json.dumps({"autre": "x"})) == json.dumps({"autre": "x"})
+
+
+def test_consult_accepts_the_raw_line_breaks_kimi_writes_inside_the_json_string(env):
+    FakeLLM.content = '{"reponse": "FAITS\nLe bail est commercial.\nDROIT\nArticle L145-4.", "popups": []}'
+    response = consult(env, login(env.db, "admin-user"))
+    assert response.status_code == 200
+    assert response.json()["reponse"] == "FAITS\nLe bail est commercial.\nDROIT\nArticle L145-4."
+
+
+@pytest.mark.parametrize("content", [
+    '{"reponse": "FAITS\\nLe bail est commercial.\\nDROIT\\nArticle L145-4 du Code de comm',
+    '{"reponse": "FAITS\nLe bail est commercial.\nDROIT\nArticle L145-4 du Code de comm',
+    '{"reponse": "FAITS\\nLe bail est commercial.\\nDROIT\\nArticle L145-4 du Code de comm", "popups": [{"titre": "A", "contenu": "B"}',
+])
+def test_consult_keeps_the_text_written_before_the_token_limit_cut_the_json(env, content):
+    FakeLLM.content = content
+    response = consult(env, login(env.db, "admin-user"))
+    assert response.status_code == 200
+    answer = response.json()["reponse"]
+    assert answer.startswith("FAITS\nLe bail est commercial.\nDROIT\nArticle L145-4 du Code de comm")
+    assert "{" not in answer and "reponse" not in answer
+
+
+def test_consult_waits_for_the_model_only_up_to_the_timeout(env, monkeypatch):
+    headers = login(env.db, "admin-user")
+
+    async def never_answers(self, **kwargs):
+        await asyncio.sleep(30)
+
+    monkeypatch.setattr(FakeLLM, "_create", never_answers)
+    monkeypatch.setattr(modules_api, "LLM_TIMEOUT", 0.05)
+    response = consult(env, headers)
+    assert response.status_code == 502 and "momentanément indisponible" in response.json()["detail"]
     assert history(env, headers) == []
 
 

@@ -46,8 +46,11 @@ STATIC = Path(__file__).parent / "static"
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
 
+LLM_TIMEOUT = 90.0
+
+
 async def _llm(prompt: str, system: str = "Tu es ΣIRIUS, entité suprême, technique et concise. Réponds en français. Tutoie toujours l'utilisateur (jamais « vous », jamais « Monsieur »).", max_tokens: int = 800) -> str:
-    from sirius_brain import k3_client, K3_MODEL, ENV_K3_KEY
+    from sirius_brain import k3_client, K3_MODEL, ENV_K3_KEY, kimi_answer_options
     from provider_access import denial_error
     
     enhanced_system = (
@@ -62,12 +65,15 @@ async def _llm(prompt: str, system: str = "Tu es ΣIRIUS, entité suprême, tech
     client = k3_client()
     if client is None:
         raise denial_error("k3", ENV_K3_KEY) or HTTPException(status_code=503, detail="Service IA non configuré sur ce serveur.")
-    r = await client.chat.completions.create(
+    # Comme le cerveau : sans « thinking: disabled », Kimi dépense tout son budget en raisonnement
+    # (30 s d'attente puis un contenu vide). Le délai borne aussi l'attente d'un fournisseur bloqué.
+    r = await asyncio.wait_for(client.chat.completions.create(
         model=K3_MODEL,
         messages=[{"role": "system", "content": enhanced_system}, {"role": "user", "content": prompt}],
-        max_tokens=max_tokens,
-    )
-    
+        **kimi_answer_options(max_tokens),
+        timeout=LLM_TIMEOUT,
+    ), timeout=LLM_TIMEOUT)
+
     raw = (r.choices[0].message.content or "").strip()
 
     # Nettoyage : Extraction du JSON uniquement
@@ -413,11 +419,14 @@ CONSULT_DOCS = {
     "SOLON#": ("solon-avis.pdf", "Avis juridique SOLON", "l'avis juridique de SOLON"),
     "PROMÉTHÉE#": ("promethee-plan.pdf", "Plan de projet PROMÉTHÉE", "le plan de projet de PROMÉTHÉE"),
 }
-CONSULT_MAX_TOKENS = 1400
+# Une consultation fait ~1300 tokens (≈ 35 s) : le plafond laisse de la marge avant coupure.
+CONSULT_MAX_TOKENS = 2500
 CONSULT_QUESTION_MAX = 4000
 CONSULT_TEXT_MAX = 20000
 CONSULT_HISTORY_MAX = 100
 CONSULT_EMAIL_RE = re.compile(r"[^@\s,;<>\"']+@[^@\s,;<>\"']+\.[^@\s,;<>\"']+")
+# Début de chaîne JSON "reponse"/"plan", y compris quand la fermeture manque (réponse coupée).
+CONSULT_PARTIAL_RE = re.compile(r'"(?:reponse|plan)"\s*:\s*"((?:[^"\\]|\\.)*)', re.S)
 
 
 def _consult_module(module: str, allowed) -> str:
@@ -429,15 +438,28 @@ def _consult_module(module: str, allowed) -> str:
 
 def _consult_answer(raw: str) -> str:
     """Extrait le texte de la réponse du JSON produit par `_llm` (texte brut si le modèle dévie)."""
-    try:
-        parsed = json.loads(raw)
-    except ValueError:
-        return raw.strip()
-    if isinstance(parsed, dict):
-        text = parsed.get("reponse") or parsed.get("plan")
-        if isinstance(text, str):
-            return text.strip()
-    return raw.strip()
+    text = str(raw or "").strip()
+    # Deux passes : `_llm` réemballe dans {"reponse": ...} un JSON coupé par la limite de tokens.
+    for _ in range(2):
+        if not text.startswith("{"):
+            break
+        try:
+            # strict=False : le modèle écrit de vrais retours à la ligne dans ses chaînes JSON.
+            parsed = json.loads(text, strict=False)
+        except ValueError:
+            partial = CONSULT_PARTIAL_RE.search(text)
+            if partial:
+                try:
+                    return json.loads(f'"{partial.group(1)}"', strict=False).strip()
+                except ValueError:
+                    pass
+            break
+        texts = [parsed[key].strip() for key in ("reponse", "plan") if isinstance(parsed.get(key), str)]
+        if not texts:
+            break
+        # Un contenu vide du modèle reste vide : il ne doit pas s'afficher comme du JSON brut.
+        text = next((item for item in texts if item), "")
+    return text
 
 
 def _consult_date(value: str) -> str:
