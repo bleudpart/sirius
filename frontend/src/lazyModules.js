@@ -46,6 +46,7 @@ export const ScriptInstaller = wrap(() => import("@/ScriptInstaller"));
 export const LocusPanel = wrap(() => import("@/LocusPanel"));
 export const AtlasPanel = wrap(() => import("@/AtlasPanel"));
 export const HeraclesPanel = wrap(() => import("@/HeraclesPanel"));
+export const CartographiePanel = wrap(() => import("@/CartographiePanel"));
 export const HephaistosPanel = wrap(() => import("@/HephaistosPanel"));
 export const MythosGallery = wrap(() => import("@/MythosGallery"));
 export const Odysseia = wrap(() => import("@/Odysseia"));

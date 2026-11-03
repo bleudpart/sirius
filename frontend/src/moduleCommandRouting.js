@@ -27,6 +27,7 @@ export const MODULE_ALIASES = {
   argus: "surveillance systeme moniteur",
   atlas: "cartes navigation itineraire",
   heracles: "enquete investigation osint domaine analyse ce domaine",
+  cartographie: "carte osiris carte des evenements evenements proches seismes catastrophes naturelles alertes",
   hephaistos: "diagnostic maintenance technique",
   locus: "localisation position geolocalisation",
   promethee: "projet taches planning",

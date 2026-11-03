@@ -75,6 +75,7 @@ jest.mock("./lazyModules", () => new Proxy({}, { get: (_, key) => {
   if (key === "HeraclesPanel") return ({ initialInput }) => (
     <div data-testid="workspace-HeraclesPanel" data-input={initialInput || ""} />
   );
+  if (key === "CartographiePanel") return () => <div data-testid="workspace-CartographiePanel" />;
   if (key === "WorkspaceSearch") return ({ initialQuery, onClose, onDossier }) => (
     <div data-testid="workspace-WorkspaceSearch" data-query={initialQuery}><button onClick={onClose}>Fermer la recherche</button>
       <button onClick={() => { onClose(); onDossier("search-dossier"); }}>Ouvrir ce dossier</button></div>
@@ -300,6 +301,13 @@ test("domain analysis voice command opens HÉRACLÈS without calling the investi
   await send("Zirius, analyse le domaine example.com");
   expect(host.querySelector('[data-testid="workspace-HeraclesPanel"]')?.getAttribute("data-input")).toBe("domain:example.com");
   expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/api/heracles/check"))).toBe(false);
+  expect(global.fetch.mock.calls.some(([url]) => /\/(?:intent|chat)(?:\/stream)?$/.test(String(url)))).toBe(false);
+});
+
+test("map voice command opens the OSIRIS cartography without asking the model", async () => {
+  await mount();
+  await send("Zirius, ouvre la carte OSIRIS");
+  expect(host.querySelector('[data-testid="workspace-CartographiePanel"]')).not.toBeNull();
   expect(global.fetch.mock.calls.some(([url]) => /\/(?:intent|chat)(?:\/stream)?$/.test(String(url)))).toBe(false);
 });
 

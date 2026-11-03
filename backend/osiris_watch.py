@@ -37,6 +37,8 @@ RADIUS_KM = 300
 MIN_MAGNITUDE = 3.0
 QUAKE_WINDOW = timedelta(days=7)
 MAX_LISTED_EVENTS = 5
+MAP_RADII_KM = (50, 100, 300, 1000)
+MAP_MAX_EVENTS = 2000
 HEAT_THRESHOLD_C = 30
 TIMEOUT = httpx.Timeout(6.0, connect=3.0)
 HEADERS = {"Accept": "application/json", "User-Agent": "SIRIUS-Veille/1.0 (+https://sirius-assistant.fr)"}
@@ -191,7 +193,17 @@ async def _read_feed(client, path, now):
     return result
 
 
-def parse_events(payload, origin, now):
+def _distance_from(origin, latitude, longitude):
+    if origin is None:
+        return None
+    return distance_km(origin["latitude"], origin["longitude"], latitude, longitude)
+
+
+def _outside(distance, radius_km) -> bool:
+    return radius_km is not None and (distance is None or distance > radius_km)
+
+
+def parse_events(payload, origin, now, radius_km=RADIUS_KM):
     rows = payload.get("events")
     if not isinstance(rows, list):
         raise FeedUnavailable("Flux d'événements OSIRIS sans liste exploitable.")
@@ -202,8 +214,8 @@ def parse_events(payload, origin, now):
             if expires is not None and expires <= now:
                 continue
             latitude, longitude = _number(row["lat"], -90, 90), _number(row["lng"], -180, 180)
-            distance = distance_km(origin["latitude"], origin["longitude"], latitude, longitude)
-            if distance > RADIUS_KM:
+            distance = _distance_from(origin, latitude, longitude)
+            if _outside(distance, radius_km):
                 continue
             severity = row.get("severity") if row.get("severity") in SEVERITY else None
             found.append({
@@ -211,7 +223,9 @@ def parse_events(payload, origin, now):
                 "title": _text(row["title"], 200),
                 "type": _text(row.get("type") or row.get("category") or "Événement", 80),
                 "severity": severity,
-                "distance_km": round(distance),
+                "distance_km": round(distance) if distance is not None else None,
+                "latitude": latitude,
+                "longitude": longitude,
                 "date": _instant(row["date"]).isoformat(),
                 "expires": expires.isoformat() if expires else None,
                 "provider": _text(row["provider"], 60),
@@ -223,7 +237,7 @@ def parse_events(payload, origin, now):
     return found, ignored
 
 
-def parse_quakes(payload, origin, now):
+def parse_quakes(payload, origin, now, radius_km=RADIUS_KM):
     rows = payload.get("earthquakes")
     if not isinstance(rows, list):
         raise FeedUnavailable("Flux sismique OSIRIS sans liste exploitable.")
@@ -234,8 +248,8 @@ def parse_quakes(payload, origin, now):
             if magnitude < MIN_MAGNITUDE:
                 continue
             latitude, longitude = _number(row["lat"], -90, 90), _number(row["lng"], -180, 180)
-            distance = distance_km(origin["latitude"], origin["longitude"], latitude, longitude)
-            if distance > RADIUS_KM:
+            distance = _distance_from(origin, latitude, longitude)
+            if _outside(distance, radius_km):
                 continue
             when = _epoch(row["time"], 1000)
             if not now - QUAKE_WINDOW <= when <= now + timedelta(minutes=15):
@@ -245,7 +259,9 @@ def parse_quakes(payload, origin, now):
                 "title": f"Séisme de magnitude {_fr(magnitude, 1)}",
                 "place": _text(row["place"], 160),
                 "magnitude": magnitude,
-                "distance_km": round(distance),
+                "distance_km": round(distance) if distance is not None else None,
+                "latitude": latitude,
+                "longitude": longitude,
                 "date": when.isoformat(),
                 "provider": "USGS",
                 "url": _link(row.get("url")),
@@ -367,11 +383,62 @@ async def build_watch(settings, *, now=None, transport=None) -> dict:
             if result["ignored"]:
                 entry["detail"] = f"{result['ignored']} entrée(s) incomplète(s) ignorée(s)."
     events.sort(key=lambda item: (item["_rank"], item["distance_km"]))
-    report["events"] = [{k: v for k, v in item.items() if k != "_rank"} for item in events[:MAX_LISTED_EVENTS]]
+    report["events"] = [_public_event(item, with_position=False) for item in events[:MAX_LISTED_EVENTS]]
     report["other_events"] = max(0, len(events) - MAX_LISTED_EVENTS)
     failed = sum(not item["ok"] for item in sources)
     report["status"] = "ok" if not failed else "unavailable" if failed == len(sources) else "partial"
     return report
+
+
+def _public_event(item, *, with_position=True) -> dict:
+    hidden = {"_rank"} if with_position else {"_rank", "latitude", "longitude"}
+    return {key: value for key, value in item.items() if key not in hidden}
+
+
+async def build_map(settings, *, now=None, transport=None) -> dict:
+    """Points OSIRIS pour la carte : flux mondiaux, filtrés côté client par rayon ou zone visible.
+
+    Le centre est la ville de la veille, même si la veille n'est pas ajoutée au briefing.
+    Comme pour le briefing, aucune position n'est envoyée à OSIRIS.
+    """
+    now = now or datetime.now(timezone.utc)
+    origin = valid_location((settings or {}).get("location"))
+    parsers = {
+        "evenements": ("/api/weather", lambda payload, at, when: parse_events(payload, at, when, radius_km=None)),
+        "seismes": ("/api/earthquakes", lambda payload, at, when: parse_quakes(payload, at, when, radius_km=None)),
+    }
+    async with httpx.AsyncClient(timeout=TIMEOUT, transport=transport, follow_redirects=False) as client:
+        results = await asyncio.gather(
+            *(_feed_items(client, path, parser, origin, now) for path, parser in parsers.values()),
+            return_exceptions=True,
+        )
+    sources, events = [], []
+    for source_id, result in zip(parsers, results):
+        label, provider, url = SOURCES[source_id]
+        entry = {"id": source_id, "label": label, "provider": provider, "url": url,
+                 "ok": not isinstance(result, BaseException), "updated_at": None, "detail": None}
+        sources.append(entry)
+        if isinstance(result, BaseException):
+            entry["detail"] = _failure(source_id, result)
+            continue
+        entry["updated_at"] = result["updated_at"]
+        events.extend(result["items"])
+        if result["ignored"]:
+            entry["detail"] = f"{result['ignored']} entrée(s) incomplète(s) ignorée(s)."
+    events.sort(key=lambda item: (
+        item["distance_km"] if item["distance_km"] is not None else math.inf,
+        item["_rank"], item["date"],
+    ))
+    failed = sum(not item["ok"] for item in sources)
+    return {
+        "read_only": True, "generated_at": now.isoformat(),
+        "origin": origin, "default_radius_km": RADIUS_KM, "radii_km": list(MAP_RADII_KM),
+        "min_magnitude": MIN_MAGNITUDE,
+        "events": [_public_event(item) for item in events[:MAP_MAX_EVENTS]],
+        "truncated": max(0, len(events) - MAP_MAX_EVENTS),
+        "sources": sources,
+        "status": "ok" if not failed else "unavailable" if failed == len(sources) else "partial",
+    }
 
 
 def _fr(value, digits) -> str:

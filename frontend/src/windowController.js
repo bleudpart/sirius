@@ -60,6 +60,7 @@ export function createWindowController(setters, display) {
     locus: () => setters.setShowLocus(false),
     atlas: () => setters.setShowAtlas(false),
     heracles: () => setters.setShowHeracles(false),
+    cartographie: () => setters.setShowCartographie?.(false),
     hephaistos: () => setters.setShowHephaistos(false),
     mythos: () => setters.setShowMythosGallery(false),
     trailer: () => setters.setShowTrailer(false),

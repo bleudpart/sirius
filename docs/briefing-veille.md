@@ -69,6 +69,32 @@ anciennes que 6 heures (5 jours pour les cours) sont refusées.
 pour une instance OSIRIS auto-hébergée. Seul `https` est accepté, ou `http`
 vers `localhost`/`127.0.0.1`.
 
+## Cartographie des événements OSIRIS
+
+Le module **CARTOGRAPHIE** (groupe OUTILS, ou « Zirius, ouvre la carte OSIRIS »)
+affiche dans ΣIRIUS une carte native des événements naturels et des séismes
+lus dans les flux OSIRIS. Le site OSIRIS interdit son intégration en iframe
+(`X-Frame-Options: SAMEORIGIN`) ; le bouton « Carte OSIRIS complète » l'ouvre
+dans un onglet séparé.
+
+- Données : `GET /api/veille/carte` (session requise), jusqu'à 2 000 points,
+  triés par distance puis gravité. Le même cache de 10 minutes que le briefing
+  est utilisé.
+- Centre : la ville réglée dans la veille (géocodée par Open-Meteo), même si la
+  veille du briefing est désactivée. Sans ville, la carte reste mondiale et le
+  filtre de rayon est désactivé.
+- Filtrage géographique : rayon de 50, 100, 300 ou 1 000 km (300 km par
+  défaut) ou monde entier, et case « Zone visible uniquement » qui limite la
+  fenêtre flottante aux événements affichés à l'écran.
+- Fenêtre flottante : les 30 événements les plus proches ; un clic centre la
+  carte et ouvre la fiche ; un clic sur le titre de la fenêtre lit le résumé.
+- Confidentialité : aucune position n'est transmise à OSIRIS. Les tuiles du
+  fond de carte proviennent d'OpenStreetMap (`tile.openstreetmap.org`), qui
+  reçoit l'adresse IP et la zone affichée. Les coordonnées de la ville ne sont
+  renvoyées qu'à l'utilisateur connecté et n'apparaissent pas dans le briefing.
+- Mêmes limites que le briefing : NOAA/NWS couvre les États-Unis et la
+  vigilance Météo-France n'est pas incluse.
+
 ## HERACLES : recherches passives de domaine
 
 La commande vocale « Zirius, analyse ce domaine » ouvre HERACLES ; un domaine

@@ -239,3 +239,42 @@ def test_payload_is_not_echoed_when_rows_are_hostile():
     report = build(overrides={"/api/weather": lambda _r: httpx.Response(200, content=json.dumps(hostile))})
     title = next(item["title"] for item in report["events"] if item["title"].startswith("Crue"))
     assert "\x00" not in title and "\n" not in title and len(title) == 200
+
+
+def build_map(settings=SETTINGS, **kwargs):
+    return asyncio.run(watch.build_map(settings, now=NOW, transport=transport(**kwargs)))
+
+
+def test_briefing_events_do_not_expose_coordinates():
+    assert all("latitude" not in item and "longitude" not in item for item in build()["events"])
+
+
+def test_map_lists_worldwide_points_sorted_by_distance_without_sending_position():
+    hits = []
+    report = build_map(hits=hits)
+    assert sorted(hits) == ["/api/earthquakes", "/api/weather"]
+    assert report["read_only"] is True and report["status"] == "ok"
+    assert report["origin"] == PARIS
+    assert report["default_radius_km"] == 300 and report["radii_km"] == [50, 100, 300, 1000]
+    titles = [item["title"] for item in report["events"]]
+    assert titles == ["Orage violent", "Crue de la Seine", "Séisme de magnitude 4,1", "Flood Warning"]
+    far = report["events"][-1]
+    assert far["distance_km"] > 8000 and far["latitude"] == 32.2 and far["longitude"] == -110.9
+    assert all("_rank" not in item for item in report["events"])
+    assert report["truncated"] == 0
+
+
+def test_map_without_configured_city_has_no_origin_or_distance():
+    report = build_map(settings=None)
+    assert report["origin"] is None
+    assert len(report["events"]) == 4
+    assert all(item["distance_km"] is None for item in report["events"])
+
+
+def test_map_caps_points_and_reports_partial_sources(monkeypatch):
+    monkeypatch.setattr(watch, "MAP_MAX_EVENTS", 2)
+    report = build_map(overrides={"/api/earthquakes": lambda _r: httpx.Response(503)})
+    assert report["status"] == "partial"
+    assert [item["title"] for item in report["events"]] == ["Orage violent", "Crue de la Seine"]
+    assert report["truncated"] == 1
+    assert {item["id"]: item["detail"] for item in report["sources"]}["seismes"] == "OSIRIS a répondu HTTP 503."

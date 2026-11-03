@@ -111,6 +111,30 @@ def test_veille_preview_uses_only_the_callers_settings(veille_client, geocoder, 
     assert seen[-1]["user_id"] == "u1" and seen[-1]["location"]["name"] == "Lyon"
 
 
+def test_veille_map_requires_login_and_uses_only_the_callers_city(veille_client, geocoder, monkeypatch):
+    client, _ = veille_client
+    seen = []
+
+    async def fake_map(settings):
+        seen.append(settings)
+        return {"read_only": True, "events": []}
+
+    monkeypatch.setattr(osiris_watch, "build_map", fake_map)
+    assert client.get("/api/veille/carte").status_code == 401
+    client.put("/api/veille/settings", headers=OWNER, json={"enabled": False, "city": "Lyon"})
+    assert client.get("/api/veille/carte", headers=OTHER).json() == {"read_only": True, "events": []}
+    assert seen[-1] is None
+    client.get("/api/veille/carte", headers=OWNER)
+    assert seen[-1]["user_id"] == "u1" and seen[-1]["location"]["name"] == "Lyon"
+
+
+def test_production_app_exposes_the_map_route_behind_login():
+    import server
+    routes = {(route.path, method) for route in server.app.routes for method in getattr(route, "methods", ())}
+    assert ("/api/veille/carte", "GET") in routes
+    assert TestClient(server.app).get("/api/veille/carte").status_code == 401
+
+
 def priority(titre, total, code="dates", niveau="urgent"):
     return SimpleNamespace(code=code, niveau=niveau, titre=titre, total=total)
 

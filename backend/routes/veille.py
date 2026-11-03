@@ -83,6 +83,11 @@ def make_veille_router(db, require_user):
         await db[COLLECTION].update_one({"user_id": uid}, {"$set": document}, upsert=True)
         return public_settings(document)
 
+    @router.get("/carte")
+    async def map_points(request: Request):
+        user = await require_user(request, db)
+        return await osiris_watch.build_map(await load_veille_settings(db, user["user_id"]))
+
     @router.get("")
     async def preview(request: Request):
         user = await require_user(request, db)

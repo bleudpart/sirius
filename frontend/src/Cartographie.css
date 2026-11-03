@@ -1,0 +1,45 @@
+/* © 2026 Daniel Partel – ΣIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France). */
+/* ΣIRIUS CARTOGRAPHIE — événements OSIRIS */
+.carto-screen { display: flex; flex-direction: column; gap: 10px; }
+.carto-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; color: #fff; font-size: 11px; letter-spacing: 1px; }
+.carto-toolbar label { display: inline-flex; align-items: center; gap: 7px; }
+.carto-toolbar select {
+  background: rgba(5, 18, 28, 0.9); color: #fff; border: 1px solid rgba(145, 230, 242, 0.5);
+  border-radius: 4px; padding: 5px 8px; font-family: inherit;
+}
+.carto-toolbar select:disabled { opacity: 0.5; }
+.carto-check input { accent-color: #91e6f2; }
+.carto-toolbar .her-go { min-height: 30px; }
+.carto-osiris { display: inline-flex; align-items: center; gap: 6px; color: #b8f4fc; text-decoration: none; margin-left: auto; }
+.carto-osiris:hover { text-decoration: underline; }
+.carto-note { margin: 0; padding: 7px 11px; border-left: 2px solid #ffb347; background: rgba(255, 179, 71, 0.08); color: #fff; font-size: 12px; }
+.carto-stage { position: relative; flex: 1; min-height: 420px; border: 1px solid rgba(145, 230, 242, 0.3); border-radius: 6px; overflow: hidden; }
+.carto-map { position: absolute; inset: 0; background: #0b1620; }
+.carto-float {
+  position: absolute; top: 12px; right: 12px; z-index: 500; width: min(340px, calc(100% - 24px));
+  max-height: calc(100% - 24px); display: flex; flex-direction: column;
+  background: rgba(4, 14, 22, 0.88); border: 1px solid rgba(145, 230, 242, 0.45); border-radius: 6px;
+  box-shadow: 0 0 18px rgba(145, 230, 242, 0.18); color: #fff; backdrop-filter: blur(6px);
+}
+.carto-float-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 8px 10px; border-bottom: 1px solid rgba(145, 230, 242, 0.25); }
+.carto-float.collapsed .carto-float-head { border-bottom: 0; }
+.carto-float-head button { background: none; border: 0; color: #b8f4fc; cursor: pointer; font-family: inherit; font-size: 11px; letter-spacing: 1.2px; padding: 2px; }
+.carto-float ol { list-style: none; margin: 0; padding: 4px; overflow-y: auto; }
+.carto-float li button {
+  display: flex; gap: 9px; align-items: flex-start; width: 100%; text-align: left; padding: 7px 8px;
+  background: none; border: 0; border-radius: 4px; color: #fff; cursor: pointer; font-family: inherit;
+}
+.carto-float li button:hover, .carto-float li button:focus-visible { background: rgba(145, 230, 242, 0.12); outline: none; }
+.carto-float li b { display: block; font-size: 12px; font-weight: 600; }
+.carto-float li small { display: block; color: rgba(255, 255, 255, 0.7); font-size: 10.5px; line-height: 1.4; }
+.carto-dot { flex: 0 0 auto; width: 9px; height: 9px; margin-top: 4px; border-radius: 50%; background: #91e6f2; }
+.carto-dot.seisme { background: #ffb347; }
+.carto-empty { margin: 0; padding: 8px 12px; color: rgba(255, 255, 255, 0.7); font-size: 11px; }
+.carto-legal { margin: 0; color: rgba(255, 255, 255, 0.65); font-size: 10.5px; line-height: 1.5; }
+.carto-popup { display: grid; gap: 4px; font-size: 12px; }
+.carto-popup span { color: #444; }
+@media (max-width: 640px) {
+  .carto-stage { min-height: 60vh; }
+  .carto-float { top: auto; bottom: 10px; right: 10px; left: 10px; width: auto; max-height: 45%; }
+  .carto-osiris { margin-left: 0; }
+}

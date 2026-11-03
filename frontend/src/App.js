@@ -7,7 +7,7 @@ import {
   ArchitectPanel, SpectatorView, FilesPanel, DevCompanion, ZeusCortex, SiriusPrime, OracleDivin,
   PantheonSystem, NexusCeleste, SiriusDisplay, EuropeanaViewer, HaccpModule, KeysStatus, KeraunosPanel,
   AboutPanel, EspacePanel, ArchiveGallery, MemoryManager, InstallWizard, ScriptInstaller, LocusPanel,
-  AtlasPanel, HeraclesPanel, HephaistosPanel, MythosGallery, Odysseia, ConsultPanel, PrometheePanel, CalliopePanel, CalendarPanel,
+  AtlasPanel, HeraclesPanel, CartographiePanel, HephaistosPanel, MythosGallery, Odysseia, ConsultPanel, PrometheePanel, CalliopePanel, CalendarPanel,
   FaceIdPanel, PythagorePanel, PackagerPanel, TrailerGallery, SiriusSetup, FirstRunWizard, PromoPanel, ThemisPanel,
   AdminPanel, EnterprisePanel, PortusNummarius, AgoraPipeline, NewsPanel, ReveilPanel, SpotifyPanel, MediaHUD, ProductivityPanel,
   FloorPlanPanel, Photo3DPanel, ConnectionsPanel, MessagingPanel, WorkModulesPanel, WorkDossiersPanel, SportCoachPanel, MediaModulesPanel, VoiceProfilePanel, WorkspaceSearch, NativeAutomationHub,
@@ -367,6 +367,7 @@ function App() {
         setShowPackager, setShowInstall, setShowScripts, setShowVision, setShowAdmin, setShowSetup,
         setShowGallery, setShowSpotifyWin, setShowMediaHud, setShowMediaModules, setShowProductivity, setShowInfoWheel,
         setActiveWorkModule, setShowPlans, setShowPhoto3D, setShowConnections, setShowReveil, setShowEnterprise, setShowWorkDossiers, setShowSportCoach, setShowVoiceProfile,
+        setShowCartographie,
       });
       if (controller.close(target)) { confirm(d.say || "Fenêtre fermée."); return true; }
       return false;
@@ -1008,6 +1009,7 @@ function App() {
   const [atlasQuery, setAtlasQuery] = useState("");
   const [atlasRoute, setAtlasRoute] = useState(null);
   const [showHeracles, setShowHeracles] = useState(false);
+  const [showCartographie, setShowCartographie] = useState(false);
   const [showHephaistos, setShowHephaistos] = useState(false);
   const [heraclesInput, setHeraclesInput] = useState("");
   const [showMythosGallery, setShowMythosGallery] = useState(false);
@@ -5232,6 +5234,14 @@ function App() {
       return;
     }
     // 0quindecies) HERACLES# : investigation OSINT « enquête sur X », « vérifie l'email X », « analyse le numéro X », « qui est X »
+    if (/^(?:(?:ouvre|affiche|montre)(?:[- ]moi)?\s+)?(?:la\s+)?(?:carte\s+(?:osiris|des\s+[ée]v[ée]nements)|cartographie(?:\s+osiris)?|(?:les\s+)?[ée]v[ée]nements\s+proches)\s*[?!.]*$/.test(low.replace(/^(?:sirius|zirius|σirius)[,\s]+/, ""))) {
+      mark("cartographie · événements OSIRIS");
+      setShowCartographie(true);
+      const message = "J'ouvre la cartographie des événements OSIRIS autour de l'établissement.";
+      setText(message);
+      speakOut(message);
+      return;
+    }
     const domainAnalysis = parseDomainAnalysisCommand(command);
     if (domainAnalysis) {
       mark("heracles · analyse passive de domaine");
@@ -7067,7 +7077,7 @@ function App() {
       openMemoryManager: () => setShowMemoryMgr(true), openArgus: () => setShowArgus(true), openJournal: () => window.dispatchEvent(new Event("sirius-journal-open")),
       openKeys: () => setShowKeysStatus(true), openCalendar: () => setShowCalendar(true), openFaceId: () => setShowFaceId(true), openReveil: () => setShowReveil(true),
       openKeraunos: () => setShowKeraunos(true), openEspace: () => setShowEspace(true), openAbout: () => setShowAbout(true), openLocus: () => setShowLocus(true),
-      openAtlas: () => { setAtlasQuery(""); setAtlasRoute(null); setShowAtlas(true); }, openHeracles: () => setShowHeracles(true), openHephaistos: () => setShowHephaistos(true),
+      openAtlas: () => { setAtlasQuery(""); setAtlasRoute(null); setShowAtlas(true); }, openHeracles: () => setShowHeracles(true), openCartographie: () => setShowCartographie(true), openHephaistos: () => setShowHephaistos(true),
       openMythos: () => setShowMythosGallery(true), openTrailer: () => setShowTrailer(true), openPromo: () => setShowPromo(true), openThemis: () => setShowThemis(true),
       openOdysseia: () => setShowOdysseia(true),
       openAgora: () => setShowAgora(true), openSolon: () => setShowSolon(true), openPromethee: () => setShowPromethee(true), openCalliope: () => setShowCalliope(true),
@@ -7329,6 +7339,7 @@ function App() {
         />
       )}
       {showHeracles && <HeraclesPanel onClose={() => { setShowHeracles(false); setHeraclesInput(""); }} onSpeak={(m) => speakRef.current(m)} initialInput={heraclesInput} />}
+      {showCartographie && <CartographiePanel onClose={() => setShowCartographie(false)} onSpeak={(m) => speakRef.current(m)} />}
       {showHephaistos && <HephaistosPanel onClose={() => setShowHephaistos(false)} onSpeak={(m) => { setStatus("speaking"); setText(m); speakOut(m); }} />}
       {showMythosGallery && <MythosGallery initialModule={mythosFocus} onClose={() => { setShowMythosGallery(false); setMythosFocus(null); }} onOpenModule={(mod) => {
         setShowMythosGallery(false);
