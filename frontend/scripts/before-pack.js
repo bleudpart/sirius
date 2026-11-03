@@ -1,6 +1,7 @@
 // Verrou d'empaquetage : electron-builder appelle ce hook quelle que soit la façon dont il est
 // lancé (npm script, npx, .bat). Il refuse de produire un installateur dont le frontend embarqué
-// ne correspond pas aux sources — la cause des installateurs « neufs » livrant une vieille version.
+// ne correspond pas aux sources — la cause des installateurs « neufs » livrant une vieille version —
+// ou dont le Chromium de l'agent web manque (voir scripts/verify_packaged_frontend.py).
 const { spawnSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
@@ -22,7 +23,7 @@ module.exports = async function beforePack() {
   });
   if (result.status !== 0) {
     throw new Error(
-      "Empaquetage interrompu : le frontend embarqué est périmé.\n" +
+      "Empaquetage interrompu : le paquet backend est périmé ou incomplet (frontend ou Chromium, voir l'erreur ci-dessus).\n" +
       "Lancez « npm run build » puis « npm run backend:build » avant de packager."
     );
   }

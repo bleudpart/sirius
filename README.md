@@ -1508,6 +1508,7 @@ Validation ciblée depuis `frontend` :
    - noms uniques : `sirius-setup-<version>.exe` et `SIRIUS-Portable-<version>.exe`, identiques aux fichiers publiés sur GitHub (aucune copie renommée nécessaire).
    - fermer l'édition installée avant d'essayer le portable : les deux utilisent le service local sur le port 8001. Un écran FDE_OMEGA peut signaler un fichier d'interface devenu indisponible ; fermer les instances puis relancer une seule édition avant de réessayer.
    - prérequis de compilation : redistribuable Microsoft Visual C++ x64 récent. Le paquet privilégie les DLL `msvcp140*` et `vcruntime140*` du même runtime système ; mélanger des copies anciennes issues des dépendances peut faire planter les embeddings ONNX.
+   - Chromium de l'agent web : `BUILD.bat` et `CREER-INSTALLATEUR-SIRIUS.bat` l'installent seuls (`python -m playwright install chromium`, cache `%LOCALAPPDATA%\ms-playwright`). Pour un build manuel (`npm run electron:build`), lance cette commande une fois par poste : sans ce Chromium, le build s'arrête avec un message explicite au lieu de produire un installateur dont l'agent web ne fonctionne pas.
 2. Dans `frontend\dist`, lance **`SIRIUS Setup 1.0.0.exe`** et suis l'assistant d'installation.
 3. ΣIRIUS apparaît ensuite dans le menu Démarrer comme n'importe quel logiciel.
 

@@ -157,7 +157,7 @@ if (-not $python) {
 }
 Write-Info "Python $($python.Version) detecte."
 
-Write-Step '3/6 - Environnement Python isole et dependances backend'
+Write-Step '3/6 - Environnement Python isole, dependances backend et Chromium'
 if (-not (Test-Path (Join-Path $venvDir 'Scripts\python.exe'))) {
     Write-Info "Creation de l'environnement virtuel $venvDir"
     $pythonPrefix = $python.Prefix
@@ -176,6 +176,10 @@ Invoke-Step -FilePath $venvPython -Arguments @(
     '-r', (Join-Path $backendDir 'requirements.txt'),
     '-r', (Join-Path $backendDir 'requirements-build.txt')
 ) -FailureMessage 'Installation des dependances Python echouee.'
+
+# Le backend embarque son propre Chromium (agent web) : sans lui le build s'arrete.
+Invoke-Step -FilePath $venvPython -Arguments @('-m', 'playwright', 'install', 'chromium') `
+    -FailureMessage 'Installation de Chromium (agent web) echouee.'
 
 # PyInstaller est appele via `python -m PyInstaller` par le script npm : on place le venv
 # en tete du PATH pour que ce soit celui du venv, jamais un Python systeme incomplet.

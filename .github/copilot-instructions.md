@@ -22,7 +22,7 @@ npm run electron:build
 npm run audit:sirius
 ```
 
-`npm run electron:build` builds the React app, packages the backend, and creates the Windows NSIS and portable installers. The audit workflow's frontend test command is `npm test -- --watchAll=false --runInBand`.
+`npm run electron:build` builds the React app, packages the backend, and creates the Windows NSIS and portable installers. It needs Playwright's Chromium on the build PC (`python -m playwright install chromium`, once; `BUILD.bat` and `scripts/build-installer.ps1` run it themselves): `backend/sirius-backend.spec` bundles it for the web agent and aborts the build when it is missing. The audit workflow's frontend test command is `npm test -- --watchAll=false --runInBand`.
 
 Run backend commands from `backend/`. For local development, install `requirements-local.txt` (the README warns that `requirements.txt` is intended for the server deployment environment):
 

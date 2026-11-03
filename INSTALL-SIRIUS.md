@@ -112,7 +112,7 @@ Le script fait tout automatiquement :
   manquent** (c'est ce qui bloquait l'installation sur un PC sans Python) ;
 - crée un environnement Python isolé (`backend\.venv-build`) pour ne pas polluer
   le Python du système ;
-- installe les dépendances, compile le HUD React, transforme le backend Python
+- installe les dépendances (dont le Chromium de l'agent web, via Playwright), compile le HUD React, transforme le backend Python
   en exécutable autonome (PyInstaller), puis génère l'installateur NSIS ;
 - ouvre `frontend\dist` avec l'installeur et la version portable.
 

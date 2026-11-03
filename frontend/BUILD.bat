@@ -93,6 +93,15 @@ if %errorlevel% neq 0 (
     exit /b
 )
 
+rem Le backend embarque son propre Chromium (agent web) : le build s'arrete s'il manque.
+call python -m playwright install chromium
+if %errorlevel% neq 0 (
+    echo.
+    echo  [ERREUR] Installation de Chromium ^(agent web^) echouee.
+    pause
+    exit /b
+)
+
 echo.
 echo  [2/4] Compilation du HUD React...
 echo.
@@ -129,8 +138,8 @@ echo.
 call python "..\scripts\verify_packaged_frontend.py"
 if %errorlevel% neq 0 (
     echo.
-    echo  [ERREUR] Le frontend embarque ne correspond pas au build React.
-    echo  Le paquet est refuse pour eviter de distribuer une ancienne interface.
+    echo  [ERREUR] Le paquet backend embarque est perime ou incomplet ^(frontend ou Chromium, voir ci-dessus^).
+    echo  Le paquet est refuse pour eviter de distribuer un installeur defectueux.
     pause
     exit /b
 )

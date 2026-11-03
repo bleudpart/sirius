@@ -1,4 +1,4 @@
-"""Verify that PyInstaller embedded the current React production bundle."""
+"""Verify that PyInstaller embedded the current React bundle and the web agent's Chromium."""
 
 from __future__ import annotations
 
@@ -10,9 +10,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "frontend" / "build" / "static" / "js"
 PACKAGED = ROOT / "backend" / "dist" / "sirius-backend" / "_internal" / "frontend" / "build" / "static" / "js"
+PACKAGED_BROWSERS = ROOT / "backend" / "dist" / "sirius-backend" / "_internal" / "playwright-browsers"
 VERSION_FILE = ROOT / "frontend" / "src" / "version.js"
 PACKAGE_FILE = ROOT / "frontend" / "package.json"
 REQUIRED_MARKERS = ("sirius-setup", "capture-interface")
+# Le lanceur chrome.exe pese ~4 Mo : en dessous, la copie est tronquee ou factice.
+MIN_CHROME_BYTES = 1_000_000
 
 
 def expected_version() -> str:
@@ -44,6 +47,18 @@ def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def packaged_chromium(browsers: Path = PACKAGED_BROWSERS) -> Path:
+    """Return the packaged chrome.exe; the web agent cannot run in the installed app without it."""
+    for executable in sorted(browsers.glob("chromium-*/**/chrome.exe")):
+        if executable.stat().st_size >= MIN_CHROME_BYTES:
+            return executable
+    command = f'"{sys.executable}" -m playwright install chromium'
+    raise RuntimeError(
+        f"Chromium absent du paquet backend ({browsers}) : l'agent web ne marcherait pas dans "
+        f"l'application installee. Lancer {command}, puis 'npm run backend:build'."
+    )
+
+
 def main() -> int:
     source = newest_bundle(SOURCE)
     packaged = newest_bundle(PACKAGED)
@@ -68,6 +83,10 @@ def main() -> int:
             "Relancer 'npm run build' avant l'empaquetage."
         )
     print(f"Packaged frontend verified: {packaged.name} v{version} sha256={packaged_hash}")
+    # Le Chromium n'est embarque que par le build Windows (cache Playwright de la machine de build).
+    if sys.platform == "win32":
+        chrome = packaged_chromium()
+        print(f"Packaged Chromium verified: {chrome.relative_to(PACKAGED_BROWSERS).as_posix()} ({chrome.stat().st_size} bytes)")
     return 0
 
 

@@ -1,8 +1,53 @@
 from pathlib import Path
+import json
 import os
 import sys
 
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+
+
+def _expected_chromium_revision():
+    """Révision de Chromium que la bibliothèque Playwright du build ira chercher (None si illisible)."""
+    try:
+        import playwright
+
+        manifest = Path(playwright.__file__).parent / "driver" / "package" / "browsers.json"
+        browsers = json.loads(manifest.read_text(encoding="utf-8"))["browsers"]
+        return next(item["revision"] for item in browsers if item["name"] == "chromium")
+    except Exception:
+        # Lecture facultative : sans elle on se rabat sur n'importe quel Chromium installé.
+        return None
+
+
+def _bundled_chromium():
+    """Dossiers Chromium à embarquer ; arrête le build s'il n'y en a aucun d'utilisable.
+
+    Le webagent (recherche invisible via Playwright) a besoin d'un vrai Chromium sur le poste
+    client, sans téléchargement réseau au premier lancement. On embarque seulement le dossier
+    "chromium-<révision>" (ni ffmpeg, ni headless-shell, ni winldd : inutilisés par webagent.py)
+    depuis le cache où `playwright install chromium` l'a déposé sur la machine de build.
+    Un paquet sans lui se construisait pourtant sans erreur et l'agent web était mort chez le
+    client (1.0.69 : -144 Mo sur un PC neuf) : mieux vaut refuser de construire.
+    """
+    cache = Path(os.environ.get("LOCALAPPDATA", "")) / "ms-playwright"
+    revision = _expected_chromium_revision()
+    # Seule la révision attendue par Playwright est lançable : une autre ne servirait à rien.
+    wanted = f"chromium-{revision}" if revision else "chromium-[0-9]*"
+    found = []
+    if cache.is_dir():
+        found = [
+            entry
+            for entry in sorted(cache.glob(wanted))
+            if entry.is_dir() and any(entry.rglob("chrome.exe"))
+        ]
+    if not found:
+        present = sorted(entry.name for entry in cache.glob("chromium-*")) if cache.is_dir() else []
+        raise SystemExit(
+            f"Chromium introuvable dans {cache} (revision attendue : {revision or 'toute'} ; "
+            f"presents : {', '.join(present) or 'aucun'}). L'agent web ne marcherait pas dans l'application "
+            f'installee. Lancer : "{sys.executable}" -m playwright install chromium, puis relancer le build.'
+        )
+    return [(str(entry), f"playwright-browsers/{entry.name}") for entry in found]
 
 
 backend_dir = Path(SPECPATH)
@@ -16,6 +61,10 @@ if sys.platform == "win32":
     # Priorite au meme runtime systeme, pas aux vieilles copies livrees par certaines dependances.
     for pattern in ("msvcp140*.dll", "vcruntime140*.dll"):
         binaries.extend((str(path), ".") for path in sorted(runtime_dir.glob(pattern)))
+    # Contrôle fait ici, avant les longues collectes de modules : l'échec est immédiat.
+    chromium_datas = _bundled_chromium()
+else:
+    chromium_datas = []
 hiddenimports = []
 for package in ("media", "productivite", "providers", "routers", "routes"):
     hiddenimports.extend(collect_submodules(package))
@@ -49,15 +98,8 @@ for source, _target in datas:
     if leaked:
         raise SystemExit("Fichier .env interdit dans le paquet : " + ", ".join(str(path) for path in leaked))
 
-# Le webagent (recherche invisible via Playwright) a besoin d'un vrai Chromium
-# sur le poste client, sans dépendre d'un téléchargement réseau au premier lancement.
-# On embarque uniquement le dossier "chromium-*" (pas ffmpeg/headless-shell/winldd,
-# inutilisés par webagent.py) depuis le cache local où `playwright install chromium`
-# l'a déposé sur la machine de build.
-playwright_cache = Path(os.environ.get("LOCALAPPDATA", "")) / "ms-playwright"
-for entry in sorted(playwright_cache.glob("chromium-*")) if playwright_cache.exists() else []:
-    if entry.is_dir() and "headless_shell" not in entry.name:
-        datas.append((str(entry), f"playwright-browsers/{entry.name}"))
+# Chromium du webagent, déjà contrôlé plus haut par _bundled_chromium().
+datas.extend(chromium_datas)
 
 analysis = Analysis(
     [str(backend_dir / "desktop_backend.py")],
