@@ -469,7 +469,7 @@ def test_packaged_flag_does_not_extend_non_admin_trial(db, monkeypatch):
     "/api/news/headlines", "/api/weather/current", "/api/country", "/api/technews/bulletin",
     "/api/documentary", "/api/europeana/search", "/api/oracle/overview", "/api/pantheon/ocr",
     "/api/nummarius/market", "/api/nummarius/history/stock", "/api/hephaistos/diagnostic",
-    "/api/agora/coach", "/api/files/uploaded/analyze",
+    "/api/agora/coach", "/api/mythos/consult", "/api/files/uploaded/analyze",
 ])
 def test_optional_online_surfaces_need_account_but_are_not_blanket_blocked_after_trial(api, path):
     client, _ = api

@@ -12,6 +12,7 @@ import secrets
 import shutil
 import smtplib
 import subprocess
+import unicodedata
 import uuid
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -45,7 +46,7 @@ STATIC = Path(__file__).parent / "static"
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
 
-async def _llm(prompt: str, system: str = "Tu es ΣIRIUS, entité suprême, technique et concise. Réponds en français. Tutoie toujours l'utilisateur (jamais « vous », jamais « Monsieur »).") -> str:
+async def _llm(prompt: str, system: str = "Tu es ΣIRIUS, entité suprême, technique et concise. Réponds en français. Tutoie toujours l'utilisateur (jamais « vous », jamais « Monsieur »).", max_tokens: int = 800) -> str:
     from sirius_brain import k3_client, K3_MODEL, ENV_K3_KEY
     from provider_access import denial_error
     
@@ -64,7 +65,7 @@ async def _llm(prompt: str, system: str = "Tu es ΣIRIUS, entité suprême, tech
     r = await client.chat.completions.create(
         model=K3_MODEL,
         messages=[{"role": "system", "content": enhanced_system}, {"role": "user", "content": prompt}],
-        max_tokens=800,
+        max_tokens=max_tokens,
     )
     
     raw = (r.choices[0].message.content or "").strip()
@@ -195,6 +196,23 @@ class ConsultPdfIn(BaseModel):
     question: str = ""
     reponse: str
     date: str = ""
+
+
+class ConsultHistoryIn(BaseModel):
+    module: str
+    q: str = ""
+    a: str
+    date: str = ""
+
+
+class ConsultEmailIn(BaseModel):
+    module: str
+    question: str = ""
+    reponse: str
+    date: str = ""
+    to: str = ""
+    subject: str = ""
+    smtp: dict = {}
 
 
 AGORA_STAGES = ["PROSPECTION", "QUALIFICATION", "PROPOSITION", "NÉGOCIATION", "CLOSING", "GAGNÉ", "PERDU"]
@@ -388,6 +406,57 @@ CONSULT_PROMPTS = {
         "optimisé pour la conversion, la rapidité et l'efficacité. Pas de markdown, pas d'astérisques. Réponds en français."
     ),
 }
+
+CONSULT_UNKNOWN = "Ce personnage ne propose pas de consultation."
+# Personnages dont l'avis s'exporte en PDF / e-mail : (nom du fichier, titre, libellé dans le message).
+CONSULT_DOCS = {
+    "SOLON#": ("solon-avis.pdf", "Avis juridique SOLON", "l'avis juridique de SOLON"),
+    "PROMÉTHÉE#": ("promethee-plan.pdf", "Plan de projet PROMÉTHÉE", "le plan de projet de PROMÉTHÉE"),
+}
+CONSULT_MAX_TOKENS = 1400
+CONSULT_QUESTION_MAX = 4000
+CONSULT_TEXT_MAX = 20000
+CONSULT_HISTORY_MAX = 100
+CONSULT_EMAIL_RE = re.compile(r"[^@\s,;<>\"']+@[^@\s,;<>\"']+\.[^@\s,;<>\"']+")
+
+
+def _consult_module(module: str, allowed) -> str:
+    key = unicodedata.normalize("NFC", str(module or "")).strip()
+    if key not in allowed:
+        raise HTTPException(status_code=404, detail=CONSULT_UNKNOWN)
+    return key
+
+
+def _consult_answer(raw: str) -> str:
+    """Extrait le texte de la réponse du JSON produit par `_llm` (texte brut si le modèle dévie)."""
+    try:
+        parsed = json.loads(raw)
+    except ValueError:
+        return raw.strip()
+    if isinstance(parsed, dict):
+        text = parsed.get("reponse") or parsed.get("plan")
+        if isinstance(text, str):
+            return text.strip()
+    return raw.strip()
+
+
+def _consult_date(value: str) -> str:
+    """Date ISO en UTC ; une date absente ou illisible devient l'instant courant."""
+    try:
+        parsed = datetime.fromisoformat(str(value or "").strip()[:40].replace("Z", "+00:00"))
+    except ValueError:
+        return now_iso()
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).isoformat()
+
+
+def _consult_recipient(value: str) -> str:
+    to = str(value or "").strip()
+    if len(to) > 254 or not CONSULT_EMAIL_RE.fullmatch(to):
+        raise HTTPException(status_code=400, detail="Adresse e-mail du destinataire invalide.")
+    return to
+
 MYTHOS_CHARACTERS = [
     {
         "module": "ARGUS#", "character": "Argus Panoptès", "role": "Surveillance & réparation",
@@ -605,9 +674,120 @@ def make_modules_router(db):
                 return char
         raise HTTPException(status_code=404, detail="Personnage non trouvé")
 
+    async def _store_consult(user_id, module, question, answer, date=None):
+        entry = {"id": str(uuid.uuid4()), "module": module, "q": question, "a": answer, "date": date or now_iso()}
+        await db.consult_history.insert_one({**entry, "user_id": user_id})
+        stored = [
+            item async for item in db.consult_history.find(
+                {"user_id": user_id, "module": module}, {"_id": 0, "id": 1, "date": 1})
+        ]
+        stored.sort(key=lambda item: item.get("date") or "", reverse=True)
+        for stale in stored[CONSULT_HISTORY_MAX:]:
+            await db.consult_history.delete_one({"id": stale["id"], "user_id": user_id})
+        return entry
+
+    @r.post("/mythos/consult")
+    async def mythos_consult(data: ConsultIn, request: Request):
+        user = await require_user(request, db)
+        module = _consult_module(data.module, CONSULT_PROMPTS)
+        question = data.question.strip()
+        if not question:
+            raise HTTPException(status_code=422, detail="Pose ta question avant de lancer la consultation.")
+        if len(question) > CONSULT_QUESTION_MAX:
+            raise HTTPException(status_code=413, detail=f"Question trop longue ({CONSULT_QUESTION_MAX} caractères maximum).")
+        bind_keys(data.keys)
+        try:
+            answer = _consult_answer(await _llm(question, CONSULT_PROMPTS[module], max_tokens=CONSULT_MAX_TOKENS))
+        except HTTPException:
+            raise
+        except Exception as error:
+            logger.warning("[MYTHOS] consultation %s indisponible: %s", module, error)
+            raise HTTPException(status_code=502, detail="La consultation est momentanément indisponible. Réessaie dans un instant.")
+        if not answer:
+            raise HTTPException(status_code=502, detail="La consultation n'a produit aucune réponse. Reformule ta question.")
+        await _store_consult(user["user_id"], module, question, answer[:CONSULT_TEXT_MAX])
+        return {"ok": True, "reponse": answer}
+
     @r.get("/mythos/consult/history")
-    def get_consult_history(module: str):
-        return []
+    async def get_consult_history(request: Request, module: str = ""):
+        user = await require_user(request, db)
+        query = {"user_id": user["user_id"]}
+        if module:
+            query["module"] = unicodedata.normalize("NFC", module)
+        history = [item async for item in db.consult_history.find(query, {"_id": 0, "user_id": 0})]
+        history.sort(key=lambda item: item.get("date") or "", reverse=True)
+        return {"history": history}
+
+    @r.post("/mythos/consult/history")
+    async def add_consult_history(data: ConsultHistoryIn, request: Request):
+        user = await require_user(request, db)
+        module = _consult_module(data.module, CONSULT_PROMPTS)
+        answer = data.a.strip()[:CONSULT_TEXT_MAX]
+        if not answer:
+            raise HTTPException(status_code=422, detail="Consultation vide.")
+        entry = await _store_consult(
+            user["user_id"], module, data.q.strip()[:CONSULT_QUESTION_MAX], answer, _consult_date(data.date))
+        return {"ok": True, "entry": entry}
+
+    @r.delete("/mythos/consult/history/{entry_id}")
+    async def delete_consult_history(entry_id: str, request: Request):
+        user = await require_user(request, db)
+        result = await db.consult_history.delete_one({"id": entry_id, "user_id": user["user_id"]})
+        if not getattr(result, "deleted_count", 0):
+            raise HTTPException(status_code=404, detail="Consultation introuvable.")
+        return {"ok": True}
+
+    @r.post("/mythos/consult/pdf")
+    async def mythos_consult_pdf(data: ConsultPdfIn, request: Request):
+        user = await require_user(request, db)
+        module = _consult_module(data.module, CONSULT_DOCS)
+        from email_signature import load_signature_identity
+        from themis_pdf import build_consult_pdf
+        identity = await load_signature_identity(db, user["user_id"])
+        pdf = build_consult_pdf(
+            module, data.question.strip()[:CONSULT_QUESTION_MAX], data.reponse[:CONSULT_TEXT_MAX],
+            data.date.strip()[:40], **identity)
+        return Response(
+            content=pdf.getvalue(), media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{CONSULT_DOCS[module][0]}"'})
+
+    @r.post("/mythos/consult/email")
+    async def mythos_consult_email(data: ConsultEmailIn, request: Request):
+        user = await require_user(request, db)
+        module = _consult_module(data.module, CONSULT_DOCS)
+        to = _consult_recipient(data.to)
+        smtp = data.smtp if isinstance(data.smtp, dict) else {}
+        if not str(smtp.get("host") or "").strip():
+            raise HTTPException(status_code=400, detail="Serveur SMTP non configuré — renseignez-le dans THÉMIS (Réglages).")
+        from email_signature import load_signature_identity
+        from personal_mail import _public_host
+        from themis_api import SmtpConf, _send_smtp
+        from themis_pdf import build_consult_pdf
+        try:
+            conf = SmtpConf(**smtp)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Configuration SMTP invalide.")
+        # Le serveur ne doit pas servir de rebond vers le réseau interne.
+        await asyncio.to_thread(_public_host, conf.host, int(conf.port))
+        identity = await load_signature_identity(db, user["user_id"])
+        pdf_name, title, label = CONSULT_DOCS[module]
+        date = data.date.strip()[:40]
+        pdf = build_consult_pdf(
+            module, data.question.strip()[:CONSULT_QUESTION_MAX], data.reponse[:CONSULT_TEXT_MAX], date, **identity)
+        subject = re.sub(r"\s+", " ", data.subject).strip()[:200] or f"{title} — ΣIRIUS"
+        when = f" (consultation du {date})" if date else ""
+        body = f"Bonjour,\n\nVeuillez trouver ci-joint {label}{when}.\n\nCordialement."
+        try:
+            await asyncio.to_thread(_send_smtp, conf, to, subject, body, pdf.getvalue(), pdf_name, **identity)
+        except smtplib.SMTPAuthenticationError:
+            raise HTTPException(status_code=400, detail="Authentification SMTP refusée : vérifiez l'identifiant et le mot de passe (pour Gmail, utilisez un mot de passe d'application).")
+        except smtplib.SMTPException as error:
+            raise HTTPException(status_code=400, detail=f"Envoi refusé par le serveur SMTP : {str(error)[:140]}")
+        except OSError as error:
+            raise HTTPException(status_code=400, detail=f"Serveur SMTP injoignable : vérifiez l'adresse et le port. ({str(error)[:140]})")
+        except Exception as error:
+            raise HTTPException(status_code=400, detail=f"Envoi impossible : {str(error)[:140]}")
+        return {"ok": True, "sent_to": to}
 
     @r.get("/mythos/img/{filename}")
     def get_mythos_image(filename: str):

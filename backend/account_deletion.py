@@ -19,7 +19,7 @@ PERSONAL_COLLECTIONS = (
     "sirius_chats", "local_memory", "episodic_memory",
     "sirius_work_dossiers", "sirius_work_entries", "sirius_work_snapshots", "sirius_work_live_states",
     "sirius_work_proposal_mutes", "agora_deals", "agora_settings",
-    "agora_coach_history",     "nummarius_alerts", "chronos_actions",
+    "agora_coach_history", "consult_history", "nummarius_alerts", "chronos_actions",
     "sirius_work_contexts", "sirius_work_recordings",
     "sirius_ariane_runs", "sirius_ariane_steps", "sirius_ariane_events",
     "sirius_finance_portfolios", "sirius_finance_previews", "sirius_finance_alerts", "sirius_finance_routines",
