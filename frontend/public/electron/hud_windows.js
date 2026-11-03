@@ -20,7 +20,7 @@ function createMediaHudWindow({ BrowserWindow, screen, baseUrl, icon, openExtern
     minHeight: 440,
     x: Math.max(20, Math.round((width - 760) / 2)),
     y: 110,
-    title: "SIRIUS MEDIA",
+    title: "ΣIRIUS MEDIA",
     backgroundColor: "#03121f",
     autoHideMenuBar: true,
     alwaysOnTop: true,

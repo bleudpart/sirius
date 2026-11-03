@@ -44,7 +44,7 @@ export default function LiveWorkSettings({ dossier, disabled, queue, onError }) 
   const configure = (enabled, allow_ai) => queue({
     title: enabled ? "Autoriser le suivi de ce dossier ?" : "Arrêter le suivi de ce dossier ?",
     text: enabled
-      ? `${dossier.title} : seules les sources déjà liées seront comparées, toutes les minutes quand SIRIUS est ouvert. ${
+      ? `${dossier.title} : seules les sources déjà liées seront comparées, toutes les minutes quand ΣIRIUS est ouvert. ${
         allow_ai ? "J'autorise l'envoi à l'IA en ligne des champs modifiés et de leurs anciennes/nouvelles valeurs. Aucun document complet ni autre dossier n'est transmis."
           : "Aucune donnée ne sera envoyée à l'IA pour ce suivi."} Aucune opération métier ne sera exécutée. Un nouveau point de comparaison sera établi.`
       : "Les analyses cessent et la mémoire de comparaison de ce suivi est effacée. Les sources métier ne sont pas modifiées.",

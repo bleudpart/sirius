@@ -54,7 +54,7 @@ export default function OverlayApp() {
         }),
       });
       const data = await resp.json();
-      if (!resp.ok) throw new Error(typeof data.detail === "string" ? data.detail : "La requête SIRIUS a échoué.");
+      if (!resp.ok) throw new Error(typeof data.detail === "string" ? data.detail : "La requête ΣIRIUS a échoué.");
       const a = data.answer || "Je n'ai pas de réponse.";
       setAnswer(a);
       speakFr(a);
@@ -71,7 +71,7 @@ export default function OverlayApp() {
         }
       }
     } catch (err) {
-      setAnswer("Sirius est injoignable. Vérifiez que le noyau tourne.");
+      setAnswer("ΣIRIUS est injoignable. Vérifiez que le noyau tourne.");
     }
     setBusy(false);
   };

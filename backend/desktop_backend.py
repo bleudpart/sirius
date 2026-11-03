@@ -144,7 +144,7 @@ def main() -> None:
         _cleanup_stale_sirius_processes("127.0.0.1", port)
         if _port_in_use("127.0.0.1", port):
             raise RuntimeError(
-                f"Le port 127.0.0.1:{port} est déjà occupé. Fermeture du backend SIRIUS précédent requis."
+                f"Le port 127.0.0.1:{port} est déjà occupé. Fermeture du backend ΣIRIUS précédent requis."
             )
 
     import uvicorn

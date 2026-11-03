@@ -133,7 +133,7 @@ client, la ville, la date, le nombre de postes et les signatures.
 - Outlook, Gmail, calendrier et contacts
 - Spotify et modules multimedia
 - Plans 2D/3D, fichiers, notes, taches et rapports
-- Modules PANTHEON, NEXUS, ORACLE, SIRIUS PRIME et ZEUS CORTEX
+- Modules PANTHEON, NEXUS, ORACLE, ΣIRIUS PRIME et ZEUS CORTEX
 
 Voir `README.md`, `INSTALL-SIRIUS.md` et `MODULES_SIRIUS.txt` pour les details
 techniques et la liste des modules.

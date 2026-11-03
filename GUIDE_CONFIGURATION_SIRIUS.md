@@ -1,8 +1,8 @@
-# Configurer SIRIUS simplement
+# Configurer ΣIRIUS simplement
 
 ## Commencer sans chercher de clés
 
-Connectez-vous à votre compte SIRIUS. Votre essai dure **15 jours à partir
+Connectez-vous à votre compte ΣIRIUS. Votre essai dure **15 jours à partir
 de la première activation du compte**, avec des limites quotidiennes.
 Pendant cet essai, les services autorisés utilisent les clés du serveur :
 vous n'avez pas à les connaître, les copier ou les demander.
@@ -13,11 +13,11 @@ Les limites quotidiennes sont visibles dans **Configuration → Clés API et ser
 Se déconnecter ou réinstaller l'application ne recommence pas l'essai.
 
 > **Important : après ces 15 jours, les services en ligne qui utilisent les
-> clés de SIRIUS ne fonctionneront plus avec ces clés. Pour continuer à
+> clés de ΣIRIUS ne fonctionneront plus avec ces clés. Pour continuer à
 > utiliser ces services, la configuration de vos propres clés devient
 > obligatoire. Préparez-la avant la fin de l'essai pour éviter une interruption.**
 >
-> Pour continuer à utiliser SIRIUS après l'essai, une licence ou une
+> Pour continuer à utiliser ΣIRIUS après l'essai, une licence ou une
 > location active est également nécessaire, achetée avec l'adresse e-mail
 > de votre compte. Sans elle, l'application se verrouille ; vos données
 > restent conservées et peuvent être exportées depuis **Mon profil**.
@@ -44,14 +44,14 @@ Chaque fournisseur exige son propre compte ; la mémoire locale ne demande aucun
    de connexion doit être résolu avant de considérer le service utilisable.
 5. Cliquez sur **ENREGISTRER** pour conserver les clés sur cet appareil.
 
-SIRIUS chiffre et enregistre les clés sur cet appareil. Il n'est pas nécessaire
+ΣIRIUS chiffre et enregistre les clés sur cet appareil. Il n'est pas nécessaire
 de modifier du code, des fichiers `.env` ou des variables d'environnement.
 Le mot de passe n'est nécessaire que pour une sauvegarde portable, pas pour
 l'enregistrement habituel sur l'appareil.
 
 > Les fournisseurs peuvent demander une validation de compte, l'activation
 > d'une API ou un moyen de paiement. Consultez leurs tarifs et leurs quotas.
-> SIRIUS ne crée pas automatiquement leurs comptes ni leurs clés.
+> ΣIRIUS ne crée pas automatiquement leurs comptes ni leurs clés.
 
 ## Restaurer automatiquement une configuration déjà préparée
 
@@ -65,12 +65,12 @@ clés une par une :
 L'import ne modifie pas les clés du serveur, les autres comptes ou votre rôle.
 Une clé refusée ou non vérifiable doit être contrôlée auprès de son fournisseur.
 
-## Créer un coffre portable sans ouvrir SIRIUS
+## Créer un coffre portable sans ouvrir ΣIRIUS
 
 ### Programme Windows portable
 
 Ouvrez **SIRIUS-Coffre-Portable.exe** sur un PC Windows 10/11 64 bits.
-Il fonctionne sans installer SIRIUS, Node.js ou Python ; il utilise
+Il fonctionne sans installer ΣIRIUS, Node.js ou Python ; il utilise
 .NET Framework et le chiffrement natif de Windows. Vous pouvez emporter
 l'exécutable sur une clé USB. Le programme ne s'exécute pas sur Android :
 c'est le fichier `.vault` qu'il crée que vous transportez sur le téléphone.
@@ -80,7 +80,7 @@ un mot de passe d'au moins 12 caractères, puis cliquez sur **Créer le coffre**
 Choisissez où enregistrer le fichier. La fenêtre indique que le chiffrement
 est en cours ; aucun fichier existant n'est écrasé.
 
-Dans SIRIUS, sur PC ou téléphone, cliquez sur **Importer mon coffre** dans
+Dans ΣIRIUS, sur PC ou téléphone, cliquez sur **Importer mon coffre** dans
 **Clés API et services**, choisissez le fichier, saisissez son mot de passe et
 cliquez sur **Importer les clés**. L'import remplace les clés de ce compte
 sur cet appareil et les enregistre directement, sans second bouton Enregistrer.
@@ -99,7 +99,7 @@ node .\scripts\portable-vault\verify.mjs
 ```
 
 L'exécutable est produit dans `dist\portable-vault`. Le test utilise uniquement
-des secrets fictifs et vérifie son coffre avec le déchiffrement réel de SIRIUS.
+des secrets fictifs et vérifie son coffre avec le déchiffrement réel de ΣIRIUS.
 Chiffrement identique : PBKDF2-SHA256 (600 000 itérations), AES-256-GCM,
 sel et nonce aléatoires. Aucun appel réseau ni stockage de clés en clair.
 
@@ -111,12 +111,12 @@ Depuis un terminal à la racine du projet, avec Node.js installé :
 node .\scripts\create-vault.mjs "$env:USERPROFILE\Desktop\sirius.vault"
 ```
 
-L'outil réutilise le chiffrement de SIRIUS et ne fait aucun appel réseau.
+L'outil réutilise le chiffrement de ΣIRIUS et ne fait aucun appel réseau.
 Collez vos clés dans les invites masquées ; appuyez sur Entrée pour ignorer
 un fournisseur. Choisissez et confirmez un mot de passe de 12 caractères minimum.
 Seul le coffre chiffré est enregistré ; un fichier existant n'est jamais écrasé.
 Les clés ne sont pas testées auprès des fournisseurs avant la création : cette
-vérification se fait à l'import dans SIRIUS.
+vérification se fait à l'import dans ΣIRIUS.
 
 Transportez le fichier sur votre téléphone ou un autre PC, puis utilisez
 **Clés API et services → Importer mon coffre**.
@@ -160,10 +160,10 @@ ou supprimez vous-même ces anciennes copies.
 Les tests de fournisseurs peuvent consommer une petite partie de leurs quotas.
 Le micro n'est testé qu'après votre action et votre autorisation.
 
-Pendant l'essai, votre clé personnelle remplace celle de SIRIUS uniquement
+Pendant l'essai, votre clé personnelle remplace celle de ΣIRIUS uniquement
 pour le fournisseur concerné. Ajouter une clé de bourse ne coupe donc pas
 l'essai des réponses IA. Une clé personnelle refusée ne déclenche pas un
-repli vers la clé de SIRIUS du même fournisseur.
+repli vers la clé de ΣIRIUS du même fournisseur.
 
 Décocher un service masque son champ sans supprimer la clé renseignée.
 Pour retirer une clé du coffre, videz le champ et enregistrez à nouveau
@@ -177,11 +177,11 @@ Le coffre ne crée pas automatiquement un connecteur manquant.
 ## Protéger vos clés et votre mot de passe
 
 Le coffre utilise un chiffrement authentifié. Son mot de passe est distinct
-du mot de passe du compte SIRIUS ; **il n'est pas récupérable dans l'application**.
+du mot de passe du compte ΣIRIUS ; **il n'est pas récupérable dans l'application**.
 Une copie du coffre avec un mot de passe perdu peut devenir inutilisable.
 Vous pouvez alors recréer vos clés chez les fournisseurs et un nouveau coffre.
 
-Après déverrouillage, les clés personnelles sont transmises au backend SIRIUS
+Après déverrouillage, les clés personnelles sont transmises au backend ΣIRIUS
 pour appeler les services choisis. Utilisez uniquement une installation et un
 serveur de confiance. Le chiffrement protège le fichier enregistré ; il ne
 rend pas sûr un appareil compromis.
@@ -207,7 +207,7 @@ du rôle de votre compte authentifié, géré séparément côté serveur.
 | Aucun coffre enregistré | Importez votre sauvegarde ou créez et protégez une nouvelle configuration. |
 | Service facultatif non configuré | Ignorez-le si vous n'en avez pas besoin. |
 
-**Le parcours le plus court : essayer SIRIUS → créer uniquement les clés utiles
+**Le parcours le plus court : essayer ΣIRIUS → créer uniquement les clés utiles
 → les tester → protéger une fois le coffre → le déverrouiller aux prochaines sessions.**
 
 ---
@@ -218,7 +218,7 @@ du rôle de votre compte authentifié, géré séparément côté serveur.
 pas comme un logiciel.** Une connexion à une boîte mail ou à Spotify utilise
 au contraire une page d'autorisation officielle, appelée **OAuth**.
 Ne collez pas votre mot de passe Gmail, Microsoft ou Spotify dans un champ
-de clé API de SIRIUS.
+de clé API de ΣIRIUS.
 
 Les adresses ci-dessous sont celles des fournisseurs. Le nom de certains
 boutons peut changer. Vérifiez les tarifs, les droits demandés et les limites
@@ -226,7 +226,7 @@ dans votre propre compte.
 
 ### Choisir sans tout configurer
 
-| Votre besoin | Fournisseur | Où aller | Dans SIRIUS |
+| Votre besoin | Fournisseur | Où aller | Dans ΣIRIUS |
 |---|---|---|---|
 | Réponses IA et transcription Groq | Groq | [Console Groq — clés](https://console.groq.com/keys) | Clé Groq |
 | Réflexion approfondie | Kimi / Moonshot | [Console Moonshot](https://platform.moonshot.cn/console/api-keys) | Clé Kimi K3 |
@@ -246,7 +246,7 @@ dans votre propre compte.
 
 1. Ouvrez [console.groq.com/keys](https://console.groq.com/keys).
 2. Créez votre compte ou connectez-vous, puis ouvrez **API Keys**.
-3. Créez une nouvelle clé et donnez-lui un nom, par exemple « Mon SIRIUS ».
+3. Créez une nouvelle clé et donnez-lui un nom, par exemple « Mon ΣIRIUS ».
 4. Copiez la clé complète dans **Clé Groq** sur la page **Clés API et services**.
 5. Cliquez sur **TESTER**, puis protégez et enregistrez le coffre.
 
@@ -259,7 +259,7 @@ pas nécessaire de configurer tous les fournisseurs.
 1. Ouvrez la [console Moonshot](https://platform.moonshot.cn/console/api-keys)
    et créez ou connectez votre compte.
 2. Dans **API Keys**, créez une clé personnelle et copiez-la.
-3. Sélectionnez le service de réflexion approfondie dans SIRIUS.
+3. Sélectionnez le service de réflexion approfondie dans ΣIRIUS.
 4. Collez la clé dans **Clé Kimi K3**, testez puis enregistrez le coffre.
 
 **Attention aux régions :** la plateforme internationale propose aussi
@@ -275,7 +275,7 @@ au hasard les champs Groq et Kimi.
 1. Ouvrez [serpapi.com](https://serpapi.com/) et créez votre compte.
 2. Connectez-vous à [la page de votre clé](https://serpapi.com/manage-api-key).
 3. Copiez la clé privée de votre compte.
-4. Dans SIRIUS, sélectionnez **recherche web**, renseignez **Clé SerpAPI**,
+4. Dans ΣIRIUS, sélectionnez **recherche web**, renseignez **Clé SerpAPI**,
    testez puis enregistrez le coffre.
 
 Le nombre de recherches dépend de votre offre SerpAPI. Ne publiez pas votre clé.
@@ -289,7 +289,7 @@ Le nombre de recherches dépend de votre offre SerpAPI. Ne publiez pas votre cl�
    (préréglage **API** lorsque proposé).
 4. Copiez la clé dans **Clé fal.ai**, cliquez sur **TESTER** et protégez le coffre.
 
-Si fal.ai ne permet pas de confirmer la clé pour le moment, SIRIUS indique
+Si fal.ai ne permet pas de confirmer la clé pour le moment, ΣIRIUS indique
 **non vérifiable** et demande votre accord avant de l'enregistrer chiffrée.
 Cet accord ne transforme pas le test en réussite : retestez le service ensuite.
 Une clé explicitement refusée n'est pas enregistrée.
@@ -339,7 +339,7 @@ activer ces deux services cloud.
 2. Activez **Cloud Text-to-Speech API** et vérifiez la facturation.
 3. Consultez [les méthodes d'authentification prises en charge](https://cloud.google.com/text-to-speech/docs/authentication).
 4. Si votre configuration autorise une clé API pour cet usage, créez une clé
-   adaptée et renseignez **Clé Google TTS** dans SIRIUS.
+   adaptée et renseignez **Clé Google TTS** dans ΣIRIUS.
 5. Testez-la. Si le fournisseur exige une autre méthode d'authentification,
    ne collez pas un fichier de compte de service dans ce champ :
    utilisez la voix locale ou demandez l'aide de l'administrateur.
@@ -357,12 +357,12 @@ Les clés Gemini ont leurs propres restrictions et règles d'accès.
 
 ### 8. Gmail et Google Agenda : autoriser votre compte, pas copier un secret
 
-1. Dans SIRIUS, ouvrez **Centre des connexions**.
+1. Dans ΣIRIUS, ouvrez **Centre des connexions**.
 2. Choisissez **Google**, puis cliquez sur le bouton de connexion.
 3. Une page Google s'ouvre : sélectionnez votre propre compte Gmail.
 4. Relisez les autorisations demandées. Autorisez seulement si vous souhaitez
-   utiliser ces fonctions et faites confiance à cette installation de SIRIUS.
-5. Revenez dans SIRIUS et vérifiez l'indication **Connecté**. Si nécessaire,
+   utiliser ces fonctions et faites confiance à cette installation de ΣIRIUS.
+5. Revenez dans ΣIRIUS et vérifiez l'indication **Connecté**. Si nécessaire,
    utilisez l'action de vérification proposée dans le centre.
 6. Pour retirer l'accès, utilisez **Déconnecter** et, si souhaité, révoquez
    l'autorisation dans [les connexions de votre compte Google](https://myaccount.google.com/connections).
@@ -374,7 +374,7 @@ Une clé Google Maps ou Gemini ne remplace pas cette autorisation Gmail.
 
 Pour l'administrateur uniquement : préparer le projet Google Cloud,
 activer les API nécessaires (Gmail et Calendar), configurer l'écran de
-consentement OAuth et les adresses de retour exactes de SIRIUS.
+consentement OAuth et les adresses de retour exactes de ΣIRIUS.
 Les identifiants OAuth de l'application restent côté serveur, pas dans
 le coffre personnel de l'utilisateur.
 [Autorisations Gmail](https://developers.google.com/workspace/gmail/api/auth/scopes).
@@ -387,14 +387,14 @@ le coffre personnel de l'utilisateur.
 3. Connectez-vous sur cette page officielle et effectuez la vérification
    supplémentaire de Microsoft si elle est demandée.
 4. Relisez les autorisations et confirmez celles nécessaires.
-5. Revenez dans SIRIUS et vérifiez l'indication **Connecté**.
+5. Revenez dans ΣIRIUS et vérifiez l'indication **Connecté**.
 6. Utilisez **Déconnecter** pour retirer la connexion de cette installation.
 
 Pour un compte professionnel, votre organisation peut bloquer les applications
 externes ou exiger l'accord de son administrateur.
 Le connecteur doit accepter le type de compte utilisé.
 
-Pour l'administrateur de SIRIUS uniquement : l'application doit être enregistrée
+Pour l'administrateur de ΣIRIUS uniquement : l'application doit être enregistrée
 dans [Microsoft Entra](https://entra.microsoft.com/), avec les types de comptes,
 adresses de retour et permissions Microsoft Graph correspondant aux fonctions
 réellement utilisées.
@@ -403,7 +403,7 @@ L'utilisateur ne doit pas créer un secret OAuth ni le coller dans **Clé Groq**
 
 ### 10. Spotify
 
-1. Ouvrez le lecteur **Spotify** de SIRIUS.
+1. Ouvrez le lecteur **Spotify** de ΣIRIUS.
 2. Cliquez sur **CONNECTER SPOTIFY**.
 3. Connectez-vous sur la page Spotify officielle et relisez l'autorisation.
 4. Revenez dans le lecteur ; recherchez un titre ou un artiste.
@@ -433,7 +433,7 @@ de l'utilisateur.
 
 **Pour regarder ou écouter avec les lecteurs officiels :**
 
-1. Ouvrez une vidéo YouTube via les fonctions multimédias de SIRIUS.
+1. Ouvrez une vidéo YouTube via les fonctions multimédias de ΣIRIUS.
 2. Lancez la lecture dans le lecteur officiel.
 3. Si YouTube l'exige, connectez-vous à YouTube dans le contexte du lecteur
    ou ouvrez la vidéo sur [youtube.com](https://www.youtube.com/).
@@ -445,7 +445,7 @@ Le coffre ne configure pas une API de gestion de votre chaîne.
 Pour une future intégration **YouTube Data API**, un développeur doit
 créer un projet Google Cloud, activer l'API, configurer les identifiants
 adaptés et OAuth pour les actions privées sur un compte.
-Créer une clé ne suffit pas à ajouter ce connecteur à SIRIUS.
+Créer une clé ne suffit pas à ajouter ce connecteur à ΣIRIUS.
 [Démarrage officiel YouTube Data API](https://developers.google.com/youtube/v3/getting-started).
 
 ### 12. Facebook : ce qui n'est pas encore intégré
@@ -462,7 +462,7 @@ Pour préparer une future intégration, et non pour activer une fonction actuell
 3. Pour les Pages, il identifie une Page qu'il est autorisé à gérer.
 4. Il configure les permissions et le parcours d'autorisation, puis teste
    avec les comptes autorisés ; une validation de Meta peut être nécessaire.
-5. Le connecteur doit être développé dans SIRIUS avant d'être utilisable.
+5. Le connecteur doit être développé dans ΣIRIUS avant d'être utilisable.
 
 Une **App Secret Meta**, un jeton de Page et le mot de passe Facebook sont
 trois choses différentes : ne les placez pas dans un champ API d'un autre service.
@@ -483,10 +483,10 @@ Pour une future intégration professionnelle :
    le parcours avec Facebook Login exige aussi une Page Facebook liée.
 4. Il prépare les autorisations et les tests, puis les validations de Meta
    nécessaires pour les utilisateurs visés.
-5. L'intégration doit ensuite être implémentée dans SIRIUS.
+5. L'intégration doit ensuite être implémentée dans ΣIRIUS.
 
 Un compte personnel ordinaire ne donne pas automatiquement accès à ces API
-professionnelles. Créer un jeton aujourd'hui ne rend pas SIRIUS compatible.
+professionnelles. Créer un jeton aujourd'hui ne rend pas ΣIRIUS compatible.
 [Documentation officielle Instagram Platform](https://developers.facebook.com/docs/instagram-platform/).
 
 ### 14. X, anciennement Twitter
@@ -503,7 +503,7 @@ Pour une future intégration :
 3. Il vérifie la tarification : l'API v2 est présentée dans la documentation
    actuelle avec une facturation à l'usage ; ne supposez pas un accès gratuit.
 4. Il configure les identifiants et l'autorisation utilisateur nécessaires.
-5. Il développe et teste le connecteur dans SIRIUS avant de distribuer cette fonction.
+5. Il développe et teste le connecteur dans ΣIRIUS avant de distribuer cette fonction.
 
 Ne collez pas les secrets X dans un champ SerpAPI ou Groq.
 [Présentation officielle de l'API X](https://docs.x.com/x-api/getting-started/about-x-api).
@@ -519,7 +519,7 @@ les champs du coffre.
 Si un fournisseur n'apparaît pas dans la page, demander son intégration
 est préférable à recopier son secret dans un champ qui ne lui correspond pas.
 
-## Pour le propriétaire de SIRIUS : anciennes clés déjà partagées
+## Pour le propriétaire de ΣIRIUS : anciennes clés déjà partagées
 
 Déplacer une clé sur le serveur **ne révoque pas les copies précédemment
 distribuées**. Si vos clés étaient présentes dans un ancien fichier de profil,

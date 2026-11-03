@@ -79,7 +79,7 @@ sans chevaucher les commandes de la fenêtre.
 L'accueil salue par le prénom, en couleur miel comme le bouton Envoyer. Les boutons
 de la barre haute utilisent tous le format 44 × 44 px des réglages. Le lexique vocal
 guide « Panthéon » vers la lecture française « pantéon », sans découpage des syllabes.
-Dans Configuration > Voix, les voix locales de Sirius (féminine, masculine et
+Dans Configuration > Voix, les voix locales de ΣIRIUS (féminine, masculine et
 AÈDES) disposent aussi du curseur « Hauteur — grave / aiguë », enregistré
 automatiquement et utilisable avec « Tester la voix ».
 Un égaliseur vocal trois bandes (250 Hz, 1,2 kHz, 4 kHz, de -12 à +12 dB)
@@ -427,7 +427,7 @@ le parcours de conversation habituel.
 
 **Android avec le lecteur natif `SiriusPlayback`** : le bulletin entier est confié
 à un service de premier plan de type `mediaPlayback`, avec notification et bouton
-**Arrêter**. Il demande les audios au serveur Sirius et les lit sans dépendre des
+**Arrêter**. Il demande les audios au serveur ΣIRIUS et les lit sans dépendre des
 minuteurs de la WebView, y compris écran verrouillé. La phrase suivante est
 préparée pendant la lecture, avec une seule requête d'avance. Le jeton de session
 et les clés vocales restent en mémoire ; les audios temporaires du cache privé
@@ -509,7 +509,7 @@ Les expressions utiles sont validées séparément ; le guidage textuel des proc
 transcriptions distantes est désactivé par défaut et exige l'activation explicite
 dans la fenêtre. Les moteurs locaux ne sont pas entraînés avec ces extraits.
 
-**Vérification du locuteur sur le serveur Sirius** : **Outils → Ma voix —
+**Vérification du locuteur sur le serveur ΣIRIUS** : **Outils → Ma voix —
 configuration & diction** ouvre directement un parcours guidé en trois étapes :
 **Préparer**, **Enregistrer**, **Activer**. Après consentement explicite, un grand
 bouton micro permet d'enregistrer trois nouvelles références de 3 à 15 secondes,
@@ -560,7 +560,7 @@ de l'enregistrer dans **Médiathèque → Architecture - Avant-Apres**. Le fichi
 contient la photo réelle jointe, le plan avant, le plan proposé, les envies,
 les conseils, l'éclairage et les achats proposés, sans les clés API.
 **Ouvrir mes projets enregistrés**, dans la même fenêtre, recharge ces fichiers
-depuis le stockage SIRIUS authentifié du compte, même après fermeture de la fenêtre.
+depuis le stockage ΣIRIUS authentifié du compte, même après fermeture de la fenêtre.
 L'emplacement affiché est un dossier de la médiathèque, pas un chemin du téléphone.
 La comparaison présente **AVANT · Sans IA** et **APRÈS · Proposition IA** :
 l'après est une simulation sur plan avec recommandations, pas une photographie
@@ -607,7 +607,7 @@ le traitement et la réponse. Un extrait refusé reste un message visuel
 Un second appui sur le bouton conversation pendant le contrôle initial annule
 l'ouverture ; un résultat tardif ne réactive pas le microphone.
 
-Le bouton **Vérifier Sirius**, près de la zone de demande, arrête l'écoute en cours
+Le bouton **Vérifier ΣIRIUS**, près de la zone de demande, arrête l'écoute en cours
 et ouvre des contrôles datés du serveur/session, du profil vocal, des capacités de
 capture et de la permission microphone si elle est lisible. Il ne demande aucune
 nouvelle permission, n'enregistre pas d'audio et ne teste pas automatiquement
@@ -640,8 +640,8 @@ Dans **Configuration → Voix**, le profil **Voix des AÈDES — ODYSSEIA** prop
 un conteur français masculin local, avec débit posé (0,90) et hauteur douce (0,94).
 Il utilise une voix française installée sur l'appareil, pas une voix clonée ni un
 nouveau moteur ; le timbre dépend des voix disponibles. Les autres profils restent
-sélectionnables et ce profil peut devenir la voix générale de SIRIUS.
-La lecture des modules se demande à la voix, par exemple « Sirius, lis ODYSSEIA » :
+sélectionnables et ce profil peut devenir la voix générale de ΣIRIUS.
+La lecture des modules se demande à la voix, par exemple « ΣIRIUS, lis ODYSSEIA » :
 aucune pastille « Oui, lis-le / Non » ni mini-écoute supplémentaire sur Windows,
 portable, navigateur ou Android. Dans ODYSSEIA, la citation sélectionnée ou le
 texte de la section ouverte est lu ; une lecture de module reste limitée à
@@ -651,7 +651,7 @@ la fenêtre, la petite croix ferme directement le module sans le restaurer.
 Cela couvre les pastilles du dock et les roues MODULES, INFOS et ODYSSEIA ;
 le Display conserve sa propre commande de fermeture en mode réduit.
 
-SIRIUS ANTICIPE vérifie les suggestions chaque minute, y compris jusqu'à deux
+ΣIRIUS ANTICIPE vérifie les suggestions chaque minute, y compris jusqu'à deux
 actualités sourcées publiées depuis moins de 24 heures : aucune tâche préalable
 n'est nécessaire. Une annonce attend au moins 45 secondes sans interaction,
 sans réponse vocale ou traitement en cours, puis respecte au moins 2 minutes
@@ -663,7 +663,7 @@ concrète, sans relance automatique après un refus ou une conclusion.
 Le suivi des interventions annonce l'état enregistré et le résultat disponible :
 en cours, terminé, annulé ou en erreur. Un changement d'état peut donner lieu à
 une nouvelle annonce ; un échec n'est pas présenté comme un travail terminé.
-Ce suivi couvre les tâches enregistrées par SIRIUS, pas les applications externes
+Ce suivi couvre les tâches enregistrées par ΣIRIUS, pas les applications externes
 auxquelles il n'a pas accès.
 
 ### Suivi contextuel des dossiers
@@ -802,7 +802,7 @@ et son découpage, y compris avec une apostrophe pleine largeur ou des séparate
 invisibles. Ce traitement est commun aux requêtes vocales distantes et au repli
 Android ; la prononciation effective reste à vérifier avec la voix de l'appareil.
 Le lexique prononce « planning » sans tiret artificiel. À l'oral, « le/ton
-Sirius Display » devient « mon Sirius Display » ; les élisions « L'… » sont
+ΣIRIUS Display » devient « mon ΣIRIUS Display » ; les élisions « L'… » sont
 envoyées avec un « l » minuscule sans modifier les lettres isolées.
 L'expression « jusqu'à » reçoit un guidage phonétique réservé à la synthèse
 vocale, y compris dans le lecteur Android natif ; son affichage reste inchangé.
@@ -812,7 +812,7 @@ pendant la calibration initiale est conservée dans le pré-roll et n'est pas
 utilisée comme bruit de fond ; la suppression pendant la réponse reste inchangée.
 Le bouton micro rouge/vert démarre désormais une conversation : un seul appui,
 écoute suspendue pendant le traitement et la réponse, puis reprise automatique
-sans imposer de répéter « Sirius » à chaque échange. Un second appui ou
+sans imposer de répéter « ΣIRIUS » à chaque échange. Un second appui ou
 « Arrêter » ferme la session. Le maintien pour parler reste un mode manuel séparé ;
 la conversation ne démarre pas automatiquement au lancement de l'application.
 Dans Diagnostic, « Test micro » utilise cette conversation avec la capture serveur.
@@ -823,7 +823,7 @@ Les dates ISO isolées sont converties pour la voix avant les plages numériques
 
 © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Voir [LICENSE](./LICENSE) et [CONTRAT_LICENCE.txt](./CONTRAT_LICENCE.txt).
 
-![Logo SIRIUS](./frontend/public/icon-source.png)
+![Logo ΣIRIUS](./frontend/public/icon-source.png)
 
 ---
 
@@ -861,7 +861,7 @@ Images / SIRIUS Captures. Dans la barre du haut, l'icône appareil photo capture
 l'interface entière et l'icône de recadrage lance la sélection d'une zone.
 La sélection d'une zone peut être annulée avec Échap.
 Les raccourcis de capture Windows restent indépendants de ces commandes.
-**SIRIUS ANTICIPE** intervient dans le dialogue et la voix, sans pile de notifications
+**ΣIRIUS ANTICIPE** intervient dans le dialogue et la voix, sans pile de notifications
 flottantes ni badges d'urgence. Le message est conservé dans l'historique du Display.
 Les actions, leur explication et la confirmation des actions sensibles restent
 accessibles sous le message. Il ne se ferme pas automatiquement pendant votre choix.
@@ -871,7 +871,7 @@ accessibles sous le message. Il ne se ferme pas automatiquement pendant votre ch
 Le module **Messagerie — Gmail & Outlook** (ou « ouvre la messagerie ») propose
 trois zones : réception avec recherche et filtre non lus, aperçu et rédaction,
 puis suivi des envois de la session. Il est aussi accessible depuis le Centre des
-connexions. La palette actuelle de SIRIUS est conservée ; les colonnes s'empilent
+connexions. La palette actuelle de ΣIRIUS est conservée ; les colonnes s'empilent
 sur téléphone.
 
 La réception charge au plus 25 aperçus depuis le compte fournisseur connecté.
@@ -916,22 +916,22 @@ ne révoque pas une autorisation déjà accordée chez le fournisseur ; l'onglet
 externe peut être fermé manuellement. Les requêtes ont un délai de 20 secondes,
 et les erreurs sont affichées avant le bloc du cache mail.
 
-Dans **Centre des connexions**, chaque compte SIRIUS peut activer séparément
+Dans **Centre des connexions**, chaque compte ΣIRIUS peut activer séparément
 le cache Gmail ou Outlook de cet appareil. Il contient uniquement les identifiants,
 expéditeurs, objets, aperçus (140 caractères), dates et indicateurs de lecture :
 25 messages Gmail maximum (limite de l'API actuelle), 50 Outlook maximum.
 Aucun corps complet, pièce jointe, jeton OAuth ou envoi différé n'est conservé.
 Les snapshots remplacent les précédents ; il ne s'agit pas d'une archive exhaustive.
 
-Le stockage `localStorage` (`sirius_mail_cache_v1:*`) n'est pas chiffré par SIRIUS.
+Le stockage `localStorage` (`sirius_mail_cache_v1:*`) n'est pas chiffré par ΣIRIUS.
 Il reste sur le navigateur ou WebView de l'appareil, sans synchronisation entre PC
-et Android. Protégez l'accès à l'appareil. Le cache est séparé par compte SIRIUS
+et Android. Protégez l'accès à l'appareil. Le cache est séparé par compte ΣIRIUS
 et lié à l'adresse du compte fournisseur ; un changement de fournisseur connecté,
 un refus d'autorisation ou sa déconnexion efface et désactive le cache concerné.
 Les erreurs de stockage sont affichées, sans effacer silencieusement les données.
 
 Synchronisation explicite à l'activation, puis toutes les cinq minutes lorsque
-SIRIUS est ouvert, visible et en ligne. Aucun service d'arrière-plan Android n'est
+ΣIRIUS est ouvert, visible et en ligne. Aucun service d'arrière-plan Android n'est
 installé. Recherche et consultation des copies dans le Centre des connexions,
 avec horodatage de la dernière synchronisation et effacement/désactivation.
 Gmail et Outlook disposent de consoles distinctes avec leurs icônes, compteurs,
@@ -1026,7 +1026,7 @@ ou de commande système et ne dispose pas d'isolation OS : il s'agit d'un
 micro-benchmark dans le serveur, pas d'un bac à sable général.
 Cerebras est le fournisseur envisagé avec plafond **0 €**, mais reste
 **désactivé** tant que le quota gratuit et son contrôle ne sont pas
-vérifiés. Les clés utilisées par le reste de SIRIUS n'autorisent aucun
+vérifiés. Les clés utilisées par le reste de ΣIRIUS n'autorisent aucun
 appel du laboratoire. La veille shadow locale est désactivée par défaut ;
 son activation volontaire autorise un essai fictif au plus toutes les
 24 heures, premier essai après 24 heures. Le serveur connecté doit
@@ -1046,7 +1046,7 @@ Les plans ont des dépendances explicites et le journal de l'orchestrateur ;
 `lab.local` exige une confirmation, une seule tentative et un délai
 maximum de cinq secondes. Son identifiant d'essai dérive de la clé
 d'idempotence du parcours. Ce sont des actions spécialisées encadrées,
-pas des agents LLM autonomes capables de modifier SIRIUS.
+pas des agents LLM autonomes capables de modifier ΣIRIUS.
 
 Routes authentifiées : `/api/nummarius/budget/analyze`,
 `/budget/history`, `/budget/{id}/usage/{candidate}` et
@@ -1059,7 +1059,7 @@ limite l'historique aux vingt dernières analyses et aux vingt derniers
 essais, et aux cent décisions les plus récentes ; les données plus
 anciennes ne sont pas automatiquement effacées.
 
-### Sous-agents IA coordonnés par SIRIUS
+### Sous-agents IA coordonnés par ΣIRIUS
 
 Dans **ARIANE — orchestration et sous-agents IA**, saisir un objectif et,
 facultativement, un contexte non sensible. Choisir THOT (analyse du texte),
@@ -1152,7 +1152,7 @@ appeler les sources de marché existantes ; ce n'est pas un mode entièrement
 hors ligne. Aucune URL, commande système, mutation, mission IA, écriture
 de code, négociation envoyée, paiement ou démarche déposée n'est autorisée,
 même si un autre parcours disposait déjà d'une confirmation sensible.
-La sélection de quelques actions ne transforme pas SIRIUS en agent général.
+La sélection de quelques actions ne transforme pas ΣIRIUS en agent général.
 
 À chaque cycle, le contrôleur vérifie le compte, les contrats inchangés,
 l'expiration et les résultats des étapes. Les dépendances déjà terminées
@@ -1232,7 +1232,7 @@ avec séparateur littéral, `replace` littéral, `unique`, `sort`, `column`,
 aucune conversion numérique ou valeur manquante n'est inventée.
 Pas de boucle, branchement libre, regex fournie, import, `eval`, shell,
 fichier, réseau ou installation. Les résultats de l'IA ne peuvent pas
-ajouter d'opération au catalogue ni modifier SIRIUS. Ce n'est **pas un bac
+ajouter d'opération au catalogue ni modifier ΣIRIUS. Ce n'est **pas un bac
 à sable système pour scripts arbitraires**.
 
 Limites : douze opérations par programme, données/exemple/attendu et chaque
@@ -1260,7 +1260,7 @@ ou bloqués, jamais présentés comme un résultat validé. Les preuves contienn
 plan, programme conforme, empreinte, tests, états des rôles et traces locales ;
 le contenu brut d'une génération non conforme n'est pas conservé. Les résultats
 ne sont pas installés ou réutilisés automatiquement dans une autre mission.
-Il n'y a pas d'auto-optimisation du code de SIRIUS.
+Il n'y a pas d'auto-optimisation du code de ΣIRIUS.
 
 Objectif, données et exemples sont transmis à Cerebras après accord :
 ne pas fournir de secrets ni de données sensibles. Ils sont conservés avec
@@ -1289,7 +1289,7 @@ Téléphone PSTN ↔ opérateur connecté à Vapi ↔ pipeline audio Vapi temps 
 ```
 
 Vapi prend en charge l'audio bidirectionnel, la transcription en continu, la
-synthèse et la gestion des interruptions. SIRIUS ne relaie pas les paquets audio
+synthèse et la gestion des interruptions. ΣIRIUS ne relaie pas les paquets audio
 et n'ouvre pas de WebSocket audio public. Le modèle proposé utilise Deepgram
 `nova-3`, `gpt-4o-mini` et `fr-FR-DeniseNeural` ; leur disponibilité, les clés
 fournisseurs, tarifs et réglages d'interruption doivent être vérifiés dans Vapi.
@@ -1298,10 +1298,10 @@ La latence vocale réelle n'est **pas mesurée ni garantie** par cette intégrat
 **Activation opérateur, jamais automatique :**
 
 1. Créer un compte Vapi et connecter un numéro téléphonique ; aucun numéro n'est
-   acheté par SIRIUS. Définir dans l'environnement serveur le compte propriétaire
+   acheté par ΣIRIUS. Définir dans l'environnement serveur le compte propriétaire
    `SIRIUS_VAPI_OWNER_USER_ID`, `VAPI_ORG_ID`, `VAPI_PRIVATE_KEY`,
    `VAPI_PHONE_NUMBER_ID` et `VAPI_ASSISTANT_ID`.
-   Une seule ligne/organisation et un seul compte SIRIUS sont liés par instance ;
+   Une seule ligne/organisation et un seul compte ΣIRIUS sont liés par instance ;
    aucun locataire ne peut choisir l'identité d'un autre compte via les métadonnées.
 2. Publier en HTTPS `/api/ariane/phone/webhook`, définir son URL complète dans
    `SIRIUS_VAPI_WEBHOOK_URL` et créer un secret aléatoire distinct d'au moins
@@ -1319,10 +1319,10 @@ La latence vocale réelle n'est **pas mesurée ni garantie** par cette intégrat
 5. Configurer **l'assistant sauvegardé ET le numéro sauvegardé** avec
    `server.url` et `server.credentialId`. Important : Vapi n'attache pas forcément
    ce credential lorsque l'URL serveur vient directement d'une requête API ;
-   SIRIUS ne fournit donc pas de `server.url` transitoire dans `/call`.
+   ΣIRIUS ne fournit donc pas de `server.url` transitoire dans `/call`.
    Pour le numéro, retirer `assistantId`, squad/workflow, hooks et
    `fallbackDestination` : l'événement `assistant-request` doit décider de
-   l'admission, sinon l'opt-in SIRIUS et ses limites seraient contournés.
+   l'admission, sinon l'opt-in ΣIRIUS et ses limites seraient contournés.
 6. Définir `SIRIUS_VAPI_ALLOWED_NUMBERS` avec les seuls destinataires autorisés
    au format E.164, séparés par des virgules ; vide interdit tous les sortants.
    Vérifier préalablement l'accord des destinataires et les règles locales
@@ -1341,7 +1341,7 @@ non sensible, attester l'accord du destinataire, préparer puis démarrer le par
 Il reste en attente de confirmation : seule l'autorisation explicite de l'étape
 `phone.dial` compose. L'objectif est ajouté comme donnée de conversation, pas
 comme politique système. Le dialogue s'adapte aux propos de l'interlocuteur
-mais n'a accès à aucun outil SIRIUS, mail, agenda, paiement ou transfert. Il
+mais n'a accès à aucun outil ΣIRIUS, mail, agenda, paiement ou transfert. Il
 demande l'accord oral avant d'aborder l'objectif, puis clôt en cas de refus.
 Cette politique LLM n'est pas une preuve formelle de conformité juridique.
 
@@ -1358,7 +1358,7 @@ créer une nouvelle mission pourrait produire un doublon.
 Les événements peuvent résoudre une opération incertaine grâce à la référence
 serveur transmise dans le champ Vapi documenté `name` ; un état terminé ne
 revient pas à « en cours » après un webhook tardif.
-L'actualisation du panneau lit la base SIRIUS, pas le fournisseur : si les
+L'actualisation du panneau lit la base ΣIRIUS, pas le fournisseur : si les
 webhooks manquent, consulter Vapi. La fin d'un appel ne certifie pas son objectif.
 
 **Raccrochage :** le bouton dédié envoie `end-call` à l'URL de contrôle Vapi
@@ -1376,13 +1376,13 @@ fournisseurs STT/LLM/TTS ; cette chaîne est distincte des clés IA personnelles
 du HUD. Le modèle contrôlé désactive enregistrement audio/vidéo, transcription archivée,
 capture SIP PCAP et journaux d'appel Vapi ; l'écoute distante est désactivée.
 Cela ne constitue pas une garantie de rétention nulle chez tous les fournisseurs :
-leurs politiques restent à configurer/vérifier. SIRIUS ne stocke ni audio, transcription,
+leurs politiques restent à configurer/vérifier. ΣIRIUS ne stocke ni audio, transcription,
 enregistrement, prompt de réponse ou URL d'écoute. Il conserve les paramètres
 ARIANE (objectif et numéro), IDs, direction, dates, états et coûts USD rapportés,
 ainsi que l'URL de contrôle privée. Les trois collections `sirius_phone_calls`,
 `sirius_phone_settings`, `sirius_phone_limits` sont isolées par compte, incluses
 dans l'export (sans URL de contrôle) et la suppression serveur revue du compte.
-Aucune purge temporelle automatique ; la suppression SIRIUS n'efface pas Vapi.
+Aucune purge temporelle automatique ; la suppression ΣIRIUS n'efface pas Vapi.
 
 Références officielles : [création d'appel](https://docs.vapi.ai/api-reference/calls/create),
 [événements](https://docs.vapi.ai/server-url/events),
@@ -1396,11 +1396,11 @@ n'est effectuée par les tests de développement.
 Dans **Automatisations Windows — hooks natifs** (menu des modules),
 chaque option est désactivée au départ :
 
-- **Ctrl+Alt+S** rappelle la fenêtre SIRIUS sans lancer le microphone ou
+- **Ctrl+Alt+S** rappelle la fenêtre ΣIRIUS sans lancer le microphone ou
   une IA. Un conflit de raccourci est signalé sans retirer celui d'une
   autre application. Les anciens raccourcis multimédia restent inchangés.
 - **Notifications Windows** affiche un message générique pour les
-  événements autorisés. Un clic rappelle SIRIUS et ouvre ce panneau.
+  événements autorisés. Un clic rappelle ΣIRIUS et ouvre ce panneau.
   Windows peut masquer les notifications (concentration/autorisations).
 - **Reprise et déverrouillage** inscrit un événement invitant à consulter
   les tâches ; le bouton correspondant ouvre le suivi CHRONOS. Aucun
@@ -1415,9 +1415,9 @@ Le journal des cent derniers événements et noms de fichiers reste en
 mémoire sur ce PC ; aucun chemin ni événement n'est envoyé au backend
 ou à une IA. Fermer le panneau conserve les hooks ; **Tout arrêter et
 réinitialiser**, la déconnexion/changement de compte, un rechargement,
-un crash du rendu ou la fermeture de SIRIUS les arrêtent. Rien ne tourne
+un crash du rendu ou la fermeture de ΣIRIUS les arrêtent. Rien ne tourne
 comme service Windows indépendant ni ne se réactive au prochain lancement.
-Les nouveaux IPC sont réservés au cadre principal de la fenêtre SIRIUS
+Les nouveaux IPC sont réservés au cadre principal de la fenêtre ΣIRIUS
 et à son origine locale autorisée ; la session native utilise un jeton
 éphémère. Fonctionnalité indisponible dans le navigateur et sur Android.
 
@@ -1455,7 +1455,7 @@ Le bilan de démarrage distingue service configuré, test réel d'une réponse
 IA, transcription du micro et lecture effectivement entendue, confirmée
 par la personne. La disponibilité d'un endpoint ne vaut pas test audio.
 
-**Note utilisateur : [Configurer SIRIUS simplement](./GUIDE_CONFIGURATION_SIRIUS.md).**
+**Note utilisateur : [Configurer ΣIRIUS simplement](./GUIDE_CONFIGURATION_SIRIUS.md).**
 Un guide rapide est également intégré à la page **Clés API et services**.
 
 Après la présentation et la configuration du profil, un guide propose trois
@@ -1498,7 +1498,7 @@ Validation ciblée depuis `frontend` :
 
 ## 🚀 Installation
 
-### Option A — Installer SIRIUS comme un logiciel Windows (recommandé)
+### Option A — Installer ΣIRIUS comme un logiciel Windows (recommandé)
 
 1. Ouvre le dossier `frontend` et double-clique sur **`BUILD.bat`**.
    Le script :
@@ -1509,7 +1509,7 @@ Validation ciblée depuis `frontend` :
    - fermer l'édition installée avant d'essayer le portable : les deux utilisent le service local sur le port 8001. Un écran FDE_OMEGA peut signaler un fichier d'interface devenu indisponible ; fermer les instances puis relancer une seule édition avant de réessayer.
    - prérequis de compilation : redistribuable Microsoft Visual C++ x64 récent. Le paquet privilégie les DLL `msvcp140*` et `vcruntime140*` du même runtime système ; mélanger des copies anciennes issues des dépendances peut faire planter les embeddings ONNX.
 2. Dans `frontend\dist`, lance **`SIRIUS Setup 1.0.0.exe`** et suis l'assistant d'installation.
-3. SIRIUS apparaît ensuite dans le menu Démarrer comme n'importe quel logiciel.
+3. ΣIRIUS apparaît ensuite dans le menu Démarrer comme n'importe quel logiciel.
 
 > L'application installée démarre elle-même son backend sur `127.0.0.1:8001`.
 > Aucun serveur Python manuel n'est nécessaire. Les données, journaux et secrets
@@ -1526,7 +1526,7 @@ les icônes Windows (installateur et portable), web/PWA et Android depuis
 cette même source. L'image `frontend/public/play-store-icon.png` est
 destinée à la fiche Google Play et n'est pas l'icône embarquée dans l'APK.
 
-> 💾 **Aucun serveur de base de données requis** : sans MongoDB, SIRIUS bascule
+> 💾 **Aucun serveur de base de données requis** : sans MongoDB, ΣIRIUS bascule
 > automatiquement sur une base SQLite locale (conversations, HACCP, fichiers…
 > tout est persisté dans ton dossier utilisateur Windows).
 
@@ -1576,9 +1576,9 @@ Guide détaillé : [INSTALL-SIRIUS.md](./INSTALL-SIRIUS.md)
 
 Pour le déploiement en petite entreprise : [GUIDE-ENTREPRISE.md](./GUIDE-ENTREPRISE.md)
 
-### À traiter avec SIRIUS : parcours Outlook, rappels et résultats
+### À traiter avec ΣIRIUS : parcours Outlook, rappels et résultats
 
-La boîte **À traiter avec SIRIUS** est accessible dans les dossiers,
+La boîte **À traiter avec ΣIRIUS** est accessible dans les dossiers,
 ARIANE et CHRONOS. Elle rassemble les signaux métier sourcés, engagements,
 éléments à relire, validations des parcours communs, blocages, rappels et
 notifications internes. Les anciennes listes manuelles restent distinctes.
@@ -2258,13 +2258,13 @@ de secours sont affichés à cet endroit.
 Une petite pastille ronde à côté du nom ΣIRIUS, en haut à gauche, indique le microphone réellement ouvert (vert) ou fermé
 (rouge), y compris l'écoute des commandes d'interruption pendant une réponse.
 
-Lecture d'un module ou d'une fenêtre à voix haute : dites « Sirius, lis ODYSSEIA »,
-« Sirius, lis le contenu de Zeus Cortex » ou « lis ça » pour la dernière fenêtre ouverte.
-SIRIUS peut lire le contenu actuellement affiché dans les fenêtres accessibles, dont
+Lecture d'un module ou d'une fenêtre à voix haute : dites « ΣIRIUS, lis ODYSSEIA »,
+« ΣIRIUS, lis le contenu de Zeus Cortex » ou « lis ça » pour la dernière fenêtre ouverte.
+ΣIRIUS peut lire le contenu actuellement affiché dans les fenêtres accessibles, dont
 ODYSSEIA et son texte historique. Sur PC, une pastille propose aussi la lecture ;
 sur Android, elle est masquée pour gagner de la place et seule la commande vocale reste.
 
-Confirmations vocales : quand une fenêtre s'ouvre, se ferme ou que Sirius exécute une
+Confirmations vocales : quand une fenêtre s'ouvre, se ferme ou que ΣIRIUS exécute une
 action (voix, doigt ou souris), il l'annonce brièvement (« J'ai ouvert Zeus Cortex. »,
 « J'ai fermé Panthéon. »). Pas d'annonce s'il vient déjà de parler, s'il est occupé ou si
 la session vocale est arrêtée. Interrupteur dans Configuration → « Confirmations vocales
@@ -2303,7 +2303,7 @@ données locales et secrets sont exclus du scan.
 ## ✨ Fonctionnalités
 
 ### Cœur du système
-- **SIRIUS SETUP** — profil utilisateur, clés API, choix de la voix
+- **ΣIRIUS SETUP** — profil utilisateur, clés API, choix de la voix
 - **Compagnon Dev** — analyse de code
 - **Médiathèque / FILES** — gestion des fichiers et de l'audio
 - **Architecte visuel** — diagrammes
@@ -2319,7 +2319,7 @@ données locales et secrets sont exclus du scan.
 - **PANTHEON SYSTEM** — supervision globale
 - **NEXUS CÉLESTE** — connexions inter-modules
 - **ORACLE DIVIN** — prédictions, marchés
-- **SIRIUS PRIME** — mémoire & apprentissage
+- **ΣIRIUS PRIME** — mémoire & apprentissage
 - **ZEUS CORTEX** — cerveau visuel, iris humain
 
 ### Modules spécialisés
@@ -2331,7 +2331,7 @@ données locales et secrets sont exclus du scan.
 - **LOCUS#** — géolocalisation & itinéraires
 - **HERACLES#** — investigation OSINT
 - **KERAUNOS#** — domotique Home Assistant (avec commandes vocales)
-- **PLANS#** — plans 2D/3D de bâtiment : description naturelle → plan coté à l'échelle (vue 2D couleur + 3D isométrique), surfaces/périmètres calculés, export **DXF** (AutoCAD) et SVG — *« Sirius, dessine-moi le plan d'un garage de 6 sur 4 »*
+- **PLANS#** — plans 2D/3D de bâtiment : description naturelle → plan coté à l'échelle (vue 2D couleur + 3D isométrique), surfaces/périmètres calculés, export **DXF** (AutoCAD) et SVG — *« ΣIRIUS, dessine-moi le plan d'un garage de 6 sur 4 »*
 - **TRAILER#** — clichés cinématiques · **PACKAGER#** — livrable multi-plateforme
 - **Gestion de la mémoire** — souvenirs longue durée (pop-up « Mémoire enregistrée », tout reste sur ton PC)
 - **Cerveau vectoriel** — rappel des souvenirs *par le sens*, **100 % hors-ligne** : modèle d'embeddings multilingue local (~130 Mo, téléchargé une fois), ~10 ms par rappel, sans clé API ; replis automatiques API Gemini puis mots-clés + synonymes
@@ -2367,12 +2367,12 @@ données locales et secrets sont exclus du scan.
 - Si le backend local est interrompu pendant le chargement d'un module, FDE_OMEGA conserve l'erreur affichée et vérifie que la sonde `/health` indique `ok` avant de recharger via « Réessayer ». Il n'efface pas les données enregistrées ; les saisies non sauvegardées peuvent être perdues au rechargement.
 
 ### Multimédia
-- **MEDIA PROXY** (menu `MEDIAS`) ou à la voix : *« Sirius, lance une musique lofi sur Spotify »*
+- **MEDIA PROXY** (menu `MEDIAS`) ou à la voix : *« ΣIRIUS, lance une musique lofi sur Spotify »*
 - YouTube, Spotify, Twitch, TikTok, Deezer via leurs lecteurs officiels uniquement
 - Synchronisation entre fenêtres via WebSocket
 
 ### Productivité & Travail
-- Menu `OUTILS` ou à la voix : *« Sirius, ouvre mes notes »*, *« analyse ce document »*, *« montre mes tâches »*
+- Menu `OUTILS` ou à la voix : *« ΣIRIUS, ouvre mes notes »*, *« analyse ce document »*, *« montre mes tâches »*
 - **DocAnalyzer**, **CodeAssist**, **SmartNotes**, **TaskMaster**, **ReportBuilder**
 - Analyses 100 % locales : le code n'est jamais exécuté, aucune clé API supplémentaire
 
@@ -2464,13 +2464,13 @@ Liste complète des modules et dates : [MODULES_SIRIUS.txt](./MODULES_SIRIUS.txt
   technique du panneau ni tronquer le sous-titre.
   « Afficher et lire le briefing » déclenche directement son affichage et sa
   narration, comme « Lis le briefing ». La voix désigne son écran par
-  « mon Sirius Display », sans modifier les autres possessifs.
+  « mon ΣIRIUS Display », sans modifier les autres possessifs.
   ΣIRIUS Display est l'espace de présentation de l'assistante : elle y montre
   ses réponses, briefings, explications et contenus (web, images, vidéos,
   e-mails ou contacts). Les modules métier gardent leurs fenêtres dédiées.
   L'affichage et la lecture vocale sont deux opérations distinctes : montrer
   un contenu ne prouve pas que sa narration a été lancée.
-  Le bouton **Lire** du Display et « Lis mon Sirius Display » lisent le texte
+  Le bouton **Lire** du Display et « Lis mon ΣIRIUS Display » lisent le texte
   disponible par morceaux, sans tronquer les longs contenus. Les boutons de
   l'interface sont exclus ; les e-mails, contacts et valeurs du brouillon
   édité sont inclus. Une page web/PDF intégrée sans texte accessible ne peut
@@ -2664,7 +2664,7 @@ Liste complète des modules et dates : [MODULES_SIRIUS.txt](./MODULES_SIRIUS.txt
   avant toute reprise. La réponse `scope: reviewed_server_data` ne certifie pas
   l'effacement des copies externes. Aucun compte réel ne doit servir aux tests.
 - **Son de démarrage personnalisé** : place un fichier `boot-sound.mp3` (libre de droits) dans `frontend/public/`. Activable dans **Configuration → « Son de démarrage »**.
-- **Sauvegarde de la mémoire locale** (SQLite) avec Sirius Doctor :
+- **Sauvegarde de la mémoire locale** (SQLite) avec ΣIRIUS Doctor :
   ```
   cd backend
   python sirius_doctor.py backup    # instantané + manifeste SHA-256

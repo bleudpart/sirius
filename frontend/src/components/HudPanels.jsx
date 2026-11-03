@@ -114,8 +114,8 @@ export function MemoryPanel({ memory, userName, onSave, onClose }) {
         <div className="setup-head">
           <Brain size={22} />
           <div>
-            <h2 className="setup-title">Ce que Sirius sait sur {userName || "vous"}</h2>
-            <p className="setup-sub">Vos souvenirs personnels. Ajoutez, modifiez ou supprimez ce que Sirius retient.</p>
+            <h2 className="setup-title">Ce que ΣIRIUS sait sur {userName || "vous"}</h2>
+            <p className="setup-sub">Vos souvenirs personnels. Ajoutez, modifiez ou supprimez ce que ΣIRIUS retient.</p>
           </div>
         </div>
 
@@ -135,7 +135,7 @@ export function MemoryPanel({ memory, userName, onSave, onClose }) {
         <div className="memory-list" data-testid="memory-list">
           {items.length === 0 && (
             <div className="memory-empty" data-testid="memory-empty">
-              Sirius ne retient encore rien sur vous. Ajoutez un souvenir ci-dessus,
+              ΣIRIUS ne retient encore rien sur vous. Ajoutez un souvenir ci-dessus,
               ou dites « souviens-toi que… » pendant une conversation.
             </div>
           )}
@@ -194,7 +194,7 @@ export function MemoryPanel({ memory, userName, onSave, onClose }) {
           </div>
           <div className="memory-list" data-testid="local-memory-list">
             {localFacts.length === 0 && (
-              <div className="memory-empty">Aucun fait en base locale. Sirius y enregistre aussi automatiquement les nouveaux souvenirs de conversation.</div>
+              <div className="memory-empty">Aucun fait en base locale. ΣIRIUS y enregistre aussi automatiquement les nouveaux souvenirs de conversation.</div>
             )}
             {localFacts.map((f) => (
               <div className="memory-item" key={f.id} data-testid={`local-memory-item-${f.id}`}>

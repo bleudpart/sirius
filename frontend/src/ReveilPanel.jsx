@@ -38,7 +38,7 @@ export default function ReveilPanel({ onClose, onSpeak }) {
       </header>
       <div className="reveil-body">
         <p className="reveil-desc">
-          À l'heure choisie, Sirius te salue, lance ton <b>briefing de travail</b> (dossiers, engagements et échéances)
+          À l'heure choisie, ΣIRIUS te salue, lance ton <b>briefing de travail</b> (dossiers, engagements et échéances)
           puis lit tes <b>derniers mails Outlook</b> à voix haute. L'onglet ΣIRIUS doit rester ouvert.
           Pour le journal d'informations, demande « les actualités ».
         </p>

@@ -1110,7 +1110,7 @@ async def diagram(req: DiagramRequest, request: Request):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"[DIAGRAM] Erreur: {e}")
-        raise HTTPException(status_code=500, detail="Sirius n'a pas pu dessiner ce diagramme, réessayez.")
+        raise HTTPException(status_code=500, detail="ΣIRIUS n'a pas pu dessiner ce diagramme, réessayez.")
 
 # ---- Médiathèque : fichiers & médias (stockage disque local) ----
 from fastapi.responses import Response as RawResponse
@@ -2288,7 +2288,7 @@ async def dev_review(req: DevRequest, request: Request):
         logger.error(f"[DEV] Erreur: {e}")
         if "invalid_api_key" in str(e).lower() or "401" in str(e):
             raise HTTPException(status_code=400, detail="Clé Groq invalide — vérifiez votre clé dans les réglages (icône profil).")
-        raise HTTPException(status_code=500, detail="Sirius n'a pas pu analyser ce code, réessayez.")
+        raise HTTPException(status_code=500, detail="ΣIRIUS n'a pas pu analyser ce code, réessayez.")
 
 # Add your routes to the router instead of directly to app
 @api_router.get("/")
@@ -2459,11 +2459,11 @@ async def usage_today(request: Request):
 
 _SETUP_STATES = {"configured", "available", "not_configured", "restricted"}
 _SETUP_DESCRIPTIONS = {
-    "owner": "Fourni par le serveur SIRIUS pendant l'essai, dans la limite des quotas du jour.",
+    "owner": "Fourni par le serveur ΣIRIUS pendant l'essai, dans la limite des quotas du jour.",
     "owner_admin": "Clé configurée sur ce serveur pour le compte administrateur, sans limite d'essai.",
     "personal": "Utilise votre clé personnelle, déverrouillée depuis votre coffre chiffré.",
     "none": "Service en ligne indisponible avec votre compte ; vos outils et dossiers locaux restent accessibles.",
-    "cloud": "Relayé par votre compte SIRIUS Cloud associé, selon son essai et ses quotas.",
+    "cloud": "Relayé par votre compte ΣIRIUS Cloud associé, selon son essai et ses quotas.",
     "local": "Voix locale du navigateur ; une clé Google ou Gemini active la voix premium.",
 }
 
@@ -2678,7 +2678,7 @@ async def setup_test_chat(body: SetupTestChatIn, request: Request):
     content = message.get("content")
     if response.status_code != 200 or not isinstance(content, str) or not content.strip():
         return {"ok": False, "provider": provider, "message": f"{label} a renvoyé une réponse inattendue ({response.status_code})."}
-    source = "votre clé personnelle" if personal else "l'essai SIRIUS"
+    source = "votre clé personnelle" if personal else "l'essai ΣIRIUS"
     return {"ok": True, "provider": provider, "source": "personal" if personal else "local",
             "message": f"Connexion {label} réussie avec {source}."}
 
@@ -2967,7 +2967,7 @@ async def websocket_endpoint(websocket: WebSocket):
             elif action == "ping":
                 await websocket.send_json({"action": "pong"})
             else:
-                await websocket.send_text(json.dumps({"status": "connected", "message": "Sirius WS actif"}))
+                await websocket.send_text(json.dumps({"status": "connected", "message": "ΣIRIUS WS actif"}))
     except WebSocketDisconnect:
         logger.info("Client Sirius déconnecté du WebSocket")
     finally:

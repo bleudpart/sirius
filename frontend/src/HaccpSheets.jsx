@@ -228,7 +228,7 @@ Responsable : ${esc(metadata.responsable || "À compléter")}<br>Version : ${esc
 export async function printSheet(sheet, prefill = false) {
   const w = window.open("", "_blank", "width=900,height=700");
   if (!w) {
-    window.dispatchEvent(new CustomEvent("haccp-error", { detail: "Fenêtre d'impression bloquée. Autorisez les fenêtres de SIRIUS puis réessayez." }));
+    window.dispatchEvent(new CustomEvent("haccp-error", { detail: "Fenêtre d'impression bloquée. Autorisez les fenêtres de ΣIRIUS puis réessayez." }));
     return false;
   }
   try {

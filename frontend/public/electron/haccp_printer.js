@@ -174,7 +174,7 @@ class HaccpPrinter {
 
   async listPrinters() {
     const win = this.getWindow();
-    if (!win || win.isDestroyed()) throw new Error("Fenêtre SIRIUS indisponible pour lister les imprimantes.");
+    if (!win || win.isDestroyed()) throw new Error("Fenêtre ΣIRIUS indisponible pour lister les imprimantes.");
     const printers = await win.webContents.getPrintersAsync();
     if (!Array.isArray(printers)) throw new Error("Liste des imprimantes Windows indisponible.");
     return printers

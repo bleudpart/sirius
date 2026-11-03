@@ -55,7 +55,7 @@ export default function DevCompanion({ keys, onClose }) {
           <Code2 size={22} />
           <div>
             <h2 className="setup-title">Mode Compagnon Dev</h2>
-            <p className="setup-sub">Collez du code, un diff ou des logs — Sirius analyse, corrige et propose des commits.</p>
+            <p className="setup-sub">Collez du code, un diff ou des logs — ΣIRIUS analyse, corrige et propose des commits.</p>
           </div>
         </div>
 

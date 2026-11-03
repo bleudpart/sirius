@@ -8,9 +8,9 @@ import "./VoiceProfilePanel.css";
 
 const defaultApi = { status: voiceIdentityStatus, enroll: enrollVoiceIdentity, remove: deleteVoiceIdentity };
 const prompts = [
-  "Sirius, je prépare ma journée et je souhaite écouter les informations de ce matin.",
+  "ΣIRIUS, je prépare ma journée et je souhaite écouter les informations de ce matin.",
   "Je parle naturellement près du téléphone, dans une pièce calme sans télévision.",
-  "Sirius, aide-moi à organiser mon activité et à retrouver mes prochains rendez-vous.",
+  "ΣIRIUS, aide-moi à organiser mon activité et à retrouver mes prochains rendez-vous.",
 ];
 const steps = ["Préparer", "Enregistrer", "Activer"];
 
@@ -176,10 +176,10 @@ export default function VoiceIdentityPanel({ account, onClose, onDismiss = onClo
       <button type="button" className="setup-close zeus-close" aria-label="Fermer la vérification de ma voix" onClick={() => leave(onDismiss)}><X size={18} /></button>
     </header>
     <div className="voice-profile-content voice-studio-content" ref={content}>
-      <div className={`voice-studio-intro ${step > 0 && !activeProfile ? "is-compact" : ""}`}><span className="voice-studio-eyebrow">SIRIUS · IDENTITÉ VOCALE</span>
+      <div className={`voice-studio-intro ${step > 0 && !activeProfile ? "is-compact" : ""}`}><span className="voice-studio-eyebrow">ΣIRIUS · IDENTITÉ VOCALE</span>
         {(step === 0 || activeProfile) && <>
           <h3>{activeProfile ? "Votre voix est configurée." : "Une voix familière. La vôtre."}</h3>
-          <p>{activeProfile ? "Votre empreinte est enregistrée sur le serveur Sirius." : "Trois courts extraits pour comparer votre voix avant les demandes en écoute continue."}</p>
+          <p>{activeProfile ? "Votre empreinte est enregistrée sur le serveur ΣIRIUS." : "Trois courts extraits pour comparer votre voix avant les demandes en écoute continue."}</p>
         </>}
         <span className={`voice-studio-status ${status?.ready ? "is-ready" : ""}`} role="status"><ShieldCheck size={16} aria-hidden="true" />{statusLabel}</span>
       </div>
@@ -211,9 +211,9 @@ export default function VoiceIdentityPanel({ account, onClose, onDismiss = onClo
           <ul className="voice-studio-checklist"><li>Coupez la télévision et la musique.</li><li>Parlez face au microphone de votre ordinateur, de votre casque ou de votre téléphone, sans coller la bouche au micro.</li><li>Lisez les trois phrases avec votre voix habituelle.</li></ul>
           <p>Chaque extrait dure de 3 à 15 secondes. Vous pourrez le réécouter et le recommencer avant de le valider.</p>
           <div className="voice-studio-consent">
-            <p>Les trois références et les extraits d'écoute continue seront envoyés au serveur Sirius pour comparaison. Il conserve une empreinte biométrique liée à votre compte, pas les fichiers audio de référence. Vous pourrez supprimer cette empreinte ici.</p>
+            <p>Les trois références et les extraits d'écoute continue seront envoyés au serveur ΣIRIUS pour comparaison. Il conserve une empreinte biométrique liée à votre compte, pas les fichiers audio de référence. Vous pourrez supprimer cette empreinte ici.</p>
             <label><input type="checkbox" checked={consent} disabled={busy} onChange={(event) => setConsent(event.target.checked)} />
-              <span>J'autorise cet envoi au serveur Sirius et la conservation de mon empreinte vocale jusqu'à sa suppression.</span></label>
+              <span>J'autorise cet envoi au serveur ΣIRIUS et la conservation de mon empreinte vocale jusqu'à sa suppression.</span></label>
           </div>
           <button type="button" className="voice-studio-primary" disabled={!account || !consent || loading || status?.ready !== true || busy} onClick={() => setStep(1)}>
             Commencer les enregistrements<ArrowRight size={18} aria-hidden="true" /></button>

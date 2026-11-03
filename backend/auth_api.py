@@ -405,9 +405,9 @@ async def _send_reset_email(email: str, code: str):
     message = EmailMessage()
     message["From"] = sender
     message["To"] = email
-    message["Subject"] = "Votre code de récupération SIRIUS"
+    message["Subject"] = "Votre code de récupération ΣIRIUS"
     message.set_content(
-        f"Votre code de récupération SIRIUS est : {code}\n\n"
+        f"Votre code de récupération ΣIRIUS est : {code}\n\n"
         "Ce code expire dans 10 minutes. Si vous n'êtes pas à l'origine de cette demande, ignorez ce message."
     )
 

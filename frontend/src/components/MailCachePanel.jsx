@@ -18,9 +18,9 @@ export default function MailCachePanel({ cache, onRead }) {
     <section className="mail-cache" aria-labelledby="mail-cache-title">
       <h2 id="mail-cache-title">Aperçus mail sur cet appareil</h2>
       <p role="status">{online ? "Réseau détecté : la disponibilité du service reste à vérifier." : "Hors ligne : seuls les aperçus déjà synchronisés sont disponibles."}</p>
-      <p>Facultatif : conservez les expéditeurs, objets et aperçus de vos derniers messages, sans corps complet ni pièce jointe. Stockage local non chiffré par SIRIUS, séparé par compte. Effacer désactive aussi la synchronisation.</p>
-      <p>Actualisation toutes les 5 minutes lorsque SIRIUS est ouvert, visible et en ligne. Une copie locale peut être ancienne ; recevoir et envoyer nécessitent le réseau. Lire un aperçu à voix haute peut transmettre son texte au serveur et au fournisseur vocal configuré ; ce n'est pas une garantie de voix locale.</p>
-      {!cache.account && <p>Connectez votre compte SIRIUS pour utiliser ce cache.</p>}
+      <p>Facultatif : conservez les expéditeurs, objets et aperçus de vos derniers messages, sans corps complet ni pièce jointe. Stockage local non chiffré par ΣIRIUS, séparé par compte. Effacer désactive aussi la synchronisation.</p>
+      <p>Actualisation toutes les 5 minutes lorsque ΣIRIUS est ouvert, visible et en ligne. Une copie locale peut être ancienne ; recevoir et envoyer nécessitent le réseau. Lire un aperçu à voix haute peut transmettre son texte au serveur et au fournisseur vocal configuré ; ce n'est pas une garantie de voix locale.</p>
+      {!cache.account && <p>Connectez votre compte ΣIRIUS pour utiliser ce cache.</p>}
       <div className="mail-cache-consoles">
       {Object.entries(MAIL_CACHE_PROVIDERS).map(([provider, meta]) => {
         const data = cache.providers[provider];

@@ -24,9 +24,9 @@ export default function PredictivePreparation({ owner, templates, onPrepare, dis
     <p>Option volontaire : mémoriser seulement le type de parcours guidé ARIANE préparé, le jour et l'heure locale.
       Aucun texte, symbole personnalisé, écran, touche, mail ou contenu de fichier. Aucun envoi au serveur.
       Historique limité à 28 jours, isolé par compte sur cet appareil.</p>
-    <p>Après trois jours distincts d'usage autour de cette heure (± une heure), SIRIUS prépare un modèle local à relire.
+    <p>Après trois jours distincts d'usage autour de cette heure (± une heure), ΣIRIUS prépare un modèle local à relire.
       Ce sont des habitudes possibles, pas une prédiction certaine. Aucun appel d'API ni lancement automatique.
-      Les paramètres sont ceux du modèle standard, pas vos anciennes saisies. SIRIUS doit rester ouvert.</p>
+      Les paramètres sont ceux du modèle standard, pas vos anciennes saisies. ΣIRIUS doit rester ouvert.</p>
     {error && <p role="alert">{error}</p>}
     <p>Collecte : {data?.enabled ? "activée" : "désactivée ou indisponible"}.</p>
     {!auditOnly && <fieldset disabled={!owner || disabled}>

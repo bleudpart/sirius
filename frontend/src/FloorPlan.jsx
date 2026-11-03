@@ -566,7 +566,7 @@ export default function FloorPlanPanel({ keys, initialPrompt, initialMode, onClo
         onSpeak(`Plan dessiné : ${data.pieces.length} pièce${data.pieces.length > 1 ? "s" : ""}${total ? `, ${String(total).replace(".", " virgule ")} mètres carrés au total` : ""}.`);
       }
     } catch (e) {
-      setError(e.message || "Sirius n'a pas pu dessiner ce plan.");
+      setError(e.message || "ΣIRIUS n'a pas pu dessiner ce plan.");
     } finally {
       setBusy(false);
     }
@@ -635,7 +635,7 @@ export default function FloorPlanPanel({ keys, initialPrompt, initialMode, onClo
         onSpeak(`Aménagement proposé pour ${target} : ${n} élément${n > 1 ? "s" : ""}${data.inspiration?.style ? `, style ${data.inspiration.style}` : ""}.`);
       }
     } catch (e) {
-      setError(e.message || "Sirius n'a pas pu aménager cette pièce.");
+      setError(e.message || "ΣIRIUS n'a pas pu aménager cette pièce.");
     } finally {
       setBusy(false);
     }

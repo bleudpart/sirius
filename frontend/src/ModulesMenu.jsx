@@ -36,7 +36,7 @@ const arcPath = (centerDeg) => {
   return `M${x0} ${y0} A${R_OUT} ${R_OUT} 0 0 1 ${x1} ${y1} L${x2} ${y2} A${R_IN} ${R_IN} 0 0 0 ${x3} ${y3}Z`;
 };
 
-const normalize = (text) => (text || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const normalize = (text) => (text || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[σς]/g, "s");
 
 function describe(item) {
   const workModule = WORK_MODULES.find((module) => module.id === item.id);

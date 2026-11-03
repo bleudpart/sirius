@@ -131,7 +131,7 @@ export function ArchitectPanel({ keys, initialPrompt, onClose, onSpeak }) {
       try { chanRef.current && chanRef.current.postMessage(data); } catch (e) {}
       if (onSpeak) onSpeak(`Architecture ${data.titre || ""} générée, avec ${(data.noeuds || []).length} composants.`);
     } catch (e) {
-      setError(e.message || "Sirius n'a pas pu dessiner ce diagramme. Vérifiez votre clé Groq.");
+      setError(e.message || "ΣIRIUS n'a pas pu dessiner ce diagramme. Vérifiez votre clé Groq.");
     }
     setLoading(false);
   };
@@ -155,7 +155,7 @@ export function ArchitectPanel({ keys, initialPrompt, onClose, onSpeak }) {
           <Workflow size={22} />
           <div>
             <h2 className="setup-title">Architecte visuel</h2>
-            <p className="setup-sub">Décrivez ce que vous voulez, Sirius dessine l'architecture sous vos yeux.</p>
+            <p className="setup-sub">Décrivez ce que vous voulez, ΣIRIUS dessine l'architecture sous vos yeux.</p>
           </div>
         </div>
 
@@ -188,7 +188,7 @@ export function ArchitectPanel({ keys, initialPrompt, onClose, onSpeak }) {
           ) : (
             <div className="architect-empty">
               Aucun diagramme pour l'instant. Décrivez votre idée ci-dessus,
-              ou dites : « Sirius, dessine-moi l'architecture d'une application de livraison ».
+              ou dites : « ΣIRIUS, dessine-moi l'architecture d'une application de livraison ».
             </div>
           )}
         </div>
@@ -226,7 +226,7 @@ export function SpectatorView() {
         {diagram ? (
           <DiagramSVG diagram={diagram} animKey={animKey} />
         ) : (
-          <div className="architect-empty">Générez un diagramme depuis le HUD Sirius : il apparaîtra ici en direct.</div>
+          <div className="architect-empty">Générez un diagramme depuis le HUD ΣIRIUS : il apparaîtra ici en direct.</div>
         )}
       </div>
     </div>

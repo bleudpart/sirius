@@ -1,11 +1,11 @@
-SIRIUS Assistant – Liste des modules et dates de création
+ΣIRIUS Assistant – Liste des modules et dates de création
 © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés.
 
 NOTE : les dates proviennent de l'historique du projet. Les modules marqués
 « restauré le 31/07/2026 » existaient avant et ont été réintégrés à cette date.
 
 ── CŒUR DU SYSTÈME ─────────────────────────────────────────────
-- SIRIUS SETUP (profil, clés API, voix)            : 25/06/2026
+- ΣIRIUS SETUP (profil, clés API, voix)            : 25/06/2026
 - Compagnon Dev (analyse de code)                  : 19/07/2026
 - Médiathèque / FILES (fichiers, audio)            : 09/07/2026
 - Architecte visuel (diagrammes)                   : 09/07/2026
@@ -14,7 +14,7 @@ NOTE : les dates proviennent de l'historique du projet. Les modules marqués
 - PANTHEON SYSTEM (supervision globale)            : 22/07/2026
 - NEXUS CÉLESTE (connexions inter-modules)         : 22/07/2026
 - ORACLE DIVIN (prédictions, marchés)              : 22/07/2026
-- SIRIUS PRIME (mémoire & apprentissage)           : 22/07/2026
+- ΣIRIUS PRIME (mémoire & apprentissage)           : 22/07/2026
 - ZEUS CORTEX (cerveau visuel, iris humain)        : 22/07/2026
 
 ── AFFICHAGE & NAVIGATION ──────────────────────────────────────
@@ -22,7 +22,7 @@ NOTE : les dates proviennent de l'historique du projet. Les modules marqués
 - Galerie des archives (souvenirs visuels)         : 25/07/2026
 - Fenêtres Web (navigation intégrée)               : 25/07/2026
 - Fenêtres de tâches (suivi en direct)             : 25/07/2026
-- SIRIUS DISPLAY (panneau média & web)             : 27/07/2026
+- ΣIRIUS DISPLAY (panneau média & web)             : 27/07/2026
 
 ── MODULES SPÉCIALISÉS (restaurés le 31/07/2026) ───────────────
 - HACCP — hygiène & sécurité alimentaire           : 31/07/2026

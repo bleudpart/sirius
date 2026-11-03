@@ -150,7 +150,7 @@ export default function MemoryManager({ onClose }) {
 
             {loading && <div className="haccp-loading"><Loader2 size={20} className="haccp-spin" /><span>Chargement...</span></div>}
             {!loading && memories.length === 0 && (
-              <div className="memory-empty" data-testid="mm-empty">Aucun souvenir pour ces critères. Dites « souviens-toi que... » à Sirius pour enrichir sa mémoire.</div>
+              <div className="memory-empty" data-testid="mm-empty">Aucun souvenir pour ces critères. Dites « souviens-toi que... » à ΣIRIUS pour enrichir sa mémoire.</div>
             )}
             {!loading && memories.map((m) => (
               <div className={`mm-row ${m.status !== "active" ? "muted" : ""}`} key={m.id} data-testid={`mm-row-${m.id}`}>

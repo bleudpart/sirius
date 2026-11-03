@@ -59,8 +59,8 @@ export default function NativeAutomationHub({ open, onClose, onReview, onRequest
     <h2>Hooks natifs · automatisations Windows</h2>
     {!bridge ? <p>Disponible uniquement dans l'application Windows Electron, pas sur le navigateur ni Android.</p> : <>
       <p>Tout est désactivé au départ. Les autorisations valent pour cette session du compte sur ce PC.
-        Fermer ce panneau ne les arrête pas ; déconnexion, rechargement ou fermeture de SIRIUS les arrêtent.
-        SIRIUS doit rester ouvert.</p>
+        Fermer ce panneau ne les arrête pas ; déconnexion, rechargement ou fermeture de ΣIRIUS les arrêtent.
+        ΣIRIUS doit rester ouvert.</p>
       <p>Aucun raccourci ne déclenche le microphone ni un appel IA. Aucun contenu de fichier n'est lu,
         classé, envoyé ou exécuté. Les noms détectés restent dans un journal local en mémoire, limité à 100 événements.</p>
       {error && <p role="alert">{error}</p>}
@@ -68,7 +68,7 @@ export default function NativeAutomationHub({ open, onClose, onReview, onRequest
         Tout arrêter et réinitialiser</button>
       <fieldset disabled={busy || !state || !token.current}>
         <legend>Autorisations facultatives</legend>
-        {[["shortcut", "Ctrl+Alt+S · rappeler la fenêtre SIRIUS"], ["notifications", "Notifications Windows génériques"],
+        {[["shortcut", "Ctrl+Alt+S · rappeler la fenêtre ΣIRIUS"], ["notifications", "Notifications Windows génériques"],
           ["resume", "Événements de reprise et déverrouillage de session"]].map(([key, label]) => <label key={key}>
           <input type="checkbox" checked={state?.[key] || false} onChange={(event) => {
             const options = { shortcut: state.shortcut, notifications: state.notifications, resume: state.resume,

@@ -382,7 +382,7 @@ export default function PublicStore() {
         </details>
         <p><strong>Sans engagement ni paiement automatique à la fin de l'essai.</strong> Sans carte bancaire, aucun abonnement à annuler.</p>
         <details><summary>Comment fonctionne l'essai ?</summary>
-          <p>L'essai commence à votre première connexion activant votre compte. Les services IA autorisés utilisent les clés de SIRIUS, dans la limite des quotas quotidiens.</p>
+          <p>L'essai commence à votre première connexion activant votre compte. Les services IA autorisés utilisent les clés de ΣIRIUS, dans la limite des quotas quotidiens.</p>
           <p>À la fin des 15 jours, l'application se verrouille jusqu'à l'achat d'une licence ou d'une location avec l'adresse e-mail de votre compte. Sur PC, l'application est reliée à votre compte ΣIRIUS pour vérifier cet accès.</p>
           <p>Ensuite, la configuration vous guide pour ajouter vos propres clés API chiffrées sur votre appareil. Les fournisseurs peuvent facturer leur utilisation.</p>
           <p>L'essai est distinct de l'achat d'une licence. Une déconnexion ou une réinstallation ne relance pas les 15 jours. Toute souscription volontaire déclenche un paiement immédiat, sans nouvel essai Stripe.</p>

@@ -655,7 +655,7 @@ test("Verify Sirius stops listening and opens actionable diagnostics with profil
   await act(async () => host.querySelector('[data-testid="sirius-voice-diagnostic-btn"]').click());
   expect(recorders[0].state).toBe("inactive");
   expect(collectVoiceDiagnostic).toHaveBeenCalledTimes(1);
-  expect(host.querySelector('[role="dialog"]').textContent).toContain("Vérifier Sirius");
+  expect(host.querySelector('[role="dialog"]').textContent).toContain("Vérifier ΣIRIUS");
   await act(async () => document.dispatchEvent(new KeyboardEvent("keydown", { code: "Space", bubbles: true })));
   expect(recorders).toHaveLength(1);
   expect(recorders[0].state).toBe("inactive");

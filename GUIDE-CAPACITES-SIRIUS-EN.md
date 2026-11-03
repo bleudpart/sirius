@@ -395,7 +395,7 @@ PANTHEON SYSTEM, NEXUS, ARGUS and HÉPHAÏSTOS provide:
 - Enterprise restore;
 - sensitive-operation logging.
 
-## 18. ORACLE DIVIN and SIRIUS PRIME
+## 18. ORACLE DIVIN and ΣIRIUS PRIME
 
 ORACLE DIVIN can display:
 
@@ -407,7 +407,7 @@ ORACLE DIVIN can display:
 - moon phase and astronomy information;
 - personal predictions based on recorded habits.
 
-SIRIUS PRIME can display:
+ΣIRIUS PRIME can display:
 
 - learning journal;
 - habits by hour and day;

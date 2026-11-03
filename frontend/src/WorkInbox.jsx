@@ -125,8 +125,8 @@ export default function WorkInbox({ dossierId = "", invoices = [], onSelectDossi
   };
   const metric = data?.metrics;
   const visibleRuns = data?.runs.filter((run) => filter === "all" || !["COMPLETED", "CANCELLED"].includes(run.state)) || [];
-  return <section className="work-inbox" aria-label="À traiter avec SIRIUS">
-    <h2>À traiter avec SIRIUS</h2>
+  return <section className="work-inbox" aria-label="À traiter avec ΣIRIUS">
+    <h2>À traiter avec ΣIRIUS</h2>
     <p>Préparer, valider, suivre : les mêmes parcours que dans ARIANE et la conversation.</p>
     <p>Service : {API_BASE_URL} · espace {data?.workspace_id || "en cours de vérification"}.</p>
     {data && <><p>{data.continuity}</p><p>{data.notification_limits}</p><p>Dernière lecture : {data.checked_at}.</p></>}

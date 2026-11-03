@@ -152,7 +152,7 @@ export default function FilesPanel({ onClose }) {
           <FolderOpen size={22} />
           <div>
             <h2 className="setup-title">Médiathèque</h2>
-            <p className="setup-sub">Vos fichiers, images, sons et documents, stockés par Sirius.</p>
+            <p className="setup-sub">Vos fichiers, images, sons et documents, stockés par ΣIRIUS.</p>
           </div>
         </div>
 
@@ -217,7 +217,7 @@ export default function FilesPanel({ onClose }) {
 
         <div className="files-grid" data-testid="files-grid">
           {shown.length === 0 && (
-            <div className="architect-empty">Aucun fichier dans ce dossier. Ajoutez des images, musiques ou documents : Sirius les garde en lieu sûr.</div>
+            <div className="architect-empty">Aucun fichier dans ce dossier. Ajoutez des images, musiques ou documents : ΣIRIUS les garde en lieu sûr.</div>
           )}
           {shown.map((f) => (
             <div
@@ -270,7 +270,7 @@ export default function FilesPanel({ onClose }) {
             </div>
           ))}
         </div>
-        <div className="memory-foot">Documents conservés dans le stockage du serveur SIRIUS, ou sur le PC en installation locale.</div>
+        <div className="memory-foot">Documents conservés dans le stockage du serveur ΣIRIUS, ou sur le PC en installation locale.</div>
         {scanning && <DocumentScanner initialFolder={dossier === "Tous" ? "Comptabilité" : dossier}
           onClose={() => setScanning(false)} onSaved={() => { setScanning(false); flash("Document enregistré ✓"); load(); }} />}
       </div>

@@ -1,4 +1,4 @@
-# SIRIUS — Installation locale (Windows)
+# ΣIRIUS — Installation locale (Windows)
 
 Assistant vocal HUD style Iron Man. Frontend React + Backend FastAPI (+ Electron pour le .exe).
 
@@ -6,33 +6,33 @@ Assistant vocal HUD style Iron Man. Frontend React + Backend FastAPI (+ Electron
 
 ## Guide rapide pour débuter
 
-### Installer SIRIUS sur un PC Windows
+### Installer ΣIRIUS sur un PC Windows
 
-1. Téléchargez le fichier `ΣIRIUS-Windows-<version>.exe`.
+1. Téléchargez le fichier `sirius-setup-<version>.exe`.
 2. Ouvrez le fichier téléchargé. Si Windows affiche un avertissement, vérifiez
-  que le fichier provient bien de votre source SIRIUS, puis autorisez son
+  que le fichier provient bien de votre source ΣIRIUS, puis autorisez son
   exécution.
 3. Acceptez le contrat de licence.
 4. Choisissez le dossier d'installation ou conservez le dossier proposé.
 5. Cliquez sur **Installer** et attendez la fin de l'installation.
-6. Laissez l'option de démarrage activée : SIRIUS ouvrira automatiquement son
+6. Laissez l'option de démarrage activée : ΣIRIUS ouvrira automatiquement son
   interface et son backend local.
 7. Au premier démarrage, autorisez l'accès au microphone si Windows le demande.
-8. Créez votre profil dans SIRIUS, puis ajoutez les clés des services que vous
+8. Créez votre profil dans ΣIRIUS, puis ajoutez les clés des services que vous
   souhaitez utiliser. La clé Groq est nécessaire pour le cerveau distant ; les
   autres intégrations sont facultatives.
 
-Pour les démarrages suivants, utilisez le raccourci **SIRIUS** du Bureau ou du
+Pour les démarrages suivants, utilisez le raccourci **ΣIRIUS** du Bureau ou du
 menu Démarrer. Vous n'avez besoin d'installer ni Python, ni Node.js, ni
-MongoDB. Le fichier `ΣIRIUS-Portable-<version>.exe` permet aussi d'utiliser
-SIRIUS sans installation classique.
+MongoDB. Le fichier `SIRIUS-Portable-<version>.exe` permet aussi d'utiliser
+ΣIRIUS sans installation classique.
 
-### Utiliser SIRIUS sur Android ou une tablette Android
+### Utiliser ΣIRIUS sur Android ou une tablette Android
 
 1. Installez Android Studio sur l'ordinateur de développement.
 2. Ouvrez le dossier `frontend/android` dans Android Studio.
 3. Configurez un appareil Android ou un émulateur.
-4. Définissez `REACT_APP_BACKEND_URL` avec l'adresse HTTPS du backend SIRIUS.
+4. Définissez `REACT_APP_BACKEND_URL` avec l'adresse HTTPS du backend ΣIRIUS.
 5. Depuis le dossier `frontend`, exécutez `npm run mobile:sync`.
 6. Lancez l'application depuis Android Studio sur le téléphone ou la tablette.
 7. Autorisez le microphone et les notifications lorsque Android les demande.
@@ -44,12 +44,12 @@ publication signé, configurez d'abord la signature Android puis lancez
 `npm run mobile:apk:release` ; sans signature configurée, l'APK release ne
 sera pas installable tel quel sur un téléphone.
 
-### Utiliser SIRIUS sur iPhone ou iPad
+### Utiliser ΣIRIUS sur iPhone ou iPad
 
 1. Sur un Mac, installez Xcode et les outils nécessaires.
 2. Ouvrez le dossier `frontend/ios` dans Xcode.
 3. Sélectionnez un iPhone ou un iPad connecté, ou un simulateur.
-4. Définissez `REACT_APP_BACKEND_URL` avec l'adresse HTTPS du backend SIRIUS.
+4. Définissez `REACT_APP_BACKEND_URL` avec l'adresse HTTPS du backend ΣIRIUS.
 5. Depuis le dossier `frontend`, exécutez `npm run mobile:sync`.
 6. Dans Xcode, choisissez l'équipe de signature Apple, puis lancez l'application.
 7. Autorisez le microphone et les notifications lorsque iOS les demande.
@@ -61,19 +61,19 @@ Store nécessite en plus les comptes développeur correspondants.
 
 ---
 
-## A. Vous êtes l'utilisateur final : installer SIRIUS
+## A. Vous êtes l'utilisateur final : installer ΣIRIUS
 
 Rien à installer au préalable : **ni Python, ni Node.js, ni MongoDB**.
 
-1. Récupérez le fichier `ΣIRIUS-Windows-<version>.exe`.
+1. Récupérez le fichier `sirius-setup-<version>.exe`.
 2. Double-cliquez dessus, acceptez le contrat de licence, choisissez le dossier.
-3. SIRIUS démarre seul : il lance son propre backend sur `127.0.0.1:8001`.
+3. ΣIRIUS démarre seul : il lance son propre backend sur `127.0.0.1:8001`.
 
 L'installation ne demande pas de droits administrateur (installation par
 utilisateur). Les données, journaux et secrets restent dans votre dossier
 utilisateur Windows. Les mises à jour sont proposées automatiquement.
 
-Une version `ΣIRIUS-Portable-<version>.exe` existe aussi : aucun installateur,
+Une version `SIRIUS-Portable-<version>.exe` existe aussi : aucun installateur,
 elle s'exécute directement.
 
 La base mobile Capacitor est préparée dans `frontend/capacitor.config.js` pour
@@ -87,7 +87,7 @@ se compilent sur un Mac avec Xcode.
 Pour un téléphone, `REACT_APP_BACKEND_URL` doit pointer vers une URL HTTPS
 accessible depuis Internet ou le réseau local. Ne laissez pas la valeur
 `http://127.0.0.1:8001`, car sur mobile elle désigne le téléphone lui-même et
-non le PC qui héberge SIRIUS. Les autorisations microphone, notifications et
+non le PC qui héberge ΣIRIUS. Les autorisations microphone, notifications et
 stockage devront être validées dans chaque projet natif avant publication.
 
 THÉMIS fournit la gestion des devis et factures, le suivi des paiements et
@@ -99,7 +99,7 @@ validation d'un expert-comptable.
 
 Pour relancer l'application sans ouvrir Python ou Node.js, double-cliquez sur
 `DEMARRER-SIRIUS.bat` depuis le dossier du projet ou utilisez le raccourci
-SIRIUS créé sur le bureau.
+ΣIRIUS créé sur le bureau.
 
 ---
 
@@ -138,7 +138,7 @@ Python sont déjà présents.
 ### 1. Prérequis
 - Node.js 18+ et Yarn  (`npm install -g yarn`)
 - Python 3.10+
-- MongoDB local **optionnel** : s'il est absent, SIRIUS utilise automatiquement
+- MongoDB local **optionnel** : s'il est absent, ΣIRIUS utilise automatiquement
   une base SQLite locale (`sirius_docstore.db`). Variable `SIRIUS_DB=local` ou
   `SIRIUS_DB=mongo` pour forcer un mode.
 
@@ -195,7 +195,7 @@ backend, publie la release GitHub, puis les applications installées proposent l
 redémarrage lorsque la mise à jour est téléchargée.
 
 ## 5. Sauvegarder la mémoire locale
-Depuis `backend/`, **Sirius Doctor** crée une copie SQLite cohérente de
+Depuis `backend/`, **ΣIRIUS Doctor** crée une copie SQLite cohérente de
 `sirius_local.db`, contrôle la base avant et après la copie, puis écrit un
 manifeste SHA-256 à côté de la sauvegarde :
 
@@ -225,8 +225,8 @@ objet doivent être sauvegardés avec les outils natifs du service concerné.
   `Sirius, lance une musique lofi sur Spotify`.
 - Le HUD synchronise son etat entre ses fenetres avec `ws://localhost:8001/api/media/ws`.
 - YouTube, Spotify, Twitch, TikTok et Deezer utilisent uniquement leurs lecteurs ou liens
-  officiels. SIRIUS ne telecharge ni ne relaie leurs flux.
-- Netflix ne propose pas de lecteur iframe public : SIRIUS ouvre donc sa page officielle
+  officiels. ΣIRIUS ne telecharge ni ne relaie leurs flux.
+- Netflix ne propose pas de lecteur iframe public : ΣIRIUS ouvre donc sa page officielle
   dans le navigateur.
 - En deploiement hors de `localhost`, configure `MEDIA_EMBED_PARENT` avec le nom de
   domaine du frontend afin que le lecteur Twitch puisse s'integrer correctement.
@@ -237,20 +237,20 @@ objet doivent être sauvegardés avec les outils natifs du service concerné.
 - Le module inclut DocAnalyzer, CodeAssist, SmartNotes, TaskMaster et ReportBuilder.
 - Les analyses de documents et de code sont locales : le code n'est jamais execute et
   aucune cle API supplementaire n'est necessaire.
-- Les notes, taches et rapports sont enregistres dans la base SQLite locale de Sirius
+- Les notes, taches et rapports sont enregistres dans la base SQLite locale de ΣIRIUS
   et sont effaces lors de la suppression du compte correspondant.
 
 ## Notes
 - La voix et le micro utilisent le navigateur (gratuit, instantané) : utilise **Chrome ou Edge** pour la reconnaissance vocale.
-- Sirius mémorise automatiquement ce que tu lui dis d'important (pop-up « Mémoire enregistrée »). Tout reste sur ton PC.
+- ΣIRIUS mémorise automatiquement ce que tu lui dis d'important (pop-up « Mémoire enregistrée »). Tout reste sur ton PC.
 - Spotify « qu'est-ce qui joue » : pense à enregistrer ta Redirect URI locale dans le Dashboard Spotify et à ajouter ton compte (User Management, mode Development).
 
 ## Son de démarrage personnalisé (ex : thème Terminator)
-Sirius joue un son au lancement. Pour mettre TON propre son :
+ΣIRIUS joue un son au lancement. Pour mettre TON propre son :
 1. Récupère un fichier audio **MP3** dont tu as les droits.
 2. Renomme-le exactement **`boot-sound.mp3`**.
 3. Place-le dans le dossier **`frontend/public/`** (à côté de `manifest.json`).
-4. Relance Sirius : il jouera ton fichier au démarrage.
-- Si aucun fichier `boot-sound.mp3` n'est présent, Sirius joue une percussion synthétisée (sans copyright).
+4. Relance ΣIRIUS : il jouera ton fichier au démarrage.
+- Si aucun fichier `boot-sound.mp3` n'est présent, ΣIRIUS joue une percussion synthétisée (sans copyright).
 - Tu peux activer/couper le son dans **Configuration → « Son de démarrage »**.
 - ⚠️ Le thème original de Terminator est protégé par des droits d'auteur : utilise un fichier libre de droits ou que tu possèdes.

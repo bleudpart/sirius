@@ -54,6 +54,7 @@ export const MODULE_ALIASES = {
 
 export const normalizeModuleText = (value) => String(value || "")
   .toLowerCase()
+  .replace(/[σς]/g, "s")
   .normalize("NFD")
   .replace(/[\u0300-\u036f]/g, "")
   .replace(/[^a-z0-9]+/g, " ")

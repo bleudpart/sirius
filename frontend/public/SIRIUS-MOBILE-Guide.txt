@@ -1,19 +1,19 @@
 ============================================================
-   S.I.R.I.U.S — Installer sur TÉLÉPHONE (Android / iPhone)
+   Σ.I.R.I.U.S — Installer sur TÉLÉPHONE (Android / iPhone)
 ============================================================
 
 ⚠️ Pour le téléphone, il n'y a pas de fichier à installer
-   manuellement : SIRIUS s'installe directement depuis le
+   manuellement : ΣIRIUS s'installe directement depuis le
    navigateur (technologie "PWA"). C'est encore plus simple.
 
-PRÉREQUIS : SIRIUS doit d'abord être DÉPLOYÉ en ligne
+PRÉREQUIS : ΣIRIUS doit d'abord être DÉPLOYÉ en ligne
 (hébergement web de votre choix) → vous obtenez une URL de
 production, par exemple : https://sirius.....
 
 -------------------------------------------------
 🧪 TEST RAPIDE SANS HÉBERGEMENT
 -------------------------------------------------
-Pour faire tester SIRIUS depuis votre PC sans acheter de
+Pour faire tester ΣIRIUS depuis votre PC sans acheter de
 domaine ni louer de serveur :
 
 1. Installez Cloudflare Tunnel (cloudflared) :
@@ -40,7 +40,7 @@ test avec Ctrl+C.
 1. Ouvrez votre URL de production dans Chrome.
 2. Menu ⋮ (en haut à droite) → "Installer l'application"
    (ou "Ajouter à l'écran d'accueil").
-3. L'icône bleue SIRIUS apparaît sur votre écran d'accueil.
+3. L'icône bleue ΣIRIUS apparaît sur votre écran d'accueil.
 4. Ouvrez-la : plein écran, micro inclus. C'est prêt !
 
 
@@ -49,7 +49,7 @@ test avec Ctrl+C.
 -------------------------------------------------
 1. Ouvrez votre URL de production dans Safari.
 2. Bouton Partager (carré avec flèche) → "Sur l'écran d'accueil".
-3. L'icône SIRIUS apparaît. Ouvrez-la.
+3. L'icône ΣIRIUS apparaît. Ouvrez-la.
 
 
 -------------------------------------------------
@@ -68,5 +68,5 @@ Si vous voulez un fichier .apk à partager/distribuer :
  plus simple pour iPhone.)
 
 ============================================================
-   SIRIUS — par partel
+   ΣIRIUS — par partel
 ============================================================

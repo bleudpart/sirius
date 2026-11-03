@@ -178,7 +178,7 @@ Faire des sauvegardes coherentes de **la base et de ses images**, tester leur
 restauration et conserver des empreintes de fin de chaine sur un support
 independant/protege selon la politique de l'etablissement. Aucune sauvegarde
 distante ou politique de retention n'est configuree automatiquement ici.
-Les autres fichiers SQLite de SIRIUS n'incluent pas ce registre.
+Les autres fichiers SQLite de ΣIRIUS n'incluent pas ce registre.
 
 Pour verifier un export du journal, la formule utilise SHA-256 sur le JSON
 canonique UTF-8 d'une liste :

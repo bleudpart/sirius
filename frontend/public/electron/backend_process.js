@@ -34,13 +34,13 @@ async function waitForHealth(child, timeoutMs = HEALTH_TIMEOUT_MS) {
   let delayMs = HEALTH_POLL_MIN_MS;
   while (Date.now() < deadline) {
     if (child && child.exitCode !== null) {
-      throw new Error(`Le backend SIRIUS s'est arrêté avec le code ${child.exitCode}.`);
+      throw new Error(`Le backend ΣIRIUS s'est arrêté avec le code ${child.exitCode}.`);
     }
     if (await readHealth()) return;
     await new Promise((resolve) => setTimeout(resolve, delayMs));
     delayMs = Math.min(HEALTH_POLL_MAX_MS, Math.round(delayMs * 1.6));
   }
-  throw new Error("Le backend SIRIUS n'a pas répondu dans le délai prévu.");
+  throw new Error("Le backend ΣIRIUS n'a pas répondu dans le délai prévu.");
 }
 
 async function startBackend({ resourcesPath, userDataPath }) {
@@ -48,7 +48,7 @@ async function startBackend({ resourcesPath, userDataPath }) {
 
   const executable = path.join(resourcesPath, "backend", "sirius-backend.exe");
   if (!fs.existsSync(executable)) {
-    throw new Error(`Backend SIRIUS introuvable : ${executable}`);
+    throw new Error(`Backend ΣIRIUS introuvable : ${executable}`);
   }
 
   fs.mkdirSync(userDataPath, { recursive: true });

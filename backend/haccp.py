@@ -509,7 +509,7 @@ def make_haccp_router(db):
             raise HTTPException(status_code=422, detail="La date de début doit précéder la date de fin.")
         sections = set(body.inclure_sections or [])
         window = {"created_at": {"$gte": debut, "$lte": f"{fin}T23:59:59+00:00"}, **scope}
-        report = ["RAPPORT D'AUDIT HACCP", f"Période auditée : {debut} au {fin}", "", "SOURCES : registres HACCP SIRIUS de l'entreprise, horodatés et filtrés sur la période sélectionnée.", "VALIDATION HUMAINE : les fiches doivent être vérifiées par un responsable avant tout usage officiel.", ""]
+        report = ["RAPPORT D'AUDIT HACCP", f"Période auditée : {debut} au {fin}", "", "SOURCES : registres HACCP ΣIRIUS de l'entreprise, horodatés et filtrés sur la période sélectionnée.", "VALIDATION HUMAINE : les fiches doivent être vérifiées par un responsable avant tout usage officiel.", ""]
         if "trace" in sections:
             traces = await db.haccp_trace.find(window, NO_ID).to_list(300)
             report.append(f"Traçabilité : {len(traces)} réception(s) enregistrée(s).")
@@ -541,7 +541,7 @@ def make_haccp_router(db):
             pending = sum(1 for item in controls if item.get("statut") != "valide")
             validated = len(controls) - pending
             report.append(f"Fiches de contrôle : {len(controls)} fiche(s), {validated} validée(s), {pending} à valider.")
-        report.extend(["", "Document de synthèse généré par SIRIUS.", "Cet outil prépare un audit interne et ne constitue pas une certification officielle."])
+        report.extend(["", "Document de synthèse généré par ΣIRIUS.", "Cet outil prépare un audit interne et ne constitue pas une certification officielle."])
         from themis_pdf import build_consult_pdf
         identity = {}
         if request.cookies.get("access_token") or (request.headers.get("authorization") or "").lower().startswith("bearer "):

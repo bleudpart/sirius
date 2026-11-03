@@ -250,7 +250,7 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
     if (file.size > 12 * 1048576) { setAnalysis({ error: "Fichier trop volumineux pour l'analyse IA (12 Mo max)." }); return; }
     setAnalysis({ busy: true });
     const pid = progress.start(`Analyse du dépôt — ${file.name}`, { silent: true });
-    progress.log(pid, "Sirius examine le fichier…", 35);
+    progress.log(pid, "ΣIRIUS examine le fichier…", 35);
     try {
       let keys = {};
       keys = loadApiKeys();
@@ -549,7 +549,7 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
                         </button>
                       )}
                     </div>
-                    {analysis.busy && <span className="sd-analysis-busy">Sirius examine le fichier…</span>}
+                    {analysis.busy && <span className="sd-analysis-busy">ΣIRIUS examine le fichier…</span>}
                     {analysis.text && <p data-testid="sirius-display-analysis-text">{analysis.text}</p>}
                     {analysis.error && <span className="sd-analysis-err" data-testid="sirius-display-analysis-error">{analysis.error}</span>}
                   </div>
@@ -568,7 +568,7 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
               <div className="sd-idle">
                 <span className="sd-idle-dot" />
                 <p>ÉCRAN PRINCIPAL — EN ATTENTE</p>
-                <em>Sirius affichera ici ses réponses, pages web, vidéos et réflexions.</em>
+                <em>ΣIRIUS affichera ici ses réponses, pages web, vidéos et réflexions.</em>
               </div>
             )}
             {!pasted && type === "message" && (

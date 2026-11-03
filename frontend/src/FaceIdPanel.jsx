@@ -201,7 +201,7 @@ export default function FaceIdPanel({ onClose, onRecognized, userName }) {
       localStorage.setItem(STORE_KEY, JSON.stringify(p));
       setProfile({ ...p, descriptor: det.descriptor });
       greetedRef.current = false;
-      setMessage(`Visage de ${p.name} enregistré. Sirius vous reconnaîtra désormais.`);
+      setMessage(`Visage de ${p.name} enregistré. ΣIRIUS vous reconnaîtra désormais.`);
     } catch (error) {
       setMessage("Enregistrement impossible : " + error.message);
     }

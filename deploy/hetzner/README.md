@@ -1,4 +1,4 @@
-# Déploiement Hetzner du site et de l’API SIRIUS
+# Déploiement Hetzner du site et de l’API ΣIRIUS
 
 Kit prévu pour un VPS Hetzner Cloud CX22 sous Ubuntu 24.04, avec Caddy en HTTPS automatique devant FastAPI/Uvicorn sur `127.0.0.1:8001`.
 Le site React est servi directement par Caddy, sans lancer Node sur le VPS.

@@ -211,17 +211,17 @@ class AlexaIntegration:
 def consent_page(ticket, origin, scopes):
     # Script data contains only a server-generated URL-safe ticket, never a caller-supplied URL.
     return """<!doctype html><html lang="fr"><meta charset="utf-8">
-<meta name="viewport" content="width=device-width"><title>Lier Alexa à SIRIUS</title>
-<h1>Lier Alexa à SIRIUS</h1>
+<meta name="viewport" content="width=device-width"><title>Lier Alexa à ΣIRIUS</title>
+<h1>Lier Alexa à ΣIRIUS</h1>
 <p>""" + html.escape(
-        "Alexa pourra consulter et commander les lumières et prises Smart Life que vous autorisez dans SIRIUS."
+        "Alexa pourra consulter et commander les lumières et prises Smart Life que vous autorisez dans ΣIRIUS."
         " Les commandes vocales seront exécutées sans confirmation supplémentaire ; une enceinte peut être partagée."
         if set(scopes) & HOME_SCOPES else
         "Alexa pourra lire les titres de vos dossiers et vos synthèses de réunion selon les droits demandés."
         " Ces données peuvent être entendues par les personnes proches de votre enceinte. Aucun envoi ni action externe."
     ) + """</p><p>Droits demandés : """ + html.escape(", ".join(scopes)) + """</p>
-<p>Connectez-vous d'abord à SIRIUS dans ce même navigateur, puis revenez ici. Aucun mot de passe n'est demandé sur cette page.</p>
-<a href='""" + html.escape(origin, quote=True) + """' target="_blank" rel="noopener">Ouvrir SIRIUS pour se connecter</a>
+<p>Connectez-vous d'abord à ΣIRIUS dans ce même navigateur, puis revenez ici. Aucun mot de passe n'est demandé sur cette page.</p>
+<a href='""" + html.escape(origin, quote=True) + """' target="_blank" rel="noopener">Ouvrir ΣIRIUS pour se connecter</a>
 <p id="status" role="status">Vérifiez le compte avant de confirmer.</p>
 <button id="check">Vérifier mon compte</button>
 <button id="approve" disabled>Autoriser ces droits à Alexa</button><button id="deny">Refuser</button>
@@ -242,7 +242,7 @@ async function submit(approve) {
 document.getElementById("check").onclick = async () => {
   try {
     const response = await fetch("/api/auth/me", {credentials:"same-origin"});
-    if (!response.ok) throw new Error("Connectez-vous à SIRIUS dans ce navigateur puis réessayez.");
+    if (!response.ok) throw new Error("Connectez-vous à ΣIRIUS dans ce navigateur puis réessayez.");
     const user = await response.json();
     status.textContent = "Compte : " + (user.email || user.user_id);
     document.getElementById("approve").disabled = false; document.getElementById("deny").disabled = false;

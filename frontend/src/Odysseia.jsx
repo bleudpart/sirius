@@ -96,7 +96,7 @@ function MarkdownArticle({ markdown }) {
       </nav>
       <article className="odysseia-article" data-read-content>
         <section className="odysseia-lead">
-          <h2>Le ciel, les récits et le nom de SIRIUS</h2>
+          <h2>Le ciel, les récits et le nom de ΣIRIUS</h2>
           {ODYSSEIA_HISTORY.map((item) => <div key={item.id}><h3>{item.title}</h3><p>{item.text}</p></div>)}
           <p className="odysseia-editorial">Repère de lecture : les mythes témoignent de traditions culturelles; ils ne constituent pas à eux seuls des preuves historiques d'événements surnaturels.</p>
         </section>

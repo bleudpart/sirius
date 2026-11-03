@@ -1,4 +1,4 @@
-# Support et récupération SIRIUS
+# Support et récupération ΣIRIUS
 
 ## Signaler un bug
 
@@ -10,7 +10,7 @@ Avant de signaler un problème :
 4. joindre `audit-report.json` ou un extrait de journal nettoyé ;
 5. ne jamais joindre de mot de passe, clé API, donnée client ou document HACCP réel.
 
-Les demandes peuvent être ouvertes dans les Issues du dépôt GitHub SIRIUS. Pour les demandes privées liées aux données personnelles, utiliser :
+Les demandes peuvent être ouvertes dans les Issues du dépôt GitHub ΣIRIUS. Pour les demandes privées liées aux données personnelles, utiliser :
 
 - danielpartel@hotmail.com
 - danielsirius.pro2026@gmail.com
@@ -18,7 +18,7 @@ Les demandes peuvent être ouvertes dans les Issues du dépôt GitHub SIRIUS. Po
 
 ## Récupération après incident
 
-1. Fermer SIRIUS et ne pas supprimer le dossier de données utilisateur.
+1. Fermer ΣIRIUS et ne pas supprimer le dossier de données utilisateur.
 2. Copier le dossier de données sur un support séparé avant toute réparation.
 3. Ouvrir la version Entreprise avec un compte administrateur.
 4. Restaurer la dernière sauvegarde vérifiée depuis **Entreprise → Sauvegardes**.

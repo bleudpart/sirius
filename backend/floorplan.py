@@ -728,7 +728,7 @@ def make_floorplan_router(rate_ok) -> APIRouter:
             raise HTTPException(status_code=400, detail=str(error))
         except Exception as error:
             logger.error("[PLANS] génération échouée : %r", error)
-            raise HTTPException(status_code=500, detail="Sirius n'a pas pu dessiner ce plan, réessayez.")
+            raise HTTPException(status_code=500, detail="ΣIRIUS n'a pas pu dessiner ce plan, réessayez.")
 
     @router.post("/interior")
     async def propose_interior(req: InteriorRequest, request: Request):
@@ -744,7 +744,7 @@ def make_floorplan_router(rate_ok) -> APIRouter:
             raise HTTPException(status_code=400, detail=str(error))
         except Exception as error:
             logger.error("[PLANS] aménagement échoué : %r", error)
-            raise HTTPException(status_code=500, detail="Sirius n'a pas pu proposer d'aménagement, réessayez.")
+            raise HTTPException(status_code=500, detail="ΣIRIUS n'a pas pu proposer d'aménagement, réessayez.")
 
     @router.post("/dxf")
     async def export_dxf(req: PlanDxfRequest):

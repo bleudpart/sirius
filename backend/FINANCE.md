@@ -762,7 +762,7 @@ Résultats :
 Quatre tableaux d’aide à la décision pour la restauration, calculés par
 `AnalyticsEngine` ([analytics_engine.py](analytics_engine.py)) sur les données
 transmises dans la requête : le moteur ne lit ni n’écrit aucune base, et les
-fiches techniques ne sont pas encore enregistrées par SIRIUS. Chaque tableau est
+fiches techniques ne sont pas encore enregistrées par ΣIRIUS. Chaque tableau est
 une enveloppe `HudPayload` commune (`schema_version` `1`) :
 
 - `kind`, `title`, `speech` (phrase française prête à être dite par le cerveau

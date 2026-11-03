@@ -19,7 +19,7 @@ export async function readAccountSetup(fetchImpl = fetch) {
       const data = await response.json();
       if (!response.ok) {
         throw new Error(typeof data.detail === "string" ? data.detail : response.status === 401
-          ? "Connectez-vous à votre compte SIRIUS pour vérifier les services."
+          ? "Connectez-vous à votre compte ΣIRIUS pour vérifier les services."
           : "Vérification des services indisponible. Réessayez.");
       }
       if (data.mode !== "trial_then_personal" || !Array.isArray(data.services)) {
@@ -47,7 +47,7 @@ export function exportAccountProfile(profile) {
 export function importAccountProfile(data) {
   if (!data || typeof data !== "object" || !data.profile || typeof data.profile !== "object"
     || Array.isArray(data.profile)) {
-    throw new Error("Ce fichier ne contient pas de profil SIRIUS valide.");
+    throw new Error("Ce fichier ne contient pas de profil ΣIRIUS valide.");
   }
   return { profile: exportAccountProfile(data.profile).profile, ignoredKeys: Boolean(data.keys) };
 }

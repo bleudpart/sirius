@@ -98,7 +98,7 @@ export function createModuleRegistry({ icons, actions, state, user, platform = "
     { id: "prime", group: "OUTILS", label: "ΣIRIUS PRIME — mémoire", Icon: icons.Sparkles, run: openPrime },
     { id: "dev", group: "OUTILS", label: "Compagnon Dev", Icon: icons.Code2, run: openDev },
     { id: "analytics", group: "OUTILS", label: "Tableau analytique", Icon: icons.BarChart3, run: openAnalytics },
-    { id: "memory", group: "OUTILS", label: "Ce que Sirius sait sur moi", Icon: icons.Brain, run: openMemory },
+    { id: "memory", group: "OUTILS", label: "Ce que ΣIRIUS sait sur moi", Icon: icons.Brain, run: openMemory },
     { id: "memorymgr", group: "OUTILS", label: "Gestion de la mémoire", Icon: icons.Database, run: openMemoryManager },
     { id: "argus", group: "PANTHÉON", label: "ARGUS — surveillance système", Icon: icons.Radar, run: openArgus },
     { id: "journal", group: "OUTILS", label: "Journal des tâches", Icon: icons.History, run: openJournal },

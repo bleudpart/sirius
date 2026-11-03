@@ -5,8 +5,8 @@ export default function AgentMissionForm({ disabled, onPrepare }) {
   const [context, setContext] = useState("");
   const [roles, setRoles] = useState(["documents", "messagerie", "planning"]);
   return <fieldset disabled={disabled}>
-    <legend>SIRIUS · délégation à des sous-agents IA</legend>
-    <p>Cerebras uniquement : jusqu'à trois spécialistes en parallèle puis une synthèse SIRIUS.
+    <legend>ΣIRIUS · délégation à des sous-agents IA</legend>
+    <p>Cerebras uniquement : jusqu'à trois spécialistes en parallèle puis une synthèse ΣIRIUS.
       Quatre appels maximum, aucune relance automatique, 30 secondes par mission.
       Les quotas et tarifs de votre compte s'appliquent : ce n'est pas le laboratoire à 0 €.</p>
     <p>Une boucle locale contrôle chaque réponse en deux passes maximum : normalisation des fins de ligne et espaces,

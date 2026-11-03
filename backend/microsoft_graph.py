@@ -780,7 +780,7 @@ def make_microsoft_router(db):
                 return _ms_popup_response(
                     False,
                     "retry",
-                    "Microsoft a renvoyé une erreur temporaire. SIRIUS relance automatiquement la connexion Outlook.",
+                    "Microsoft a renvoyé une erreur temporaire. ΣIRIUS relance automatiquement la connexion Outlook.",
                     retry_login=True,
                 )
             return _ms_popup_response(False, "error", "La connexion Microsoft a été refusée ou annulée.")

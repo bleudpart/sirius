@@ -172,7 +172,7 @@ export default function FirstRunWizard({ userName = "", userEmail = "", keys = {
 
   const brainLabel = {
     personal: "Clés personnelles prêtes — test IA proposé",
-    cloud: "Compte SIRIUS Cloud relié — test IA proposé",
+    cloud: "Compte ΣIRIUS Cloud relié — test IA proposé",
     server: "Service IA configuré sur le serveur — test IA proposé",
   }[brain.via];
 
@@ -198,7 +198,7 @@ export default function FirstRunWizard({ userName = "", userEmail = "", keys = {
                 <button type="button" className="fw-secondary" onClick={checkBrain}>Réessayer</button>
               </>
             )}
-            {brain.setup?.trial?.state === "active" && <p>Essai SIRIUS : 15 jours avec quotas, jusqu'au {new Date(brain.setup.trial.expires_at).toLocaleString("fr-FR")}. Ensuite, utilisez vos propres clés.</p>}
+            {brain.setup?.trial?.state === "active" && <p>Essai ΣIRIUS : 15 jours avec quotas, jusqu'au {new Date(brain.setup.trial.expires_at).toLocaleString("fr-FR")}. Ensuite, utilisez vos propres clés.</p>}
             {brain.state === "missing" && <p className="fw-status ko">Service IA non disponible pour ce compte. Ajoutez vos clés personnelles dans Réglages.</p>}
             {brain.state === "configured" && <button type="button" className="fw-primary" onClick={testChat} disabled={chatTest.state === "testing"} data-testid="fw-chat-test">Tester une réponse IA</button>}
             {chatTest.state === "testing" && <p role="status">Test IA en cours…</p>}
@@ -206,7 +206,7 @@ export default function FirstRunWizard({ userName = "", userEmail = "", keys = {
             {chatTest.state === "error" && <p role="alert" className="fw-status ko">{chatTest.message}</p>}
             {brain.state === "link" && (
               <form className="fw-link" onSubmit={linkAccount} data-testid="fw-link-form">
-                <p>Reliez votre compte SIRIUS pour les services de l'essai de 15 jours, sous quotas. Les clés personnelles prennent ensuite le relais.</p>
+                <p>Reliez votre compte ΣIRIUS pour les services de l'essai de 15 jours, sous quotas. Les clés personnelles prennent ensuite le relais.</p>
                 <div className="fw-tabs">
                   <button type="button" className={mode === "login" ? "on" : ""} onClick={() => setMode("login")}>J'ai un compte</button>
                   <button type="button" className={mode === "register" ? "on" : ""} onClick={() => setMode("register")} data-testid="fw-mode-register">Créer un compte</button>
@@ -238,7 +238,7 @@ export default function FirstRunWizard({ userName = "", userEmail = "", keys = {
         {step === 1 && (
           <section className="fw-body" data-testid="fw-mic">
             <h2><Mic size={18} /> Le micro</h2>
-            <p>Appuyez sur le bouton, puis dites « Bonjour SIRIUS ».</p>
+            <p>Appuyez sur le bouton, puis dites « Bonjour ΣIRIUS ».</p>
             <button type="button" className="fw-primary" onClick={testMic}
               disabled={mic.state === "recording" || mic.state === "transcribing"} data-testid="fw-mic-test">
               {mic.state === "recording" ? "Je vous écoute…" : mic.state === "transcribing" ? "Transcription…" : "Tester le micro"}
@@ -248,7 +248,7 @@ export default function FirstRunWizard({ userName = "", userEmail = "", keys = {
             <h2><Volume2 size={18} /> La lecture vocale</h2>
             <button type="button" className="fw-secondary" onClick={() => {
               setVoiceTest("playing");
-              speakFr("Bonjour, ceci est un test de lecture SIRIUS.", {
+              speakFr("Bonjour, ceci est un test de lecture ΣIRIUS.", {
                 onend: () => { if (mounted.current) setVoiceTest("confirm"); },
               });
             }} disabled={voiceTest === "playing"} data-testid="fw-voice-test">Écouter une phrase de test</button>

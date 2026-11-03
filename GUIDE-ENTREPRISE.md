@@ -1,13 +1,13 @@
-# SIRIUS Entreprise
+# ΣIRIUS Entreprise
 
-SIRIUS Entreprise regroupe les fonctions HACCP, la mémoire documentaire,
+ΣIRIUS Entreprise regroupe les fonctions HACCP, la mémoire documentaire,
 l'audit et les intégrations de productivité dans un espace de travail isolé.
 Cette version est conçue pour une petite équipe et doit être utilisée avec des
 données de test avant toute mise en production réglementaire.
 
 ## Mise en route
 
-1. Installer la version Windows depuis la [release SIRIUS](https://github.com/bleudpart/sirius/releases).
+1. Installer la version Windows depuis la [release ΣIRIUS](https://github.com/bleudpart/sirius/releases).
 2. Créer le premier compte administrateur.
 3. Ouvrir le contexte **Entreprise** et créer l'entreprise.
 4. Ajouter les membres de l'équipe et attribuer leurs rôles.
@@ -126,7 +126,7 @@ une restauration sur une machine de test.
 ## Outlook et calendrier
 
 Les connexions Microsoft Graph et Google Agenda utilisent OAuth. Les mots de
-passe ne sont jamais demandés à SIRIUS. Avant une mise en production, vérifier
+passe ne sont jamais demandés à ΣIRIUS. Avant une mise en production, vérifier
 les permissions accordées, le fuseau horaire, la lecture des événements et la
 confirmation humaine avant l'envoi d'un e-mail ou la création d'un rendez-vous.
 
@@ -160,7 +160,7 @@ message, la création d'un événement et l'export d'un document de test.
 - vérifier les connexions Outlook/Google sans stocker de secrets dans le dépôt ;
 - exécuter les tests backend et le build frontend avant publication.
 
-SIRIUS facilite le suivi et la préparation documentaire. Les décisions
+ΣIRIUS facilite le suivi et la préparation documentaire. Les décisions
 sanitaires, comptables, juridiques et réglementaires doivent rester validées
 par une personne compétente.
 

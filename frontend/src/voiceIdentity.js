@@ -19,7 +19,7 @@ export function voiceIdentityGuidance(status) {
 const readJson = async (response) => {
   const data = await response.json();
   if (!response.ok) throw new Error(response.status === 401
-    ? "Session expirée. Reconnectez-vous à Sirius pour utiliser votre profil vocal."
+    ? "Session expirée. Reconnectez-vous à ΣIRIUS pour utiliser votre profil vocal."
     : typeof data?.detail === "string" ? data.detail : "Vérification vocale indisponible. Utilisez le bouton maintenu.");
   return data;
 };

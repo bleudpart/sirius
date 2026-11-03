@@ -44,7 +44,7 @@ class NativeAutomation {
     if (!this.options.notifications) return;
     const token = this.token;
     const notification = new this.Notification({
-      title: "SIRIUS", body: "Un événement attend votre consultation dans les automatisations Windows.",
+      title: "ΣIRIUS", body: "Un événement attend votre consultation dans les automatisations Windows.",
     });
     this.notifications.add(notification);
     notification.on("click", () => {
@@ -77,7 +77,7 @@ class NativeAutomation {
     if (options.notifications && !this.Notification.isSupported()) throw new Error("Notifications Windows indisponibles.");
     if (options.shortcut && !this.options.shortcut) {
       const registered = this.globalShortcut.register(SHORTCUT, () => {
-        this.focus(); this.record("shortcut", "SIRIUS appelé par Ctrl+Alt+S.");
+        this.focus(); this.record("shortcut", "ΣIRIUS appelé par Ctrl+Alt+S.");
       });
       if (!registered) throw new Error("Ctrl+Alt+S est déjà utilisé. Le raccourci n'a pas été activé.");
     } else if (!options.shortcut && this.options.shortcut) this.globalShortcut.unregister(SHORTCUT);

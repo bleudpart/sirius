@@ -100,7 +100,7 @@ export default function TaskWindows({ tasks, onClose }) {
         </button>
       </header>
       <div className="task-console-list">
-        {!visibleTasks.length && <p className="task-console-empty">Aucune tâche en cours. Les analyses, recherches et résultats de Sirius apparaîtront ici.</p>}
+        {!visibleTasks.length && <p className="task-console-empty">Aucune tâche en cours. Les analyses, recherches et résultats de ΣIRIUS apparaîtront ici.</p>}
         {visibleTasks.map((task) => {
           const badge = task.status === "done" ? "TERMINÉ" : task.status === "error" ? "ERREUR" : "EN COURS";
           return (

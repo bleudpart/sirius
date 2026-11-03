@@ -28,7 +28,7 @@ plus bas, après le parcours d'achat. Aucun gain de temps ni conformité comptab
 n'est présenté comme démontré.
 
 Le scanner est accessible dans la médiathèque et dans « Mes dossiers ». Il conserve
-la photo originale sur le serveur SIRIUS après confirmation. La lecture du texte
+la photo originale sur le serveur ΣIRIUS après confirmation. La lecture du texte
 se fait localement avec les ressources OCR embarquées ; les champs extraits doivent
 être relus avant enregistrement. Le mode Achat prépare une fiche de dépense ;
 le mode Vente prépare un brouillon de facture non émis.

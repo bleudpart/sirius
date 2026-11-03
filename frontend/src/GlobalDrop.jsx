@@ -66,7 +66,7 @@ export default function GlobalDrop() {
           <div className="gdrop-box">
             <UploadCloud size={34} />
             <b>Déposez vos fichiers</b>
-            <span>Sirius les enregistre dans la médiathèque</span>
+            <span>ΣIRIUS les enregistre dans la médiathèque</span>
           </div>
         </div>
       )}

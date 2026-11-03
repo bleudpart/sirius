@@ -75,7 +75,7 @@ export default function ActionInitiatives({ auditOnly, onReview }) {
     <h3>Déclencheurs proactifs locaux · sans appel IA</h3>
     <p>Après activation, contrôle toutes les quinze minutes des vingt parcours non expirés les plus récents,
       créés depuis au moins quinze minutes. Un blocage ou un accord en attente produit une proposition
-      consultable ici, sans exécuter ni reprendre le parcours. SIRIUS connecté doit rester allumé.</p>
+      consultable ici, sans exécuter ni reprendre le parcours. ΣIRIUS connecté doit rester allumé.</p>
     <p>Le contrôle fonctionne côté serveur même si ce panneau est fermé. Aucun courriel, notification OS,
       paiement, code modifié ou appel fournisseur n'est déclenché par ce contrôle.</p>
     {error && <p role="alert">{error}</p>}

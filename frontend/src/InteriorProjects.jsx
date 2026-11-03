@@ -42,7 +42,7 @@ export default function InteriorProjects({ draft, renderPlan }) {
   const project = selected || draft;
   return <section className="interior-projects fp-card" aria-label="Projets avant et après">
     <h3>Mes projets · Avant / Après</h3>
-    <p>Emplacement SIRIUS : <strong>Médiathèque → {INTERIOR_PROJECT_FOLDER}</strong>. Fichiers conservés sur le stockage SIRIUS de votre compte, pas dans un dossier du téléphone.</p>
+    <p>Emplacement ΣIRIUS : <strong>Médiathèque → {INTERIOR_PROJECT_FOLDER}</strong>. Fichiers conservés sur le stockage ΣIRIUS de votre compte, pas dans un dossier du téléphone.</p>
     <label>Nom du projet<input maxLength={100} value={name} placeholder={draft?.name || "Ex. Salon à rénover"} onChange={(event) => setName(event.target.value)} /></label>
     <div className="interior-project-actions">
       <button type="button" disabled={!draft || busy} onClick={save} data-testid="interior-save-project">Enregistrer la proposition avant / après</button>

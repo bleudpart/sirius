@@ -628,7 +628,7 @@ export default function ThemisPanel({ onClose, initialSource }) {
                 ? <span className="th-drop-busy">LECTURE DE LA PIÈCE EN COURS — extraction IA de la date, du fournisseur et des montants…</span>
                 : <span>Déposez ici une facture PDF ou un document scanné (PNG, JPG) — Thémis lit automatiquement la date, le fournisseur, le HT, la TVA et le TTC.</span>}
             </div>
-            {!groqKey() && <p className="th-note">Astuce : renseignez votre clé Groq dans les réglages de Sirius pour activer la lecture automatique (OCR) des pièces.</p>}
+            {!groqKey() && <p className="th-note">Astuce : renseignez votre clé Groq dans les réglages de ΣIRIUS pour activer la lecture automatique (OCR) des pièces.</p>}
             <table className="th-table" data-testid="themis-pieces-table"><tbody>
               {pieces.map((p) => (
                 <tr key={p.id} className={p.status === "à_payer" ? "" : "th-paid"}>
@@ -711,7 +711,7 @@ export default function ThemisPanel({ onClose, initialSource }) {
         {tab === "byok" && (
           <div className="th-form-card th-byok" data-testid="themis-byok">
             <div className="th-section-title">BYOK — VOS PROPRES CLÉS API</div>
-            <p className="th-note">Vos clés restent stockées localement dans ce navigateur. Les identifiants SMTP ne transitent par votre serveur Sirius qu’au moment d’un envoi, sans jamais y être conservés.</p>
+            <p className="th-note">Vos clés restent stockées localement dans ce navigateur. Les identifiants SMTP ne transitent par votre serveur ΣIRIUS qu’au moment d’un envoi, sans jamais y être conservés.</p>
             {[["stripe", "Clé API Paiements (Stripe, PayPal…)"], ["compta", "Clé API Comptabilité (Pennylane, QuickBooks…)"], ["autre", "Autre clé / service personnalisé"]].map(([k, label]) => (
               <div key={k}>
                 <label className="th-label">{label}</label>

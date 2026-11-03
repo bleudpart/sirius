@@ -138,14 +138,14 @@ public class SiriusPlaybackService extends Service {
         try {
             NotificationManager notifications = getSystemService(NotificationManager.class);
             if (Build.VERSION.SDK_INT >= 26) notifications.createNotificationChannel(new NotificationChannel(
-                CHANNEL, "Lecture vocale Sirius", NotificationManager.IMPORTANCE_LOW));
+                CHANNEL, "Lecture vocale ΣIRIUS", NotificationManager.IMPORTANCE_LOW));
             mediaSession = new MediaSession(this, "SiriusVoice");
             mediaSession.setCallback(new MediaSession.Callback() {
                 @Override public void onStop() { cancel(null); }
                 @Override public void onPause() { cancel(null); }
             });
             mediaSession.setMetadata(new MediaMetadata.Builder()
-                .putString(MediaMetadata.METADATA_KEY_TITLE, "Lecture vocale Sirius").build());
+                .putString(MediaMetadata.METADATA_KEY_TITLE, "Lecture vocale ΣIRIUS").build());
             mediaSession.setActive(true);
             startForeground(NOTIFICATION, notification());
             AudioAttributes attributes = attributes();
@@ -191,7 +191,7 @@ public class SiriusPlaybackService extends Service {
         Intent open = getPackageManager().getLaunchIntentForPackage(getPackageName());
         Notification.Builder builder = Build.VERSION.SDK_INT >= 26
             ? new Notification.Builder(this, CHANNEL) : new Notification.Builder(this);
-        builder.setSmallIcon(android.R.drawable.ic_media_play).setContentTitle("Sirius")
+        builder.setSmallIcon(android.R.drawable.ic_media_play).setContentTitle("ΣIRIUS")
             .setContentText("Lecture vocale en cours").setOngoing(true).setOnlyAlertOnce(true)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .addAction(new Notification.Action.Builder(android.R.drawable.ic_media_pause,

@@ -183,7 +183,7 @@ public class SiriusHaccpPrinterPlugin extends Plugin {
 
     private void begin(PluginCall call, boolean test) {
         if (!foreground || getActivity() == null || getActivity().isFinishing()) {
-            call.reject("Gardez SIRIUS au premier plan pour imprimer."); return;
+            call.reject("Gardez ΣIRIUS au premier plan pour imprimer."); return;
         }
         if (!busy.compareAndSet(false, true)) { call.reject("Impression deja en cours, aucun nouvel envoi."); return; }
         try {
@@ -241,7 +241,7 @@ public class SiriusHaccpPrinterPlugin extends Plugin {
         boolean accepted = false;
         String detail = "Impression non confirmee.";
         try {
-            if (!foreground || finished.get()) throw new IllegalStateException("SIRIUS n'est plus au premier plan.");
+            if (!foreground || finished.get()) throw new IllegalStateException("ΣIRIUS n'est plus au premier plan.");
             PrinterDriverGenerateResult opened = PrinterDriverGenerator.openChannel(Channel.newWifiChannel(ip));
             if (opened.getError().getCode() != OpenChannelError.ErrorCode.NoError) {
                 throw new IllegalStateException("Connexion Brother : " + opened.getError().getCode());

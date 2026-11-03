@@ -27,7 +27,7 @@ export default function VoiceDiagnosticPanel({ onClose, onProfile, onSettings, c
   }, [collect, revision]);
   return <section className="prime-screen voice-diagnostic-panel" role="dialog" aria-labelledby="voice-diagnostic-title"
     onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); onClose(); } }}>
-    <header><h2 id="voice-diagnostic-title">Vérifier Sirius</h2>
+    <header><h2 id="voice-diagnostic-title">Vérifier ΣIRIUS</h2>
       <button ref={closeButton} type="button" onClick={onClose}>Fermer le diagnostic</button></header>
     <p>Contrôles limités, sans ouvrir le microphone, sans enregistrer votre voix et sans lancer de synthèse vocale.
       Le serveur est interrogé avec votre session ; aucun extrait audio n'est envoyé.</p>

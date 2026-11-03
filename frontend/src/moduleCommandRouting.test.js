@@ -78,6 +78,30 @@ test("restores the matching pill and still executes the real module open action"
   expect(runModule).toHaveBeenCalledWith(opened);
 });
 
+const brandedModules = [
+  { id: "prime", label: "ΣIRIUS PRIME — mémoire" },
+  { id: "memory", label: "Ce que ΣIRIUS sait sur moi" },
+  { id: "enterprise", label: "ΣIRIUS ENTREPRISE — équipe, audit & sauvegardes" },
+  { id: "info-hub", label: "Centre d'information ΣIRIUS" },
+  { id: "reload", label: "Recharger ΣIRIUS" },
+];
+
+test.each([
+  ["ouvre sirius prime", "prime"],
+  ["ouvre ce que sirius sait sur moi", "memory"],
+  ["ouvre sirius entreprise", "enterprise"],
+  ["ouvre le centre d'information sirius", "info-hub"],
+  ["lance recharger sirius", "reload"],
+  ["ouvre ΣIRIUS PRIME", "prime"],
+])("la marque ΣIRIUS reste prononçable pour ouvrir un module: %s", (command, expectedId) => {
+  expect(findModuleForCommand(command, brandedModules, MODULE_ALIASES).item?.id).toBe(expectedId);
+});
+
+test("une pastille de dock ΣIRIUS correspond au module ΣIRIUS", () => {
+  expect(dockTitleMatchesModule("ΣIRIUS PRIME — MÉMOIRE", brandedModules[0], MODULE_ALIASES)).toBe(true);
+  expect(dockTitleMatchesModule("ΣIRIUS ENTREPRISE", brandedModules[0], MODULE_ALIASES)).toBe(false);
+});
+
 test("generic camera opens Vision while facial capture opens Face ID", () => {
   expect(findModuleForCommand("ouvre la caméra", modules, MODULE_ALIASES).item?.id).toBe("vision");
   expect(findModuleForCommand("ouvre la caméra faciale", modules, MODULE_ALIASES).item?.id).toBe("faceid");

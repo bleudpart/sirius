@@ -4,7 +4,7 @@ import { voiceIdentityStatus, voiceIdentityGuidance } from "./voiceIdentity";
 async function serviceStatus({ signal }) {
   return withBackendResponse("/setup/status", { method: "GET" }, async (response) => {
     if (!response.ok) throw new Error(response.status === 401
-      ? "Session expirée : reconnectez-vous à Sirius."
+      ? "Session expirée : reconnectez-vous à ΣIRIUS."
       : `Le serveur répond avec une erreur HTTP ${response.status}.`);
     const data = await response.json();
     if (!Array.isArray(data?.services)) throw new Error("Réponse du serveur invalide. Vérifiez sa mise à jour.");

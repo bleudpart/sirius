@@ -226,7 +226,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
   const testVoice = () => {
     if (voiceTesting) return;
     setVoiceTesting(true);
-    speakFr("Bonjour, je suis Sirius, votre assistant personnel. Comment puis-je vous aider aujourd'hui ?", { onend: () => setVoiceTesting(false) });
+    speakFr("Bonjour, je suis ΣIRIUS, votre assistant personnel. Comment puis-je vous aider aujourd'hui ?", { onend: () => setVoiceTesting(false) });
   };
 
   // IA : mode Rapide (Groq direct) / Profond (Kimi + Groq)
@@ -314,7 +314,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
     const v = s?.version ? ` ${s.version}` : "";
     if (s?.phase === "ready") {
       setUpdateProgress({ phase: "ready", percent: 100 });
-      setUpdateStatus(`Mise à jour${v} prête — fermez SIRIUS pour l'installer.`);
+      setUpdateStatus(`Mise à jour${v} prête — fermez ΣIRIUS pour l'installer.`);
       return true;
     }
     if (s?.phase === "error") {
@@ -342,7 +342,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
     setUpdateStatus("Vérification en cours...");
     const result = await window.siriusUpdates.check();
     if (!result?.ok) { setUpdateStatus("Vérification impossible pour le moment."); return; }
-    if (!result.available) { setUpdateStatus("SIRIUS est à jour."); return; }
+    if (!result.available) { setUpdateStatus("ΣIRIUS est à jour."); return; }
     if (!window.siriusUpdates.status) {
       setUpdateStatus("Nouvelle version détectée. Téléchargement en cours...");
       return;
@@ -480,7 +480,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
             <label className="setup-label">Centres d'intérêt</label>
             <textarea className="setup-input setup-textarea" value={profile.interests} onChange={setP("interests")} placeholder="Ex : astronomie, football, cuisine..." data-testid="setup-interests" rows={2} />
             <label className="setup-label">Mon style d'écriture <span className="setup-tag opt">Ghost Writer</span></label>
-            <textarea className="setup-input setup-textarea" value={profile.style} onChange={setP("style")} placeholder="Collez 2-3 exemples de textes que VOUS avez écrits. Sirius imitera votre style avec « écris ... comme moi »." data-testid="setup-style" rows={3} />
+            <textarea className="setup-input setup-textarea" value={profile.style} onChange={setP("style")} placeholder="Collez 2-3 exemples de textes que VOUS avez écrits. ΣIRIUS imitera votre style avec « écris ... comme moi »." data-testid="setup-style" rows={3} />
             <label className="setup-label"><Music size={13} style={{ marginRight: 6, verticalAlign: "-2px" }} />Service musique</label>
             <select className="setup-input" value={musicSource} onChange={(e) => setMusicSource(e.target.value)} data-testid="setup-music-source">
               <option value="ask">Me demander à chaque fois</option>
@@ -491,7 +491,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
               <QRCodeSVG value="https://sirius-assistant.fr/" size={92} bgColor="#dff8ff" fgColor="#061321" level="M" includeMargin />
               <div>
                 <b>RETROUVER ΣIRIUS</b>
-                <span>Scannez pour découvrir le store SIRIUS.</span>
+                <span>Scannez pour découvrir le store ΣIRIUS.</span>
               </div>
             </div>
           </section>
@@ -777,7 +777,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
               <button type="button" className={`setup-mode ${readAloudOn ? "active" : ""}`}
                 onClick={() => { localStorage.setItem("sirius_read_aloud", "on"); setReadAloudOn(true); }} data-testid="setup-readaloud-on">
                 <b>ACTIVÉE</b>
-                <span>Sirius propose de lire les contenus affichés.</span>
+                <span>ΣIRIUS propose de lire les contenus affichés.</span>
               </button>
               <button type="button" className={`setup-mode ${!readAloudOn ? "active" : ""}`}
                 onClick={() => { localStorage.setItem("sirius_read_aloud", "off"); setReadAloudOn(false); }} data-testid="setup-readaloud-off">
@@ -785,7 +785,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
                 <span>Aucune proposition de lecture.</span>
               </button>
             </div>
-            <p className="setup-note">Sur Android, pas de pastille : dites « Sirius, lis Zeus Cortex ».</p>
+            <p className="setup-note">Sur Android, pas de pastille : dites « ΣIRIUS, lis Zeus Cortex ».</p>
             <label className="setup-label"><Volume2 size={13} style={{ marginRight: 6, verticalAlign: "-2px" }} />Confirmations vocales des actions</label>
             <div className="setup-modes">
               <button type="button" className={`setup-mode ${actionConfirmOn ? "active" : ""}`}
@@ -811,7 +811,7 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
         {tab === "stockage" && (
           <section className="setup-section setup-single" data-testid="setup-panel-stockage">
             <label className="setup-label"><HardDrive size={13} style={{ marginRight: 6, verticalAlign: "-2px" }} />Stockage NAS <span className="setup-tag opt">préparation</span></label>
-            <p className="setup-note">Préparez le chemin du serveur. Sirius utilisera ce stockage dès que le NAS sera disponible sur votre réseau.</p>
+            <p className="setup-note">Préparez le chemin du serveur. ΣIRIUS utilisera ce stockage dès que le NAS sera disponible sur votre réseau.</p>
             <label className="setup-label">Chemin du partage ou URL WebDAV</label>
             <input
               className="setup-input"

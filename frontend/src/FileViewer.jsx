@@ -76,7 +76,7 @@ export default function FileViewer({ file, onClose, onSaved }) {
       if (!r.ok) throw new Error(d.detail || "Enregistrement impossible");
       setDirty(false); setDraftAvailable(false);
       try { localStorage.removeItem(draftKey); } catch {}
-      flash("Enregistré dans Sirius ✓");
+      flash("Enregistré dans ΣIRIUS ✓");
       if (onSaved) onSaved();
     } catch (e) { flash(e.message); }
     setSaving(false);

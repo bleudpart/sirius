@@ -231,7 +231,7 @@ export default function PantheonSystem({ onClose, keys }) {
               <div className="pantheon-hint">
                 Activation (1 min, gratuit) : ajoutez <b>+34 644 05 92 17</b> à vos contacts, envoyez-lui sur WhatsApp
                 « <b>I allow callmebot to send me messages</b> », puis collez ici la clé API reçue en réponse.
-                Sirius vous écrira quand une action Alpha Vantage varie de ±2 % ou plus.
+                ΣIRIUS vous écrira quand une action Alpha Vantage varie de ±2 % ou plus.
               </div>
             </>
           )}

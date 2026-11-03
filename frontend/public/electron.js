@@ -29,9 +29,9 @@ if (!hasSingleInstanceLock) {
   // comme « ça ne démarre pas ». On affiche désormais un message explicite (utilisable
   // avant même que l'app soit "ready") pour que l'utilisateur sache quoi faire.
   dialog.showErrorBox(
-    "SIRIUS — déjà en cours d'exécution",
-    "Une autre instance de SIRIUS semble déjà active (peut-être masquée ou bloquée en arrière-plan après un redémarrage).\n\n" +
-      "Ouvrez le Gestionnaire des tâches (Ctrl+Maj+Échap), cherchez un processus « SIRIUS » ou « electron.exe », terminez-le, puis relancez l'application."
+    "ΣIRIUS — déjà en cours d'exécution",
+    "Une autre instance de ΣIRIUS semble déjà active (peut-être masquée ou bloquée en arrière-plan après un redémarrage).\n\n" +
+      "Ouvrez le Gestionnaire des tâches (Ctrl+Maj+Échap), cherchez un processus « ΣIRIUS » ou « electron.exe », terminez-le, puis relancez l'application."
   );
   app.quit();
 }
@@ -75,7 +75,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 680,
     backgroundColor: "#061321",
-    title: "SIRIUS",
+    title: "ΣIRIUS",
     autoHideMenuBar: true,
     icon: path.join(__dirname, "icon.ico"),
     webPreferences: {
@@ -181,7 +181,7 @@ app.whenReady().then(async () => {
       });
     } catch (error) {
       dialog.showErrorBox(
-        "SIRIUS — démarrage impossible",
+        "ΣIRIUS — démarrage impossible",
         `${error.message}\n\nConsultez backend.log dans ${app.getPath("userData")}.`
       );
       app.quit();
@@ -273,7 +273,7 @@ app.whenReady().then(async () => {
     return error ? { ok: false, error } : { ok: true };
   });
   ipcMain.handle("sirius-capture-interface", async (_event, region) => {
-    if (!mainWindow || mainWindow.isDestroyed()) return { ok: false, error: "Fenêtre SIRIUS indisponible." };
+    if (!mainWindow || mainWindow.isDestroyed()) return { ok: false, error: "Fenêtre ΣIRIUS indisponible." };
     try {
       const rect = captureRectangle(region, mainWindow.getContentBounds());
       const image = await mainWindow.webContents.capturePage(rect);

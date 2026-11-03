@@ -85,7 +85,7 @@ async def active_account(db, uid):
         raise HTTPException(401, "Compte indisponible.")
     status = await access_status(db, user)
     if not status.get("allowed"):
-        raise HTTPException(402, status.get("detail") or "Accès SIRIUS indisponible.")
+        raise HTTPException(402, status.get("detail") or "Accès ΣIRIUS indisponible.")
 
 
 async def verify_pubsub(request):

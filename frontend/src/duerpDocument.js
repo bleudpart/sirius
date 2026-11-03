@@ -47,7 +47,7 @@ La cotation tient compte des mesures existantes ; l'efficacité des actions futu
 <p class="signature">Validation de l'employeur / responsable : ____________________ Date : __________ Signature : ____________________</p>
 <p class="note">Document de travail à compléter et à valider avec les personnes concernées.
 Les mentions « À compléter » signalent des informations absentes. L'absence de risques saisis ne signifie pas une absence de risques.
-Distinct du PMS et de l'audit HACCP : aucune conformité réglementaire ou efficacité des mesures n'est certifiée par SIRIUS.
+Distinct du PMS et de l'audit HACCP : aucune conformité réglementaire ou efficacité des mesures n'est certifiée par ΣIRIUS.
 Conserver les versions et organiser leur mise à jour, leur accès et leur archivage selon les obligations applicables.</p>
 </body></html>`;
 }

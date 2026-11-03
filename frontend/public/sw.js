@@ -64,7 +64,7 @@ self.addEventListener("fetch", (event) => {
 
 // Notifications push SIRIUS
 self.addEventListener("push", (event) => {
-  let data = { title: "SIRIUS", body: "", url: "/" };
+  let data = { title: "ΣIRIUS", body: "", url: "/" };
   try { data = Object.assign(data, event.data.json()); } catch (e) {}
   event.waitUntil(
     self.registration.showNotification(data.title, {

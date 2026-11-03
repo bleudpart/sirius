@@ -10,11 +10,11 @@ export default function PublicAccount() {
       <p className="public-account-notice">
         Créer un compte est gratuit et ne nécessite aucun paiement.
         La création du compte ne vaut pas achat ni activation d’un abonnement.
-        Utilisez ce même compte dans l’application SIRIUS.
+        Utilisez ce même compte dans l’application ΣIRIUS.
       </p>
       {user ? (
         <section className="public-account-success" aria-labelledby="public-account-title">
-          <h1 id="public-account-title">Votre compte SIRIUS est prêt</h1>
+          <h1 id="public-account-title">Votre compte ΣIRIUS est prêt</h1>
           <p role="status">Connexion réussie{user.name ? `, ${user.name}` : ""}.</p>
           <p>Connectez-vous dans l’application avec la même adresse e-mail et le même mot de passe.
             Les fonctions disponibles dépendent de vos droits d’accès.</p>

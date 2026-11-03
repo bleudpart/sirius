@@ -66,7 +66,7 @@ function addLocalShutdownMiddleware(middlewares) {
 
       if (!fs.existsSync(SHUTDOWN_SCRIPT)) {
         res.writeHead(503, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ detail: "Contrôleur d'arrêt SIRIUS introuvable." }));
+        res.end(JSON.stringify({ detail: "Contrôleur d'arrêt ΣIRIUS introuvable." }));
         return;
       }
 
@@ -76,7 +76,7 @@ function addLocalShutdownMiddleware(middlewares) {
       } catch (error) {
         console.error("Configuration du backend SIRIUS invalide.", error);
         res.writeHead(500, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ detail: "Configuration du backend SIRIUS invalide." }));
+        res.end(JSON.stringify({ detail: "Configuration du backend ΣIRIUS invalide." }));
         return;
       }
 

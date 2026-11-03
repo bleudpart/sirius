@@ -41,7 +41,7 @@ export function localAnswer(c) {
   if (/(bonjour|bonsoir|salut|coucou|hello)/.test(normalized)) return `Bonjour. Tous mes systèmes sont en ligne.`;
   if (/(ca va|comment vas|comment tu vas|tu vas bien)/.test(normalized)) return `Je fonctionne parfaitement. Merci de demander.`;
   if (/(merci)/.test(normalized)) return `Je vous en prie. C'est un plaisir.`;
-  if (/(ton nom|qui es tu|comment tu t appelles|c est quoi ton nom)/.test(normalized)) return `Je suis Sirius, votre assistant personnel.`;
+  if (/(ton nom|qui es tu|comment tu t appelles|c est quoi ton nom)/.test(normalized)) return `Je suis ΣIRIUS, votre assistant personnel.`;
   if (/(ton createur|qui t a cree|qui ta cree)/.test(normalized)) return `J'ai été créé par Partel.`;
   if (/(au revoir|a bientot|bonne nuit)/.test(normalized)) return `À ton service. À très bientôt.`;
   if (/(arrete|stop|silence|tais toi|coupe la musique)/.test(normalized)) return `Je n'ai pas pu joindre le cerveau distant, mais aucune action n'a été envoyée.`;

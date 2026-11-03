@@ -156,7 +156,7 @@ internal sealed class VaultForm : Form
 
     public VaultForm()
     {
-        Text = "SIRIUS — Coffre portable";
+        Text = "ΣIRIUS — Coffre portable";
         ClientSize = new Size(590, 610);
         MinimumSize = new Size(520, 640);
         StartPosition = FormStartPosition.CenterScreen;
@@ -169,7 +169,7 @@ internal sealed class VaultForm : Form
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         layout.AutoScroll = true;
         Controls.Add(layout);
-        AddWide(new Label { Text = "Créez votre sauvegarde, puis importez-la dans SIRIUS.\nAucun réseau. Laissez les services inutilisés vides.", AutoSize = true, Margin = new Padding(0, 0, 0, 16) });
+        AddWide(new Label { Text = "Créez votre sauvegarde, puis importez-la dans ΣIRIUS.\nAucun réseau. Laissez les services inutilisés vides.", AutoSize = true, Margin = new Padding(0, 0, 0, 16) });
         foreach (var service in new[] {
             new[] { "cerebras", "Cerebras" }, new[] { "groq_key", "Groq (voix)" },
             new[] { "serp", "SerpAPI" }, new[] { "fal", "fal.ai" },
@@ -227,7 +227,7 @@ internal sealed class VaultForm : Form
         }
         string destination;
         using (var dialog = new SaveFileDialog {
-            Filter = "Coffre SIRIUS (*.vault)|*.vault", FileName = "sirius.vault",
+            Filter = "Coffre ΣIRIUS (*.vault)|*.vault", FileName = "sirius.vault",
             DefaultExt = "vault", AddExtension = true, OverwritePrompt = true
         })
         {
@@ -256,7 +256,7 @@ internal sealed class VaultForm : Form
             password.Clear();
             confirmation.Clear();
             status.ForeColor = Color.DarkGreen;
-            status.Text = "Coffre créé : " + destination + "\nDans SIRIUS : Clés API et services → Importer mon coffre.";
+            status.Text = "Coffre créé : " + destination + "\nDans ΣIRIUS : Clés API et services → Importer mon coffre.";
         }
         catch (Exception error)
         {

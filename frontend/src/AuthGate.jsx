@@ -378,7 +378,7 @@ export function ProfilePanel({ user, access = null, onClose, onUpdate, onLogout 
             onChange={(e) => setSignatureEmail(e.target.value)} autoComplete="email" data-testid="profile-signature-email" />
           {saveError && <div className="profile-save-error" role="alert">{saveError}</div>}
         </section>
-        <label className="profile-label">PRÉFÉRENCES PERSONNELLES (Sirius en tiendra compte)</label>
+        <label className="profile-label">PRÉFÉRENCES PERSONNELLES (ΣIRIUS en tiendra compte)</label>
         <textarea className="profile-input" rows={4} value={notes} placeholder="Ex. : je préfère des réponses courtes, je travaille dans la restauration…"
           onChange={(e) => setNotes(e.target.value)} data-testid="profile-notes-input" />
         <div className="gcal-toolbar">

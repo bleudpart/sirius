@@ -643,7 +643,7 @@ def test_setup_test_chat_trial_uses_owner_with_quota_and_admin_exemption(server_
     status = client.get("/api/setup/status").json()
     assert {s["id"]: s["state"] for s in status["services"]}["groq"] == "configured"
     first = client.post("/api/setup/test-chat", json={"keys": {}})
-    assert first.json() == {"ok": True, "provider": "groq", "message": "Connexion Groq réussie avec l'essai SIRIUS.", "source": "local"}
+    assert first.json() == {"ok": True, "provider": "groq", "message": "Connexion Groq réussie avec l'essai ΣIRIUS.", "source": "local"}
     assert "owner-private" not in first.text
     assert client.post("/api/setup/test-chat", json={"keys": {}}).status_code == 429
     assert client.post("/api/setup/test-chat", json={"keys": {"groq_key": "personal"}}).json()["ok"] is True
@@ -724,7 +724,7 @@ def test_setup_test_chat_active_trial_with_unrelated_keys_uses_owner_chat(server
     asyncio.run(db.users.update_one({"user_id": user["user_id"]}, {"$set": {"trial_started_at": access.utc_now()}}))
     keys = {"gmaps": "personal-maps", "fal": "personal-fal"}
     first = client.post("/api/setup/test-chat", json={"keys": keys})
-    assert first.json() == {"ok": True, "provider": "groq", "message": "Connexion Groq réussie avec l'essai SIRIUS.", "source": "local"}
+    assert first.json() == {"ok": True, "provider": "groq", "message": "Connexion Groq réussie avec l'essai ΣIRIUS.", "source": "local"}
     assert client.post("/api/setup/test-chat", json={"keys": keys}).status_code == 429
     assert calls == ["api.groq.com"] and _usage(db, user) == 1
     assert all(s not in first.text for s in ("owner-private", "personal-maps", "personal-fal"))

@@ -70,7 +70,7 @@ export function parseVault(text) {
     throw new Error("Coffre trop volumineux.");
   }
   let envelope;
-  try { envelope = JSON.parse(text); } catch { throw new Error("Ce fichier n'est pas un coffre SIRIUS valide."); }
+  try { envelope = JSON.parse(text); } catch { throw new Error("Ce fichier n'est pas un coffre ΣIRIUS valide."); }
   if (!envelope || envelope.format !== "sirius.vault" || envelope.version !== 1
     || envelope.kdf !== "PBKDF2-SHA256" || envelope.iterations !== ITERATIONS || envelope.cipher !== "AES-256-GCM") {
     throw new Error("Format de coffre non pris en charge.");

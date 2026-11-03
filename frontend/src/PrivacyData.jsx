@@ -23,7 +23,7 @@ export default function PrivacyData({ onOpenAccount, onMemory, onConnections }) 
         {" "}Les voix et possibilités hors ligne dépendent du système. La transcription du microphone est distincte de la lecture vocale.</dd>
       <dt><strong>Vérification du locuteur en écoute continue</strong></dt>
       <dd>Cette écoute nécessite un profil vocal serveur créé volontairement dans « Ma voix et ma diction ».
-        Après consentement, trois nouvelles références et les extraits à vérifier sont transmis au serveur Sirius.
+        Après consentement, trois nouvelles références et les extraits à vérifier sont transmis au serveur ΣIRIUS.
         Le serveur conserve une empreinte biométrique personnelle, pas les fichiers audio de référence.
         Les exemples de la bibliothèque locale ne sont jamais envoyés automatiquement.
         Une phrase refusée n'est pas transcrite ; une phrase acceptée peut ensuite être envoyée au fournisseur STT habituel.
@@ -35,15 +35,15 @@ export default function PrivacyData({ onOpenAccount, onMemory, onConnections }) 
       <dt><strong>Téléphone Vapi, facultatif</strong></dt>
       <dd>Les appels réels transmettent l'audio, l'objectif et la conversation à Vapi et aux fournisseurs vocaux/IA configurés.
         Les sortants nécessitent votre confirmation ARIANE, les entrants une autorisation distincte.
-        SIRIUS ne conserve ni audio ni transcription téléphonique, mais garde les numéros sortants, références,
+        ΣIRIUS ne conserve ni audio ni transcription téléphonique, mais garde les numéros sortants, références,
         états, coûts rapportés et paramètres des parcours jusqu'à leur effacement.
         L'export et la suppression du compte couvrent ces données serveur, pas les données conservées chez Vapi.
         Désactiver les entrants ou arrêter un parcours ne raccroche pas un appel déjà en cours.</dd>
       <dt><strong>Raycast et réunions Discord/Slack, facultatifs</strong></dt>
       <dd>Raycast envoie seulement vos questions explicites et consulte les réunions du compte connecté.
         Le bot Discord demande l'accord individuel des participants avant toute réception audio.
-        Les fragments audio sont transmis au moteur STT SIRIUS configuré, les transcriptions à Cerebras pour synthèse.
-        SIRIUS conserve texte, participants, accords déclarés et propositions ; aucun fichier audio n'est sauvegardé par le bot.
+        Les fragments audio sont transmis au moteur STT ΣIRIUS configuré, les transcriptions à Cerebras pour synthèse.
+        ΣIRIUS conserve texte, participants, accords déclarés et propositions ; aucun fichier audio n'est sauvegardé par le bot.
         Les tâches doivent être validées et affectées nominativement dans un dossier privé, sans notification inter-compte.
         Slack reçoit uniquement la synthèse et les tâches validées après confirmation de publication ; aucun audio de Huddle n'est capturé.
         L'effacement d'une réunion ne supprime pas ses tâches déjà enregistrées ni les publications Slack ou les données des fournisseurs.</dd>
@@ -56,11 +56,11 @@ export default function PrivacyData({ onOpenAccount, onMemory, onConnections }) 
         L'effacement du compte ne supprime pas les données déjà reçues par Zapier ou ses destinations.</dd>
       <dt><strong>WhatsApp et synchronisation Google Workspace, facultatifs</strong></dt>
       <dd>La liaison WhatsApp demande un code à envoyer depuis votre numéro à la ligne professionnelle configurée.
-        Meta transmet les textes reçus à la boîte SIRIUS du compte lié ; les expéditeurs non liés sont ignorés.
+        Meta transmet les textes reçus à la boîte ΣIRIUS du compte lié ; les expéditeurs non liés sont ignorés.
         Aucun message entrant ne déclenche d'action ni de réponse automatique.
         Google fournit un instantané limité de votre boîte Gmail et des événements à venir, pas une sauvegarde complète.
-        Les notifications de changement ne contiennent pas le corps des e-mails ; SIRIUS relit les métadonnées autorisées.
-        Les nouveaux envois WhatsApp/Gmail et événements de cette intégration nécessitent un aperçu et une confirmation dans SIRIUS.
+        Les notifications de changement ne contiennent pas le corps des e-mails ; ΣIRIUS relit les métadonnées autorisées.
+        Les nouveaux envois WhatsApp/Gmail et événements de cette intégration nécessitent un aperçu et une confirmation dans ΣIRIUS.
         Déconnecter arrête les prochains traitements, mais ne rappelle pas un envoi déjà engagé et n'efface pas les copies chez Meta ou Google.</dd>
       <dt><strong>Alexa et Smart Life/Tuya, facultatifs</strong></dt>
       <dd>Deux liaisons distinctes séparent la lecture des dossiers et synthèses du contrôle domotique.
@@ -68,7 +68,7 @@ export default function PrivacyData({ onOpenAccount, onMemory, onConnections }) 
         Les paroles d'Alexa peuvent être entendues près de l'enceinte.
         Tuya reçoit les commandes des lampes et prises sélectionnées ; elles ne demandent pas de nouvelle confirmation vocale.
         N'autorisez aucune prise alimentant un appareil dangereux, un chauffage ou un équipement de sécurité.
-        SIRIUS conserve les autorisations jusqu'à leur retrait ; les résultats de commandes sont nettoyés à la prochaine utilisation après 30 jours.
+        ΣIRIUS conserve les autorisations jusqu'à leur retrait ; les résultats de commandes sont nettoyés à la prochaine utilisation après 30 jours.
         Ces historiques ne contiennent aucun audio Alexa ni secret Tuya.
         La révocation arrête les nouvelles commandes, pas une commande déjà partie.
         L'export et l'effacement du compte couvrent ces données serveur, pas les copies conservées chez Amazon ou Tuya.</dd>

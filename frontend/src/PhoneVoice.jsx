@@ -53,13 +53,13 @@ export default function PhoneVoice({ disabled, auditOnly = false, onPrepare }) {
     setMessage("Formulaire ARIANE rempli, aucun appel effectué. Démarrez le parcours puis autorisez explicitement l'étape appel.");
   };
   return <section aria-label="Téléphonie Vapi">
-    <h3>Téléphone · SIRIUS via Vapi</h3>
+    <h3>Téléphone · ΣIRIUS via Vapi</h3>
     <p>Appels réels payants, désactivés sans configuration serveur. Vapi gère le réseau téléphonique,
-      l'audio bidirectionnel, la transcription, le dialogue et la voix. Aucun accès aux outils internes de SIRIUS.</p>
+      l'audio bidirectionnel, la transcription, le dialogue et la voix. Aucun accès aux outils internes de ΣIRIUS.</p>
     <p>Annonce IA et accord de l'interlocuteur avant la conversation. Deux minutes maximum par appel,
       cinq tentatives par jour UTC pour les entrants et sortants réunis. Ce n'est pas un plafond financier garanti.</p>
     <p>Audio, objectif et conversation sont transmis à Vapi et à ses fournisseurs STT/IA/TTS.
-      SIRIUS garde seulement le suivi et les paramètres du parcours, sans audio ni transcription.
+      ΣIRIUS garde seulement le suivi et les paramètres du parcours, sans audio ni transcription.
       Vérifiez la conservation et la facturation chez Vapi. Aucun secret ni donnée sensible dans l'objectif.</p>
     <button type="button" disabled={busy} onClick={() => operate(load)}>
       {overview ? "Actualiser le suivi téléphonique" : "Charger la configuration téléphonique"}</button>

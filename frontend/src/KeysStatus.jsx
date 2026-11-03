@@ -74,7 +74,7 @@ export default function KeysStatus({ onClose }) {
             <span className={`keys-led ${watch.enabled ? "on" : "off"}`} data-testid="watch-led" />
           </div>
           <p className="keys-watch-desc">
-            Sirius surveille les actualités toutes les {watch.interval_min} min et vous prévient par notification,
+            ΣIRIUS surveille les actualités toutes les {watch.interval_min} min et vous prévient par notification,
             même application fermée. {watch.subscribers} appareil{watch.subscribers > 1 ? "s" : ""} abonné{watch.subscribers > 1 ? "s" : ""}.
           </p>
           <div className="keys-watch-actions">

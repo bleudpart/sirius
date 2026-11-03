@@ -43,9 +43,9 @@ def config(uid):
         raise HTTPException(503, "Projet Tuya serveur non configuré.")
     account = bindings.get(uid)
     if not isinstance(account, str) or not IDENTIFIER.fullmatch(account):
-        raise HTTPException(403, "Ce compte SIRIUS n'est pas lié à un compte Smart Life vérifié.")
+        raise HTTPException(403, "Ce compte ΣIRIUS n'est pas lié à un compte Smart Life vérifié.")
     if list(bindings.values()).count(account) != 1:
-        raise HTTPException(503, "Un compte Smart Life ne peut être partagé entre comptes SIRIUS.")
+        raise HTTPException(503, "Un compte Smart Life ne peut être partagé entre comptes ΣIRIUS.")
     return client, secret, REGIONS[region], account
 
 

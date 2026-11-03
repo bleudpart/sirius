@@ -137,7 +137,7 @@ async def technical_analysis(symbol, label, period):
         "limitations": [
             "Clôtures journalières différées, pas un cours en temps réel. Cache maximal : quinze minutes.",
             "Performance de prix hors réinvestissement des dividendes, frais et change. Horizons en séances (252/an).",
-            "Ajustements du fournisseur : les fractionnements sont signalés, pas recalculés par SIRIUS.",
+            "Ajustements du fournisseur : les fractionnements sont signalés, pas recalculés par ΣIRIUS.",
             "Volatilité sur vingt rendements logarithmiques, annualisée sur 252 séances ; pas une prévision.",
             "Supports/résistances : extrema des vingt dernières séances, pas des objectifs de cours.",
             "Fondamentaux, actualités et calendrier non raccordés à cette analyse technique.",

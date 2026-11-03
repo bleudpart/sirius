@@ -3,14 +3,14 @@ import { readAccountSetup } from "@/accountSetup";
 
 const STATE_LABELS = {
   configured: "Configuré — pas encore testé", available: "Disponible selon le serveur",
-  not_configured: "Non configuré", restricted: "Non accessible avec les clés de SIRIUS",
+  not_configured: "Non configuré", restricted: "Non accessible avec les clés de ΣIRIUS",
 };
 const QUOTA_LABELS = { chat: "Messages IA", stt: "Transcriptions", tts: "Lectures vocales" };
 const SCOPE_LABELS = {
   owner: "Configuration du serveur. La présence d'une clé ne prouve pas le fonctionnement du fournisseur.",
   personal: "Après l'essai, enregistrez vos clés personnelles pour utiliser ce service.",
   none: "Ce service n'est pas disponible dans la configuration actuelle.",
-  cloud: "Service relié à votre compte SIRIUS Cloud, avec ses limites d'essai.",
+  cloud: "Service relié à votre compte ΣIRIUS Cloud, avec ses limites d'essai.",
   local: "Fonction locale disponible sans clé de fournisseur.",
 };
 
@@ -32,7 +32,7 @@ export default function AccountServices() {
     <section data-testid="account-services">
       <h2>Essai et services de mon compte</h2>
       <p className="setup-note">Pendant 15 jours, les services autorisés utilisent les clés du serveur sans vous les transmettre. Ensuite, configurez vos propres clés.</p>
-      <p className="setup-warn">Après 15 jours, les services utilisant les clés de SIRIUS sont bloqués. Vos propres clés deviennent obligatoires pour continuer ces services. Les dossiers et outils locaux restent accessibles.</p>
+      <p className="setup-warn">Après 15 jours, les services utilisant les clés de ΣIRIUS sont bloqués. Vos propres clés deviennent obligatoires pour continuer ces services. Les dossiers et outils locaux restent accessibles.</p>
       {loading && <p role="status">Vérification des services…</p>}
       {error && <p className="fw-status ko" role="alert">{error}</p>}
       {!loading && <button type="button" className="setup-io-btn" onClick={() => setAttempt((value) => value + 1)}>Revérifier</button>}
@@ -53,7 +53,7 @@ export default function AccountServices() {
           </ul>
           {status.quotas?.enabled ? (
             <div data-testid="setup-account-quotas">
-              <p>Consommation des services SIRIUS — remise à zéro à minuit UTC.</p>
+              <p>Consommation des services ΣIRIUS — remise à zéro à minuit UTC.</p>
               {Object.entries(status.quotas.limits).map(([kind, limit]) => (
                 <p key={kind}>{QUOTA_LABELS[kind] || kind} : {status.quotas.usage?.[kind] || 0} / {limit}</p>
               ))}

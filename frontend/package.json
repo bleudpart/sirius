@@ -4,7 +4,7 @@
   "private": true,
   "license": "SEE LICENSE IN LICENSE",
   "author": "partel",
-  "description": "SIRIUS - Assistant holographique",
+  "description": "ΣIRIUS - Assistant holographique",
   "main": "public/electron.js",
   "homepage": "./",
   "proxy": "http://127.0.0.1:8001",

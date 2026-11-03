@@ -236,7 +236,7 @@ export default function ArianeActions({ auditOnly = false, user }) {
           {" · "}données {step.output.analysis.data_version}</p>}
         {step.output?.findings && <p>{step.output.findings.length} dépassement(s), {step.output.missing.length} réserve(s).
           Résultats descriptifs, pas une recommandation personnalisée.</p>}
-        {step.output?.data?.synthesis && <div><h4>Synthèse SIRIUS</h4><pre>{step.output.data.synthesis}</pre></div>}
+        {step.output?.data?.synthesis && <div><h4>Synthèse ΣIRIUS</h4><pre>{step.output.data.synthesis}</pre></div>}
         {step.output?.data?.microtool && <div>
           <h4>Micro-outil · {step.output.data.state === "COMPLETED" ? "appliqué aux données fournies" : "bloqué, aucun résultat final validé"}</h4>
           <p>{step.output.data.provider_calls} appel(s) IA. {step.output.data.notice}</p>

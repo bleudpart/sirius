@@ -106,7 +106,7 @@ export default function FinanceWorkspace({ routinesOnly = false, auditOnly = fal
       </button>
       {showBudgetLab && <BudgetLabWorkspace request={request} auditOnly={auditOnly} />}
     </>}
-    <p>Données du compte dans le service SIRIUS connecté. Aucun ordre, courtier, courriel ni push externe.
+    <p>Données du compte dans le service ΣIRIUS connecté. Aucun ordre, courtier, courriel ni push externe.
       Les routines et surveillances nécessitent que ce serveur soit allumé ; notifications ci-dessous.</p>
     {error && <p role="alert">{error}</p>}
     {notice && <p role="status">{notice}</p>}

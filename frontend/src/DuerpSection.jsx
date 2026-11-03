@@ -174,6 +174,6 @@ export default function DuerpSection({ onDirtyChange }) {
     {dirty && <p role="status">Modifications non enregistrées. Enregistrez une version avant de l'imprimer ou de quitter cet onglet.</p>}
     <p className="hc-note">L'impression utilise un document A4 paysage, sans le HUD, avec plan d'actions et zone de signature.
       Choisissez « Enregistrer en PDF » dans la boîte d'impression si votre appareil le propose.
-      Gardez vos versions et sauvegardes : SIRIUS ne garantit ni archivage légal de longue durée ni conformité automatique.</p>
+      Gardez vos versions et sauvegardes : ΣIRIUS ne garantit ni archivage légal de longue durée ni conformité automatique.</p>
   </section>;
 }

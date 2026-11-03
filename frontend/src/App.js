@@ -787,7 +787,7 @@ function App() {
     if (!content) {
       setVoiceMessage(display.type === "web"
         ? "Le texte de cette page intégrée n'est pas accessible à la lecture. Fournissez son texte pour que je le lise."
-        : "Aucun texte accessible à lire dans mon Sirius Display.");
+        : "Aucun texte accessible à lire dans mon ΣIRIUS Display.");
       return;
     }
     cancelSpeech();
@@ -1542,7 +1542,7 @@ function App() {
   const triggerState = useCallback((s) => {
     setStatus(s);
     const msgs = {
-      idle: "En veille. Dis « Sirius » pour m'activer.",
+      idle: "En veille. Dis « ΣIRIUS » pour m'activer.",
       listening: userName ? `Je t'écoute, ${userName}...` : "Je t'écoute...",
       thinking: "Réflexion en cours...",
       speaking: userName ? `Bien sûr ${userName}, voici ma réponse.` : "Bien sûr, voici ma réponse.",
@@ -1637,7 +1637,7 @@ function App() {
     beginDisplayResponse(command);
     let pid = null;
     if (typeof progress !== "undefined" && progress?.start) {
-      pid = progress.start("Réponse de Sirius", { silent: true });
+      pid = progress.start("Réponse de ΣIRIUS", { silent: true });
     }
 
     const workContext = workConversationContextRef.current;
@@ -1687,7 +1687,7 @@ function App() {
       const message = typeof data?.detail === "string" ? data.detail : workDetail || (status >= 500
         ? "Service indisponible. Aucun résultat ne peut être vérifié ; aucune action n'est annoncée comme effectuée."
         : status === 401
-        ? "Connectez-vous à votre compte SIRIUS."
+        ? "Connectez-vous à votre compte ΣIRIUS."
         : status === 429 ? "La limite d'utilisation est atteinte. Réessayez après sa remise à zéro."
           : "Accès au service refusé. Vérifiez votre essai et vos clés dans Réglages → Services et clés.");
       setText(message);
@@ -1931,7 +1931,7 @@ function App() {
     setVoiceMessage("Réponse du service IA indisponible — réponse locale.");
     const fallback = typeof localAnswer === "function" 
       ? localAnswer(command.toLowerCase()) 
-      : "Mode secours : Le serveur Sirius ne répond pas actuellement.";
+      : "Mode secours : Le serveur ΣIRIUS ne répond pas actuellement.";
       
     setText(fallback);
     speakOut(fallback);
@@ -2971,7 +2971,7 @@ function App() {
         titre: "E-MAIL ENVOYÉ — OUTLOOK",
         contenu: `À : ${to}\nObjet : ${subject || "Message envoyé par ΣIRIUS"}\n\n${body || ""}${signaturePreviewText(authUser)}`,
       });
-      const m = `C'est envoyé à ${to} avec ma signature SIRIUS.`;
+      const m = `C'est envoyé à ${to} avec ma signature ΣIRIUS.`;
       setText(m); speakOut(m);
       return true;
     } catch (e) {
@@ -4752,7 +4752,7 @@ function App() {
     if (/montre[\s-]*(moi)?[\s-]*(ton|le)?[\s-]*cortex/.test(low)) {
       mark("cortex");
       setShowCortex(true);
-      const m = "Accès autorisé. Voici mon cortex, Sirius t'écoute.";
+      const m = "Accès autorisé. Voici mon cortex, ΣIRIUS t'écoute.";
       setText(m); speakOut(m);
       return;
     }
@@ -4761,7 +4761,7 @@ function App() {
       [/panth[ée]on/, () => setShowPantheon(true), () => setShowPantheon(false), "Panthéon ouvert. Supervision globale en ligne."],
       [/nexus/, () => setShowNexus(true), () => setShowNexus(false), "Nexus céleste ouvert. Connexions inter-modules affichées."],
       [/oracle/, () => setShowOracle(true), () => setShowOracle(false), "Oracle divin ouvert. Consultation des prédictions."],
-      [/\bprime\b|apprentissage/, () => setShowPrime(true), () => setShowPrime(false), "Sirius Prime ouvert. Mémoire et apprentissage."],
+      [/\bprime\b|apprentissage/, () => setShowPrime(true), () => setShowPrime(false), "ΣIRIUS Prime ouvert. Mémoire et apprentissage."],
       [/compagnon|mode dev\b/, () => setShowDev(true), () => setShowDev(false), "Compagnon dev ouvert. Colle ton code."],
       [/gestion.*m[ée]moire|m[ée]moire longue|gestionnaire.*m[ée]moire/, () => setShowMemoryMgr(true), () => setShowMemoryMgr(false), "Gestionnaire de mémoire ouvert. Tes souvenirs sont sous ton contrôle."],
       [/(lance|d[ée]marre|ouvre|relance).{0,14}installation|assistant d'installation|diagnostic d'installation|v[ée]rifie (ton |l')installation/, () => setShowInstall(true), () => setShowInstall(false), "Assistant d'installation lancé. Vérification de tous les systèmes."],
@@ -5140,7 +5140,7 @@ function App() {
       mark("display · question fichier");
       (async () => {
         setStatus("thinking");
-        setText(`Sirius interroge ${dispCtx.name}…`);
+        setText(`ΣIRIUS interroge ${dispCtx.name}…`);
         try {
           const r = await fetch(`${API}/display/ask`, {
             method: "POST", headers: { "Content-Type": "application/json" },
@@ -5568,11 +5568,11 @@ function App() {
       setVoicePhase(micOnRef.current ? "listening" : "idle");
       const missingWakeWord = requireWakeWord && !startsWithVoiceWakeWord(normalizedTranscript);
       const feedback = missingWakeWord
-        ? "En mode mains-libres, dis « Sirius » puis ta demande."
+        ? "En mode mains-libres, dis « ΣIRIUS » puis ta demande."
         : "Je t'écoute : dis ta demande.";
       setText(feedback);
       setVoiceMessage(missingWakeWord
-        ? `Reconnu : « ${normalizedTranscript} ». Dis « Sirius » puis ta demande.`
+        ? `Reconnu : « ${normalizedTranscript} ». Dis « ΣIRIUS » puis ta demande.`
         : `Reconnu : « ${normalizedTranscript} ». Dis ta demande complète.`);
       return false;
     }
@@ -6277,7 +6277,7 @@ function App() {
         window.__siriusMicOn = false;
         setMicOn(false);
         if (e.error === "not-allowed") {
-          setText("Accès au micro refusé. Autorisez le microphone pour parler à Sirius.");
+          setText("Accès au micro refusé. Autorisez le microphone pour parler à ΣIRIUS.");
           setStatus("idle");
         } else if (e.error === "network" || e.error === "service-not-allowed") {
           preferServerSttRef.current = true;
@@ -7655,7 +7655,7 @@ function App() {
           && Date.now() - lastActivityRef.current >= 45000}
         onInitiative={(suggestion, message) => {
           setText(message);
-          showOnDisplay({ type: "message", titre: "SIRIUS", contenu: message, suggestion });
+          showOnDisplay({ type: "message", titre: "ΣIRIUS", contenu: message, suggestion });
         }}
         onError={(message) => setVoiceMessage(message)}
         onSpeak={(m) => speakRef.current(m)}
@@ -7845,7 +7845,7 @@ function App() {
         <div className="workspace-shortcuts" role="group" aria-label="Suggestions de demandes">
           <button type="button" data-testid="sirius-voice-diagnostic-btn"
             onPointerDown={stopVoice}
-            onClick={() => { stopVoice(); setShowVoiceDiagnostic(true); }}>Vérifier Sirius</button>
+            onClick={() => { stopVoice(); setShowVoiceDiagnostic(true); }}>Vérifier ΣIRIUS</button>
           {["Préparer ma journée de demain", "Faire le point sur mon activité", "Organiser une idée de projet"].map((suggestion) => (
             <button key={suggestion} type="button" onClick={() => { setCmd(suggestion); commandInputRef.current?.focus(); }}>{suggestion}</button>
           ))}

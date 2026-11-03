@@ -63,7 +63,7 @@ export default function BudgetLabWorkspace({ request, auditOnly = false }) {
   });
   return <section aria-label="Budget personnel et laboratoire">
     <h3>Budget personnel · EUR · recommandations uniquement</h3>
-    <p>Les analyses sont conservées dans le service SIRIUS connecté, par compte. Le CSV brut n'est pas conservé :
+    <p>Les analyses sont conservées dans le service ΣIRIUS connecté, par compte. Le CSV brut n'est pas conservé :
       seuls les totaux, les libellés récurrents et leurs preuves sont enregistrés. Aucune transmission à Cerebras.</p>
     {error && <p role="alert">{error}</p>}
     {notice && <p role="status">{notice}</p>}

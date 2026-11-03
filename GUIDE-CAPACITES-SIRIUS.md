@@ -113,7 +113,7 @@ Le système de mémoire propose :
 
 **Confidentialité :** les clés et données personnelles ne doivent pas être ajoutées aux rapports ou au dépôt de code.
 
-## 6. SIRIUS Entreprise
+## 6. ΣIRIUS Entreprise
 
 Le module Entreprise fournit un espace de travail pour petite équipe :
 
@@ -404,7 +404,7 @@ PANTHEON SYSTEM, NEXUS, ARGUS et HÉPHAÏSTOS fournissent :
 - restauration des données d'entreprise ;
 - journal des opérations sensibles.
 
-## 18. ORACLE DIVIN et SIRIUS PRIME
+## 18. ORACLE DIVIN et ΣIRIUS PRIME
 
 ORACLE DIVIN peut afficher :
 
@@ -416,7 +416,7 @@ ORACLE DIVIN peut afficher :
 - phase lunaire et données astronomiques ;
 - prédictions personnelles basées sur les habitudes enregistrées.
 
-SIRIUS PRIME peut afficher :
+ΣIRIUS PRIME peut afficher :
 
 - journal d'apprentissage ;
 - habitudes par heure et jour ;

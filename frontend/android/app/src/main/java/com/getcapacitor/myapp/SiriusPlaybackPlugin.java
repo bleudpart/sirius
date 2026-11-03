@@ -18,7 +18,7 @@ public class SiriusPlaybackPlugin extends Plugin {
     public void start(PluginCall call) {
         getActivity().runOnUiThread(() -> {
             if (!getActivity().getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.RESUMED)) {
-                call.reject("Démarrez la lecture avec Sirius ouvert.", "BACKGROUND_START");
+                call.reject("Démarrez la lecture avec ΣIRIUS ouvert.", "BACKGROUND_START");
                 return;
             }
             try {

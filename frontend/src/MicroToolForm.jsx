@@ -28,7 +28,7 @@ export default function MicroToolForm({ disabled, onPrepare }) {
     <p>Un programme JSON fermé, pas un script Python/JavaScript ni un bac à sable système.
       Opérations : strip, lower, upper, lines, split/join, replace littéral, unique, sort,
       column, filter_equals, sum et count. Pipeline linéaire : douze étapes maximum.
-      Aucun fichier, réseau, shell, installation ou modification de SIRIUS.</p>
+      Aucun fichier, réseau, shell, installation ou modification de ΣIRIUS.</p>
     <p>Après votre autorisation dans le parcours : planificateur, codeur, tests sur vos exemples,
       une correction maximum si nécessaire, puis vérificateur avant application aux données.
       Cerebras uniquement, trois appels normalement, quatre maximum, trente secondes au total.

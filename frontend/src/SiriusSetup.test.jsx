@@ -295,7 +295,7 @@ test("update check follows the download until the installer is ready", async () 
     expect(bar().getAttribute("aria-valuenow")).toBe("40");
     expect(bar().firstChild.style.width).toBe("40%");
     await act(async () => { jest.advanceTimersByTime(1500); });
-    expect(status()).toBe("Mise à jour 1.0.32 prête — fermez SIRIUS pour l'installer.");
+    expect(status()).toBe("Mise à jour 1.0.32 prête — fermez ΣIRIUS pour l'installer.");
     expect(bar().className).toContain("is-ready");
     expect(bar().firstChild.style.width).toBe("100%");
     await act(async () => { jest.advanceTimersByTime(3000); });

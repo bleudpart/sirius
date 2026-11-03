@@ -79,7 +79,7 @@ class SpecialistAgents:
 
     def register(self):
         self.runs.registry.register(ActionDefinition(
-            "agents.mission", "SIRIUS / THOT / HERMÈS / CHRONOS",
+            "agents.mission", "ΣIRIUS / THOT / HERMÈS / CHRONOS",
             "Déléguer une mission textuelle à des sous-agents Cerebras puis synthétiser",
             "2", MissionInputs, ActionOutput, self.execute, risk="sensitive",
             timeout_seconds=30, max_attempts=1,

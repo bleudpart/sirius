@@ -55,7 +55,7 @@ function ConfigScreen({ initialUrl, onSaved, onClose, configured }) {
   return (
     <div className="kr-config" data-testid="keraunos-config">
       <p className="kr-help">
-        Reliez Sirius à votre <b>Home Assistant</b>. Créez un jeton dans HA :
+        Reliez ΣIRIUS à votre <b>Home Assistant</b>. Créez un jeton dans HA :
         profil (en bas à gauche) → Sécurité → « Jetons d&apos;accès longue durée » → Créer.
       </p>
       <label className="kr-label">URL HOME ASSISTANT</label>
