@@ -7,6 +7,8 @@ import "./publicPantheon.css";
 import { GaplessLoop } from "./gaplessLoop";
 
 const THEME_URL = "/audio/zirius-loop.wav?revision=3";
+const WINDOWS_VERSION = "1.0.69";
+const WINDOWS_DOWNLOAD_URL = `https://github.com/bleudpart/sirius/releases/download/v${WINDOWS_VERSION}`;
 
 const API = `${process.env.REACT_APP_BACKEND_URL || "https://api.sirius-assistant.fr"}/api`;
 
@@ -24,6 +26,56 @@ const MATRIX_ACTIONS = [
   { icon: Search, text: "Analysez les informations importantes", detail: "Demandez une synthèse des informations fournies. Vérifiez les conclusions ; un service IA configuré et une connexion réseau sont nécessaires." },
   { icon: Mic, text: "Travaillez à la voix ou par écrit", detail: "Le microphone reste facultatif. Sur Android, la transcription envoie un extrait audio au serveur." },
   { icon: ShieldCheck, text: "Gardez vos actions sous contrôle", detail: "Relisez les propositions et confirmez les actions importantes, notamment l'envoi d'un courriel." },
+];
+
+const NEW_FEATURES = [
+  {
+    id: "etiquettes", icon: FileText, title: "Photos et étiquettes HACCP",
+    features: [
+      "Lecture d'une photo fournisseur : produit, lot, DLC/DDM, origines et allergènes, avec les champs incertains signalés.",
+      "Étiquettes de préparation prêtes à imprimer : nom, date et heure de fabrication, DLC exacte et conditions de conservation.",
+      "DLC calculée selon la durée confirmée pour le produit : par exemple 72 heures si votre règle le prévoit.",
+    ],
+    note: "La lecture doit être contrôlée. La durée et les conditions de conservation doivent être validées dans votre plan de maîtrise sanitaire (PMS) ; J+3 n'est pas une règle universelle.",
+  },
+  {
+    id: "receptions", icon: FolderOpen, title: "Réceptions et traçabilité",
+    features: [
+      "Photo originale archivée et informations réparties entre journal de traçabilité, lots, observations d'allergènes et achats / bons de livraison.",
+      "Alertes 48 heures avant l'échéance : priorité aux dates les plus proches, puis aux lots les plus anciens à date égale.",
+      "Étiquette de déconditionnement après déclaration d'ouverture, sans dépasser la DLC fournisseur.",
+    ],
+    note: "La photo ne mesure ni la température ni les quantités livrées. Les lots à contrôler ne remplacent pas l'inventaire physique ; les allergènes et le rapprochement des bons de livraison restent à vérifier.",
+  },
+  {
+    id: "finance", icon: ChartNoAxesCombined, title: "Finance et rentabilité",
+    features: [
+      "Factures : TVA multi-taux, numérotation à l'émission, verrouillage des factures émises et export PDF.",
+      "Menu engineering : classement des plats selon leur marge et leur popularité.",
+      "Comparaison du food cost réel et théorique, et simulation de l'impact d'une hausse fournisseur.",
+      "Seuil de rentabilité : chiffre d'affaires à atteindre et progression sur le mois.",
+    ],
+    note: "Les quatre tableaux analytiques sont accessibles via API, sur les données fournies, sans panneau dédié ni rapprochement automatique avec les réceptions. Ces aides à la décision ne remplacent pas votre expert-comptable.",
+  },
+  {
+    id: "tri-cortex", icon: Zap, title: "Tri-Cortex et ZEUS CORTEX",
+    features: [
+      "Trois cerveaux complémentaires : dialogue, logique métier et supervision des tâches de fond.",
+      "Sentinel Master coordonne quatre subagents : Vision, vigilance sanitaire, analyse des prix et archivage.",
+      "Trois graphes analytiques ZEUS CORTEX affichent l'activité réelle des cerveaux et de leurs traitements.",
+      "Reprise des tâches enregistrées côté serveur et isolation des pannes des subagents.",
+    ],
+    note: "Les services IA nécessitent une configuration et une connexion réseau. Une photo non transmise hors ligne n'est pas prise en charge ; les résultats restent à valider par une personne.",
+  },
+  {
+    id: "consultations", icon: Mail, title: "Consultations MYTHOS",
+    features: [
+      "SOLON vous aide à structurer une question juridique : faits, analyse et options à examiner.",
+      "PROMÉTHÉE prépare un plan de projet : objectifs, jalons, risques et actions.",
+      "Retrouvez vos consultations dans l'historique, exportez-les en PDF et envoyez-les par e-mail après confirmation.",
+    ],
+    note: "Les réponses générées par l'IA doivent être relues. SOLON ne remplace pas un avocat. L'envoi d'e-mails nécessite un serveur SMTP configuré.",
+  },
 ];
 
 export default function PublicStore() {
@@ -209,6 +261,7 @@ export default function PublicStore() {
         <a className="public-brand" href="/"><span className="public-brand-gold">ΣIRIUS</span><span>.</span></a>
         <nav className="public-nav-links" aria-label="Navigation de la boutique">
           <a href="#demonstration">Comment ça marche</a>
+          <a href="#nouveautes">Nouveautés</a>
           <a href="#offres">Les offres</a>
           <a href="#essayer">Essai gratuit</a>
           <a href="/aide-emails.html">Aide</a>
@@ -330,6 +383,22 @@ export default function PublicStore() {
         </div>
         <p className="public-function-note">L'animation illustre le noyau, sans exécuter de commande : pas une démonstration en direct. Les services connectés nécessitent le réseau et leur délai de réponse peut varier.</p>
       </section>
+      <section className="public-updates public-workflow" id="nouveautes" aria-labelledby="public-updates-title">
+        <p className="public-eyebrow">Nouveautés · Version {WINDOWS_VERSION}</p>
+        <h2 id="public-updates-title" className="public-section-title">De la réception aux décisions</h2>
+        <p>Les nouvelles fonctions de ΣIRIUS pour préparer vos étiquettes, suivre vos lots, analyser votre activité, consulter MYTHOS et comprendre le travail des trois cerveaux.</p>
+        <div className="public-updates-grid">
+          {NEW_FEATURES.map(({ id, icon: Icon, title, features, note }) => (
+            <article className="public-update-card" key={id} aria-labelledby={`public-update-${id}`}>
+              <div className="public-update-heading"><Icon size={24} aria-hidden="true" /><h3 id={`public-update-${id}`}>{title}</h3></div>
+              <ul>{features.map((feature) => <li key={feature}>{feature}</li>)}</ul>
+              <p className="public-update-note">{note}</p>
+            </article>
+          ))}
+        </div>
+        <p className="public-function-note">Disponibilité selon votre formule, vos droits d'accès et les services configurés. Les nouveautés ne déclenchent ni validation sanitaire ni action comptable à votre place.</p>
+        <a className="public-secondary-cta" href="#essayer">Découvrir la version {WINDOWS_VERSION} <ArrowRight size={17} /></a>
+      </section>
       <section className="public-plans" id="offres" aria-label="Offres ΣIRIUS">
         <h2 className="public-section-title">Choisissez votre formule</h2>
         {PLANS.map((plan) => {
@@ -371,8 +440,11 @@ export default function PublicStore() {
       <section className="public-trial" id="essayer" aria-labelledby="public-trial-title">
         <h2 id="public-trial-title" className="public-section-title">Commencez gratuitement pendant 15 jours</h2>
         <p>Aucune connaissance de l'IA nécessaire. Téléchargez ΣIRIUS, ouvrez l'application, puis créez votre compte.</p>
-        <a className="public-primary-cta" href="https://github.com/bleudpart/sirius/releases/download/v1.0.57/sirius-setup-1.0.57.exe">Télécharger pour Windows <ArrowRight size={17} /></a>
-        <p className="public-function-note">Version publique Windows 1.0.57. Aucun téléphone demandé sur cette page pour l'essai.</p>
+        <div className="public-downloads">
+          <a className="public-primary-cta" href={`${WINDOWS_DOWNLOAD_URL}/sirius-setup-${WINDOWS_VERSION}.exe`}>Télécharger pour Windows <ArrowRight size={17} /></a>
+          <a className="public-secondary-cta" href={`${WINDOWS_DOWNLOAD_URL}/SIRIUS-Portable-${WINDOWS_VERSION}.exe`}>Télécharger la version portable <ArrowRight size={17} /></a>
+        </div>
+        <p className="public-function-note">Version publique Windows {WINDOWS_VERSION} : installateur ou portable sans installation. Aucun téléphone demandé sur cette page pour l'essai.</p>
         <details className="public-defender-help" data-testid="public-defender-help"><summary>Windows bloque le téléchargement ou l'installation ?</summary>
           <p>ΣIRIUS est récent : Windows Defender SmartScreen peut le signaler comme « peu téléchargé ». Le fichier provient directement de notre dépôt officiel.</p>
           <ol>

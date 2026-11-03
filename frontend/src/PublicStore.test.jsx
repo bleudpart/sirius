@@ -119,8 +119,58 @@ test("three concrete requests lead to the trial instead of checkout", () => {
   expect(container.querySelector(".public-demo-text-link").getAttribute("href")).toBe("#demonstration");
   expect(container.querySelector(".public-purchase").open).toBe(false);
   expect(container.querySelector("#public-phone").required).toBe(false);
-  expect(container.querySelector("#essayer a").getAttribute("href")).toContain("releases/download/v1.0.57/");
-  expect(container.querySelector("#essayer").textContent).toContain("1.0.57");
+  expect(container.querySelector("#essayer a").getAttribute("href")).toContain("releases/download/v1.0.69/");
+  expect(container.querySelector("#essayer").textContent).toContain("1.0.69");
+});
+
+test("new features are reachable from navigation and presented before the offers", () => {
+  expect(container.querySelector('nav a[href="#nouveautes"]').textContent).toBe("Nouveautés");
+  const updates = container.querySelector("#nouveautes");
+  expect(updates.getAttribute("aria-labelledby")).toBe(updates.querySelector("h2").id);
+  expect(updates.textContent).toContain("Version 1.0.69");
+  expect(updates.previousElementSibling.id).toBe("matrice-demo");
+  expect(updates.nextElementSibling.id).toBe("offres");
+  const cards = [...updates.querySelectorAll("article")];
+  expect(cards.map((card) => card.querySelector("h3").textContent)).toEqual([
+    "Photos et étiquettes HACCP", "Réceptions et traçabilité",
+    "Finance et rentabilité", "Tri-Cortex et ZEUS CORTEX", "Consultations MYTHOS",
+  ]);
+  cards.forEach((card) => expect(card.getAttribute("aria-labelledby")).toBe(card.querySelector("h3").id));
+  expect(updates.querySelector("a").getAttribute("href")).toBe("#essayer");
+});
+
+test("new features explain human review, sanitary rules and analytics availability", () => {
+  const updates = container.querySelector("#nouveautes");
+  expect(updates.textContent).toContain("date et heure de fabrication, DLC exacte");
+  expect(updates.textContent).toContain("J+3 n'est pas une règle universelle");
+  expect(updates.textContent).toContain("Alertes 48 heures");
+  expect(updates.textContent).toContain("ne remplacent pas l'inventaire physique");
+  expect(updates.textContent).toContain("Menu engineering");
+  expect(updates.textContent).toContain("food cost réel et théorique");
+  expect(updates.textContent).toContain("hausse fournisseur");
+  expect(updates.textContent).toContain("Seuil de rentabilité");
+  expect(updates.textContent).toContain("accessibles via API");
+  expect(updates.textContent).toContain("sans panneau dédié ni rapprochement automatique");
+  expect(updates.textContent).toContain("Trois graphes analytiques ZEUS CORTEX");
+  expect(updates.textContent).toContain("quatre subagents");
+  expect(updates.textContent).toContain("configuration et une connexion réseau");
+  expect(updates.textContent).toContain("selon votre formule");
+  expect(updates.textContent).toContain("PROMÉTHÉE prépare un plan de projet");
+  expect(updates.textContent).toContain("e-mail après confirmation");
+  expect(updates.textContent).toContain("SOLON ne remplace pas un avocat");
+  expect(updates.textContent).toContain("serveur SMTP configuré");
+});
+
+test("Windows installer and portable downloads point to the same public release", () => {
+  const downloads = [...container.querySelectorAll("#essayer .public-downloads a")];
+  expect(downloads.map((link) => link.getAttribute("href"))).toEqual([
+    "https://github.com/bleudpart/sirius/releases/download/v1.0.69/sirius-setup-1.0.69.exe",
+    "https://github.com/bleudpart/sirius/releases/download/v1.0.69/SIRIUS-Portable-1.0.69.exe",
+  ]);
+  expect(downloads[0].textContent).toContain("Télécharger pour Windows");
+  expect(downloads[1].textContent).toContain("version portable");
+  expect(container.querySelector("#essayer").textContent).toContain("sans installation");
+  expect(container.textContent).not.toContain("1.0.57");
 });
 
 test("the creator introduces Sirius immediately after the demonstration and before the workflow", () => {

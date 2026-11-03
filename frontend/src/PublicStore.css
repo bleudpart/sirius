@@ -167,7 +167,7 @@
 .public-store { --store-content:1180px; }
 .public-store *, .public-store *::before, .public-store *::after { box-sizing:border-box; }
 .public-nav { max-width:var(--store-content); gap:24px; }
-.public-nav-links { display:flex; align-items:center; gap:24px; font:500 13px/1.4 "Inter",sans-serif; }
+.public-nav-links { display:flex; flex-wrap:wrap; align-items:center; gap:24px; font:500 13px/1.4 "Inter",sans-serif; }
 .public-nav-links a { color:#ffffff; text-decoration:none; }
 .public-nav-links a:hover { color:var(--store-gold-strong); }
 .public-nav-links .public-nav-cta { display:flex; align-items:center; gap:8px; padding:10px 14px; border:1px solid var(--store-line); border-radius:8px; color:var(--store-gold-strong); }
@@ -306,6 +306,26 @@
 .public-situations img { display: block; width: 100%; height: auto; }
 .public-situations figcaption { display: grid; gap: 8px; padding: 16px; color: rgba(255, 255, 255, 0.78); }
 @media (max-width: 700px) { .public-situations-grid { grid-template-columns: 1fr; } }
+
+.public-updates-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; margin-top:28px; }
+.public-update-card { display:flex; flex-direction:column; min-width:0; padding:24px; border:1px solid var(--store-line); border-radius:12px; background:linear-gradient(145deg,rgba(16,40,61,.9),rgba(5,20,33,.92)); }
+.public-update-card:last-child:nth-child(odd) { grid-column:1/-1; }
+.public-update-heading { display:flex; align-items:center; gap:12px; }
+.public-update-heading svg { flex-shrink:0; color:var(--store-gold-strong); }
+.public-update-heading h3 { margin:0; font-size:22px; line-height:1.3; }
+.public-update-card ul { padding-left:20px; margin:20px 0; color:#fff; font:400 14px/1.7 "Inter",sans-serif; }
+.public-update-card li + li { margin-top:10px; }
+.public-update-card li::marker { color:var(--store-gold); }
+.public-update-note { margin:auto 0 0; padding-top:16px; border-top:1px solid rgba(145,230,242,.2); color:rgba(255,255,255,.78); font:400 13px/1.7 "Inter",sans-serif; }
+.public-updates > .public-secondary-cta { margin-top:20px; }
+.public-downloads { display:flex; flex-wrap:wrap; gap:12px; }
+.public-downloads a:focus-visible,.public-updates > a:focus-visible { outline:2px solid var(--store-gold-strong); outline-offset:4px; }
+@media(max-width:700px) {
+  .public-updates-grid { grid-template-columns:1fr; }
+  .public-update-card { padding:20px; }
+  .public-downloads { flex-direction:column; align-items:stretch; }
+  .public-downloads a { padding:12px 16px; text-align:center; }
+}
 
 .public-odysseia-card {
   max-width:var(--store-content,1180px);

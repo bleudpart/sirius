@@ -6,6 +6,18 @@ Assistant vocal HUD style Iron Man. Frontend React + Backend FastAPI (+ Electron
 
 ## Guide rapide pour débuter
 
+### Téléchargements officiels — version 1.0.69
+
+- [Installateur Windows](https://github.com/bleudpart/sirius/releases/download/v1.0.69/sirius-setup-1.0.69.exe)
+- [Version portable, sans installation classique](https://github.com/bleudpart/sirius/releases/download/v1.0.69/SIRIUS-Portable-1.0.69.exe)
+- [Nouveautés et formules sur la boutique](https://sirius-assistant.fr/#nouveautes)
+
+Cette version inclut les étiquettes et réceptions HACCP, les évolutions Finance,
+les trois graphes Tri-Cortex et les consultations MYTHOS (historique, PDF et e-mail).
+Les quatre nouveaux tableaux analytiques
+Finance restent accessibles via API, sans panneau dédié. Les règles sanitaires
+et les résultats de gestion restent à vérifier par un professionnel.
+
 ### Installer ΣIRIUS sur un PC Windows
 
 1. Téléchargez le fichier `sirius-setup-<version>.exe`.
