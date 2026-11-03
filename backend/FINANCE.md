@@ -10,21 +10,21 @@ registre distinct que ce module ne lit ni ne modifie.
 
 ## Répartition entre les trois cerveaux de ΣIRIUS (Tri-Cortex)
 
-Brain 1 et Brain 2 sont des appels directs ; Brain 3, le Sentinel Master,
+Les Cerveaux 1 et 2 sont des appels directs ; le Cerveau 3, le Sentinel Master,
 supervise quatre subagents en arrière-plan. Aucun ne bloque les autres
 (architecture détaillée dans [Tri-Cortex](../docs/tri-cortex.md)) :
 
-| Brain 1 — opérationnel, temps réel | Brain 2 — analytique, direct | Brain 3 — Sentinel, arrière-plan |
+| Cerveau 1 — opérationnel, temps réel | Cerveau 2 — analytique, direct | Cerveau 3 — Sentinel, arrière-plan |
 |---|---|---|
 | Comprendre et exécuter les commandes ; répondre en flux sans attendre une analyse de fond. | Valider une saisie ou un import dans sa transaction ; contrôler les lectures HACCP et la cohérence des factures. | `SubagentVision` lit les étiquettes et factures par OCR ; `SubagentSanitaryGuard` surveille DLC et allergènes. |
-| Pour une question stratégique, lire l’état publié. Si celui-ci manque ou date de plus de 24 heures, demander son actualisation sans retarder la réponse. | Calculer à la demande un tableau de bord ou un stress test ; agréger les écritures validées sur trois mois, calculer ratios, seuils et projection de trésorerie. | `SubagentMarginAudit` héberge l’ordonnanceur financier unique : il regroupe les signaux, planifie la consolidation et confie chaque analyse à Brain 2 via la file durable. |
-| Restituer sur le HUD et dans ZEUS CORTEX les résultats validés par Brain 2. | Rédiger la synthèse IA en étape finale, seulement à partir de chiffres déjà calculés et vérifiables ; sinon, utiliser une synthèse déterministe. | Publier les alertes suivies ; `SubagentArchivist` gère les copies, la purge des caches et la reprise hors ligne bornée. |
+| Pour une question stratégique, lire l’état publié. Si celui-ci manque ou date de plus de 24 heures, demander son actualisation sans retarder la réponse. | Calculer à la demande un tableau de bord ou un stress test ; agréger les écritures validées sur trois mois, calculer ratios, seuils et projection de trésorerie. | `SubagentMarginAudit` héberge l’ordonnanceur financier unique : il regroupe les signaux, planifie la consolidation et confie chaque analyse au Cerveau 2 via la file durable. |
+| Restituer sur le HUD et dans ZEUS CORTEX les résultats validés par le Cerveau 2. | Rédiger la synthèse IA en étape finale, seulement à partir de chiffres déjà calculés et vérifiables ; sinon, utiliser une synthèse déterministe. | Publier les alertes suivies ; `SubagentArchivist` gère les copies, la purge des caches et la reprise hors ligne bornée. |
 
-Le seul échange de Brain 1 vers Sentinel est un signal après validation :
+Le seul échange du Cerveau 1 vers Sentinel est un signal après validation :
 entreprise, type d’opération, source, référence facultative, auteur, nombre
 d’écritures quand il est connu et date. Il ne contient aucun montant ni ligne financière.
 Sentinel et l’analyse de fond ne valident, ne modifient et ne suppriment jamais les écritures ;
-Brain 1 n’exécute pas de calcul stratégique de fond dans le temps de réponse.
+le Cerveau 1 n’exécute pas de calcul stratégique de fond dans le temps de réponse.
 Les seuils sont des repères de gestion, pas une notation bancaire ni un conseil
 juridique, fiscal ou comptable.
 
@@ -59,7 +59,7 @@ financière ne masque pas les commandes, les services et les ressources.
   enfant supervisée de `SubagentMarginAudit` ; file bornée à 256 signaux et
   entreprises en attente, regroupement après 20 secondes de calme, au plus
   120 secondes de regroupement. Chaque analyse prête devient une tâche durable de
-  la file Sentinel, calculée sous Brain 2. « Relancer l'analyse » est immédiat dans la file,
+  la file Sentinel, calculée sous le Cerveau 2. « Relancer l'analyse » est immédiat dans la file,
   sans interrompre l'analyse déjà en cours. Les calculs et accès SQL passent par
   `asyncio.to_thread` ; aucune transaction ne reste ouverte pendant la rédaction IA.
 - **Consolidation** : première vérification cinq minutes après démarrage, puis

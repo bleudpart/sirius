@@ -404,5 +404,5 @@ class HudPayload(StrictModel):
     gauge: dict[str, JsonValue] | None = None
     alerts: tuple[Alert, ...]
     sort: HudSort
-    # Phrase prête à être dite par Brain 2 ou affichée en bandeau par Brain 1.
+    # Phrase prête à être dite par le Cerveau 2 ou affichée en bandeau par le Cerveau 1.
     speech: str

@@ -69,9 +69,9 @@ test("le contrat réel du backend affiche les trois cerveaux, les chiffres et la
   await mount();
   expect(host.querySelector('[data-testid="zeus-analytical"]')).not.toBeNull();
   expect(host.textContent).toContain("AUDIT FINANCIER · SENTINEL");
-  expect(host.textContent).toContain("Brain 1 · dialogue direct");
-  expect(host.textContent).toContain("Brain 2 · logique métier directe");
-  expect(host.textContent).toContain("Brain 3 · Sentinel Master");
+  expect(host.textContent).toContain("Cerveau 1 · dialogue direct");
+  expect(host.textContent).toContain("Cerveau 2 · logique métier directe");
+  expect(host.textContent).toContain("Cerveau 3 · Sentinel Master");
   expect(host.textContent).toContain("Entreprise A");
   expect(host.textContent).toContain(formatFinanceValue("-3000.00"));
   expect(host.textContent).toContain("J+15");

@@ -1,17 +1,25 @@
-import React, { Component, lazy, Suspense, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { API_BASE_URL, websocketUrl } from "./lib/api";
 import { websocketProtocols } from "./lib/sessionToken";
 import { withTimeout } from "./companyFinance";
+import { recordFrame } from "./cortexHistory";
+import { ExchangeChart, OutcomeDonut, SquadRose } from "./ZeusBrainCharts";
 import "./ZeusTriCortex.css";
 
-const Graph = lazy(() => import("./three/TriCortexGraph"));
 const MAIN = ["brain_1", "brain_2", "brain_3"];
 const SATELLITES = ["vision", "sanitary_guard", "margin_audit", "archivist"];
 const IDS = [...MAIN, ...SATELLITES];
 const LABELS = {
-  brain_1: "Brain 1 · Fast Stream / HUD", brain_2: "Brain 2 · Logique métier",
-  brain_3: "Brain 3 · Sentinel Master", vision: "Vision", sanitary_guard: "SanitaryGuard",
+  brain_1: "Cerveau 1 · Fast Stream / HUD", brain_2: "Cerveau 2 · Logique métier",
+  brain_3: "Cerveau 3 · Sentinel Master", vision: "Vision", sanitary_guard: "SanitaryGuard",
   margin_audit: "MarginAudit", archivist: "Archivist",
+};
+const ROLES = {
+  brain_1: "Dialogue et HUD en direct", brain_2: "Règles HACCP, TVA et marges", brain_3: "Superviseur de quatre agents",
+};
+const COLORS = {
+  brain_1: "#7fb2d4", brain_2: "#d8b875", brain_3: "#70c5b4",
+  vision: "#8d8fc4", sanitary_guard: "#77b18b", margin_audit: "#d29f68", archivist: "#b783a4",
 };
 const STATES = { stopped: "Arrêté", idle: "Disponible", busy: "En activité", degraded: "Dégradé", failed: "En échec" };
 const TASKS = {
@@ -50,24 +58,6 @@ export function validateCortexFrame(frame) {
   return frame;
 }
 
-class GraphBoundary extends Component {
-  state = { failed: false };
-  static getDerivedStateFromError() { return { failed: true }; }
-  componentDidCatch(error) { console.error("[ZEUS CORTEX] Vue 3D indisponible", error); }
-  render() {
-    return this.state.failed ? <p className="tri-notice">Vue 3D indisponible. Les mesures restent lisibles ci-dessous.</p> : this.props.children;
-  }
-}
-
-function supports3D() {
-  if (typeof window.WebGL2RenderingContext === "undefined") return false;
-  const canvas = document.createElement("canvas");
-  const gl = canvas.getContext("webgl2");
-  if (!gl) return false;
-  gl.getExtension("WEBGL_lose_context")?.loseContext();
-  return true;
-}
-
 async function request(path, options = {}) {
   return withTimeout(async (signal) => {
     const response = await fetch(`${API_BASE_URL}/cortex/tri${path}`, { credentials: "include", ...options, signal });
@@ -77,11 +67,47 @@ async function request(path, options = {}) {
   }, { signal: options.signal, timeoutMs: 10000, message: "Sentinel ne répond pas dans le délai prévu." });
 }
 
+const SHORT = Object.fromEntries(IDS.map((id) => [id, LABELS[id].split(" · ")[0]]));
+const duration = (value) => (value == null ? "—" : `${Math.round(value)} ms`);
+
+function Stats({ id, node }) {
+  const tiles = [
+    ["Charge", node ? `${Math.round(node.load * 100)} %` : "—"],
+    ["Dernière durée", duration(node?.latency_ms)],
+    ...(id === "brain_1" ? [["Premier fragment", duration(node?.first_token_ms)]] : []),
+    ["File / terminées", node ? `${node.queued} / ${node.completed}` : "—"],
+    ["Échecs / redémarrages", node ? `${node.failures} / ${node.restarts}` : "—"],
+  ];
+  return <dl className="tri-stats" data-tiles={tiles.length}>
+    {tiles.map(([term, value]) => <div key={term}><dt>{term}</dt><dd>{value}</dd></div>)}
+  </dl>;
+}
+
+function State({ node }) {
+  return <div className="tri-state">
+    <strong>{node ? STATES[node.status] : "Mesure indisponible"}</strong>
+    <p>{!node ? "—" : node.current_task ? TASKS[node.current_task] : "Aucune tâche en cours"}</p>
+  </div>;
+}
+
+function Flows({ frame }) {
+  return <div className="tri-flows" role="group" aria-label="Transferts récents entre les cerveaux et les agents">
+    <span className="tri-flows-title">Transferts · 2 dernières secondes</span>
+    {frame?.edge_flows.length > 0
+      ? <ul>{frame.edge_flows.map((edge, index) => <li key={`${edge.source}-${edge.target}-${index}`}
+        style={{ "--from": COLORS[edge.source], "--to": COLORS[edge.target] }}>
+        <b>{SHORT[edge.source]}</b><i aria-label="vers">→</i><b>{SHORT[edge.target]}</b>
+        {edge.count > 1 && <em>×{edge.count}</em>}
+      </li>)}</ul>
+      : <span className="tri-flow-empty">{frame ? "Aucun transfert récent" : "Mesure indisponible"}</span>}
+  </div>;
+}
+
 export default function ZeusTriCortex() {
   const [frame, setFrame] = useState(null);
   const [notice, setNotice] = useState("Connexion à Sentinel…");
   const [refresh, setRefresh] = useState(0);
-  const [webgl] = useState(supports3D);
+  const [history, setHistory] = useState(null);
   const [jobs, setJobs] = useState([]);
   const [jobsLoaded, setJobsLoaded] = useState(false);
   const [jobsError, setJobsError] = useState("");
@@ -100,6 +126,7 @@ export default function ZeusTriCortex() {
 
   useEffect(() => {
     setFrame(null);
+    setHistory(null);
     setDetail(null);
     setJobs([]);
     setJobsLoaded(false);
@@ -122,6 +149,7 @@ export default function ZeusTriCortex() {
       received = Date.now();
       if (alive) {
         setFrame(valid); setNotice("");
+        setHistory((previous) => recordFrame(previous, valid));
         if (!connected.current) { connected.current = true; setJobsVersion((value) => value + 1); }
       }
     };
@@ -130,7 +158,7 @@ export default function ZeusTriCortex() {
       accessEpoch.current += 1;
       connected.current = false;
       mutation.current?.abort();
-      setFrame(null); setDetail(null); setJobs([]); setJobsLoaded(false);
+      setFrame(null); setHistory(null); setDetail(null); setJobs([]); setJobsLoaded(false);
       setNotice(message);
     };
     const connect = async () => {
@@ -251,35 +279,56 @@ export default function ZeusTriCortex() {
   };
 
   const measured = new Map([...(frame?.nodes || []), ...(frame?.satellites || [])].map((node) => [node.id, node]));
+  const charts = {
+    brain_1: <ExchangeChart exchanges={history?.exchanges || []} busy={measured.get("brain_1")?.status === "busy"}
+      available={Boolean(frame)} />,
+    brain_2: <OutcomeDonut completed={measured.get("brain_2")?.completed ?? 0} failures={measured.get("brain_2")?.failures ?? 0}
+      queued={measured.get("brain_2")?.queued ?? 0} busy={measured.get("brain_2")?.status === "busy"} available={Boolean(frame)} />,
+    brain_3: <SquadRose available={Boolean(frame)} agents={SATELLITES.map((id) => {
+      const agent = measured.get(id);
+      return {
+        id, label: LABELS[id], color: COLORS[id], completed: agent?.completed ?? 0, failures: agent?.failures ?? 0,
+        status: agent?.status ?? "unknown", statusLabel: agent ? STATES[agent.status] : "Mesure indisponible",
+      };
+    })} />,
+  };
   return <section className="tri-cortex" aria-label="TriCortex et ses quatre subagents" data-testid="zeus-tricortex">
     <header className="tri-head">
       <div><h2>TRICORTEX · SENTINEL MASTER</h2>
         <p>Deux processeurs directs · quatre agents supervisés · {frame?.source === "cloud" ? "Cloud via relais" : "instance API"}</p></div>
-      <button type="button" className="zcx-brain-button" onClick={() => setRefresh((value) => value + 1)}>Reconnecter</button>
+      <div className="tri-head-actions">
+        {frame && <span className="tri-live-chip">En direct</span>}
+        <button type="button" className="zcx-brain-button" onClick={() => setRefresh((value) => value + 1)}>Reconnecter</button>
+      </div>
     </header>
     {notice && <p role="status" className="tri-notice">{notice}</p>}
-    {frame && webgl ? <GraphBoundary key={refresh}>
-      <Suspense fallback={<p className="tri-notice">Chargement du graphe 3D…</p>}>
-        <Graph frame={frame} />
-      </Suspense>
-    </GraphBoundary> : <div className="tri-graph-placeholder">
-      {frame ? "Vue compatible sans WebGL 2 : toutes les mesures restent disponibles." : "En attente de mesures authentifiées."}
-    </div>}
-    <p className="tri-caption">Orbites = architecture. Intensité = charge de travail mesurée, pas CPU. Arêtes = transferts des 2 dernières secondes.</p>
-    <div className="tri-nodes">
-      {IDS.map((id) => {
+    <div className="tri-brains">
+      {MAIN.map((id) => {
         const node = measured.get(id);
-        return <article key={id} className="tri-node" data-node={id} data-status={node?.status || "unknown"}>
+        return <article key={id} className="tri-node tri-brain" data-node={id} data-status={node?.status || "unknown"}
+          style={{ "--accent": COLORS[id], "--load": node ? node.load : 0 }}>
+          <header>
+            <span className="tri-role">{ROLES[id]}</span>
+            <h3>{LABELS[id]}</h3>
+            <State node={node} />
+          </header>
+          {charts[id]}
+          <Stats id={id} node={node} />
+        </article>;
+      })}
+    </div>
+    <Flows frame={frame} />
+    <p className="tri-caption">Chaque graphe est tracé uniquement avec les mesures reçues de Sentinel : aucune valeur n’est simulée.
+      Les compteurs cumulent l’activité de l’instance ; la charge est un travail en cours, pas un usage CPU.</p>
+    <p className="tri-section">Escouade supervisée par le Cerveau 3</p>
+    <div className="tri-nodes">
+      {SATELLITES.map((id) => {
+        const node = measured.get(id);
+        return <article key={id} className="tri-node tri-agent" data-node={id} data-status={node?.status || "unknown"}
+          style={{ "--accent": COLORS[id] }}>
           <h3>{LABELS[id]}</h3>
-          <strong>{node ? STATES[node.status] : "Mesure indisponible"}</strong>
-          <p>{node?.current_task ? TASKS[node.current_task] : "—"}</p>
-          <dl>
-            <div><dt>Charge</dt><dd>{node ? `${Math.round(node.load * 100)} %` : "—"}</dd></div>
-            <div><dt>Dernière durée</dt><dd>{node?.latency_ms == null ? "—" : `${Math.round(node.latency_ms)} ms`}</dd></div>
-            {id === "brain_1" && <div><dt>Premier fragment</dt><dd>{node?.first_token_ms == null ? "—" : `${Math.round(node.first_token_ms)} ms`}</dd></div>}
-            <div><dt>File / terminées</dt><dd>{node ? `${node.queued} / ${node.completed}` : "—"}</dd></div>
-            <div><dt>Échecs / redémarrages</dt><dd>{node ? `${node.failures} / ${node.restarts}` : "—"}</dd></div>
-          </dl>
+          <State node={node} />
+          <Stats id={id} node={node} />
         </article>;
       })}
     </div>

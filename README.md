@@ -1958,11 +1958,12 @@ enregistrées, dans un registre SQLAlchemy distinct du portefeuille personnel.
 [Le guide backend](backend/FINANCE.md) fait référence : parcours de test
 bancaire et grille de recette, formules, seuils, limites, API et exploitation.
 
-**ZEUS CORTEX** expose aussi l'architecture Tri-Cortex de ΣIRIUS : Brain 1
-(dialogue et HUD) et Brain 2 (contrôles HACCP, TVA, marges) répondent
-directement, tandis que Brain 3, le Sentinel Master, supervise quatre subagents
+**ZEUS CORTEX** expose aussi l'architecture Tri-Cortex de ΣIRIUS : le Cerveau 1
+(dialogue et HUD) et le Cerveau 2 (contrôles HACCP, TVA, marges) répondent
+directement, tandis que le Cerveau 3, le Sentinel Master, supervise quatre subagents
 d'arrière-plan (Vision, SanitaryGuard, MarginAudit, Archivist) sur une file
-durable. Un graphe 3D affiche leur activité réelle, sans animation simulée ;
+durable. Trois graphes analytiques, un par cerveau, affichent leur activité réelle,
+sans animation simulée ;
 l'audit financier y montre santé, alertes acquittables, trésorerie glissante et
 synthèses traçables. Voir [Tri-Cortex](docs/tri-cortex.md) et
 [la répartition financière](backend/FINANCE.md#cerveau-analytique-dans-zeus-cortex).

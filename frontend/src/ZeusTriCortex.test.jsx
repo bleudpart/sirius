@@ -117,6 +117,99 @@ test("l'activité et les arêtes changent uniquement à réception d'une mesure 
   expect(node("vision").dataset.status).toBe("busy");
 });
 
+test("présente trois fenêtres de cerveaux, chacune avec son graphe analytique et sans canevas 3D", async () => {
+  await mount();
+  expect(host.querySelectorAll(".tri-brain")).toHaveLength(3);
+  expect(host.querySelectorAll(".tri-agent")).toHaveLength(4);
+  expect(host.querySelectorAll("canvas")).toHaveLength(0);
+  expect(node("brain_1").querySelector('[data-testid="brain-chart-latency"]')).not.toBeNull();
+  expect(node("brain_2").querySelector('[data-testid="brain-chart-outcomes"]')).not.toBeNull();
+  expect(node("brain_3").querySelector('[data-testid="brain-chart-squad"]')).not.toBeNull();
+  expect(host.querySelectorAll(".tri-agent svg")).toHaveLength(0);
+  expect(node("brain_1").textContent).toContain("Dialogue et HUD en direct");
+  expect(node("brain_2").textContent).toContain("Règles HACCP, TVA et marges");
+  expect(node("brain_3").textContent).toContain("Superviseur de quatre agents");
+  expect(node("brain_1").textContent).toContain("Premier fragment");
+  expect(node("brain_2").textContent).not.toContain("Premier fragment");
+  expect(host.querySelector(".tri-live-chip")).not.toBeNull();
+});
+
+test("le graphe du Cerveau 1 n'ajoute un point qu'à chaque échange réellement terminé", async () => {
+  await mount();
+  const chart = () => node("brain_1").querySelector("svg");
+  expect(chart().getAttribute("aria-label")).toBe("Durée des échanges du Cerveau 1 : aucune mesure.");
+  expect(node("brain_1").textContent).toContain("Aucun échange mesuré pour l’instant");
+
+  const first = makeFrame(10);
+  Object.assign(first.nodes[0], { completed: 1, latency_ms: 300 });
+  await act(async () => socket().emit(first));
+  expect(node("brain_1").querySelectorAll(".tri-point")).toHaveLength(1);
+
+  const unchanged = makeFrame(11);
+  Object.assign(unchanged.nodes[0], { completed: 1, latency_ms: 300 });
+  await act(async () => socket().emit(unchanged));
+  expect(node("brain_1").querySelectorAll(".tri-point")).toHaveLength(1);
+
+  const second = makeFrame(12);
+  Object.assign(second.nodes[0], { completed: 2, latency_ms: 500, first_token_ms: 40 });
+  await act(async () => socket().emit(second));
+  expect(node("brain_1").querySelectorAll(".tri-point")).toHaveLength(2);
+  expect(node("brain_1").querySelectorAll(".tri-point-fragment")).toHaveLength(1);
+  expect(chart().getAttribute("aria-label")).toContain("2 échanges mesurés");
+  expect(chart().getAttribute("aria-label")).toContain("dernière 500 ms");
+
+  await act(async () => socket().emit(makeFrame(9)));
+  expect(node("brain_1").querySelectorAll(".tri-point")).toHaveLength(2);
+});
+
+test("les graphes des cerveaux sont vidés avec les autres mesures quand le flux est perdu", async () => {
+  await mount();
+  const update = makeFrame(10);
+  Object.assign(update.nodes[0], { completed: 1, latency_ms: 300 });
+  Object.assign(update.nodes[1], { completed: 4 });
+  await act(async () => socket().emit(update));
+  expect(node("brain_1").querySelectorAll(".tri-point")).toHaveLength(1);
+  expect(host.querySelector(".tri-live-chip")).not.toBeNull();
+
+  await act(async () => socket().disconnect(1006));
+  expect(node("brain_1").querySelectorAll(".tri-point")).toHaveLength(0);
+  expect(node("brain_1").textContent).toContain("Mesure indisponible");
+  expect(node("brain_2").querySelector("svg").getAttribute("aria-label"))  .toBe("Tâches du Cerveau 2 : mesure indisponible.");
+    expect(node("brain_3").querySelector("svg").getAttribute("aria-label")).toBe("Agents du Cerveau 3 : mesure indisponible.");
+  expect(host.querySelector(".tri-flows").textContent).toContain("Mesure indisponible");
+  expect(host.querySelector(".tri-live-chip")).toBeNull();
+});
+
+test("les graphes du Cerveau 2 et du Cerveau 3 reprennent uniquement les compteurs mesurés", async () => {
+  await mount();
+  const update = makeFrame(10);
+  Object.assign(update.nodes[1], { completed: 8, failures: 1, queued: 1 });
+  Object.assign(update.satellites[0], { completed: 6 });
+  Object.assign(update.satellites[1], { completed: 3, failures: 1, status: "degraded" });
+  await act(async () => socket().emit(update));
+  expect(node("brain_2").querySelector("svg").getAttribute("aria-label"))
+    .toBe("Tâches du Cerveau 2 : 8 terminées, 1 échec, 1 en file, taux de réussite 88 %.");
+  expect(node("brain_3").querySelector("svg").getAttribute("aria-label"))
+    .toBe("Tâches terminées par agent du Cerveau 3 : Vision 6, SanitaryGuard 3, MarginAudit 0, Archivist 0.");
+  expect(node("brain_3").querySelectorAll(".tri-petal")).toHaveLength(2);
+  expect(node("brain_3").querySelectorAll(".tri-petal.is-alert")).toHaveLength(1);
+});
+
+test("la bande de transferts n'affiche que les flux mesurés des 2 dernières secondes", async () => {
+  await mount();
+  expect(host.querySelector(".tri-flows").textContent).toContain("Aucun transfert récent");
+  const update = makeFrame(10);
+  update.edge_flows = [{ source: "vision", target: "brain_2", count: 3, last_at: STAMP }];
+  await act(async () => socket().emit(update));
+  const chips = host.querySelectorAll(".tri-flows li");
+  expect(chips).toHaveLength(1);
+  expect(chips[0].textContent).toContain("Vision");
+  expect(chips[0].textContent).toContain("Cerveau 2");
+  expect(chips[0].textContent).toContain("×3");
+  await act(async () => socket().emit(makeFrame(11)));
+  expect(host.querySelectorAll(".tri-flows li")).toHaveLength(0);
+});
+
 test.each([
   (frame) => { frame.satellites[0].pulse_level = 1.01; },
   (frame) => { frame.satellites[0].pulse_level = -0.1; },

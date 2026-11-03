@@ -25,7 +25,7 @@ INVOICE_PROMPT = """Lis fidelement cette facture fournisseur, uniquement les inf
 N'invente ni identite juridique, ni reference, ni devise, ni taux de TVA.
 Les montants et quantites sont des chaines decimales, jamais des nombres flottants.
 Une valeur absente ou illisible vaut null. Ne reconstruis pas les totaux ou les lignes
-par calcul : Brain 2 controle les montants lus. Ne deduis pas la TVA deductible.
+par calcul : le Cerveau 2 controle les montants lus. Ne deduis pas la TVA deductible.
 La date est ISO YYYY-MM-DD seulement si jour, mois et annee sont explicites.
 Garde quantite, unite, reference produit et prix unitaire HT distincts des montants
 de ligne. Une marque ne suffit pas a identifier le fournisseur facturant.

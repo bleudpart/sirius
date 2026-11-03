@@ -1,27 +1,81 @@
-.tri-cortex { margin: 18px; border: 1px solid var(--zcx-line, #3e4c54); border-radius: 12px; background: #0b1725; overflow: hidden; }
+.tri-cortex {
+  margin: 18px; border: 1px solid var(--zcx-line, #3e4c54); border-radius: 16px; overflow: hidden;
+  background: radial-gradient(120% 70% at 50% -15%, #153048 0%, #0b1725 55%, #08111e 100%);
+}
 .tri-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 18px 8px; }
-.tri-head > button { flex: none; }
+.tri-head-actions { display: flex; flex: none; align-items: center; gap: 10px; }
+.tri-head-actions .zcx-brain-button {
+  padding: 0 18px; border-color: rgba(216, 184, 117, 0.4); border-radius: 999px; background: rgba(216, 184, 117, 0.1);
+  font-size: 11.5px; letter-spacing: 0.1em; text-transform: uppercase;
+}
 .tri-head h2 { margin: 0; color: #ffe6a3; font-size: 17px; letter-spacing: 0.09em; }
 .tri-head p, .tri-caption { color: #93adbd; font-size: 12px; line-height: 1.5; }
-.tri-caption { padding: 0 16px; }
+.tri-caption { margin: 10px 0 0; padding: 0 16px; }
+.tri-live-chip {
+  display: inline-flex; align-items: center; gap: 7px; padding: 4px 11px; border: 1px solid rgba(111, 224, 182, 0.35);
+  border-radius: 999px; background: rgba(111, 224, 182, 0.09); color: #b6efdd; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+}
+.tri-live-chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #6fe0b6; box-shadow: 0 0 8px #6fe0b6; animation: triLive 1.8s ease-in-out infinite; }
 .tri-notice { margin: 12px 16px; padding: 10px 12px; border-left: 3px solid #d8b875; color: #ffe6a3; background: #182332; overflow-wrap: anywhere; }
-.tri-graph { height: 300px; width: 100%; background: radial-gradient(ellipse at 60% 50%, #132d3b, #08111e 75%); }
-.tri-graph-placeholder { padding: 24px 16px; color: #93adbd; text-align: center; }
-.tri-nodes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 10px 14px; }
-.tri-node { min-width: 0; padding: 12px; border: 1px solid #253a4a; border-radius: 8px; background: #0d1b2b; }
-.tri-node:nth-child(-n+3) { grid-column: span 1; }
-.tri-node:nth-child(3) { grid-column: span 2; }
-.tri-node h3 { margin: 0 0 8px; color: #c6d9e3; font-size: 13px; overflow-wrap: anywhere; }
-.tri-node strong { color: #83b9aa; font-size: 13px; }
-.tri-node[data-status="busy"] { border-color: #7ab9b1; }
-.tri-node[data-status="busy"] strong { color: #b6efdd; }
-.tri-node[data-status="failed"] strong, .tri-node[data-status="degraded"] strong { color: #f0a197; }
-.tri-node[data-status="unknown"] strong, .tri-node[data-status="stopped"] strong { color: #91a1ac; }
-.tri-node p { min-height: 16px; margin: 5px 0; color: #b8cbd8; font-size: 12px; }
-.tri-node dl { margin: 10px 0 0; font-size: 11px; }
-.tri-node dl > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px; padding-top: 4px; }
-.tri-node dt { color: #93adbd; }
-.tri-node dd { margin: 0; color: #eff8ff; font-variant-numeric: tabular-nums; }
+.tri-section { margin: 14px 16px 2px; color: #8aa5b6; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; }
+
+.tri-brains { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 10px 16px 4px; }
+.tri-node { min-width: 0; border: 1px solid rgba(255, 255, 255, 0.08); background: #0d1b2b; }
+.tri-brain {
+  position: relative; display: flex; flex-direction: column; gap: 12px; padding: 18px 14px 14px; border-radius: 16px; overflow: hidden;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01)), #0d1b2b;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.tri-brain::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 3px;
+  background: linear-gradient(90deg, var(--accent) calc(var(--load, 0) * 100%), rgba(255, 255, 255, 0.07) 0);
+}
+.tri-brain > header { min-width: 0; }
+.tri-role { color: var(--accent); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; }
+.tri-node h3 { margin: 3px 0 0; color: #e6f3fb; font-size: 15px; overflow-wrap: anywhere; }
+.tri-state { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 9px; }
+.tri-state strong {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 11px 3px 9px; border-radius: 999px;
+  background: rgba(131, 185, 170, 0.12); color: #83b9aa; font-size: 12px; font-weight: 600;
+}
+.tri-state strong::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 7px currentColor; }
+.tri-state p { margin: 0; color: #b8cbd8; font-size: 12px; }
+.tri-node[data-status="busy"] strong { background: rgba(182, 239, 221, 0.14); color: #b6efdd; }
+.tri-node[data-status="failed"] strong, .tri-node[data-status="degraded"] strong { background: rgba(240, 161, 151, 0.13); color: #f0a197; }
+.tri-node[data-status="unknown"] strong, .tri-node[data-status="stopped"] strong { background: rgba(145, 161, 172, 0.12); color: #91a1ac; }
+.tri-node[data-status="busy"] { border-color: var(--accent, #7ab9b1); }
+.tri-brain[data-status="busy"] { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28), 0 0 26px -8px var(--accent); }
+.tri-node[data-status="failed"], .tri-node[data-status="degraded"] { border-color: rgba(240, 161, 151, 0.6); }
+
+.tri-stats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; margin: 0; }
+.tri-stats > div {
+  grid-column: span 2; display: flex; flex-direction: column; justify-content: space-between; gap: 3px; min-width: 0;
+  padding: 7px 9px; border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; background: rgba(255, 255, 255, 0.035);
+}
+.tri-stats[data-tiles="4"] > div, .tri-stats[data-tiles="5"] > div:nth-child(n+4) { grid-column: span 3; }
+.tri-stats dt { color: #8aa5b6; font-size: 10.5px; line-height: 1.25; }
+.tri-stats dd { margin: 0; color: #eff8ff; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+.tri-flows {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 8px 16px 0; padding: 9px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 12px; background: rgba(255, 255, 255, 0.025);
+}
+.tri-flows-title { color: #8aa5b6; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; }
+.tri-flows ul { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.tri-flows li {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 11px; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06); color: #e6f3fb; font-size: 12px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--from) 24%, transparent), color-mix(in srgb, var(--to) 24%, transparent));
+}
+.tri-flows li i { color: #8aa5b6; font-style: normal; }
+.tri-flows li em { color: #ffe6a3; font-style: normal; font-variant-numeric: tabular-nums; }
+.tri-flow-empty { color: #7b97ac; font-size: 12px; }
+
+.tri-nodes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 6px 16px 10px; }
+.tri-agent { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 13px 12px 12px 15px; border-radius: 14px; overflow: hidden; }
+.tri-agent::before { content: ""; position: absolute; left: 0; top: 13px; bottom: 13px; width: 3px; border-radius: 0 3px 3px 0; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+.tri-agent h3 { margin: 0; font-size: 13.5px; }
+.tri-agent .tri-state { margin-top: 0; }
 .tri-jobs { border-top: 1px solid #253a4a; padding: 14px 16px; font-size: 13px; }
 .tri-jobs summary { cursor: pointer; color: #d8b875; }
 .tri-jobs > p { line-height: 1.5; color: #93adbd; }
@@ -31,12 +85,22 @@
 .tri-result pre { max-height: 350px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: #c6d9e3; background: #08111e; padding: 12px; font-size: 11px; }
 .tri-result p { color: #d8b875; }
 .zcx-brain-roles .zcx-rE { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@keyframes triLive { 50% { opacity: 0.35; } }
+@media (max-width: 999px) {
+  .tri-brains, .tri-nodes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tri-brain:nth-child(3) { grid-column: 1 / -1; }
+}
 @media (max-width: 680px) {
   .tri-cortex { margin: 10px; }
   .tri-head { align-items: flex-start; padding: 12px; }
   .tri-head h2 { font-size: 14px; }
-  .tri-nodes { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 8px; }
-  .tri-node:nth-child(3) { grid-column: span 2; }
-  .tri-graph { height: 280px; }
+  .tri-brains { grid-template-columns: minmax(0, 1fr); padding: 8px; }
+  .tri-brain:nth-child(3) { grid-column: auto; }
+  .tri-nodes { padding: 6px 8px 10px; }
+  .tri-section, .tri-caption { padding-left: 12px; padding-right: 12px; margin-left: 0; margin-right: 0; }
+  .tri-flows { margin: 8px 8px 0; }
   .zcx-brain-roles .zcx-rE { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tri-live-chip::before { animation: none; }
 }

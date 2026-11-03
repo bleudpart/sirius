@@ -1632,8 +1632,8 @@ async def summarize_episode(history):
 # ==========================================
 async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="normal", keys=None, mood=None, environment=None):
     """
-    Processeurs directs de ΣIRIUS : Brain 1 pour le dialogue, Brain 2 en mode profond.
-    Sentinel (Brain 3) supervise séparément les analyses de fond.
+    Processeurs directs de ΣIRIUS : Cerveau 1 pour le dialogue, Cerveau 2 en mode profond.
+    Sentinel (Cerveau 3) supervise séparément les analyses de fond.
     Cerebras/Groq répondent en mode normal ; Kimi rédige les réponses en mode profond.
     """
     keys = keys or {}

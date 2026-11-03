@@ -1,4 +1,4 @@
-"""Brain 1 et Brain 2 sont des appels directs, sans worker ni file d'attente."""
+"""Les Cerveaux 1 et 2 sont des appels directs, sans worker ni file d'attente."""
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from contextlib import contextmanager

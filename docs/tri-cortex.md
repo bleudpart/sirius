@@ -1,9 +1,10 @@
-# Tri-Cortex : Brain 1, Brain 2 et Sentinel Master
+# Tri-Cortex : Cerveau 1, Cerveau 2 et Sentinel Master
 
 Tri-Cortex sépare le dialogue, la logique métier et le travail de fond de ΣIRIUS.
-Brain 1 et Brain 2 sont des **appels directs**, sans worker ni file. Brain 3,
-le **Sentinel Master**, supervise quatre subagents `asyncio` qui consomment une
-file durable SQLite. Le graphe **ZEUS CORTEX** affiche leur activité réelle.
+Le Cerveau 1 et le Cerveau 2 sont des **appels directs**, sans worker ni file. Le
+Cerveau 3, le **Sentinel Master**, supervise quatre subagents `asyncio` qui
+consomment une file durable SQLite. Trois graphes analytiques de **ZEUS CORTEX**,
+un par cerveau, affichent leur activité réelle.
 
 Les transports IA existants sont conservés : Cerebras/Groq pour le dialogue
 rapide, Kimi pour le mode profond et OpenAI pour Vision. Tri-Cortex ne change
@@ -25,9 +26,9 @@ Ce que Tri-Cortex **ne fait pas** :
 
 ```mermaid
 flowchart LR
-    U["Utilisateur"] <--> B1["Brain 1 · Fast Stream / HUD"]
-    B1 <--> B2["Brain 2 · Deep Reasoning"]
-    B1 -- "photo, signal" --> B3["Brain 3 · Sentinel Master"]
+    U["Utilisateur"] <--> B1["Cerveau 1 · Fast Stream / HUD"]
+    B1 <--> B2["Cerveau 2 · Deep Reasoning"]
+    B1 -- "photo, signal" --> B3["Cerveau 3 · Sentinel Master"]
     B3 --> V["SubagentVision"]
     B3 --> S["SubagentSanitaryGuard"]
     B3 --> M["SubagentMarginAudit"]
@@ -37,7 +38,7 @@ flowchart LR
     B2 -- "résultat validé" --> B1
     S -- "alertes DLC / allergènes" --> B1
     Q[("tri_cortex.sqlite3 · file durable")] <--> B3
-    T["Télémétrie · WebSocket"] --> Z["ZEUS CORTEX 3D"]
+    T["Télémétrie · WebSocket"] --> Z["ZEUS CORTEX · graphes analytiques"]
 ```
 
 | Composant | Rôle | Exécution |
@@ -45,27 +46,27 @@ flowchart LR
 | `Brain1FastStream` | Réponse et flux de dialogue, temps jusqu'au premier fragment, publication HUD | Direct, dans la requête |
 | `Brain2DeepReasoning` | Contrôles HACCP des lectures, cohérence HT/TVA/TTC des factures, variation de prix, coût matière, marge et point mort | Direct ; calculs synchrones en thread |
 | `Brain3SentinelMaster` | Démarre/arrête l'escouade, heartbeat (1 s), redistribution des tâches dues, relance des workers | Arrière-plan |
-| `SubagentVision` | Lecture d'étiquette ou de facture, confiance par champ, puis Brain 2 → Brain 1 | File Sentinel |
+| `SubagentVision` | Lecture d'étiquette ou de facture, confiance par champ, puis Cerveau 2 → Cerveau 1 | File Sentinel |
 | `SubagentSanitaryGuard` | DLC expirée, rotation ≤ 48 h, date inconnue, lecture non conforme, allergènes à vérifier | File Sentinel |
 | `SubagentMarginAudit` | Audit des prix fournisseurs confirmés ; héberge l'unique ordonnanceur financier existant | File Sentinel |
 | `SubagentArchivist` | Copies JPEG compressées, purge des caches, lecture des tâches hors ligne dues | File Sentinel |
 | `TriCortexOrchestrator` | Assemble les trois cerveaux, le bus d'événements et la télémétrie | Cycle de vie FastAPI |
 
-### Chaîne opérationnelle Vision → Brain 2 → Brain 1
+### Chaîne opérationnelle Vision → Cerveau 2 → Cerveau 1
 
 1. Le scanner HACCP ou `POST /api/cortex/tri/vision` stocke l'image dans la file
    avec son SHA-256, puis crée une tâche idempotente (`scope`, type, clé de requête).
 2. `SubagentVision` relit l'image depuis SQLite, vérifie son empreinte et appelle
    le transport Vision existant (`gpt-4o-mini`, délai de 30 s, sans nouvel essai SDK).
-3. Brain 2 revalide la lecture avec les règles HACCP existantes. Une confiance
+3. Le Cerveau 2 revalide la lecture avec les règles HACCP existantes. Une confiance
    absente, illisible ou portant sur un champ incertain reste **inconnue** (`null`).
-4. Brain 1 publie le résultat sur le HUD. Le résultat durable porte
+4. Le Cerveau 1 publie le résultat sur le HUD. Le résultat durable porte
    `requires_human_review=true` et `confidence_method="model_self_report_not_calibrated"`.
 
 Dans le scanner, la sauvegarde de réception existante reste inchangée : source
 canonique v1, original SHA-256 et quatre destinations. Les scores de confiance
 restent dans le résultat Cortex, jamais dans la preuve HACCP archivée. Si une
-analyse reprise est utilisée plus tard, Brain 2 recontrôle la DLC à la date
+analyse reprise est utilisée plus tard, le Cerveau 2 recontrôle la DLC à la date
 d'utilisation.
 
 ## Cycle de vie et isolation des pannes
@@ -81,8 +82,9 @@ contient que des identifiants.
   tentatives au total. Erreur métier attendue : échec enregistré, sans relance.
 - Erreur inattendue : tâche en échec et worker arrêté. Sentinel le relance au plus
   trois fois par minute, avec un délai croissant plafonné à 30 s.
-- Une panne de subagent ne touche ni Brain 1 ni Brain 2 ; un échec de démarrage
-  SQLite laisse aussi Brain 1 et Brain 2 disponibles, Brain 3 apparaissant `failed`.
+- Une panne de subagent ne touche ni le Cerveau 1 ni le Cerveau 2 ; un échec de
+  démarrage SQLite laisse aussi les Cerveaux 1 et 2 disponibles, le Cerveau 3
+  apparaissant `failed`.
 - Une tâche altérée dans SQLite (empreinte ou contrat invalide) est mise en
   quarantaine en `failed`, sans boucle de redémarrage.
 - Capacité de 64 tâches non terminées par subagent ; au-delà, la demande est
@@ -129,6 +131,35 @@ Le flux est une `CortexFrame` JSON, version 1, émise environ chaque seconde :
 - Le client refuse les trames incomplètes ou hors ordre, efface les mesures après
   5 s sans nouvelle trame et affiche « indisponible » plutôt qu'un faux zéro.
   Aucune activité n'est simulée par une animation aléatoire.
+
+### Les trois graphes analytiques
+
+Chaque fenêtre de cerveau porte un graphe SVG natif, sans dépendance de
+graphisme, tracé **uniquement** avec les trames reçues
+([ZeusBrainCharts.jsx](../frontend/src/ZeusBrainCharts.jsx)) :
+
+| Fenêtre | Graphe | Mesures utilisées |
+|---|---|---|
+| Cerveau 1 · Fast Stream / HUD | Courbe lissée des durées d'échange, points « premier fragment », moyenne en pointillé | `latency_ms`, `first_token_ms`, `completed`, `failures` |
+| Cerveau 2 · Logique métier | Anneau segmenté terminées / échecs / en file, taux de réussite au centre | `completed`, `failures`, `queued` |
+| Cerveau 3 · Sentinel Master | Rose polaire des tâches terminées par chacun des quatre agents | `completed`, `failures` et `status` des satellites |
+
+- Le Cerveau 1 garde un **historique glissant de 24 échanges** dans le navigateur
+  ([cortexHistory.js](../frontend/src/cortexHistory.js)). Un point n'est ajouté que
+  lorsque `completed + failures` augmente entre deux trames : il porte la dernière
+  durée mesurée, sans interpolation. Si plusieurs échanges se terminent entre deux
+  trames, un seul point est tracé. Une trame dupliquée ou plus ancienne n'ajoute
+  rien ; un nouveau `runtime_id` repart d'un historique vide. Le premier fragment,
+  mesuré pendant le flux, est rattaché à l'échange qui se termine ensuite.
+- Les compteurs des Cerveaux 2 et 3 sont un **cumul de l'instance** serveur suivie.
+  Le serveur oublie les lignes inactives après 3 600 s : un compteur peut donc
+  diminuer.
+- Un secteur très petit de l'anneau reçoit un balayage minimal visible (6°) ;
+  les valeurs et parts exactes restent dans les infobulles et la légende.
+- L'anneau et la rose ne s'animent que lorsque le nœud est réellement `busy`.
+- Sans flux (5 s de silence, déconnexion, trame invalide), les graphes se vident et
+  affichent « Mesure indisponible » : aucune courbe ni aucun secteur n'est tracé
+  sans mesure.
 
 ## API
 
@@ -180,13 +211,13 @@ Depuis `backend` :
 [Le script](../backend/tri_cortex_demo.py) utilise le vrai runtime et une vraie
 file SQLite temporaire, sans clé, compte ni réseau. Les données sont **fictives**.
 
-1. Brain 3 lance l'analyse d'une étiquette de viande ; le lecteur Vision simulé
-   reste occupé.
-2. Pendant ce temps, Brain 1 diffuse une réponse. Le script vérifie que le premier
-   fragment arrive avant la fin de Vision.
-3. SanitaryGuard plante volontairement. Brain 2 répond toujours, puis Sentinel
+1. Le Cerveau 3 lance l'analyse d'une étiquette de viande ; le lecteur Vision
+   simulé reste occupé.
+2. Pendant ce temps, le Cerveau 1 diffuse une réponse. Le script vérifie que le
+   premier fragment arrive avant la fin de Vision.
+3. SanitaryGuard plante volontairement. Le Cerveau 2 répond toujours, puis Sentinel
    relance le worker et un nouveau contrôle aboutit.
-4. MarginAudit calcule un audit de prix via Brain 2, sans écriture comptable.
+4. MarginAudit calcule un audit de prix via le Cerveau 2, sans écriture comptable.
 5. Le script affiche la lecture à vérifier, les confiances, deux trames 3 + 4 et
    les `edge_flows`, puis arrête l'escouade et supprime son dossier temporaire.
 
@@ -198,7 +229,7 @@ Les deux lignes `[SENTINEL]` de la panne sont attendues.
 |---|---|
 | [schemas.py](../backend/tri_cortex/schemas.py) | Contrats Pydantic stricts, tâches, résultats, trames |
 | [store.py](../backend/tri_cortex/store.py) | File SQLite WAL, idempotence, leases, reprise bornée |
-| [brains.py](../backend/tri_cortex/brains.py) | Brain 1 et Brain 2 directs |
+| [brains.py](../backend/tri_cortex/brains.py) | Cerveau 1 et Cerveau 2 directs |
 | [runtime.py](../backend/tri_cortex/runtime.py) | `BaseSubAgent`, `Brain3SentinelMaster`, `TriCortexOrchestrator` |
 | [agents.py](../backend/tri_cortex/agents.py) | Les quatre subagents |
 | [vision.py](../backend/tri_cortex/vision.py) | Lecture scorée sans changer le schéma HACCP canonique |
@@ -206,11 +237,13 @@ Les deux lignes `[SENTINEL]` de la panne sont attendues.
 | [telemetry.py](../backend/tri_cortex/telemetry.py) | Bus borné et trames ZEUS CORTEX |
 | [routes.py](../backend/tri_cortex/routes.py) | API et WebSocket |
 | [ZeusTriCortex.jsx](../frontend/src/ZeusTriCortex.jsx) | Panneau, validation des trames, tâches et relance |
-| [TriCortexGraph.jsx](../frontend/src/three/TriCortexGraph.jsx) | Graphe Three.js 3 nœuds + 4 satellites |
+| [ZeusBrainCharts.jsx](../frontend/src/ZeusBrainCharts.jsx) | Les trois graphes : durées d'échange, issue des tâches, travail de l'escouade |
+| [cortexHistory.js](../frontend/src/cortexHistory.js) | Historique glissant du Cerveau 1, construit depuis les trames reçues |
+| [chartMath.js](../frontend/src/lib/chartMath.js) | Échelles, courbes lissées, secteurs et anneaux SVG (fonctions pures) |
 
 ```powershell
 # backend
 & '..\.venv\Scripts\python.exe' -m pytest tests\test_tri_cortex.py tests\test_tri_cortex_api.py tests\test_tri_cortex_services.py tests\test_brain_analytical.py -q
 # frontend
-npm test -- --watchAll=false --runInBand --runTestsByPath src\ZeusTriCortex.test.jsx src\ZeusCortex.test.jsx
+npm test -- --watchAll=false --runInBand --runTestsByPath src\ZeusTriCortex.test.jsx src\ZeusCortex.test.jsx src\ZeusBrainCharts.test.jsx src\cortexHistory.test.js src\lib\chartMath.test.js
 ```

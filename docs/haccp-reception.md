@@ -57,7 +57,7 @@ flowchart TD
 ### Supervision Sentinel (Tri-Cortex)
 
 Dans le serveur, la lecture du scanner passe par `SubagentVision` de
-[Tri-Cortex](tri-cortex.md), puis Brain 2 la revalide avant l'enregistrement
+[Tri-Cortex](tri-cortex.md), puis le Cerveau 2 la revalide avant l'enregistrement
 decrit ici. Apres une nouvelle reception, Sentinel programme un controle DLC /
 allergenes et une copie compressee. Ces traitements secondaires ne modifient ni
 la source canonique v1, ni l'original SHA-256, ni les quatre destinations. Les

@@ -1,7 +1,7 @@
 """Tableaux analytiques décisionnels de la finance d'entreprise : Decimal exact, sans I/O, sans IA.
 
-Chaque méthode publique renvoie un HudPayload triable par colonne, diffusable tel quel au HUD (Brain 1)
-ou interrogeable par Brain 2 grâce au champ `speech`.
+Chaque méthode publique renvoie un HudPayload triable par colonne, diffusable tel quel au HUD (Cerveau 1)
+ou interrogeable par le Cerveau 2 grâce au champ `speech`.
 """
 import calendar
 import json

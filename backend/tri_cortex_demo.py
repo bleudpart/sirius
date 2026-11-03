@@ -1,7 +1,7 @@
 """Demonstration autonome Tri-Cortex, sans cle ni reseau : python -m tri_cortex_demo.
 
-Brain 3 analyse une etiquette fictive pendant que Brain 1 diffuse une reponse ; un crash
-volontaire de SanitaryGuard montre que Brain 1 et Brain 2 restent disponibles.
+Le Cerveau 3 analyse une etiquette fictive pendant que le Cerveau 1 diffuse une reponse ;
+un crash volontaire de SanitaryGuard montre que les Cerveaux 1 et 2 restent disponibles.
 """
 import argparse
 import asyncio
@@ -139,7 +139,7 @@ async def _scenario(root: Path, vision_seconds: float) -> JsonObject:
         release.set()
         vision = VisionResult.model_validate(await core.brain3.wait(vision_job, timeout=10))
         if clock["first_fragment"] >= clock["vision_done"]:
-            raise RuntimeError("Brain 1 a attendu Brain 3 : isolation non respectee.")
+            raise RuntimeError("Le Cerveau 1 a attendu le Cerveau 3 : isolation non respectee.")
 
         deadline = time.monotonic() + 5
         while core.telemetry.restarts["sanitary_guard"] < 1 or not core.brain3.agents["sanitary_guard"].running:

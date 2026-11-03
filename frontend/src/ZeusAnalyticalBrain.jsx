@@ -19,9 +19,9 @@ const known = (map, key) => Object.prototype.hasOwnProperty.call(map, key);
 const strings = (v) => Array.isArray(v) && v.every(text);
 const nullableTimestamp = (v) => v === null || timestamp(v);
 const BRAINS = {
-  OPERATIONNEL: "Brain 1 · dialogue direct",
-  ANALYTIQUE: "Brain 2 · logique métier directe",
-  SENTINEL: "Brain 3 · Sentinel Master",
+  OPERATIONNEL: "Cerveau 1 · dialogue direct",
+  ANALYTIQUE: "Cerveau 2 · logique métier directe",
+  SENTINEL: "Cerveau 3 · Sentinel Master",
 };
 
 export function validateAnalyticalView(view) {
@@ -157,7 +157,7 @@ export default function ZeusAnalyticalBrain() {
       <div className="zcx-brain-head">
         <div>
           <h2>AUDIT FINANCIER · SENTINEL</h2>
-          <p>Brain 3 supervise · Brain 2 calcule · Brain 1 restitue</p>
+          <p>Cerveau 3 supervise · Cerveau 2 calcule · Cerveau 1 restitue</p>
         </div>
         {worker && <span className={`zcx-brain-badge ${worker.actif ? "" : "warning"}`}>
           {worker.actif ? worker.en_attente ? "Analyse en cours ou en attente" : "Moteur actif" : "Moteur arrêté"}

@@ -1,0 +1,55 @@
+.tri-chart { margin: 0; min-width: 0; }
+.tri-chart-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; margin-bottom: 8px; }
+.tri-chart-head b { color: #e6f3fb; font-size: 14px; font-weight: 600; letter-spacing: 0.03em; }
+.tri-chart-head > span { color: #7b97ac; font-size: 11.5px; }
+.tri-plot {
+  display: block; width: 100%; max-width: 560px; height: auto; margin: 0 auto; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 12px;
+  background: radial-gradient(110% 80% at 50% -10%, rgba(127, 178, 212, 0.11), transparent 62%), linear-gradient(180deg, #0a1523, #08111e);
+}
+.tri-grid { fill: none; stroke: rgba(255, 255, 255, 0.065); stroke-width: 1; }
+.tri-axis { stroke: rgba(255, 255, 255, 0.18); stroke-width: 1; }
+.tri-tick { fill: #5f7d8f; font-size: 9.5px; font-variant-numeric: tabular-nums; }
+.tri-tick-mean { fill: #b3c8d6; font-weight: 600; }
+.tri-key text { fill: #93adbd; font-size: 10px; }
+.tri-average { stroke: rgba(147, 173, 189, 0.55); stroke-width: 1; stroke-dasharray: 4 4; }
+.tri-line { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.tri-line-total { stroke: #7fb2d4; stroke-width: 2.4; filter: drop-shadow(0 0 5px rgba(127, 178, 212, 0.55)); }
+.tri-line-fragment { stroke: #ffe6a3; stroke-width: 1.8; filter: drop-shadow(0 0 4px rgba(255, 230, 163, 0.45)); }
+.tri-point { fill: #0a1523; stroke: #7fb2d4; stroke-width: 2; }
+.tri-point.is-last { fill: #7fb2d4; }
+.tri-point.is-failed { stroke: #e58a80; }
+.tri-point.is-failed.is-last { fill: #e58a80; }
+.tri-point-fragment { fill: #0a1523; stroke: #ffe6a3; stroke-width: 1.6; }
+.tri-halo { fill: rgba(127, 178, 212, 0.2); transform-box: fill-box; transform-origin: center; }
+.tri-halo.is-busy { animation: triHalo 1.6s ease-out infinite; }
+.tri-empty { fill: #93adbd; font-size: 12.5px; }
+.tri-empty-small { fill: #5f7d8f; font-size: 10.5px; }
+
+.tri-track { fill: none; stroke: rgba(255, 255, 255, 0.06); }
+.tri-slice { stroke-linejoin: round; }
+.tri-donut.is-busy { animation: triBreath 2.2s ease-in-out infinite; }
+.tri-big { fill: #ffe6a3; font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tri-big-small { font-size: 17px; }
+.tri-sub { fill: #7b97ac; font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; }
+.tri-legend-label { fill: #e6f3fb; font-size: 12px; font-weight: 600; }
+.tri-legend-sub { fill: #8aa5b6; font-size: 10.5px; }
+.tri-legend-value { fill: #fff; font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tri-warn { fill: #f0a197; }
+.tri-live { fill: #b6efdd; }
+.tri-petal-track { fill: rgba(255, 255, 255, 0.025); stroke: rgba(255, 255, 255, 0.075); stroke-dasharray: 3 4; }
+.tri-petal { stroke-width: 1.6; stroke-linejoin: round; }
+.tri-petal.is-busy { animation: triPetal 1.8s ease-in-out infinite; }
+.tri-petal.is-alert { stroke-dasharray: 4 3; }
+
+@keyframes triHalo { 0% { transform: scale(0.55); opacity: 0.9; } 100% { transform: scale(1.9); opacity: 0; } }
+@keyframes triBreath {
+  0%, 100% { filter: drop-shadow(0 0 2px rgba(216, 184, 117, 0.25)); }
+  50% { filter: drop-shadow(0 0 9px rgba(216, 184, 117, 0.65)); }
+}
+@keyframes triPetal {
+  0%, 100% { filter: drop-shadow(0 0 2px rgba(182, 239, 221, 0.3)); }
+  50% { filter: drop-shadow(0 0 10px rgba(182, 239, 221, 0.85)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tri-halo.is-busy, .tri-donut.is-busy, .tri-petal.is-busy { animation: none; }
+}

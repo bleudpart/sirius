@@ -1,4 +1,4 @@
-"""Les quatre satellites de Brain 3 ; les regles metier restent dans Brain 2."""
+"""Les quatre satellites du Cerveau 3 ; les regles metier restent dans le Cerveau 2."""
 from collections.abc import Awaitable, Callable
 
 from tri_cortex.brains import Brain1FastStream, Brain2DeepReasoning
@@ -71,7 +71,7 @@ class SubagentArchivist(BaseSubAgent):
         return await self.handler(job)
 
     async def due_offline(self) -> dict[AgentId, list[str]]:
-        """Les donnees sont dans SQLite ; Brain 3 seul repartit la reprise vers chaque specialiste."""
+        """Les donnees sont dans SQLite ; le Cerveau 3 seul repartit la reprise vers chaque specialiste."""
         from tri_cortex.schemas import AGENT_IDS
 
         return {agent: await run_io(self.store.due, agent) for agent in AGENT_IDS}
