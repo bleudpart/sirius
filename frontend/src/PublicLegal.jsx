@@ -9,7 +9,7 @@ const CONTENT = {
     title: "Mentions légales",
     sections: [
       ["Éditeur", "Le site ΣIRIUS est édité par Daniel Partel. Adresse de contact : " + CONTACT_EMAIL + "."],
-      ["Hébergement", "Le site public est hébergé par Render Services, Inc. Les paiements sont traités par Stripe selon leurs propres conditions de sécurité et de confidentialité."],
+      ["Hébergement", "Le site public et l’API ΣIRIUS sont hébergés sur un VPS Hetzner Cloud situé à Helsinki, en Finlande. Les paiements sont traités par Stripe selon ses propres conditions de sécurité et de confidentialité."],
       ["Propriété intellectuelle", "ΣIRIUS, ses interfaces, modules, contenus et code sont protégés. Toute reproduction, décompilation, redistribution ou revente non autorisée est interdite."],
       ["Informations à compléter avant vente réelle", "Ajoutez ici votre adresse professionnelle, votre statut juridique et votre numéro SIREN ou SIRET, ainsi que le numéro de TVA intracommunautaire lorsqu'il est applicable."],
     ],

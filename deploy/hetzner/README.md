@@ -2,7 +2,7 @@
 
 Kit prévu pour un VPS Hetzner Cloud CX22 sous Ubuntu 24.04, avec Caddy en HTTPS automatique devant FastAPI/Uvicorn sur `127.0.0.1:8001`.
 Le site React est servi directement par Caddy, sans lancer Node sur le VPS.
-Sa compilation se fait dans GitHub Actions, pas dans Render ni sur le VPS.
+Sa compilation se fait dans GitHub Actions, pas sur le VPS.
 
 ## 1. Préparer la clé SSH Windows
 
@@ -44,7 +44,7 @@ Le script est idempotent : il met à jour Ubuntu, installe `ufw`, `fail2ban`, Ca
 
 ## 4. Variables d’environnement
 
-Copiez les variables Render nécessaires dans :
+Copiez les variables nécessaires depuis le déploiement précédent dans :
 
 ```bash
 sudo nano /etc/sirius/sirius.env
@@ -89,7 +89,7 @@ Pour héberger aussi le site, après publication et vérification locale du buil
 - retirer les anciens `A`/`AAAA` de ces deux noms qui pointent ailleurs, sans
   toucher aux enregistrements de messagerie, de vérification ou à `api`.
 
-Conserver Render pendant la propagation. Le fichier Caddy fourni cible les
+Conserver l’ancien hébergement pendant la propagation. Le fichier Caddy fourni cible les
 trois noms `api.sirius-assistant.fr`, `sirius-assistant.fr` et `www.sirius-assistant.fr` :
 adapter ces noms avant installation pour un autre domaine.
 
@@ -111,7 +111,7 @@ Le workflow `.github/workflows/deploy-hetzner.yml` ne fait rien si `HETZNER_HOST
 Il se déclenche aussi sur les changements frontend. Il compile avec
 `REACT_APP_BACKEND_URL=https://api.sirius-assistant.fr`, transfère le build par SSH,
 puis publie le commit exact. Les limites et la facturation GitHub Actions
-restent applicables ; aucune minute de compilation Render n’est consommée.
+restent applicables.
 
 Les versions du site restent dans `/var/www/sirius/releases`. Le lien `current`
 est remplacé atomiquement après validation du build et de la configuration Caddy.
@@ -136,12 +136,32 @@ Sans argument, il ne remplace pas le site. Pour publier le site, utiliser le
 workflow GitHub Actions : il fournit l’archive et le SHA attendus, puis vérifie
 le site sur la boucle locale avant le contrôle de santé API.
 
-## 9. Rollback
+## 9. Clôturer l’ancien hébergement
 
-Plan de retour rapide : remettez les enregistrements DNS `A/AAAA` de `api.sirius-assistant.fr` vers Render. Tant que le TTL est bas, le retour est rapide. Gardez Render actif jusqu’à validation complète du VPS.
-Pour le site seulement, restaurer les anciennes entrées `@` et `www` vers Render,
-sans modifier `api`. Une version locale antérieure peut aussi être réactivée en
-remplaçant le lien `/var/www/sirius/current` par la version choisie.
+Avant de supprimer un ancien service, vérifier les trois noms de domaine
+(`sirius-assistant.fr`, `www.sirius-assistant.fr`, `api.sirius-assistant.fr`),
+`https://sirius-assistant.fr/deploy-sha.txt` et
+`https://api.sirius-assistant.fr/api/health`, puis tester les fonctions métier
+et la continuité des données sur le VPS.
+
+Vérifier dans `/etc/sirius/sirius.env` que les clés et services nécessaires
+sont configurés sur Hetzner. Confirmer où se trouvent les données MongoDB et
+les fichiers téléversés ; si l’ancien déploiement utilisait SQLite ou un
+disque persistant, exporter et restaurer ces données avant la fermeture.
+Conserver une sauvegarde vérifiée du VPS et des données.
+
+Après ces vérifications, dans le tableau de bord de l’ancien hébergeur,
+désactiver les déploiements automatiques, identifier les seuls services du
+site et de l’API SIRIUS, vérifier leurs disques et tâches, puis les supprimer.
+Ne pas supprimer MongoDB Atlas ni les services tiers. Vérifier ensuite que les
+trois domaines et le site répondent toujours depuis Hetzner. Les journaux ou
+sauvegardes de l’ancien hébergeur peuvent suivre une durée de rétention propre
+au fournisseur ; la suppression des services ne prouve pas leur effacement
+immédiat.
+
+Une fois l’ancien service supprimé, il n’y a plus de retour DNS instantané vers
+lui. Pour un rollback, restaurer une sauvegarde validée sur un hôte disponible
+et ne modifier le DNS qu’après les contrôles de santé.
 
 ## 10. Préparer la reconnaissance du locuteur, sans l'activer
 

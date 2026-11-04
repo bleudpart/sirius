@@ -2559,7 +2559,7 @@ Liste complète des modules et dates : [MODULES_SIRIUS.txt](./MODULES_SIRIUS.txt
   secours serveur : les deux moteurs ont des timbres différents malgré le nom
   Aoede commun. Le serveur appelle les API REST avec `httpx` déjà présent ;
   aucun SDK supplémentaire ni secret n'est ajouté à l'APK. Configurer
-  `GOOGLE_TTS_API_KEY` et `GEMINI_TTS_API_KEY` sur Render,
+  `GOOGLE_TTS_API_KEY` et `GEMINI_TTS_API_KEY` dans `/etc/sirius/sirius.env` sur le VPS Hetzner,
   `GEMINI_TTS_MODEL=gemini-3.8-flash-tts` et `GEMINI_TTS_VOICE=Aoede`.
   `GEMINI_TTS_PRIMARY=1` rétablit explicitement Gemini en premier.
   Déployer le backend pour changer cette priorité ; reconstruire l'APK pour les
