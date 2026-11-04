@@ -13,6 +13,15 @@
 .carto-layer-toolbar > span { color: #b8f4fc; letter-spacing: 1px; }
 .carto-layer-toolbar label { display: inline-flex; align-items: center; gap: 5px; }
 .carto-layer-toolbar .carto-dot { margin-top: 0; }
+.carto-wind-controls { display: inline-flex; align-items: center; gap: 5px; }
+.carto-wind-controls select, .carto-wind-controls button {
+  background: rgba(5, 18, 28, 0.9); color: #fff; border: 1px solid rgba(145, 230, 242, 0.5);
+  border-radius: 4px; padding: 3px 6px; font: inherit;
+}
+.carto-wind-controls button:disabled { opacity: 0.4; }
+.carto-rain-privacy { color: rgba(255, 255, 255, 0.75); font-size: 10px; }
+.carto-wind-icon { background: transparent; border: 0; }
+.carto-wind-arrow { display: block; font-size: 19px; font-weight: 800; line-height: 22px; text-align: center; text-shadow: 0 0 3px #000; }
 .carto-layer-status {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 2.7em;
   align-content: start; gap: 4px 16px; color: rgba(255, 255, 255, 0.8); font-size: 10.5px;
@@ -25,6 +34,12 @@
 .carto-note { margin: 0; padding: 7px 11px; border-left: 2px solid #ffb347; background: rgba(255, 179, 71, 0.08); color: #fff; font-size: 12px; }
 .carto-stage { position: relative; flex: 1; min-height: 420px; border: 1px solid rgba(145, 230, 242, 0.3); border-radius: 6px; overflow: hidden; }
 .carto-map { position: absolute; inset: 0; background: #0b1620; }
+.carto-rain-legend {
+  position: absolute; bottom: 12px; left: 12px; z-index: 490; width: min(230px, calc(100% - 24px));
+  display: grid; gap: 3px; padding: 6px; background: rgba(4, 14, 22, 0.9);
+  border: 1px solid rgba(145, 230, 242, 0.45); border-radius: 4px; color: #fff; font-size: 10px;
+}
+.carto-rain-legend img { display: block; width: 100%; background: #fff; }
 .carto-float {
   position: absolute; top: 12px; right: 12px; z-index: 500; width: min(340px, calc(100% - 24px));
   max-height: calc(100% - 24px); display: flex; flex-direction: column;
@@ -48,13 +63,17 @@
 .carto-dot.satellite { background: #c89cff; }
 .carto-dot.conflit { background: #ff6d74; }
 .carto-dot.actualite { background: #ffbf69; }
+.carto-dot.maritime { background: #63e6be; }
+.carto-dot.camera { background: #f28ed4; }
 .carto-empty { margin: 0; padding: 8px 12px; color: rgba(255, 255, 255, 0.7); font-size: 11px; }
 .carto-legal { margin: 0; color: rgba(255, 255, 255, 0.65); font-size: 10.5px; line-height: 1.5; }
 .carto-popup { display: grid; gap: 4px; font-size: 12px; }
 .carto-popup span { color: #444; }
+.carto-popup img { display: block; max-width: 100%; max-height: 180px; }
 @media (max-width: 640px) {
   .carto-layer-status { grid-template-columns: minmax(0, 1fr); }
   .carto-stage { min-height: 60vh; }
   .carto-float { top: auto; bottom: 10px; right: 10px; left: 10px; width: auto; max-height: 45%; }
+  .carto-rain-legend { top: 10px; bottom: auto; left: 52px; width: min(230px, calc(100% - 78px)); }
   .carto-osiris { margin-left: 0; }
 }

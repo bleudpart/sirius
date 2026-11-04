@@ -9,15 +9,16 @@ météo. Une source en panne est signalée ; aucune valeur n'est remplacée.
 """
 
 import asyncio
+import ipaddress
 import json
 import logging
 import math
 import os
 import re
 import time
+from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
-from itertools import chain
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -60,6 +61,14 @@ MAP_LAYERS = {
         "path": "/api/news", "label": "Actualités internationales", "provider": "OSIRIS — sources de presse et OSINT",
         "ttl": 120, "max_age": timedelta(hours=2), "max_bytes": MAX_PAYLOAD_BYTES,
     },
+    "maritime": {
+        "path": "/api/maritime", "label": "Ports & passages maritimes", "provider": "OSIRIS — données maritimes",
+        "ttl": 300, "max_age": timedelta(hours=24), "max_bytes": MAX_PAYLOAD_BYTES,
+    },
+    "camera": {
+        "path": "/api/cctv", "label": "Caméras publiques", "provider": "OSIRIS — caméras publiques",
+        "ttl": 300, "max_age": timedelta(hours=1), "max_bytes": 20 * 1024 * 1024,
+    },
 }
 HEAT_THRESHOLD_C = 30
 TIMEOUT = httpx.Timeout(6.0, connect=3.0)
@@ -83,6 +92,7 @@ SOURCES = {
 }
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 _cache: dict = {}
+_wind_grids: OrderedDict = OrderedDict()
 
 
 class FeedUnavailable(Exception):
@@ -91,6 +101,7 @@ class FeedUnavailable(Exception):
 
 def clear_watch_cache():
     _cache.clear()
+    _wind_grids.clear()
 
 
 def base_url() -> str:
@@ -139,6 +150,29 @@ def _link(value):
         return None
     parsed = urlparse(value)
     return value if parsed.scheme == "https" and parsed.hostname else None
+
+
+def _camera_link(value):
+    try:
+        value = _link(value)
+        if not value or _CONTROL.search(value):
+            return None
+        parsed = urlparse(value)
+        hostname = parsed.hostname.lower()
+        parsed.port
+        if parsed.username is not None or parsed.password is not None or hostname.endswith((".local", ".localhost")):
+            return None
+        try:
+            if not ipaddress.ip_address(hostname).is_global:
+                return None
+        except ValueError:
+            if ("." not in hostname or re.fullmatch(r"[0-9a-fx.]+", hostname)
+                    or not all(re.fullmatch(r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?", label)
+                               for label in hostname.encode("idna").decode("ascii").split("."))):
+                return None
+    except (UnicodeError, ValueError):
+        return None
+    return value
 
 
 def distance_km(lat1, lon1, lat2, lon2) -> float:
@@ -466,21 +500,26 @@ async def build_map(settings, *, now=None, transport=None) -> dict:
 
 
 def _layer_rows(kind, payload):
-    keys = {
-        "avion": ("commercial_flights", "private_flights", "private_jets", "military_flights"),
-        "satellite": ("satellites",),
-        "conflit": ("zones",),
-        "actualite": ("news",),
+    groups_by_kind = {
+        "avion": ((None, "commercial_flights"), (None, "private_flights"), (None, "private_jets"), (None, "military_flights")),
+        "satellite": ((None, "satellites"),),
+        "conflit": ((None, "zones"),),
+        "actualite": ((None, "news"),),
+        "maritime": (("port", "ports"), ("chokepoint", "chokepoints"), ("ship", "ships")),
+        "camera": ((None, "cameras"),),
     }[kind]
-    groups = [payload.get(key) for key in keys]
-    if any(not isinstance(group, list) for group in groups):
+    groups = [
+        (category, payload.get(key, []) if kind == "maritime" else payload.get(key))
+        for category, key in groups_by_kind
+    ]
+    if any(not isinstance(group, list) for _, group in groups):
         raise FeedUnavailable("Flux OSIRIS sans liste exploitable.")
-    count = sum(len(group) for group in groups)
+    count = sum(len(group) for _, group in groups)
     if not count:
         raise FeedUnavailable("OSIRIS ne fournit actuellement aucune donnée pour ce calque.")
     if count > MAP_LAYER_MAX_ROWS:
         raise FeedUnavailable("Flux OSIRIS trop volumineux pour la carte.")
-    return chain.from_iterable(groups)
+    return ((category, row) for category, group in groups for row in group)
 
 
 def _optional_number(value, low, high):
@@ -490,7 +529,7 @@ def _optional_number(value, low, high):
         return None
 
 
-def _layer_point(kind, row, stamp, now):
+def _layer_point(kind, row, stamp, now, category=None):
     if not isinstance(row, dict):
         raise ValueError("Entrée invalide.")
     provider = MAP_LAYERS[kind]["provider"]
@@ -519,7 +558,7 @@ def _layer_point(kind, row, stamp, now):
         title = f"Zone de conflit : {_text(row['label'], 120)}"
         latitude, longitude = row["lat"], row["lng"]
         url = _link(row.get("sourceUrl"))
-    else:
+    elif kind == "actualite":
         if row.get("coords_default") is not False:
             raise ValueError("Actualité non localisée.")
         coordinates = row["coords"]
@@ -537,6 +576,61 @@ def _layer_point(kind, row, stamp, now):
             raise ValueError("Lien source absent.")
         precision = row.get("location_precision")
         details = {"location_precision": precision if precision in ("settlement", "region", "country-anchor") else "unknown"}
+    elif kind == "camera":
+        identifier = _text(row["id"], 120)
+        title = f"Caméra : {_text(row['name'], 140)}"
+        latitude, longitude = row["lat"], row["lng"]
+        source = row.get("source")
+        if isinstance(source, str) and source:
+            provider = f"OSIRIS — {_text(source, 80)}"
+        image = _camera_link(row.get("feed_url"))
+        url = _camera_link(row.get("stream_url")) or image
+        details = {"preview_url": image if image and urlparse(image).path.lower().endswith((".jpg", ".jpeg", ".png")) else None}
+        for field in ("city", "country"):
+            if isinstance(row.get(field), str) and row[field]:
+                details[field] = _text(row[field], 100)
+    else:
+        if category == "port":
+            identifier = _text(row["name"], 120)
+            port_type = row.get("type")
+            title = f"Base navale : {identifier}" if port_type == "naval" else identifier
+            latitude, longitude = row["lat"], row["lng"]
+            details = {
+                "subtype": "port",
+                "port_type": _text(port_type, 40) if isinstance(port_type, str) and port_type else "unknown",
+            }
+            if isinstance(row.get("country"), str) and row["country"]:
+                details["country"] = _text(row["country"], 8)
+            if isinstance(row.get("volume"), str) and row["volume"] and not row["volume"].lower().startswith("undefined"):
+                details["volume"] = _text(row["volume"], 100)
+            if isinstance(row.get("fleet"), str) and row["fleet"]:
+                details["fleet"] = _text(row["fleet"], 100)
+            if isinstance(row.get("congestion"), str) and row["congestion"]:
+                details["congestion"] = _text(row["congestion"], 30)
+        elif category == "chokepoint":
+            identifier = _text(row["name"], 120)
+            title = f"Passage stratégique : {identifier}"
+            latitude, longitude = row["lat"], row["lng"]
+            details = {"subtype": "chokepoint"}
+            if isinstance(row.get("traffic"), str) and row["traffic"]:
+                details["traffic"] = _text(row["traffic"], 100)
+            if isinstance(row.get("risk"), str) and row["risk"]:
+                details["risk"] = _text(row["risk"], 30).upper()
+        elif category == "ship":
+            raw_id = row.get("mmsi") or row.get("imo") or row.get("id") or row.get("name")
+            identifier = _text(str(raw_id) if raw_id is not None else "", 120)
+            name = _text(row.get("name") or row.get("vessel_name") or identifier, 120)
+            title = f"Navire {name}"
+            latitude = row.get("lat", row.get("latitude"))
+            longitude = row.get("lng", row.get("lon", row.get("longitude")))
+            details = {
+                "subtype": "ship",
+                "speed_knots": _optional_number(row.get("speed_knots"), 0, 200),
+            }
+        else:
+            raise ValueError("Type d’entrée maritime invalide.")
+        identifier = f"{category}:{identifier}"
+        url = None
 
     return {
         "kind": kind, "id": identifier, "title": title,
@@ -581,9 +675,10 @@ async def build_map_layer(settings, kind, bounds, radius_km=None, *, now=None, t
             raise FeedUnavailable("OSIRIS ne dispose que de données orbitales de secours non vérifiables.")
 
         points, seen, usable = [], set(), 0
-        for row in _layer_rows(kind, payload):
+        counts = {"port": 0, "chokepoint": 0, "ship": 0}
+        for category, row in _layer_rows(kind, payload):
             try:
-                item = _layer_point(kind, row, stamp, now)
+                item = _layer_point(kind, row, stamp, now, category)
             except (AttributeError, KeyError, TypeError, ValueError, OverflowError):
                 report["ignored"] += 1
                 continue
@@ -599,6 +694,8 @@ async def build_map_layer(settings, kind, bounds, radius_km=None, *, now=None, t
                 continue
             item["distance_km"] = round(distance) if distance is not None else None
             points.append(item)
+            if kind == "maritime":
+                counts[item["subtype"]] += 1
         if not usable:
             raise FeedUnavailable("Aucune donnée géolocalisée exploitable dans ce flux OSIRIS.")
 
@@ -608,10 +705,156 @@ async def build_map_layer(settings, kind, bounds, radius_km=None, *, now=None, t
             points.sort(key=lambda item: (item["latitude"], item["longitude"], item["id"]))
         report["total"] = len(points)
         report["truncated"] = max(0, len(points) - MAP_LAYER_LIMIT)
+        if kind == "maritime":
+            report["counts"] = counts
         if report["truncated"] and not origin:
             report["items"] = [points[index * len(points) // MAP_LAYER_LIMIT] for index in range(MAP_LAYER_LIMIT)]
         else:
             report["items"] = points[:MAP_LAYER_LIMIT]
+        source["ok"] = True
+    except FeedUnavailable as error:
+        source["detail"] = str(error)
+    return report
+
+
+async def _wind_grid(client, run, forecast):
+    url = f"{base_url()}/api/wind?{urlencode({'run': run, 't': forecast})}"
+    entry = _wind_grids.get(url)
+    if entry and time.monotonic() - entry[0] < entry[1]:
+        _wind_grids.move_to_end(url)
+        if isinstance(entry[2], str):
+            raise FeedUnavailable(entry[2])
+        return entry[2]
+    try:
+        value = await _download(client, url, max_bytes=4 * 1024 * 1024)
+        _wind_components(value, _instant(forecast), _instant(run))
+        ttl = 6 * 60 * 60
+    except FeedUnavailable as error:
+        value, ttl = str(error), FAILURE_TTL
+    _wind_grids[url] = (time.monotonic(), ttl, value)
+    _wind_grids.move_to_end(url)
+    while len(_wind_grids) > 3:
+        _wind_grids.popitem(last=False)
+    if isinstance(value, str):
+        raise FeedUnavailable(value)
+    return value
+
+
+def _wind_metadata(payload, now):
+    try:
+        run = _instant(payload["run"])
+        if not now - timedelta(hours=36) <= run <= now + timedelta(minutes=15):
+            raise FeedUnavailable("Cycle du modèle de vent trop ancien ou futur.")
+        values = payload["times"]
+        if not isinstance(values, list) or not 1 <= len(values) <= 200:
+            raise ValueError("Échéances invalides.")
+        times = [(_instant(value), value) for value in values]
+        if len({at for at, _ in times}) != len(times):
+            raise ValueError("Échéances dupliquées.")
+        times = sorted((at, raw) for at, raw in times
+                       if now - timedelta(days=7) <= at <= now + timedelta(days=10))
+        if not times:
+            raise ValueError("Aucune échéance récente.")
+        return run, times
+    except (KeyError, TypeError, ValueError, OverflowError) as error:
+        raise FeedUnavailable("Horaires du modèle de vent illisibles.") from error
+
+
+def _wind_intervals(bounds, origin, radius_km):
+    south, north = bounds["south"], bounds["north"]
+    west, east = bounds["west"], bounds["east"]
+    if origin is None or radius_km is None:
+        return south, north, [(west, east)]
+    angular = radius_km / 6371.0
+    lat_span = math.degrees(angular)
+    south = max(south, origin["latitude"] - lat_span)
+    north = min(north, origin["latitude"] + lat_span)
+    if south >= north:
+        return south, north, []
+    if abs(origin["latitude"]) + lat_span >= 90:
+        lon_span = 180.0
+    else:
+        lon_span = math.degrees(math.asin(min(1.0, math.sin(angular) / math.cos(math.radians(origin["latitude"])))))
+    intervals = []
+    for offset in range(-3, 4):
+        center = origin["longitude"] + offset * 360
+        left, right = max(west, center - lon_span), min(east, center + lon_span)
+        if left < right:
+            intervals.append((left, right))
+    return south, north, intervals
+
+
+def _wind_axis(start, end, limit):
+    count = min(limit, max(1, math.ceil(end - start)))
+    return [start + (index + 0.5) * (end - start) / count for index in range(count)]
+
+
+def _wind_components(grid, forecast, latest_run):
+    try:
+        reference = _instant(grid["refTime"])
+        if reference > forecast or reference > latest_run or forecast - reference > timedelta(days=10):
+            raise ValueError("Cycle incohérent.")
+        for key, expected in (("ni", 360), ("nj", 181), ("la1", 90), ("lo1", 0), ("dx", 1), ("dy", 1)):
+            if _number(grid[key], -360, 360) != expected:
+                raise ValueError("Grille inconnue.")
+        u, v = grid["u"], grid["v"]
+        if not isinstance(u, list) or not isinstance(v, list) or len(u) != 360 * 181 or len(v) != len(u):
+            raise ValueError("Composantes manquantes.")
+    except (KeyError, TypeError, ValueError, OverflowError) as error:
+        raise FeedUnavailable("Grille du modèle de vent illisible ou incohérente.") from error
+    return u, v, reference
+
+
+def _wind_points(grid, bounds, origin, radius_km, forecast, latest_run):
+    u, v, reference = _wind_components(grid, forecast, latest_run)
+    south, north, intervals = _wind_intervals(bounds, origin, radius_km)
+    points, ignored, candidates = [], 0, 0
+    for latitude in _wind_axis(south, north, 12) if intervals else []:
+        for west, east in intervals:
+            for longitude in _wind_axis(west, east, 16):
+                distance = _distance_from(origin, latitude, longitude)
+                if _outside(distance, radius_km):
+                    continue
+                candidates += 1
+                index = max(0, min(180, round(90 - latitude))) * 360 + round(longitude) % 360
+                try:
+                    east_ms = _number(u[index], -2000, 2000) / 10
+                    north_ms = _number(v[index], -2000, 2000) / 10
+                except ValueError:
+                    ignored += 1
+                    continue
+                points.append({
+                    "latitude": round(latitude, 4), "longitude": round(longitude, 4),
+                    "east_ms": east_ms, "north_ms": north_ms,
+                    "speed_kmh": round(math.hypot(east_ms, north_ms) * 3.6, 1),
+                })
+    if candidates and not points:
+        raise FeedUnavailable("Aucun vecteur de vent exploitable dans cette zone.")
+    return points, ignored, reference
+
+
+async def build_map_wind(settings, bounds, radius_km=None, forecast_time=None, *, now=None, transport=None):
+    now = now or datetime.now(timezone.utc)
+    origin = valid_location((settings or {}).get("location"))
+    source = {"label": "Vent à 10 m", "provider": "NOAA GFS via OSIRIS", "ok": False, "detail": None}
+    report = {
+        "kind": "vent", "read_only": True, "generated_at": now.isoformat(), "source": source,
+        "run": None, "latest_run": None, "times": [], "time": None, "points": [], "ignored": 0,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT, transport=transport, follow_redirects=False) as client:
+            payload, _ = await _read_feed(client, "/api/wind", now, ttl=300, max_bytes=MAX_PAYLOAD_BYTES)
+            run, times = _wind_metadata(payload, now)
+            report["latest_run"] = run.isoformat()
+            report["times"] = [at.isoformat() for at, _ in times]
+            selected = forecast_time if forecast_time is not None else min(times, key=lambda pair: abs(pair[0] - now))[0]
+            raw = next((raw for at, raw in times if at == selected), None)
+            if raw is None:
+                raise FeedUnavailable("Cette échéance de vent n'est plus disponible : choisis un autre horaire.")
+            report["time"] = selected.isoformat()
+            grid = await _wind_grid(client, payload["run"], raw)
+        report["points"], report["ignored"], reference = _wind_points(grid, bounds, origin, radius_km, selected, run)
+        report["run"] = reference.isoformat()
         source["ok"] = True
     except FeedUnavailable as error:
         source["detail"] = str(error)

@@ -7,8 +7,11 @@ import "./Cartographie.css";
 import { API_BASE_URL } from "./lib/api";
 import { OSIRIS_MAP_URL } from "./domainOsint";
 import useCartographieLayer from "./useCartographieLayer";
+import useCartographiePluie from "./useCartographiePluie";
+import useCartographieVent from "./useCartographieVent";
+import { nightPolygons } from "./cartographieSoleil";
 import {
-  EXTRA_LAYER_LABELS, KIND_LABELS, WORLD, eventSubtitle, filterMapEvents, inBounds, layerQuery,
+  EXTRA_LAYER_LABELS, KIND_LABELS, RAIN_LEGEND_URL, RAIN_WMS_URL, WORLD, eventSubtitle, eventTitle, filterMapEvents, inBounds, layerQuery,
   leafletBounds, markerStyle, nearbyList,
 } from "./cartographie";
 
@@ -21,7 +24,7 @@ function itemKey(item) {
 }
 
 function itemSignature(item) {
-  return JSON.stringify([item.latitude, item.longitude, item.title, eventSubtitle(item), item.url, markerStyle(item)]);
+  return JSON.stringify([item.latitude, item.longitude, item.title, eventSubtitle(item), item.url, item.preview_url, markerStyle(item)]);
 }
 
 function LayerStatus({ label, state }) {
@@ -36,26 +39,96 @@ function LayerStatus({ label, state }) {
   return (
     <span>
       {label} : {result.items.length} affiché(s) sur {result.total} dans la zone{updated}
+      {result.kind === "maritime" && result.counts
+        ? ` · ${result.counts.port} port(s), ${result.counts.chokepoint} passage(s), ${result.counts.ship} navire(s) en direct dans la zone`
+        : ""}
       {result.truncated ? " · liste limitée, zoome pour plus de détails" : ""}
       {result.ignored ? ` · ${result.ignored} entrée(s) non exploitables ou non localisées` : ""}
     </span>
   );
 }
 
+function windTime(value) {
+  return new Date(value).toLocaleString("fr-FR", {
+    day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris",
+  });
+}
+
+function WindStatus({ state }) {
+  if (!state) return <span>Vent : en attente de la carte…</span>;
+  if (state.pending) return <span>Vent : actualisation…</span>;
+  if (state.error) return <span className="carto-layer-error" role="alert">Vent : {state.error}</span>;
+  return (
+    <span>
+      Vent à 10 m : {state.points.length} repère(s) · NOAA GFS · échéance {windTime(state.result.time)}
+      {" "}· cycle {windTime(state.result.run)}
+      {state.result.ignored ? ` · ${state.result.ignored} vecteur(s) indisponible(s)` : ""}
+    </span>
+  );
+}
+
+function RainStatus({ state, selectedTime, tileError }) {
+  if (!state || (state.pending && !state.result)) return <span>Pluie NASA : recherche des images…</span>;
+  if (state.error) return <span className="carto-layer-error" role="alert">Pluie NASA : {state.error}</span>;
+  if (!state.result.times.includes(selectedTime)) {
+    return <span className="carto-layer-error" role="alert">Pluie NASA : cet horaire n’est plus disponible ; choisis-en un autre.</span>;
+  }
+  const delay = (Date.now() - Date.parse(selectedTime)) / 3_600_000;
+  const age = delay >= 0 ? `image vieille d’environ ${delay.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} h`
+    : "horaire futur : vérifie l’horloge";
+  return (
+    <span className={tileError ? "carto-layer-error" : ""} role={tileError ? "alert" : undefined}>
+      Pluie satellite NASA : {windTime(selectedTime)} · {age}, pas un radar en direct
+      {tileError ? " · certaines tuiles sont indisponibles" : ""}
+    </span>
+  );
+}
+
+function windIcon(point) {
+  const angle = Math.atan2(point.east_ms, point.north_ms) * 180 / Math.PI;
+  const color = point.speed_kmh < 20 ? "#b8f4fc" : point.speed_kmh < 50 ? "#80db8d"
+    : point.speed_kmh < 90 ? "#ffcc70" : "#ff7878";
+  const symbol = point.speed_kmh < 0.1 ? "•" : "↑";
+  return L.divIcon({
+    className: "carto-wind-icon", iconSize: [22, 22], iconAnchor: [11, 11],
+    html: `<span class="carto-wind-arrow" style="color:${color};transform:rotate(${angle.toFixed(1)}deg)">${symbol}</span>`,
+  });
+}
+
 function popupNode(item) {
   const box = document.createElement("div");
   box.className = "carto-popup";
   const title = document.createElement("strong");
-  title.textContent = item.title;
+  title.textContent = eventTitle(item);
   const detail = document.createElement("span");
   detail.textContent = eventSubtitle(item);
   box.append(title, detail);
+  if (item.kind === "camera" && item.preview_url) {
+    const previewButton = document.createElement("button");
+    previewButton.type = "button";
+    previewButton.textContent = "Afficher l’aperçu";
+    previewButton.addEventListener("click", () => {
+      previewButton.disabled = true;
+      const image = document.createElement("img");
+      image.alt = `Aperçu : ${item.title}`;
+      image.referrerPolicy = "no-referrer";
+      image.addEventListener("error", () => {
+        image.remove();
+        const message = document.createElement("span");
+        message.textContent = "Aperçu indisponible auprès de la source.";
+        box.append(message);
+      }, { once: true });
+      image.src = item.preview_url;
+      box.append(image);
+    }, { once: true });
+    box.append(previewButton);
+  }
   if (item.url) {
     const link = document.createElement("a");
     link.href = item.url;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
-    link.textContent = "Source officielle";
+    link.textContent = item.kind === "camera" ? "Ouvrir le flux" : "Source officielle";
     box.append(link);
   }
   return box;
@@ -75,7 +148,13 @@ export default function CartographiePanel({ onClose, onSpeak }) {
   const [visibleOnly, setVisibleOnly] = useState(false);
   const [kinds, setKinds] = useState({
     seisme: true, evenement: true, avion: false, satellite: false, conflit: false, actualite: false,
+    maritime: false, camera: false,
   });
+  const [nightEnabled, setNightEnabled] = useState(false);
+  const [windEnabled, setWindEnabled] = useState(false);
+  const [rainEnabled, setRainEnabled] = useState(false);
+  const [rainTileError, setRainTileError] = useState(false);
+  const [rainLegendError, setRainLegendError] = useState(false);
   const [bounds, setBounds] = useState(null);
   const [floatingOpen, setFloatingOpen] = useState(true);
   const [refreshVersion, setRefreshVersion] = useState(0);
@@ -99,22 +178,43 @@ export default function CartographiePanel({ onClose, onSpeak }) {
     setBusy(false);
   }, []);
 
+  useEffect(() => {
+    if (!nightEnabled || !mapRef.current) return undefined;
+    const shade = L.polygon(nightPolygons(new Date()), {
+      interactive: false, stroke: false, fillColor: "#000929", fillOpacity: 0.35,
+    }).addTo(mapRef.current);
+    shade.bringToBack();
+    const timer = setInterval(() => shade.setLatLngs(nightPolygons(new Date())), REFRESH_INTERVAL_MS);
+    return () => { clearInterval(timer); shade.remove(); };
+  }, [nightEnabled]);
+
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    const map = L.map(mapNode.current, { worldCopyJump: true, minZoom: 2, preferCanvas: true }).setView(FRANCE, 5);
+    const map = L.map(mapNode.current, {
+      worldCopyJump: true, minZoom: 2, preferCanvas: true, zoomControl: false,
+    }).setView(FRANCE, 5);
     const markers = markersRef.current;
+    L.control.zoom({ zoomInTitle: "Zoom avant", zoomOutTitle: "Zoom arrière" }).addTo(map);
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 18,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>',
     }).addTo(map);
+    const rainPane = map.createPane("sirius-rain");
+    rainPane.style.zIndex = "250";
+    rainPane.style.pointerEvents = "none";
     layerRef.current = L.layerGroup().addTo(map);
     const track = () => {
       const next = leafletBounds(map.getBounds());
       setBounds((previous) => previous && ["south", "west", "north", "east"]
         .every((key) => Math.abs(previous[key] - next[key]) < 0.0000001) ? previous : next);
     };
+    const labelPopup = ({ popup }) => {
+      const closeButton = popup.getElement()?.querySelector(".leaflet-popup-close-button");
+      if (closeButton) closeButton.setAttribute("aria-label", "Fermer la fiche");
+    };
     map.on("moveend", track);
+    map.on("popupopen", labelPopup);
     track();
     mapRef.current = map;
     // La fenêtre s'anime à l'ouverture et peut être agrandie : Leaflet doit relire la taille du conteneur.
@@ -125,6 +225,7 @@ export default function CartographiePanel({ onClose, onSpeak }) {
     return () => {
       resize?.disconnect();
       map.off("moveend", track);
+      map.off("popupopen", labelPopup);
       map.remove();
       mapRef.current = null;
       layerRef.current = null;
@@ -141,13 +242,28 @@ export default function CartographiePanel({ onClose, onSpeak }) {
   const satelliteLayer = useCartographieLayer("satellite", kinds.satellite, query, refreshVersion);
   const conflitLayer = useCartographieLayer("conflit", kinds.conflit, query, refreshVersion);
   const actualiteLayer = useCartographieLayer("actualite", kinds.actualite, query, refreshVersion);
-  const layers = { avion: avionLayer, satellite: satelliteLayer, conflit: conflitLayer, actualite: actualiteLayer };
+  const maritimeLayer = useCartographieLayer("maritime", kinds.maritime, query, refreshVersion);
+  const cameraLayer = useCartographieLayer("camera", kinds.camera, query, refreshVersion);
+  const wind = useCartographieVent(windEnabled, query, refreshVersion);
+  const rain = useCartographiePluie(rainEnabled, refreshVersion);
+  const windTimes = wind.state?.result?.times || EMPTY_POINTS;
+  const windSelection = wind.selectedTime || wind.state?.result?.time || "";
+  const windIndex = windTimes.indexOf(windSelection);
+  const rainTimes = rain.state?.result?.times || EMPTY_POINTS;
+  const rainSelection = rain.selectedTime || rain.state?.result?.latest || "";
+  const rainIndex = rainTimes.indexOf(rainSelection);
+  const layers = {
+    avion: avionLayer, satellite: satelliteLayer, conflit: conflitLayer, actualite: actualiteLayer,
+    maritime: maritimeLayer, camera: cameraLayer,
+  };
   const extraActive = Object.keys(EXTRA_LAYER_LABELS).some((kind) => kinds[kind]);
   const extraPoints = useMemo(() => [
     ...(avionLayer?.items || EMPTY_POINTS), ...(satelliteLayer?.items || EMPTY_POINTS),
     ...(conflitLayer?.items || EMPTY_POINTS), ...(actualiteLayer?.items || EMPTY_POINTS),
+    ...(maritimeLayer?.items || EMPTY_POINTS), ...(cameraLayer?.items || EMPTY_POINTS),
   ].filter((item) => inBounds(bounds, item.latitude, item.longitude)), [
-    avionLayer?.items, satelliteLayer?.items, conflitLayer?.items, actualiteLayer?.items, bounds,
+    avionLayer?.items, satelliteLayer?.items, conflitLayer?.items, actualiteLayer?.items,
+    maritimeLayer?.items, cameraLayer?.items, bounds,
   ]);
   const shown = useMemo(
     () => filterMapEvents([...(data?.events || EMPTY_POINTS), ...extraPoints], { origin, radiusKm, kinds }),
@@ -156,7 +272,7 @@ export default function CartographiePanel({ onClose, onSpeak }) {
   const nearby = useMemo(() => nearbyList(shown, { bounds, visibleOnly }), [shown, bounds, visibleOnly]);
 
   useEffect(() => {
-    if (!extraActive) return undefined;
+    if (!extraActive && !windEnabled && !rainEnabled) return undefined;
     const refreshVisible = () => {
       if (document.visibilityState !== "hidden") setRefreshVersion((current) => current + 1);
     };
@@ -166,7 +282,42 @@ export default function CartographiePanel({ onClose, onSpeak }) {
       clearInterval(timer);
       document.removeEventListener("visibilitychange", refreshVisible);
     };
-  }, [extraActive]);
+  }, [extraActive, windEnabled, rainEnabled]);
+
+  useEffect(() => {
+    setRainTileError(false);
+    setRainLegendError(false);
+    if (!rainEnabled || !mapRef.current || rainIndex < 0) return undefined;
+    let active = true;
+    const layer = L.tileLayer.wms(RAIN_WMS_URL, {
+      layers: "IMERG_Precipitation_Rate_30min", format: "image/png", transparent: true,
+      version: "1.1.1", time: rainSelection, pane: "sirius-rain", opacity: 0.75,
+      referrerPolicy: "no-referrer",
+      attribution: 'Images NASA <a href="https://earthdata.nasa.gov/gibs" target="_blank" rel="noopener noreferrer">GIBS / ESDIS</a>',
+    });
+    const onLoading = () => { if (active) setRainTileError(false); };
+    const onError = () => { if (active) setRainTileError(true); };
+    layer.on("loading", onLoading);
+    layer.on("tileerror", onError);
+    layer.addTo(mapRef.current);
+    return () => {
+      active = false;
+      layer.off("loading", onLoading);
+      layer.off("tileerror", onError);
+      layer.remove();
+    };
+  }, [rainEnabled, rainSelection, rainIndex]);
+
+  useEffect(() => {
+    if (!windEnabled || !mapRef.current || !wind.state?.points?.length) return undefined;
+    const group = L.layerGroup().addTo(mapRef.current);
+    wind.state.points.forEach((point) => {
+      L.marker([point.latitude, point.longitude], { icon: windIcon(point), keyboard: false })
+        .bindTooltip(`Vent estimé : ${point.speed_kmh.toLocaleString("fr-FR")} km/h · direction de la flèche`)
+        .addTo(group);
+    });
+    return () => group.remove();
+  }, [windEnabled, wind.state?.points]);
 
   useEffect(() => {
     const layer = layerRef.current;
@@ -248,10 +399,12 @@ export default function CartographiePanel({ onClose, onSpeak }) {
     const zone = extraActive ? "selon les filtres affichés"
       : visibleOnly ? "dans la zone affichée" : radiusKm === WORLD || !origin ? "dans le monde" : `à moins de ${radiusKm} km`;
     const incomplete = (data?.sources || []).some((source) => !source.ok)
-      || Object.keys(EXTRA_LAYER_LABELS).some((kind) => kinds[kind] && layers[kind]?.error);
+      || Object.keys(EXTRA_LAYER_LABELS).some((kind) => kinds[kind] && layers[kind]?.error)
+      || (windEnabled && wind.state?.error)
+      || (rainEnabled && (rain.state?.error || rainTileError || rainLegendError || (rain.state?.result && rainIndex < 0)));
     const warning = incomplete ? " Certaines sources sont indisponibles." : "";
     onSpeak && onSpeak(count
-      ? `${count} ${noun}${count > 1 ? "s" : ""} ${zone}. ${origin ? "Le plus proche" : "Premier élément"} : ${nearby.items[0].title}.${warning}`
+      ? `${count} ${noun}${count > 1 ? "s" : ""} ${zone}. ${origin ? "Le plus proche" : "Premier élément"} : ${eventTitle(nearby.items[0])}.${warning}`
       : `Aucun ${noun} affiché ${zone} dans les données disponibles.${warning}`);
   };
 
@@ -305,16 +458,76 @@ export default function CartographiePanel({ onClose, onSpeak }) {
             <span className={`carto-dot ${kind}`} aria-hidden="true" /> {label}
           </label>
         ))}
+        <label className="carto-check">
+          <input type="checkbox" checked={nightEnabled} data-testid="cartographie-night"
+            onChange={(event) => setNightEnabled(event.target.checked)} />
+          Jour / nuit
+        </label>
+        <label className="carto-check">
+          <input type="checkbox" checked={windEnabled} data-testid="cartographie-wind"
+            onChange={(event) => setWindEnabled(event.target.checked)} />
+          Vent
+        </label>
+        {windEnabled && (
+          <div className="carto-wind-controls">
+            <label>
+              Horaire
+              <select aria-label="Horaire du vent" data-testid="cartographie-wind-time"
+                value={windSelection} disabled={!windTimes.length}
+                onChange={(event) => wind.setSelectedTime(event.target.value)}>
+                {windIndex < 0 && <option value={windSelection}>Choisir un horaire</option>}
+                {windTimes.map((time) => <option value={time} key={time}>{windTime(time)}</option>)}
+              </select>
+            </label>
+            <button type="button" aria-label="Horaire précédent" disabled={windIndex <= 0}
+              onClick={() => wind.setSelectedTime(windTimes[windIndex - 1])}>‹</button>
+            <button type="button" aria-label="Horaire suivant" disabled={windIndex < 0 || windIndex >= windTimes.length - 1}
+              onClick={() => wind.setSelectedTime(windTimes[windIndex + 1])}>›</button>
+          </div>
+        )}
+        <label className="carto-check">
+          <input type="checkbox" checked={rainEnabled} data-testid="cartographie-rain"
+            onChange={(event) => setRainEnabled(event.target.checked)} />
+          Pluie NASA (différée)
+        </label>
+        <small className="carto-rain-privacy">NASA reçoit l’adresse IP et la zone affichée si le calque est activé.</small>
+        {rainEnabled && (
+          <div className="carto-wind-controls">
+            <label>
+              Image
+              <select aria-label="Horaire de la pluie" data-testid="cartographie-rain-time"
+                value={rainSelection} disabled={!rainTimes.length}
+                onChange={(event) => rain.setSelectedTime(event.target.value)}>
+                {rainIndex < 0 && <option value={rainSelection}>Choisir un horaire</option>}
+                {rainTimes.map((time) => <option value={time} key={time}>{windTime(time)}</option>)}
+              </select>
+            </label>
+            <button type="button" aria-label="Image précédente" disabled={rainIndex <= 0}
+              onClick={() => rain.setSelectedTime(rainTimes[rainIndex - 1])}>‹</button>
+            <button type="button" aria-label="Image suivante" disabled={rainIndex < 0 || rainIndex >= rainTimes.length - 1}
+              onClick={() => rain.setSelectedTime(rainTimes[rainIndex + 1])}>›</button>
+            <button type="button" disabled={!rainTimes.length || !rain.selectedTime}
+              onClick={() => rain.setSelectedTime("")}>Plus récente</button>
+          </div>
+        )}
       </div>
-      {extraActive && (
+      {(extraActive || windEnabled || rainEnabled) && (
         <div className="carto-layer-status" aria-live="polite">
           {Object.entries(EXTRA_LAYER_LABELS).filter(([kind]) => kinds[kind]).map(([kind, label]) => (
             <LayerStatus key={kind} label={label} state={layers[kind]} />
           ))}
+          {windEnabled && <WindStatus state={wind.state} />}
+          {rainEnabled && <RainStatus state={rain.state} selectedTime={rainSelection} tileError={rainTileError} />}
         </div>
       )}
 
       {error && <p className="her-error" role="alert" data-testid="cartographie-error">{error}</p>}
+      {kinds.camera && (
+        <p className="carto-note" data-testid="cartographie-camera-privacy">
+          Aperçu ou flux ouverts uniquement sur demande : le fournisseur reçoit ton adresse IP.
+          La date affichée est celle du catalogue, pas nécessairement celle de l’image.
+        </p>
+      )}
       {data && !origin && (
         <p className="carto-note" data-testid="cartographie-no-origin">
           Aucune ville d’établissement : le filtre par rayon est désactivé. Renseigne-la dans Réveil matinal &gt; Veille locale.
@@ -326,6 +539,19 @@ export default function CartographiePanel({ onClose, onSpeak }) {
 
       <div className="carto-stage">
         <div ref={mapNode} className="carto-map" data-testid="cartographie-map" />
+        {rainEnabled && rainIndex >= 0 && (
+          <aside className="carto-rain-legend" aria-label="Légende de pluie NASA">
+            <strong>Intensité des précipitations (mm/h)</strong>
+            {rainLegendError ? <span>Légende NASA indisponible.</span> : (
+              <>
+                <img src={RAIN_LEGEND_URL} alt="Échelle NASA de l’intensité des précipitations" referrerPolicy="no-referrer"
+                  onError={() => setRainLegendError(true)} />
+                <span>Échelle du haut : pluie ; échelle du bas : neige.</span>
+              </>
+            )}
+            <span>Zone transparente : pluie très faible ou donnée absente.</span>
+          </aside>
+        )}
         <aside className={`carto-float ${floatingOpen ? "" : "collapsed"}`} aria-label={extraActive ? "Éléments proches" : "Événements proches"} data-testid="cartographie-nearby">
           <div className="carto-float-head">
             <button type="button" onClick={announce} className="carto-float-title" title="Lire le résumé">
@@ -343,7 +569,7 @@ export default function CartographiePanel({ onClose, onSpeak }) {
                   <li key={itemKey(item)}>
                     <button type="button" onClick={() => focus(item)}>
                       <span className={`carto-dot ${item.kind}`} aria-hidden="true" />
-                      <span><b>{item.title}</b><small>{eventSubtitle(item)}</small></span>
+                      <span><b>{eventTitle(item)}</b><small>{eventSubtitle(item)}</small></span>
                     </button>
                   </li>
                 ))}
@@ -361,11 +587,15 @@ export default function CartographiePanel({ onClose, onSpeak }) {
         {data?.truncated ? ` ${data.truncated} point(s) supplémentaire(s) non affiché(s).` : ""}
         {" "}Les alertes NOAA/NWS couvrent les États-Unis ; la vigilance Météo-France n’est pas incluse. Fond de carte © OpenStreetMap.
         {extraActive && (
-          <> Les calques complémentaires sont limités à la zone visible et au rayon choisi ; la zone est envoyée à l’API ΣIRIUS, pas à OSIRIS.
+          <> Les calques de repères sont limités à la zone visible et au rayon choisi ; la zone est envoyée à l’API ΣIRIUS, pas à OSIRIS.
             {" "}Les positions d’avions sont indicatives ; celles des satellites sont calculées et approximatives.
             {" "}Les conflits sont des repères éditoriaux, pas des frontières ; les actualités et leurs localisations restent à vérifier.
+            {" "}Les caméras proviennent de sources publiques et leur disponibilité ou leur date ne sont pas garanties.
             {" "}Ne pas utiliser cette carte pour la navigation ou la sécurité.</>
         )}
+        {nightEnabled && " La limite jour / nuit est calculée localement et reste approximative."}
+        {windEnabled && " Vent : modèle NOAA GFS à 10 m via OSIRIS, grille de 1° ; les flèches indiquent la direction du déplacement, pas une mesure en direct."}
+        {rainEnabled && " Pluie : estimation satellite NASA IMERG différée, couvrant la zone visible sans filtre par rayon ; une zone transparente peut aussi signifier une donnée absente."}
       </p>
     </div>
   );

@@ -152,18 +152,65 @@ def test_map_layers_validate_bounds_and_use_only_the_callers_city(veille_client,
     assert client.get(path, params={**params, "south": 60}, headers=OWNER).status_code == 422
     assert client.get(path, params={**params, "west": 20}, headers=OWNER).status_code == 422
     assert client.get(path, params={**params, "east": "nan"}, headers=OWNER).status_code == 422
+    maritime_path = "/api/veille/carte/calques/maritime"
+    assert client.get(maritime_path, params=params, headers=OWNER).status_code == 200
+    assert seen[-1][1] == "maritime"
+    camera_path = "/api/veille/carte/calques/camera"
+    assert client.get(camera_path, params=params).status_code == 401
+    assert client.get(camera_path, params=params, headers=OWNER).status_code == 200
+    assert seen[-1][1] == "camera"
     assert client.get("/api/veille/carte/calques/navire", params=params, headers=OWNER).status_code == 422
 
 
 def test_production_app_exposes_the_map_route_behind_login():
     import server
-    routes = {(route.path, method) for route in server.app.routes for method in getattr(route, "methods", ())}
-    assert ("/api/veille/carte", "GET") in routes
-    assert ("/api/veille/carte/calques/{kind}", "GET") in routes
-    assert TestClient(server.app).get("/api/veille/carte").status_code == 401
-    assert TestClient(server.app).get(
+    client = TestClient(server.app)
+    assert client.get("/api/veille/route-absente").status_code == 404
+    assert client.get("/api/veille/carte").status_code == 401
+    assert client.get(
         "/api/veille/carte/calques/avion?south=41&west=-5&north=52&east=10",
     ).status_code == 401
+    assert client.get(
+        "/api/veille/carte/calques/maritime?south=41&west=-5&north=52&east=10",
+    ).status_code == 401
+    assert client.get(
+        "/api/veille/carte/vent?south=41&west=-5&north=52&east=10",
+    ).status_code == 401
+    assert client.get("/api/veille/carte/pluie").status_code == 401
+
+
+def test_wind_route_validates_authentication_bounds_and_forecast_time(veille_client, monkeypatch):
+    client, _ = veille_client
+    seen = []
+
+    async def fake_wind(settings, bounds, radius_km, forecast_time):
+        seen.append((settings, bounds, radius_km, forecast_time))
+        return {"source": {"ok": True}, "points": []}
+
+    monkeypatch.setattr(osiris_watch, "build_map_wind", fake_wind)
+    params = {"south": 41, "west": -5, "north": 52, "east": 10, "t": "2026-05-02T09:00:00Z"}
+    assert client.get("/api/veille/carte/vent", params=params).status_code == 401
+    assert client.get("/api/veille/carte/vent", params=params, headers=OWNER).status_code == 200
+    assert seen[-1][1] == {"south": 41, "west": -5, "north": 52, "east": 10}
+    assert seen[-1][3].isoformat() == "2026-05-02T09:00:00+00:00"
+    assert client.get("/api/veille/carte/vent", params={**params, "south": 60}, headers=OWNER).status_code == 422
+    assert client.get("/api/veille/carte/vent", params={**params, "t": "2026-05-02T09:00:00"}, headers=OWNER).status_code == 422
+    assert client.get("/api/veille/carte/vent", params={**params, "radius_km": 50}, headers=OTHER).status_code == 422
+
+
+def test_rain_route_requires_authentication_and_does_not_send_location(veille_client, monkeypatch):
+    client, _ = veille_client
+    calls = []
+
+    async def fake_rain():
+        calls.append(True)
+        return {"kind": "pluie", "source": {"ok": True}, "times": []}
+
+    monkeypatch.setattr("gibs_rain.rain_metadata", fake_rain)
+    assert client.get("/api/veille/carte/pluie").status_code == 401
+    assert not calls
+    assert client.get("/api/veille/carte/pluie", headers=OWNER).status_code == 200
+    assert calls == [True]
 
 
 def priority(titre, total, code="dates", niveau="urgent"):

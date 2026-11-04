@@ -17,6 +17,8 @@ test("exposes the same privacy policy in the legal view and standalone HTML", ()
   try {
     act(() => root.render(<PublicLegal />));
     expect(container.querySelector("h1").textContent).toBe(policy.title);
+    const headings = policy.sections.map(([heading]) => heading);
+    expect(new Set(headings).size).toBe(headings.length);
     const html = renderPrivacyPage(policy);
     for (const [heading, text] of policy.sections) {
       expect(Array.from(container.querySelectorAll("h2"), (element) => element.textContent)).toContain(heading);

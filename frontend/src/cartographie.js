@@ -1,4 +1,6 @@
 export const WORLD = "monde";
+export const RAIN_WMS_URL = "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi";
+export const RAIN_LEGEND_URL = "https://gibs.earthdata.nasa.gov/legends/GPM_Precipitation_Rate_H.png";
 
 export const KIND_LABELS = { seisme: "Séismes", evenement: "Événements naturels" };
 export const EXTRA_LAYER_LABELS = {
@@ -6,9 +8,54 @@ export const EXTRA_LAYER_LABELS = {
   satellite: "Satellites",
   conflit: "Zones de conflit",
   actualite: "Actualités internationales",
+  maritime: "Ports et passages",
+  camera: "Caméras publiques",
 };
 
-const LAYER_COLORS = { avion: "#69d8ff", satellite: "#c89cff", conflit: "#ff6d74", actualite: "#ffbf69" };
+const LAYER_COLORS = {
+  avion: "#69d8ff", satellite: "#c89cff", conflit: "#ff6d74", actualite: "#ffbf69", maritime: "#63e6be",
+  camera: "#f28ed4",
+};
+
+const EVENT_TYPES_FR = {
+  "flood": "Inondation",
+  "flood advisory": "Avis d’inondation",
+  "flood warning": "Alerte inondation",
+  "sea and lake ice": "Glaces de mer et de lac",
+  "severe storm": "Tempête violente",
+  "storm": "Tempête",
+};
+const MARITIME_RISK_FR = {
+  LOW: "faible", MODERATE: "modéré", MEDIUM: "moyen", ELEVATED: "élevé", HIGH: "fort", CRITICAL: "critique",
+};
+const MARITIME_CONGESTION_FR = {
+  LOW: "faible", MODERATE: "modérée", MEDIUM: "moyenne", ELEVATED: "élevée", HIGH: "forte", CRITICAL: "critique",
+};
+
+function eventTypeInFrench(value) {
+  if (typeof value !== "string") return value;
+  const key = value.toLowerCase();
+  return Object.prototype.hasOwnProperty.call(EVENT_TYPES_FR, key) ? EVENT_TYPES_FR[key] : value;
+}
+
+function maritimeTextInFrench(value) {
+  return value
+    .replace(/\bLIVE SHIPS:\s*/gi, "Navires en direct : ")
+    .replace(/\bLIVE:\s*/gi, "En direct : ")
+    .replace(/\bWAITING:\s*/gi, "En attente : ")
+    .replace(/\b(\d+(?:\.\d+)?)M\b/g, (_, amount) => `${amount.replace(".", ",")} M`)
+    .replace(/\bbpd oil\b/gi, "barils de pétrole/jour")
+    .replace(/\bbpd\b/gi, "barils/jour")
+    .replace(/\bTEU\b/gi, "EVP")
+    .replace(/\bworld trade\b/gi, "du commerce mondial")
+    .replace(/\blarge ships\b/gi, "des grands navires")
+    .replace(/\bAlt route\b/gi, "Route alternative à")
+    .replace(/\bAlt\b/gi, "Alternative à");
+}
+
+export function eventTitle(item) {
+  return item.kind === "evenement" ? eventTypeInFrench(item.title) : item.title;
+}
 
 export function layerQuery(bounds, origin, radiusKm) {
   if (!bounds || ![bounds.south, bounds.west, bounds.north, bounds.east].every(Number.isFinite)) return null;
@@ -76,10 +123,26 @@ export function eventSubtitle(item) {
       "country-anchor": "Point indicatif du pays", unknown: "Localisation incertaine",
     };
     parts.push(precision[item.location_precision] || "Localisation incertaine");
-  } else if (item.type) parts.push(item.type);
+  } else if (item.kind === "maritime") {
+    const labels = { port: "Port", chokepoint: "Passage stratégique", ship: "Navire en direct" };
+    parts.push(labels[item.subtype] || "Repère maritime");
+    if (item.country) parts.push(item.country);
+    if (item.fleet) parts.push(item.fleet);
+    if (item.volume) parts.push(maritimeTextInFrench(item.volume));
+    if (item.traffic) parts.push(maritimeTextInFrench(item.traffic));
+    if (item.risk) parts.push(`Risque ${MARITIME_RISK_FR[item.risk.toUpperCase()] || item.risk.toLowerCase()}`);
+    if (item.congestion && item.congestion.toUpperCase() !== "NORMAL") {
+      parts.push(`Congestion ${MARITIME_CONGESTION_FR[item.congestion.toUpperCase()] || item.congestion.toLowerCase()}`);
+    }
+    if (Number.isFinite(item.speed_knots)) parts.push(`${Math.round(item.speed_knots)} nœuds`);
+  } else if (item.kind === "camera") {
+    if (item.city) parts.push(item.city);
+    if (item.country) parts.push(item.country);
+    parts.push(item.url ? "Flux public à vérifier" : "Lien du flux indisponible");
+  } else if (item.type) parts.push(eventTypeInFrench(item.type));
   if (Number.isFinite(item.distance_km)) {
     const label = item.kind === "satellite" ? "Point au sol à "
-      : item.kind === "conflit" || item.kind === "actualite" ? "Repère à " : "";
+      : item.kind === "conflit" || item.kind === "actualite" || item.kind === "maritime" || item.kind === "camera" ? "Repère à " : "";
     parts.push(`${label}${item.distance_km} km`);
   }
   const date = item.date ? new Date(item.date) : null;

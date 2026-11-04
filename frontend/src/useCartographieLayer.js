@@ -36,6 +36,11 @@ export default function useCartographieLayer(kind, enabled, query, refreshVersio
           || !Number.isFinite(body.total) || !Number.isFinite(body.truncated)) {
           throw new Error("Réponse du calque invalide.");
         }
+        if (kind === "maritime" && body.source.ok && (body.kind !== "maritime" || !body.counts
+          || !["port", "chokepoint", "ship"].every((key) => Number.isInteger(body.counts[key]) && body.counts[key] >= 0)
+          || body.counts.port + body.counts.chokepoint + body.counts.ship !== body.total)) {
+          throw new Error("Réponse du calque invalide.");
+        }
         if (!active) return;
         if (!body.source.ok) {
           setState({

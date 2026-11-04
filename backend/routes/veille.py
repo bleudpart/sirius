@@ -8,6 +8,7 @@ import httpx
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, StrictBool, StringConstraints
 
+import gibs_rain
 import osiris_watch
 import weather_bulletin
 
@@ -88,16 +89,7 @@ def make_veille_router(db, require_user):
         user = await require_user(request, db)
         return await osiris_watch.build_map(await load_veille_settings(db, user["user_id"]))
 
-    @router.get("/carte/calques/{kind}")
-    async def map_layer(
-        kind: Literal["avion", "satellite", "conflit", "actualite"],
-        request: Request,
-        south: float = Query(..., ge=-90, le=90),
-        west: float = Query(..., ge=-540, le=540),
-        north: float = Query(..., ge=-90, le=90),
-        east: float = Query(..., ge=-540, le=540),
-        radius_km: int | None = None,
-    ):
+    async def map_context(request, south, west, north, east, radius_km):
         user = await require_user(request, db)
         if south >= north or west >= east or east - west > 360:
             raise HTTPException(422, "Zone de carte invalide.")
@@ -106,8 +98,43 @@ def make_veille_router(db, require_user):
         settings = await load_veille_settings(db, user["user_id"])
         if radius_km is not None and not osiris_watch.valid_location((settings or {}).get("location")):
             raise HTTPException(422, "Renseignez une ville pour utiliser le filtre par rayon.")
-        bounds = {"south": south, "west": west, "north": north, "east": east}
+        return settings, {"south": south, "west": west, "north": north, "east": east}
+
+    @router.get("/carte/calques/{kind}")
+    async def map_layer(
+        kind: Literal["avion", "satellite", "conflit", "actualite", "maritime", "camera"],
+        request: Request,
+        south: float = Query(..., ge=-90, le=90),
+        west: float = Query(..., ge=-540, le=540),
+        north: float = Query(..., ge=-90, le=90),
+        east: float = Query(..., ge=-540, le=540),
+        radius_km: int | None = None,
+    ):
+        settings, bounds = await map_context(request, south, west, north, east, radius_km)
         return await osiris_watch.build_map_layer(settings, kind, bounds, radius_km)
+
+    @router.get("/carte/vent")
+    async def map_wind(
+        request: Request,
+        south: float = Query(..., ge=-90, le=90),
+        west: float = Query(..., ge=-540, le=540),
+        north: float = Query(..., ge=-90, le=90),
+        east: float = Query(..., ge=-540, le=540),
+        radius_km: int | None = None,
+        forecast_time: datetime | None = Query(None, alias="t"),
+    ):
+        settings, bounds = await map_context(request, south, west, north, east, radius_km)
+        if forecast_time is not None and forecast_time.utcoffset() is None:
+            raise HTTPException(422, "L'horaire de vent doit préciser son fuseau.")
+        return await osiris_watch.build_map_wind(
+            settings, bounds, radius_km,
+            forecast_time.astimezone(timezone.utc) if forecast_time is not None else None,
+        )
+
+    @router.get("/carte/pluie")
+    async def map_rain(request: Request):
+        await require_user(request, db)
+        return await gibs_rain.rain_metadata()
 
     @router.get("")
     async def preview(request: Request):

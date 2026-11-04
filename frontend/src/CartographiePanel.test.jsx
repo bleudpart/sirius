@@ -3,10 +3,17 @@ import { createRoot } from "react-dom/client";
 import L from "leaflet";
 import CartographiePanel from "./CartographiePanel";
 
-jest.mock("leaflet", () => ({
-  __esModule: true,
-  default: { map: jest.fn(), tileLayer: jest.fn(), layerGroup: jest.fn(), circleMarker: jest.fn(), circle: jest.fn() },
-}));
+jest.mock("leaflet", () => {
+  const tileLayer = jest.fn();
+  tileLayer.wms = jest.fn();
+  return {
+    __esModule: true,
+    default: {
+      map: jest.fn(), tileLayer, layerGroup: jest.fn(), circleMarker: jest.fn(), circle: jest.fn(),
+      polygon: jest.fn(), marker: jest.fn(), divIcon: jest.fn(), control: { zoom: jest.fn() },
+    },
+  };
+});
 
 // CRA active resetMocks : les implémentations Leaflet sont recréées avant chaque test.
 function installLeafletMock() {
@@ -14,19 +21,24 @@ function installLeafletMock() {
     const item = {};
     Object.assign(item, {
       addTo: jest.fn(() => item), bindPopup: jest.fn(() => item), bindTooltip: jest.fn(() => item),
-      on: jest.fn(() => item), openPopup: jest.fn(), clearLayers: jest.fn(), removeLayer: jest.fn(),
+      on: jest.fn(() => item), off: jest.fn(() => item), openPopup: jest.fn(), clearLayers: jest.fn(), removeLayer: jest.fn(),
       setLatLng: jest.fn(() => item), setStyle: jest.fn(() => item), setPopupContent: jest.fn(() => item),
+      setLatLngs: jest.fn(() => item), bringToBack: jest.fn(() => item), remove: jest.fn(() => item),
       getBounds: jest.fn(() => ({ circle: true })),
     });
     return item;
   };
   const map = {
     on: jest.fn(), off: jest.fn(), remove: jest.fn(), fitBounds: jest.fn(), getZoom: () => 5, invalidateSize: jest.fn(),
+    createPane: jest.fn(() => ({ style: {} })),
     getBounds: () => ({ getSouth: () => 41, getWest: () => -5, getNorth: () => 51.5, getEast: () => 10 }),
   };
   map.setView = jest.fn(() => map);
   L.map.mockImplementation(() => map);
-  ["tileLayer", "layerGroup", "circleMarker", "circle"].forEach((name) => L[name].mockImplementation(layer));
+  ["tileLayer", "layerGroup", "circleMarker", "circle", "polygon", "marker"].forEach((name) => L[name].mockImplementation(layer));
+  L.tileLayer.wms.mockImplementation(layer);
+  L.control.zoom.mockImplementation(layer);
+  L.divIcon.mockImplementation((options) => options);
 }
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
@@ -51,6 +63,7 @@ const FLIGHT = {
 
 function layerPayload(items, options = {}) {
   return {
+    kind: options.kind || null, counts: options.counts,
     items, total: options.total ?? items.length, truncated: options.truncated ?? 0, ignored: options.ignored ?? 0,
     source: { ok: options.ok ?? true, detail: options.detail ?? null, updated_at: "2026-05-02T05:00:00Z" },
   };
@@ -115,6 +128,22 @@ test("world radius and visible-area filter update the floating list", async () =
   expect(titles()).toEqual(["Orage <img src=x onerror=alert(1)>"]);
 });
 
+test("displays and reads known event titles in French without changing the source", async () => {
+  const onSpeak = jest.fn();
+  const event = { ...EVENTS[2], type: "Flood Warning", distance_km: 10, latitude: 48.9, longitude: 2.4 };
+  global.fetch.mockImplementation(async () => ({
+    ok: true, status: 200, json: async () => ({ ...PAYLOAD, events: [event], sources: [] }),
+  }));
+  await act(async () => root.render(<CartographiePanel onClose={jest.fn()} onSpeak={onSpeak} />));
+  expect(titles()).toEqual(["Alerte inondation"]);
+  const popup = L.circleMarker.mock.results
+    .map((result) => result.value.bindPopup.mock.calls[0]?.[0]).find(Boolean);
+  expect(popup.querySelector("strong").textContent).toBe("Alerte inondation");
+  await change(".carto-float-title", (button) => button.click());
+  expect(onSpeak.mock.calls[0][0]).toContain("Alerte inondation");
+  expect(event.title).toBe("Flood Warning");
+});
+
 test("without an establishment city the radius filter is disabled and explained", async () => {
   global.fetch.mockImplementation(async () => ({
     ok: true, status: 200,
@@ -145,6 +174,25 @@ test("re-measures the map when its window is resized", async () => {
   } finally {
     global.ResizeObserver = original;
   }
+});
+
+test("labels map zoom controls and popup close buttons in French", async () => {
+  await act(async () => root.render(<CartographiePanel onClose={jest.fn()} />));
+  const map = L.map.mock.results[0].value;
+  expect(L.map).toHaveBeenCalledWith(expect.any(HTMLElement), expect.objectContaining({ zoomControl: false }));
+  expect(L.control.zoom).toHaveBeenCalledWith({ zoomInTitle: "Zoom avant", zoomOutTitle: "Zoom arrière" });
+  expect(L.control.zoom.mock.results[0].value.addTo).toHaveBeenCalledWith(map);
+
+  const labelPopup = map.on.mock.calls.find(([event]) => event === "popupopen")[1];
+  const container = document.createElement("div");
+  container.innerHTML = '<a class="leaflet-popup-close-button" aria-label="Close popup"></a>';
+  labelPopup({ popup: { getElement: () => container } });
+  expect(container.firstChild.getAttribute("aria-label")).toBe("Fermer la fiche");
+  expect(() => labelPopup({ popup: { getElement: () => null } })).not.toThrow();
+
+  await act(async () => root.unmount());
+  expect(map.off).toHaveBeenCalledWith("popupopen", labelPopup);
+  root = createRoot(host);
 });
 
 test("asks to log in when the session is missing", async () => {
@@ -220,15 +268,19 @@ test("shows geopolitical source failures and treats article text as text with ap
     };
     global.fetch.mockImplementation(async (url) => ({
       ok: true, status: 200,
-      json: async () => url.includes("/calques/conflit")
+      json: async () => url.includes("/calques/maritime")
+        ? layerPayload([], { ok: false, detail: "Flux OSIRIS trop ancien." })
+        : url.includes("/calques/conflit")
         ? layerPayload([], { ok: false, detail: "Flux indisponible." })
         : url.includes("/calques/actualite") ? layerPayload([article], { ignored: 2 }) : PAYLOAD,
     }));
     await act(async () => root.render(<CartographiePanel onClose={jest.fn()} />));
     await change('[data-testid="cartographie-kind-conflit"]', (box) => box.click());
     await change('[data-testid="cartographie-kind-actualite"]', (box) => box.click());
+    await change('[data-testid="cartographie-kind-maritime"]', (box) => box.click());
     await act(async () => { jest.advanceTimersByTime(250); });
     expect(host.textContent).toContain("Zones de conflit : Flux indisponible.");
+    expect(host.textContent).toContain("Ports et passages : Flux OSIRIS trop ancien.");
     expect(host.textContent).toContain("2 entrée(s) non exploitables ou non localisées");
     expect(host.textContent).toContain("Point indicatif du pays");
     expect(host.querySelector('[data-testid="cartographie-nearby"] img')).toBeNull();
@@ -236,6 +288,215 @@ test("shows geopolitical source failures and treats article text as text with ap
   } finally {
     jest.useRealTimers();
   }
+});
+
+test("loads maritime ports and passages and reports live ships separately", async () => {
+  jest.useFakeTimers();
+  try {
+    const port = {
+      id: "port:Le Havre", kind: "maritime", subtype: "port", title: "Le Havre",
+      latitude: 49.49, longitude: 0.1, distance_km: 180, date: "2026-05-02T05:00:00Z",
+      country: "FR", volume: "14.5M TEU", provider: "OSIRIS — données maritimes",
+    };
+    const passage = {
+      id: "chokepoint:Pas de Calais", kind: "maritime", subtype: "chokepoint",
+      title: "Passage stratégique : Pas de Calais", latitude: 50.96, longitude: 1.85,
+      distance_km: 240, date: "2026-05-02T05:00:00Z", traffic: "90M tonnes", risk: "LOW",
+      provider: "OSIRIS — données maritimes",
+    };
+    global.fetch.mockImplementation(async (url) => ({
+      ok: true, status: 200,
+      json: async () => url.includes("/calques/maritime")
+        ? layerPayload([port, passage], { kind: "maritime", counts: { port: 1, chokepoint: 1, ship: 0 } })
+        : PAYLOAD,
+    }));
+    await act(async () => root.render(<CartographiePanel onClose={jest.fn()} />));
+    await change('[data-testid="cartographie-kind-maritime"]', (box) => box.click());
+    await act(async () => { jest.advanceTimersByTime(250); });
+    expect(global.fetch.mock.calls.at(-1)[0]).toContain("/veille/carte/calques/maritime?");
+    expect(titles()).toContain("Le Havre");
+    expect(titles()).toContain("Passage stratégique : Pas de Calais");
+    expect(host.textContent).toContain("1 port(s), 1 passage(s), 0 navire(s) en direct dans la zone");
+    expect(host.textContent).toContain("90 M tonnes · Risque faible");
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test("opens camera previews only on request and reports unavailable images", async () => {
+  jest.useFakeTimers();
+  try {
+    const camera = {
+      id: "c1", kind: "camera", title: "Caméra : Paris", latitude: 48.9, longitude: 2.4,
+      distance_km: 40, date: "2026-05-02T05:00:00Z", city: "Paris", country: "FR",
+      provider: "OSIRIS — Source", url: "https://example.org/live", preview_url: "https://example.org/camera.jpg",
+    };
+    global.fetch.mockImplementation(async (url) => ({
+      ok: true, status: 200,
+      json: async () => url.includes("/calques/camera") ? layerPayload([camera]) : PAYLOAD,
+    }));
+    await act(async () => root.render(<CartographiePanel onClose={jest.fn()} />));
+    await change('[data-testid="cartographie-kind-camera"]', (box) => box.click());
+    await act(async () => { jest.advanceTimersByTime(250); });
+    expect(titles()).toContain("Caméra : Paris");
+    expect(host.querySelector('[data-testid="cartographie-camera-privacy"]').textContent).toContain("adresse IP");
+    const marker = L.circleMarker.mock.results.map((result) => result.value)
+      .find((item) => item.bindPopup.mock.calls[0]?.[0].textContent.startsWith("Caméra : Paris"));
+    const popup = marker.bindPopup.mock.calls[0][0];
+    expect(popup.querySelector("img")).toBeNull();
+    expect(popup.querySelector("a").textContent).toBe("Ouvrir le flux");
+    expect(popup.querySelector("a").rel).toBe("noopener noreferrer");
+    popup.querySelector("button").click();
+    const image = popup.querySelector("img");
+    expect(image.src).toBe("https://example.org/camera.jpg");
+    expect(image.referrerPolicy).toBe("no-referrer");
+    image.dispatchEvent(new Event("error"));
+    expect(popup.textContent).toContain("Aperçu indisponible");
+    expect(popup.querySelector("img")).toBeNull();
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test("adds, refreshes and removes the locally calculated night layer", async () => {
+  jest.useFakeTimers();
+  try {
+    await act(async () => root.render(<CartographiePanel onClose={jest.fn()} />));
+    expect(L.polygon).not.toHaveBeenCalled();
+    await change('[data-testid="cartographie-night"]', (box) => box.click());
+    expect(L.polygon).toHaveBeenCalledTimes(1);
+    const shade = L.polygon.mock.results[0].value;
+    expect(shade.bringToBack).toHaveBeenCalled();
+    expect(host.textContent).toContain("calculée localement");
+    await act(async () => { jest.advanceTimersByTime(60_000); });
+    expect(shade.setLatLngs).toHaveBeenCalledTimes(1);
+    await change('[data-testid="cartographie-night"]', (box) => box.click());
+    expect(shade.remove).toHaveBeenCalledTimes(1);
+    await act(async () => { jest.advanceTimersByTime(60_000); });
+    expect(shade.setLatLngs).toHaveBeenCalledTimes(1);
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test("loads wind vectors on demand, changes forecast time and removes the layer", async () => {
+  jest.useFakeTimers();
+  try {
+    const times = ["2026-05-02T06:00:00+00:00", "2026-05-02T09:00:00+00:00"];
+    global.fetch.mockImplementation(async (url) => {
+      if (!url.includes("/carte/vent?")) return { ok: true, status: 200, json: async () => PAYLOAD };
+      const selected = new URL(url, "https://sirius.test").searchParams.get("t") || times[0];
+      return {
+        ok: true, status: 200,
+        json: async () => ({
+          kind: "vent", source: { ok: true }, run: "2026-05-02T00:00:00+00:00", times, time: selected, ignored: 0,
+          points: [{ latitude: 48.9, longitude: 2.4, east_ms: 3, north_ms: 0, speed_kmh: 10.8 }],
+        }),
+      };
+    });
+    await act(async () => root.render(<CartographiePanel onClose={jest.fn()} />));
+    expect(global.fetch.mock.calls.some(([url]) => url.includes("/carte/vent?"))).toBe(false);
+    await change('[data-testid="cartographie-wind"]', (box) => box.click());
+    await act(async () => { jest.advanceTimersByTime(250); });
+    expect(L.marker).toHaveBeenCalledTimes(1);
+    expect(L.divIcon.mock.calls[0][0].html).toContain("rotate(90.0deg)");
+    expect(host.textContent).toContain("NOAA GFS");
+    expect(host.textContent).toContain("pas une mesure en direct");
+    expect(host.querySelector('[data-testid="cartographie-wind-time"]').value).toBe(times[0]);
+    const firstWindGroup = L.layerGroup.mock.results[1].value;
+    await change('[aria-label="Horaire suivant"]', (button) => button.click());
+    expect(firstWindGroup.remove).toHaveBeenCalled();
+    await act(async () => { jest.advanceTimersByTime(250); });
+    const request = global.fetch.mock.calls.at(-1)[0];
+    expect(new URL(request, "https://sirius.test").searchParams.get("t")).toBe(times[1]);
+    expect(host.querySelector('[data-testid="cartographie-wind-time"]').value).toBe(times[1]);
+    const secondWindGroup = L.layerGroup.mock.results[2].value;
+    await change('[data-testid="cartographie-wind"]', (box) => box.click());
+    expect(secondWindGroup.remove).toHaveBeenCalled();
+    expect(host.querySelector('[data-testid="cartographie-wind-time"]')).toBeNull();
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test("reports a wind source failure and does not display invented vectors", async () => {
+  jest.useFakeTimers();
+  try {
+    const onSpeak = jest.fn();
+    global.fetch.mockImplementation(async (url) => ({
+      ok: true, status: 200,
+      json: async () => url.includes("/carte/vent?")
+        ? { kind: "vent", source: { ok: false, detail: "Vent indisponible." }, times: [], points: [] }
+        : { ...PAYLOAD, sources: [{ id: "evenements", ok: true }, { id: "seismes", ok: true }] },
+    }));
+    await act(async () => root.render(<CartographiePanel onClose={jest.fn()} onSpeak={onSpeak} />));
+    await change('[data-testid="cartographie-wind"]', (box) => box.click());
+    await act(async () => { jest.advanceTimersByTime(250); });
+    expect(host.textContent).toContain("Vent : Vent indisponible.");
+    expect(L.marker).not.toHaveBeenCalled();
+    await change(".carto-float-title", (button) => button.click());
+    expect(onSpeak.mock.calls[0][0]).toContain("Certaines sources sont indisponibles");
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test("loads delayed NASA rain only on demand and controls the actual image time", async () => {
+  const times = ["2026-05-01T10:00:00Z", "2026-05-01T10:30:00Z"];
+  global.fetch.mockImplementation(async (url) => ({
+    ok: true, status: 200,
+    json: async () => url.endsWith("/carte/pluie")
+      ? { kind: "pluie", source: { ok: true }, latest: times[1], times }
+      : PAYLOAD,
+  }));
+  await act(async () => root.render(<CartographiePanel onClose={jest.fn()} />));
+  expect(global.fetch.mock.calls.some(([url]) => url.endsWith("/carte/pluie"))).toBe(false);
+  expect(L.tileLayer.wms).not.toHaveBeenCalled();
+  expect(host.textContent).toContain("NASA reçoit l’adresse IP et la zone affichée");
+  await change('[data-testid="cartographie-rain"]', (box) => box.click());
+  expect(global.fetch.mock.calls.at(-1)[0]).toMatch(/\/veille\/carte\/pluie$/);
+  expect(L.tileLayer.wms).toHaveBeenCalledTimes(1);
+  const options = L.tileLayer.wms.mock.calls[0][1];
+  expect(options).toEqual(expect.objectContaining({
+    layers: "IMERG_Precipitation_Rate_30min", time: times[1], transparent: true, pane: "sirius-rain",
+  }));
+  expect(host.textContent).toContain("pas un radar en direct");
+  expect(host.textContent).toContain("donnée absente");
+  expect(host.textContent).toContain("Échelle du haut : pluie ; échelle du bas : neige.");
+  const legend = host.querySelector(".carto-rain-legend img");
+  expect(legend.getAttribute("referrerpolicy")).toBe("no-referrer");
+  await act(async () => legend.dispatchEvent(new Event("error")));
+  expect(host.textContent).toContain("Légende NASA indisponible.");
+  const firstLayer = L.tileLayer.wms.mock.results[0].value;
+  const tileError = firstLayer.on.mock.calls.find(([event]) => event === "tileerror")[1];
+  await act(async () => tileError());
+  expect(host.textContent).toContain("certaines tuiles sont indisponibles");
+  await change('[aria-label="Image précédente"]', (button) => button.click());
+  expect(firstLayer.remove).toHaveBeenCalled();
+  expect(L.tileLayer.wms.mock.calls[1][1].time).toBe(times[0]);
+  expect(host.querySelector('[data-testid="cartographie-rain-time"]').value).toBe(times[0]);
+  expect(host.textContent).not.toContain("certaines tuiles sont indisponibles");
+  expect(host.textContent).not.toContain("Légende NASA indisponible.");
+  const latest = [...host.querySelectorAll("button")].find((button) => button.textContent === "Plus récente");
+  await act(async () => latest.click());
+  expect(L.tileLayer.wms.mock.calls[2][1].time).toBe(times[1]);
+  const latestLayer = L.tileLayer.wms.mock.results[2].value;
+  await change('[data-testid="cartographie-rain"]', (box) => box.click());
+  expect(latestLayer.remove).toHaveBeenCalled();
+  expect(host.querySelector('[aria-label="Légende de pluie NASA"]')).toBeNull();
+});
+
+test("reports NASA metadata failure without showing a stale image", async () => {
+  global.fetch.mockImplementation(async (url) => ({
+    ok: true, status: 200,
+    json: async () => url.endsWith("/carte/pluie")
+      ? { kind: "pluie", source: { ok: false, detail: "NASA indisponible." }, latest: null, times: [] }
+      : PAYLOAD,
+  }));
+  await act(async () => root.render(<CartographiePanel onClose={jest.fn()} />));
+  await change('[data-testid="cartographie-rain"]', (box) => box.click());
+  expect(host.textContent).toContain("Pluie NASA : NASA indisponible.");
+  expect(L.tileLayer.wms).not.toHaveBeenCalled();
 });
 
 test("refreshes enabled layers while visible but not while the page is hidden", async () => {

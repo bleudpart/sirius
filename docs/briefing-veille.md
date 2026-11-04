@@ -75,7 +75,10 @@ Le module **CARTOGRAPHIE** (groupe OUTILS, ou « Zirius, ouvre la carte OSIRIS �
 affiche dans ΣIRIUS une carte native des événements naturels et des séismes
 lus dans les flux OSIRIS. Le site OSIRIS interdit son intégration en iframe
 (`X-Frame-Options: SAMEORIGIN`) ; le bouton « Carte OSIRIS complète » l'ouvre
-dans un onglet séparé.
+dans un onglet séparé. L'interface de la carte native est en français ; les
+noms et les titres propres aux sources restent dans leur langue d'origine
+lorsqu'une traduction fiable n'est pas disponible. La légende de la NASA
+comporte du texte anglais, expliqué en français à côté de l'image.
 
 - Données : `GET /api/veille/carte` (session requise), jusqu'à 2 000 points,
   triés par distance puis gravité. Le même cache de 10 minutes que le briefing
@@ -95,12 +98,12 @@ dans un onglet séparé.
 - Mêmes limites que le briefing : NOAA/NWS couvre les États-Unis et la
   vigilance Météo-France n'est pas incluse.
 
-### Calques complémentaires : aviation, espace et géopolitique
+### Calques complémentaires
 
-Les calques **Avions**, **Satellites**, **Zones de conflit** et **Actualités
-internationales** sont désactivés à l'ouverture. Les activer charge les flux
-publics OSIRIS correspondants uniquement pour la zone visible et le rayon
-choisi. Sans ville, seul le filtre de zone visible s'applique.
+Les calques **Avions**, **Satellites**, **Zones de conflit**, **Actualités
+internationales**, **Ports et passages** et **Caméras publiques** sont désactivés à l'ouverture. Les
+activer charge les flux publics OSIRIS correspondants uniquement pour la zone
+visible et le rayon choisi. Sans ville, seul le filtre de zone visible s'applique.
 
 - Les avions proviennent des données OpenSky / ADS-B agrégées par OSIRIS.
   Leur couverture et leur fraîcheur varient ; l'heure affichée est celle du
@@ -116,10 +119,41 @@ choisi. Sans ville, seul le filtre de zone visible s'applique.
   notamment un simple point associé à un pays. Les publications sans lien
   HTTPS ou sans localisation exploitable, et celles de plus de sept jours, ne
   sont pas affichées. Les titres peuvent rester dans la langue de la source.
+- Le flux maritime affiche les ports et passages stratégiques fournis par OSIRIS,
+  distinctement des positions de navires. Lors de la vérification du 4 novembre
+  2026, le flux comptait 52 ports, 10 passages et aucune position de navire AIS.
+  La carte indique le nombre de navires live réellement présents dans les
+  données et ne déduit aucune position à partir des repères statiques.
+- Les caméras sont des repères issus du catalogue public OSIRIS : leur flux peut
+  être indisponible et la date affichée est celle du catalogue, pas celle de
+  l'image. Le flux externe et l'aperçu d'une image ne sont ouverts que sur
+  demande ; le fournisseur reçoit alors l'adresse IP de l'appareil. Aucun
+  lecteur de flux tiers n'est intégré automatiquement.
+- Le calque **Jour / nuit** calcule localement une limite solaire approximative,
+  actualisée chaque minute ; il ne nécessite aucune requête réseau.
+- Le calque **Vent** affiche des flèches orientées dans le sens du déplacement
+  et une vitesse en km/h. Il utilise le modèle NOAA GFS à 10 m, sur une grille
+  mondiale de 1 degré fournie par OSIRIS : c'est une estimation du modèle,
+  **pas une mesure en direct**. L'horaire sélectionné et le cycle du modèle
+  sont affichés ; les boutons permettent de parcourir les échéances disponibles.
+  La grille mondiale est mise en cache puis échantillonnée et filtrée par
+  ΣIRIUS : seuls le cycle et l'horaire, jamais la zone affichée, sont transmis
+  à OSIRIS. Trois grilles au maximum sont conservées en mémoire.
+- Le calque **Pluie NASA (différée)** affiche l'estimation satellitaire IMERG
+  en millimètres par heure, par tranches de 30 minutes. Ce n'est **pas un
+  radar en direct** : la date et l'ancienneté de l'image sont indiquées et
+  peuvent atteindre plusieurs heures. Les commandes parcourent les dernières
+  images publiées. Une zone transparente peut signifier soit une pluie très
+  faible, soit l'absence de données ; elle ne prouve pas qu'il ne pleut pas.
+  La couche couvre toute la zone visible, sans appliquer le rayon.
+  Les horaires sont demandés par l'API ΣIRIUS ; les images et leur légende sont
+  chargées directement depuis NASA GIBS, qui reçoit l'adresse IP de l'appareil
+  et la zone affichée. Sources : NASA Global Imagery Browse Services (GIBS),
+  partie de l'Earth Science Data and Information System (ESDIS).
 - La carte est informative et **ne doit pas être utilisée pour la navigation,
   la sécurité ou une décision opérationnelle**. Consulter et recouper les
   sources officielles.
-- Chaque calque affiche au maximum 500 points dans la zone et le rayon
+- Chaque calque de repères affiche au maximum 500 points dans la zone et le rayon
   sélectionnés, avec le nombre total et une mention en cas de limitation.
   Zoomer permet d'explorer une zone plus petite. Les calques actifs sont
   actualisés toutes les minutes lorsque la page est visible ; les caches
@@ -129,8 +163,6 @@ choisi. Sans ville, seul le filtre de zone visible s'applique.
   à l'API ΣIRIUS, locale ou distante selon la configuration. Aucune ville,
   position ou zone visible n'est envoyée à OSIRIS ; le fond OpenStreetMap
   reçoit toujours l'adresse IP et la zone affichée.
-- Les navires sont reportés : lors de la vérification du 3 novembre 2026,
-  le flux maritime public d'OSIRIS ne renvoyait aucune position AIS.
 
 ## HERACLES : recherches passives de domaine
 

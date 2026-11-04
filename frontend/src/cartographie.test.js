@@ -1,4 +1,4 @@
-import { WORLD, eventSubtitle, filterMapEvents, inBounds, layerQuery, markerStyle, nearbyList } from "./cartographie";
+import { WORLD, eventSubtitle, eventTitle, filterMapEvents, inBounds, layerQuery, markerStyle, nearbyList } from "./cartographie";
 
 const ORIGIN = { name: "Paris", country: "France", latitude: 48.86, longitude: 2.35 };
 const EVENTS = [
@@ -59,5 +59,28 @@ test("transport and geopolitical details distinguish estimates from published re
     date: "2026-05-02T05:00:00Z", provider: "Agence",
   })).toContain("Point indicatif du pays · Repère à 12 km · Publication");
   expect(eventSubtitle({ kind: "conflit", date: null, provider: "OSIRIS" })).toBe("Repère indicatif, pas une frontière · OSIRIS");
+  expect(eventSubtitle({
+    kind: "maritime", subtype: "chokepoint", traffic: "21M bpd oil", risk: "HIGH",
+    distance_km: 25, date: "2026-05-02T05:00:00Z", provider: "OSIRIS",
+  })).toContain("Passage stratégique · 21 M barils de pétrole/jour · Risque fort · Repère à 25 km · Flux");
   expect(markerStyle({ kind: "avion" }).color).not.toBe(markerStyle({ kind: "satellite" }).color);
+  expect(markerStyle({ kind: "maritime" }).color).toBe("#63e6be");
+  expect(eventSubtitle({ kind: "camera", city: "Paris", country: "FR", url: null }))
+    .toContain("Paris · FR · Lien du flux indisponible");
+  expect(markerStyle({ kind: "camera" }).color).toBe("#f28ed4");
+});
+
+test("translates known source labels while preserving unknown titles", () => {
+  expect(eventTitle({ kind: "evenement", title: "Flood Warning" })).toBe("Alerte inondation");
+  expect(eventSubtitle({ kind: "evenement", type: "Flood Advisory" })).toBe("Avis d’inondation");
+  expect(eventTitle({ kind: "evenement", title: "Un rapport spécifique" })).toBe("Un rapport spécifique");
+  expect(eventTitle({ kind: "evenement", title: "constructor" })).toBe("constructor");
+  expect(eventTitle({ kind: "actualite", title: "Flood Warning" })).toBe("Flood Warning");
+  expect(eventSubtitle({
+    kind: "maritime", subtype: "port", volume: "12.0M TEU | LIVE: 0 (WAITING: 0)", congestion: "HIGH",
+  })).toBe("Port · 12,0 M EVP | En direct : 0 (En attente : 0) · Congestion forte");
+  expect(eventSubtitle({
+    kind: "maritime", subtype: "chokepoint", traffic: "12% world trade | LIVE SHIPS: 0", risk: "CRITICAL",
+  })).toBe("Passage stratégique · 12% du commerce mondial | Navires en direct : 0 · Risque critique");
+  expect(eventSubtitle({ kind: "maritime", subtype: "port", risk: "UNUSUAL" })).toBe("Port · Risque unusual");
 });
