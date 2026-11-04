@@ -271,7 +271,7 @@ export default function PublicStore() {
       <div className="public-theme-audio" aria-label="Musique de la boutique">
         <button type="button" className="public-theme-toggle" aria-controls="public-theme-player"
           aria-label={themePlaying ? "Couper le son" : "Activer le son"}
-          title={themeAutoplayBlocked ? "Le navigateur demande votre accord pour démarrer le son" : "Thème Zirius"}
+          title={themeAutoplayBlocked ? "Le navigateur demande votre accord pour démarrer le son" : "Thème ΣIRIUS"}
           onClick={() => {
             const audio = themePlayer();
             if (!audio) return;
@@ -286,7 +286,7 @@ export default function PublicStore() {
           {themePlaying ? "Couper le son" : "Activer le son"}
         </button>
         <audio id="public-theme-player" ref={themeAudioRef} hidden loop autoPlay={!gaplessEnabled.current} preload={gaplessEnabled.current ? "none" : "auto"}
-          aria-label="Écouter le thème Zirius" src={THEME_URL}
+          aria-label="Écouter le thème ΣIRIUS" src={THEME_URL}
           onPlay={() => { setThemePlaying(true); setThemeAutoplayBlocked(false); setThemeAudioError(""); }}
           onPause={() => setThemePlaying(false)}
           onError={() => { setThemePlaying(false); setThemeAudioError("La musique est indisponible. Rechargez la page pour réessayer."); }} />

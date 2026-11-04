@@ -178,6 +178,14 @@ test("Android reads the assistant name without pronouncing the Greek sigma", asy
   }));
 });
 
+test.each(["Zirius", "zirius", "Zyrius"])("Android never pronounces the transcription %s instead of Sirius", async (name) => {
+  speakFr(`J'ouvre la carte autour de ${name}.`);
+  await flush();
+  expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/tts/gemini"), expect.objectContaining({
+    body: JSON.stringify({ text: "J'ouvre la carte autour de Siriusse.", keys: {}, voice: "Charon" }),
+  }));
+});
+
 test.each(["ton ΣIRIUS Display", "ton Sirius Display", "ton Zirius Display", "le ΣIRIUS DISPLAY", "le Sirius Display", "le Zirius Display"])(
   "Sirius refers to %s as its own screen without changing other possessives",
   async (screen) => {

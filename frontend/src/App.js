@@ -4117,7 +4117,7 @@ function App() {
 
     // Les modules ont leur propre fenêtre ; ΣIRIUS Display reste réservé aux réponses.
     const msg = item.id === "cartographie"
-      ? "J'ouvre la cartographie des événements OSIRIS autour de Zirius."
+      ? "J'ouvre la cartographie des événements OSIRIS autour de ΣIRIUS."
       : item.id === "display"
         ? "J'ouvre ΣIRIUS Display."
         : `J'ouvre le module ${moduleDisplayName(item)}.`;
@@ -4502,7 +4502,7 @@ function App() {
       na.play().catch(() => {});
       ambientRef.current = na;
       window.__siriusAmbient = na;
-      const m = choice === "gregorien" ? "Chant grégorien en ambiance." : "Thème Zirius en ambiance.";
+      const m = choice === "gregorien" ? "Chant grégorien en ambiance." : "Thème ΣIRIUS en ambiance.";
       setStatus("speaking"); setText(m); speakOut(m);
       return;
     }
@@ -4863,7 +4863,7 @@ function App() {
       ambientRef.current = na;
       window.__siriusAmbient = na;
       setStatus("speaking");
-      const m = choice === "gregorien" ? "Chant grégorien en ambiance." : "Thème Zirius en ambiance.";
+      const m = choice === "gregorien" ? "Chant grégorien en ambiance." : "Thème ΣIRIUS en ambiance.";
       setText(m); setStatus("speaking"); speakOut(m);
       return;
     }

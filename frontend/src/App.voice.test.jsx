@@ -325,7 +325,7 @@ test.each([
   expect(host.querySelector('[data-testid="workspace-AtlasPanel"]')).toBeNull();
   expect(host.querySelector('[data-testid="sirius-display"]')).toBeNull();
   expect(speakFr).toHaveBeenCalledWith(
-    "J'ouvre la cartographie des événements OSIRIS autour de Zirius.",
+    "J'ouvre la cartographie des événements OSIRIS autour de ΣIRIUS.",
     expect.any(Object),
   );
   expect(global.fetch.mock.calls.some(([url]) => /\/(?:intent|chat)(?:\/stream)?$/.test(String(url)))).toBe(false);
@@ -348,7 +348,7 @@ test.each(["cartographie", "osiris"])("Android executes the server's OSIRIS targ
   expect(host.querySelector('[data-testid="workspace-AtlasPanel"]')).toBeNull();
   expect(host.querySelector('[data-testid="sirius-display"]')).toBeNull();
   expect(speakFr).toHaveBeenCalledWith(
-    "J'ouvre la cartographie des événements OSIRIS autour de Zirius.",
+    "J'ouvre la cartographie des événements OSIRIS autour de ΣIRIUS.",
     expect.any(Object),
   );
   expect(speakFr.mock.calls.some(([message]) => message.includes("déjà affichée"))).toBe(false);

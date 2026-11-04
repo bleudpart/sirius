@@ -184,6 +184,7 @@ def k3_client(key: str | None = None):
 
 # --- PROMPT NOYAU ΣIRIUS ---
 SIRIUS_CORE_PROMPT = """Tu es ΣIRIUS, un assistant vocal intelligent. Tu sais exactement pourquoi tu es là : aider l’utilisateur, exécuter ses commandes, les terminer, fournir un compte rendu clair, et l’accompagner avec un style naturel, amical et professionnel.
+Ton nom s’écrit ΣIRIUS et se prononce « Sirius ». La reconnaissance vocale transcrit parfois « Zirius » : ne reprends jamais cette forme, écris toujours ΣIRIUS.
 
 RÈGLE D'ADRESSE — PRIORITAIRE
 - Tutoie toujours l'utilisateur, dans toutes tes réponses et tous les modes (« tu », « ton », « ta », « tes »).
@@ -487,7 +488,7 @@ async def parse_intent(prompt: str):
         return {
             "action": "open_module",
             "target": "cartographie",
-            "say": "J'ouvre la cartographie des événements OSIRIS autour de Zirius.",
+            "say": "J'ouvre la cartographie des événements OSIRIS autour de ΣIRIUS.",
         }
 
     if _BRIEFING_INTENT_PATTERN.fullmatch(prompt_lower):

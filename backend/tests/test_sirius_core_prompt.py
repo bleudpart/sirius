@@ -54,6 +54,7 @@ def test_system_prompt_matches_the_current_sirius_production_contract():
     assert "COMPTE RENDU DES TÂCHES" in SIRIUS_CORE_PROMPT
     assert "EXÉCUTION AUTONOME" in SIRIUS_CORE_PROMPT
     assert "ΣIRIUS Display sans bouton intermédiaire" in SIRIUS_CORE_PROMPT
+    assert "ne reprends jamais cette forme, écris toujours ΣIRIUS" in SIRIUS_CORE_PROMPT
     assert "commentaire technique reste court" in SIRIUS_CORE_PROMPT
     # Charte de proactivité : initiative encadrée par les niveaux d'autonomie.
     assert "PROACTIVITÉ" in SIRIUS_CORE_PROMPT

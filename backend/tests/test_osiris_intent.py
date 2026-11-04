@@ -33,7 +33,7 @@ def test_osiris_opens_cartographie_without_a_provider(monkeypatch, command):
     assert asyncio.run(sirius_brain.parse_intent(command)) == {
         "action": "open_module",
         "target": "cartographie",
-        "say": "J'ouvre la cartographie des événements OSIRIS autour de Zirius.",
+        "say": "J'ouvre la cartographie des événements OSIRIS autour de ΣIRIUS.",
     }
 
 

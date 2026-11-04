@@ -47,7 +47,9 @@ export function cleanTextForDisplay(t) {
 function cleanTextForSpeech(t) {
   return normalizeFrenchElisions(normalizeFrenchElisions(stripSpokenSources(t))
     // « ΣIRIUS » : la synthèse lit le sigma grec (« sigma irius ») ; le nom se prononce « Sirius ».
+    // « Zirius » n'est qu'une transcription de la voix de l'utilisateur : ΣIRIUS ne doit jamais le prononcer ainsi.
     .replace(/Σ\s?IRIUS/gi, "Sirius")
+    .replace(/\bZ(?:irius|yrius)\b/gi, "Sirius")
     .replace(/\bCEST\b/g, "heure d'été d'Europe centrale")
     .replace(/\bCET\b/g, "heure d'Europe centrale")
     .replace(/\b(?:versus|vs\.?)(?!\s+Code\b)(?=\s|$|[,:;!?])/gi, "contre")

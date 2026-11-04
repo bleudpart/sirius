@@ -6,7 +6,7 @@
  * pour rester compatible avec tout le code existant dans App.js.
  *
  * Presets :
- *   "epique"    — thème Zirius (identifiant conservé pour les réglages existants)
+ *   "epique"    — thème ΣIRIUS (identifiant conservé pour les réglages existants)
  *   "gregorien" — public/audio/gregorien.mp3
  *
  * (Une version précédente synthétisait un drone via Web Audio API — remplacée ici par la
