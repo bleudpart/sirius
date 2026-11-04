@@ -373,7 +373,7 @@ def test_real_chat_intent_and_stream_routes_bind_personal_scope(server_api, monk
     monkeypatch.setattr(sirius_brain, "ask_sirius_stream", stream)
     body = {"text": "bonjour", "keys": {key_name: "invalid-personal"}}
     assert client.post("/api/chat", json=body).status_code == 200
-    assert client.post("/api/chat/stream", json=body).status_code == 200
+    assert client.post("/api/chat/stream", json={**body, "text": "bonjour en flux"}).status_code == 200
     assert client.post("/api/intent", json=body).status_code == 200
     assert seen == ["invalid-personal"] * 3
     for path in ("/api/chat", "/api/chat/stream"):
@@ -428,15 +428,18 @@ def test_active_trial_daily_quota_and_admin_exemption_on_chat(server_api, db, mo
     monkeypatch.setattr(server, "_gather_memory_context", memory)
     monkeypatch.setattr(server, "ask_sirius", answer)
     asyncio.run(db.users.update_one({"user_id": user["user_id"]}, {"$set": {"trial_started_at": access.utc_now()}}))
-    assert client.post("/api/chat", json={"text": "bonjour"}).status_code == 200
-    assert client.post("/api/chat", json={"text": "bonjour"}).status_code == 429
+    body = {"text": "bonjour", "session_id": "trial-daily-quota"}
+    assert client.post("/api/chat", json=body).status_code == 200
+    assert client.post("/api/chat", json=body).status_code == 200
+    assert _usage(db, user) == 1
+    assert client.post("/api/chat", json={**body, "text": "bonjour encore"}).status_code == 429
     status = client.get("/api/setup/status").json()
     assert status["trial"]["state"] == "active"
     assert status["quotas"]["usage"]["chat"] == 1
     asyncio.run(db.users.update_one({"user_id": user["user_id"]}, {"$set": {
         "role": "admin", "trial_started_at": access.utc_now() - timedelta(days=20),
     }}))
-    assert client.post("/api/chat", json={"text": "bonjour"}).status_code == 200
+    assert client.post("/api/chat", json={**body, "text": "bonjour administrateur"}).status_code == 200
     assert client.get("/api/setup/status").json()["trial"]["state"] == "admin"
 
 
@@ -512,7 +515,7 @@ def test_expired_chat_autonomous_local_action_is_not_blocked(server_api, monkeyp
     response = client.post("/api/chat", json={"text": "ouvre le dossier"})
     assert response.status_code == 200
     assert response.json()["answer"] == "Dossier ouvert."
-    stream = client.post("/api/chat/stream", json={"text": "ouvre le dossier"})
+    stream = client.post("/api/chat/stream", json={"text": "ouvre le dossier en flux"})
     assert stream.status_code == 200 and "Dossier ouvert." in stream.text
 
 
@@ -675,15 +678,23 @@ def test_active_trial_unrelated_personal_key_keeps_owner_chat_and_stream(server_
     monkeypatch.setattr(server, "should_extract_memory", lambda *args: False)
     monkeypatch.setattr(sirius_brain, "ask_sirius_stream", stream)
     asyncio.run(db.users.update_one({"user_id": user["user_id"]}, {"$set": {"trial_started_at": access.utc_now()}}))
-    body = {"text": "bonjour", "keys": {"gmaps": "personal-maps", "serp": "personal-serp"}}
+    body = {
+        "text": "bonjour", "session_id": "trial-unrelated-keys",
+        "keys": {"gmaps": "personal-maps", "serp": "personal-serp"},
+    }
     assert client.post("/api/chat", json=body).status_code == 200
-    assert client.post("/api/chat/stream", json=body).status_code == 200
+    stream_duplicate = client.post("/api/chat/stream", json=body)
+    assert stream_duplicate.status_code == 200 and '"duplicate": true' in stream_duplicate.text
+    assert seen == ["owner-brain"] and _usage(db, user) == 1
+    assert client.post("/api/chat", json=body).status_code == 200
+    assert seen == ["owner-brain"] and _usage(db, user) == 1
+    assert client.post("/api/chat", json={**body, "text": "bonjour encore"}).status_code == 200
     assert seen == ["owner-brain", "owner-brain"] and _usage(db, user) == 2
-    assert client.post("/api/chat", json=body).status_code == 429
     # Expired: the same partial vault never reaches the owner key.
     asyncio.run(db.users.update_one({"user_id": user["user_id"]}, {"$set": {"trial_started_at": access.utc_now() - timedelta(days=15, seconds=1)}}))
+    expired_body = {**body, "text": "bonjour apres expiration"}
     for path in ("/api/chat", "/api/chat/stream"):
-        assert client.post(path, json=body).status_code == 403
+        assert client.post(path, json=expired_body).status_code == 403
     assert seen == ["owner-brain", "owner-brain"]
 
 
@@ -700,13 +711,19 @@ def test_active_trial_personal_groq_with_owner_kimi_is_charged_and_exhausted_quo
     monkeypatch.setattr(server, "ask_sirius", answer)
     monkeypatch.setattr(server, "should_extract_memory", lambda *args: False)
     asyncio.run(db.users.update_one({"user_id": user["user_id"]}, {"$set": {"trial_started_at": access.utc_now()}}))
-    body = {"text": "bonjour", "keys": {"groq_key": "personal-groq"}}
+    body = {
+        "text": "bonjour", "session_id": "trial-personal-groq",
+        "keys": {"groq_key": "personal-groq"},
+    }
+    assert client.post("/api/chat", json=body).status_code == 200
+    assert seen == [("personal-groq", "owner-kimi")] and _usage(db, user) == 1
+    # A retry reuses the result; a distinct request with the personal key remains available.
     assert client.post("/api/chat", json=body).status_code == 200
     assert seen == [("personal-groq", "owner-kimi")] and _usage(db, user) == 1
     # Quota reached: own Groq key keeps working, owner Kimi is no longer offered nor charged.
-    assert client.post("/api/chat", json=body).status_code == 200
+    assert client.post("/api/chat", json={**body, "text": "bonjour quota atteint"}).status_code == 200
     assert seen[-1] == ("personal-groq", "") and _usage(db, user) == 1
-    assert client.post("/api/chat", json={"text": "bonjour"}).status_code == 429
+    assert client.post("/api/chat", json={"text": "bonjour quota depasse"}).status_code == 429
 
 
 def test_setup_test_chat_active_trial_with_unrelated_keys_uses_owner_chat(server_api, db, monkeypatch):
@@ -1424,7 +1441,8 @@ def test_intent_uses_personal_groq_and_never_owner_or_quota_with_personal_vault(
     partial = {"k3": "personal-kimi", "gmaps": "personal-maps"}
     assert client.post("/api/intent", json={"text": text, "keys": partial}).json()["action"] == "open_app"
     assert created == ["owner-intent-private"]
-    assert client.post("/api/intent", json={"text": text, "keys": partial}).status_code == 429
+    assert client.post("/api/intent", json={"text": text, "keys": partial}).json()["action"] == "open_app"
+    assert created == ["owner-intent-private"]
     # Own Groq key keeps working past the trial quota and is never replaced by the owner's.
     assert client.post("/api/intent", json={"text": text, "keys": {**partial, "groq_key": "good-personal"}}).json()["action"] == "open_app"
     bad = client.post("/api/intent", json={"text": text, "keys": {**partial, "groq_key": "bad-personal"}})
@@ -1472,7 +1490,9 @@ def test_background_memory_extraction_uses_daily_quota_limit_expiry_and_personal
     assert seen == ["owner-bg"] and _usage(db, user) == 2
 
     # Limit reached: the background task never reaches the owner key and charges nothing more.
-    assert client.post("/api/chat/stream", json={"text": "je m'appelle Daniel", "keys": {"k3": "personal-kimi"}}).status_code == 200
+    assert client.post("/api/chat/stream", json={
+        "text": "je m'appelle Daniel pour la dernière fois", "keys": {"k3": "personal-kimi"},
+    }).status_code == 200
     run_next()
     assert seen == ["owner-bg"] and _usage(db, user) == 2
 

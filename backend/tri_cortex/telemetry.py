@@ -9,7 +9,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from tri_cortex.schemas import (
-    AGENT_IDS, NODE_IDS, AgentId, CortexEvent, CortexFrame, EdgeFlow, EventKind, NodeId, NodeMetrics, NodeStatus,
+    AGENT_IDS, BRAIN1_AGENT_IDS, NODE_IDS, AgentId, CortexEvent, CortexFrame, EdgeFlow, EventKind, NodeId,
+    NodeMetrics, NodeStatus,
 )
 from tri_cortex.store import utc_now
 
@@ -60,10 +61,14 @@ class Telemetry:
         self.runtime_id = uuid.uuid4().hex
         self.sequence = 0
         self.heartbeat_at: datetime | None = None
-        self.states: dict[NodeId, NodeStatus] = {node: "stopped" for node in NODE_IDS}
+        self.states: dict[NodeId, NodeStatus] = {node: "stopped" for node in (*NODE_IDS, *BRAIN1_AGENT_IDS)}
         self.restarts: Counter[NodeId] = Counter()
         self.activity: dict[tuple[str, NodeId], Activity] = {}
         self.backlog: dict[tuple[str, AgentId], int] = {}
+        self.duplicates: Counter[tuple[str, NodeId]] = Counter()
+
+    def duplicate(self, scope: str, node: NodeId) -> None:
+        self.duplicates[(scope, node)] += 1
 
     def _activity(self, scope: str, node: NodeId) -> Activity:
         key = (scope, node)
@@ -106,25 +111,7 @@ class Telemetry:
             raise ValueError("Metriques sans perimetre interdites.")
         self.sequence += 1
         now = utc_now()
-        metrics = []
-        for node in NODE_IDS:
-            rows = [value for (scope, key), value in self.activity.items() if scope in scopes and key == node]
-            tasks = Counter()
-            for row in rows:
-                tasks.update(row.tasks)
-            queued = sum(count for (scope, key), count in self.backlog.items() if scope in scopes and key == node)
-            latest = max(rows, key=lambda row: row.touched, default=None)
-            state = self.states[node]
-            status = state if state != "idle" else "busy" if tasks else "idle"
-            load = min(1.0, sum(tasks.values()) + queued / 64)
-            metrics.append(NodeMetrics(
-                id=node, parent="brain_3" if node in AGENT_IDS else None, status=status,
-                latency_ms=latest.latency_ms if latest else None,
-                first_token_ms=latest.first_token_ms if latest else None,
-                load=load, pulse_level=load, current_task=next(iter(tasks), None),
-                queued=queued, completed=sum(row.completed for row in rows),
-                failures=sum(row.failures for row in rows), restarts=self.restarts[node],
-            ))
+        metrics = [self._node_metrics(node, scopes) for node in NODE_IDS]
         satellites = metrics[3:]
         master = metrics[2]
         if master.status == "idle":
@@ -138,6 +125,8 @@ class Telemetry:
         for event in self.bus.flows:
             if event.scope not in scopes or event.source == event.target or (now - event.at).total_seconds() > 2:
                 continue
+            if event.source not in NODE_IDS or event.target not in NODE_IDS:
+                continue
             pair = (event.source, event.target)
             flows[pair] = EdgeFlow(
                 source=event.source, target=event.target,
@@ -148,4 +137,27 @@ class Telemetry:
             heartbeat_at=self.heartbeat_at, nodes=[metrics[0], metrics[1], master],
             satellites=satellites, edge_flows=list(flows.values()),
             dropped_events=sum(self.bus.dropped[scope] for scope in scopes),
+            brain1_agents=[self._node_metrics(node, scopes) for node in BRAIN1_AGENT_IDS],
+        )
+
+    def _node_metrics(self, node: NodeId, scopes: frozenset[str]) -> NodeMetrics:
+        rows = [value for (scope, key), value in self.activity.items() if scope in scopes and key == node]
+        tasks = Counter()
+        for row in rows:
+            tasks.update(row.tasks)
+        queued = sum(count for (scope, key), count in self.backlog.items() if scope in scopes and key == node)
+        latest = max(rows, key=lambda row: row.touched, default=None)
+        state = self.states[node]
+        status = state if state != "idle" else "busy" if tasks else "idle"
+        load = min(1.0, sum(tasks.values()) + queued / 64)
+        parent = "brain_3" if node in AGENT_IDS else "brain_1" if node in BRAIN1_AGENT_IDS else None
+        return NodeMetrics(
+            id=node, parent=parent, status=status,
+            latency_ms=latest.latency_ms if latest else None,
+            first_token_ms=latest.first_token_ms if latest else None,
+            load=load, pulse_level=load, current_task=next(iter(tasks), None),
+            queued=queued, completed=sum(row.completed for row in rows),
+            failures=sum(row.failures for row in rows), restarts=self.restarts[node],
+            duplicates_blocked=sum(count for (scope, key), count in self.duplicates.items()
+                                   if scope in scopes and key == node),
         )

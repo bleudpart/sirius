@@ -9,7 +9,8 @@ from schemas.finance import IsoDate, Money, NonNegativeMoney, Period, Percent, Q
 from schemas.haccp import EtiquetteVisionOutput, OriginesProduit, PoidsNet
 
 JsonObject: TypeAlias = dict[str, JsonValue]
-NodeId = Literal["brain_1", "brain_2", "brain_3", "vision", "sanitary_guard", "margin_audit", "archivist"]
+NodeId = Literal["brain_1", "brain_2", "brain_3", "vision", "sanitary_guard", "margin_audit", "archivist", "hermes", "iris"]
+Brain1AgentId = Literal["hermes", "iris"]
 AgentId = Literal["vision", "sanitary_guard", "margin_audit", "archivist"]
 TaskKind = Literal[
     "vision_label", "vision_invoice", "sanitary_check", "price_audit",
@@ -24,6 +25,7 @@ TASK_AGENTS: dict[TaskKind, AgentId] = {
 }
 AGENT_IDS: tuple[AgentId, ...] = ("vision", "sanitary_guard", "margin_audit", "archivist")
 NODE_IDS: tuple[NodeId, ...] = ("brain_1", "brain_2", "brain_3", *AGENT_IDS)
+BRAIN1_AGENT_IDS: tuple[Brain1AgentId, ...] = ("hermes", "iris")
 Confidence = Annotated[float, Field(strict=True, ge=0, le=1, allow_inf_nan=False)]
 Digest = Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
 
@@ -212,7 +214,7 @@ class SanitaryResult(Contract):
 
 class NodeMetrics(Contract):
     id: NodeId
-    parent: Literal["brain_3"] | None = None
+    parent: Literal["brain_1", "brain_3"] | None = None
     status: NodeStatus
     latency_ms: float | None = Field(default=None, ge=0)
     first_token_ms: float | None = Field(default=None, ge=0)
@@ -223,6 +225,7 @@ class NodeMetrics(Contract):
     completed: int = Field(ge=0)
     failures: int = Field(ge=0)
     restarts: int = Field(ge=0)
+    duplicates_blocked: int = Field(default=0, ge=0)
 
 
 class EdgeFlow(Contract):
@@ -243,6 +246,7 @@ class CortexFrame(Contract):
     satellites: list[NodeMetrics] = Field(min_length=4, max_length=4)
     edge_flows: list[EdgeFlow]
     dropped_events: int = Field(ge=0)
+    brain1_agents: list[NodeMetrics] = Field(default_factory=list, max_length=2)
 
 
 class CortexEvent(Contract):

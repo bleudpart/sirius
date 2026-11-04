@@ -9,6 +9,10 @@ import "./ZeusTriCortex.css";
 const MAIN = ["brain_1", "brain_2", "brain_3"];
 const SATELLITES = ["vision", "sanitary_guard", "margin_audit", "archivist"];
 const IDS = [...MAIN, ...SATELLITES];
+const BRAIN1_AGENTS = {
+  hermes: { label: "HERMÈS · Aiguilleur", role: "Comprend les commandes et ouvre les modules, sans converser.", color: "#9fc6e4" },
+  iris: { label: "IRIS · Messagère", role: "Rédige les réponses et le texte du Display, sans exécuter d’action.", color: "#c3a6dd" },
+};
 const LABELS = {
   brain_1: "Cerveau 1 · Fast Stream / HUD", brain_2: "Cerveau 2 · Logique métier",
   brain_3: "Cerveau 3 · Sentinel Master", vision: "Vision", sanitary_guard: "SanitaryGuard",
@@ -29,6 +33,7 @@ const TASKS = {
   raisonnement: "Raisonnement", raisonnement_stream: "Raisonnement en flux", hud_result: "Mise à jour du HUD",
   validation_document: "Validation documentaire", calcul_marges: "Calcul des marges",
   analyse_financiere: "Analyse financière", finance_direct: "Finance directe", ticket_caisse: "Ticket de caisse",
+  intent: "Compréhension d’une commande",
 };
 const JOB_STATES = { pending: "En attente", running: "En cours", retry: "Reprise planifiée", done: "Terminée", failed: "En échec" };
 const count = (value) => Number.isSafeInteger(value) && value >= 0;
@@ -56,6 +61,15 @@ export function validateCortexFrame(frame) {
       && IDS.includes(edge.target) && edge.source !== edge.target && count(edge.count) && edge.count > 0 && date(edge.last_at));
   if (!valid) throw new Error("Télémétrie Sentinel incohérente : aucune activité supposée.");
   return frame;
+}
+
+export function brain1Agents(frame) {
+  const rows = Array.isArray(frame?.brain1_agents) ? frame.brain1_agents : [];
+  return rows.filter((node) => node && own(BRAIN1_AGENTS, node.id) && node.parent === "brain_1"
+    && own(STATES, node.status) && fraction(node.load) && nullableLatency(node.latency_ms)
+    && [node.completed, node.failures].every(count)
+    && (node.duplicates_blocked === undefined || count(node.duplicates_blocked))
+    && (node.current_task === null || own(TASKS, node.current_task)));
 }
 
 async function request(path, options = {}) {
@@ -318,6 +332,24 @@ export default function ZeusTriCortex() {
       })}
     </div>
     <Flows frame={frame} />
+    {brain1Agents(frame).length > 0 && <>
+      <p className="tri-section">Agents du Cerveau 1 · une requête = un seul agent, doublons bloqués</p>
+      <div className="tri-nodes" data-testid="brain1-agents">
+        {brain1Agents(frame).map((node) => (
+          <article key={node.id} className="tri-node tri-agent" data-node={node.id} data-status={node.status}
+            style={{ "--accent": BRAIN1_AGENTS[node.id].color }}>
+            <h3>{BRAIN1_AGENTS[node.id].label}</h3>
+            <span className="tri-role">{BRAIN1_AGENTS[node.id].role}</span>
+            <State node={node} />
+            <dl className="tri-stats" data-tiles={3}>
+              <div><dt>Dernière durée</dt><dd>{duration(node.latency_ms)}</dd></div>
+              <div><dt>Terminées / échecs</dt><dd>{node.completed} / {node.failures}</dd></div>
+              <div><dt>Doublons bloqués</dt><dd>{node.duplicates_blocked ?? 0}</dd></div>
+            </dl>
+          </article>
+        ))}
+      </div>
+    </>}
     <p className="tri-caption">Chaque graphe est tracé uniquement avec les mesures reçues de Sentinel : aucune valeur n’est simulée.
       Les compteurs cumulent l’activité de l’instance ; la charge est un travail en cours, pas un usage CPU.</p>
     <p className="tri-section">Escouade supervisée par le Cerveau 3</p>

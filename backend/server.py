@@ -418,6 +418,25 @@ class IntentRequest(BaseModel):
     text: str
     keys: dict = Field(default_factory=dict)
 
+
+_BRAIN1_CREDENTIAL_FINGERPRINT_SECRET = secrets.token_bytes(32)
+
+
+def _brain1_request_options(req, request: Request):
+    options = req.model_dump(exclude={"text", "keys"})
+    application_id = getattr(request.app.state, "brain1_dedupe_namespace", None)
+    if application_id is None:
+        application_id = secrets.token_urlsafe(16)
+        request.app.state.brain1_dedupe_namespace = application_id
+    options["application_id"] = application_id
+    options["credential_fingerprints"] = sorted(
+        (name, hmac.new(_BRAIN1_CREDENTIAL_FINGERPRINT_SECRET, value.encode("utf-8"), "sha256").hexdigest())
+        for name, value in (req.keys or {}).items()
+        if isinstance(name, str) and isinstance(value, str) and value
+    )
+    return options
+
+
 @api_router.post("/intent")
 async def ui_intent(req: IntentRequest, request: Request):
     """Compréhension naturelle d'une commande vocale → intention UI structurée (Groq)."""
@@ -429,9 +448,14 @@ async def ui_intent(req: IntentRequest, request: Request):
         logger.warning("Intent rate limit exceeded", extra={"client_ip": ip})
         return {"action": "none"}
 
+    scope = f"user:{user['user_id']}"
+    key = tri_cortex.hermes.key(scope, "intent", req.text or "", _brain1_request_options(req, request))
+    return await tri_cortex.hermes.handle(scope, "intent", key, lambda: _intent_reply(req, user))
+
+
+async def _intent_reply(req: IntentRequest, user: dict):
     if is_haccp_closing_request(req.text) or is_haccp_activity_request(req.text):
         return {"action": "general", "query": req.text.strip()}
-
     if cloud_link.should_relay_chat(req.keys):
         try:
             return await cloud_link.relay_json("/api/intent", req.model_dump())
@@ -572,6 +596,14 @@ async def chat(req: ChatRequest, request: Request):
         raise HTTPException(status_code=400, detail="Texte vide")
     if not _rate_ok(uid):
         raise HTTPException(status_code=429, detail="Trop de requêtes, patientez un instant.")
+    scope = f"user:{uid}"
+    key = tri_cortex.iris.key(scope, "dialogue", texte, _brain1_request_options(req, request))
+    return await tri_cortex.iris.handle(scope, "dialogue", key, lambda: _chat_reply(req, request, user))
+
+
+async def _chat_reply(req: ChatRequest, request: Request, user: dict):
+    uid = user["user_id"]
+    texte = (req.text or "").strip()
     session_id = f"{uid}:{req.session_id or 'default'}"
     doc = await db.sirius_chats.find_one({"session_id": session_id}, {"_id": 0, "history": 1})
     history = (doc or {}).get("history", [])
@@ -688,6 +720,32 @@ async def chat_stream(req: ChatRequest, request: Request):
         raise HTTPException(status_code=400, detail="Texte vide")
     if not _rate_ok(uid):
         raise HTTPException(status_code=429, detail="Trop de requêtes, patientez un instant.")
+    scope = f"user:{uid}"
+    key = tri_cortex.iris.key(scope, "dialogue", texte, _brain1_request_options(req, request))
+    if not tri_cortex.iris.claim_stream(scope, key):
+        # Même demande déjà en cours ou tout juste traitée : réponse silencieuse, aucun second appel IA.
+        async def duplicate_events():
+            yield "data: " + json.dumps({
+                "type": "done", "ignored": True, "duplicate": True, "answer": "", "response": "", "text": "",
+                "memories": [], "popups": [], "action": None, "timings": {"brain_ms": 0},
+            }, ensure_ascii=False) + "\n\n"
+        return StreamingResponse(
+            duplicate_events(), media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+    try:
+        response = await _chat_stream_reply(req, request, user)
+    except BaseException:
+        tri_cortex.iris.guard.release_stream(key, success=False)
+        raise
+    response.body_iterator = tri_cortex.iris.track_stream(scope, key, response.body_iterator)
+    return response
+
+
+async def _chat_stream_reply(req: ChatRequest, request: Request, user: dict):
+    from fastapi.responses import StreamingResponse
+    uid = user["user_id"]
+    texte = (req.text or "").strip()
     session_id = f"{uid}:{req.session_id or 'default'}"
     doc = await db.sirius_chats.find_one({"session_id": session_id}, {"_id": 0, "history": 1})
     history = (doc or {}).get("history", [])

@@ -69,6 +69,34 @@ restent dans le résultat Cortex, jamais dans la preuve HACCP archivée. Si une
 analyse reprise est utilisée plus tard, le Cerveau 2 recontrôle la DLC à la date
 d'utilisation.
 
+## Les deux agents du Cerveau 1
+
+Le Cerveau 1 répartit chaque requête vers **un seul** agent, selon le point d'entrée :
+
+| Agent | Point d'entrée | Travail | Ce qu'il ne fait jamais |
+|---|---|---|---|
+| **HERMÈS · Aiguilleur** | `/api/intent` | Comprend une commande et renvoie l'action d'interface : ouvrir, fermer ou réduire un module, briefing, musique… | Converser ou rédiger une réponse longue |
+| **IRIS · Messagère** | `/api/chat`, `/api/chat/stream` | Rédige les réponses parlées et le texte de ΣIRIUS Display, avec la mémoire et l'historique | Exécuter une action d'interface ou ouvrir un module |
+
+Garde-fou anti-doublons (`RequestGuard`) :
+
+- La clé d'une requête combine l'agent, l'utilisateur, la tâche, le texte normalisé
+  (minuscules, sans accents ni ponctuation, sans « Zirius » au début) et toutes les options
+  qui changent la réponse (session, profil, mémoire, modes, environnement). Les valeurs
+  des clés API sont représentées par des empreintes HMAC temporaires au processus : elles
+  ne sont ni stockées ni journalisées.
+- Une requête identique **déjà en cours** rejoint le même traitement : un seul appel IA,
+  une seule écriture d'historique, un seul décompte de quota.
+- `/api/chat` et `/api/chat/stream` partagent le même garde-fou IRIS : un doublon entre les
+  deux modes de réponse reste silencieux et ne déclenche pas un second appel IA.
+- Une requête identique reçue juste après reprend le résultat : pendant 3 s pour HERMÈS
+  et 4 s pour IRIS. En flux, le doublon reçoit une réponse silencieuse (`ignored`).
+- Un échec ou une coupure n'est jamais mis en cache : une nouvelle tentative repart.
+- Les compteurs « Doublons bloqués », durées, réussites et échecs de chaque agent sont
+  publiés dans `brain1_agents` de la trame et affichés dans ZEUS CORTEX.
+
+Un troisième agent pourra être ajouté au même modèle (`Brain1AgentSpec`) si les essais de
+fluidité le justifient.
 ## Cycle de vie et isolation des pannes
 
 `BaseSubAgent` fournit `start`, `stop`, `restart_on_failure`, une `asyncio.Queue`
@@ -230,6 +258,7 @@ Les deux lignes `[SENTINEL]` de la panne sont attendues.
 | [schemas.py](../backend/tri_cortex/schemas.py) | Contrats Pydantic stricts, tâches, résultats, trames |
 | [store.py](../backend/tri_cortex/store.py) | File SQLite WAL, idempotence, leases, reprise bornée |
 | [brains.py](../backend/tri_cortex/brains.py) | Cerveau 1 et Cerveau 2 directs |
+| [brain1_agents.py](../backend/tri_cortex/brain1_agents.py) | HERMÈS, IRIS et le garde-fou anti-doublons |
 | [runtime.py](../backend/tri_cortex/runtime.py) | `BaseSubAgent`, `Brain3SentinelMaster`, `TriCortexOrchestrator` |
 | [agents.py](../backend/tri_cortex/agents.py) | Les quatre subagents |
 | [vision.py](../backend/tri_cortex/vision.py) | Lecture scorée sans changer le schéma HACCP canonique |

@@ -102,6 +102,22 @@ test("affiche exactement trois cerveaux et quatre satellites avec le transport a
     String(url).startsWith(API_BASE_URL) && options.credentials === "include")).toBe(true);
 });
 
+test("affiche HERMÈS et IRIS sous le Cerveau 1 avec leurs doublons bloqués mesurés", async () => {
+  await mount();
+  const update = makeFrame(11);
+  update.brain1_agents = [
+    { ...makeNode("hermes"), parent: "brain_1", completed: 3, duplicates_blocked: 1 },
+    { ...makeNode("iris"), parent: "brain_1", status: "busy", load: 1, current_task: "dialogue", completed: 5, duplicates_blocked: 2 },
+  ];
+  await act(async () => socket().emit(update));
+  expect(host.querySelector('[data-testid="brain1-agents"]')).not.toBeNull();
+  expect(node("hermes").textContent).toContain("HERMÈS · Aiguilleur");
+  expect(node("hermes").textContent).toMatch(/Doublons bloqués\s*1/);
+  expect(node("iris").dataset.status).toBe("busy");
+  expect(node("iris").textContent).toMatch(/Doublons bloqués\s*2/);
+  expect(node("iris").textContent).toContain("Dialogue");
+});
+
 test("l'activité et les arêtes changent uniquement à réception d'une mesure réelle", async () => {
   await mount();
   const update = makeFrame(10);

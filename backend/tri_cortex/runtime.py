@@ -8,9 +8,10 @@ from abc import ABC, abstractmethod
 from collections import deque
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 
+from tri_cortex.brain1_agents import HERMES, IRIS, Brain1Agent
 from tri_cortex.brains import Brain1FastStream, Brain2DeepReasoning
 from tri_cortex.schemas import (
-    AGENT_IDS, TASK_AGENTS, AgentId, CortexError, Job, JsonObject, QueueUnavailable,
+    AGENT_IDS, BRAIN1_AGENT_IDS, TASK_AGENTS, AgentId, CortexError, Job, JsonObject, QueueUnavailable,
     RetryableTaskError, TaskContext, TaskFailed, TaskInput, TaskPending, VisionInput, VisionResult,
 )
 from tri_cortex.store import OfflineStore, run_io, utc_now
@@ -288,6 +289,8 @@ class TriCortexOrchestrator:
         self.telemetry = Telemetry(self.bus)
         self.brain1 = Brain1FastStream(self.telemetry)
         self.brain2 = Brain2DeepReasoning(self.telemetry)
+        self.hermes = Brain1Agent(HERMES, self.telemetry, window=3)
+        self.iris = Brain1Agent(IRIS, self.telemetry, window=4)
         options = {"retry_delay": retry_delay}
         archivist = SubagentArchivist(store, self.telemetry, authorize, archive_handler, **options)
         self.brain3 = Brain3SentinelMaster(store, self.telemetry, [
@@ -299,7 +302,8 @@ class TriCortexOrchestrator:
         self.brain3.offline_recovery = archivist.due_offline
 
     async def start(self) -> None:
-        self.telemetry.states["brain_1"] = self.telemetry.states["brain_2"] = "idle"
+        for node in ("brain_1", "brain_2", *BRAIN1_AGENT_IDS):
+            self.telemetry.states[node] = "idle"
         try:
             await self.brain3.start()
         except (OSError, sqlite3.Error) as error:
@@ -309,7 +313,8 @@ class TriCortexOrchestrator:
 
     async def stop(self) -> None:
         await self.brain3.stop()
-        self.telemetry.states["brain_1"] = self.telemetry.states["brain_2"] = "stopped"
+        for node in ("brain_1", "brain_2", *BRAIN1_AGENT_IDS):
+            self.telemetry.states[node] = "stopped"
 
     async def stream(self, scope: str, source: AsyncIterator[str], *, deep: bool = False) -> AsyncIterator[str]:
         stream = self.brain2.stream(scope, source) if deep else source
