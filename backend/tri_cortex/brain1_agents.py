@@ -6,17 +6,15 @@ IRIS (messagere) traite seule /chat et /chat/stream : elle produit les reponses 
 texte de SIRIUS Display, sans jamais executer d'action d'interface.
 
 Chaque requete appartient a un seul agent. Une requete identique (meme utilisateur, meme
-texte normalise, memes options) deja en cours ou terminee depuis quelques secondes n'est pas
-relancee : elle rejoint le resultat existant, ou reste silencieuse pour un flux.
+texte normalise, memes options) deja en cours n'est pas relancee : elle rejoint le resultat
+existant, ou reste silencieuse pour un flux. Une nouvelle demande apres la fin est recalculee.
 """
 import asyncio
 import copy
 import hashlib
 import json
 import re
-import time
 import unicodedata
-from collections import OrderedDict
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
@@ -55,30 +53,13 @@ IRIS = Brain1AgentSpec(
 
 
 class RequestGuard:
-    """Une seule execution par requete identique pendant son traitement et `window` secondes apres."""
+    """Une seule execution par requete identique pendant son traitement."""
 
-    def __init__(self, *, window: float, capacity: int = 512):
-        self.window = window
-        self.capacity = capacity
+    def __init__(self):
         self._inflight: dict[str, asyncio.Future] = {}
-        self._recent: OrderedDict[str, tuple[float, Any]] = OrderedDict()
-        self._streams: dict[str, float] = {}
-
-    def _prune(self, now: float) -> None:
-        for key, (expires, _) in list(self._recent.items()):
-            if expires <= now:
-                del self._recent[key]
-        while len(self._recent) > self.capacity:
-            self._recent.popitem(last=False)
-        for key, expires in list(self._streams.items()):
-            if expires <= now:
-                del self._streams[key]
+        self._streams: dict[str, asyncio.Task] = {}
 
     async def run(self, key: str, operation: Callable[[], Awaitable[Any]]) -> tuple[Any, bool]:
-        now = time.monotonic()
-        self._prune(now)
-        if key in self._recent:
-            return copy.deepcopy(self._recent[key][1]), True
         if key in self._inflight:
             return copy.deepcopy(await asyncio.shield(self._inflight[key])), True
         future = asyncio.get_running_loop().create_future()
@@ -94,34 +75,36 @@ class RequestGuard:
             raise
         else:
             future.set_result(result)
-            self._recent[key] = (time.monotonic() + self.window, result)
             return copy.deepcopy(result), False
         finally:
             self._inflight.pop(key, None)
 
     def claim_stream(self, key: str) -> bool:
-        self._prune(time.monotonic())
-        if key in self._streams or key in self._inflight or key in self._recent:
+        if key in self._streams or key in self._inflight:
             return False
-        self._streams[key] = float("inf")
+        owner = asyncio.current_task()
+        if owner is None:
+            raise RuntimeError("Un flux doit etre rattache a une tache active.")
+        self._streams[key] = owner
+        owner.add_done_callback(lambda task: self._release_stream_owner(key, task))
         return True
 
     def stream_duplicate(self, key: str) -> bool:
-        self._prune(time.monotonic())
         return key in self._streams
 
-    def release_stream(self, key: str, *, success: bool) -> None:
-        if success:
-            self._streams[key] = time.monotonic() + self.window
-        else:
-            self._streams.pop(key, None)
+    def release_stream(self, key: str) -> None:
+        self._streams.pop(key, None)
+
+    def _release_stream_owner(self, key: str, owner: asyncio.Task) -> None:
+        if self._streams.get(key) is owner:
+            self.release_stream(key)
 
 
 class Brain1Agent:
-    def __init__(self, spec: Brain1AgentSpec, telemetry: Telemetry, *, window: float):
+    def __init__(self, spec: Brain1AgentSpec, telemetry: Telemetry):
         self.spec = spec
         self.telemetry = telemetry
-        self.guard = RequestGuard(window=window)
+        self.guard = RequestGuard()
 
     def key(self, scope: str, task: str, text: str, *options: Any) -> str:
         material = json.dumps(
@@ -153,14 +136,9 @@ class Brain1Agent:
         return False
 
     async def track_stream(self, scope: str, key: str, source: AsyncIterator[Any]) -> AsyncIterator[Any]:
-        success = False
         try:
             with self.telemetry.measure(scope, self.spec.id, "dialogue_stream"):
-                failed = False
                 async for chunk in source:
-                    text = chunk.decode("utf-8", "ignore") if isinstance(chunk, (bytes, bytearray)) else str(chunk)
-                    failed = failed or '"type": "error"' in text
                     yield chunk
-                success = not failed
         finally:
-            self.guard.release_stream(key, success=success)
+            self.guard.release_stream(key)

@@ -289,8 +289,8 @@ class TriCortexOrchestrator:
         self.telemetry = Telemetry(self.bus)
         self.brain1 = Brain1FastStream(self.telemetry)
         self.brain2 = Brain2DeepReasoning(self.telemetry)
-        self.hermes = Brain1Agent(HERMES, self.telemetry, window=3)
-        self.iris = Brain1Agent(IRIS, self.telemetry, window=4)
+        self.hermes = Brain1Agent(HERMES, self.telemetry)
+        self.iris = Brain1Agent(IRIS, self.telemetry)
         options = {"retry_delay": retry_delay}
         archivist = SubagentArchivist(store, self.telemetry, authorize, archive_handler, **options)
         self.brain3 = Brain3SentinelMaster(store, self.telemetry, [

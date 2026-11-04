@@ -82,16 +82,18 @@ Garde-fou anti-doublons (`RequestGuard`) :
 
 - La clé d'une requête combine l'agent, l'utilisateur, la tâche, le texte normalisé
   (minuscules, sans accents ni ponctuation, sans « Zirius » au début) et toutes les options
-  qui changent la réponse (session, profil, mémoire, modes, environnement). Les valeurs
-  des clés API sont représentées par des empreintes HMAC temporaires au processus : elles
-  ne sont ni stockées ni journalisées.
+  qui changent la réponse (session, profil, mémoire, modes, environnement), ainsi que le
+  rôle, l'établissement et le début d'essai associés au compte. Les valeurs des clés API
+  sont représentées par des empreintes HMAC temporaires au processus : elles ne sont ni
+  stockées ni journalisées.
 - Une requête identique **déjà en cours** rejoint le même traitement : un seul appel IA,
   une seule écriture d'historique, un seul décompte de quota.
 - `/api/chat` et `/api/chat/stream` partagent le même garde-fou IRIS : un doublon entre les
   deux modes de réponse reste silencieux et ne déclenche pas un second appel IA.
-- Une requête identique reçue juste après reprend le résultat : pendant 3 s pour HERMÈS
-  et 4 s pour IRIS. En flux, le doublon reçoit une réponse silencieuse (`ignored`).
-- Un échec ou une coupure n'est jamais mis en cache : une nouvelle tentative repart.
+- Après la fin du traitement, une nouvelle demande est recalculée, même si son texte est
+  identique : le contexte, les données ou les autorisations peuvent avoir changé.
+  Aucun résultat terminé n'est conservé par ce garde-fou.
+- Un échec ou une coupure libère aussi la demande : une nouvelle tentative repart.
 - Les compteurs « Doublons bloqués », durées, réussites et échecs de chaque agent sont
   publiés dans `brain1_agents` de la trame et affichés dans ZEUS CORTEX.
 

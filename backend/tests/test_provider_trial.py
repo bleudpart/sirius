@@ -430,7 +430,7 @@ def test_active_trial_daily_quota_and_admin_exemption_on_chat(server_api, db, mo
     asyncio.run(db.users.update_one({"user_id": user["user_id"]}, {"$set": {"trial_started_at": access.utc_now()}}))
     body = {"text": "bonjour", "session_id": "trial-daily-quota"}
     assert client.post("/api/chat", json=body).status_code == 200
-    assert client.post("/api/chat", json=body).status_code == 200
+    assert client.post("/api/chat", json=body).status_code == 429
     assert _usage(db, user) == 1
     assert client.post("/api/chat", json={**body, "text": "bonjour encore"}).status_code == 429
     status = client.get("/api/setup/status").json()
@@ -663,7 +663,7 @@ def _usage(db, user, kind="chat"):
 def test_active_trial_unrelated_personal_key_keeps_owner_chat_and_stream(server_api, db, monkeypatch):
     import sirius_brain
     client, user, server = server_api
-    monkeypatch.setenv("SIRIUS_QUOTA_CHAT", "2")
+    monkeypatch.setenv("SIRIUS_QUOTA_CHAT", "4")
     seen = []
     async def memory(*args):
         return []
@@ -683,19 +683,19 @@ def test_active_trial_unrelated_personal_key_keeps_owner_chat_and_stream(server_
         "keys": {"gmaps": "personal-maps", "serp": "personal-serp"},
     }
     assert client.post("/api/chat", json=body).status_code == 200
-    stream_duplicate = client.post("/api/chat/stream", json=body)
-    assert stream_duplicate.status_code == 200 and '"duplicate": true' in stream_duplicate.text
-    assert seen == ["owner-brain"] and _usage(db, user) == 1
+    stream_response = client.post("/api/chat/stream", json=body)
+    assert stream_response.status_code == 200 and '"duplicate": true' not in stream_response.text
+    assert seen == ["owner-brain"] * 2 and _usage(db, user) == 2
     assert client.post("/api/chat", json=body).status_code == 200
-    assert seen == ["owner-brain"] and _usage(db, user) == 1
+    assert seen == ["owner-brain"] * 3 and _usage(db, user) == 3
     assert client.post("/api/chat", json={**body, "text": "bonjour encore"}).status_code == 200
-    assert seen == ["owner-brain", "owner-brain"] and _usage(db, user) == 2
+    assert seen == ["owner-brain"] * 4 and _usage(db, user) == 4
     # Expired: the same partial vault never reaches the owner key.
     asyncio.run(db.users.update_one({"user_id": user["user_id"]}, {"$set": {"trial_started_at": access.utc_now() - timedelta(days=15, seconds=1)}}))
     expired_body = {**body, "text": "bonjour apres expiration"}
     for path in ("/api/chat", "/api/chat/stream"):
         assert client.post(path, json=expired_body).status_code == 403
-    assert seen == ["owner-brain", "owner-brain"]
+    assert seen == ["owner-brain"] * 4
 
 
 def test_active_trial_personal_groq_with_owner_kimi_is_charged_and_exhausted_quota_blocks_owner_only(server_api, db, monkeypatch):
@@ -717,9 +717,9 @@ def test_active_trial_personal_groq_with_owner_kimi_is_charged_and_exhausted_quo
     }
     assert client.post("/api/chat", json=body).status_code == 200
     assert seen == [("personal-groq", "owner-kimi")] and _usage(db, user) == 1
-    # A retry reuses the result; a distinct request with the personal key remains available.
+    # A new request rechecks quota and still has access to the personal key.
     assert client.post("/api/chat", json=body).status_code == 200
-    assert seen == [("personal-groq", "owner-kimi")] and _usage(db, user) == 1
+    assert seen == [("personal-groq", "owner-kimi"), ("personal-groq", "")] and _usage(db, user) == 1
     # Quota reached: own Groq key keeps working, owner Kimi is no longer offered nor charged.
     assert client.post("/api/chat", json={**body, "text": "bonjour quota atteint"}).status_code == 200
     assert seen[-1] == ("personal-groq", "") and _usage(db, user) == 1
@@ -1441,7 +1441,7 @@ def test_intent_uses_personal_groq_and_never_owner_or_quota_with_personal_vault(
     partial = {"k3": "personal-kimi", "gmaps": "personal-maps"}
     assert client.post("/api/intent", json={"text": text, "keys": partial}).json()["action"] == "open_app"
     assert created == ["owner-intent-private"]
-    assert client.post("/api/intent", json={"text": text, "keys": partial}).json()["action"] == "open_app"
+    assert client.post("/api/intent", json={"text": text, "keys": partial}).status_code == 429
     assert created == ["owner-intent-private"]
     # Own Groq key keeps working past the trial quota and is never replaced by the owner's.
     assert client.post("/api/intent", json={"text": text, "keys": {**partial, "groq_key": "good-personal"}}).json()["action"] == "open_app"

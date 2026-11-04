@@ -6,10 +6,10 @@ from tri_cortex.brain1_agents import HERMES, IRIS, Brain1Agent, RequestGuard, no
 from tri_cortex.telemetry import EventBus, Telemetry
 
 
-def make_agent(spec=IRIS, window=4):
+def make_agent(spec=IRIS):
     telemetry = Telemetry(EventBus())
     telemetry.states[spec.id] = "idle"
-    return Brain1Agent(spec, telemetry, window=window), telemetry
+    return Brain1Agent(spec, telemetry), telemetry
 
 
 def test_roles_are_exclusive_and_defined():
@@ -58,9 +58,9 @@ def test_identical_requests_in_flight_share_one_execution():
     assert iris.completed == 1 and iris.duplicates_blocked == 1
 
 
-def test_recent_result_is_reused_then_expires():
+def test_completed_requests_are_recomputed_immediately():
     async def scenario():
-        guard = RequestGuard(window=0.05)
+        guard = RequestGuard()
         calls = 0
 
         async def operation():
@@ -70,19 +70,16 @@ def test_recent_result_is_reused_then_expires():
 
         first, dup1 = await guard.run("k", operation)
         second, dup2 = await guard.run("k", operation)
-        second["n"] = 99
-        await asyncio.sleep(0.08)
-        third, dup3 = await guard.run("k", operation)
-        return calls, first, dup1, dup2, third, dup3
+        return calls, first, dup1, second, dup2
 
-    calls, first, dup1, dup2, third, dup3 = asyncio.run(scenario())
-    assert calls == 2 and first == {"n": 1} and third == {"n": 2}
-    assert (dup1, dup2, dup3) == (False, True, False)
+    calls, first, dup1, second, dup2 = asyncio.run(scenario())
+    assert calls == 2 and first == {"n": 1} and second == {"n": 2}
+    assert (dup1, dup2) == (False, False)
 
 
 def test_failure_is_not_cached_so_a_retry_runs_again():
     async def scenario():
-        guard = RequestGuard(window=10)
+        guard = RequestGuard()
         attempts = 0
 
         async def operation():
@@ -116,51 +113,126 @@ def test_different_users_options_or_agents_never_collide():
 
 def test_stream_and_non_stream_share_the_same_duplicate_guard():
     async def scenario():
-        agent, _ = make_agent(window=1)
+        agent, _ = make_agent()
         calls = 0
+        started = asyncio.Event()
+        release = asyncio.Event()
 
         async def operation():
             nonlocal calls
             calls += 1
             return {"answer": "Bonjour"}
 
+        async def slow_operation():
+            nonlocal calls
+            calls += 1
+            started.set()
+            await release.wait()
+            return {"answer": "Bonjour"}
+
         stream_key = agent.key("user:a", "dialogue", "bonjour en flux")
         assert agent.claim_stream("user:a", stream_key)
         ignored = await agent.handle("user:a", "dialogue", stream_key, operation)
+        assert not agent.claim_stream("user:a", stream_key)
         async for _ in agent.track_stream("user:a", stream_key, _source(['data: {"type": "done"}\n\n'])):
             pass
-        assert not agent.claim_stream("user:a", stream_key)
+        assert await agent.handle("user:a", "dialogue", stream_key, operation) == {"answer": "Bonjour"}
 
         regular_key = agent.key("user:a", "dialogue", "bonjour normal")
-        assert await agent.handle("user:a", "dialogue", regular_key, operation) == {"answer": "Bonjour"}
+        request = asyncio.create_task(agent.handle("user:a", "dialogue", regular_key, slow_operation))
+        await started.wait()
         assert not agent.claim_stream("user:a", regular_key)
+        release.set()
+        assert await request == {"answer": "Bonjour"}
+        assert agent.claim_stream("user:a", regular_key)
+        async for _ in agent.track_stream("user:a", regular_key, _source(['data: {"type": "done"}\n\n'])):
+            pass
         return ignored, calls
 
     ignored, calls = asyncio.run(scenario())
     assert ignored["ignored"] is True
-    assert calls == 1
+    assert calls == 2
 
 
-def test_stream_duplicate_is_refused_until_window_ends_and_failure_frees_it():
+def test_stream_duplicate_is_refused_only_until_completion_and_failure_frees_it():
     async def consume(agent, key, chunks):
         return [chunk async for chunk in agent.track_stream("user:a", key, _source(chunks))]
 
+    async def failing_source():
+        yield 'data: {"type": "delta"}\n\n'
+        raise RuntimeError("flux interrompu")
+
     async def scenario():
-        agent, telemetry = make_agent(window=0.05)
+        agent, telemetry = make_agent()
         key = agent.key("user:a", "dialogue", "bonjour")
         assert agent.claim_stream("user:a", key)
         assert not agent.claim_stream("user:a", key)
         await consume(agent, key, ['data: {"type": "done"}\n\n'])
-        assert not agent.claim_stream("user:a", key)
-        await asyncio.sleep(0.08)
         assert agent.claim_stream("user:a", key)
-        await consume(agent, key, ['data: {"type": "error"}\n\n'])
+        with pytest.raises(RuntimeError, match="flux interrompu"):
+            async for _ in agent.track_stream("user:a", key, failing_source()):
+                pass
         assert agent.claim_stream("user:a", key)
+        stream = agent.track_stream("user:a", key, _source(['data: {"type": "delta"}\n\n']))
+        await stream.__anext__()
+        await stream.aclose()
+        assert agent.claim_stream("user:a", key)
+        await consume(agent, key, ['data: {"type": "done"}\n\n'])
         return telemetry.frame(frozenset({"user:a"}))
 
     frame = asyncio.run(scenario())
     iris = next(node for node in frame.brain1_agents if node.id == "iris")
-    assert iris.duplicates_blocked == 2
+    assert iris.duplicates_blocked == 1
+
+
+@pytest.mark.parametrize("cancelled", [False, True])
+def test_stream_claim_is_released_if_request_ends_before_iteration(cancelled):
+    async def scenario():
+        guard = RequestGuard()
+        started, finish = asyncio.Event(), asyncio.Event()
+
+        async def abandoned_request():
+            assert guard.claim_stream("k")
+            started.set()
+            await finish.wait()
+
+        task = asyncio.create_task(abandoned_request())
+        await started.wait()
+        if cancelled:
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        else:
+            finish.set()
+            await task
+        await asyncio.sleep(0)
+        assert guard.claim_stream("k")
+        guard.release_stream("k")
+
+    asyncio.run(scenario())
+
+
+def test_old_stream_owner_cannot_release_a_new_request():
+    async def scenario():
+        guard = RequestGuard()
+        first_started, finish_first = asyncio.Event(), asyncio.Event()
+
+        async def first_request():
+            assert guard.claim_stream("k")
+            guard.release_stream("k")
+            first_started.set()
+            await finish_first.wait()
+
+        first = asyncio.create_task(first_request())
+        await first_started.wait()
+        assert guard.claim_stream("k")
+        finish_first.set()
+        await first
+        await asyncio.sleep(0)
+        assert not guard.claim_stream("k")
+        guard.release_stream("k")
+
+    asyncio.run(scenario())
 
 
 async def _source(chunks):
