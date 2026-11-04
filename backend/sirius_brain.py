@@ -6,6 +6,7 @@ import hashlib
 import importlib
 import logging
 import time
+import unicodedata
 from datetime import datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import httpx
@@ -423,7 +424,7 @@ _INTENT_SYSTEM_PROMPT = """Tu analyses une commande vocale destinée à ΣIRIUS 
 à une ACTION D'INTERFACE précise, ou s'il s'agit d'une simple question/conversation.
 
 Réponds UNIQUEMENT avec un objet JSON valide, sans markdown, correspondant à l'un de ces formats exacts :
-- Ouvrir un module/fenêtre : {"action": "open_module", "target": "<id>", "say": "J'ai ouvert <nom du module>."}
+- Ouvrir un module/fenêtre : {"action": "open_module", "target": "<id>", "say": "J'ouvre <nom du module>."}
 - Fermer un module/fenêtre : {"action": "close_module", "target": "<id>", "say": "J'ai fermé <nom du module>."}
 - Réduire un module en pastille : {"action": "minimize_module", "target": "<id>", "say": "J'ai réduit <nom du module>."}
 - Tout réduire en pastilles : {"action": "minimize_all"}
@@ -434,15 +435,40 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans markdown, correspondant à l
 - Briefing de travail (dossiers, engagements et échéances, jamais le journal d'actualités) : {"action": "daily_briefing", "say": "<confirmation courte>"}
 - Aucune action d'interface, simple question/conversation : {"action": "general", "query": "<texte original>"}
 
-<id> est l'identifiant du module en minuscules sans accent, par exemple : themis, atlas, oracle, nummarius,
+<id> est l'identifiant du module en minuscules sans accent, par exemple : themis, atlas, cartographie, oracle, nummarius,
 cortex, admin, gcal, display, memorymgr, keraunos, locus, heracles, hephaistos, mythos, trailer, promo,
 agora, solon, promethee, calliope, pythagore, news, packager, install, scripts, vision, setup, gallery,
 espace, faceid, keys, argus, about, europeana, haccp, prime, dev, analytics, memory, files, architect,
 pantheon, nexus, outlook (boîte mail Outlook), outlook_agenda (agenda Outlook).
 
+OSIRIS, carte OSIRIS et cartographie des événements désignent le module "cartographie",
+disponible aussi dans l'application Android. ATLAS ("atlas") sert aux lieux et itinéraires.
+Même si l'utilisateur demande OSIRIS dans le Display, ouvre "cartographie", pas "display" ni "atlas".
+Une intention est une demande d'ouverture, pas une preuve que la carte est déjà affichée.
+
 Si la phrase n'est clairement ni une ouverture/fermeture/réduction de module, ni l'une des actions ci-dessus,
 réponds TOUJOURS par {"action": "general", "query": "<texte original>"} — ne force jamais une action qui ne
 correspond pas clairement à la demande."""
+
+_OSIRIS_MAP_OPEN_PATTERN = re.compile(
+    r"^(?:(?:sirius|zirius)\s+)?"
+    r"(?:s il te plait\s+)?"
+    r"(?:(?:(?:est ce que\s+)?tu (?:peux|pourrais)|peux tu|pourrais tu|je veux|je voudrais|j aimerais|je souhaite|je te demande de)\s+)?"
+    r"(?:(?:m|me)\s+)?"
+    r"(?:(?:ouvre|ouvrir|affiche|afficher|montre|montrer|lance|lancer|deploie|deployer|presente|presenter|restaure|restaurer|rouvre|rouvrir|voir|consulter)(?:\s+moi)?\s+)?"
+    r"(?:(?:le|la|les|l|mon|ma|mes|ton|ta|tes)\s+)?"
+    r"(?:(?:module|panneau)\s+)?"
+    r"(?:osiris*(?:\s+(?:cartes?|cartographie))?|cartes?(?:\s+(?:de|d))?\s+osiris*"
+    r"|cartographie(?:\s+(?:(?:de|d)\s+)?osiris*)?|carte des evenements|evenements proches)"
+    r"(?:\s+(?:dans|sur)\s+(?:(?:le|l|mon|ton)\s+)?(?:(?:sirius|zirius)\s+)?(?:display|ecran|hud))?"
+    r"(?:\s+s il te plait)?$"
+)
+
+
+def is_osiris_map_open_request(prompt: str) -> bool:
+    text = (prompt or "").lower().replace("σ", "s").replace("ς", "s")
+    text = "".join(char for char in unicodedata.normalize("NFD", text) if not unicodedata.combining(char))
+    return bool(_OSIRIS_MAP_OPEN_PATTERN.fullmatch(re.sub(r"[^a-z0-9]+", " ", text).strip()))
 
 
 async def parse_intent(prompt: str):
@@ -454,6 +480,13 @@ async def parse_intent(prompt: str):
 
     if is_haccp_closing_request(prompt) or is_haccp_activity_request(prompt):
         return {"action": "general", "query": prompt}
+
+    if is_osiris_map_open_request(prompt):
+        return {
+            "action": "open_module",
+            "target": "cartographie",
+            "say": "J'ouvre la cartographie des événements OSIRIS autour de Zirius.",
+        }
 
     if _BRIEFING_INTENT_PATTERN.fullmatch(prompt_lower):
         return {
@@ -1418,6 +1451,15 @@ def module_catalog_text() -> str:
             "\n\nTES MODULES RÉELS (noms de la mythologie grecque, ce ne sont ni des logiciels tiers ni des acronymes) :\n"
             + ("\n".join(lines) + "\n" if lines else "")
             + "Autres modules : Nummarius (finances), Keraunos, Gallery, Files, Outlook, HACCP, News.\n"
+            "- CARTOGRAPHIE (id cartographie, aussi appelée OSIRIS) : carte native des événements "
+            "et calques OSIRIS dans ΣIRIUS, disponible sur Android et ordinateur. "
+            "Commande : « ouvre la carte OSIRIS » ou « affiche OSIRIS carte ». "
+            "ATLAS est un autre module, consacré aux lieux et itinéraires.\n"
+            "OUVERTURE DES FENÊTRES : une réponse de conversation n'ouvre aucun module. "
+            "Sans confirmation réelle de l'interface, ne dis jamais qu'une carte est affichée "
+            "ou qu'un module a été ouvert. « ΣIRIUS Display ouvert » ne prouve pas qu'OSIRIS "
+            "ou une carte y est affichée. Ne prétends pas non plus que Cartographie est "
+            "indisponible sur Android : indique son entrée dans le menu OUTILS si nécessaire.\n"
             "RÈGLE ANTI-INVENTION : si on te demande ce qu'est un nom, un module, un sigle ou un terme que tu ne "
             "connais pas avec certitude (y compris un mot probablement mal transcrit par la reconnaissance vocale), "
             "ne fabrique JAMAIS de définition, d'acronyme ni de développement de sigle. Dis simplement que tu ne "

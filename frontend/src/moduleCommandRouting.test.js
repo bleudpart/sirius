@@ -1,4 +1,5 @@
-import { dockTitleMatchesModule, executeModuleOpen, findModuleForCommand, MODULE_ALIASES, parseModuleOpenCommand, moduleDisplayName } from "./moduleCommandRouting";
+import { dockTitleMatchesModule, executeModuleOpen, findModuleForCommand, isCartographieOpenCommand, isNamedModuleOpenRequest, MODULE_ALIASES, parseModuleOpenCommand, parseModuleOpenRequest, moduleDisplayName } from "./moduleCommandRouting";
+import { createModuleRegistry } from "./moduleRegistry";
 
 test.each([
   ["plans", "Architecture & Intérieur (PLANS)", "PLANS"],
@@ -105,4 +106,100 @@ test("une pastille de dock ΣIRIUS correspond au module ΣIRIUS", () => {
 test("generic camera opens Vision while facial capture opens Face ID", () => {
   expect(findModuleForCommand("ouvre la caméra", modules, MODULE_ALIASES).item?.id).toBe("vision");
   expect(findModuleForCommand("ouvre la caméra faciale", modules, MODULE_ALIASES).item?.id).toBe("faceid");
+});
+
+const mapModules = [
+  { id: "display", label: "ΣIRIUS DISPLAY" },
+  { id: "atlas", label: "ATLAS — cartes et navigation" },
+  { id: "cartographie", label: "CARTOGRAPHIE — événements OSIRIS proches" },
+];
+
+test.each([
+  "Zirius, ouvre la carte OSIRIS",
+  "ΣIRIUS, affiche OSIRIS carte",
+  "afficher OSIRIS carte",
+  "ouvre OSIRIS",
+  "montre-moi les cartes OSIRIS",
+  "peux-tu m'afficher la carte OSIRIS ?",
+  "est-ce que tu peux ouvrir OSIRIS dans ton Zirius Display ?",
+  "je voudrais voir la carte d'OSIRIS s'il te plaît",
+  "affiche la cartographie sur l'écran",
+  "ouvre le module OSIRIS",
+  "OSIRIS carte",
+  "cartographie",
+  "la carte des événements",
+  "les événements proches",
+  "ouvre Osiri",
+  "affiche Osirisss",
+])("OSIRIS ouvre Cartographie et jamais ATLAS ou le Display : %s", (command) => {
+  expect(isCartographieOpenCommand(command)).toBe(true);
+  expect(findModuleForCommand(command, mapModules, MODULE_ALIASES).item?.id).toBe("cartographie");
+});
+
+test.each([
+  "que fait OSIRIS en plus de la météo ?",
+  "comment ouvrir la carte OSIRIS ?",
+  "n'ouvre pas OSIRIS",
+  "je ne veux pas afficher OSIRIS",
+  "ferme OSIRIS",
+  "réduis OSIRIS",
+  "ouvre ATLAS",
+  "affiche la carte de Paris",
+  "affiche le guide de la carte OSIRIS",
+  "explique la cartographie",
+])("une mention ou une autre action ne devient pas une ouverture OSIRIS : %s", (command) => {
+  expect(isCartographieOpenCommand(command)).toBe(false);
+});
+
+test("la carte OSIRIS restaure sa propre pastille avant de rouvrir le module", () => {
+  const cartographiePill = { querySelector: () => ({ textContent: "CARTOGRAPHIE" }), click: jest.fn() };
+  const atlasPill = { querySelector: () => ({ textContent: "ATLAS" }), click: jest.fn() };
+  const run = jest.fn();
+  expect(executeModuleOpen("affiche OSIRIS carte", mapModules, MODULE_ALIASES, [atlasPill, cartographiePill], run)?.id)
+    .toBe("cartographie");
+  expect(cartographiePill.click).toHaveBeenCalledTimes(1);
+  expect(atlasPill.click).not.toHaveBeenCalled();
+  expect(run).toHaveBeenCalledWith(mapModules[2]);
+});
+
+test.each(["android", "web"])("chaque identifiant de module disponible sur %s reste ouvrable avec une demande naturelle", (platform) => {
+  const items = createModuleRegistry({ platform, icons: {}, actions: {}, state: {}, user: { role: "admin" } });
+  for (const item of items) {
+    const command = `Zirius, peux-tu m'afficher le module ${item.id} dans ton Display ?`;
+    expect(parseModuleOpenRequest(command)).toEqual({
+      query: item.id.replace(/-/g, " "), target: "display", explicit: true,
+    });
+    expect(findModuleForCommand(command, items, MODULE_ALIASES).item?.id).toBe(item.id);
+  }
+});
+
+test.each([
+  "peux-tu m'afficher le module Thémis ?",
+  "Zirius, montre-moi la fenêtre Thémis dans ton Display",
+  "je voudrais consulter Thémis",
+  "je te demande de m'afficher le panneau Thémis",
+])("les préfixes naturels n'empêchent pas l'ouverture d'un module : %s", (command) => {
+  expect(parseModuleOpenRequest(command)).not.toBeNull();
+  expect(findModuleForCommand(command, modules, MODULE_ALIASES).item?.id).toBe("themis");
+});
+
+test.each([
+  "comment ouvrir Thémis ?",
+  "n'ouvre pas le module Thémis",
+  "je ne veux pas afficher Thémis",
+  "peux-tu expliquer le module Thémis ?",
+])("les questions et les négations ne deviennent pas des demandes d'ouverture : %s", (command) => {
+  expect(parseModuleOpenRequest(command)).toBeNull();
+});
+
+test.each(["display", "ouvre le Display", "affiche l'écran"])("le Display reste ouvrable uniquement quand il est demandé : %s", (command) => {
+  expect(findModuleForCommand(command, mapModules, MODULE_ALIASES).item?.id).toBe("display");
+});
+
+test("les vrais noms de modules priment sur le dialogue métier, pas les demandes de données", () => {
+  const items = createModuleRegistry({ platform: "android", icons: {}, actions: {}, state: {}, user: {} });
+  expect(isNamedModuleOpenRequest("affiche Nummarius", items, MODULE_ALIASES)).toBe(true);
+  expect(isNamedModuleOpenRequest("montre le module dossiers", items, MODULE_ALIASES)).toBe(true);
+  expect(isNamedModuleOpenRequest("affiche mes dossiers", items, MODULE_ALIASES)).toBe(false);
+  expect(isNamedModuleOpenRequest("montre mes résultats de travail", items, MODULE_ALIASES)).toBe(false);
 });

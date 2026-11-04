@@ -76,6 +76,10 @@ jest.mock("./lazyModules", () => new Proxy({}, { get: (_, key) => {
     <div data-testid="workspace-HeraclesPanel" data-input={initialInput || ""} />
   );
   if (key === "CartographiePanel") return () => <div data-testid="workspace-CartographiePanel" />;
+  if (key === "AtlasPanel") return () => <div data-testid="workspace-AtlasPanel" />;
+  if (["ThemisPanel", "OracleDivin", "ZeusCortex", "PortusNummarius"].includes(key)) {
+    return () => <div data-testid={`workspace-${key}`} />;
+  }
   if (key === "WorkspaceSearch") return ({ initialQuery, onClose, onDossier }) => (
     <div data-testid="workspace-WorkspaceSearch" data-query={initialQuery}><button onClick={onClose}>Fermer la recherche</button>
       <button onClick={() => { onClose(); onDossier("search-dossier"); }}>Ouvrir ce dossier</button></div>
@@ -304,15 +308,133 @@ test("domain analysis voice command opens HÉRACLÈS without calling the investi
   expect(global.fetch.mock.calls.some(([url]) => /\/(?:intent|chat)(?:\/stream)?$/.test(String(url)))).toBe(false);
 });
 
-test("map voice command opens the OSIRIS cartography without asking the model", async () => {
+test.each([
+  "Zirius, ouvre la carte OSIRIS",
+  "affiche OSIRIS carte",
+  "Zirius, affiche OSIRIS carte",
+  "ouvre OSIRIS",
+  "montre-moi les cartes OSIRIS",
+  "peux-tu m'afficher la carte OSIRIS ?",
+  "est-ce que tu peux ouvrir OSIRIS dans ton Zirius Display ?",
+  "je voudrais voir la carte d'OSIRIS s'il te plaît",
+])("Android opens the actual OSIRIS cartography without asking the model: %s", async (command) => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
   await mount();
-  await send("Zirius, ouvre la carte OSIRIS");
+  await send(command);
   expect(host.querySelector('[data-testid="workspace-CartographiePanel"]')).not.toBeNull();
+  expect(host.querySelector('[data-testid="workspace-AtlasPanel"]')).toBeNull();
+  expect(host.querySelector('[data-testid="sirius-display"]')).toBeNull();
   expect(speakFr).toHaveBeenCalledWith(
     "J'ouvre la cartographie des événements OSIRIS autour de Zirius.",
     expect.any(Object),
   );
   expect(global.fetch.mock.calls.some(([url]) => /\/(?:intent|chat)(?:\/stream)?$/.test(String(url)))).toBe(false);
+});
+
+test.each(["cartographie", "osiris"])("Android executes the server's OSIRIS target %s instead of trusting an invented display confirmation", async (target) => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  const original = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation((url, options) => {
+    if (String(url).endsWith("/intent")) return Promise.resolve({
+      ok: true, json: async () => ({ action: "open_module", target, say: "La carte est déjà affichée dans le Display." }),
+    });
+    return original(url, options);
+  });
+  await mount();
+  await send("Serait-il possible d'ouvrir la carte OSIRIS pour moi ?");
+  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/intent"))).toBe(true);
+  expect(global.fetch.mock.calls.some(([url]) => /\/chat(?:\/stream)?$/.test(String(url)))).toBe(false);
+  expect(host.querySelector('[data-testid="workspace-CartographiePanel"]')).not.toBeNull();
+  expect(host.querySelector('[data-testid="workspace-AtlasPanel"]')).toBeNull();
+  expect(host.querySelector('[data-testid="sirius-display"]')).toBeNull();
+  expect(speakFr).toHaveBeenCalledWith(
+    "J'ouvre la cartographie des événements OSIRIS autour de Zirius.",
+    expect.any(Object),
+  );
+  expect(speakFr.mock.calls.some(([message]) => message.includes("déjà affichée"))).toBe(false);
+});
+
+test("the generic map command still opens ATLAS on Android", async () => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  await mount();
+  await send("ouvre la carte");
+  expect(host.querySelector('[data-testid="workspace-AtlasPanel"]')).not.toBeNull();
+  expect(host.querySelector('[data-testid="workspace-CartographiePanel"]')).toBeNull();
+});
+
+test.each([
+  ["Zirius, peux-tu m'afficher le module Thémis ?", "ThemisPanel", null],
+  ["montre-moi Chronos dans ton Display", "WorkModulesPanel", "planning"],
+  ["peux-tu ouvrir Ariane ?", "WorkModulesPanel", "workflows"],
+  ["affiche-moi le module Cortex sur ton Zirius Display", "ZeusCortex", null],
+  ["je voudrais consulter Oracle", "OracleDivin", null],
+  ["je te demande de m'afficher le module ATLAS", "AtlasPanel", null],
+  ["affiche le module carte OSIRIS", "CartographiePanel", null],
+  ["affiche Nummarius", "PortusNummarius", null],
+  ["montre le module dossiers", "WorkModulesPanel", "dossiers"],
+])("Android opens the requested module, not a fictional Display result: %s", async (command, panel, module) => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  await mount();
+  await send(command);
+  const opened = host.querySelector(`[data-testid="workspace-${panel}"]`);
+  expect(opened).not.toBeNull();
+  if (module) expect(opened.getAttribute("data-module")).toBe(module);
+  expect(host.querySelector('[data-testid="sirius-display"]')).toBeNull();
+  expect(global.fetch.mock.calls.some(([url]) => /\/(?:intent|chat)(?:\/stream)?$/.test(String(url)))).toBe(false);
+  expect(speakFr.mock.calls.some(([message]) => /dans.*Display/.test(message))).toBe(false);
+});
+
+test("Android restores the requested module's minimized window before confirming the opening", async () => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  await mount();
+  const pill = document.createElement("button");
+  pill.className = "holo-dock-pill";
+  pill.innerHTML = '<span class="hdp-label">THÉMIS</span>';
+  const restore = jest.fn();
+  pill.addEventListener("click", restore);
+  host.appendChild(pill);
+  await send("peux-tu m'afficher le module Thémis ?");
+  expect(restore).toHaveBeenCalledTimes(1);
+  expect(host.querySelector('[data-testid="workspace-ThemisPanel"]')).not.toBeNull();
+});
+
+test("a successful voice opening closes the module list so it does not cover the requested window", async () => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  await mount();
+  await act(async () => host.querySelector('[data-testid="sirius-modules-btn"]').click());
+  expect(document.querySelector('[data-testid="modules-menu"]')).not.toBeNull();
+  await send("peux-tu m'afficher le module Thémis ?");
+  expect(host.querySelector('[data-testid="workspace-ThemisPanel"]')).not.toBeNull();
+  expect(document.querySelector('[data-testid="modules-menu"]')).toBeNull();
+});
+
+test.each(["un module imaginaire", "le module Héphaïstos", "un module"])("Android reports a module it cannot open instead of asking the chat to invent an opening: %s", async (subject) => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  await mount();
+  await send(`peux-tu m'afficher ${subject} ?`);
+  expect(document.querySelector('[data-testid="modules-menu"]')).not.toBeNull();
+  expect(host.querySelector('[data-testid="sirius-display"]')).toBeNull();
+  expect(speakFr).toHaveBeenCalledWith(
+    "Je n'ai pas identifié de module à ouvrir sur cet appareil. Voici la liste des modules disponibles.",
+    expect.any(Object),
+  );
+  expect(global.fetch.mock.calls.some(([url]) => /\/(?:intent|chat)(?:\/stream)?$/.test(String(url)))).toBe(false);
+});
+
+test("an unknown server module target is explicitly reported without falling into a false chat confirmation", async () => {
+  const original = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation((url, options) => {
+    if (String(url).endsWith("/intent")) return Promise.resolve({
+      ok: true, json: async () => ({ action: "open_module", target: "inexistant", say: "Déjà affiché dans le Display." }),
+    });
+    return original(url, options);
+  });
+  await mount();
+  await send("Serait-il possible d'ouvrir un panneau pour moi ?");
+  expect(document.querySelector('[data-testid="modules-menu"]')).not.toBeNull();
+  expect(host.querySelector('[data-testid="sirius-display"]')).toBeNull();
+  expect(global.fetch.mock.calls.some(([url]) => /\/chat(?:\/stream)?$/.test(String(url)))).toBe(false);
+  expect(speakFr.mock.calls.some(([message]) => message.includes("Déjà affiché"))).toBe(false);
 });
 
 test("Chronos appointment requests bypass Outlook and confirm only the issued proposal", async () => {

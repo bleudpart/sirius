@@ -80,6 +80,15 @@ noms et les titres propres aux sources restent dans leur langue d'origine
 lorsqu'une traduction fiable n'est pas disponible. La légende de la NASA
 comporte du texte anglais, expliqué en français à côté de l'image.
 
+Sur Android comme sur ordinateur, « affiche OSIRIS carte », « ouvre OSIRIS »,
+« montre les cartes OSIRIS » et « peux-tu m'afficher la carte OSIRIS ? » ouvrent
+directement **CARTOGRAPHIE**, sans passer par ATLAS ni par une réponse de
+conversation. Une demande « dans le Display » ouvre aussi cette fenêtre native,
+pas une intégration du site OSIRIS dans le Display. Le routeur serveur reconnaît
+également ces commandes pour les clients qui lui soumettent leur intention.
+Une annonce d'ouverture ne confirme pas le chargement des données : les erreurs
+de connexion et de sources restent affichées dans la carte.
+
 - Données : `GET /api/veille/carte` (session requise), jusqu'à 2 000 points,
   triés par distance puis gravité. Le même cache de 10 minutes que le briefing
   est utilisé.

@@ -23,6 +23,13 @@ Nouveautes 1.0.70 :
   sur demande. La carte ne remplace ni les sources officielles ni les
   outils de navigation ou de securite.
 - Recherche passive de domaine dans HERACLES, sans scan automatique.
+- Ouverture des modules par leur nom : "Zirius, peux-tu m'afficher le
+  module Themis ?" ou "montre-moi Chronos dans ton Display" ouvre la
+  fenetre native correspondante, pas un texte qui pretend l'avoir ouverte.
+  Les noms sont recherches dans les modules disponibles sur cet appareil.
+  Pour un module explicite non reconnu, la liste des modules est affichee
+  sans annoncer une ouverture fictive. "Ouvre OSIRIS" et "affiche OSIRIS
+  carte" designent Cartographie ; ATLAS reste reserve aux lieux et trajets.
 - Preparation des trois paquets : installateur Windows, portable Windows
   et APK Diagnostic. Aucune publication automatique n'est effectuee.
 

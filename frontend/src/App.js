@@ -15,7 +15,7 @@ import {
 import { pushStats, setStatsOffline } from "@/liveStats";
 import { formatLocalDate, formatLocalTime, getLocalDateKey } from "@/dateTime";
 import { STATES, isLocalTimeQuestion, localAnswer, weatherInfo, pttBeep } from "@/appLogic";
-import { executeModuleOpen, MODULE_ALIASES, moduleDisplayName } from "@/moduleCommandRouting";
+import { executeModuleOpen, isCartographieOpenCommand, isNamedModuleOpenRequest, MODULE_ALIASES, moduleDisplayName, parseModuleOpenRequest } from "@/moduleCommandRouting";
 import { MedallionRing, ReactorCore, Waveform } from "@/components/ReactorVisuals";
 import { MemoryPanel, HoloPopups, AnalyticsPanel, MusicChoice, CentralCard, BootScreen } from "@/components/HudPanels";
 import OverlayApp from "@/OverlayApp";
@@ -311,7 +311,7 @@ function App() {
   // ──👉 EXECUTEINTENT (collé automatiquement) — garder au tout début du composant App
   const executeIntentImpl = (d) => {
     const act = d.action;
-    const target = (d.target || "").toLowerCase().trim();
+    const target = typeof d.target === "string" ? d.target.toLowerCase().trim() : "";
     const confirm = (msg) => { setStatus("speaking"); setText(msg); speakOut(msg); };
     const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     if (act === "minimize_all") {
@@ -348,12 +348,14 @@ function App() {
       confirm(d.say || "J'ouvre le module Productivite et Travail.");
       return true;
     }
-    if (act === "open_module" && target) {
+    if (act === "open_module") {
       const it = moduleItemsRef.current.find((m) => m.id === target);
-      if (it) { it.run(); confirm(`J'ouvre ${moduleDisplayName(it)}.`); return true; }
+      if (it) return openModuleByName(target);
       const extra = { setup: () => setShowSetup(true), gallery: () => setShowGallery(true), outlook: () => launchOutlookMail(), outlook_agenda: () => launchOutlookAgenda(), outlook_read: () => readMailAloud() }[target];
       if (extra) { extra(); confirm(d.say || "C'est ouvert."); return true; }
-      return openModuleByName(target);
+      if (openModuleByName(target)) return true;
+      reportModuleOpenFailure();
+      return true;
     }
     if (act === "close_module" && target) {
       cancelCascadeRef.current();
@@ -4110,13 +4112,25 @@ function App() {
       },
     );
     if (!item) return false;
+    setShowModulesMenu(false);
+    setShowCmdPalette(false);
 
     const surface = item.id === "display" ? "ΣIRIUS Display" : "le HUD";
-    const msg = `J'ouvre ${moduleDisplayName(item)} dans ${surface}.`;
+    const msg = item.id === "cartographie"
+      ? "J'ouvre la cartographie des événements OSIRIS autour de Zirius."
+      : `J'ouvre ${moduleDisplayName(item)} dans ${surface}.`;
     setText(msg);
     speakOut(msg);
     return true;
   }, [speakOut, pinDisplay]);
+
+  const reportModuleOpenFailure = useCallback(() => {
+    const message = "Je n'ai pas identifié de module à ouvrir sur cet appareil. Voici la liste des modules disponibles.";
+    setShowModulesMenu(true);
+    setStatus("speaking");
+    setText(message);
+    speakOut(message);
+  }, [speakOut]);
 
   // Actions ponctuelles (rechargement, capture, caméra) : jamais ouvertes dans une cascade.
   const CASCADE_SKIP = useMemo(() => new Set(["reload", "capture-interface", "capture-region", "open-capture-folder", "vision", "install", "packager"]), []);
@@ -4287,7 +4301,7 @@ function App() {
       void resolveIntent(previewReply);
       return;
     }
-    if (isOperationalCommand(command)) {
+    if (isOperationalCommand(command) && !isNamedModuleOpenRequest(command, moduleItemsRef.current, MODULE_ALIASES)) {
       releaseBulletinFocus(lastBulletinRef.current);
       void resolveIntent(command);
       return;
@@ -4636,7 +4650,7 @@ function App() {
 
     // 00) Normalisation UNE SEULE FOIS pour tout le pipeline
     const low = (typeof command === "string" ? command : command?.text || "").toLowerCase().trim();
-    if (isOperationalCommand(low)) {
+    if (isOperationalCommand(low) && !isNamedModuleOpenRequest(command, moduleItemsRef.current, MODULE_ALIASES)) {
       await resolveIntent(typeof command === "string" ? command : command.text);
       return;
     }
@@ -4757,6 +4771,18 @@ function App() {
       const m = auto ? "Un instant, j'observe ce que tu me montres." : "Module vision activé. J'observe via la caméra dès que tu l'autorises.";
       setStatus("speaking"); setText(m); speakOut(m);
       return;
+    }
+    const moduleRequest = parseModuleOpenRequest(command);
+    if (moduleRequest) {
+      if (openModuleByName(command)) {
+        mark("module · ouverture");
+        return;
+      }
+      if (moduleRequest.explicit) {
+        mark("module · non identifié");
+        reportModuleOpenFailure();
+        return;
+      }
     }
     // 0) Panneau ZEUS CORTEX
     if (/montre[\s-]*(moi)?[\s-]*(ton|le)?[\s-]*cortex/.test(low)) {
@@ -5234,12 +5260,8 @@ function App() {
       return;
     }
     // 0quindecies) HERACLES# : investigation OSINT « enquête sur X », « vérifie l'email X », « analyse le numéro X », « qui est X »
-    if (/^(?:(?:ouvre|affiche|montre)(?:[- ]moi)?\s+)?(?:la\s+)?(?:carte\s+(?:osiris|des\s+[ée]v[ée]nements)|cartographie(?:\s+osiris)?|(?:les\s+)?[ée]v[ée]nements\s+proches)\s*[?!.]*$/.test(low.replace(/^(?:sirius|zirius|σirius)[,\s]+/, ""))) {
+    if (isCartographieOpenCommand(command) && openModuleByName(command)) {
       mark("cartographie · événements OSIRIS");
-      setShowCartographie(true);
-      const message = "J'ouvre la cartographie des événements OSIRIS autour de Zirius.";
-      setText(message);
-      speakOut(message);
       return;
     }
     const domainAnalysis = parseDomainAnalysisCommand(command);

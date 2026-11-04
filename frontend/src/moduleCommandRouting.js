@@ -27,7 +27,7 @@ export const MODULE_ALIASES = {
   argus: "surveillance systeme moniteur",
   atlas: "cartes navigation itineraire",
   heracles: "enquete investigation osint domaine analyse ce domaine",
-  cartographie: "carte osiris carte des evenements evenements proches seismes catastrophes naturelles alertes",
+  cartographie: "osiris carte cartes carte des evenements evenements proches seismes catastrophes naturelles alertes",
   hephaistos: "diagnostic maintenance technique",
   locus: "localisation position geolocalisation",
   promethee: "projet taches planning",
@@ -61,34 +61,61 @@ export const normalizeModuleText = (value) => String(value || "")
   .replace(/[^a-z0-9]+/g, " ")
   .trim();
 
+const MODULE_OPEN_PREFIX = /^(?:ouvre|ouvrir|affiche|afficher|montre|montrer|lance|lancer|deploie|deployer|presente|presenter|restaure|restaurer|rouvre|rouvrir|voir|consulter)(?:\s+moi)?\s+/;
+const MODULE_DETERMINERS = /^(?:(?:le|la|les|l|mon|ma|mes|ton|ta|tes|un|une)\s+)+/;
+const MODULE_DESTINATION = /\s+(?:dans|sur)\s+(?:(?:le|la|l|mon|ton)\s+)?(?:(?:sirius|zirius)\s+)?(hud|display|ecran)$/;
+
+function normalizeModuleRequest(raw) {
+  return normalizeModuleText(raw)
+    .replace(/^(?:sirius|zirius)\s+/, "")
+    .replace(/^s il te plait\s+|\s+s il te plait$/g, "")
+    .replace(/^(?:(?:est ce que\s+)?tu (?:peux|pourrais)|peux tu|pourrais tu|je veux|je voudrais|j aimerais|je souhaite|je te demande de)\s+(?:(?:m|me)\s+)?/, "");
+}
+
 export function moduleDisplayName(item) {
   const names = { plans: "PLANS", photo3d: "PHOTO3D" };
   return names[item.id] || String(item.label || item.id).split("—")[0].replace(/#/g, "").trim();
 }
 
 export function parseModuleOpenCommand(raw) {
-  let query = normalizeModuleText(raw)
-    .replace(/^(?:(?:ouvre|ouvrir|affiche|afficher|montre|montrer|lance|lancer|deploie|presenter|presente)(?:\s+moi)?\s+)+/, "")
-    .replace(/^(?:(?:le|la|les|mon|ma|mes|un|une|module|fenetre|panneau)\s+)+/, "")
+  let query = normalizeModuleRequest(raw).replace(MODULE_OPEN_PREFIX, "")
+    .replace(MODULE_DETERMINERS, "")
+    .replace(/^(?:module|fenetre|panneau)\s+/, "")
+    .replace(MODULE_DETERMINERS, "")
     .trim();
-  const displayTarget = /\b(?:dans|sur)\s+(?:le\s+)?(?:display|ecran)\b/.test(query);
-  const hudTarget = /\b(?:dans|sur)\s+(?:le\s+)?hud\b/.test(query);
-  query = query.replace(/\b(?:dans|sur)\s+(?:le\s+)?(?:hud|display|ecran)\b/g, " ").trim();
-  return { query, target: displayTarget ? "display" : hudTarget ? "hud" : "auto" };
+  const destination = query.match(MODULE_DESTINATION)?.[1];
+  query = query.replace(MODULE_DESTINATION, "").trim();
+  return { query, target: destination === "hud" ? "hud" : destination ? "display" : "auto" };
+}
+
+export function parseModuleOpenRequest(raw) {
+  const normalized = normalizeModuleRequest(raw);
+  if (!MODULE_OPEN_PREFIX.test(normalized)) return null;
+  const subject = normalized.replace(MODULE_OPEN_PREFIX, "").replace(MODULE_DETERMINERS, "");
+  return { ...parseModuleOpenCommand(raw), explicit: /^(?:module|fenetre|panneau)\b/.test(subject) };
+}
+
+export function isCartographieOpenCommand(raw) {
+  const { query } = parseModuleOpenCommand(raw);
+  return /^(?:osiris*(?:\s+(?:cartes?|cartographie))?|cartes?(?:\s+(?:de|d))?\s+osiris*|cartographie(?:\s+(?:(?:de|d)\s+)?osiris*)?|carte des evenements|evenements proches)$/.test(query);
 }
 
 export function findModuleForCommand(raw, items, aliases = {}) {
   const { query, target } = parseModuleOpenCommand(raw);
   if (!query) return { item: null, target };
-  const tokens = query.split(/\s+/).filter((word) => word.length > 2 && !STOP_WORDS.has(word));
-  if (!tokens.length) return { item: null, target };
+  if (isCartographieOpenCommand(raw)) {
+    const cartographie = (items || []).find((item) => item.id === "cartographie");
+    if (cartographie) return { item: cartographie, target };
+  }
   const exactItem = (items || []).find((item) => normalizeModuleText(item.id) === query);
   if (exactItem) return { item: exactItem, target };
-  const singleTermPriority = { camera: "vision", webcam: "vision", photo: "photo3d" };
-  if (tokens.length === 1 && singleTermPriority[query]) {
+  const singleTermPriority = { camera: "vision", webcam: "vision", photo: "photo3d", ecran: "display" };
+  if (singleTermPriority[query]) {
     const preferred = (items || []).find((item) => item.id === singleTermPriority[query]);
     if (preferred) return { item: preferred, target };
   }
+  const tokens = query.split(/\s+/).filter((word) => word.length > 2 && !STOP_WORDS.has(word));
+  if (!tokens.length) return { item: null, target };
 
   const ranked = (items || []).map((item) => {
     const haystack = normalizeModuleText(`${item.label || ""} ${item.id || ""} ${aliases[item.id] || ""}`);
@@ -99,6 +126,16 @@ export function findModuleForCommand(raw, items, aliases = {}) {
     .sort((left, right) => right.score - left.score);
 
   return { item: ranked[0]?.item || null, target };
+}
+
+export function isNamedModuleOpenRequest(raw, items, aliases = {}) {
+  const request = parseModuleOpenRequest(raw);
+  if (!request) return false;
+  if (request.explicit) return true;
+  const { item } = findModuleForCommand(raw, items, aliases);
+  if (!item) return false;
+  const name = normalizeModuleText(moduleDisplayName(item));
+  return isCartographieOpenCommand(raw) || name === request.query || name.split(/\s+/).includes(request.query);
 }
 
 export function dockTitleMatchesModule(title, item, aliases = {}) {
