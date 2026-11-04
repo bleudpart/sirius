@@ -424,7 +424,7 @@ _INTENT_SYSTEM_PROMPT = """Tu analyses une commande vocale destinée à ΣIRIUS 
 à une ACTION D'INTERFACE précise, ou s'il s'agit d'une simple question/conversation.
 
 Réponds UNIQUEMENT avec un objet JSON valide, sans markdown, correspondant à l'un de ces formats exacts :
-- Ouvrir un module/fenêtre : {"action": "open_module", "target": "<id>", "say": "J'ouvre <nom du module>."}
+- Ouvrir un module/fenêtre : {"action": "open_module", "target": "<id>", "say": "J'ouvre le module <nom du module>."}
 - Fermer un module/fenêtre : {"action": "close_module", "target": "<id>", "say": "J'ai fermé <nom du module>."}
 - Réduire un module en pastille : {"action": "minimize_module", "target": "<id>", "say": "J'ai réduit <nom du module>."}
 - Tout réduire en pastilles : {"action": "minimize_all"}
@@ -444,6 +444,8 @@ pantheon, nexus, outlook (boîte mail Outlook), outlook_agenda (agenda Outlook).
 OSIRIS, carte OSIRIS et cartographie des événements désignent le module "cartographie",
 disponible aussi dans l'application Android. ATLAS ("atlas") sert aux lieux et itinéraires.
 Même si l'utilisateur demande OSIRIS dans le Display, ouvre "cartographie", pas "display" ni "atlas".
+Tous les modules s'ouvrent dans leur propre fenêtre, en dehors de ΣIRIUS Display, qui sert seulement
+à afficher les réponses et les textes. "dans le Display" ne change pas le module à ouvrir.
 Une intention est une demande d'ouverture, pas une preuve que la carte est déjà affichée.
 
 Si la phrase n'est clairement ni une ouverture/fermeture/réduction de module, ni l'une des actions ci-dessus,
@@ -1455,7 +1457,11 @@ def module_catalog_text() -> str:
             "et calques OSIRIS dans ΣIRIUS, disponible sur Android et ordinateur. "
             "Commande : « ouvre la carte OSIRIS » ou « affiche OSIRIS carte ». "
             "ATLAS est un autre module, consacré aux lieux et itinéraires.\n"
-            "OUVERTURE DES FENÊTRES : une réponse de conversation n'ouvre aucun module. "
+            "OUVERTURE DES FENÊTRES : chaque module s'ouvre dans sa propre fenêtre, en dehors de "
+            "ΣIRIUS Display. ΣIRIUS Display sert uniquement à communiquer : afficher tes réponses, "
+            "textes et résultats. Ne dis jamais qu'un module ou une carte est affiché dans ton Display. "
+            "Pour ouvrir un module, annonce simplement « J'ouvre le module <nom> ». "
+            "Une réponse de conversation n'ouvre aucun module. "
             "Sans confirmation réelle de l'interface, ne dis jamais qu'une carte est affichée "
             "ou qu'un module a été ouvert. « ΣIRIUS Display ouvert » ne prouve pas qu'OSIRIS "
             "ou une carte y est affichée. Ne prétends pas non plus que Cartographie est "

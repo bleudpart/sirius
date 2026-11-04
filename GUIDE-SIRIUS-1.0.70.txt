@@ -26,6 +26,9 @@ Nouveautes 1.0.70 :
 - Ouverture des modules par leur nom : "Zirius, peux-tu m'afficher le
   module Themis ?" ou "montre-moi Chronos dans ton Display" ouvre la
   fenetre native correspondante, pas un texte qui pretend l'avoir ouverte.
+  Chaque module s'ouvre dans sa propre fenetre, en dehors de SIRIUS
+  Display, qui sert uniquement aux reponses et aux textes. SIRIUS annonce
+  "J'ouvre le module ...".
   Les noms sont recherches dans les modules disponibles sur cet appareil.
   Pour un module explicite non reconnu, la liste des modules est affichee
   sans annoncer une ouverture fictive. "Ouvre OSIRIS" et "affiche OSIRIS

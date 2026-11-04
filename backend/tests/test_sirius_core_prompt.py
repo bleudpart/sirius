@@ -86,7 +86,9 @@ def test_prompt_knows_android_cartography_without_inventing_an_open_window():
     assert "CARTOGRAPHIE (id cartographie, aussi appelée OSIRIS)" in prompt
     assert "disponible sur Android et ordinateur" in prompt
     assert "ATLAS est un autre module" in prompt
-    assert "une réponse de conversation n'ouvre aucun module" in prompt
+    assert "Une réponse de conversation n'ouvre aucun module" in prompt
+    assert "chaque module s'ouvre dans sa propre fenêtre, en dehors de ΣIRIUS Display" in prompt
+    assert "Ne dis jamais qu'un module ou une carte est affiché dans ton Display" in prompt
     assert "« ΣIRIUS Display ouvert » ne prouve pas qu'OSIRIS" in prompt
 
 

@@ -4115,10 +4115,12 @@ function App() {
     setShowModulesMenu(false);
     setShowCmdPalette(false);
 
-    const surface = item.id === "display" ? "ΣIRIUS Display" : "le HUD";
+    // Les modules ont leur propre fenêtre ; ΣIRIUS Display reste réservé aux réponses.
     const msg = item.id === "cartographie"
       ? "J'ouvre la cartographie des événements OSIRIS autour de Zirius."
-      : `J'ouvre ${moduleDisplayName(item)} dans ${surface}.`;
+      : item.id === "display"
+        ? "J'ouvre ΣIRIUS Display."
+        : `J'ouvre le module ${moduleDisplayName(item)}.`;
     setText(msg);
     speakOut(msg);
     return true;

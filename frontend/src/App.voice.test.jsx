@@ -382,6 +382,9 @@ test.each([
   expect(host.querySelector('[data-testid="sirius-display"]')).toBeNull();
   expect(global.fetch.mock.calls.some(([url]) => /\/(?:intent|chat)(?:\/stream)?$/.test(String(url)))).toBe(false);
   expect(speakFr.mock.calls.some(([message]) => /dans.*Display/.test(message))).toBe(false);
+  if (panel !== "CartographiePanel") {
+    expect(speakFr.mock.calls.some(([message]) => /^J'ouvre le module \S/.test(message))).toBe(true);
+  }
 });
 
 test("Android restores the requested module's minimized window before confirming the opening", async () => {
