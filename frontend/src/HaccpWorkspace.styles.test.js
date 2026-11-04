@@ -31,7 +31,7 @@ test("page uses the actual shared window class and palette instead of a separate
   const capture = fs.readFileSync(path.join(__dirname, "HaccpLabelCapture.jsx"), "utf8");
   const workspace = fs.readFileSync(path.join(__dirname, "HaccpWorkspace.jsx"), "utf8");
   expect(capture).toContain("workspace-surface haccp-card");
-  expect(workspace.match(/workspace-surface haccp-card/g)).toHaveLength(2);
+  expect(workspace).toContain("workspace-surface haccp-card");
   expect(value(".haccp-ui", "--haccp-border")).toContain("var(--workspace-line,");
   expect(value(".haccp-ui", "--haccp-text")).toContain("var(--workspace-text,");
   expect(value(".haccp-ui button > svg", "color")).toContain("var(--workspace-cyan,");

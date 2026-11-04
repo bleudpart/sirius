@@ -59,11 +59,21 @@ test("QR points to the authenticated standalone capture and loads its active est
   expect(global.fetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/enterprise\/context$/), expect.any(Object));
 });
 
+test.each([
+  ["qr", "QR code de capture"],
+  ["closing", "Bilan HACCP de fin de service"],
+  ["registre", "Contrôle sanitaire"],
+])("%s section uses the shared workspace card", async (tab, label) => {
+  await act(async () => root.render(<HaccpWorkspace initialTab={tab} />));
+  const section = host.querySelector(`section[aria-label="${label}"]`);
+  expect(section).not.toBeNull();
+  expect(section.classList.contains("workspace-surface")).toBe(true);
+  expect(section.classList.contains("haccp-card")).toBe(true);
+});
+
 test("closing report shows scoped priorities, opens the exact source record and requires human PDF confirmation", async () => {
-  const day = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(new Date());
-  const report = {
+  let day;
+  const report = () => ({
     date: day, fuseau: "Europe/Paris", genere_le: `${day}T16:00:00+00:00`,
     etiquettes_enregistrees: 2, impressions_confirmees: 1, impressions_sans_date: 1,
     statut: "attention",
@@ -77,9 +87,12 @@ test("closing report shows scoped priorities, opens the exact source record and 
         motif: "Date à vérifier aujourd'hui.", date_cible: day, statut_impression: null,
       }],
     }],
-  };
+  });
   global.fetch.mockImplementation(async (url, options = {}) => {
-    if (url.includes("/registre/cloture?")) return reply(report);
+    if (url.includes("/registre/cloture?")) {
+      day = new URL(url).searchParams.get("date");
+      return reply(report());
+    }
     if (url.endsWith("/registre/73/donnees")) return reply({
       id: 73, nom_produit: "Soupe TEST", numero_lot: "LOT-73", type_operation: "preparation",
       date_fabrication: `${day}T07:00:00Z`, dlc_secondaire: `${day}T22:00:00Z`,
@@ -96,6 +109,7 @@ test("closing report shows scoped priorities, opens the exact source record and 
   const anchorClick = jest.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
   await act(async () => root.render(<HaccpWorkspace initialTab="closing" />));
   expect(host.querySelector('[aria-label="Bilan HACCP de fin de service"]')).not.toBeNull();
+  expect(day).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   expect(host.textContent).toContain("2Étiquettes enregistrées");
   expect(host.textContent).toContain("Le registre ne confirme pas le stock réel.");
   expect(button("Valider et télécharger le PDF").disabled).toBe(true);
@@ -124,25 +138,35 @@ test("closing report shows scoped priorities, opens the exact source record and 
 });
 
 test("closing PDF does not download when the registry changed after manager review", async () => {
-  const day = "2026-11-03";
   global.fetch.mockImplementation(async (url, options = {}) => {
-    if (url.includes("/registre/cloture?")) return reply({
-      date: day, fuseau: "Europe/Paris", genere_le: `${day}T16:00:00+00:00`,
-      etiquettes_enregistrees: 0, impressions_confirmees: 0, impressions_sans_date: 0,
-      statut: "aucune_alerte_enregistree", revision: "b".repeat(64), priorites: [], limites: [],
-    });
+    if (url.includes("/registre/cloture?")) {
+      const day = new URL(url).searchParams.get("date");
+      return reply({
+        date: day, fuseau: "Europe/Paris", genere_le: `${day}T16:00:00+00:00`,
+        etiquettes_enregistrees: 0, impressions_confirmees: 0, impressions_sans_date: 0,
+        statut: "aucune_alerte_enregistree", revision: "b".repeat(64), priorites: [], limites: [],
+      });
+    }
     if (url.endsWith("/registre/cloture/pdf") && options.method === "POST") {
-      return reply({ detail: "Le registre a changé depuis le bilan." }, false);
+      return { ok: false, status: 409, json: async () => ({ detail: "Le registre a changé depuis le bilan." }) };
     }
     return reply([]);
   });
   const anchorClick = jest.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
   await act(async () => root.render(<HaccpWorkspace initialTab="closing" />));
+  const day = field("Date du service").value;
+  expect(day).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   await change(field("Nom du responsable"), "Responsable Test");
   const checkbox = host.querySelector('.haccp-closing-validation input[type="checkbox"]');
   await act(async () => checkbox.click());
   expect(button("Valider et télécharger le PDF").disabled).toBe(false);
   await click("Valider et télécharger le PDF");
+  const pdfCalls = global.fetch.mock.calls.filter(([url]) => url.endsWith("/registre/cloture/pdf"));
+  expect(pdfCalls).toHaveLength(1);
+  expect(JSON.parse(pdfCalls[0][1].body)).toEqual({
+    date: day, revision: "b".repeat(64), nom_responsable: "Responsable Test",
+    confirme_verification_humaine: true,
+  });
   expect(host.querySelector('[role="alert"]').textContent).toContain("Le registre a changé");
   expect(anchorClick).not.toHaveBeenCalled();
 });
