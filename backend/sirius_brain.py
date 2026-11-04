@@ -453,15 +453,15 @@ réponds TOUJOURS par {"action": "general", "query": "<texte original>"} — ne 
 correspond pas clairement à la demande."""
 
 _OSIRIS_MAP_OPEN_PATTERN = re.compile(
-    r"^(?:(?:sirius|zirius)\s+)?"
+    r"^(?:(?:sirius|zirius|cirius|syrius|zyrius|serious)\s+)?"
     r"(?:s il te plait\s+)?"
     r"(?:(?:(?:est ce que\s+)?tu (?:peux|pourrais)|peux tu|pourrais tu|je veux|je voudrais|j aimerais|je souhaite|je te demande de)\s+)?"
     r"(?:(?:m|me)\s+)?"
     r"(?:(?:ouvre|ouvrir|affiche|afficher|montre|montrer|lance|lancer|deploie|deployer|presente|presenter|restaure|restaurer|rouvre|rouvrir|voir|consulter)(?:\s+moi)?\s+)?"
     r"(?:(?:le|la|les|l|mon|ma|mes|ton|ta|tes)\s+)?"
     r"(?:(?:module|panneau)\s+)?"
-    r"(?:osiris*(?:\s+(?:cartes?|cartographie))?|cartes?(?:\s+(?:de|d))?\s+osiris*"
-    r"|cartographie(?:\s+(?:(?:de|d)\s+)?osiris*)?|carte des evenements|evenements proches)"
+    r"(?:o[sz][eiy]r[iy]s*(?:\s+(?:cartes?|cartographie))?|cartes?(?:\s+(?:de|d))?\s+o[sz][eiy]r[iy]s*"
+    r"|cartographie(?:\s+(?:(?:de|d)\s+)?o[sz][eiy]r[iy]s*)?|carte des evenements|evenements proches)"
     r"(?:\s+(?:dans|sur)\s+(?:(?:le|l|mon|ton)\s+)?(?:(?:sirius|zirius)\s+)?(?:display|ecran|hud))?"
     r"(?:\s+s il te plait)?$"
 )

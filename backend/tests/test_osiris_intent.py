@@ -22,6 +22,8 @@ import sirius_brain
     "les événements proches",
     "ouvre Osiri",
     "affiche Osirisss",
+    "SIRIUS, affiche le module OZERIS.",
+    "Cirius, ouvre Ozyris",
 ])
 def test_osiris_opens_cartographie_without_a_provider(monkeypatch, command):
     def unexpected_provider(*args, **kwargs):

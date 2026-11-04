@@ -203,3 +203,28 @@ test("les vrais noms de modules priment sur le dialogue métier, pas les demande
   expect(isNamedModuleOpenRequest("affiche mes dossiers", items, MODULE_ALIASES)).toBe(false);
   expect(isNamedModuleOpenRequest("montre mes résultats de travail", items, MODULE_ALIASES)).toBe(false);
 });
+test.each([
+  ["SIRIUS, affiche le module OZERIS.", "cartographie"],
+  ["AFIS affiche le module OSIRIS.", "cartographie"],
+  ["Cirius, ouvre Ozyris", "cartographie"],
+  ["euh affiche le module Témis", "themis"],
+  ["affiche le module Chrono", "planning"],
+])("un nom de module mal transcrit ouvre quand même le bon module : %s", (command, expectedId) => {
+  const items = createModuleRegistry({ platform: "android", icons: {}, actions: {}, state: {}, user: { role: "admin" } });
+  expect(parseModuleOpenRequest(command)).not.toBeNull();
+  expect(findModuleForCommand(command, items, MODULE_ALIASES).item?.id).toBe(expectedId);
+  expect(isNamedModuleOpenRequest(command, items, MODULE_ALIASES)).toBe(true);
+});
+
+test.each([
+  "je ne veux pas afficher le module Thémis",
+  "explique comment ouvrir OSIRIS",
+  "si tu affiches OSIRIS",
+])("le rattrapage des mots parasites ne transforme pas une négation ou une question en ouverture : %s", (command) => {
+  expect(parseModuleOpenRequest(command)).toBeNull();
+});
+
+test("un nom inconnu sans proximité claire n'ouvre aucun module", () => {
+  const items = createModuleRegistry({ platform: "android", icons: {}, actions: {}, state: {}, user: { role: "admin" } });
+  expect(findModuleForCommand("affiche le module bouillabaisse", items, MODULE_ALIASES).item).toBeNull();
+});

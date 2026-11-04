@@ -17,8 +17,9 @@ MAX_VOCABULARY_TERM = 80
 MAX_VOCABULARY_CHARS = 1600
 _BASE_PROMPT = (
     "Lexique SIRIUS en français : SIRIUS, Daniel Partel, ARGUS, OMEGA, ATLAS, "
-    "Outlook, Hotmail, Thémis, Panthéon, Héphaïstos, Héraclès, Pythagore, "
-    "Calliope, Prométhée, Hermès, Agora. Transcrire ces noms exactement."
+    "OSIRIS, Cartographie, Outlook, Hotmail, Thémis, Panthéon, Héphaïstos, Héraclès, Pythagore, "
+    "Calliope, Prométhée, Hermès, Agora, Chronos, Mnémosyne, Ariane, Némésis, Asclépios, "
+    "Nummarius, Keraunos. Transcrire ces noms exactement."
     " Vocabulaire courant : actualité, actualités, infos du jour, briefing."
 )
 
