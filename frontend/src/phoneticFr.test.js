@@ -60,9 +60,9 @@ test("francise les anglicismes sous toutes leurs formes", () => {
 
 test("corrige les noms propres mal prononcés", () => {
   expect(applyFrenchPhonetics("Roger Partel")).toBe("Rojé Partel");
-  expect(applyFrenchPhonetics("Sirius est prêt")).toBe("Siriusse est prêt");
-  expect(applyFrenchPhonetics("Sirius Display")).toBe("Siriusse displé");
-  expect(applyFrenchPhonetics("Zirius Display")).toBe("Siriusse displé");
+  expect(applyFrenchPhonetics("Sirius est prêt")).toBe("Si-riusse est prêt");
+  expect(applyFrenchPhonetics("Sirius Display")).toBe("Si-riusse displé");
+  expect(applyFrenchPhonetics("Zirius Display")).toBe("Si-riusse displé");
   expect(applyFrenchPhonetics("La carte OSIRIS est prête")).toBe("La carte Osirisse est prête");
 });
 

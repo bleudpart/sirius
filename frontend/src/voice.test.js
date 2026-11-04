@@ -174,7 +174,7 @@ test("Android reads the assistant name without pronouncing the Greek sigma", asy
   speakFr("ΣIRIUS a ouvert Panthéon.");
   await flush();
   expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/tts/gemini"), expect.objectContaining({
-    body: JSON.stringify({ text: "Siriusse a ouvert pantéon.", keys: {}, voice: "Charon" }),
+    body: JSON.stringify({ text: "Si-riusse a ouvert pantéon.", keys: {}, voice: "Charon" }),
   }));
 });
 
@@ -182,7 +182,7 @@ test.each(["Zirius", "zirius", "Zyrius"])("Android never pronounces the transcri
   speakFr(`J'ouvre la carte autour de ${name}.`);
   await flush();
   expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/tts/gemini"), expect.objectContaining({
-    body: JSON.stringify({ text: "J'ouvre la carte autour de Siriusse.", keys: {}, voice: "Charon" }),
+    body: JSON.stringify({ text: "J'ouvre la carte autour de Si-riusse.", keys: {}, voice: "Charon" }),
   }));
 });
 
@@ -194,7 +194,7 @@ test.each(["ton ΣIRIUS Display", "ton Sirius Display", "ton Zirius Display", "l
     const request = global.fetch.mock.calls.find(([url]) => String(url).includes("/tts/gemini"));
     const text = JSON.parse(request[1].body).text;
     expect(text).toContain("ton briefing");
-    expect(text).toContain("dans mon Siriusse displé");
+    expect(text).toContain("dans mon Si-riusse displé");
     expect(text).not.toMatch(/dans ton /);
   }
 );
@@ -273,7 +273,7 @@ test("planning and an uppercase elision remain words on remote and native speech
   speakFr("Voici le PLANNING. L ’ effet est visible dans le ΣIRIUS DISPLAY.");
   await flush();
   const request = global.fetch.mock.calls.find(([url]) => String(url).includes("/tts/gemini"));
-  const expected = "Voici le planigne. l'effet est visible dans mon Siriusse displé.";
+  const expected = "Voici le planigne. l'effet est visible dans mon Si-riusse displé.";
   expect(JSON.parse(request[1].body).text).toBe(expected);
   expect(speakNative.mock.calls[0][0]).toBe(expected);
 });
@@ -361,7 +361,7 @@ test("boot narration reports real audio progress only during current playback", 
   const onprogress = jest.fn();
   speakCinematic("Je suis ΣIRIUS. Je suis prêt à vous accompagner.", { onprogress });
   await flush();
-  expect(JSON.parse(global.fetch.mock.calls[0][1].body).text).toContain("Je suis Siriusse.");
+  expect(JSON.parse(global.fetch.mock.calls[0][1].body).text).toContain("Je suis Si-riusse.");
   audio.ontimeupdate();
   expect(onprogress).not.toHaveBeenCalled();
   audio.onplay();

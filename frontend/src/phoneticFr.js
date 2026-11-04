@@ -48,10 +48,10 @@ export const FR_ANGLICISMS = {
 
 // Noms propres et vocabulaire ΣIRIUS.
 export const FR_NAMES = {
-  "Sirius Display": "Siriusse displé",
-  "Zirius Display": "Siriusse displé",
+  "Sirius Display": "Si-riusse displé",
+  "Zirius Display": "Si-riusse displé",
   Roger: "Rojé",
-  Sirius: "Siriusse",
+  Sirius: "Si-riusse",
   OSIRIS: "Osirisse",
   "Panthéon": "pantéon",
   Pantheon: "pantéon",
@@ -108,7 +108,7 @@ export const FR_CASED_NAMES = {
 // Règles contextuelles qui ne se réduisent pas à un mot isolé.
 const FR_RULES = [
   [/(?<![\p{L}\p{N}_])jusqu[\s\u200b\u200c\u200d\u2060\ufeff]*['’‘ʼ＇][\s\u200b\u200c\u200d\u2060\ufeff]*à(?![\p{L}\p{N}_])/giu, "juska"],
-  [/\bS\.I\.R\.I\.U\.S\b/gi, "Siriusse"],
+  [/\bS\.I\.R\.I\.U\.S\b/gi, "Si-riusse"],
   // Le mot français évite l'épellation de l'anglicisme par certains moteurs.
   [/(?<![\p{L}\p{N}_@.+-])(?:e[-\u2010\u2011 ]?)?mails(?![\p{L}\p{N}_@+-]|\.\p{L})/giu, "courriels"],
   [/(?<![\p{L}\p{N}_@.+-])(?:e[-\u2010\u2011 ]?)?mail(?![\p{L}\p{N}_@+-]|\.\p{L})/giu, "courriel"],
