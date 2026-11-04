@@ -15,10 +15,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 FRONTEND = ROOT / "frontend"
 REPORT = ROOT / "audit-report.json"
-SECRET_PATTERNS = (
-    re.compile(r"(?:ghp_|github_pat_|gsk_|sk-[A-Za-z0-9]{20,})"),
-    re.compile(r"(?i)(?:api[_-]?key|secret|token|password)\s*[:=]\s*[\"'][^\"']{12,}[\"']"),
-)
+# Formats complets des jetons : un prefixe seul (ex. "gsk_..." dans une aide) n'est pas un secret.
+SECRET_TOKEN_PATTERNS = {
+    "GitHub token": r"gh[pousr]_[A-Za-z0-9]{36}",
+    "GitHub fine-grained token": r"github_pat_[A-Za-z0-9_]{40,}",
+    "Groq key": r"gsk_[A-Za-z0-9]{40,}",
+    "OpenAI/Anthropic key": r"sk-[A-Za-z0-9_-]{32,}",
+    "Google API key": r"AIza[0-9A-Za-z_-]{35}",
+}
+SECRET_BOUNDARY = r"(^|[^A-Za-z0-9_-])"
+SECRET_GREP_PATTERN = SECRET_BOUNDARY + "(" + "|".join(SECRET_TOKEN_PATTERNS.values()) + ")"
+SECRET_PATTERNS = {
+    label: re.compile(r"(?<![A-Za-z0-9_-])" + pattern) for label, pattern in SECRET_TOKEN_PATTERNS.items()
+}
 KEY_NAMES = {"groq_key", "groq", "serp", "fal", "gmaps", "alphavantage"}
 
 
@@ -27,9 +36,36 @@ def run(command: list[str], cwd: Path = ROOT) -> tuple[bool, str]:
     return result.returncode == 0, (result.stdout + result.stderr)[-4000:]
 
 
-def check_tracked_secrets() -> list[str]:
-    ok, output = run(["git", "grep", "-nI", "-E", "ghp_|github_pat_|gsk_|sk-[A-Za-z0-9]{20,}"])
-    return [] if ok or not output.strip() else ["Secret-like token found in tracked files"]
+def find_secrets_in_text(text: str) -> list[tuple[int, str]]:
+    return [
+        (number, label)
+        for number, line in enumerate(text.splitlines(), start=1)
+        for label, pattern in SECRET_PATTERNS.items()
+        if pattern.search(line)
+    ]
+
+
+def check_tracked_secrets(root: Path = ROOT) -> list[str]:
+    # git grep : 0 = correspondance, 1 = aucune, autre = erreur (ne doit jamais passer pour un succes).
+    result = subprocess.run(
+        ["git", "grep", "-lIz", "-E", SECRET_GREP_PATTERN],
+        cwd=root, capture_output=True,
+    )
+    if result.returncode == 1:
+        return []
+    if result.returncode != 0:
+        error = result.stderr.decode("utf-8", errors="replace").strip()[-500:]
+        return [f"Secret scan failed (git grep exit {result.returncode}): {error}"]
+    issues = []
+    for raw_path in filter(None, result.stdout.split(b"\0")):
+        path = raw_path.decode("utf-8", errors="replace")
+        text = (root / path).read_text(encoding="utf-8", errors="replace")
+        findings = find_secrets_in_text(text)
+        # Les valeurs ne sont jamais recopiees : le rapport est publie dans les journaux CI.
+        issues.extend(f"Secret-like token in {path}:{number} ({label})" for number, label in findings)
+        if not findings:
+            issues.append(f"Secret-like token in {path} (git grep match)")
+    return issues
 
 
 def check_key_contract() -> list[str]:
