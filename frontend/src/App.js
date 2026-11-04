@@ -5957,7 +5957,9 @@ function App() {
         setStatus("listening");
         setVoicePhase("listening");
         setText("Je t'écoute. Cet extrait audio sera envoyé au serveur ΣIRIUS pour transcription.");
-        if (protectedCapture) setVoiceMessage("Écoute protégée : vérification de chaque voix sur le serveur avant transcription.");
+        if (protectedCapture && !preserveFeedback) {
+          setVoiceMessage("Écoute protégée : vérification de chaque voix sur le serveur avant transcription.");
+        }
       };
       recorder.start(250);
       if (!pushToTalk) {

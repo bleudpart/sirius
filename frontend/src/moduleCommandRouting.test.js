@@ -125,6 +125,7 @@ test.each([
   "je voudrais voir la carte d'OSIRIS s'il te plaît",
   "affiche la cartographie sur l'écran",
   "ouvre le module OSIRIS",
+  "affiche le module osiris",
   "OSIRIS carte",
   "cartographie",
   "la carte des événements",

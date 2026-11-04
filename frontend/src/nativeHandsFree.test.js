@@ -36,6 +36,29 @@ test.each([false, undefined])("unrecognized or malformed speaker decision %s nev
   await controller.stop();
 });
 
+test("native listening keeps a rejected-voice message visible when capture resumes", async () => {
+  const message = "Voix non reconnue : demande ignorée.";
+  const verifyIdentity = jest.fn()
+    .mockResolvedValueOnce({ verified: false, message })
+    .mockResolvedValueOnce({ verified: true });
+  const { controller, events, onState, onTranscript } = setup(undefined, { verifyIdentity });
+  await controller.setBlocked(false);
+  await controller.start();
+  events.utterance({ audio: btoa("RIFFfirst") });
+  await flush();
+  expect(onState).toHaveBeenLastCalledWith({ phase: "paused", message });
+  events.state({ phase: "ready" });
+  expect(onState).toHaveBeenLastCalledWith({ phase: "ready", message });
+  events.utterance({ audio: btoa("RIFFsecond") });
+  await flush();
+  expect(onState).toHaveBeenCalledWith({ phase: "transcribing", message: expect.stringContaining("Voix vérifiée") });
+  expect(onTranscript).toHaveBeenCalledTimes(1);
+  await controller.setBlocked(false);
+  events.state({ phase: "ready" });
+  expect(onState).toHaveBeenLastCalledWith({ phase: "ready", message: "" });
+  await controller.stop();
+});
+
 test("missing profile or unavailable verifier blocks native microphone startup", async () => {
   const requireIdentity = jest.fn(async () => { throw new Error("Profil absent"); });
   const { controller, plugin, onState } = setup(undefined, { requireIdentity });

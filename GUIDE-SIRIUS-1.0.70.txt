@@ -33,6 +33,11 @@ Nouveautes 1.0.70 :
   Pour un module explicite non reconnu, la liste des modules est affichee
   sans annoncer une ouverture fictive. "Ouvre OSIRIS" et "affiche OSIRIS
   carte" designent Cartographie ; ATLAS reste reserve aux lieux et trajets.
+- Ecoute continue protegee : si la voix n'est pas reconnue, la demande
+  n'est ni transcrite ni executee et le message de refus reste visible
+  pendant la reprise de l'ecoute. Un contenu deja affiche n'est pas une
+  reponse a cette demande refusee. Reenregistrer sa voix dans Outils >
+  Ma voix ou utiliser le bouton micro maintenu en attendant.
 - Preparation des trois paquets : installateur Windows, portable Windows
   et APK Diagnostic. Aucune publication automatique n'est effectuee.
 

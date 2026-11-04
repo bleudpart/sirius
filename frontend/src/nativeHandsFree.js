@@ -45,6 +45,7 @@ export function createNativeHandsFree({
   const receive = async (current, event) => {
     if (session !== current || blocked || current.processing || current.controller.signal.aborted) return;
     current.processing = true;
+    current.rejectionMessage = "";
     report("verifying", "Vérification de votre voix en cours.");
     try {
       await suppress(current, true);
@@ -55,7 +56,8 @@ export function createNativeHandsFree({
       const identity = await verifyIdentity(blob, { signal: current.controller.signal });
       if (session !== current || current.controller.signal.aborted) return;
       if (identity.verified !== true) {
-        report("paused", identity.message || "Voix non reconnue : demande ignorée.");
+        current.rejectionMessage = identity.message || "Voix non reconnue : demande ignorée.";
+        report("paused", current.rejectionMessage);
         return;
       }
       const form = new FormData();
@@ -98,7 +100,7 @@ export function createNativeHandsFree({
     },
     async start({ diagnosticCapture = false } = {}) {
       if (session) return;
-      const current = { controller: new AbortController(), listeners: [], processing: false, operations: Promise.resolve(), requestedSuppression: null };
+      const current = { controller: new AbortController(), listeners: [], processing: false, operations: Promise.resolve(), requestedSuppression: null, rejectionMessage: "" };
       session = current;
       report("opening");
       try {
@@ -112,7 +114,10 @@ export function createNativeHandsFree({
             if (event.phase === "error") { void fail(new Error(event.message || "Erreur du microphone natif.")); return; }
             if (event.phase === "stopped") { void stop().catch((error) => report("error", error.message)); return; }
             if (event.phase === "diagnostic-error") { report(event.phase, event.message); return; }
-            if (!current.processing && !blocked && !event.suppressed) report(event.phase, event.message);
+            if (!current.processing && !blocked && !event.suppressed) {
+              report(event.phase, event.phase === "ready" && current.rejectionMessage
+                ? current.rejectionMessage : event.message);
+            }
           }],
           ["utterance", (event) => { void receive(current, event); }],
         ]) {

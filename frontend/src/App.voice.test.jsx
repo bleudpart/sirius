@@ -331,6 +331,31 @@ test.each([
   expect(global.fetch.mock.calls.some(([url]) => /\/(?:intent|chat)(?:\/stream)?$/.test(String(url)))).toBe(false);
 });
 
+test("Android opens OSIRIS after a rejected voice is retried and verified", async () => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  verifyVoiceIdentity
+    .mockResolvedValueOnce({ verified: false, message: "Voix non reconnue : demande ignorée." })
+    .mockResolvedValueOnce({ verified: true });
+  const recorders = mockContinuousAudio("affiche le module osiris");
+  await mount();
+  await act(async () => host.querySelector('[data-testid="test-initiative"]').click());
+  await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
+  await act(async () => recorders[0].stop());
+  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/stt"))).toBe(false);
+  await act(async () => jest.advanceTimersByTime(600));
+  expect(host.querySelector(".voice-session-controls").textContent).toContain("Voix non reconnue");
+  await act(async () => recorders[1].stop());
+  expect(verifyVoiceIdentity).toHaveBeenCalledTimes(2);
+  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/stt"))).toBe(true);
+  expect(host.querySelector('[data-testid="workspace-CartographiePanel"]')).not.toBeNull();
+  expect(host.querySelector(".voice-session-controls").textContent).not.toContain("Voix non reconnue");
+  expect(speakFr).toHaveBeenCalledWith(
+    "J'ouvre la cartographie des événements OSIRIS autour de ΣIRIUS.",
+    expect.any(Object),
+  );
+  expect(global.fetch.mock.calls.some(([url]) => /\/(?:intent|chat)(?:\/stream)?$/.test(String(url)))).toBe(false);
+});
+
 test.each(["cartographie", "osiris"])("Android executes the server's OSIRIS target %s instead of trusting an invented display confirmation", async (target) => {
   jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
   const original = global.fetch.getMockImplementation();
@@ -844,6 +869,7 @@ test.each(["android", "web"])("TV audio is verified before STT and rejected with
   expect(host.querySelector(".voice-session-controls").textContent).toContain("Voix non reconnue");
   await act(async () => jest.advanceTimersByTime(600));
   expect(recorders).toHaveLength(2);
+  expect(host.querySelector(".voice-session-controls").textContent).toContain("Voix non reconnue");
 });
 
 test("a verification outage disables continuous listening instead of using a permissive fallback", async () => {
