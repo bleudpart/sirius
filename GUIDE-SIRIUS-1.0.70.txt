@@ -503,6 +503,10 @@ Reproductibilite developpeur (depuis la racine du depot) :
    Cette commande compile/teste ; elle n'installe ni ne publie l'application.
    Pour preparer les ressources React, utiliser le build frontend habituel
    puis la synchronisation Capacitor avant une future livraison autorisee.
+   Pour le bundle release, les regles ProGuard conservent le code Brother
+   et ignorent uniquement l'annotation de compilation
+   kotlinx.android.parcel.Parcelize : le code Parcelable est deja genere
+   dans le SDK. La minification R8 reste active.
 
 Licence et distribution :
 Redist.txt du SDK autorise les fichiers libs comme modules redistribuables,

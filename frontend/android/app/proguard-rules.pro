@@ -22,3 +22,5 @@
 
 # SDK Brother : conserver les noms utilises par la bibliotheque native JNI.
 -keep class com.brother.** { *; }
+# Annotation de compilation du SDK, dont le code Parcelable est deja genere.
+-dontwarn kotlinx.android.parcel.Parcelize
