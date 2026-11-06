@@ -250,3 +250,9 @@ body:has(.haccp-standalone) {
 .haccp-simple-photo strong { font-size: 24px; }
 .haccp-simple-photo p { margin: 0; }
 .haccp-ui .haccp-simple-full { justify-self: center; display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 0; background: transparent; color: var(--haccp-muted); font-size: 14px; text-decoration: underline; }
+@media (max-width: 600px) {
+  .haccp-workspace.haccp-workspace-simple { padding: 6px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; gap: 10px; }
+  .haccp-simple { gap: 10px; }
+  .haccp-simple-camera { min-height: min(64vh, 640px); border-width: 1px; border-radius: 12px; }
+  .haccp-ui .haccp-simple-shoot { min-height: 112px; }
+}
