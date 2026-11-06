@@ -64,6 +64,14 @@ if [[ -f /etc/sirius/voice-identity.prepared ]]; then
   bash "$APP_DIR/deploy/hetzner/install-voice-identity-runtime.sh"
 fi
 
+# Sauvegarde hors serveur : active seulement apres prepare-backup.sh.
+if [[ -f /etc/sirius/backup.env ]]; then
+  install -o root -g root -m 0644 "$APP_DIR/deploy/hetzner/sirius-backup.service" /etc/systemd/system/sirius-backup.service
+  install -o root -g root -m 0644 "$APP_DIR/deploy/hetzner/sirius-backup.timer" /etc/systemd/system/sirius-backup.timer
+  systemctl daemon-reload
+  systemctl enable --now sirius-backup.timer
+fi
+
 if [[ -n "$FRONTEND_ARCHIVE" ]]; then
   echo "==> Publication du site statique"
   install -d -m 0755 "$WEB_DIR/releases" "$WEB_DIR/assets/static"

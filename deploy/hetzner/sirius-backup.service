@@ -1,0 +1,13 @@
+[Unit]
+Description=Sauvegarde chiffree des donnees SIRIUS vers la Storage Box
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/etc/sirius/backup.env
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/sirius/sirius.env
+ExecStart=/bin/bash /opt/sirius/deploy/hetzner/backup.sh
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=6h

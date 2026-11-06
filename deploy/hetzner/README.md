@@ -251,3 +251,45 @@ Ils vérifient notamment les refus avant installation, la copie vérifiée, les
 échecs du moteur, l'idempotence, le maintien du runtime optionnel et l'absence
 d'activation ou de redémarrage du service. Un test vérifie aussi le refus d'un
 faux modèle avec la véritable commande SHA-256.
+## 11. Sauvegarde quotidienne hors serveur (Storage Box)
+
+Les étiquettes HACCP, leurs photos et toutes les données SQLite vivent dans
+`/var/lib/sirius`. Cette sauvegarde les copie chaque nuit (vers 3 h 30, heure de
+Paris), chiffrées avec restic, vers une Hetzner Storage Box : un autre serveur que le VPS.
+Elle complète les backups Hetzner du VPS, sans les remplacer.
+
+1. Commander une **Storage Box BX11** dans la console Hetzner (environ 4 € par mois).
+2. Dans ses réglages, activer **SSH** et **l'accès externe**, puis définir un mot de passe.
+3. Ouvrir la console du VPS dans Hetzner Cloud et lancer, avec l'identifiant
+   de la Storage Box :
+
+```bash
+sudo bash /opt/sirius/deploy/hetzner/prepare-backup.sh u123456
+```
+
+Le script installe restic, crée une clé SSH dédiée et l'installe sur la Storage Box.
+Le mot de passe de la Storage Box est demandé une seule fois.
+Le script crée ensuite le dépôt chiffré, active `sirius-backup.timer` et lance une
+première sauvegarde. Il affiche alors le **mot de passe de chiffrement** : à noter
+hors du serveur, sinon la sauvegarde est illisible si le VPS est perdu.
+
+Rétention : 30 jours, 12 semaines, 24 mois. Les bases SQLite sont copiées par l'API
+de sauvegarde SQLite et vérifiées avant l'envoi ; chaque sauvegarde relit aussi 5 % des données.
+Le déploiement réinstalle le timer seulement si `/etc/sirius/backup.env` existe.
+
+Contrôles :
+
+```bash
+systemctl list-timers sirius-backup.timer
+journalctl -u sirius-backup.service -n 50 --no-pager
+sudo bash -c 'set -a; . /etc/sirius/backup.env; restic snapshots'
+```
+
+Restauration dans un dossier séparé, sans écraser la production :
+
+```bash
+sudo bash -c 'set -a; . /etc/sirius/backup.env; restic restore latest --target /var/tmp/sirius-restore'
+```
+
+Les bases SQLite restaurées se trouvent sous `var/tmp/sirius-sqlite-snapshot/`,
+les fichiers (photos, documents) sous `var/lib/sirius/`.
