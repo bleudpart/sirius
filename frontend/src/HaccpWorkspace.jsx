@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { AlertTriangle, Camera, ClipboardCheck, ClipboardList, QrCode, ShieldCheck, Search, Download, FileDown, Image, X, Utensils } from "lucide-react";
+import HaccpKitchen from "./HaccpKitchen";
 import HaccpLabelCapture from "./HaccpLabelCapture";
 import HaccpPreparation from "./HaccpPreparation";
 import HaccpReceptions from "./HaccpReceptions";
@@ -27,10 +28,10 @@ async function checked(response) {
   return response;
 }
 
-export default function HaccpWorkspace({ standalone = false, captureRequest = 0, initialTab = "capture" }) {
+export default function HaccpWorkspace({ standalone = false, captureRequest = 0, initialTab = "simple" }) {
   const [tab, setTab] = useState(initialTab);
   useEffect(() => {
-    if (captureRequest > 0) setTab("capture");
+    if (captureRequest > 0) setTab("simple");
   }, [captureRequest]);
   useEffect(() => {
     if (initialTab) setTab(initialTab);
@@ -352,7 +353,9 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0,
       if (mounted.current) setClosingBusy(false);
     }
   }
-  return <section aria-label="Registre de réception, ouverture et préparation ΣIRIUS" className={`haccp-ui haccp-workspace${standalone ? " haccp-standalone" : ""}`}>
+  const simple = tab === "simple";
+  return <section aria-label="Registre de réception, ouverture et préparation ΣIRIUS" className={`haccp-ui haccp-workspace${standalone ? " haccp-standalone" : ""}${simple ? " haccp-workspace-simple" : ""}`}>
+    {!simple && <>
     <header className="haccp-heading">
       <div className="haccp-emblem" aria-hidden="true"><ShieldCheck size={30} /></div>
       <div><p className="haccp-kicker">ΣIRIUS · HACCP</p><h2>ΣIRIUS · Étiquettes cuisine</h2><p>Réception, ouverture et préparation : gardez la trace.</p></div>
@@ -360,14 +363,16 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0,
     <nav className="haccp-navigation" aria-label="Parcours des étiquettes">
       <button type="button" aria-pressed={tab === "capture"} onClick={() => setTab("capture")}><Camera size={19} aria-hidden="true" />Réception / Ouverture</button>
       <button type="button" aria-pressed={tab === "preparation"} onClick={() => setTab("preparation")}><Utensils size={19} aria-hidden="true" />Préparation / DLC</button>
-      <button type="button" aria-pressed={tab === "kitchen"} onClick={() => setTab("kitchen")}><Utensils size={19} aria-hidden="true" />Cuisine simplifiée</button>
+      <button type="button" aria-pressed={simple} onClick={() => setTab("simple")}><Camera size={19} aria-hidden="true" />Cuisine simplifiée</button>
       <button type="button" aria-pressed={tab === "registre"} onClick={() => setTab("registre")}><ClipboardList size={19} aria-hidden="true" />Registre / Contrôle</button>
       <button type="button" aria-pressed={tab === "receptions"} onClick={() => setTab("receptions")}><ClipboardList size={19} aria-hidden="true" />Réceptions / Lots</button>
       <button type="button" aria-pressed={tab === "closing"} onClick={() => setTab("closing")}><ClipboardCheck size={19} aria-hidden="true" />Fin de service</button>
       <button type="button" aria-pressed={tab === "qr"} onClick={() => setTab("qr")}><QrCode size={19} aria-hidden="true" />QR code réserve</button>
     </nav>
     {standalone && wakeLockStatus && <p className="haccp-wake-lock" role="status">{wakeLockStatus}</p>}
-    {(tab === "capture" || tab === "kitchen" || tab === "preparation" || tab === "receptions") && <section className="haccp-card haccp-establishment" aria-label="Dossier de l’établissement">
+    </>}
+    {(tab === "capture" || tab === "preparation" || tab === "receptions"
+      || (simple && !establishmentLoading && !activeEstablishment)) && <section className="haccp-card haccp-establishment" aria-label="Dossier de l’établissement">
       <p className="haccp-kicker">Établissement actif</p>
       {establishmentLoading && <p role="status">Recherche de l’établissement…</p>}
       {!establishmentLoading && establishmentOptions.length > 1 && <label>Restaurant actif
@@ -405,10 +410,11 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0,
       sessionReady={sessionReady}
       onCaptureSaved={refreshDossier}
     />}
-    {tab === "kitchen" && <HaccpLabelCapture kitchenMode
+    {simple && establishmentLoading && <p role="status">…</p>}
+    {simple && <HaccpKitchen
       establishmentName={activeEstablishment}
-      sessionReady={sessionReady}
       onCaptureSaved={refreshDossier}
+      onFullMode={() => setTab("capture")}
     />}
     {tab === "preparation" && <HaccpPreparation
       key={activeEstablishment}

@@ -41,7 +41,7 @@ async function change(input, value) {
   });
 }
 async function renderRegistry() {
-  await act(async () => root.render(<HaccpWorkspace standalone />));
+  await act(async () => root.render(<HaccpWorkspace standalone initialTab="capture" />));
   global.fetch.mockClear();
   await click("Registre / Contrôle");
 }
@@ -50,7 +50,7 @@ async function search() {
 }
 
 test("QR points to the authenticated standalone capture and loads its active establishment", async () => {
-  await act(async () => root.render(<HaccpWorkspace />));
+  await act(async () => root.render(<HaccpWorkspace initialTab="capture" />));
   await click("QR code réserve");
   expect(host.querySelector("svg")).not.toBeNull();
   expect(host.querySelector("a").href).toBe(HACCP_CAPTURE_URL);
@@ -182,7 +182,7 @@ test("existing restaurant folders require resuming before scans and show saved d
     });
     return reply([]);
   });
-  await act(async () => root.render(<HaccpWorkspace />));
+  await act(async () => root.render(<HaccpWorkspace initialTab="capture" />));
   expect(host.textContent).toContain("Dossier en cours : le-papillon");
   expect(host.textContent).toContain("le-papillon_reception_20261029_225501_a8f9c321.jpg");
   expect(button("Reprendre / Continuer")).not.toBeNull();
@@ -208,7 +208,7 @@ test("late dossier responses cannot replace the currently selected establishment
     }
     return reply([]);
   });
-  await act(async () => root.render(<HaccpWorkspace />));
+  await act(async () => root.render(<HaccpWorkspace initialTab="capture" />));
   const select = host.querySelector(".haccp-establishment select");
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(select, "Le Papillon");
@@ -229,17 +229,22 @@ test("late dossier responses cannot replace the currently selected establishment
   expect(host.textContent).not.toContain("Dossier en cours : le-papillon");
 });
 
-test("simplified kitchen workspace presents the oversized scan flow without hiding the safety review", async () => {
+test("the kitchen screen opens by default with only photo and find buttons, and the full mode stays reachable", async () => {
   await act(async () => root.render(<HaccpWorkspace standalone />));
+  expect(host.querySelector(".haccp-simple")).not.toBeNull();
+  expect(host.querySelector(".haccp-navigation")).toBeNull();
+  expect(host.querySelector('[aria-label="Dossier de l’établissement"]')).toBeNull();
+  expect(button("PHOTO")).not.toBeUndefined();
+  expect(button("RETROUVER")).not.toBeUndefined();
+  expect(host.textContent).not.toContain("Opérateur");
+  await click("Mode complet");
+  expect(host.querySelector(".haccp-navigation")).not.toBeNull();
   await click("Cuisine simplifiée");
-  expect(host.querySelector(".haccp-kitchen")).not.toBeNull();
-  expect(host.querySelector("button.haccp-kitchen-scan")).not.toBeNull();
-  expect(host.textContent).toContain("vérifiez le produit, le lot et la date avant de confirmer l’impression");
-  expect(host.textContent).not.toContain("J’ai vérifié le produit, le lot et la DLC — imprimer");
+  expect(host.querySelector(".haccp-simple")).not.toBeNull();
 });
 
 test("preparation is accessible in the shared workspace and uses the active establishment dossier", async () => {
-  await act(async () => root.render(<HaccpWorkspace standalone />));
+  await act(async () => root.render(<HaccpWorkspace standalone initialTab="capture" />));
   await click("Préparation / DLC");
   expect(host.querySelector('[aria-label="Étiquette de préparation"]')).not.toBeNull();
   expect(host.querySelector('[aria-label="Dossier de l’établissement"]')).not.toBeNull();
@@ -269,7 +274,7 @@ test("archived preparations reopen without requesting or inventing a photo", asy
 });
 
 test("receipt destinations are connected to the workspace and its active establishment", async () => {
-  await act(async () => root.render(<HaccpWorkspace standalone />));
+  await act(async () => root.render(<HaccpWorkspace standalone initialTab="capture" />));
   global.fetch.mockResolvedValueOnce(reply({ items: [], total: 0, offset: 0, limit: 25 }));
   await click("Réceptions / Lots");
   expect(host.querySelector('[aria-label="Suivi des réceptions fournisseurs"]')).not.toBeNull();
@@ -289,7 +294,7 @@ test("standalone scan page requests screen wake lock and reacquires it after rel
   const request = jest.fn().mockResolvedValue(lock);
   Object.defineProperty(navigator, "wakeLock", { configurable: true, value: { request } });
   await act(async () => {
-    root.render(<HaccpWorkspace standalone />);
+    root.render(<HaccpWorkspace standalone initialTab="capture" />);
     await Promise.resolve();
   });
   expect(request).toHaveBeenCalledWith("screen");

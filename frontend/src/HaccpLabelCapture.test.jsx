@@ -79,7 +79,7 @@ async function enableRule() {
 test("capture is connected to the existing traceability section without removing legacy entries", async () => {
   global.fetch.mockResolvedValue(reply({ items: [] }));
   await act(async () => root.render(<HaccpModule />));
-  expect(host.querySelector('[aria-label="Capture des étiquettes ΣIRIUS"]')).not.toBeNull();
+  expect(host.querySelector(".haccp-simple")).not.toBeNull();
   expect(host.querySelector('[data-testid="haccp-trace-add"]')).not.toBeNull();
   const shortcut = host.querySelector("a.haccp-capture-link");
   expect(shortcut.href).toBe("https://sirius-assistant.fr/haccp");
@@ -93,13 +93,14 @@ test("Android shortcut keeps the scanner inside the native app, including from t
   global.fetch.mockResolvedValue(reply({ items: [] }));
   await act(async () => root.render(<HaccpModule />));
   expect(host.querySelector("a.haccp-capture-link")).toBeNull();
+  await click("Mode complet");
   await click("Registre / Contrôle");
-  expect(host.querySelector('[aria-label="Capture des étiquettes ΣIRIUS"]')).toBeNull();
+  expect(host.querySelector(".haccp-simple")).toBeNull();
   await act(async () => host.querySelector("button.haccp-capture-link").click());
-  expect(host.querySelector('[aria-label="Capture des étiquettes ΣIRIUS"]')).not.toBeNull();
+  expect(host.querySelector(".haccp-simple")).not.toBeNull();
   await act(async () => host.querySelector('[data-testid="haccp-tab-temp"]').click());
   await act(async () => host.querySelector("button.haccp-capture-link").click());
-  expect(host.querySelector('[aria-label="Capture des étiquettes ΣIRIUS"]')).not.toBeNull();
+  expect(host.querySelector(".haccp-simple")).not.toBeNull();
 });
 
 test("reception opens the rear live camera and captures full-resolution video without a file picker", async () => {
