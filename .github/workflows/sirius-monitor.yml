@@ -47,7 +47,7 @@ jobs:
             echo 'INODES'
             df -i /var/lib/sirius /var/www/sirius
             echo 'DIRECTORY SIZE IN MIB'
-            for path in /opt/sirius /var/lib/sirius /var/www/sirius /var/log /tmp /var/cache /home /usr /var/lib; do
+            for path in /opt/sirius /var/lib/sirius /var/www/sirius /var/www/sirius/releases /var/www/sirius/assets /var/log /tmp /var/cache /home /usr /var/lib; do
               if [ -e "$path" ]; then
                 if size="$(du -sm -- "$path" 2>/dev/null)"; then
                   printf '%s\n' "$size"
@@ -58,6 +58,10 @@ jobs:
                 printf '%s: not present\n' "$path"
               fi
             done
+            echo 'WEBSITE RELEASE COUNT'
+            python3 -c "from pathlib import Path; print(sum(path.is_dir() for path in Path('/var/www/sirius/releases').iterdir()))"
+            echo 'CURRENT WEBSITE RELEASE'
+            readlink -f /var/www/sirius/current
   monitor:
     if: ${{ github.event_name != 'workflow_dispatch' }}
     runs-on: ubuntu-latest
