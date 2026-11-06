@@ -87,9 +87,4 @@ jobs:
               echo "Activation de la protection de la base cloud."
               sudo /opt/sirius/deploy/hetzner/deploy.sh "" "${{ github.sha }}"
             fi
-            # The deployment script is updated during its own run; execute the
-            # checked-out retention helper now so its first rollout takes effect.
-            if [ -d /var/www/sirius/releases ] && [ -e /var/www/sirius/current ]; then
-              sudo bash /opt/sirius/deploy/hetzner/cleanup-releases.sh /var/www/sirius/releases /var/www/sirius/current 5
-            fi
             python3 /opt/sirius/deploy/hetzner/monitor.py api-local
