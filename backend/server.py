@@ -2415,12 +2415,22 @@ from routers.haccp import make_haccp_router as make_haccp_labels_router
 
 
 async def _haccp_labels_scope(request: Request) -> str:
-    from enterprise import require_permission
+    import haccp_kitchen
 
     if cloud_link.relay_allowed() and not is_direct_local_request(request):
         raise HTTPException(403, "Le relais HACCP Cloud est reserve a ce PC.")
+    if haccp_kitchen.kitchen_token(request) is not None:
+        if cloud_link.relay_allowed():
+            raise HTTPException(403, "Le QR code cuisine fonctionne sur sirius-assistant.fr.")
+        return await haccp_kitchen.resolve_kitchen(request, db, _haccp_user_scope)
     user = await require_user(request, db)
     request.state.haccp_actor = user["user_id"]
+    return await _haccp_user_scope(user)
+
+
+async def _haccp_user_scope(user: dict) -> str:
+    from enterprise import require_permission
+
     if user.get("company_id"):
         membership = await db.enterprise_members.find_one({
             "company_id": user["company_id"], "user_id": user["user_id"],
@@ -2430,6 +2440,8 @@ async def _haccp_labels_scope(request: Request) -> str:
     return f"user:{user['user_id']}"
 
 
+from haccp_kitchen import make_haccp_kitchen_router
+api_router.include_router(make_haccp_kitchen_router(_haccp_labels_scope, lambda: db))
 api_router.include_router(make_haccp_labels_router(
     _haccp_labels_scope, vision_analyser=tri_cortex_services.analyse_label, on_received=tri_cortex_services.received,
 ))

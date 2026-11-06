@@ -84,3 +84,17 @@ test("find lists recent products and opens the product photo", async () => {
   await act(async () => button("PHOTO").click());
   expect(host.querySelector(".haccp-simple-shoot")).not.toBeNull();
 });
+
+test("a kitchen token is sent on scan, search and photo requests", async () => {
+  global.fetch = jest.fn(async (url) => url.includes("/recherche")
+    ? reply([{ id: 8, nom_produit: "Thon", conforme_reception: true, type_operation: "reception" }])
+    : reply({ id: 8, nom_produit: "Thon", conforme_reception: true }));
+  await act(async () => root.render(<HaccpKitchen kitchenToken="jeton-cuisine-0123456789" establishmentName="Le Papillon" />));
+  await pickPhoto();
+  await act(async () => button("RETROUVER").click());
+  await act(async () => button("Thon").click());
+  expect(global.fetch).toHaveBeenCalledTimes(3);
+  for (const [, options] of global.fetch.mock.calls) {
+    expect(options.headers).toEqual({ "X-Sirius-Cuisine": "jeton-cuisine-0123456789" });
+  }
+});

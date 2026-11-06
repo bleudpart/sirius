@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { QRCodeSVG } from "qrcode.react";
 import { AlertTriangle, Camera, ClipboardCheck, ClipboardList, QrCode, ShieldCheck, Search, Download, FileDown, Image, X, Utensils } from "lucide-react";
 import HaccpKitchen from "./HaccpKitchen";
+import HaccpKitchenLink from "./HaccpKitchenLink";
 import HaccpLabelCapture from "./HaccpLabelCapture";
 import HaccpPreparation from "./HaccpPreparation";
 import HaccpReceptions from "./HaccpReceptions";
@@ -367,11 +367,11 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0,
       <button type="button" aria-pressed={tab === "registre"} onClick={() => setTab("registre")}><ClipboardList size={19} aria-hidden="true" />Registre / Contrôle</button>
       <button type="button" aria-pressed={tab === "receptions"} onClick={() => setTab("receptions")}><ClipboardList size={19} aria-hidden="true" />Réceptions / Lots</button>
       <button type="button" aria-pressed={tab === "closing"} onClick={() => setTab("closing")}><ClipboardCheck size={19} aria-hidden="true" />Fin de service</button>
-      <button type="button" aria-pressed={tab === "qr"} onClick={() => setTab("qr")}><QrCode size={19} aria-hidden="true" />QR code réserve</button>
+      <button type="button" aria-pressed={tab === "qr"} onClick={() => setTab("qr")}><QrCode size={19} aria-hidden="true" />QR code Cuisine</button>
     </nav>
     {standalone && wakeLockStatus && <p className="haccp-wake-lock" role="status">{wakeLockStatus}</p>}
     </>}
-    {(tab === "capture" || tab === "preparation" || tab === "receptions"
+    {(tab === "capture" || tab === "preparation" || tab === "receptions" || tab === "qr"
       || (simple && !establishmentLoading && !activeEstablishment)) && <section className="haccp-card haccp-establishment" aria-label="Dossier de l’établissement">
       <p className="haccp-kicker">Établissement actif</p>
       {establishmentLoading && <p role="status">Recherche de l’établissement…</p>}
@@ -422,14 +422,7 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0,
       sessionReady={sessionReady}
     />}
     {tab === "receptions" && <HaccpReceptions key={activeEstablishment} establishmentName={activeEstablishment} />}
-    {tab === "qr" && <section className="workspace-surface haccp-card haccp-qr" aria-label="QR code de capture">
-      <p className="haccp-kicker">Accès cuisine</p>
-      <h3>Ouvrir la capture sur le téléphone</h3>
-      <div className="haccp-qr-code"><QRCodeSVG value={HACCP_CAPTURE_URL} size={200} marginSize={4} /></div>
-      <p><a href={HACCP_CAPTURE_URL}>{HACCP_CAPTURE_URL}</a></p>
-      <p>À afficher dans la réserve. Ce QR code ne contient aucun secret et ne donne aucun accès sans connexion. Utiliser un compte autorisé du même établissement.</p>
-      <p>Il ouvre le registre du serveur Internet, pas les archives locales d’un PC. Connexion Internet requise.</p>
-    </section>}
+    {tab === "qr" && <HaccpKitchenLink establishmentName={activeEstablishment} />}
     {tab === "closing" && <section className="workspace-surface haccp-card haccp-closing" aria-label="Bilan HACCP de fin de service">
       <p className="haccp-kicker">Revue opérationnelle · Responsable</p>
       <h3>Bilan de fin de service</h3>

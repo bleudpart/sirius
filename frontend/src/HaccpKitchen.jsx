@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowLeft, Camera, CheckCircle2, ImageIcon, LoaderCircle, RotateCcw, Search, Settings, X } from "lucide-react";
 import { API_BASE_URL } from "./lib/api";
 import { checkHaccpResponse, haccpFetch } from "./haccpRequest";
@@ -14,7 +14,8 @@ const daysAgo = (days) => {
 };
 
 // Écran cuisine : photo → analyse → enregistrement automatique, sans formulaire ni confirmation.
-export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, onFullMode }) {
+export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, onFullMode, kitchenToken = "" }) {
+  const auth = useMemo(() => kitchenToken ? { headers: { "X-Sirius-Cuisine": kitchenToken } } : {}, [kitchenToken]);
   const [view, setView] = useState("camera");
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState("");
@@ -93,7 +94,7 @@ export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, o
     body.append("operation", JSON.stringify({ type_operation: "reception" }));
     body.append("capture_id", captureId.current);
     try {
-      const record = await haccpFetch(`${API}/etiquettes/scan`, { method: "POST", body },
+      const record = await haccpFetch(`${API}/etiquettes/scan`, { ...auth, method: "POST", body },
         async (response) => (await checkHaccpResponse(response)).json());
       pendingFile.current = null; captureId.current = null;
       if (mounted.current) setResult(record);
@@ -138,7 +139,7 @@ export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, o
     if (term.trim()) params.set("terme", term.trim());
     else params.set("date_debut", daysAgo(30));
     try {
-      const records = await haccpFetch(`${API}/registre/recherche?${params}`, {},
+      const records = await haccpFetch(`${API}/registre/recherche?${params}`, auth,
         async (response) => (await checkHaccpResponse(response)).json());
       if (!Array.isArray(records)) throw new Error("Réponse invalide.");
       if (mounted.current && request === listRequest.current) setItems(records.slice(0, 60));
@@ -147,13 +148,13 @@ export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, o
     } finally {
       if (mounted.current && request === listRequest.current) setListBusy(false);
     }
-  }, [term]);
+  }, [term, auth]);
   const openFind = () => { setView("find"); setItems([]); void loadList(); };
   const openPhoto = async (record) => {
     clearPhoto(); setListError("");
     if (record.type_operation === "preparation") { setPhoto({ record, src: null }); return; }
     try {
-      const blob = await haccpFetch(`${API}/registre/${record.id}/photo`, {}, async (response) => {
+      const blob = await haccpFetch(`${API}/registre/${record.id}/photo`, auth, async (response) => {
         await checkHaccpResponse(response);
         if (!response.headers.get("content-type")?.startsWith("image/")) throw new Error("Photo introuvable.");
         return response.blob();

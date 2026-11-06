@@ -250,6 +250,10 @@ body:has(.haccp-standalone) {
 .haccp-simple-photo strong { font-size: 24px; }
 .haccp-simple-photo p { margin: 0; }
 .haccp-ui .haccp-simple-full { justify-self: center; display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 0; background: transparent; color: var(--haccp-muted); font-size: 14px; text-decoration: underline; }
+.haccp-kitchen-page { display: grid; }
+.haccp-kitchen-page-message { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; min-height: 70dvh; margin: 0; padding: 24px; font-size: 26px; font-weight: 700; text-align: center; }
+.haccp-kitchen-page-message p { margin: 0; }
+.haccp-kitchen-page-message svg { color: var(--haccp-gold); }
 @media (max-width: 600px) {
   .haccp-workspace.haccp-workspace-simple { padding: 6px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; gap: 10px; }
   .haccp-simple { gap: 10px; }

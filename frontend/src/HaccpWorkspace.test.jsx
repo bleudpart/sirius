@@ -49,18 +49,27 @@ async function search() {
   await act(async () => host.querySelector("form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
 }
 
-test("QR points to the authenticated standalone capture and loads its active establishment", async () => {
+test("QR code Cuisine creates a revocable kitchen link for the active establishment", async () => {
+  const kitchenUrl = "https://sirius-assistant.fr/cuisine#k=abcdefghijklmnopqrstuvwxyz";
+  const base = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation(async (url, options = {}) => {
+    if (url.endsWith("/haccp/cuisine/lien")) return reply(options.method === "POST"
+      ? { active: true, url: kitchenUrl, restaurant_name: "Le Papillon" } : { active: false });
+    return base(url, options);
+  });
   await act(async () => root.render(<HaccpWorkspace initialTab="capture" />));
-  await click("QR code réserve");
-  expect(host.querySelector("svg")).not.toBeNull();
-  expect(host.querySelector("a").href).toBe(HACCP_CAPTURE_URL);
+  await click("QR code Cuisine");
+  expect(host.textContent).toContain("Aucun QR code actif");
+  await click("Créer le QR code pour Le Papillon");
+  const [, options] = global.fetch.mock.calls.find(([url, opts]) => url.endsWith("/haccp/cuisine/lien") && opts?.method === "POST");
+  expect(JSON.parse(options.body)).toEqual({ restaurant_name: "Le Papillon" });
+  expect(host.querySelector('section[aria-label="QR code Cuisine"] svg')).not.toBeNull();
+  expect(host.textContent).toContain("seulement de photographier");
   expect(HACCP_CAPTURE_URL).toBe("https://sirius-assistant.fr/haccp");
-  expect(host.textContent).toContain("aucun accès sans connexion");
-  expect(global.fetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/enterprise\/context$/), expect.any(Object));
 });
 
 test.each([
-  ["qr", "QR code de capture"],
+  ["qr", "QR code Cuisine"],
   ["closing", "Bilan HACCP de fin de service"],
   ["registre", "Contrôle sanitaire"],
 ])("%s section uses the shared workspace card", async (tab, label) => {

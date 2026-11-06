@@ -1,0 +1,17 @@
+{
+  "short_name": "Cuisine",
+  "name": "ΣIRIUS Cuisine - Étiquettes HACCP",
+  "description": "Photo et recherche des étiquettes HACCP",
+  "icons": [
+    { "src": "icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any maskable" },
+    { "src": "icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any maskable" }
+  ],
+  "id": "/cuisine",
+  "start_url": "/cuisine",
+  "scope": "/cuisine",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#06121d",
+  "background_color": "#03060c",
+  "lang": "fr"
+}

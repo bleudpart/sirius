@@ -352,6 +352,9 @@ def make_haccp_router(
         mime_type = (file.content_type or "").split(";", 1)[0].strip().lower()
         if mime_type not in IMAGE_FORMATS:
             raise HTTPException(400, "Formats autorises : JPEG, PNG et WebP.")
+        kitchen = getattr(request.state, "haccp_kitchen", None)
+        if kitchen is not None:
+            operateur, restaurant_name = "Cuisine", kitchen["restaurant_name"]
         if not operateur.strip():
             raise HTTPException(422, "Le nom de l'operateur ne peut pas etre vide.")
         if not restaurant_name.strip():
@@ -363,6 +366,8 @@ def make_haccp_router(
             raise HTTPException(422, "Operation invalide : fournissez une duree en heures entieres, "
                                 "une justification fabricant/PMS et la confirmation de la regle, "
                                 "ou archivez l'ouverture sans regle.") from error
+        if kitchen is not None and capture.type_operation != "reception":
+            raise HTTPException(403, "Le QR code cuisine enregistre seulement les réceptions.")
         maintenant = datetime.now(timezone.utc)
         content = await file.read(MAX_IMAGE_BYTES + 1)
         if not content:
