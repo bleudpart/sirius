@@ -2325,6 +2325,12 @@ Lecture d'un module ou d'une fenêtre à voix haute : dites « ΣIRIUS, lis ODYS
 ODYSSEIA et son texte historique. Sur PC, une pastille propose aussi la lecture ;
 sur Android, elle est masquée pour gagner de la place et seule la commande vocale reste.
 
+Sur Android, l'écran reste allumé tant que l'application ΣIRIUS est visible. Le
+verrouillage manuel et la veille après passage à une autre application restent
+possibles ; l'écran allumé consomme davantage de batterie. Les pages HACCP et
+Cuisine ouvertes dans un navigateur demandent aussi ce maintien lorsqu'il est
+pris en charge et signalent son indisponibilité.
+
 Confirmations vocales : quand une fenêtre s'ouvre, se ferme ou que ΣIRIUS exécute une
 action (voix, doigt ou souris), il l'annonce brièvement (« J'ai ouvert Zeus Cortex. »,
 « J'ai fermé Panthéon. »). Pas d'annonce s'il vient déjà de parler, s'il est occupé ou si

@@ -3,6 +3,7 @@ package fr.sirius_assistant.app;
 import android.content.pm.PackageManager;
 import android.os.SystemClock;
 import android.os.Bundle;
+import android.view.WindowManager;
 
 import com.getcapacitor.BridgeActivity;
 
@@ -17,6 +18,7 @@ public class MainActivity extends BridgeActivity {
 		registerPlugin(SiriusPlaybackPlugin.class);
 		registerPlugin(SiriusHaccpPrinterPlugin.class);
 		super.onCreate(savedInstanceState);
+		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 	}
 
 	@Override

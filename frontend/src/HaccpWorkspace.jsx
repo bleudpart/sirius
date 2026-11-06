@@ -8,6 +8,7 @@ import HaccpReceptions from "./HaccpReceptions";
 import { downloadHaccpBlob } from "./haccpDocuments";
 import { API_BASE_URL } from "./lib/api";
 import { haccpFetch } from "./haccpRequest";
+import useScreenWakeLock from "./useScreenWakeLock";
 import "./HaccpWorkspace.css";
 
 const ROOT = `${API_BASE_URL}/haccp/registre`;
@@ -41,7 +42,7 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0,
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [photo, setPhoto] = useState(null);
-  const [wakeLockStatus, setWakeLockStatus] = useState("");
+  const { message: wakeLockStatus } = useScreenWakeLock(standalone);
   const [establishmentOptions, setEstablishmentOptions] = useState([]);
   const [activeEstablishment, setActiveEstablishment] = useState("");
   const [establishmentDraft, setEstablishmentDraft] = useState("");
@@ -178,55 +179,6 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0,
     if (activeEstablishment) return loadDossier(activeEstablishment, true);
     return Promise.resolve();
   }, [activeEstablishment, loadDossier]);
-  useEffect(() => {
-    if (!standalone) return undefined;
-    if (!navigator.wakeLock?.request) {
-      setWakeLockStatus("Ce navigateur ne permet pas de garder l’écran allumé.");
-      return undefined;
-    }
-    let active = true;
-    let lock = null;
-    let requesting = false;
-    const requestLock = async () => {
-      if (!active || document.visibilityState !== "visible" || lock || requesting) return;
-      requesting = true;
-      try {
-        const nextLock = await navigator.wakeLock.request("screen");
-        if (!active || document.visibilityState !== "visible") {
-          await nextLock.release();
-          return;
-        }
-        lock = nextLock;
-        setWakeLockStatus("Écran maintenu allumé pendant le service.");
-        nextLock.addEventListener("release", () => {
-          if (lock === nextLock) {
-            lock = null;
-            if (active) setWakeLockStatus("Verrou d’écran libéré ; il sera redemandé au retour dans l’application.");
-          }
-        }, { once: true });
-      } catch (failure) {
-        if (active) setWakeLockStatus(`Maintien de l’écran indisponible : ${failure.message}`);
-      } finally {
-        requesting = false;
-      }
-    };
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") void requestLock();
-    };
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    void requestLock();
-    return () => {
-      active = false;
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-      if (lock) {
-        const heldLock = lock;
-        lock = null;
-        heldLock.release().catch((failure) => {
-          console.error("HACCP : libération du verrou d’écran impossible.", failure);
-        });
-      }
-    };
-  }, [standalone]);
   function params(exporting = false) {
     const result = new URLSearchParams();
     Object.entries(filters).forEach(([name, value]) => {

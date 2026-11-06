@@ -3,6 +3,7 @@ import { Camera, LoaderCircle, RotateCcw, X } from "lucide-react";
 import HaccpKitchen from "./HaccpKitchen";
 import { API_BASE_URL } from "./lib/api";
 import { checkHaccpResponse, haccpFetch } from "./haccpRequest";
+import useScreenWakeLock from "./useScreenWakeLock";
 import "./HaccpWorkspace.css";
 
 export const KITCHEN_STORAGE_KEY = "sirius-cuisine-jeton";
@@ -27,6 +28,7 @@ export default function HaccpKitchenPage() {
   const [token] = useState(readKitchenToken);
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState(() => token ? { status: "loading" } : { status: "missing" });
+  const wakeLock = useScreenWakeLock(state.status === "ready");
   useEffect(() => {
     if (!token) return undefined;
     let active = true;
@@ -63,5 +65,7 @@ export default function HaccpKitchenPage() {
       establishmentName={state.restaurant}
       onFullMode={() => window.location.assign("/haccp")}
     />}
+    {state.status === "ready" && wakeLock.status !== "active" && wakeLock.message
+      && <p className="haccp-wake-lock" role="status">{wakeLock.message}</p>}
   </main>;
 }
