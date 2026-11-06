@@ -139,9 +139,10 @@ restent applicables.
 
 Les versions du site restent dans `/var/www/sirius/releases`. Le lien `current`
 est remplacé atomiquement après validation du build et de la configuration Caddy.
-Les ressources hachées restent dans `/var/www/sirius/assets/static` pour les
-onglets déjà ouverts. Ces versions et ressources sont conservées : surveiller
-l’espace disque et nettoyer uniquement les versions identifiées comme inutiles.
+À chaque déploiement, la rétention conserve la version active et les cinq versions
+les plus récentes ; seules les autres versions validées sont supprimées. Les
+ressources hachées restent dans `/var/www/sirius/assets/static` pour les onglets
+déjà ouverts et ne sont jamais supprimées par cette rétention.
 `/deploy-sha.txt` permet de vérifier le commit réellement servi.
 Le port de contrôle `8080` écoute uniquement sur `127.0.0.1`.
 

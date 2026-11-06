@@ -103,6 +103,11 @@ if [[ -n "$FRONTEND_ARCHIVE" ]]; then
   rmdir -- "$(dirname "$FRONTEND_ARCHIVE")"
 fi
 
+if [[ -d "$WEB_DIR/releases" && -e "$WEB_DIR/current" ]]; then
+  echo "==> Retention des versions du site"
+  bash "$APP_DIR/deploy/hetzner/cleanup-releases.sh" "$WEB_DIR/releases" "$WEB_DIR/current" 5
+fi
+
 echo "==> Redémarrage du service"
 systemctl restart sirius.service
 

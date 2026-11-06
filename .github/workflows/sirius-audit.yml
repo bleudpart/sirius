@@ -90,6 +90,8 @@ jobs:
         working-directory: frontend
       - name: Monitoring alert tests
         run: node --test deploy/hetzner/monitor-deployment.test.cjs deploy/hetzner/monitor-issues.test.cjs deploy/hetzner/monitor-sms.test.cjs
+      - name: Website release retention test
+        run: bash deploy/hetzner/cleanup-releases.test.sh
       - name: Run SIRIUS audit
         run: python scripts/sirius_audit.py
       - name: Upload audit report
