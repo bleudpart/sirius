@@ -62,6 +62,35 @@ jobs:
             python3 -c "from pathlib import Path; print(sum(path.is_dir() for path in Path('/var/www/sirius/releases').iterdir()))"
             echo 'CURRENT WEBSITE RELEASE'
             readlink -f /var/www/sirius/current
+            echo 'READ-ONLY RELEASE RETENTION ESTIMATE'
+            python3 - <<'PY'
+            import os
+            import re
+            import subprocess
+            from pathlib import Path
+
+            base = Path('/var/www/sirius/releases').resolve(strict=True)
+            links = (Path('/var/www/sirius/current'), Path('/var/www/sirius/current.next'))
+            protected = {link.resolve(strict=True) for link in links if link.is_symlink()}
+            releases = [
+                path for path in base.iterdir()
+                if not path.is_symlink() and path.is_dir()
+                and re.fullmatch(r'[0-9a-f]{40}-[A-Za-z0-9]{6}', path.name)
+            ]
+            releases.sort(key=lambda path: path.stat().st_mtime_ns, reverse=True)
+            retained = set(releases[:5]) | protected
+            candidates = [path for path in releases if path.resolve() not in retained]
+            print(f'RELEASES_MATCHING_DEPLOY_FORMAT={len(releases)}')
+            print(f'OLD_RELEASES_EXCLUDING_LATEST_FIVE_AND_CURRENT={len(candidates)}')
+            print(f'RELEASES_DIR_WRITABLE={os.access(base, os.W_OK)}')
+            if candidates:
+                result = subprocess.run(
+                    ['du', '-sm', '--', *(str(path) for path in candidates)],
+                    capture_output=True, text=True, check=True,
+                )
+                total_mib = sum(int(line.split('\t', 1)[0]) for line in result.stdout.splitlines())
+                print(f'ESTIMATED_RECLAIMABLE_MIB={total_mib}')
+            PY
   monitor:
     if: ${{ github.event_name != 'workflow_dispatch' }}
     runs-on: ubuntu-latest
