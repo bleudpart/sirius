@@ -283,8 +283,10 @@ Paris), chiffrées avec restic, vers une Hetzner Storage Box : un autre serveur 
 Elle complète les backups Hetzner du VPS, sans les remplacer.
 Elle ne sauvegarde pas MongoDB ou MongoDB Atlas : les comptes et les données de
 la base documentaire doivent être protégés séparément. Vérifier la méthode et
-les restaurations auprès de l'hébergeur MongoDB ; les clusters Atlas gratuits
-ne disposent pas des sauvegardes automatiques Atlas.
+les restaurations auprès de l'hébergeur MongoDB. Pour les clusters Atlas gratuits,
+une [option payante de sauvegarde quotidienne](https://www.mongodb.com/docs/atlas/backup/cloud-backup/free-cluster-backup/)
+est proposée en préversion privée et peut ne pas être disponible ; elle n'est
+pas activée par défaut. Vérifier l'offre et les coûts avant toute activation.
 
 1. Commander une **Storage Box BX11** dans la console Hetzner (environ 4 € par mois).
 2. Dans ses réglages, activer **SSH** et **l'accès externe**, puis définir un mot de passe.
@@ -337,8 +339,11 @@ procédure de restauration.
 ## 12. Surveillance et alertes
 
 Le workflow GitHub Actions `SIRIUS monitoring` vérifie après chaque déploiement
-et environ toutes les 15 minutes le site publié, l'API, sa connexion à MongoDB et la protection
-contre une bascule inattendue vers SQLite sur le serveur. Par SSH avec l'utilisateur `deploy`,
+et environ toutes les 15 minutes le résultat du dernier déploiement, le site
+publié, l'API, sa connexion à MongoDB et la protection contre une bascule
+inattendue vers SQLite sur le serveur. Un déploiement en cours ne ferme pas une
+alerte précédente ; celle-ci est fermée seulement après un déploiement réussi.
+Par SSH avec l'utilisateur `deploy`,
 sans sudo, il contrôle les systèmes de fichiers des données et du site (alerte à
 85 % d'occupation ou à 1 Gio libre ou moins), ainsi que le minuteur de sauvegarde
 et le résultat et l'âge de la dernière exécution (au plus 36 heures). Une
@@ -352,8 +357,9 @@ surveillance SSH peut aussi provoquer une alerte sans prouver une panne du
 serveur. GitHub peut retarder ou suspendre des tâches planifiées ; ces contrôles
 ne constituent pas une surveillance temps réel. Pour éviter un courriel d'échec
 toutes les 15 minutes tant que la Storage Box n'est pas installée, une alerte
-de sauvegarde seule ouvre une issue et un avertissement sans faire échouer le
-workflow : un workflow vert ne signifie donc pas que les sauvegardes sont saines.
+de sauvegarde, d'identité SSH ou de déploiement seule ouvre une issue et un
+avertissement sans faire échouer le workflow : un workflow vert ne signifie donc
+pas que les sauvegardes sont saines.
 
 Le contrôle de sauvegarde vérifie seulement l'exécution du service sur le VPS :
 il ne garantit ni la présence ni la restaurabilité des données dans MongoDB.

@@ -4,7 +4,10 @@ const smsIssueTitle = 'SIRIUS surveillance : envoi SMS';
 const pendingMarker = /<!-- sirius-sms-attempts:(\d+) -->/;
 const sentMarker = '<!-- sirius-sms-sent -->';
 const maxAttempts = 3;
-const labels = { site: 'site', api: 'API', disk: 'disque', backup: 'sauvegarde', hostkey: 'SSH' };
+const labels = {
+  site: 'site', api: 'API', disk: 'disque', backup: 'sauvegarde',
+  hostkey: 'SSH', deployment: 'déploiement',
+};
 
 class SmsError extends Error {}
 

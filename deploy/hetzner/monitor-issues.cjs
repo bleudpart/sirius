@@ -21,6 +21,10 @@ const checks = {
     title: 'SIRIUS surveillance : identité SSH du serveur',
     description: "L'empreinte SSH vérifiée du serveur n'est pas configurée dans GitHub.",
   },
+  deployment: {
+    title: 'SIRIUS surveillance : déploiement',
+    description: "Le dernier déploiement a échoué ou son résultat n'a pas pu être vérifié.",
+  },
 };
 const smsPending = '<!-- sirius-sms-attempts:0 -->';
 
@@ -34,6 +38,10 @@ async function reconcile(github, context, outcomes) {
 
   for (const [name, check] of Object.entries(checks)) {
     const existing = openIssues.filter(issue => !issue.pull_request && issue.title === check.title);
+    if (name === 'deployment' && outcomes[name] === 'pending') {
+      activeAlerts.push(...existing.map(issue => ({ ...issue, check: name })));
+      continue;
+    }
     if (outcomes[name] !== 'success') {
       if (existing.length === 0) {
         const created = await github.rest.issues.create({

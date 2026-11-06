@@ -168,7 +168,10 @@ test('incomplete configuration opens one GitHub alert without a network request'
 
 test('issue lifecycle and SMS stay coordinated across outages and recovery', async () => {
   const { github, issues } = harness();
-  const outcomes = { site: 'failure', api: 'success', disk: 'success', backup: 'failure', hostkey: 'success' };
+  const outcomes = {
+    site: 'failure', api: 'success', disk: 'success', backup: 'failure',
+    hostkey: 'success', deployment: 'success',
+  };
   let state = await reconcile(github, context, outcomes);
   assert.equal(state.activeAlerts.length, 2);
   await handleSms(github, context, state.activeAlerts, state.openIssues, {});
@@ -194,4 +197,30 @@ test('issue lifecycle and SMS stay coordinated across outages and recovery', asy
   await handleSms(github, context, state.activeAlerts, state.openIssues, env, { fetch });
   assert.equal(requests, 2);
   assert.equal(issues.filter(issue => issue.title === checks.site.title).length, 2);
+});
+
+test('a failed deployment generates one SMS and remains open during a retry', async () => {
+  const { github, issues } = harness();
+  const outcomes = {
+    site: 'success', api: 'success', disk: 'success', backup: 'success',
+    hostkey: 'success', deployment: 'failure',
+  };
+  let state = await reconcile(github, context, outcomes);
+  let message;
+  const fetch = async (_url, options) => {
+    message = new URLSearchParams(options.body).get('Body');
+    return accepted();
+  };
+  await handleSms(github, context, state.activeAlerts, state.openIssues, env, { fetch });
+  assert.equal(message, 'SIRIUS alerte : déploiement. Voir GitHub.');
+
+  state = await reconcile(github, context, { ...outcomes, deployment: 'pending' });
+  assert.equal(state.activeAlerts.length, 1);
+  assert.equal(issues[0].state, 'open');
+  assert.deepEqual(
+    await handleSms(github, context, state.activeAlerts, state.openIssues, env, { fetch }),
+    { enabled: true, sent: false },
+  );
+  await reconcile(github, context, { ...outcomes, deployment: 'success' });
+  assert.equal(issues[0].state, 'closed');
 });

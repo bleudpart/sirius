@@ -16,6 +16,7 @@ on:
     - cron: "*/15 * * * *"
 
 permissions:
+  actions: read
   contents: read
   issues: write
 
@@ -29,6 +30,16 @@ jobs:
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
+      - name: Check latest deployment
+        id: deployment
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { latestDeployment } = require('./deploy/hetzner/monitor-deployment.cjs');
+            const outcome = await latestDeployment(github, context);
+            core.setOutput('outcome', outcome);
+            if (outcome === 'failure') core.setFailed("Le dernier déploiement n'a pas réussi.");
       - name: Check public website
         id: site
         continue-on-error: true
@@ -80,6 +91,8 @@ jobs:
           DISK_OUTCOME: ${{ steps.disk.outcome }}
           BACKUP_OUTCOME: ${{ steps.backup.outcome }}
           HOSTKEY_OUTCOME: ${{ steps.hostkey.outcome }}
+          DEPLOYMENT_OUTCOME: ${{ steps.deployment.outcome }}
+          DEPLOYMENT_STATUS: ${{ steps.deployment.outputs.outcome }}
           SIRIUS_SMS_ENABLED: ${{ vars.SIRIUS_SMS_ENABLED }}
           SIRIUS_SMS_ACCOUNT_SID: ${{ secrets.SIRIUS_SMS_ACCOUNT_SID }}
           SIRIUS_SMS_AUTH_TOKEN: ${{ secrets.SIRIUS_SMS_AUTH_TOKEN }}
@@ -96,6 +109,8 @@ jobs:
               disk: process.env.DISK_OUTCOME,
               backup: process.env.BACKUP_OUTCOME,
               hostkey: process.env.HOSTKEY_OUTCOME,
+              deployment: process.env.DEPLOYMENT_STATUS === 'pending'
+                ? 'pending' : process.env.DEPLOYMENT_OUTCOME,
             });
             await sms.handleSms(github, context, state.activeAlerts, state.openIssues, process.env, {
               test: process.env.SIRIUS_SMS_TEST === 'true',
@@ -106,6 +121,9 @@ jobs:
       - name: Report SSH identity warning
         if: ${{ !cancelled() && steps.hostkey.outcome != 'success' }}
         run: echo "::warning::Identité SSH non vérifiée ; consulter l'issue de surveillance."
+      - name: Report deployment warning
+        if: ${{ !cancelled() && steps.deployment.outcome != 'success' }}
+        run: echo "::warning::Déploiement en échec ou invérifiable ; consulter l'issue de surveillance."
       - name: Fail when an availability check failed
         if: ${{ !cancelled() && (steps.site.outcome != 'success' || steps.api.outcome != 'success' || steps.disk.outcome != 'success') }}
         run: exit 1

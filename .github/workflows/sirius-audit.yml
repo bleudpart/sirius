@@ -89,7 +89,7 @@ jobs:
         run: node --test scripts/haccp-printer.test.cjs scripts/native-automation.test.cjs
         working-directory: frontend
       - name: Monitoring alert tests
-        run: node --test deploy/hetzner/monitor-issues.test.cjs deploy/hetzner/monitor-sms.test.cjs
+        run: node --test deploy/hetzner/monitor-deployment.test.cjs deploy/hetzner/monitor-issues.test.cjs deploy/hetzner/monitor-sms.test.cjs
       - name: Run SIRIUS audit
         run: python scripts/sirius_audit.py
       - name: Upload audit report

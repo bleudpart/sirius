@@ -9,7 +9,10 @@ const context = {
   serverUrl: 'https://github.com',
   runId: 123,
 };
-const healthy = { site: 'success', api: 'success', disk: 'success', backup: 'success', hostkey: 'success' };
+const healthy = {
+  site: 'success', api: 'success', disk: 'success', backup: 'success',
+  hostkey: 'success', deployment: 'success',
+};
 
 function harness(issues = []) {
   const calls = [];
@@ -68,5 +71,32 @@ test('closes only recovered alert issues, including duplicates', async () => {
 test('missing outcomes are treated as failures, not successes', async () => {
   const { github, calls } = harness();
   await reconcile(github, context, {});
-  assert.equal(calls.filter(([action]) => action === 'create').length, 5);
+  assert.equal(calls.filter(([action]) => action === 'create').length, 6);
+});
+
+test('opens a failed deployment alert and closes it only after a successful deployment', async () => {
+  let state = harness();
+  await reconcile(state.github, context, { ...healthy, deployment: 'failure' });
+  assert.deepEqual(
+    state.calls.filter(([action]) => action === 'create').map(([, options]) => options.title),
+    [checks.deployment.title],
+  );
+
+  state = harness([{ number: 10, title: checks.deployment.title }]);
+  const pending = await reconcile(state.github, context, { ...healthy, deployment: 'pending' });
+  assert.deepEqual(pending.activeAlerts.map(issue => issue.number), [10]);
+  assert.equal(state.calls.filter(([action]) => action === 'update').length, 0);
+
+  state = harness([{ number: 10, title: checks.deployment.title }]);
+  await reconcile(state.github, context, healthy);
+  assert.deepEqual(
+    state.calls.filter(([action]) => action === 'update').map(([, options]) => options.issue_number),
+    [10],
+  );
+});
+
+test('does not open a deployment alert while a new deployment is pending', async () => {
+  const { github, calls } = harness();
+  await reconcile(github, context, { ...healthy, deployment: 'pending' });
+  assert.equal(calls.filter(([action]) => action === 'create').length, 0);
 });
