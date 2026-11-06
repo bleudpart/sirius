@@ -12,11 +12,11 @@ test("shows each real phase with an always accessible stop button", async () => 
   const stop = jest.fn();
   try {
     for (const [phase, label] of Object.entries({
-      idle: "Prêt", requesting: "Ouverture du microphone…",
-      checking: "Je vérifie le profil vocal…", verifying: "Je vérifie votre voix…",
+      idle: "Prêt", requesting: "Activation du micro…",
+      checking: "Préparation…", verifying: "Un instant…",
       rejected: "Demande ignorée", error: "Dialogue vocal interrompu",
-      listening: "J’écoute…", transcribing: "Je transcris…",
-      thinking: "Je traite votre demande…", preparing: "Je prépare la voix…", speaking: "Je réponds…",
+      listening: "J’écoute…", transcribing: "Un instant…",
+      thinking: "Je traite votre demande…", preparing: "Un instant…", speaking: "Je réponds…",
     })) {
       await act(async () => root.render(<VoiceSessionControls phase={phase} message="Voix de secours active" onStop={stop} />));
       expect(host.querySelector('[role="status"]').textContent).toContain(label);
@@ -30,6 +30,87 @@ test("shows each real phase with an always accessible stop button", async () => 
   } finally {
     await act(async () => root.unmount());
     host.remove();
+  }
+});
+
+test("shows discreet, accessible verification indicators without technical commentary", async () => {
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  try {
+    await act(async () => root.render(<VoiceSessionControls phase="verifying" onStop={() => {}} />));
+    let indicator = host.querySelector('[data-testid="voice-validation"]');
+    expect(indicator.dataset.state).toBe("checking");
+    expect(indicator.getAttribute("aria-label")).toBe("Vérification de la voix en cours");
+    expect(host.textContent).not.toMatch(/vérifi|transcri/i);
+
+    await act(async () => root.render(<VoiceSessionControls phase="transcribing" voiceValidation="verified" onStop={() => {}} />));
+    indicator = host.querySelector('[data-testid="voice-validation"]');
+    expect(indicator.dataset.state).toBe("verified");
+    expect(indicator.getAttribute("aria-label")).toBe("Voix vérifiée pour cette demande");
+    expect(host.textContent).not.toMatch(/vérifi|transcri/i);
+
+    await act(async () => root.render(<VoiceSessionControls phase="transcribing" onStop={() => {}} />));
+    indicator = host.querySelector('[data-testid="voice-validation"]');
+    expect(indicator.dataset.state).toBe("idle");
+    expect(indicator.getAttribute("aria-label")).toBe("Aucune vérification de voix en cours");
+
+    await act(async () => root.render(
+      <VoiceSessionControls phase="error" message="Le service est indisponible : demande ignorée." onStop={() => {}} />,
+    ));
+    expect(host.querySelector('[data-testid="voice-validation"]').dataset.state).toBe("idle");
+    expect(host.textContent).toContain("Le service est indisponible : demande ignorée.");
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+  }
+});
+
+test("announces a refused voice immediately with a specific label", async () => {
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  try {
+    await act(async () => root.render(
+      <VoiceSessionControls
+        phase="rejected"
+        message="Voix non reconnue : demande ignorée. Utilisez le bouton maintenu si nécessaire."
+        voiceValidation="rejected"
+        onStop={() => {}}
+      />,
+    ));
+    const status = host.querySelector(".voice-session-status");
+    expect(status.getAttribute("role")).toBe("status");
+    expect(status.getAttribute("aria-live")).toBe("assertive");
+    expect(status.textContent).toContain("Voix non reconnue : demande ignorée. Utilisez le bouton maintenu si nécessaire.");
+    expect(status.textContent.match(/Voix non reconnue/g)).toHaveLength(1);
+    expect(status.querySelector(".voice-session-detail")).toBeNull();
+    expect(host.querySelector('[data-testid="voice-validation"]').dataset.state).toBe("rejected");
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+  }
+});
+
+test("Android compact mode keeps the full refusal accessible and shows only a short label", async () => {
+  const host = document.createElement("div");
+  const root = createRoot(host);
+  const message = "Voix non reconnue : demande ignorée. Utilisez le bouton maintenu si nécessaire.";
+  try {
+    await act(async () => root.render(<VoiceSessionControls phase="rejected" message={message} voiceValidation="rejected" compact onStop={() => {}} />));
+    const label = host.querySelector(".voice-session-label > span");
+    expect(label.textContent).toBe("Voix non reconnue : demande ignorée.");
+    expect(label.getAttribute("aria-label")).toBe(message);
+    expect(label.title).toBe(message);
+    expect(host.querySelector('[data-testid="voice-validation"]').dataset.state).toBe("rejected");
+    expect(host.querySelector(".voice-session-status").getAttribute("aria-live")).toBe("assertive");
+    expect(host.querySelector(".voice-session-controls").hasAttribute("data-quiet")).toBe(false);
+    await act(async () => root.render(<VoiceSessionControls phase="thinking" compact onStop={() => {}} />));
+    expect(host.querySelector(".voice-session-label").textContent).toContain("Je traite…");
+    await act(async () => root.render(<VoiceSessionControls phase="idle" compact onStop={() => {}} />));
+    expect(host.querySelector(".voice-session-controls").dataset.quiet).toBe("true");
+  } finally {
+    await act(async () => root.unmount());
   }
 });
 

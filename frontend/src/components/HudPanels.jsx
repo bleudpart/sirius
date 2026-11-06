@@ -7,11 +7,12 @@ import { Activity, BarChart3, Brain, Check, Database, MapPin, Music, Pencil, Plu
 import { weatherInfo } from "@/appLogic";
 import { CoreRings, ReactorCore } from "@/components/ReactorVisuals";
 import { LiveClock, LiveDate, useLiveStats } from "@/liveStats";
-import { getLocalDateKey } from "@/dateTime";
+import { getLocalDateKey, getTimeOfDayGreeting } from "@/dateTime";
 import { speakCinematic, cancelSpeech, cleanTextForDisplay } from "@/voice";
 import { WORK_MODULES } from "@/workModules";
 import { API_BASE_URL } from "@/lib/api";
 import { readAccountSetup } from "@/accountSetup";
+import { APP_RELEASE, APP_VERSION } from "@/version";
 
 const BRAIN_RETRY_MS = 2000;
 const BRAIN_DEADLINE_MS = 20000;
@@ -583,6 +584,10 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [catalogueOpen, setCatalogueOpen] = useState(false);
   const loaded = verifiedCount === checks.length && checks.every(({ state }) => state !== null);
+  const [bootGreeting, setBootGreeting] = useState(null);
+  useEffect(() => {
+    if (loaded && bootGreeting === null) setBootGreeting(getTimeOfDayGreeting());
+  }, [loaded, bootGreeting]);
   const [speechDone, setSpeechDone] = useState(false);
   const [speechUnavailable, setSpeechUnavailable] = useState(false);
   const [speechPlaying, setSpeechPlaying] = useState(false);
@@ -611,7 +616,7 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
   }, []);
   // On attend le verdict du cerveau avant d'annoncer l'état à voix haute ; un « Réessayer »
   // ultérieur ne relance pas la présentation.
-  const narrationReady = loaded;
+  const narrationReady = loaded && bootGreeting !== null;
   useEffect(() => {
     if (brain === null) return;
     window.__siriusStartupDiagnostic = {
@@ -620,9 +625,11 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
     };
   }, [brain, checks]);
   const padRef = useRef(null);
+  const greeting = `${bootGreeting ?? getTimeOfDayGreeting()}${welcomeName ? ` ${welcomeName}` : ""}`;
+  const introduction = `Je suis ΣIRIUS. ${greeting}`;
   const readyMessage = brain === true && services !== null
-    ? `Connexion établie. Bonjour${welcomeName ? ` ${welcomeName}` : ""}. Je suis ΣIRIUS. Je suis prêt à vous accompagner.`
-    : `Bonjour${welcomeName ? ` ${welcomeName}` : ""}, ${brain === false
+    ? `${introduction}. Connexion établie. Je suis prêt à vous accompagner.`
+    : `${introduction}, ${brain === false
       ? "le serveur ne répond pas encore. Vous pouvez réessayer la connexion."
       : "la configuration des services n'a pas pu être vérifiée."}`;
   const [readyTextLength, setReadyTextLength] = useState(0);
@@ -770,82 +777,36 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
   }, [loaded, readyTextComplete, speechDone, brain, detailsOpen, catalogueOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
 
-    <div className={`boot-screen ${closing ? "closing" : ""}`} data-testid="boot-screen" onClick={() => {
+    <div className={`boot-screen boot-reference ${closing ? "closing" : ""}`} data-testid="boot-screen" onClick={() => {
       if (closingRef.current || !narrationReady) return;
       if (!speechStartedRef.current && !speechDone) { playIntroSpeech(); return; }
       if (speechDone) closeBoot();
     }}>
       <div className="boot-grid" />
       <div className="boot-scan" />
-      <details className="boot-modules workspace-surface" data-testid="boot-modules" onClick={(event) => event.stopPropagation()}
-        onToggle={(event) => setCatalogueOpen(event.currentTarget.open)}>
-        <summary className="boot-modules-title">L’univers de ΣIRIUS</summary>
-        {[
-          ["argus", "ARGUS", "Surveillance & réparation"],
-          ["atlas", "ATLAS", "Carte & navigation"],
-          ["oracle", "ORACLE", "Informations & synthèses"],
-          ["heracles", "HERACLES", "Investigation"],
-          ["hephaistos", "HÉPHAÏSTOS", "Outils & maintenance"],
-          ["themis", "THÉMIS", "Gestion d'entreprise"],
-          ["solon", "SOLON", "Conseil juridique"],
-          ["promethee", "PROMÉTHÉE", "Gestion de projet"],
-          ...WORK_MODULES.map(({ id, label, description }) => [id, label, description]),
-          ["calliope", "CALLIOPE", "Bibliothèque audio"],
-          ["pythagore", "PYTHAGORE", "Mathématiques & géométrie"],
-          ["agora", "HERMÈS AGORA", "Expert en vente"],
-          ["nummarius", "PORTUS NUMMARIUS", "Bourse & marchés"],
-          ["keraunos", "KERAUNOS", "Commandes domotiques"],
-          ["locus", "LOCUS", "Géolocalisation"],
-          ["pantheon", "PANTHÉON", "Cœur du système"],
-          ["cortex", "CORTEX", "Intelligence centrale"],
-          ["odysseia", "ODYSSEIA", "Accéder à la bibliothèque des mythes anciens"],
-        ].map(([id, name, role], i) => (
-          <div
-            className="boot-module"
-            key={id}
-            role="button"
-            tabIndex={0}
-            style={{ animationDelay: `${Math.min(i * 0.02, 0.3)}s` }}
-            data-testid={`boot-module-${id}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              closeBoot(id);
-            }}
-            onKeyDown={(e) => {
-              if (e.key !== "Enter" && e.key !== " ") return;
-              e.preventDefault();
-              e.currentTarget.click();
-            }}
-          >
-            <span className="boot-module-name font-divine">{name}</span>
-            <span className="boot-module-role">{role}</span>
-          </div>
-        ))}
-      </details>
       <div className="boot-center">
         <h1 className="boot-welcome">Bienvenue{welcomeName ? `, ${welcomeName}` : ""}.</h1>
         <div className="boot-reactor" data-testid="boot-reactor">
           <CoreRings />
           <ReactorCore status="thinking" volume={0.35} color="#91e6f2" eco={false} />
         </div>
-        <div className="boot-acronym" data-testid="boot-acronym">
-          {[["Σ", "System"], ["I", "Intelligent"], ["R", "Responsive"], ["I", "Interface"], ["U", "Universal"], ["S", "Secure"]].map(([l, w], i) => (
-            <span className="boot-acro-item" key={i} style={{ animationDelay: `${0.5 + i * 0.22}s` }}>
-              <b>{l}</b>
-              <i>{w}</i>
-            </span>
-          ))}
-        </div>
-        <p className="boot-signature">ΣIRIUS — Votre intelligence au travail</p>
-        <p className="boot-tagline">Parlez-lui simplement. ΣIRIUS vous répond.</p>
-        <p className="sirius-colleague">LE COLLÈGUE SUR QUI VOUS POUVEZ COMPTER</p>
       </div>
-      <section className="boot-status workspace-surface" aria-label="Initialisation de votre espace">
-        <span className="workspace-kicker">MISE EN ROUTE</span>
-        <h2>Initialisation de votre espace</h2>
+      <section className="boot-status boot-status-reference" aria-label="Initialisation de ΣIRIUS">
+        <h2>Initialisation de ΣIRIUS…</h2>
+        <div className="boot-bar" role="progressbar" aria-label="Chargement de ΣIRIUS"
+          aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
+          <div className="boot-bar-fill" style={{ width: `${progress}%` }} />
+        </div>
+        <div className="boot-pct">{progress}% — {speechUnavailable
+          ? "voix indisponible — ouverture du HUD"
+          : speechPlaying
+            ? "accueil vocal…"
+            : speechDone && !speechStartedRef.current
+              ? "ouverture du HUD…"
+              : "touchez pour activer la voix"}</div>
         <details className="boot-check-details" onClick={(event) => event.stopPropagation()}
           onToggle={(event) => setDetailsOpen(event.currentTarget.open)}>
-          <summary>Détail des vérifications</summary>
+          <summary>Détails des vérifications</summary>
           <ul>
             {checks.map(({ label, state, success, scope }) => (
               <li key={label}>
@@ -860,32 +821,66 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
                 : state === "not_configured" ? "non configuré"
                   : state === "restricted" ? "accès restreint" : "état non reconnu"}</li>
           ))}</ul>}
+          <div className="boot-log boot-display" role="log" aria-label="Résultats des contrôles de démarrage" aria-live="polite" aria-relevant="additions text">
+            {lines.map((l, index) => (
+              <div key={l.label} className={`boot-line boot-line-${l.tone}`}
+                style={{ animationDelay: `${index * 0.35}s` }}>
+                <span className="boot-line-label">{l.label}</span>
+                <span className="boot-line-state">{l.status}</span>
+              </div>
+            ))}
+            {loaded && <p className={`boot-ready ${readyTextComplete ? "boot-ready-complete" : ""}`}
+              data-testid="boot-ready" aria-live="off">
+              {welcomeSpeech.slice(0, Math.max(0, readyTextLength - welcomeOffset))}
+            </p>}
+          </div>
         </details>
-        <div className="boot-log boot-display" role="log" aria-label="Résultats des contrôles de démarrage" aria-live="polite" aria-relevant="additions text">
-          {lines.map((l, index) => (
-            <div key={l.label} className={`boot-line boot-line-${l.tone}`}
-              style={{ animationDelay: `${index * 0.35}s` }}>
-              <span className="boot-line-label">{l.label}</span>
-              <span className="boot-line-state">{l.status}</span>
+        <details className="boot-modules" data-testid="boot-modules" onClick={(event) => event.stopPropagation()}
+          onToggle={(event) => setCatalogueOpen(event.currentTarget.open)}>
+          <summary className="boot-modules-title">L’univers de ΣIRIUS</summary>
+          {[
+            ["argus", "ARGUS", "Surveillance & réparation"],
+            ["atlas", "ATLAS", "Carte & navigation"],
+            ["oracle", "ORACLE", "Informations & synthèses"],
+            ["heracles", "HERACLES", "Investigation"],
+            ["hephaistos", "HÉPHAÏSTOS", "Outils & maintenance"],
+            ["themis", "THÉMIS", "Gestion d'entreprise"],
+            ["solon", "SOLON", "Conseil juridique"],
+            ["promethee", "PROMÉTHÉE", "Gestion de projet"],
+            ...WORK_MODULES.map(({ id, label, description }) => [id, label, description]),
+            ["calliope", "CALLIOPE", "Bibliothèque audio"],
+            ["pythagore", "PYTHAGORE", "Mathématiques & géométrie"],
+            ["agora", "HERMÈS AGORA", "Expert en vente"],
+            ["nummarius", "PORTUS NUMMARIUS", "Bourse & marchés"],
+            ["keraunos", "KERAUNOS", "Commandes domotiques"],
+            ["locus", "LOCUS", "Géolocalisation"],
+            ["pantheon", "PANTHÉON", "Cœur du système"],
+            ["cortex", "CORTEX", "Intelligence centrale"],
+            ["odysseia", "ODYSSEIA", "Accéder à la bibliothèque des mythes anciens"],
+          ].map(([id, name, role], i) => (
+            <div
+              className="boot-module"
+              key={id}
+              role="button"
+              tabIndex={0}
+              style={{ animationDelay: `${Math.min(i * 0.02, 0.3)}s` }}
+              data-testid={`boot-module-${id}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                closeBoot(id);
+              }}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter" && e.key !== " ") return;
+                e.preventDefault();
+                e.currentTarget.click();
+              }}
+            >
+              <span className="boot-module-name font-divine">{name}</span>
+              <span className="boot-module-role">{role}</span>
             </div>
           ))}
-          {loaded && <p className={`boot-ready ${readyTextComplete ? "boot-ready-complete" : ""}`}
-            data-testid="boot-ready" aria-live="off">
-            {welcomeSpeech.slice(0, Math.max(0, readyTextLength - welcomeOffset))}
-          </p>}
-        </div>
-        <div className="boot-bar" role="progressbar" aria-label="Chargement de ΣIRIUS"
-          aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
-          <div className="boot-bar-fill" style={{ width: `${progress}%` }} />
-        </div>
-        <div className="boot-pct">{progress}%  —          {speechUnavailable
-          ? "voix indisponible — ouverture du HUD"
-          : speechPlaying
-            ? "accueil vocal…"
-                  : speechDone && !speechStartedRef.current
-                    ? "ouverture du HUD…"
-                    : "touchez pour activer la voix"}</div>
-        {servicesError && <div onClick={(event) => event.stopPropagation()}>
+        </details>
+        {servicesError && <div className="boot-service-error" onClick={(event) => event.stopPropagation()}>
           <p role="alert">{servicesError}</p>
           <button type="button" onClick={retryBrain}>Revérifier les services</button>
         </div>}
@@ -913,7 +908,10 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
           </div>
         )}
       </section>
-      <div className="boot-copyright">COPYRIGHT © 2026 ΣIRIUS par Daniel Partel – Tous droits réservés.</div>
+      <div className="boot-copyright" data-testid="boot-copyright">
+        COPYRIGHT © 2026 ΣIRIUS par Daniel Partel – Tous droits réservés.
+        <span className="hud-version-badge footer-version-badge" title={APP_RELEASE}>v{APP_VERSION}</span>
+      </div>
     </div>
   );
 }

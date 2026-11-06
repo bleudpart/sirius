@@ -14,6 +14,9 @@ import HaccpWorkspace from "@/HaccpWorkspace";
 import "./siriusVisualTheme.css";
 import "./moduleWindowLayout.css";
 import "./pantheonTheme.css";
+import "./androidHud.css";
+import "./electronHud.css";
+import "./windowHud.css";
 
 document.documentElement.dataset.siriusVisualTheme = "classic";
 document.documentElement.dataset.siriusPlatform = Capacitor.getPlatform();

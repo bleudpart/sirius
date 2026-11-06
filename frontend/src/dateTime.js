@@ -11,6 +11,15 @@ const LOCAL_DATE_OPTIONS = {
   day: "numeric",
 };
 
+export function phaseOfDay(nowLocal = new Date()) {
+  const h = nowLocal.getHours();
+  return h >= 5 && h < 9 ? "dawn" : h >= 9 && h < 17 ? "day" : h >= 17 && h < 22 ? "dusk" : "night";
+}
+
+export function getTimeOfDayGreeting(nowLocal = new Date()) {
+  return ["dusk", "night"].includes(phaseOfDay(nowLocal)) ? "Bonsoir" : "Bonjour";
+}
+
 export function formatLocalTime(nowLocal = new Date()) {
   return nowLocal.toLocaleTimeString([], LOCAL_TIME_OPTIONS);
 }

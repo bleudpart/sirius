@@ -46,12 +46,12 @@ test("native listening keeps a rejected-voice message visible when capture resum
   await controller.start();
   events.utterance({ audio: btoa("RIFFfirst") });
   await flush();
-  expect(onState).toHaveBeenLastCalledWith({ phase: "paused", message });
+  expect(onState).toHaveBeenLastCalledWith({ phase: "paused", message, speakerRejected: true });
   events.state({ phase: "ready" });
   expect(onState).toHaveBeenLastCalledWith({ phase: "ready", message });
   events.utterance({ audio: btoa("RIFFsecond") });
   await flush();
-  expect(onState).toHaveBeenCalledWith({ phase: "transcribing", message: expect.stringContaining("Voix vérifiée") });
+  expect(onState).toHaveBeenCalledWith({ phase: "transcribing", message: "", speakerVerified: true });
   expect(onTranscript).toHaveBeenCalledTimes(1);
   await controller.setBlocked(false);
   events.state({ phase: "ready" });
@@ -105,12 +105,12 @@ test("native state remains verifying until identity succeeds, then becomes trans
   onState.mockClear();
   events.utterance({ audio: btoa("RIFFtest") });
   await flush();
-  expect(onState).toHaveBeenLastCalledWith({ phase: "verifying", message: expect.any(String) });
+  expect(onState).toHaveBeenLastCalledWith({ phase: "verifying", message: "" });
   expect(onState.mock.calls.some(([event]) => event.phase === "transcribing")).toBe(false);
   expect(transcribe).not.toHaveBeenCalled();
   finish({ verified: true });
   await flush();
-  expect(onState).toHaveBeenCalledWith({ phase: "transcribing", message: expect.stringContaining("Voix vérifiée") });
+  expect(onState).toHaveBeenCalledWith({ phase: "transcribing", message: "", speakerVerified: true });
   await controller.stop();
 });
 test("opens once, suppresses playback and resumes without reopening the microphone", async () => {

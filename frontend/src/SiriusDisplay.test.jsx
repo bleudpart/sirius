@@ -41,3 +41,44 @@ test("history labels use each question and retain the full question in the toolt
     host.remove();
   }
 });
+
+test("labels proactive suggestions and does not ask users to rate them as answers", async () => {
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  try {
+    await act(async () => root.render(
+      <SiriusDisplay
+        item={{ type: "message", titre: "ΣIRIUS", contenu: "Un point à vérifier.", suggestion: { id: "suggestion-1" } }}
+        history={[]}
+        onClose={() => {}}
+      />,
+    ));
+    expect(host.querySelector('[data-testid="sirius-display-proactive-context"]').textContent)
+      .toContain("ce n’est pas une réponse à votre demande");
+    expect(host.querySelector('[data-testid="sirius-display-feedback"]')).toBeNull();
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+  }
+});
+
+test("keeps answer feedback on ordinary messages", async () => {
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  try {
+    await act(async () => root.render(
+      <SiriusDisplay
+        item={{ type: "message", titre: "Réponse", contenu: "Voici la réponse." }}
+        history={[]}
+        onClose={() => {}}
+      />,
+    ));
+    expect(host.querySelector('[data-testid="sirius-display-proactive-context"]')).toBeNull();
+    expect(host.querySelector('[data-testid="sirius-display-feedback"]')).not.toBeNull();
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+  }
+});

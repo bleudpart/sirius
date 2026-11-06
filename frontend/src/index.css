@@ -4,12 +4,12 @@
 @tailwind utilities;
 
 :root {
-    --sirius-bg-950: #030b14;
-    --sirius-bg-900: #061321;
-    --sirius-bg-850: #091827;
-    --sirius-panel: rgba(13, 35, 54, 0.72);
-    --sirius-panel-strong: rgba(9, 28, 45, 0.88);
-    --sirius-panel-soft: rgba(27, 55, 75, 0.52);
+    --sirius-bg-950: #010307;
+    --sirius-bg-900: #03070d;
+    --sirius-bg-850: #050d14;
+    --sirius-panel: rgba(8, 19, 30, 0.78);
+    --sirius-panel-strong: rgba(4, 11, 19, 0.92);
+    --sirius-panel-soft: rgba(15, 31, 44, 0.48);
     --sirius-blue-steel: #31536c;
     --sirius-blue-muted: #7995a7;
     --sirius-cyan: #91e6f2;
@@ -21,6 +21,7 @@
     --sirius-gold-light: #f2d99a;
     --sirius-gold-dark: #9d7a3e;
     --sirius-gold-glow: rgba(216, 184, 117, 0.32);
+    --sirius-copyright-color: #e8c979;
     --sirius-text: #edf7f8;
     --sirius-text-secondary: #a8bac5;
     --sirius-text-muted: #748b99;
@@ -30,7 +31,7 @@
     --sirius-success: #91e6f2;
     --sirius-warning: #d8b875;
     --sirius-danger: #c98175;
-    --sirius-background: #061321;
+    --sirius-background: #03070d;
     --sirius-space-xs: 4px;
     --sirius-space-sm: 8px;
     --sirius-space-md: 12px;

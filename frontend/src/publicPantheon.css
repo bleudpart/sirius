@@ -3,16 +3,16 @@
   --store-gold-strong: #c5a059;
   --store-lime: #c5a059;
   --store-line: rgba(197, 160, 89, .34);
-  --store-paper: #06101b;
-  --store-panel: #102637;
+  --store-paper: #03070d;
+  --store-panel: #091722;
   --store-text: #edf4fc;
   --store-muted: #b0c2d8;
   --store-heading: "Palatino Linotype", "Book Antiqua", Palatino, serif;
-  --store-surface: linear-gradient(145deg, #102637, #081522);
+  --store-surface: linear-gradient(145deg, #091722, #040a10);
   color: var(--store-text);
-  background: radial-gradient(ellipse at 50% 25%, #16455448, transparent 55%),
-    linear-gradient(#5e91b409 1px, transparent 1px) 0 0 / 48px 48px,
-    linear-gradient(90deg, #5e91b409 1px, transparent 1px) 0 0 / 48px 48px, #06101b;
+  background: radial-gradient(ellipse at 50% 25%, #16455422, transparent 55%),
+    linear-gradient(#5e91b407 1px, transparent 1px) 0 0 / 48px 48px,
+    linear-gradient(90deg, #5e91b407 1px, transparent 1px) 0 0 / 48px 48px, #03070d;
   font-family: "Segoe UI", system-ui, sans-serif;
   overflow-wrap: anywhere;
 }
@@ -49,7 +49,7 @@
   max-height: 65vh;
   border: 1px solid var(--store-line);
   border-radius: 8px;
-  background: #06101b;
+  background: #03070d;
 }
 
 .public-store .public-request-examples {
@@ -159,7 +159,7 @@
 }
 
 .public-store :is(.public-secondary-cta, .public-demo-link, .public-odysseia-close) {
-  background: #081522;
+  background: #040a10;
   color: var(--store-gold);
   border: 1px solid var(--store-line);
   border-radius: 8px;
@@ -172,7 +172,7 @@
 }
 
 .public-store .public-form-row input {
-  background: #06101b;
+  background: #03070d;
   border: 1px solid var(--store-line);
   border-radius: 8px;
   color: var(--store-text);
@@ -259,5 +259,177 @@
 @media (max-width: 380px) {
   .public-store .public-odysseia-card {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.public-store {
+  --store-paper: #010307;
+  --store-panel: #050d14;
+  --store-line: rgba(145, 230, 242, .24);
+  --store-gold: #c5a059;
+  --store-gold-strong: #d8b875;
+  --store-cyan: #91e6f2;
+  --store-text: #edf4fc;
+  --store-muted: #b0c2d8;
+  --store-surface: linear-gradient(160deg, #08131d, #02070b);
+  --workspace-surface: var(--store-surface);
+  --workspace-line: var(--store-line);
+  --pantheon-surface: var(--store-surface);
+  --workspace-shadow: 0 18px 42px #0009, 0 0 22px rgba(145, 230, 242, .08), inset 0 0 8px rgba(145, 230, 242, .04);
+  --store-heading: "Segoe UI", system-ui, sans-serif;
+  background:
+    radial-gradient(ellipse at 55% 8%, rgba(145, 230, 242, .045), transparent 44%),
+    linear-gradient(rgba(94, 145, 187, .025) 1px, transparent 1px) 0 0 / 48px 48px,
+    linear-gradient(90deg, rgba(94, 145, 187, .025) 1px, transparent 1px) 0 0 / 48px 48px,
+    #010307;
+  color: var(--store-text);
+  font-family: var(--workspace-font);
+}
+
+.public-store .public-nav {
+  border-color: rgba(145, 230, 242, .18);
+}
+
+.public-store .public-brand {
+  font-family: var(--store-heading);
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+
+.public-store .public-nav-links a:not(.public-nav-cta) {
+  padding: 8px 11px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  transition: background-color .18s ease, border-color .18s ease, color .18s ease;
+}
+
+.public-store .public-nav-links a:not(.public-nav-cta):is(:hover, :focus-visible) {
+  border-color: var(--store-line);
+  background: rgba(145, 230, 242, .06);
+  color: var(--store-cyan);
+}
+
+.public-store .public-hero h1 {
+  max-width: 16ch;
+  color: var(--store-text);
+  font: 600 clamp(36px, 4.1vw, 58px)/1.14 var(--store-heading);
+  text-shadow: none;
+}
+
+.public-store .public-value {
+  color: var(--store-text);
+  font-family: var(--store-heading);
+  font-weight: 400;
+}
+
+.public-store .public-eyebrow,
+.public-store .public-trial-highlight {
+  color: var(--store-gold-strong);
+}
+
+.public-store .public-benefits span,
+.public-store .public-request-examples li {
+  border-color: var(--store-line);
+  background: rgba(5, 13, 20, .82);
+}
+
+.public-store :is(.public-primary-cta, .public-secondary-cta, .public-demo-link, .public-nav-cta) {
+  border-radius: 999px;
+  font-family: var(--store-heading);
+}
+
+.public-store .public-primary-cta {
+  color: #061015;
+  background: linear-gradient(135deg, #a9eff4, #58bdc9);
+  box-shadow: 0 10px 24px rgba(72, 196, 209, .16);
+}
+
+.public-store .public-primary-cta:hover {
+  box-shadow: 0 12px 28px rgba(72, 196, 209, .25);
+}
+
+.public-store .public-section-title {
+  color: var(--store-gold-strong);
+  font: 600 clamp(24px, 2.6vw, 32px)/1.25 var(--store-heading);
+  letter-spacing: .01em;
+}
+
+.public-store :is(.public-window-bar, .public-metrics, .public-core-preview, .public-matrix-actions li,
+  .public-plan, .public-checkout, .public-trial, .public-testimonial, .public-workflow-steps li,
+  .public-situations figure, .public-update-card, .public-odysseia-card, .public-odysseia-dialog) {
+  border-color: var(--store-line);
+  background-color: var(--store-panel);
+}
+
+.public-store .public-window-bar {
+  font-family: var(--store-heading);
+}
+
+.public-store .public-section-icon,
+.public-store .public-plan-icon {
+  border-radius: 12px;
+  border-color: var(--store-line);
+  background: rgba(145, 230, 242, .05);
+  color: var(--store-cyan);
+}
+
+.public-store .public-matrix-actions li svg,
+.public-store .public-update-heading svg {
+  color: var(--store-cyan);
+}
+
+.public-store .public-plan {
+  border-radius: 14px;
+  background: var(--store-surface);
+}
+
+.public-store .public-plan.featured,
+.public-store .public-plan-pro {
+  border-color: rgba(197, 160, 89, .65);
+  background: linear-gradient(150deg, #101b20, #040a10);
+  box-shadow: 0 18px 40px #0007, 0 0 20px rgba(197, 160, 89, .09);
+}
+
+.public-store .public-plan-name,
+.public-store .public-metrics strong {
+  font-family: var(--store-heading);
+}
+
+.public-store .public-plan-icon,
+.public-store .public-plan-choice {
+  color: var(--store-cyan);
+}
+
+.public-store .public-form-row input {
+  border-radius: 10px;
+  background: #010307;
+  font-family: var(--store-heading);
+}
+
+.public-store .public-form-row button,
+.public-store .public-paypal-btn {
+  border-radius: 999px;
+  font-family: var(--store-heading);
+}
+
+.public-store .public-trial,
+.public-store .public-core-preview,
+.public-store .public-checkout {
+  border-radius: 14px;
+}
+
+.public-store .public-footer,
+.public-store .public-function-note,
+.public-store .public-preview-caption {
+  color: var(--store-muted);
+}
+
+.public-store :is(button, a, input, select, textarea):focus-visible {
+  outline-color: var(--store-cyan);
+}
+
+@media (max-width: 800px) {
+  .public-store .public-hero h1 {
+    font-size: clamp(32px, 8vw, 46px);
   }
 }

@@ -75,8 +75,7 @@ export default function MobileNavigation({ active, onNavigate }) {
           }
           setExpanded((value) => !value);
         }}>
-        <span className="mobile-navigation-grip" aria-hidden="true" />
-        <span>Menu</span>
+        <><span className="mobile-navigation-grip" aria-hidden="true" /><span>Menu</span></>
       </button>
       <div id="mobile-navigation-destinations" className="mobile-navigation-destinations">
       {destinations.map(({ id, label, Icon, primary }) => (

@@ -48,7 +48,7 @@ export default function ProactivePanel({ onSpeak, canSpeak, onInitiative, onErro
     if (!suggestion) return;
     const message = `${suggestion.description} ${suggestion.intervention || ""}`.trim();
     onInitiativeRef.current?.(suggestion, message);
-    onSpeakRef.current(message);
+    onSpeakRef.current(`Suggestion de ΣIRIUS. ${message}`);
     announcedIdsRef.current.add(suggestion.id);
     lastAnnouncementRef.current = now;
   }, []);

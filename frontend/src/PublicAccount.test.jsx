@@ -36,6 +36,8 @@ afterEach(() => {
 
 test("account page requires an email and does not bootstrap the HUD or local session", () => {
   expect(container.querySelector('[data-testid="auth-email-input"]').required).toBe(true);
+  expect(container.querySelector(".auth-tagline").textContent).toBe("Parlez-lui, il vous répond.");
+  expect(container.querySelector(".sirius-colleague")).toBeNull();
   expect(container.textContent).not.toContain("SE CONNECTER AU PC");
   expect(container.textContent).toContain("aucun paiement");
   expect(global.fetch).not.toHaveBeenCalled();

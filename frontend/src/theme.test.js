@@ -15,8 +15,18 @@ describe("visual theme preferences", () => {
 
   test("loads the default palette and ignores malformed saved colors", () => {
     expect(loadVisualTheme()).toEqual(VISUAL_THEME_DEFAULTS);
+    expect(VISUAL_THEME_DEFAULTS.background).toBe("#03070d");
+    applyVisualTheme();
+    expect(document.documentElement.style.getPropertyValue("--sirius-background")).toBe("#03070d");
     localStorage.setItem("sirius_visual_theme", JSON.stringify({ cyan: "red", gold: "#123456" }));
     expect(loadVisualTheme()).toEqual({ ...VISUAL_THEME_DEFAULTS, gold: "#123456" });
+  });
+
+  test("preserves an explicitly saved background, including the former default", () => {
+    localStorage.setItem("sirius_visual_theme", JSON.stringify({ background: "#061321" }));
+    applyVisualTheme();
+    expect(document.documentElement.style.getPropertyValue("--sirius-background")).toBe("#061321");
+    expect(JSON.parse(localStorage.getItem("sirius_visual_theme")).background).toBe("#061321");
   });
 
   test("saves custom palette and applies it to the shared HUD variables immediately", () => {

@@ -1,5 +1,7 @@
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
+import fs from "fs";
+import path from "path";
 import PublicStore from "./PublicStore";
 
 jest.mock("./components/ReactorVisuals", () => ({
@@ -255,12 +257,21 @@ test("store describes real prerequisites without fabricated evidence or empty vi
   expect(video.autoplay).toBe(false);
   expect(video.querySelector("source").getAttribute("src")).toBe("/demo/sirius-demo-store.mp4");
   expect(video.querySelector("track").getAttribute("src")).toBe("/demo/sirius-demo-store.vtt");
+  expect(video.querySelector("track").getAttribute("kind")).toBe("subtitles");
+  expect(video.querySelector("track").hasAttribute("default")).toBe(true);
+  const demoNote = container.querySelector("#demonstration .public-function-note").textContent;
+  expect(demoNote).toContain("Démonstration muette");
+  expect(demoNote).toContain("Session simulée et données fictives");
+  expect(demoNote).toContain("aucune réponse IA ni aucun envoi réel");
   expect(container.querySelector("blockquote")).toBeNull();
   expect(container.querySelector(".public-metrics")).toBeNull();
   for (const claim of ["+12 000", "24h/24", "Instantané", "Ils utilisent", "256 bits", "Voir une démo", "aucun débit réel"]) {
     expect(container.textContent).not.toContain(claim);
   }
-  expect(container.querySelector(".hud-preview img").getAttribute("src")).toBe("/hud-preview.png");
+  const hudPreview = container.querySelector(".hud-preview img");
+  expect(hudPreview.getAttribute("src")).toBe("/hud-preview.png");
+  expect(hudPreview.getAttribute("alt")).toContain("profil fictif");
+  expect(container.querySelector(".public-preview-caption").textContent).toContain("peut différer de la version téléchargée");
   expect(container.querySelectorAll(".public-matrix-actions li")).toHaveLength(6);
   expect(container.querySelector(".public-matrix h2").textContent).toBe("Ce que vous pouvez lui confier");
   expect(container.querySelector(".public-matrix-actions").textContent).toContain("Préparez vos documents");
@@ -270,6 +281,31 @@ test("store describes real prerequisites without fabricated evidence or empty vi
   expect(container.textContent).toContain("leur délai de réponse peut varier");
   expect(container.textContent).toContain("ne garantit pas que le prestataire est en mode test");
   expect(container.querySelector(".public-demo-link").textContent).toContain("Voir les fonctions");
+});
+
+test("demo subtitles describe the fictional walkthrough in chronological order", () => {
+  const subtitles = fs.readFileSync(path.join(__dirname, "..", "public", "demo", "sirius-demo-store.vtt"), "utf8");
+  expect(subtitles).toMatch(/^WEBVTT/);
+  for (const phrase of ["session simulée", "données fictives", "MNÉMOSYNE", "CHRONOS", "aucune réponse IA ni aucun envoi réel"]) {
+    expect(subtitles).toContain(phrase);
+  }
+  const cues = [...subtitles.matchAll(/^(\d\d):(\d\d):(\d\d\.\d{3}) --> (\d\d):(\d\d):(\d\d\.\d{3})$/gm)];
+  expect(cues).toHaveLength(5);
+  let previousEnd = 0;
+  for (const cue of cues) {
+    const start = Number(cue[1]) * 3600 + Number(cue[2]) * 60 + Number(cue[3]);
+    const end = Number(cue[4]) * 3600 + Number(cue[5]) * 60 + Number(cue[6]);
+    expect(start).toBeGreaterThanOrEqual(previousEnd);
+    expect(end).toBeGreaterThan(start);
+    previousEnd = end;
+  }
+  expect(previousEnd).toBe(31);
+});
+
+test("the store copyright has its own styling without changing the legal links", () => {
+  const copyright = container.querySelector(".public-footer .public-copyright");
+  expect(copyright.textContent).toBe("© 2026 ΣIRIUS par Daniel Partel");
+  expect(copyright.closest("footer").querySelectorAll("a")).toHaveLength(5);
 });
 
 test("checkout preserves the selected tier and exposes payment failures", async () => {
@@ -300,6 +336,8 @@ test("situation screenshots are labeled as fictional and open the full images", 
     expect(image.closest("a").getAttribute("href")).toBe(image.getAttribute("src"));
     expect(image.closest("a").getAttribute("rel")).toBe("noopener noreferrer");
   }
+  expect(section.querySelector('img[src="/demo/sirius-planning.png"]').getAttribute("alt"))
+    .toContain("rendez-vous fictif");
   expect(global.fetch).not.toHaveBeenCalled();
 });
 

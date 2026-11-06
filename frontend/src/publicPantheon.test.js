@@ -35,3 +35,25 @@ test("public portraits preserve the full image and responsive four-to-five propo
   expect(value(small, "width")).toBe("96px");
   expect(value(small, "height")).toBe("120px");
 });
+
+test("storefront and public password page use the dark HUD palette", () => {
+  const storeSkin = rule(".public-store");
+  expect(value(storeSkin, "--store-paper")).toBe("#010307");
+  expect(value(storeSkin, "--store-line")).toBe("rgba(145, 230, 242, .24)");
+
+  const accountStyles = postcss.parse(read("PublicAccount.css"));
+  const account = accountStyles.nodes.find(node => node.type === "rule" && node.selector === ".public-account");
+  const passwordInput = accountStyles.nodes.find(node => node.type === "rule" && node.selector === ".public-account .auth-form input");
+  expect(value(account, "background")).toContain("#010307");
+  expect(value(passwordInput, "border-radius")).toBe("10px");
+  expect(value(passwordInput, "background")).toBe("#010307");
+});
+
+test("the HUD storefront overrides its legacy heading and button styles", () => {
+  const theme = postcss.parse(read("pantheonTheme.css"));
+  const hero = theme.nodes.find(node => node.type === "rule" && node.selector.includes(".public-store .public-hero h1"));
+  const actions = theme.nodes.find(node => node.type === "rule" && node.selector.includes(".public-primary-cta") && node.selector.includes(".public-nav-cta"));
+  expect(value(hero, "color")).toBe("var(--store-text)");
+  expect(value(hero, "font")).toContain("var(--store-heading)");
+  expect(value(actions, "background")).toContain("#a9eff4");
+});

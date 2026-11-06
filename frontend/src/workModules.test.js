@@ -24,6 +24,17 @@ test("declares the six work modules with a portrait", () => {
   });
 });
 
+test("work module portraits match the names depicted in the historical image files", () => {
+  expect(Object.fromEntries(WORK_MODULES.map(({ id, image }) => [id, image]))).toEqual({
+    workflows: "/api/mythos/img/thot.jpg",
+    pricing: "/api/mythos/img/nemesis.jpg",
+    dossiers: "/api/mythos/img/chronos.jpg",
+    audit: "/api/mythos/img/plutos.jpg",
+    documents: "/api/mythos/img/ariane.jpg",
+    planning: "/api/mythos/img/mnemosyne.jpg",
+  });
+});
+
 test.each(WORK_IDS)("registry entry '%s' opens its work module", (id) => {
   const openWorkModule = jest.fn();
   const entry = buildRegistry(openWorkModule).find((item) => item.id === id);

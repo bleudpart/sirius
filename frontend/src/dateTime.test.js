@@ -3,12 +3,29 @@ import {
   formatLocalTime,
   formatLocalDate,
   getLocalDateKey,
+  getTimeOfDayGreeting,
+  phaseOfDay,
   formatDocumentDate,
   formatSpeechDate,
 } from "./dateTime";
 
 describe("dateTime", () => {
   const fixed = new Date(2026, 0, 5, 9, 7, 3); // 5 janvier 2026, 09:07:03 locale
+
+  test.each([
+    [4, 59, "night", "Bonsoir"],
+    [5, 0, "dawn", "Bonjour"],
+    [8, 59, "dawn", "Bonjour"],
+    [9, 0, "day", "Bonjour"],
+    [16, 59, "day", "Bonjour"],
+    [17, 0, "dusk", "Bonsoir"],
+    [21, 59, "dusk", "Bonsoir"],
+    [22, 0, "night", "Bonsoir"],
+  ])("la phase locale à %i h %i est %s et la salutation est %s", (hour, minute, phase, greeting) => {
+    const now = new Date(2026, 0, 5, hour, minute);
+    expect(phaseOfDay(now)).toBe(phase);
+    expect(getTimeOfDayGreeting(now)).toBe(greeting);
+  });
 
   test("les dates vocales utilisent le mois français sans décalage de fuseau", () => {
     expect(formatSpeechDate("2026-11-14")).toBe("14 novembre 2026");

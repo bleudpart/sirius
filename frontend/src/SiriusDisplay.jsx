@@ -573,37 +573,44 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
             )}
             {!pasted && type === "message" && (
               <div className="sd-message" data-testid="sirius-display-message">
+                {item.suggestion && (
+                  <p className="sd-proactive-context" role="note" data-testid="sirius-display-proactive-context">
+                    Suggestion proactive de ΣIRIUS — ce n’est pas une réponse à votre demande.
+                  </p>
+                )}
                 {item.titre && <div className="sd-msg-title">{item.titre}</div>}
                 <p>{cleanTextForDisplay(item.contenu)}</p>
                 {item.suggestion && (
                   <ProactiveConversation key={item.suggestion.id} suggestion={item.suggestion}
                     onAction={onSuggestionAction} onSpeak={onSpeak} />
                 )}
-                <div className="sd-feedback" data-testid="sirius-display-feedback">
-                  <button
-                    className={`sd-vote up ${feedbackVote === "up" ? "active" : ""}`}
-                    onClick={() => sendFeedback("up")}
-                    title="Bonne réponse"
-                    data-testid="sirius-display-vote-up"
-                    disabled={feedbackVote !== null}
-                  >
-                    <ThumbsUp size={12} />
-                  </button>
-                  <button
-                    className={`sd-vote down ${feedbackVote === "down" ? "active" : ""}`}
-                    onClick={() => sendFeedback("down")}
-                    title="Mauvaise réponse"
-                    data-testid="sirius-display-vote-down"
-                    disabled={feedbackVote !== null}
-                  >
-                    <ThumbsDown size={12} />
-                  </button>
-                  {feedbackVote && (
-                    <span className="sd-vote-thanks" data-testid="sirius-display-vote-thanks">
-                      {feedbackVote === "up" ? "Merci ✓" : "Noté"}
-                    </span>
-                  )}
-                </div>
+                {!item.suggestion && (
+                  <div className="sd-feedback" data-testid="sirius-display-feedback">
+                    <button
+                      className={`sd-vote up ${feedbackVote === "up" ? "active" : ""}`}
+                      onClick={() => sendFeedback("up")}
+                      title="Bonne réponse"
+                      data-testid="sirius-display-vote-up"
+                      disabled={feedbackVote !== null}
+                    >
+                      <ThumbsUp size={12} />
+                    </button>
+                    <button
+                      className={`sd-vote down ${feedbackVote === "down" ? "active" : ""}`}
+                      onClick={() => sendFeedback("down")}
+                      title="Mauvaise réponse"
+                      data-testid="sirius-display-vote-down"
+                      disabled={feedbackVote !== null}
+                    >
+                      <ThumbsDown size={12} />
+                    </button>
+                    {feedbackVote && (
+                      <span className="sd-vote-thanks" data-testid="sirius-display-vote-thanks">
+                        {feedbackVote === "up" ? "Merci ✓" : "Noté"}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             )}
             {!pasted && isWeb && (

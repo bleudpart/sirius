@@ -42,6 +42,8 @@
   color: #ffffff;
 }
 
+.about-copyright { color: var(--sirius-copyright-color); }
+
 /* Footer global — bandeau très fin, discret, non intrusif */
 .sirius-footer {
   position: fixed;

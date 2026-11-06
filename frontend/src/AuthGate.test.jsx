@@ -9,7 +9,7 @@ jest.mock("./components/ReactorVisuals", () => ({
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
-test("the login tagline uses the Sigma brand", async () => {
+test("the login shows the requested tagline without the colleague slogan", async () => {
   const originalFetch = global.fetch;
   const originalWindowFetch = window.fetch;
   const container = document.createElement("div");
@@ -20,7 +20,9 @@ test("the login tagline uses the Sigma brand", async () => {
   try {
     await act(async () => root.render(<AuthGate><div>HUD</div></AuthGate>));
     expect(container.querySelector(".auth-title").textContent).toBe("ΣIRIUS");
-    expect(container.querySelector(".auth-tagline").textContent).toBe("Parlez-lui simplement. ΣIRIUS vous répond.");
+    expect(container.querySelector(".auth-tagline").textContent).toBe("Parlez-lui, il vous répond.");
+    expect(container.querySelector(".sirius-colleague")).toBeNull();
+    expect(container.querySelector(".auth-powered.auth-copyright").textContent).toContain("© 2026");
   } finally {
     await act(async () => root.unmount());
     global.fetch = originalFetch;

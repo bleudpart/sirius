@@ -5,7 +5,7 @@ export const SIRIUS_THEME = Object.freeze({
     cyanDeep: "#091a2b",
     gold: "#d8b875",
     goldBright: "#f2d99a",
-    background: "#061321",
+    background: "#03070d",
     steel: "#31536c",
     text: "#eaf4f5",
     textSecondary: "#9fb2bf",

@@ -1,6 +1,7 @@
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { BootScreen } from "./HudPanels";
+import { APP_RELEASE, APP_VERSION } from "@/version";
 import { speakCinematic, cancelSpeech } from "@/voice";
 import { generateBootPresentation } from "@/bootPresentation";
 import { readAccountSetup } from "@/accountSetup";
@@ -35,6 +36,7 @@ const tap = () => act(() => container.querySelector('[data-testid="boot-screen"]
 
 beforeEach(() => {
   jest.useFakeTimers();
+  jest.setSystemTime(new Date(2026, 0, 5, 10));
   jest.clearAllMocks();
   originalFetch = global.fetch;
   originalRecognition = window.SpeechRecognition;
@@ -63,8 +65,43 @@ test.each([true, false])("boot greets only the first name when the server respon
     for (let i = 0; i < 12; i += 1) await flush(2000);
   }
   expect(container.querySelector("h1").textContent).toBe("Bienvenue, Daniel.");
-  expect(speakCinematic.mock.calls[0][0]).toContain("Bonjour Daniel");
+  expect(speakCinematic.mock.calls[0][0]).toContain("Je suis ΣIRIUS. Bonjour Daniel");
   expect(speakCinematic.mock.calls[0][0]).not.toMatch(/partel/i);
+});
+
+test.each([
+  [4, "Bonsoir"],
+  [5, "Bonjour"],
+  [16, "Bonjour"],
+  [17, "Bonsoir"],
+  [22, "Bonsoir"],
+])("the boot introduces itself before the local greeting at %i h", async (hour, greeting) => {
+  jest.setSystemTime(new Date(2026, 0, 5, hour));
+  await render(<BootScreen userName="Daniel" onDone={jest.fn()} />);
+  const [message, callbacks] = speakCinematic.mock.calls[0];
+  const introduction = `Je suis ΣIRIUS. ${greeting} Daniel.`;
+  expect(message).toContain(introduction);
+  act(() => callbacks.onend());
+  expect(container.querySelector('[data-testid="boot-ready"]').textContent).toContain(introduction);
+});
+
+test("the greeting is selected after checks and stays in sync while narration plays", async () => {
+  jest.setSystemTime(new Date(2026, 0, 5, 16, 59, 58));
+  await render(<BootScreen userName="Daniel" onDone={jest.fn()} />);
+  const [message, callbacks] = speakCinematic.mock.calls[0];
+  expect(message).toContain("Je suis ΣIRIUS. Bonsoir Daniel.");
+  jest.setSystemTime(new Date(2026, 0, 6, 9));
+  act(() => callbacks.onend());
+  expect(container.querySelector('[data-testid="boot-ready"]').textContent)
+    .toContain("Je suis ΣIRIUS. Bonsoir Daniel.");
+});
+
+test("an offline boot introduces itself before the evening greeting", async () => {
+  jest.setSystemTime(new Date(2026, 0, 5, 20));
+  await render(<BootScreen userName="Daniel" onDone={jest.fn()} probeBrain={() => Promise.resolve(false)} />);
+  for (let i = 0; i < 12; i += 1) await flush(2000);
+  expect(speakCinematic.mock.calls[0][0])
+    .toContain("Je suis ΣIRIUS. Bonsoir Daniel, le serveur ne répond pas encore.");
 });
 
 test("opens the HUD when loading and narration both finish", async () => {
@@ -179,26 +216,31 @@ test("four truthful checks are paced over 2.8 seconds without delaying network p
   expect(container.querySelector('[role="log"]').textContent).toContain("CONNEXION ÉTABLIE");
 });
 
-test("presentation welcomes the user and exposes real loading progress in its dedicated frame", async () => {
+test("presentation follows the boot reference while keeping the animated core and real progress", async () => {
   await render(<BootScreen connected userName="Daniel" onDone={jest.fn()} />);
+  expect(container.querySelector('[data-testid="boot-screen"]').className).toContain("boot-reference");
   expect(container.querySelector("h1").textContent).toBe("Bienvenue, Daniel.");
-  expect(container.querySelector('[aria-label="Initialisation de votre espace"]').className).toContain("workspace-surface");
+  expect(container.querySelector('[aria-label="Initialisation de ΣIRIUS"]').className).toContain("boot-status-reference");
   expect(container.querySelector('[data-testid="boot-reactor"]')).not.toBeNull();
-  expect(container.querySelectorAll(".boot-signature")).toHaveLength(1);
-  expect(container.querySelector(".boot-signature").textContent).toBe("ΣIRIUS — Votre intelligence au travail");
-  expect(container.querySelector(".boot-tagline").textContent)
-    .toBe("Parlez-lui simplement. ΣIRIUS vous répond.");
-  expect(container.querySelector(".boot-signature").nextElementSibling.className).toBe("boot-tagline");
+  expect(container.querySelector(".boot-signature")).toBeNull();
+  expect(container.querySelector(".boot-tagline")).toBeNull();
+  expect(container.querySelector(".boot-acronym")).toBeNull();
+  expect(container.querySelector(".boot-status h2").textContent).toBe("Initialisation de ΣIRIUS…");
+  expect(container.querySelector(".boot-check-details summary").textContent).toBe("Détails des vérifications");
+  expect(container.querySelector(".boot-check-details [role='log']")).not.toBeNull();
+  const copyright = container.querySelector('[data-testid="boot-copyright"]');
+  expect(copyright.textContent).toContain("COPYRIGHT © 2026 ΣIRIUS par Daniel Partel");
+  expect(copyright.querySelector(".footer-version-badge").textContent).toBe(`v${APP_VERSION}`);
+  expect(copyright.querySelector(".footer-version-badge").title).toBe(APP_RELEASE);
   expect(container.querySelector(".boot-welcome-sub")).toBeNull();
   expect(container.textContent).not.toContain("Votre assistant intelligent");
   expect(container.textContent).not.toContain("Votre espace prend vie");
   expect(container.textContent).not.toContain("VOTRE INTELLIGENCE · VOTRE UNIVERS");
   expect(container.textContent).not.toContain("Une intelligence à votre écoute");
-  expect(container.querySelectorAll(".boot-acro-item")).toHaveLength(6);
+  expect(container.querySelectorAll(".boot-acro-item")).toHaveLength(0);
   const catalogue = container.querySelector('[data-testid="boot-modules"]');
   expect(catalogue.tagName).toBe("DETAILS");
   expect(catalogue.querySelector("summary").textContent).toBe("L’univers de ΣIRIUS");
-  expect(catalogue.querySelector(".workspace-kicker")).toBeNull();
   const progress = container.querySelector('[role="progressbar"]');
   expect(progress.getAttribute("aria-valuenow")).toBe("100");
 });
@@ -220,7 +262,7 @@ test("progress waits for real server and service responses rather than elapsed t
   await flush(5000);
   expect(progress.getAttribute("aria-valuenow")).toBe("100");
   expect(container.textContent).toContain("Réponses IA : non configuré");
-  expect(speakCinematic.mock.calls[0][0]).toContain("Connexion établie. Bonjour. Je suis ΣIRIUS. Je suis prêt à vous accompagner.");
+  expect(speakCinematic.mock.calls[0][0]).toContain("Je suis ΣIRIUS. Bonjour. Connexion établie. Je suis prêt à vous accompagner.");
   expect(speakCinematic.mock.calls[0][0]).not.toContain("Réponses IA.");
   expect(generateBootPresentation).not.toHaveBeenCalled();
   expect(container.querySelector('[role="log"]').textContent).toContain("REÇUE");
@@ -229,7 +271,7 @@ test("progress waits for real server and service responses rather than elapsed t
 test("the real welcome message appears progressively at a readable pace", async () => {
   await render(<BootScreen connected onDone={jest.fn()} />);
   const ready = container.querySelector('[data-testid="boot-ready"]');
-  const fullMessage = "Connexion établie. Bonjour. Je suis ΣIRIUS. Je suis prêt à vous accompagner.";
+  const fullMessage = "Je suis ΣIRIUS. Bonjour. Connexion établie. Je suis prêt à vous accompagner.";
   const narrated = speakCinematic.mock.calls[0][0];
   const offset = narrated.length - fullMessage.length;
   expect(ready.textContent).toBe("");
@@ -281,6 +323,7 @@ test("a failed service check is a completed failure, never a successful service"
     expect(container.textContent).toContain("Configuration des services");
     expect(container.textContent).toContain("INDISPONIBLE");
     expect(container.textContent).toContain("Revérifier les services");
+    expect(speakCinematic.mock.calls[0][0]).toContain("Je suis ΣIRIUS. Bonjour, la configuration des services");
     expect(speakCinematic.mock.calls[0][0]).toContain("la configuration des services n'a pas pu être vérifiée");
     expect(speakCinematic.mock.calls[0][0]).not.toContain("prêt à être utilisé");
   } finally {
@@ -310,7 +353,7 @@ test("retries the brain, then explains the failure instead of opening a dead HUD
   expect(container.querySelector('[data-testid="boot-brain-alert"]')).toBeNull();
   await flush(5000);
   expect(container.querySelector('[data-testid="boot-ready"]').textContent)
-    .toBe("Connexion établie. Bonjour. Je suis ΣIRIUS. Je suis prêt à vous accompagner.");
+    .toBe("Je suis ΣIRIUS. Bonjour. Connexion établie. Je suis prêt à vous accompagner.");
   expect(container.querySelector('[data-testid="boot-screen"]').className).toContain("closing");
   await flush(500);
   expect(onDone).toHaveBeenCalledTimes(1);
@@ -334,7 +377,7 @@ test("a brain that answers late is announced as ready", async () => {
   expect(speakCinematic).not.toHaveBeenCalled();
   await flush(2000);
   await flush(700);
-  expect(speakCinematic.mock.calls[0][0]).toContain("Je suis ΣIRIUS. Je suis prêt à vous accompagner.");
+  expect(speakCinematic.mock.calls[0][0]).toContain("Je suis ΣIRIUS. Bonjour. Connexion établie. Je suis prêt à vous accompagner.");
 });
 
 test("an offline screen does not label completed speech as a stuck reader", async () => {
@@ -356,7 +399,7 @@ test("reads the complete status window in order with a natural voice, without an
   const onDone = jest.fn();
   await render(<BootScreen connected userName="Daniel" onDone={onDone} />);
   const [message, callbacks] = speakCinematic.mock.calls[0];
-  expect(message).toBe("Initialisation de votre espace. Interface ΣIRIUS : Initialisée. Connexion au serveur : Connexion établie. Configuration des services : Reçue. Interface vocale : API disponibles. Connexion établie. Bonjour Daniel. Je suis ΣIRIUS. Je suis prêt à vous accompagner.");
+  expect(message).toBe("Initialisation de votre espace. Interface ΣIRIUS : Initialisée. Connexion au serveur : Connexion établie. Configuration des services : Reçue. Interface vocale : API disponibles. Je suis ΣIRIUS. Bonjour Daniel. Connexion établie. Je suis prêt à vous accompagner.");
   expect(callbacks.natural).toBe(true);
   expect(message).not.toContain("fournisseur non testé");
   expect(message).not.toContain("Interface Sirius.");

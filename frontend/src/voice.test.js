@@ -170,6 +170,21 @@ test.each(["answer", "boot"])("desktop Gemini %s uses the same endpoint as Andro
   expect(global.fetch.mock.calls.some(([url]) => String(url).includes("/tts/google"))).toBe(false);
 });
 
+test.each([
+  ["android", "Bonjour"],
+  ["android", "Bonsoir"],
+  ["web", "Bonjour"],
+  ["web", "Bonsoir"],
+])("%s boot narration keeps the introduction before %s", async (platform, greeting) => {
+  Capacitor.getPlatform.mockReturnValue(platform);
+  localStorage.setItem("sirius_voice", JSON.stringify({ name: "gemini", rate: 1, pitch: 0 }));
+  speakCinematic(`Je suis ΣIRIUS. ${greeting} Daniel. Connexion établie.`, { natural: true });
+  await flush();
+  const request = global.fetch.mock.calls.find(([url]) => String(url).includes("/tts/gemini"));
+  expect(request).toBeDefined();
+  expect(JSON.parse(request[1].body).text).toBe(`Je suis Si-riusse. ${greeting} Daniel. Connexion établie.`);
+});
+
 test("Android reads the assistant name without pronouncing the Greek sigma", async () => {
   speakFr("ΣIRIUS a ouvert Panthéon.");
   await flush();

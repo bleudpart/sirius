@@ -2,7 +2,7 @@
 
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { Mic, MicOff, Clock, Cpu, Wifi, MapPin, Calendar, X, Leaf, Settings2, Brain, Music, Repeat, RotateCcw, BarChart3, Workflow, Ruler, FolderOpen, Code2, Database, Sparkles, Eye, Landmark, Library, Orbit, Monitor, ShieldCheck, Radar, ShieldAlert, Camera, Crop, ImageDown, Fingerprint, Zap, Package, Clapperboard, Grip, Radio, Wrench, FileCode, History, Maximize, Minimize, KeyRound, Home as HomeIcon, BadgeInfo, Globe2, Hammer, TrendingUp, Newspaper, Scale, Flame, BookOpen, Sigma, AlarmClock, Power, Boxes, Link2, Building2, Activity, Mail } from "lucide-react";
+import { Mic, MicOff, Clock, Cpu, Wifi, MapPin, Calendar, X, Check, Leaf, Settings2, Brain, Music, Repeat, RotateCcw, BarChart3, Workflow, Ruler, FolderOpen, Code2, Database, Sparkles, Eye, Landmark, Library, Orbit, Monitor, ShieldCheck, Radar, ShieldAlert, Camera, Crop, ImageDown, Fingerprint, Zap, Package, Clapperboard, Grip, Radio, Wrench, FileCode, History, Maximize, Minimize, KeyRound, Home as HomeIcon, BadgeInfo, Globe2, Hammer, TrendingUp, Newspaper, Scale, Flame, BookOpen, Sigma, AlarmClock, Power, Boxes, Link2, Building2, Activity, Mail, UserRound } from "lucide-react";
 import {
   ArchitectPanel, SpectatorView, FilesPanel, DevCompanion, ZeusCortex, SiriusPrime, OracleDivin,
   PantheonSystem, NexusCeleste, SiriusDisplay, EuropeanaViewer, HaccpModule, KeysStatus, KeraunosPanel,
@@ -13,7 +13,7 @@ import {
   FloorPlanPanel, Photo3DPanel, ConnectionsPanel, MessagingPanel, WorkModulesPanel, WorkDossiersPanel, SportCoachPanel, MediaModulesPanel, VoiceProfilePanel, WorkspaceSearch, NativeAutomationHub,
 } from "@/lazyModules";
 import { pushStats, setStatsOffline } from "@/liveStats";
-import { formatLocalDate, formatLocalTime, getLocalDateKey } from "@/dateTime";
+import { formatLocalDate, formatLocalTime, getLocalDateKey, getTimeOfDayGreeting, phaseOfDay } from "@/dateTime";
 import { STATES, isLocalTimeQuestion, localAnswer, weatherInfo, pttBeep } from "@/appLogic";
 import { executeModuleOpen, isCartographieOpenCommand, isNamedModuleOpenRequest, MODULE_ALIASES, moduleDisplayName, parseModuleOpenRequest } from "@/moduleCommandRouting";
 import { MedallionRing, ReactorCore, Waveform } from "@/components/ReactorVisuals";
@@ -122,6 +122,7 @@ const NATIVE_APP = typeof window !== "undefined"
   && window.location.protocol === "https:";
 const WS_URL = process.env.REACT_APP_WS_URL || (NATIVE_APP ? "wss://api.sirius-assistant.fr/api/ws" : "");
 const ARGUS_ALERT_DISMISS_MS = 30 * 60 * 1000;
+const VOICE_VERIFIED_FEEDBACK_MS = 2500;
 
 // Silence après lequel une phrase dictée est considérée terminée et envoyée au traitement.
 const PHRASE_SILENCE_MS = 1200;
@@ -150,10 +151,6 @@ const PantheonLogo = ({ size = 16 }) => <HoloLogo src="/holo/logo-pantheon.png" 
 const MythosLogo = ({ size = 16 }) => <HoloLogo src="/holo/logo-mythos.png" size={size} />;
 
 // Salutation adaptée à l'heure du sanctuaire (aube dorée, jour, crépuscule, nuit feutrée)
-const phaseOfDay = () => {
-  const h = new Date().getHours();
-  return h >= 5 && h < 9 ? "dawn" : h >= 9 && h < 17 ? "day" : h >= 17 && h < 22 ? "dusk" : "night";
-};
 const PHASE_GREETINGS = {
   dawn: (n) => `Bonjour${n}. L'aube dorée se lève sur le sanctuaire.`,
   day: (n) => `Bonjour${n}.`,
@@ -212,8 +209,22 @@ const imageFileToBase64 = (file) => new Promise((resolve, reject) => {
 });
 
 function App() {
+  const isAndroidNative = Capacitor.getPlatform() === "android";
+  const isElectronDesktop = Boolean(window.siriusDesktop
+    || (typeof navigator !== "undefined" && /Electron/i.test(navigator.userAgent || "")));
+  const isReferenceHome = isAndroidNative || isElectronDesktop;
+  const streamDisplayIdRef = useRef(null);
+  const streamTypingRef = useRef({ timer: null, target: "", shown: 0, done: false });
   const [voicePhase, setVoicePhase] = useState("idle");
+  const voicePhaseRef = useRef(voicePhase);
+  voicePhaseRef.current = voicePhase;
   const [voiceMessage, setVoiceMessage] = useState("");
+  const [voiceValidation, setVoiceValidation] = useState("idle");
+  useEffect(() => {
+    if (voiceValidation !== "verified") return undefined;
+    const timer = setTimeout(() => setVoiceValidation((current) => current === "verified" ? "idle" : current), VOICE_VERIFIED_FEEDBACK_MS);
+    return () => clearTimeout(timer);
+  }, [voiceValidation]);
   const [showVoiceDiagnostic, setShowVoiceDiagnostic] = useState(false);
   const [androidRecognition, setAndroidRecognition] = useState(() =>
     localStorage.getItem("sirius_android_stt") === "native" ? "native" : "server");
@@ -723,8 +734,6 @@ function App() {
   // temps réel. Le cerveau peut générer toute la réponse très rapidement :
   // seconde : sans cadence d'affichage, le texte apparaîtrait d'un bloc. Un minuteur
   // révèle donc le texte à vitesse de lecture, en accélérant si le retard s'accumule.
-  const streamDisplayIdRef = useRef(null);
-  const streamTypingRef = useRef({ timer: null, target: "", shown: 0, done: false });
   const beginDisplayResponse = useCallback((question = "") => {
     const previous = streamTypingRef.current;
     clearInterval(previous.timer);
@@ -1073,7 +1082,7 @@ function App() {
   const mailCache = useMailCache(authUser);
   // Plein écran global du HUD : fenêtre Electron si disponible, sinon API Fullscreen du navigateur
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [desktopCloseError, setDesktopCloseError] = useState("");
+  const [appCloseError, setAppCloseError] = useState("");
   useEffect(() => {
     const onFs = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", onFs);
@@ -1109,13 +1118,13 @@ function App() {
   }, []);
   const closeDesktopApp = useCallback(async () => {
     if (!window.siriusDesktop?.closeApp) return;
-    setDesktopCloseError("");
+    setAppCloseError("");
     try {
       const result = await window.siriusDesktop.closeApp();
       if (!result?.closed) throw new Error("La fenêtre principale n’a pas confirmé sa fermeture.");
     } catch (error) {
       console.error("Impossible de fermer ΣIRIUS.", error);
-      setDesktopCloseError("Impossible de fermer ΣIRIUS. Réessayez ou utilisez le bouton de fermeture Windows.");
+      setAppCloseError("Impossible de fermer ΣIRIUS. Réessayez ou utilisez le bouton de fermeture Windows.");
     }
   }, []);
   // Application Windows : Échap quitte le plein écran (comme un navigateur) et F11 le bascule.
@@ -4639,6 +4648,7 @@ function App() {
     renderVoiceSignal, watchActionConfirmation, readOwnDisplay, showOnDisplay, launchNewsBulletin, speakBulletin, answerBulletinQuestion,
   ]);
 
+  processCommandRef.current = processCommand;
   useEffect(() => {
     if (!resumedCommand) return;
     setResumedCommand(null);
@@ -5601,6 +5611,7 @@ function App() {
   const handleTranscript = useCallback((transcript, isFinal, { requireWakeWord = false, speakerVerified = false } = {}) => {
     if ((autoMicRef.current || conversationMicRef.current || handsFreeRef.current?.active)
       && !pttRef.current && !speakerVerified) {
+      setVoiceValidation("rejected");
       setVoiceMessage("Commande ignorée : voix non vérifiée. Utilisez le bouton maintenu.");
       return false;
     }
@@ -5642,7 +5653,7 @@ function App() {
     if (Capacitor.getPlatform() !== "android") return;
     let disposed = false;
     const controller = createNativeHandsFree({
-      onState: ({ phase, message }) => {
+      onState: ({ phase, message, speakerVerified, speakerRejected }) => {
         if (disposed) return;
         if (phase === "diagnostic-error") {
           setVoiceMessage(message || "Conservation audio locale interrompue.");
@@ -5651,25 +5662,31 @@ function App() {
         setHandsFreePhase(phase);
         if (phase === "ready") {
           setVoicePhase("listening");
-          setVoiceMessage("Micro natif prêt. Dites votre demande ; Stop ferme la session.");
+          setVoiceValidation((current) => message && current === "rejected" ? current : "idle");
+          setVoiceMessage("");
         } else if (phase === "opening") {
           setVoicePhase("checking");
-          setVoiceMessage("Ouverture du microphone natif — attendez « Prêt ».");
+          setVoiceValidation("idle");
+          setVoiceMessage("");
         } else if (phase === "speech") {
           setVoicePhase("listening");
         } else if (phase === "verifying") {
           setVoicePhase("verifying");
-          setVoiceMessage("Vérification de votre voix en cours.");
+          setVoiceValidation("idle");
+          setVoiceMessage("");
         } else if (phase === "transcribing") {
           setVoicePhase("transcribing");
-          setVoiceMessage("Transcription de votre phrase en cours.");
+          setVoiceValidation(speakerVerified === true ? "verified" : "idle");
         } else if (phase === "error") {
           setVoicePhase("error");
+          setVoiceValidation("idle");
         } else if (phase === "stopped") {
           setVoicePhase((current) => ["checking", "listening", "verifying", "transcribing"].includes(current) ? "idle" : current);
+          setVoiceValidation("idle");
         } else if (phase === "paused") {
           setVoicePhase((current) => ["checking", "verifying", "transcribing"].includes(current) ? "idle" : current);
         }
+        if (speakerRejected === true) setVoiceValidation("rejected");
         if (message) setVoiceMessage(message);
       },
       onTranscript: (transcript) => {
@@ -5716,6 +5733,7 @@ function App() {
   const startServerListening = useCallback(async (preserveFeedback = false) => {
     if (serverRecorderRef.current || micOnRef.current || microphoneStartPendingRef.current || speakingRef.current) return;
     if (Date.now() < microphoneRequestCooldownRef.current) return;
+    setVoiceValidation((current) => preserveFeedback && current === "rejected" ? current : "idle");
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
       setText("L'enregistrement vocal n'est pas disponible sur cet appareil.");
       setStatus("idle");
@@ -5858,18 +5876,20 @@ function App() {
         if (!protectedCapture) setText("Transcription vocale ΣIRIUS en cours...");
         try {
           if (protectedCapture) {
-            setVoiceMessage("Vérification de votre voix en cours.");
+            setVoiceValidation("idle");
+            setVoiceMessage("");
             const identity = await verifyVoiceIdentity(blob, { signal: voiceSignal });
             if (voiceSignal.aborted || session !== microphoneSessionRef.current) return;
             if (identity.verified !== true) {
-              setVoiceMessage(identity.message);
+              setVoiceValidation("rejected");
+              setVoiceMessage(identity.message || "Vérification vocale non validée : demande ignorée.");
               setStatus("idle");
               setVoicePhase("rejected");
               retryHandsFree();
               return;
             }
+            setVoiceValidation("verified");
             setVoicePhase("transcribing");
-            setVoiceMessage("Transcription de votre phrase en cours.");
             setText("Transcription vocale ΣIRIUS en cours...");
           }
           await streamSttPromise;
@@ -5914,6 +5934,7 @@ function App() {
           streamStt?.close();
           if (voiceSignal.aborted) return;
           console.error("Erreur transcription ΣIRIUS :", error);
+          setVoiceValidation("idle");
           setText(error.message || "La transcription vocale ΣIRIUS est indisponible.");
           setStatus("idle");
           setVoicePhase("error");
@@ -5957,9 +5978,6 @@ function App() {
         setStatus("listening");
         setVoicePhase("listening");
         setText("Je t'écoute. Cet extrait audio sera envoyé au serveur ΣIRIUS pour transcription.");
-        if (protectedCapture && !preserveFeedback) {
-          setVoiceMessage("Écoute protégée : vérification de chaque voix sur le serveur avant transcription.");
-        }
       };
       recorder.start(250);
       if (!pushToTalk) {
@@ -6067,6 +6085,7 @@ function App() {
     voiceSeriesPendingRef.current = false;
     speakingRef.current = false;
     isBusy.current = false;
+    setVoiceValidation("idle");
     setVoicePhase("idle");
     setStatus("idle");
     setVoiceMessage("Écoute et réponse interrompues. Une action déjà envoyée peut avoir été exécutée ; vérifiez son résultat.");
@@ -6136,10 +6155,16 @@ function App() {
   }, [isLocalDevServer, isShuttingDown, stopListening]);
 
   const exitMobileApp = useCallback(async () => {
+    setAppCloseError("");
     cancelSpeech();
     stopListening();
     if (ambientRef.current) ambientRef.current.pause();
-    await CapacitorApp.exitApp();
+    try {
+      await CapacitorApp.exitApp();
+    } catch (error) {
+      console.error("Impossible de quitter ΣIRIUS.", error);
+      setAppCloseError("Impossible de quitter ΣIRIUS. Réessayez ou utilisez les commandes de navigation Android.");
+    }
   }, [stopListening]);
 
   const stopNativeCapture = useCallback(() => {
@@ -6236,7 +6261,11 @@ function App() {
   // Démarre l'écoute via la reconnaissance vocale du navigateur (instantanée, gratuite)
   const startListening = useCallback((preserveFeedback = false) => {
     if (micOnRef.current || speakingRef.current || isBusy.current || voiceSeriesPendingRef.current
-      || handsFreeRef.current?.active) return;
+      || handsFreeRef.current?.active || (!pttRef.current && (
+        microphoneStartPendingRef.current || nativeStartingRef.current
+        || ["verifying", "transcribing", "thinking", "preparing", "speaking"].includes(voicePhaseRef.current)
+      ))) return;
+    setVoiceValidation((current) => preserveFeedback && current === "rejected" ? current : "idle");
     voiceSessionRef.current.resume();
     if (!preserveFeedback) setVoiceMessage("");
     if (!pttRef.current && (autoMicRef.current || conversationMicRef.current)) {
@@ -6433,7 +6462,7 @@ function App() {
       const signal = voiceSessionRef.current.signal;
       openingSignal = signal;
       setVoicePhase("checking");
-      setVoiceMessage("Vérification du profil vocal sur le serveur. Le microphone n'est pas encore ouvert.");
+      setVoiceMessage("");
       await handsFreeRef.current?.stop();
       if (signal.aborted) return;
       await requireVoiceIdentity({ signal });
@@ -6459,6 +6488,7 @@ function App() {
   // ---- Talkie-walkie (push-to-talk) : maintenir = micro actif, relâcher = envoi ----
   const pttDown = useCallback(() => {
     if (pttRef.current) return;
+    setVoiceValidation("idle");
     const nativeHandsFreeWasActive = handsFreeRef.current?.active;
     const nativeStop = handsFreeRef.current?.stop();
     stopListening();
@@ -7156,18 +7186,27 @@ function App() {
       window.setTimeout(() => commandInputRef.current?.focus(), 0);
     }
   };
+  const microphoneIndicatorActive = autoMic || captureMicOn || interruptMicOn
+    || ["ready", "speech", "paused", "verifying", "transcribing", "processing"].includes(handsFreePhase);
 
   return (
     <div
-      className={`sirius-root workspace-mode mobile-section-${mobileDestination} ${booting ? "is-booting" : ""} ${ecoMode || reduceVisualEffects ? "eco" : ""} ${windowHidden ? "backgrounded" : ""} mode-${sysMode}`}
-      style={{ ...getHUDStyleVariables(visualTheme), "--accent": accentColor, "--glow": glowColor, "--hud-scale": hudScale }}
+      className={`sirius-root workspace-mode mobile-section-${mobileDestination} ${isAndroidNative ? "android-home-reference" : ""} ${isElectronDesktop ? "electron-home-reference" : ""} ${booting ? "is-booting" : ""} ${ecoMode || reduceVisualEffects ? "eco" : ""} ${windowHidden ? "backgrounded" : ""} mode-${sysMode}`}
+      style={{
+        ...getHUDStyleVariables(visualTheme),
+        "--accent": accentColor,
+        "--glow": glowColor,
+        "--hud-scale": hudScale,
+        "--hud-layout-height": `${100 / hudScale}%`,
+        "--hud-spacer-compensation": `${(1 - hudScale) * 100}%`,
+      }}
       data-core-active={hudTheme.core.active}
       data-pantheon-active={booting || status !== "idle" || voicePhase !== "idle"}
       data-guardian-active={hudTheme.guardian.visible}
       data-testid="sirius-hud"
     >
-      {desktopCloseError && <div role="alert" style={{ position: "fixed", top: 68, right: 12, zIndex: 10000, maxWidth: 420 }}>
-        {desktopCloseError}
+      {appCloseError && <div role="alert" style={{ position: "fixed", top: 68, right: 12, zIndex: 10000, maxWidth: 420 }}>
+        {appCloseError}
       </div>}
       {haccpPrinterRelay.error && <div role="alert" style={{ position: "fixed", bottom: 12, left: 12, zIndex: 10000, background: "#291313", padding: 12, maxWidth: 450 }}>
         Impression HACCP arrêtée : {haccpPrinterRelay.error} Vérifiez le poste puis rechargez ΣIRIUS. Aucun nouvel essai automatique.
@@ -7537,6 +7576,13 @@ function App() {
             </button>
           </div>
         </div>
+        {isAndroidNative && (
+          <button type="button" className="profile-btn android-account-shortcut"
+            onClick={() => auth.openProfile ? auth.openProfile() : setShowSetup(true)}
+            aria-label="Mon compte" title="Mon compte">
+            <UserRound size={18} aria-hidden="true" />
+          </button>
+        )}
         <div className="sys-indicators" data-testid="sirius-indicators">
           <span className="ind"><i className="ind-dot orange" />IA</span>
           <span className="ind"><i className="ind-dot cyan" />CLOUD</span>
@@ -7546,7 +7592,7 @@ function App() {
           <WorkspaceClock />
           <span className={`conn-led ${connected ? "on" : "off"}`} />
           <span className="conn-label">IA CLOUD</span>
-          <MicrophoneIndicator active={autoMic || captureMicOn || interruptMicOn || ["ready", "speech", "paused", "verifying", "transcribing", "processing"].includes(handsFreePhase)} showLabel />
+          <MicrophoneIndicator active={microphoneIndicatorActive} showLabel />
           {mode === "brainstorm" && <span className="mode-badge" data-testid="brainstorm-badge">BRAINSTORM</span>}
           
           {/* Connection status badge */}
@@ -7561,15 +7607,16 @@ function App() {
             <span className={`conn-brand outlook ${connectionStatus.microsoft ? "active" : ""}`} title={connectionStatus.microsoft ? "Outlook connecté" : "Outlook non connecté"}><ProviderLogo provider="outlook" size={15} /></span>
           </button>
           
-          {window.Capacitor?.getPlatform?.() === "android" && (
+          {isAndroidNative && (
             <ConfirmButton
               className="profile-btn sirius-shutdown-btn sirius-mobile-exit"
               onConfirm={exitMobileApp}
               testId="sirius-mobile-exit-btn"
               title="Quitter ΣIRIUS"
               label="QUITTER ?"
+              confirmIcon={<Check size={18} strokeWidth={1.6} aria-hidden="true" />}
             >
-              <Power size={15} />
+              <Power size={18} strokeWidth={1.6} aria-hidden="true" />
             </ConfirmButton>
           )}
           <button
@@ -7585,6 +7632,7 @@ function App() {
             onClick={() => setShowModulesMenu((o) => !o)}
             data-testid="sirius-modules-btn"
             title="Menu des modules (Ctrl+K)"
+            aria-label="Menu des modules"
           >
             <Grip size={15} />
           </button>
@@ -7655,8 +7703,9 @@ function App() {
               testId="sirius-shutdown-btn"
               title={isShuttingDown ? "Extinction de ΣIRIUS en cours" : "Éteindre ΣIRIUS"}
               label="ÉTEINDRE ?"
+              confirmIcon={<Check size={18} strokeWidth={1.6} aria-hidden="true" />}
             >
-              <Power size={15} />
+              <Power size={18} strokeWidth={1.6} aria-hidden="true" />
             </ConfirmButton>
           )}
           {window.siriusDesktop?.closeApp && (
@@ -7667,8 +7716,9 @@ function App() {
               title="Fermer ΣIRIUS"
               ariaLabel="Fermer ΣIRIUS"
               label="FERMER ?"
+              confirmIcon={<Check size={18} strokeWidth={1.6} aria-hidden="true" />}
             >
-              <X size={15} aria-hidden="true" />
+              <Power size={18} strokeWidth={1.6} aria-hidden="true" />
             </ConfirmButton>
           )}
         </div>
@@ -7841,7 +7891,6 @@ function App() {
               </div>
               <ReactorCore status={status} volume={0.35} color={visualTheme.cyan} eco={ecoMode || reduceVisualEffects} />
             </div>
-            <Waveform status={status} color={accentColor} />
             {activeCard && (
               <CentralCard card={activeCard} weather={weather} onClose={() => setActiveCard(null)} />
             )}
@@ -7851,7 +7900,7 @@ function App() {
               <span className="sirius-title-label">
                 <span className="sirius-mobile-introduction">Je suis ΣIRIUS</span>
                 <span className="sirius-wordmark workspace-welcome">
-                  {["dusk", "night"].includes(phaseOfDay()) ? "Bonsoir" : "Bonjour"}{welcomeName ? `, ${welcomeName}` : ""}
+                  {getTimeOfDayGreeting()}{welcomeName ? `, ${welcomeName}` : ""}
                 </span>
                 <span className="sirius-tagline">Qu’aimeriez-vous faire avancer aujourd’hui ?</span>
               </span>
@@ -7871,8 +7920,30 @@ function App() {
           </div>
         )}
 
+        <div className="workspace-shortcuts" role="group" aria-label="Suggestions de demandes">
+          {isReferenceHome && <span className="workspace-shortcuts-label" aria-hidden="true">Suggestions</span>}
+          {!isReferenceHome && (
+            <button type="button" data-testid="sirius-voice-diagnostic-btn"
+              aria-label="Vérifier ΣIRIUS" title="Vérifier ΣIRIUS"
+              onPointerDown={stopVoice}
+              onClick={() => { stopVoice(); setShowVoiceDiagnostic(true); }}>
+              Vérifier ΣIRIUS
+            </button>
+          )}
+          {[
+            { label: "Préparer demain", command: "Préparer ma journée de demain" },
+            { label: "Bilan d’activité", command: "Faire le point sur mon activité" },
+            { label: "Idée de projet", command: "Organiser une idée de projet" },
+          ].map(({ label, command }) => (
+            <button key={command} type="button" aria-label={command} title={command}
+              onClick={() => { setCmd(command); commandInputRef.current?.focus(); }}>
+              {isReferenceHome ? label : command}
+            </button>
+          ))}
+        </div>
         <div className="pantheon-composer">
-        <VoiceSessionControls phase={voicePhase} message={voiceMessage} onStop={stopVoice}
+        <VoiceSessionControls phase={voicePhase} message={voiceMessage} voiceValidation={voiceValidation} onStop={stopVoice}
+          compact={isReferenceHome}
           androidRecognition={null}
           onRecognitionChange={changeAndroidRecognition} />
         <form className="cmd-bar" onSubmit={sendCommand} data-testid="sirius-cmd-form">
@@ -7885,27 +7956,34 @@ function App() {
             onChange={(event) => selectImageReference(event.target.files?.[0])}
             data-testid="sirius-image-reference-input"
           />
-          <input
-            ref={commandInputRef}
-            className="cmd-input"
-            aria-label="Votre demande à ΣIRIUS"
-            type="text"
-            value={cmd}
-            onChange={(e) => setCmd(e.target.value)}
-            placeholder="Écrivez à ΣIRIUS…"
-            data-testid="sirius-cmd-input"
-          />
-          <PushToTalkButton active={pttActive} ready={captureMicOn} onStart={pttDown} onStop={pttUp} />
+          {isAndroidNative && (
+            <PushToTalkButton active={pttActive} ready={captureMicOn} onStart={pttDown} onStop={pttUp} />
+          )}
+          <div className={`cmd-input-wrap${["speaking", "listening", "thinking"].includes(status) ? " is-active" : ""}`}>
+            <input
+              ref={commandInputRef}
+              className="cmd-input"
+              aria-label="Votre demande à ΣIRIUS"
+              type="text"
+              value={cmd}
+              onChange={(e) => setCmd(e.target.value)}
+              data-testid="sirius-cmd-input"
+            />
+            <Waveform status={status} color={accentColor} theme={visualTheme} reference={isReferenceHome} />
+          </div>
+          {isReferenceHome && (
+            <button type="button" className="android-voice-analyzer" data-testid="sirius-voice-diagnostic-btn"
+              aria-label="Analyser la voix" title="Analyser la voix"
+              onPointerDown={stopVoice}
+              onClick={() => { stopVoice(); setShowVoiceDiagnostic(true); }}>
+              <Activity size={15} aria-hidden="true" />
+            </button>
+          )}
+          {!isAndroidNative && (
+            <PushToTalkButton active={pttActive} ready={captureMicOn} onStart={pttDown} onStop={pttUp} />
+          )}
           <button type="submit" className="cmd-send" data-testid="sirius-cmd-send" aria-label="Envoyer la commande" title="Envoyer la commande">→</button>
         </form>
-        </div>
-        <div className="workspace-shortcuts" role="group" aria-label="Suggestions de demandes">
-          <button type="button" data-testid="sirius-voice-diagnostic-btn"
-            onPointerDown={stopVoice}
-            onClick={() => { stopVoice(); setShowVoiceDiagnostic(true); }}>Vérifier ΣIRIUS</button>
-          {["Préparer ma journée de demain", "Faire le point sur mon activité", "Organiser une idée de projet"].map((suggestion) => (
-            <button key={suggestion} type="button" onClick={() => { setCmd(suggestion); commandInputRef.current?.focus(); }}>{suggestion}</button>
-          ))}
         </div>
         {handsFreeAvailable && showAudioDiagnostics && (
           <details data-testid="native-audio-diagnostics">

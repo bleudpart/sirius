@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { STATES } from "@/appLogic";
+import { getHUDStyleVariables } from "@/theme";
 
 const isMobileViewport = () => Boolean(window.matchMedia?.("(max-width: 1023px)")?.matches);
 // Fenêtres plein écran sur mobile : le réacteur est caché dessous.
@@ -342,8 +343,8 @@ export function ReactorCore({ status, volume, color, eco }) {
 // Visualiseur vocal dynamique : onde fluide (Canvas) réagissant en temps réel
 // - écoute : niveau réel du micro (getUserMedia + AnalyserNode)
 // - Sirius parle : enveloppe synthétique animée
-// - repos : ligne douce ondulante
-export function Waveform({ status, color }) {
+// - repos : aucune onde affichée
+export function Waveform({ status, color, theme, reference = false }) {
   const canvasRef = useRef(null);
   const levelRef = useRef(0.05);
   const particlesRef = useRef([]);
@@ -391,6 +392,9 @@ export function Waveform({ status, color }) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
+    const palette = getHUDStyleVariables(theme);
+    const cyan = palette["--workspace-cyan"];
+    const cyanLight = palette["--sirius-cyan-light"];
     const DPR = Math.min(window.devicePixelRatio || 1, 2);
     let raf, t = 0;
     const resize = () => {
@@ -400,6 +404,8 @@ export function Waveform({ status, color }) {
     };
     resize();
     window.addEventListener("resize", resize);
+    const resizeObserver = new ResizeObserver(resize);
+    resizeObserver.observe(canvas);
     let lastWave = 0;
     const isMobile = isMobileViewport();
     const draw = (ts) => {
@@ -413,7 +419,7 @@ export function Waveform({ status, color }) {
       const w = canvas.width, h = canvas.height, mid = h / 2;
       ctx.clearRect(0, 0, w, h);
       const st = statusRef.current;
-      if (st !== "speaking" && st !== "listening" && st !== "thinking") {
+      if (!w || !h || (st !== "speaking" && st !== "listening" && st !== "thinking")) {
         raf = requestAnimationFrame(draw);
         return;
       }
@@ -427,32 +433,33 @@ export function Waveform({ status, color }) {
         return mid + Math.sin(nx * 18 + t * (2.2 + li)) * mid * amp * env
                    + Math.sin(nx * 41 - t * 3) * mid * amp * 0.35 * env;
       };
-      // Dégradé cyan ↔ or animé le long de l'onde — palette resynchronisée avec les anneaux
-      // du globe (cyan #4ff0ff/#7fd8ff/#b6f0ff, or #ffd166/#ffc978) : la ligne se fond
-      // désormais dans le HUD actuel au lieu de garder l'ancien cyan/or plus vif et isolé.
+      // Dégradé cyan animé avec les couleurs du thème du HUD.
       const grad = ctx.createLinearGradient(0, 0, w, 0);
       const ph = (Math.sin(t * 0.7) + 1) / 2;
-      grad.addColorStop(0, "#7fd8ff");
-      grad.addColorStop(Math.max(0.12, Math.min(0.88, 0.5 - ph * 0.25)), "#ffd166");
-      grad.addColorStop(Math.max(0.14, Math.min(0.9, 0.5 + ph * 0.25)), "#ffc978");
-      grad.addColorStop(1, "#7fd8ff");
+      grad.addColorStop(0, cyan);
+      grad.addColorStop(Math.max(0.12, Math.min(0.88, 0.5 - ph * 0.25)), cyanLight);
+      grad.addColorStop(Math.max(0.14, Math.min(0.9, 0.5 + ph * 0.25)), cyan);
+      grad.addColorStop(1, cyan);
       // Spectre pointu (pics verticaux symétriques) — style hologramme cyan
       ctx.beginPath();
       for (let x = 0; x <= w; x += 3 * DPR) {
         const nx = x / w;
-        const env = Math.pow(Math.sin(nx * Math.PI), 0.75);
+        const env = Math.pow(Math.sin(nx * Math.PI), reference ? 2 : 0.75);
         const n = Math.sin(nx * 57 + t * 5.1) * Math.sin(nx * 23 - t * 3.7) * Math.sin(nx * 91 + t * 2.3);
-        const sh = Math.abs(n) * mid * amp * env * 1.5 + 1;
+        const sh = reference
+          ? Math.min(mid - 0.7 * DPR, 0.55 * DPR + mid * amp * env * (0.32 + Math.abs(n) * 0.95) * 1.5)
+          : Math.abs(n) * mid * amp * env * 1.5 + 1;
         ctx.moveTo(x, mid - sh);
         ctx.lineTo(x, mid + sh);
       }
-      ctx.strokeStyle = "#4ff0ff";
-      ctx.globalAlpha = 0.85;
-      ctx.lineWidth = 1.3 * DPR;
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = "#7fd8ff";
+      ctx.strokeStyle = reference ? grad : cyan;
+      ctx.globalAlpha = reference ? 0.9 : 0.85;
+      ctx.lineCap = reference ? "round" : "butt";
+      ctx.lineWidth = (reference ? 1.2 : 1.3) * DPR;
+      ctx.shadowBlur = reference ? 6 : 10;
+      ctx.shadowColor = cyanLight;
       ctx.stroke();
-      // Onde fluide dorée en surimpression
+      // Onde fluide en surimpression
       ctx.beginPath();
       for (let x = 0; x <= w; x += 4) {
         const nx = x / w;
@@ -462,22 +469,22 @@ export function Waveform({ status, color }) {
         x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
       }
       ctx.strokeStyle = grad;
-      ctx.globalAlpha = 0.9;
-      ctx.lineWidth = 1.6 * DPR;
-      ctx.shadowBlur = 12;
-      ctx.shadowColor = "#ffd166";
+      ctx.globalAlpha = reference ? 0.3 : 0.9;
+      ctx.lineWidth = (reference ? 0.75 : 1.6) * DPR;
+      ctx.shadowBlur = reference ? 4 : 12;
+      ctx.shadowColor = cyan;
       ctx.stroke();
       // Ligne d'horizon lumineuse
       ctx.beginPath();
       ctx.moveTo(0, mid);
       ctx.lineTo(w, mid);
       ctx.strokeStyle = grad;
-      ctx.globalAlpha = 0.55;
-      ctx.lineWidth = 1 * DPR;
-      ctx.shadowBlur = 8;
-      ctx.shadowColor = "#b6f0ff";
+      ctx.globalAlpha = reference ? 0.25 : 0.55;
+      ctx.lineWidth = (reference ? 0.7 : 1) * DPR;
+      ctx.shadowBlur = reference ? 3 : 8;
+      ctx.shadowColor = cyanLight;
       ctx.stroke();
-      // Particules dorées émises par l'onde quand Sirius parle (ou fort niveau micro)
+      // Particules émises par l'onde quand Sirius parle (ou fort niveau micro)
       const emitting = st === "speaking" || (st === "listening" && levelRef.current > 0.25);
       if (emitting && particlesRef.current.length < 110) {
         for (let i = 0; i < 3; i++) {
@@ -488,19 +495,19 @@ export function Waveform({ status, color }) {
             vy: (-0.5 - Math.random() * 1.1) * DPR,
             r: (0.8 + Math.random() * 1.8) * DPR,
             life: 1, decay: 0.012 + Math.random() * 0.015,
-            gold: Math.random() > 0.25,
+            bright: Math.random() > 0.25,
           });
         }
       }
-      ctx.shadowBlur = 8;
+      ctx.shadowBlur = reference ? 4 : 8;
       particlesRef.current = particlesRef.current.filter((p) => {
         p.x += p.vx; p.y += p.vy; p.vy *= 0.985; p.life -= p.decay;
         if (p.life <= 0) return false;
-        ctx.globalAlpha = p.life * 0.9;
-        ctx.fillStyle = p.gold ? "#ffd166" : "#b6f0ff";
-        ctx.shadowColor = p.gold ? "#ffc978" : "#7fd8ff";
+        ctx.globalAlpha = p.life * (reference ? 0.3 : 0.9);
+        ctx.fillStyle = p.bright ? cyanLight : cyan;
+        ctx.shadowColor = p.bright ? cyan : cyanLight;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r * (0.6 + p.life * 0.6), 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, p.r * (0.6 + p.life * 0.6) * (reference ? 0.3 : 1), 0, Math.PI * 2);
         ctx.fill();
         return true;
       });
@@ -509,8 +516,9 @@ export function Waveform({ status, color }) {
       raf = requestAnimationFrame(draw);
     };
     draw();
-    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); };
-  }, [color]);
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); resizeObserver.disconnect(); };
+  }, [color, theme, reference]);
 
-  return <canvas ref={canvasRef} className="waveform-canvas" data-testid="sirius-waveform" />;
+  return <canvas ref={canvasRef} className={`waveform-canvas${reference ? " waveform-canvas--reference" : ""}`}
+    data-testid="sirius-waveform" aria-hidden="true" />;
 }

@@ -208,8 +208,7 @@ export function AuthScreen({ onAuth, accountOnly = false }) {
             </span>
             <h1 className="auth-title">ΣIRIUS</h1>
           </div>
-          <p className="auth-tagline">Parlez-lui simplement. ΣIRIUS vous répond.</p>
-          <p className="sirius-colleague">LE COLLÈGUE SUR QUI VOUS POUVEZ COMPTER</p>
+          <p className="auth-tagline">Parlez-lui, il vous répond.</p>
         </header>
         <p className="auth-sub">{registerMode ? "Créez votre compte pour accéder à ΣIRIUS" : "Identifiez-vous pour accéder à ΣIRIUS"}</p>
         <form onSubmit={resetMode ? resetPassword : submit} className="auth-form" data-testid="auth-form">
@@ -261,7 +260,7 @@ export function AuthScreen({ onAuth, accountOnly = false }) {
             {registerMode ? "J’ai déjà un compte — Se connecter" : "Première connexion — Créer mon compte"}
           </button>
         )}
-        <p className="auth-powered">Application propulsée par <strong>Daniel Partel</strong> © 2026 — Tous droits réservés.</p>
+        <p className="auth-powered auth-copyright">Application propulsée par <strong>Daniel Partel</strong> © 2026 — Tous droits réservés.</p>
       </div>
     </div>
   );

@@ -1,0 +1,481 @@
+@media (max-width: 599px) {
+  .sirius-root.android-home-reference {
+    grid-template-rows: 48px minmax(0, 1fr) 0;
+  }
+
+  .sirius-root.android-home-reference .top-bar {
+    position: relative;
+    top: 20px;
+    min-width: 0;
+    width: fit-content;
+    max-width: calc(100vw - 20px);
+    min-height: 42px;
+    height: 42px;
+    justify-self: center;
+    padding: 3px 7px;
+    gap: 4px;
+    justify-content: center;
+    overflow: visible;
+    border: 1px solid rgba(145, 230, 242, 0.26);
+    border-radius: 999px;
+    background: rgba(5, 20, 31, 0.72);
+    box-shadow: inset 0 1px 0 rgba(214, 248, 255, 0.08), 0 6px 18px rgba(0, 0, 0, 0.2), var(--sirius-glow-frame, 0 0 transparent);
+  }
+
+  .sirius-root.android-home-reference .top-bar-start,
+  .sirius-root.android-home-reference .top-settings {
+    display: contents;
+  }
+
+  .sirius-root.android-home-reference .brand-tag,
+  .sirius-root.android-home-reference .sys-indicators,
+  .sirius-root.android-home-reference .conn-status > :not(.top-mic-btn):not([data-testid="sirius-modules-btn"]):not(.sirius-mobile-exit) {
+    display: none !important;
+  }
+
+  .sirius-root.android-home-reference .conn-status {
+    display: contents;
+    border: 0;
+    padding: 0;
+  }
+
+  .sirius-root.android-home-reference .top-settings .profile-btn,
+  .sirius-root.android-home-reference .android-account-shortcut,
+  .sirius-root.android-home-reference .top-mic-btn,
+  .sirius-root.android-home-reference .sirius-mobile-exit,
+  .sirius-root.android-home-reference [data-testid="sirius-modules-btn"] {
+    display: inline-flex;
+    flex: 0 0 34px;
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    padding: 0;
+    border: 0 !important;
+    border-radius: 50% !important;
+    background: transparent !important;
+    color: #d7e4e6 !important;
+    box-shadow: none !important;
+  }
+
+  .sirius-root.android-home-reference .top-settings .profile-btn::before,
+  .sirius-root.android-home-reference .android-account-shortcut::before,
+  .sirius-root.android-home-reference .top-mic-btn::before,
+  .sirius-root.android-home-reference .sirius-mobile-exit::before,
+  .sirius-root.android-home-reference [data-testid="sirius-modules-btn"]::before {
+    display: none;
+  }
+
+  .sirius-root.android-home-reference .top-settings-btn:first-of-type {
+    background: rgba(145, 230, 242, 0.88) !important;
+    color: #071821 !important;
+  }
+
+  .sirius-root.android-home-reference [data-testid="sirius-modules-btn"] {
+    order: 2;
+  }
+
+  .sirius-root.android-home-reference .top-mic-btn {
+    order: 3;
+  }
+
+  .sirius-root.android-home-reference .android-account-shortcut {
+    order: 4;
+  }
+
+  .sirius-root.android-home-reference .sirius-mobile-exit {
+    order: 5;
+  }
+
+  .sirius-root.android-home-reference .sirius-dashboard {
+    min-height: 0;
+    height: var(--hud-layout-height, 100%);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 0;
+    padding: 0 8px;
+    overflow: hidden;
+    transform: none;
+    container: android-hud / size;
+  }
+
+  .sirius-root.android-home-reference.mobile-section-info .sirius-dashboard {
+    height: 100%;
+  }
+
+  .sirius-root.android-home-reference .workspace-navigation,
+  .sirius-root.android-home-reference .workspace-summary {
+    display: none;
+  }
+
+  .sirius-root.android-home-reference .sirius-center {
+    grid-column: 1;
+    grid-row: 1;
+    min-height: 0;
+    justify-content: flex-start;
+    gap: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+
+  .sirius-root.android-home-reference .corner {
+    width: 30px;
+    height: 30px;
+    border-width: 1.5px;
+    opacity: 0.78;
+    filter: drop-shadow(0 0 5px rgba(216, 184, 117, 0.45));
+  }
+
+  /* Le menu replié occupe les 44 px du bas : les coins inférieurs restent au-dessus. */
+  .sirius-root.android-home-reference .corner.bl,
+  .sirius-root.android-home-reference .corner.br {
+    bottom: 56px;
+  }
+
+  /* Les marges compensées gardent le cœur en place ; le texte évite la capsule. */
+  .sirius-root.android-home-reference .sirius-identity {
+    position: sticky;
+    top: 22px;
+    margin-top: -36px;
+    margin-bottom: 36px;
+    order: -1;
+    flex: 0 0 auto;
+    gap: 3px;
+    padding: 8px 8px 4px;
+  }
+
+  .sirius-root.android-home-reference .sirius-title {
+    margin: 0;
+    color: #e2d7b8;
+    background: none;
+    filter: none;
+    font: 500 14px/1.35 "Cinzel", serif;
+    letter-spacing: 0;
+    white-space: normal;
+    animation: none;
+    -webkit-text-fill-color: currentColor;
+  }
+
+  .sirius-root.android-home-reference .sirius-title-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .sirius-root.android-home-reference .sirius-mobile-introduction {
+    color: rgba(226, 215, 184, 0.9);
+    font: 500 13px/1.3 "Cinzel", serif;
+    letter-spacing: 0.02em;
+    text-shadow: var(--sirius-glow-gold, none);
+  }
+
+  .sirius-root.android-home-reference .sirius-wordmark {
+    color: #e2d7b8;
+    font: 600 clamp(26px, 7vw, 32px)/1.2 "Cinzel", serif;
+    letter-spacing: 0.01em;
+    text-shadow: var(--sirius-glow-gold, 0 0 12px rgba(216, 184, 117, 0.22));
+    -webkit-text-fill-color: currentColor;
+  }
+
+  .sirius-root.android-home-reference .sirius-tagline {
+    display: block;
+    margin-top: 5px;
+    color: rgba(232, 239, 242, 0.9);
+    font: 400 13px/1.35 "Rajdhani", sans-serif;
+    letter-spacing: 0;
+  }
+
+  .sirius-root.android-home-reference .sirius-stage {
+    order: 0;
+    flex: 1 1 0;
+    height: auto;
+    min-height: 0;
+  }
+
+  html[data-sirius-platform="android"] .sirius-root.android-home-reference .sirius-stage .reactor-wrap .reactor-canvas {
+    opacity: 1;
+  }
+
+  .sirius-root.android-home-reference .sirius-stage .reactor-wrap::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 4;
+    width: 19%;
+    height: 19%;
+    border: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle closest-side, rgba(215, 255, 255, 0.35) 0%, rgba(100, 233, 248, 0.12) 45%, transparent 100%);
+    box-shadow: none;
+    mix-blend-mode: screen;
+    content: "";
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    animation: android-core-breathe 2.8s ease-in-out infinite;
+  }
+
+  @keyframes android-core-breathe {
+    0%, 100% { filter: brightness(0.9); transform: translate(-50%, -50%) scale(0.9); }
+    50% { filter: brightness(1.2); transform: translate(-50%, -50%) scale(1.12); }
+  }
+
+  .sirius-root.android-home-reference .sirius-command-area {
+    order: 2;
+    flex: 0 0 auto;
+    max-width: min(100%, var(--hud-layout-height, 100%));
+    align-items: stretch;
+    gap: 6px;
+    margin-inline: auto;
+    padding: 4px 7px 8px;
+  }
+
+  /* L'espace après le cœur compense le pincement et les 28 px retirés en bas. */
+  .sirius-root.android-home-reference .sirius-center::before,
+  .sirius-root.android-home-reference .sirius-center::after {
+    content: "";
+    pointer-events: none;
+  }
+
+  .sirius-root.android-home-reference .sirius-center::before {
+    order: -2;
+    flex: 1 1 28px;
+  }
+
+  .sirius-root.android-home-reference .sirius-center::after {
+    order: 1;
+    flex: 1 1 max(0px, calc(28px + var(--hud-spacer-compensation, 0%)));
+  }
+
+  @container android-hud (max-height: 500px) {
+    html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-root.android-home-reference .sirius-center {
+      gap: 4px;
+      margin-top: 24px;
+    }
+
+    html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-root.android-home-reference .sirius-center::before,
+    html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-root.android-home-reference .sirius-center::after {
+      flex: 0 1 0;
+    }
+
+    html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-root.android-home-reference .sirius-identity {
+      position: static;
+      margin: 0;
+    }
+
+    html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-root.android-home-reference .sirius-center .sirius-stage {
+      flex: 1 1 0;
+      height: auto;
+      min-height: 48px;
+    }
+
+    html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-root.android-home-reference .sirius-stage .reactor-wrap {
+      width: auto;
+      height: min(119px, 70%);
+      aspect-ratio: 1;
+    }
+
+    html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-root.android-home-reference .sirius-stage .reactor-wrap::before {
+      inset: -14%;
+    }
+
+    html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-root.android-home-reference .sirius-command-area {
+      gap: 4px;
+    }
+  }
+
+  @container android-hud (max-height: 340px) {
+    html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-root.android-home-reference .sirius-identity .sirius-tagline {
+      font-size: 12px !important;
+      line-height: 1.35 !important;
+    }
+  }
+
+  html[data-sirius-platform="android"] .sirius-root.android-home-reference .pantheon-composer {
+    display: grid;
+    width: 100%;
+    max-width: none;
+    min-height: 54px;
+    grid-template-columns: minmax(0, 1fr) 30px;
+    align-items: center;
+    gap: 4px;
+    margin: 0;
+    padding: 5px 7px;
+    border: 1px solid rgba(145, 230, 242, 0.34) !important;
+    border-radius: 999px !important;
+    background: rgba(34, 52, 62, 0.82) !important;
+    box-shadow: inset 0 1px 0 rgba(214, 248, 255, 0.06), 0 8px 20px rgba(0, 0, 0, 0.18), var(--sirius-glow-frame, 0 0 transparent) !important;
+  }
+
+  html[data-sirius-platform="android"] .sirius-root.android-home-reference .pantheon-composer .voice-session-controls {
+    display: contents;
+  }
+
+  .sirius-root.android-home-reference .voice-session-controls .voice-session-emblem {
+    display: none;
+  }
+
+  .sirius-root.android-home-reference .voice-session-controls .voice-session-status {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .sirius-root.android-home-reference .voice-session-controls button {
+    grid-column: 2;
+    grid-row: 1;
+    display: inline-flex;
+    width: 30px;
+    min-width: 30px;
+    height: 30px;
+    min-height: 30px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid rgba(145, 230, 242, 0.24);
+    border-radius: 50%;
+    background: rgba(5, 20, 31, 0.36);
+    color: #dce5e7;
+  }
+
+  .sirius-root.android-home-reference .voice-session-stop-label {
+    display: none;
+  }
+
+  html[data-sirius-platform="android"] .sirius-root.android-home-reference .pantheon-composer .cmd-bar {
+    display: flex;
+    grid-column: 1;
+    grid-row: 1;
+    width: 100%;
+    min-width: 0;
+    min-height: 40px;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+  }
+
+  .sirius-root.android-home-reference .cmd-prompt {
+    display: none;
+  }
+
+  html[data-sirius-platform="android"] .sirius-root.android-home-reference .pantheon-composer .cmd-input {
+    order: 0;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 38px;
+    padding: 6px 5px;
+    border: 0;
+    background: transparent;
+    color: #e6eef0;
+    font: 400 14px/1.3 "Rajdhani", sans-serif;
+  }
+
+  .sirius-root.android-home-reference .cmd-input::placeholder {
+    color: rgba(194, 210, 216, 0.78);
+    font-size: 13px;
+    letter-spacing: 0;
+  }
+
+  html[data-sirius-platform="android"] .sirius-root.android-home-reference .pantheon-composer .cmd-bar :is(.ptt-btn, .cmd-send) {
+    flex: 0 0 30px;
+    width: 30px !important;
+    min-width: 30px !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    max-width: 30px;
+    max-height: 30px;
+    padding: 0;
+    border-radius: 50%;
+  }
+
+  .sirius-root.android-home-reference .cmd-bar .ptt-btn {
+    border: 1px solid rgba(145, 230, 242, 0.28);
+    background: rgba(5, 20, 31, 0.72);
+    color: #b8e4e9;
+  }
+
+  .sirius-root.android-home-reference .android-voice-analyzer {
+    display: inline-flex;
+    flex: 0 0 30px;
+    width: 30px;
+    min-width: 30px;
+    height: 30px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid rgba(145, 230, 242, 0.28);
+    border-radius: 50%;
+    background: rgba(5, 20, 31, 0.72);
+    color: #b8e4e9;
+  }
+
+  .sirius-root.android-home-reference .cmd-bar .cmd-send {
+    border: 0;
+    background: #d8b875;
+    color: #101923;
+    box-shadow: var(--sirius-glow-gold-control, none);
+    animation: none;
+  }
+
+  html[data-sirius-platform="android"] .sirius-root.android-home-reference .workspace-shortcuts {
+    display: flex !important;
+    width: 100%;
+    flex-wrap: nowrap;
+    justify-content: center;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 2px 4px 1px;
+    scrollbar-width: none;
+  }
+
+  html[data-sirius-platform="android"] .sirius-root.android-home-reference .workspace-shortcuts::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sirius-root.android-home-reference .workspace-shortcuts-label {
+    flex: 0 0 auto;
+    align-self: center;
+    padding: 5px 9px;
+    border: 1px solid rgba(145, 230, 242, 0.22);
+    border-radius: 999px;
+    background: rgba(31, 47, 57, 0.76);
+    color: #c4d3d8;
+    font: 400 10px/1.1 "Rajdhani", sans-serif;
+    box-shadow: var(--sirius-glow-control, none);
+  }
+
+  .sirius-root.android-home-reference .workspace-shortcuts button {
+    flex: 0 0 auto;
+    min-height: 30px;
+    padding: 5px 9px;
+    border: 1px solid rgba(145, 230, 242, 0.22);
+    border-radius: 999px;
+    background: rgba(31, 47, 57, 0.76);
+    color: #c9d6db;
+    font: 400 10px/1.15 "Rajdhani", sans-serif;
+    white-space: nowrap;
+    box-shadow: var(--sirius-glow-control, none);
+  }
+
+  .sirius-root.android-home-reference .workspace-shortcuts button:active {
+    background: rgba(145, 230, 242, 0.2);
+  }
+
+  .sirius-root.android-home-reference .sirius-footer {
+    display: block;
+    max-width: 100%;
+    font-size: 8px;
+    letter-spacing: 0.02em;
+    white-space: normal;
+  }
+}

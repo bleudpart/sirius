@@ -5,6 +5,7 @@ import App from "./App";
 import { speakFr, cancelSpeech, speakSeries, speakSequence } from "./voice";
 import { TextDecoder } from "util";
 import { Capacitor } from "@capacitor/core";
+import { App as CapacitorApp } from "@capacitor/app";
 import { createNativeRecognition } from "./nativeSpeechRecognition";
 import { connectStreamingStt } from "./services/streamingStt";
 import { pttBeep } from "./appLogic";
@@ -12,8 +13,10 @@ import { createNativeHandsFree } from "./nativeHandsFree";
 import { saveVoiceVocabulary } from "./voiceVocabulary";
 import { requireVoiceIdentity, verifyVoiceIdentity } from "./voiceIdentity";
 import { collectVoiceDiagnostic } from "./voiceDiagnostic";
+import { APP_RELEASE, APP_VERSION } from "./version";
 
 jest.mock("./voiceDiagnostic", () => ({ collectVoiceDiagnostic: jest.fn() }));
+jest.mock("@capacitor/app", () => ({ App: { exitApp: jest.fn().mockResolvedValue() } }));
 jest.mock("./voiceIdentity", () => ({ requireVoiceIdentity: jest.fn(), verifyVoiceIdentity: jest.fn() }));
 jest.mock("./nativeSpeechRecognition", () => ({ createNativeRecognition: jest.fn() }));
 jest.mock("./nativeHandsFree", () => ({ createNativeHandsFree: jest.fn() }));
@@ -21,6 +24,7 @@ jest.mock("./services/streamingStt", () => ({ connectStreamingStt: jest.fn() }))
 jest.mock("./appLogic", () => ({ ...jest.requireActual("./appLogic"), pttBeep: jest.fn() }));
 
 let mockAuthUser;
+let mockTouchNavHandlers;
 let originalSiriusDesktop;
 jest.mock("./AuthGate", () => ({ useAuth: () => ({ user: mockAuthUser }) }));
 jest.mock("./ProactivePanel", () => ({ onInitiative }) => (
@@ -30,7 +34,7 @@ jest.mock("./ProactivePanel", () => ({ onInitiative }) => (
 ));
 jest.mock("./voice", () => ({
   speakFr: jest.fn(), cancelSpeech: jest.fn(), speakSeries: jest.fn(() => Promise.resolve()),
-  speakSequence: jest.fn(), speakAsCharacter: jest.fn(),
+  speakSequence: jest.fn(), speakAsCharacter: jest.fn(), cleanTextForDisplay: (text) => text,
 }));
 // Le bulletin passe par speakSequence : chaque phrase est déléguée au mock speakSeries pour réutiliser ses attentes.
 // Comme dans voice.js, speakFr (nouvelle voix) ou cancelSpeech (simple arrêt) interrompt la série active.
@@ -75,7 +79,9 @@ jest.mock("./lazyModules", () => new Proxy({}, { get: (_, key) => {
   if (key === "HeraclesPanel") return ({ initialInput }) => (
     <div data-testid="workspace-HeraclesPanel" data-input={initialInput || ""} />
   );
-  if (key === "CartographiePanel") return () => <div data-testid="workspace-CartographiePanel" />;
+  if (key === "CartographiePanel") return ({ onClose }) => (
+    <div data-testid="workspace-CartographiePanel"><button onClick={onClose}>Fermer la cartographie</button></div>
+  );
   if (key === "AtlasPanel") return () => <div data-testid="workspace-AtlasPanel" />;
   if (["ThemisPanel", "OracleDivin", "ZeusCortex", "PortusNummarius"].includes(key)) {
     return () => <div data-testid={`workspace-${key}`} />;
@@ -113,7 +119,12 @@ jest.mock("./lazyModules", () => new Proxy({}, { get: (_, key) => {
   </div>;
   return () => null;
 } }));
-jest.mock("./components/ReactorVisuals", () => ({ MedallionRing: () => null, ReactorCore: () => null, Waveform: () => null }));
+jest.mock("./components/ReactorVisuals", () => ({
+  MedallionRing: () => null,
+  ReactorCore: () => null,
+  Waveform: ({ status, reference }) => <canvas data-testid="sirius-waveform" data-status={status}
+    data-reference={String(Boolean(reference))} aria-hidden="true" />,
+}));
 jest.mock("./components/HudPanels", () => {
   const React = require("react");
   return {
@@ -125,7 +136,7 @@ jest.mock("./components/HudPanels", () => {
 jest.mock("./uiSounds", () => ({ initUiSounds: () => () => {} }));
 jest.mock("./holoFx", () => ({ initHoloFx: () => () => {} }));
 jest.mock("./readAloud", () => ({ initReadAloud: () => () => {}, parseReadPanelCommand: () => null, readPanelAloud: () => false }));
-jest.mock("./useTouchNav", () => () => {});
+jest.mock("./useTouchNav", () => (handlers) => { mockTouchNavHandlers = handlers; });
 jest.mock("./hud/SiriusHudPanels", () => ({
   SiriusInfoHub: () => null,
   SiriusInfoWheel: ({ open }) => open ? <div data-testid="info-wheel">Centre d'information ΣIRIUS</div> : null,
@@ -273,9 +284,43 @@ test("packaged Electron HUD exposes a confirmed close action", async () => {
   expect(close).not.toBeNull();
   expect(close.title).toBe("Fermer ΣIRIUS");
   expect(close.getAttribute("aria-label")).toBe("Fermer ΣIRIUS");
+  expect(close.querySelector(".lucide-power")).not.toBeNull();
   await act(async () => close.click());
+  expect(closeApp).not.toHaveBeenCalled();
+  expect(close.querySelector(".lucide-check")).not.toBeNull();
+  expect(close.getAttribute("aria-label")).toBe("FERMER ?");
   await act(async () => close.click());
   expect(closeApp).toHaveBeenCalledTimes(1);
+});
+
+test("Android capsule exposes a confirmed quit action through the native plugin", async () => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  await mount();
+  const quit = host.querySelector('[data-testid="sirius-mobile-exit-btn"]');
+  expect(quit.closest(".top-bar")).not.toBeNull();
+  expect(quit.getAttribute("aria-label")).toBe("Quitter ΣIRIUS");
+  expect(quit.querySelector(".lucide-power")).not.toBeNull();
+  await act(async () => quit.click());
+  expect(CapacitorApp.exitApp).not.toHaveBeenCalled();
+  expect(quit.querySelector(".lucide-check")).not.toBeNull();
+  expect(quit.querySelector(".confirm-txt")).toBeNull();
+  await act(async () => jest.advanceTimersByTime(3000));
+  expect(quit.querySelector(".lucide-power")).not.toBeNull();
+  await act(async () => quit.click());
+  await act(async () => quit.click());
+  expect(CapacitorApp.exitApp).toHaveBeenCalledTimes(1);
+});
+
+test("Android quit failures are reported instead of silently failing", async () => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  CapacitorApp.exitApp.mockRejectedValueOnce(new Error("Native exit unavailable"));
+  const log = jest.spyOn(console, "error").mockImplementation(() => {});
+  await mount();
+  const quit = host.querySelector('[data-testid="sirius-mobile-exit-btn"]');
+  await act(async () => quit.click());
+  await act(async () => quit.click());
+  expect(log).toHaveBeenCalledWith("Impossible de quitter ΣIRIUS.", expect.any(Error));
+  expect(host.textContent).toContain("Impossible de quitter ΣIRIUS. Réessayez");
 });
 
 test("ordinary native STT reads only this account's opted-in text and drops disabled hints", async () => {
@@ -331,6 +376,18 @@ test.each([
   expect(global.fetch.mock.calls.some(([url]) => /\/(?:intent|chat)(?:\/stream)?$/.test(String(url)))).toBe(false);
 });
 
+test("opening and closing OSIRIS returns to the assistant without opening the Display", async () => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  await mount();
+  await send("affiche le module OSIRIS");
+  expect(host.querySelector('[data-testid="workspace-CartographiePanel"]')).not.toBeNull();
+  expect(host.querySelector('[data-testid="sirius-display"]')).toBeNull();
+  await act(async () => host.querySelector('[data-testid="workspace-CartographiePanel"] button').click());
+  expect(host.querySelector('[data-testid="workspace-CartographiePanel"]')).toBeNull();
+  expect(host.querySelector('[data-testid="sirius-cmd-form"] input[type="text"]')).not.toBeNull();
+  expect(host.querySelector('[data-testid="sirius-display"]')).toBeNull();
+});
+
 test("Android opens OSIRIS after a rejected voice is retried and verified", async () => {
   jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
   verifyVoiceIdentity
@@ -344,6 +401,7 @@ test("Android opens OSIRIS after a rejected voice is retried and verified", asyn
   expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/stt"))).toBe(false);
   await act(async () => jest.advanceTimersByTime(600));
   expect(host.querySelector(".voice-session-controls").textContent).toContain("Voix non reconnue");
+  expect(host.querySelector(".voice-session-status").getAttribute("aria-live")).toBe("assertive");
   await act(async () => recorders[1].stop());
   expect(verifyVoiceIdentity).toHaveBeenCalledTimes(2);
   expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/stt"))).toBe(true);
@@ -693,6 +751,13 @@ test("the HUD keeps the validated greeting and a single readable prompt", async 
   expect(tagline.textContent).toBe("Qu’aimeriez-vous faire avancer aujourd’hui ?");
 });
 
+test.each([[16, "Bonjour"], [17, "Bonsoir"]])("the HUD greeting follows local time at %i h", async (hour, greeting) => {
+  jest.setSystemTime(new Date(2026, 0, 5, hour));
+  localStorage.setItem("sirius_profile", JSON.stringify({ name: "daniel partel" }));
+  await mount();
+  expect(host.querySelector(".workspace-welcome").textContent).toBe(`${greeting}, Daniel`);
+});
+
 test("the desktop workspace connects to existing wheels, settings, dossiers and personal voice", async () => {
   await mount();
   const nav = host.querySelector('[data-testid="workspace-navigation"]');
@@ -795,7 +860,9 @@ test("profile readiness has its own state; a second press cancels it before open
   await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
   const controls = host.querySelector('[data-testid="sirius-voice-controls"]');
   expect(controls.dataset.phase).toBe("checking");
-  expect(controls.textContent).toContain("Je vérifie le profil vocal");
+  expect(controls.textContent).toContain("Préparation");
+  expect(controls.textContent).not.toMatch(/vérifi|profil vocal|serveur/i);
+  expect(controls.querySelector('[data-testid="voice-validation"]').dataset.state).toBe("preparing");
   expect(host.querySelector('[data-testid="sirius-top-mic-btn"]').getAttribute("aria-pressed")).toBe("true");
   expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
   await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
@@ -805,7 +872,7 @@ test("profile readiness has its own state; a second press cancels it before open
   expect(controls.dataset.phase).toBe("idle");
 });
 
-test("speaker comparison is shown separately from STT and a refusal is never spoken", async () => {
+test("speaker comparison stays discreet and a refusal is never spoken", async () => {
   const recorders = mockContinuousAudio("Explique le ciel bleu");
   let finish;
   verifyVoiceIdentity.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
@@ -814,11 +881,91 @@ test("speaker comparison is shown separately from STT and a refusal is never spo
   await act(async () => recorders[0].stop());
   const controls = host.querySelector('[data-testid="sirius-voice-controls"]');
   expect(controls.dataset.phase).toBe("verifying");
-  expect(controls.textContent).toContain("Je vérifie votre voix");
+  expect(controls.textContent).not.toMatch(/vérifi|transcri/i);
+  expect(controls.querySelector('[data-testid="voice-validation"]').dataset.state).toBe("checking");
   expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/stt"))).toBe(false);
   await act(async () => finish({ verified: false, message: "Voix non reconnue : demande ignorée." }));
   expect(controls.dataset.phase).toBe("rejected");
+  expect(controls.querySelector('[data-testid="voice-validation"]').dataset.state).toBe("rejected");
   expect(speakFr).not.toHaveBeenCalled();
+});
+
+test.each(["android", "web"])("the validation dot only turns green after an accepted voice on %s", async (platform) => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue(platform);
+  const recorders = mockContinuousAudio();
+  let finishVerification;
+  let finishTranscription;
+  verifyVoiceIdentity.mockImplementationOnce(() => new Promise((resolve) => { finishVerification = resolve; }));
+  const fallback = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation((url, options) => String(url).endsWith("/stt")
+    ? new Promise((resolve) => { finishTranscription = resolve; })
+    : fallback(url, options));
+  await mount();
+  await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
+  await act(async () => recorders[0].stop());
+  const controls = host.querySelector('[data-testid="sirius-voice-controls"]');
+  const indicator = () => controls.querySelector('[data-testid="voice-validation"]');
+  expect(indicator().dataset.state).toBe("checking");
+  expect(controls.textContent).not.toMatch(/vérifi|transcri/i);
+  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/stt"))).toBe(false);
+  await act(async () => jest.advanceTimersByTime(1300));
+  expect(recorders).toHaveLength(1);
+  expect(indicator().dataset.state).toBe("checking");
+
+  await act(async () => finishVerification({ verified: true }));
+  expect(indicator().dataset.state).toBe("verified");
+  expect(indicator().getAttribute("aria-label")).toBe("Voix vérifiée pour cette demande");
+  expect(controls.textContent).not.toMatch(/vérifi|transcri/i);
+  expect(typeof finishTranscription).toBe("function");
+  await act(async () => jest.advanceTimersByTime(2499));
+  expect(recorders).toHaveLength(1);
+  expect(indicator().dataset.state).toBe("verified");
+  await act(async () => jest.advanceTimersByTime(1));
+  expect(indicator().dataset.state).toBe("idle");
+  await act(async () => finishTranscription({ ok: true, json: async () => ({ text: "quelle heure est-il" }) }));
+  expect(speakFr.mock.calls.some(([text]) => text.startsWith("Il est "))).toBe(true);
+});
+
+test("native diagnostic reports a verified dot only for an explicitly accepted voice", async () => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  await mount();
+  const indicator = () => host.querySelector('[data-testid="voice-validation"]');
+  await act(async () => handsFreeOptions.onState({ phase: "verifying", message: "" }));
+  expect(indicator().dataset.state).toBe("checking");
+  await act(async () => handsFreeOptions.onState({ phase: "transcribing", message: "" }));
+  expect(indicator().dataset.state).toBe("idle");
+  await act(async () => handsFreeOptions.onState({ phase: "transcribing", message: "", speakerVerified: true }));
+  expect(indicator().dataset.state).toBe("verified");
+  await act(async () => handsFreeOptions.onState({ phase: "ready", message: "" }));
+  expect(indicator().dataset.state).toBe("idle");
+  await act(async () => handsFreeOptions.onState({ phase: "verifying", message: "" }));
+  const refusal = "Voix non reconnue : demande ignorée.";
+  await act(async () => handsFreeOptions.onState({ phase: "paused", message: refusal, speakerRejected: true }));
+  expect(indicator().dataset.state).toBe("rejected");
+  await act(async () => handsFreeOptions.onState({ phase: "ready", message: refusal }));
+  expect(indicator().dataset.state).toBe("rejected");
+  await act(async () => handsFreeOptions.onState({ phase: "verifying", message: "" }));
+  expect(indicator().dataset.state).toBe("checking");
+});
+
+test("manual push-to-talk cancels a pending verification without displaying a stale success", async () => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  const recorders = mockContinuousAudio();
+  let finishVerification;
+  verifyVoiceIdentity.mockImplementationOnce(() => new Promise((resolve) => { finishVerification = resolve; }));
+  await mount();
+  await act(async () => host.querySelector('[data-testid="sirius-top-mic-btn"]').click());
+  await act(async () => recorders[0].stop());
+  expect(host.querySelector('[data-testid="voice-validation"]').dataset.state).toBe("checking");
+
+  await act(async () => document.dispatchEvent(new KeyboardEvent("keydown", { code: "Space", bubbles: true })));
+  expect(recorders).toHaveLength(2);
+  expect(host.querySelector('[data-testid="voice-validation"]').dataset.state).toBe("idle");
+  await act(async () => finishVerification({ verified: true }));
+  expect(host.querySelector('[data-testid="voice-validation"]').dataset.state).toBe("idle");
+  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/stt"))).toBe(false);
+  await act(async () => document.dispatchEvent(new KeyboardEvent("keyup", { code: "Space", bubbles: true })));
+  expect(verifyVoiceIdentity).toHaveBeenCalledTimes(1);
 });
 
 test("Verify Sirius stops listening and opens actionable diagnostics with profile/settings navigation", async () => {
@@ -870,6 +1017,7 @@ test.each(["android", "web"])("TV audio is verified before STT and rejected with
   await act(async () => jest.advanceTimersByTime(600));
   expect(recorders).toHaveLength(2);
   expect(host.querySelector(".voice-session-controls").textContent).toContain("Voix non reconnue");
+  expect(host.querySelector('[data-testid="voice-validation"]').dataset.state).toBe("rejected");
 });
 
 test("a verification outage disables continuous listening instead of using a permissive fallback", async () => {
@@ -1001,6 +1149,134 @@ function mockConversationStream(events) {
     : fallback(url, options));
   return reader;
 }
+
+test("Android starts on the reference home with its reactor, voice controls and suggestions", async () => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  await mount();
+  expect(host.querySelector(".sirius-root").classList.contains("android-home-reference")).toBe(true);
+  expect(host.querySelector(".sirius-stage .core-rings")).not.toBeNull();
+  const footer = host.querySelector('[data-testid="sirius-footer"]');
+  expect(footer.textContent).toContain("COPYRIGHT © 2026 ΣIRIUS par Daniel Partel");
+  expect(footer.querySelector(".footer-version-badge").textContent).toBe(`v${APP_VERSION}`);
+  expect(footer.querySelector(".footer-version-badge").title).toBe(APP_RELEASE);
+  expect(host.querySelector(".sirius-mobile-introduction").textContent).toBe("Je suis ΣIRIUS");
+  expect(host.querySelector(".sirius-tagline").textContent).toContain("Qu’aimeriez-vous faire avancer aujourd’hui ?");
+  expect(host.querySelector('[data-testid="sirius-voice-controls"]')).not.toBeNull();
+  expect(host.querySelector('[data-testid="sirius-ptt-btn"]')).not.toBeNull();
+  expect(host.querySelector('[data-testid="sirius-cmd-send"]')).not.toBeNull();
+  expect(host.querySelector('[data-testid="sirius-voice-diagnostic-btn"]')).not.toBeNull();
+  expect(host.querySelector('[data-testid="sirius-voice-diagnostic-btn"]').getAttribute("aria-label")).toBe("Analyser la voix");
+  expect(host.querySelector(".workspace-shortcuts").compareDocumentPosition(host.querySelector(".pantheon-composer"))
+    & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(host.querySelector('[data-testid="sirius-modules-btn"]').getAttribute("aria-label")).toBe("Menu des modules");
+  expect(host.querySelector(".mobile-navigation-handle").textContent).toContain("Menu");
+  expect(host.querySelector('[data-testid="android-conversation"]')).toBeNull();
+  await act(async () => host.querySelector('[data-testid="mobile-nav-assistant"]').click());
+  expect(host.querySelector(".sirius-stage .core-rings")).not.toBeNull();
+});
+
+test.each(["Android", "Electron"])("%s keeps its layout compensation in sync with the saved scale and pinch", async (platform) => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue(platform === "Android" ? "android" : "web");
+  if (platform === "Electron") window.siriusDesktop = {};
+  localStorage.setItem("sirius_hud_scale", "0.8");
+  await mount();
+  const style = host.querySelector(".sirius-root").style;
+  const expectScale = (scale) => {
+    expect(Number(style.getPropertyValue("--hud-scale"))).toBeCloseTo(scale);
+    expect(parseFloat(style.getPropertyValue("--hud-layout-height"))).toBeCloseTo(100 / scale);
+    expect(parseFloat(style.getPropertyValue("--hud-spacer-compensation"))).toBeCloseTo((1 - scale) * 100);
+  };
+  expectScale(0.8);
+
+  mockTouchNavHandlers.onPinchStart();
+  await act(async () => mockTouchNavHandlers.onPinch(1.25));
+  expectScale(1);
+  expect(Number(localStorage.getItem("sirius_hud_scale"))).toBeCloseTo(1);
+
+  mockTouchNavHandlers.onPinchStart();
+  await act(async () => mockTouchNavHandlers.onPinch(2));
+  expectScale(1.1);
+  expect(Number(localStorage.getItem("sirius_hud_scale"))).toBeCloseTo(1.1);
+
+  mockTouchNavHandlers.onPinchStart();
+  await act(async () => mockTouchNavHandlers.onPinch(0.1));
+  expectScale(0.8);
+  expect(Number(localStorage.getItem("sirius_hud_scale"))).toBeCloseTo(0.8);
+});
+
+test("Electron uses the reference home and keeps voice analysis inside the composer", async () => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("web");
+  window.siriusDesktop = {};
+  await mount();
+  const root = host.querySelector(".sirius-root");
+  const analyzer = host.querySelector('[data-testid="sirius-voice-diagnostic-btn"]');
+  expect(root.classList.contains("electron-home-reference")).toBe(true);
+  expect(root.classList.contains("android-home-reference")).toBe(false);
+  expect(host.querySelector(".sirius-mobile-introduction").textContent).toBe("Je suis ΣIRIUS");
+  expect(analyzer.getAttribute("aria-label")).toBe("Analyser la voix");
+  expect(analyzer.closest(".pantheon-composer")).not.toBeNull();
+  expect(host.querySelector(".workspace-shortcuts-label").textContent).toBe("Suggestions");
+  expect(host.querySelector(".workspace-shortcuts button").textContent).toBe("Préparer demain");
+  expect(host.querySelector(".workspace-shortcuts [data-testid='sirius-voice-diagnostic-btn']")).toBeNull();
+  const footer = host.querySelector('[data-testid="sirius-footer"]');
+  expect(footer.textContent).toContain("COPYRIGHT © 2026 ΣIRIUS par Daniel Partel");
+  expect(footer.querySelector(".footer-version-badge").textContent).toBe(`v${APP_VERSION}`);
+  expect(footer.querySelector(".footer-version-badge").title).toBe(APP_RELEASE);
+  expect(host.querySelector(".pantheon-composer").compareDocumentPosition(footer)
+    & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+test.each(["Android", "Electron", "navigateur"])("the %s composer contains the animated voice waveform", async (platform) => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue(platform === "Android" ? "android" : "web");
+  if (platform === "Electron") window.siriusDesktop = {};
+  else delete window.siriusDesktop;
+  await mount();
+
+  const waveform = host.querySelector('[data-testid="sirius-waveform"]');
+  const input = host.querySelector('[data-testid="sirius-cmd-input"]');
+  expect(host.querySelectorAll('[data-testid="sirius-waveform"]')).toHaveLength(1);
+  expect(input.hasAttribute("placeholder")).toBe(false);
+  expect(input.getAttribute("aria-label")).toBe("Votre demande à ΣIRIUS");
+  expect(waveform.closest(".pantheon-composer")).not.toBeNull();
+  expect(waveform.closest(".sirius-stage")).toBeNull();
+  expect(waveform.parentElement).toBe(input.parentElement);
+  expect(waveform.dataset.reference).toBe(String(platform !== "navigateur"));
+  expect(waveform.dataset.status).toBe("idle");
+  expect(waveform.parentElement.classList.contains("is-active")).toBe(false);
+  const microphone = host.querySelector('[data-testid="sirius-ptt-btn"]');
+  const order = platform === "Android"
+    ? microphone.compareDocumentPosition(input)
+    : input.compareDocumentPosition(microphone);
+  expect(order & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+  await act(async () => window.dispatchEvent(new CustomEvent("sirius-voice-phase", { detail: "speaking" })));
+  expect(waveform.dataset.status).toBe("speaking");
+  expect(waveform.parentElement.classList.contains("is-active")).toBe(true);
+
+  await act(async () => window.dispatchEvent(new CustomEvent("sirius-voice-phase", { detail: "idle" })));
+  expect(waveform.dataset.status).toBe("idle");
+  expect(waveform.parentElement.classList.contains("is-active")).toBe(false);
+  expect(host.querySelector('[data-testid="sirius-ptt-btn"]')).not.toBeNull();
+  expect(host.querySelector('[data-testid="sirius-cmd-send"]')).not.toBeNull();
+});
+
+test("the Android microphone remains usable after moving to the start of the composer", async () => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  const recorders = mockContinuousAudio();
+  await mount();
+  const microphone = host.querySelector('[data-testid="sirius-ptt-btn"]');
+  microphone.setPointerCapture = jest.fn();
+  const press = new Event("pointerdown", { bubbles: true, cancelable: true });
+  Object.defineProperty(press, "pointerId", { value: 1 });
+  await act(async () => microphone.dispatchEvent(press));
+  expect(microphone.setPointerCapture).toHaveBeenCalledWith(1);
+  expect(recorders).toHaveLength(1);
+  expect(recorders[0].state).toBe("recording");
+  await act(async () => microphone.dispatchEvent(new Event("pointerup", { bubbles: true })));
+  expect(recorders[0].state).toBe("inactive");
+  expect(host.querySelector('[data-testid="sirius-voice-diagnostic-btn"]')).not.toBeNull();
+  expect(host.querySelector('[aria-label="Arrêter le microphone et la réponse"]')).not.toBeNull();
+});
 
 test("stream transport preserves incremental speech and does not send a duplicate HTTP chat", async () => {
   const reader = mockConversationStream([
@@ -1869,6 +2145,7 @@ test("saved hands-free preference stays disabled and touching the HUD never spea
 
   expect(host.querySelector('[data-testid="core-quote-btn"]')).toBeNull();
   expect(host.querySelector('[aria-label="Écouter une citation philosophique"]')).toBeNull();
+  await act(async () => host.querySelector('[data-testid="mobile-nav-home"]').click());
   speakFr.mockClear();
   await act(async () => {
     host.querySelector(".core-rings").dispatchEvent(new Event("pointerdown", { bubbles: true }));
@@ -2016,6 +2293,7 @@ test.each([false, true])("Android waits for microphone readiness and handles ear
       expect(connectStreamingStt).toHaveBeenCalledWith(expect.objectContaining({ vocabulary: ["Daniel Partel"] }));
       expect(requireVoiceIdentity).not.toHaveBeenCalled();
       expect(verifyVoiceIdentity).not.toHaveBeenCalled();
+      expect(host.querySelector('[data-testid="voice-validation"]').dataset.state).toBe("idle");
       expect(host.querySelector('[data-testid="sirius-ptt-btn"]').textContent).toContain("OUVERTURE");
       expect(pttBeep).not.toHaveBeenCalled();
       await act(async () => recorders[0].onstart());
@@ -2023,6 +2301,7 @@ test.each([false, true])("Android waits for microphone readiness and handles ear
       expect(pttBeep).toHaveBeenCalledWith(false);
       await act(async () => document.dispatchEvent(new KeyboardEvent("keyup", { code: "Space", bubbles: true })));
       expect(connection.finish).toHaveBeenCalledTimes(1);
+      expect(host.querySelector('[data-testid="voice-validation"]').dataset.state).toBe("idle");
       expect(speakFr.mock.calls.some(([text]) => text.startsWith("Il est "))).toBe(true);
       expect(stopTrack).toHaveBeenCalledTimes(1);
     }

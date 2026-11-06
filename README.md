@@ -63,7 +63,55 @@ leur éclairage suit un cycle de 9 secondes, dont 6,3 secondes de retombée douc
 L'animation est désactivée en mode éco, en arrière-plan, sur Android/tactile et
 lorsqu'une réduction des animations est demandée.
 
+La couche finale `frontend/src/windowHud.css` aligne toutes les fenêtres et tous les
+modules, y compris ΣIRIUS Display, sur le HUD de l'accueil : liseré cyan, coins dorés,
+titres Cinzel, commandes rondes, cartes ardoise et badges en capsule. Ses variables
+sont limitées aux fenêtres pour ne pas modifier l'accueil, et elle ne change ni les
+positions, ni les tailles, ni les couleurs d'alerte.
+
+Un léger halo cyan souligne les contours et commandes de l'accueil et des fenêtres
+sur Android et Windows ; les titres et le bouton d'envoi gardent un halo doré.
+Cet éclairage reste fixe au repos et préserve les effets d'activité et les alertes.
+
+Les fonds du boot, de l'accueil, de la connexion, des fenêtres de modules et des
+pages publiques utilisent une palette bleu nuit plus sombre, sans atténuer les
+accents cyan/dorés ni les alertes. Les pages autonomes d'aide et de confidentialité
+reprennent ce fond ; les couleurs personnalisées enregistrées sont conservées.
+La mention de copyright utilise le même or sur le boot, l'accueil, la connexion,
+la boutique et le panneau « À propos » ; le badge de version reprend cet or.
+Le mode contraste renforcé les affiche en blanc.
+La capsule supérieure Android et Windows
+propose une icône de sortie (symbole marche/arrêt) pour quitter ou fermer ΣIRIUS : un premier clic
+affiche une coche de confirmation, le second confirme dans les trois secondes.
+
 L'accueil regroupe l'état vocal et la saisie sans retirer le bouton d'arrêt.
+Le spectre vocal animé est intégré au champ du chat et reprend le cyan lumineux du thème.
+Sur l'accueil Android et Windows, ses barres sont arrondies et resserrées vers le
+centre ; sur Android, le micro remplace l'icône décorative pour dégager la saisie.
+L'analyse vocale, l'envoi et l'arrêt restent accessibles. Le spectre réagit au
+micro en écoute et reste animé pendant la réflexion et les
+réponses ; pour la parole de ΣIRIUS, son enveloppe est synthétique.
+Une petite pastille indique discrètement la vérification vocale : grise au repos,
+orange pendant la préparation ou la vérification, verte brièvement après une
+vérification réussie et rouge en cas de refus. Les refus et erreurs restent
+expliqués à l'écran ; le nom de la pastille est accessible aux lecteurs d'écran.
+Cette pastille est distincte du témoin du microphone dans la barre haute.
+Le bouton maintenu n'effectue pas cette vérification et ne fait pas passer la
+pastille au vert.
+Sur les écrans Android étroits, l'accueil conserve le noyau animé, le salut,
+le composeur vocal et les suggestions d'origine dans une disposition compacte.
+La capsule supérieure reste centrée à l'intérieur du cadre doré ; sur les écrans courts, le texte
+d'accueil conserve son espace sous les boutons. Les suggestions, le composeur
+et le copyright sont proches du menu replié, y compris après un pincement ; le
+composeur reste dans l'écran même à l'échelle maximale.
+Si l'espace manque, l'accueil défile au-dessus du menu ; le halo cyan du noyau
+reste animé et fondu, sans disque supplémentaire au centre.
+Sur Windows installé et portable, le composeur et le copyright restent proches
+du bas, ou du menu dans les vues très étroites, et accessibles lorsque l'échelle
+du HUD change ; la disposition peut défiler si la hauteur disponible ne suffit
+pas.
+L'état vocal reste lisible et le bouton d'arrêt accessible ; les autres
+plateformes conservent leur HUD.
 Les suggestions préparent une demande sans l'envoyer. ODYSSEIA est doré ; les
 autres destinations gardent leur couleur de lecture. L'horloge réelle passe dans
 la barre supérieure et les notes rapides sont temporaires, non enregistrées.
@@ -177,8 +225,10 @@ prend environ 2,8 secondes lorsque les réponses sont immédiates, sans retarder
 les requêtes réseau. Ces contrôles ne testent pas les fournisseurs IA ni les
 permissions du microphone.
 La narration lit tout le panneau de vérification : titre, quatre verdicts réels,
-puis accueil personnalisé « Connexion établie. Bonjour Daniel. Je suis ΣIRIUS.
+puis accueil personnalisé « Je suis ΣIRIUS. Bonjour Daniel. Connexion établie.
 Je suis prêt à vous accompagner. » Elle ne se limite plus à cette dernière phrase.
+Selon l'heure locale, la salutation est « Bonjour » de 5 h à 16 h 59 et
+« Bonsoir » de 17 h à 4 h 59.
 Le texte du panneau reste doré avec une police de lecture sans empattement,
 y compris son titre ; les échecs conservent leur couleur d'alerte.
 La progression RGB mesure 2 px, sans halo épais.
@@ -848,13 +898,15 @@ La boutique explique l'essai gratuit des services IA pendant 15 jours dès la
 première connexion activant le compte : quotas quotidiens, aucun paiement
 automatique à expiration, puis configuration des clés personnelles. Cet essai
 est distinct de l'achat de la licence ; les coûts des fournisseurs restent séparés.
-Elle présente une capture statique du HUD et les prérequis des fonctions,
-sans lecteur vidéo vide, compteur d'utilisation ni témoignages non vérifiés.
+Elle présente une capture statique du HUD, une démonstration muette sous-titrée
+de l'accueil, des dossiers et de l'agenda, et les prérequis des fonctions, sans
+compteur d'utilisation ni témoignages non vérifiés. La vidéo est une session
+simulée avec des données fictives : aucune réponse IA ni aucun envoi réel.
 L'animation du noyau n'est pas une démonstration fonctionnelle.
-La galerie « ΣIRIUS en situation » utilise `frontend/public/demo/sirius-dossiers.png`
-et `sirius-planning.png` : captures locales avec données fictives et session API
-simulée, identifiées comme données de démonstration. Elles ne prouvent pas
-une connexion IA ou un service externe. Les liens ouvrent les images originales.
+L'aperçu du HUD et la galerie « ΣIRIUS en situation » utilisent des captures locales
+avec données fictives et session API simulée. La galerie montre un dossier et un
+rendez-vous fictif ; elle ne prouve pas une connexion IA ou un service externe.
+Les liens ouvrent les images originales.
 Dans la boutique, les titres et noms des formules utilisent Cinzel doré ;
 les descriptions, prix, boutons et champs de saisie gardent leurs styles de lecture.
 Ne présenter un paiement comme fictif que lorsque le mode test du prestataire

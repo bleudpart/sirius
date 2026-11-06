@@ -13,7 +13,7 @@ export function createNativeHandsFree({
   let blocked = true;
   let stopping = Promise.resolve();
 
-  const report = (phase, message = "") => onState({ phase, message });
+  const report = (phase, message = "", details = {}) => onState({ phase, message, ...details });
   const stop = () => {
     const previous = session;
     session = null;
@@ -46,7 +46,7 @@ export function createNativeHandsFree({
     if (session !== current || blocked || current.processing || current.controller.signal.aborted) return;
     current.processing = true;
     current.rejectionMessage = "";
-    report("verifying", "Vérification de votre voix en cours.");
+    report("verifying");
     try {
       await suppress(current, true);
       if (session !== current) return;
@@ -57,12 +57,12 @@ export function createNativeHandsFree({
       if (session !== current || current.controller.signal.aborted) return;
       if (identity.verified !== true) {
         current.rejectionMessage = identity.message || "Voix non reconnue : demande ignorée.";
-        report("paused", current.rejectionMessage);
+        report("paused", current.rejectionMessage, { speakerRejected: true });
         return;
       }
       const form = new FormData();
       form.append("file", blob, "sirius-native.wav");
-      report("transcribing", "Voix vérifiée. Transcription de votre phrase en cours.");
+      report("transcribing", "", { speakerVerified: true });
       const key = groqKey();
       if (key) form.append("groq_key", key);
       const response = await transcribe(form, { signal: current.controller.signal, vocabulary: vocabulary() });

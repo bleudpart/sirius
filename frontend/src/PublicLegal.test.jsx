@@ -5,6 +5,8 @@ import policy from "./privacyPolicy.json";
 import deletionPage from "./accountDeletionPage.json";
 
 const { escapeHtml, renderPrivacyPage } = require("../scripts/generate-privacy-page");
+const fs = require("fs");
+const path = require("path");
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -44,6 +46,17 @@ test("escapes text instead of injecting HTML into the public policy", () => {
   expect(html).toContain("A &amp; B");
   expect(html).toContain("&quot;&lt;img src=x&gt;&quot;");
   expect(html).not.toContain("<img");
+});
+
+test("standalone public pages share the darker background and generated pages stay in sync", () => {
+  for (const [filename, data] of [["confidentialite.html", policy], ["suppression-compte.html", deletionPage]]) {
+    const html = fs.readFileSync(path.join(__dirname, "..", "public", filename), "utf8");
+    expect(html.replace(/\r\n/g, "\n")).toBe(renderPrivacyPage(data));
+    expect(html).toMatch(/body\s*\{[^}]*background\s*:\s*#03070d/i);
+  }
+  const help = fs.readFileSync(path.join(__dirname, "..", "public", "aide-emails.html"), "utf8");
+  expect(help).toMatch(/body\s*\{[^}]*background\s*:\s*#03070d/i);
+  expect(help).toMatch(/\.note\s*\{[^}]*background\s*:\s*#091722/i);
 });
 
 test("account deletion page provides public email instructions without promising immediate erasure", () => {

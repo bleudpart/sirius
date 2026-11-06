@@ -33,7 +33,7 @@ test("une initiative entre dans le dialogue au moment de parler sans alerte flot
   expect(onInitiative).not.toHaveBeenCalled();
   await act(async () => jest.advanceTimersByTime(45000));
   expect(onInitiative).toHaveBeenCalledWith(suggestion, "Test");
-  expect(onSpeak).toHaveBeenCalledWith("Test");
+  expect(onSpeak).toHaveBeenCalledWith("Suggestion de ΣIRIUS. Test");
   await act(async () => jest.advanceTimersByTime(300000));
   expect(onInitiative).toHaveBeenCalledTimes(1);
 });
@@ -73,7 +73,7 @@ test("announces during silence, never during speech, and never repeats an item",
   act(() => window.dispatchEvent(new CustomEvent("sirius-voice-phase", { detail: "idle" })));
   await act(async () => jest.advanceTimersByTime(45000));
   expect(onSpeak).toHaveBeenCalledTimes(1);
-  expect(onSpeak).toHaveBeenCalledWith("Test");
+  expect(onSpeak).toHaveBeenCalledWith("Suggestion de ΣIRIUS. Test");
   await act(async () => jest.advanceTimersByTime(300000));
   expect(onSpeak).toHaveBeenCalledTimes(1);
   expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/suggestions/evaluate"),

@@ -11,8 +11,12 @@ html[data-sirius-visual-theme="classic"][data-sirius-platform] {
   --workspace-line: rgba(197, 160, 89, .34);
   --workspace-font: "Segoe UI", system-ui, sans-serif;
   --pantheon-heading: "Palatino Linotype", "Book Antiqua", Palatino, serif;
-  --workspace-surface: linear-gradient(145deg, #102637, #081522);
-  --workspace-shadow: 0 14px 32px #0005, inset 0 0 8px #c5a0590d;
+  --workspace-surface: linear-gradient(145deg, #091722, #040a10);
+  --sirius-glow-frame: 0 0 18px rgba(145, 230, 242, 0.16);
+  --sirius-glow-control: 0 0 9px rgba(145, 230, 242, 0.14);
+  --sirius-glow-gold: 0 0 14px rgba(216, 184, 117, 0.28);
+  --sirius-glow-gold-control: 0 0 10px rgba(216, 184, 117, 0.25);
+  --workspace-shadow: 0 14px 32px #0005, var(--sirius-glow-frame), inset 0 0 8px #c5a0590d;
   --pantheon-corners:
     linear-gradient(#c5a05999, #c5a05999) left 7px top 7px / 17px 1px no-repeat,
     linear-gradient(#c5a05999, #c5a05999) left 7px top 7px / 1px 17px no-repeat,
@@ -32,9 +36,9 @@ html[data-sirius-visual-theme="classic"][data-sirius-platform] {
 html[data-sirius-visual-theme="classic"][data-sirius-platform] :is(
   .sirius-root, .boot-screen, .auth-screen, .spectator-view
 ) {
-  background: radial-gradient(ellipse at 50% 40%, #16455448, transparent 55%),
-    linear-gradient(#5e91b409 1px, transparent 1px) 0 0 / 48px 48px,
-    linear-gradient(90deg, #5e91b409 1px, transparent 1px) 0 0 / 48px 48px, #06101b !important;
+  background: radial-gradient(ellipse at 50% 40%, #16455422, transparent 55%),
+    linear-gradient(#5e91b407 1px, transparent 1px) 0 0 / 48px 48px,
+    linear-gradient(90deg, #5e91b407 1px, transparent 1px) 0 0 / 48px 48px, #03070d !important;
 }
 html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-root > :is(.city-backdrop, .vignette) { display: none; }
 
@@ -78,8 +82,8 @@ html[data-sirius-visual-theme="classic"][data-sirius-platform] .shud-panel::befo
 }
 
 @keyframes pantheonAfterglow {
-  0%, 100% { box-shadow: 0 14px 32px #0005, 0 0 18px #65dbe309, inset 0 0 10px #65dbe309, inset 0 0 7px #c5a0590d; }
-  30% { box-shadow: 0 14px 32px #0005, 0 0 18px #65dbe32b, inset 0 0 10px #65dbe32b, inset 0 0 7px #c5a05928; }
+  0%, 100% { box-shadow: 0 14px 32px #0005, var(--sirius-glow-frame), inset 0 0 10px #65dbe309, inset 0 0 7px #c5a0590d; }
+  30% { box-shadow: 0 14px 32px #0005, 0 0 18px #65dbe346, inset 0 0 10px #65dbe32b, inset 0 0 7px #c5a05928; }
 }
 html[data-sirius-visual-theme="classic"][data-sirius-platform] body:has(.sirius-root[data-pantheon-active="true"])
   :is(.sirius-module-window, .workspace-surface, .pantheon-composer, .modwheel, .sirius-display, .web-window, .shud-panel) {
@@ -91,7 +95,7 @@ html[data-sirius-visual-theme="classic"][data-sirius-platform] :is(
   .kr-bar, .esp-bar, .p3d-bar, .an3d-bar, .ww-bar, .sd-bar, .fv-bar, .shud-head, .media-hud-header, .spectator-head,
   .modwheel-heading, .productivity-header, .fp-header, .connections-header, .keys-bar, .sp-bar, .vision-head, .getting-started > header
 ) {
-  background: linear-gradient(90deg, transparent, #c5a05922, transparent) 0 100% / 100% 1px no-repeat, #081522 !important;
+  background: linear-gradient(90deg, transparent, #c5a05922, transparent) 0 100% / 100% 1px no-repeat, #040a10 !important;
   border-bottom-color: var(--workspace-line) !important;
   border-image: none !important;
   border-bottom-width: 1px !important;
@@ -106,7 +110,7 @@ html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-module-wi
   min-width: 0; max-width: 100% !important; max-height: none !important;
   object-fit: contain !important; object-position: center !important;
   border: 1px solid var(--workspace-line); border-radius: 8px !important;
-  background: #081522; box-shadow: none !important; filter: none !important;
+  background: #040a10; box-shadow: none !important; filter: none !important;
 }
 html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-module-window.kr-panel {
   grid-template-columns: 160px minmax(0, 1fr);
@@ -132,7 +136,7 @@ html[data-sirius-visual-theme="classic"][data-sirius-platform] :is(
   font-family: var(--pantheon-heading) !important;
   color: #e2c78f;
   letter-spacing: .075em !important;
-  text-shadow: none !important;
+  text-shadow: var(--sirius-glow-gold) !important;
 }
 html[data-sirius-visual-theme="classic"][data-sirius-platform] :is(
   .prime-sub, .zeus-sub, .setup-sub, .eu-sub, .atlas-sub, .kr-sub, .oracle-sub,
@@ -149,7 +153,7 @@ html[data-sirius-visual-theme="classic"][data-sirius-platform] :is(
   .work-dossiers-entry, .work-dossiers-proposal, .work-dossiers-integrations p
 ) {
   border-radius: 8px !important;
-  background: linear-gradient(145deg, #102637, #081522) !important;
+  background: var(--workspace-surface) !important;
 }
 html[data-sirius-visual-theme="classic"][data-sirius-platform] :is(.sirius-module-window, .modwheel, .auth-card, .workspace-summary)
   :is(input, select, textarea):focus-visible {
@@ -197,6 +201,7 @@ html[data-sirius-visual-theme="classic"][data-sirius-platform] :is(.infowheel, .
 
 html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-center .sirius-wordmark {
   font-family: var(--pantheon-heading); color: var(--workspace-gold); -webkit-text-fill-color: var(--workspace-gold); letter-spacing: normal; word-spacing: normal; text-transform: none;
+  text-shadow: var(--sirius-glow-gold);
 }
 html[data-sirius-visual-theme="classic"][data-sirius-platform] .top-bar .profile-btn {
   box-sizing: border-box; flex: 0 0 44px; width: 44px !important; height: 44px !important;
@@ -337,7 +342,7 @@ html[data-sirius-visual-theme="classic"][data-sirius-platform] .pantheon-compose
     gap: 6px;
     padding: 0;
   }
-  html[data-sirius-visual-theme="classic"][data-sirius-platform] .voice-session-controls:not(:has(select)) {
+  html[data-sirius-visual-theme="classic"][data-sirius-platform] .pantheon-composer .voice-session-controls:not(:has(select)) {
     grid-template-columns: 24px minmax(0, 1fr) 32px;
   }
   html[data-sirius-visual-theme="classic"][data-sirius-platform] .voice-session-controls .voice-session-emblem {
@@ -388,7 +393,7 @@ html[data-sirius-visual-theme="classic"][data-sirius-platform] .pantheon-compose
 }
 .voice-equalizer {
   margin: 20px 0; padding: 18px; min-width: 0; border: 1px solid var(--workspace-line);
-  border-radius: 8px; background: linear-gradient(145deg, #102637, #081522);
+  border-radius: 8px; background: linear-gradient(145deg, #091722, #040a10);
 }
 .voice-equalizer legend { color: var(--workspace-gold); padding: 0 8px; font-family: var(--pantheon-heading); }
 .voice-equalizer p { color: var(--workspace-muted); font: 13px/1.6 var(--workspace-font); }
@@ -429,7 +434,7 @@ html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen .boo
 html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen .boot-bar-fill {
   background: linear-gradient(90deg, #c5a059, #91d9db); transition: width .6s ease;
 }
-html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen .boot-copyright { grid-row: 4; }
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen .boot-copyright { grid-row: 3; }
 
 /* Shared public and standalone surfaces use the palette without changing product or warning colours. */
 html[data-sirius-visual-theme="classic"][data-sirius-platform] .public-store :is(
@@ -441,7 +446,70 @@ html[data-sirius-visual-theme="classic"][data-sirius-platform] .public-store :is
   .public-hud-hero, .public-metrics, .public-core-preview, .public-matrix-actions li,
   .public-plan, .public-checkout, .public-testimonial, .public-why-grid article,
   .public-subscription-success, .public-situations figure, .public-odysseia-card, .public-odysseia-dialog
-)::before { animation: none; background: linear-gradient(90deg, transparent, #c5a05988, transparent); }
+)::before { animation: none; background: linear-gradient(90deg, transparent, #91e6f244, #c5a05966, transparent); }
+
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .public-store {
+  font-family: var(--store-heading);
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .public-store .public-hero h1 {
+  max-width: 16ch;
+  color: var(--store-text);
+  font: 600 clamp(36px, 4.1vw, 58px)/1.14 var(--store-heading);
+  text-shadow: none;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .public-store :is(
+  .public-section-title, .public-plan-name, .public-window-bar, .public-metrics strong,
+  .public-matrix-actions strong, .public-situations figcaption strong, .public-order-summary > span
+) {
+  color: var(--store-gold-strong);
+  font-family: var(--store-heading);
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .public-store :is(
+  .public-primary-cta, .public-nav-cta
+) {
+  border-radius: 999px;
+  color: #061015;
+  background: linear-gradient(135deg, #a9eff4, #58bdc9);
+  border-color: #91e6f2;
+  font-family: var(--store-heading);
+  box-shadow: 0 10px 24px rgba(72, 196, 209, .16);
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .public-store :is(
+  .public-secondary-cta, .public-demo-link
+) {
+  border-radius: 999px;
+  color: var(--store-cyan);
+  border-color: var(--store-line);
+  font-family: var(--store-heading);
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .public-store .public-nav-links a:not(.public-nav-cta) {
+  padding: 8px 11px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .public-store .public-plan {
+  border-radius: 14px;
+  background: var(--store-surface);
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .public-store .public-plan.featured {
+  border-color: rgba(197, 160, 89, .65);
+  background: linear-gradient(150deg, #101b20, #040a10);
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .public-store .public-form-row input {
+  border-radius: 10px;
+  background: #010307;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .public-store .public-form-row button {
+  border-radius: 999px;
+  background: linear-gradient(135deg, #a9eff4, #58bdc9);
+  color: #061015;
+}
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .public-store .public-section-icon {
+  border-color: var(--store-line);
+  border-radius: 12px;
+  background: rgba(145, 230, 242, .05);
+  color: var(--store-cyan);
+}
 
 @media (max-width: 1023px) {
   html[data-sirius-visual-theme="classic"][data-sirius-platform] {
@@ -467,4 +535,132 @@ html[data-sirius-visual-theme="classic"][data-sirius-platform="android"] body:ha
 ) { animation: none !important; }
 html[data-sirius-visual-theme="classic"][data-sirius-platform] body.hud-high-contrast {
   --workspace-text: #fff; --workspace-muted: #fff; --workspace-line: #b4ebf4;
+}
+
+html[data-sirius-visual-theme="classic"] .boot-screen.boot-reference,
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen.boot-reference {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(min-content, 1fr) auto auto;
+  align-content: stretch;
+  align-items: stretch;
+  justify-content: stretch;
+  justify-items: stretch;
+  gap: 0;
+  padding: max(20px, env(safe-area-inset-top)) clamp(24px, 8vw, 80px) max(20px, env(safe-area-inset-bottom));
+  overflow-y: auto;
+}
+html[data-sirius-visual-theme="classic"] .boot-screen.boot-reference .boot-center,
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen.boot-reference .boot-center {
+  grid-row: 1;
+  align-self: start;
+  justify-self: stretch;
+  width: 100%;
+  row-gap: clamp(8px, 2.4vh, 20px);
+  padding-top: clamp(72px, 12vh, 132px);
+  box-sizing: border-box;
+  transform: none;
+}
+html[data-sirius-visual-theme="classic"] .boot-screen.boot-reference .boot-welcome,
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen.boot-reference .boot-welcome {
+  margin: 0;
+  font: 400 clamp(28px, 7vw, 42px)/1.3 Georgia, serif;
+  text-wrap: balance;
+}
+html[data-sirius-visual-theme="classic"] .boot-screen.boot-reference .boot-status,
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen.boot-reference .boot-status {
+  grid-row: 2;
+  align-self: end;
+  justify-self: center;
+  width: min(100%, 520px);
+  height: auto;
+  max-height: none;
+  min-width: 0;
+  margin: 0 0 12px;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  animation: none;
+}
+html[data-sirius-visual-theme="classic"] .boot-screen.boot-reference .boot-status h2,
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen.boot-reference .boot-status h2 {
+  margin: 0 0 12px;
+  font: 400 clamp(21px, 5vw, 28px)/1.35 Georgia, serif;
+  letter-spacing: .03em;
+}
+html[data-sirius-visual-theme="classic"] .boot-screen.boot-reference .boot-bar,
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen.boot-reference .boot-bar {
+  height: 3px;
+  margin: 0;
+}
+html[data-sirius-visual-theme="classic"] .boot-screen.boot-reference .boot-pct,
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen.boot-reference .boot-pct {
+  margin-top: 8px;
+  font: 400 13px/1.5 var(--workspace-font);
+  letter-spacing: .02em;
+}
+html[data-sirius-visual-theme="classic"] .boot-screen.boot-reference .boot-check-details,
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen.boot-reference .boot-check-details {
+  display: block;
+  max-height: 34vh;
+  margin-top: 12px;
+  overflow-y: auto;
+  font: 400 12px/1.5 var(--workspace-font);
+}
+html[data-sirius-visual-theme="classic"] .boot-screen.boot-reference .boot-check-details summary,
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen.boot-reference .boot-check-details summary,
+html[data-sirius-visual-theme="classic"] .boot-screen.boot-reference .boot-modules-title,
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen.boot-reference .boot-modules-title {
+  min-height: 32px;
+  align-content: center;
+  font: 400 12px/1.5 var(--workspace-font);
+  letter-spacing: .02em;
+  cursor: pointer;
+}
+html[data-sirius-visual-theme="classic"] .boot-screen.boot-reference .boot-check-details:not([open]) .boot-display,
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen.boot-reference .boot-check-details:not([open]) .boot-display {
+  display: none;
+}
+html[data-sirius-visual-theme="classic"] .boot-screen.boot-reference .boot-check-details ul,
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen.boot-reference .boot-check-details ul {
+  padding-left: 18px;
+}
+html[data-sirius-visual-theme="classic"] .boot-screen.boot-reference .boot-modules,
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen.boot-reference .boot-modules {
+  position: relative;
+  inset: auto;
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  max-height: 34vh;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+  animation: none;
+}
+html[data-sirius-visual-theme="classic"] .boot-screen.boot-reference .boot-module,
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen.boot-reference .boot-module {
+  min-height: 40px;
+  padding: 8px 10px;
+}
+html[data-sirius-visual-theme="classic"] .boot-screen.boot-reference .boot-copyright,
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen.boot-reference .boot-copyright {
+  align-self: end;
+  margin: 4px 0 0;
+  padding-top: 8px;
+}
+@media (max-height: 560px) {
+  html[data-sirius-visual-theme="classic"] .boot-screen.boot-reference .boot-status,
+  html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen.boot-reference .boot-status {
+    margin-bottom: 0;
+  }
 }

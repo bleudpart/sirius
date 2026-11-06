@@ -9,6 +9,7 @@ body.hud-high-contrast {
   --workspace-text: #fff;
   --workspace-gold: #ffe09c;
   --workspace-line: #b4ebf4;
+  --sirius-copyright-color: #fff;
 }
 body.hud-high-contrast :is(p, label, summary, dt, dd, li) { color: #fff !important; }
 body.hud-high-contrast :is(button, input, select, textarea) {
@@ -683,7 +684,7 @@ html[data-sirius-visual-theme="classic"] .public-popular { border-radius: 0 20px
     box-shadow: none;
   }
   html[data-sirius-visual-theme="classic"] .boot-screen .boot-pct { color: var(--workspace-gold); font: 400 12px/1.6 var(--boot-status-font); letter-spacing: .02em; }
-  html[data-sirius-visual-theme="classic"] .boot-screen .boot-copyright { position: relative; z-index: 2; grid-column: 1 / -1; text-align: center; margin: 0; color: var(--workspace-gold); font: 400 10px/1.6 var(--workspace-font); }
+  html[data-sirius-visual-theme="classic"] .boot-screen .boot-copyright { position: relative; z-index: 2; grid-column: 1 / -1; text-align: center; margin: 0; color: var(--sirius-copyright-color); font: 400 10px/1.6 var(--workspace-font); }
   @media (max-width: 1100px) {
     html[data-sirius-visual-theme="classic"] .boot-screen { grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); }
     html[data-sirius-visual-theme="classic"] .boot-screen .boot-modules { display: none; }

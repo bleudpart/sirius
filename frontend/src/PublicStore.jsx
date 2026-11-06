@@ -308,8 +308,8 @@ export default function PublicStore() {
       </section>
       <section className="public-hud-preview public-hud-hero" aria-label="Capture d'écran du HUD ΣIRIUS">
         <div className="public-window-bar"><span className="public-window-dot" /> ΣIRIUS · L'espace de travail</div>
-        <div className="hud-preview"><img src="/hud-preview.png" alt="HUD ΣIRIUS en situation" loading="eager" /></div>
-        <p className="public-preview-caption">Une interface pour vos commandes, vos outils et vos modules.</p>
+        <div className="hud-preview"><img src="/hud-preview.png" alt="HUD ΣIRIUS avec un profil fictif de démonstration" loading="eager" /></div>
+        <p className="public-preview-caption">Une interface pour vos commandes, vos outils et vos modules. Capture de démonstration avec un profil fictif ; l'apparence peut différer de la version téléchargée.</p>
       </section>
       </div>
       <section className="public-demo public-workflow" id="demonstration" aria-labelledby="public-demo-title">
@@ -320,7 +320,7 @@ export default function PublicStore() {
           <track kind="subtitles" src="/demo/sirius-demo-store.vtt" srcLang="fr" label="Français" default />
           Votre navigateur ne lit pas cette vidéo. <a href="/demo/sirius-demo-store.mp4">Télécharger la démonstration</a>
         </video>
-        <p className="public-function-note">Une minute de démonstration enregistrée : suivi d'activité, factures et préparation d'un courriel. Données fictives, aucun envoi réel. Ce n'est pas une réponse IA en direct ; l'apparence peut différer de la version téléchargée.</p>
+        <p className="public-function-note">Démonstration muette : accueil, dossier et rendez-vous dans CHRONOS. Session simulée et données fictives ; aucune réponse IA ni aucun envoi réel. L'apparence peut différer de la version téléchargée.</p>
       </section>
       <section className="public-founder public-workflow" aria-labelledby="public-founder-title">
         <h2 id="public-founder-title" className="public-section-title">Daniel Partel vous présente ΣIRIUS</h2>
@@ -346,9 +346,9 @@ export default function PublicStore() {
           </figure>
           <figure>
             <a href="/demo/sirius-planning.png" target="_blank" rel="noopener noreferrer" aria-label="Agrandir la capture du planning">
-              <img src="/demo/sirius-planning.png" alt="CHRONOS : échéance de relecture associée au dossier fictif Atelier Horizon" width="1440" height="1000" loading="lazy" />
+              <img src="/demo/sirius-planning.png" alt="CHRONOS : rendez-vous fictif pour relire le devis d'Atelier Horizon" width="1440" height="1000" loading="lazy" />
             </a>
-            <figcaption><strong>Gardez vos échéances en vue</strong><span>Une tâche datée associée à un dossier. Données de démonstration.</span></figcaption>
+            <figcaption><strong>Gardez vos rendez-vous en vue</strong><span>Un rendez-vous daté pour un dossier fictif. Données de démonstration.</span></figcaption>
           </figure>
         </div>
       </section>
@@ -525,7 +525,7 @@ export default function PublicStore() {
       <footer className="public-footer">
         <p className="public-slogan">ΣIRIUS travaille pour vous.</p>
         <p className="public-footer-secure"><ShieldCheck size={13} /> Paiement via Stripe ou PayPal</p>
-        © 2026 ΣIRIUS par Daniel Partel · <a href="/mentions-legales">Mentions légales</a> · <a href="/conditions-generales">Conditions générales</a> · <a href="/confidentialite.html">Confidentialité</a>         · <a href="/suppression-compte.html">Suppression du compte</a> · <a href="/aide-emails.html">Aide : envoi d'e-mails</a>
+        <span className="public-copyright">© 2026 ΣIRIUS par Daniel Partel</span> · <a href="/mentions-legales">Mentions légales</a> · <a href="/conditions-generales">Conditions générales</a> · <a href="/confidentialite.html">Confidentialité</a>         · <a href="/suppression-compte.html">Suppression du compte</a> · <a href="/aide-emails.html">Aide : envoi d'e-mails</a>
       </footer>
       {mythWindowOpen && (
         <div
