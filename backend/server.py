@@ -26,9 +26,10 @@ from pydantic import BaseModel, Field, ConfigDict
 
 from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Request, Depends, Header, status
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo.errors import ConnectionFailure
 from starlette.types import ASGIApp, Scope, Receive, Send
 from runtime_paths import SOURCE_DIR, data_dir, project_dir
 
@@ -266,6 +267,16 @@ async def _lifespan(_app):
 
 app = FastAPI(title="ΣIRIUS Backend API", version="1.0.0", lifespan=_lifespan)
 
+
+@app.exception_handler(ConnectionFailure)
+async def _mongo_unavailable(_request: Request, _error: ConnectionFailure):
+    logger.warning("[DB] MongoDB indisponible pendant une requête.")
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Base de données temporairement indisponible. Réessayez dans quelques instants."},
+    )
+
+
 # Imports des modules Sirius
 from storage import put_object, get_object, APP_NAME
 from local_memory import list_facts, add_fact, delete_fact, update_fact, log_event, prime_overview, log_service, list_service_log, recall_facts, learn_fact, recent_episodes
@@ -281,7 +292,7 @@ from version_info import APP_NAME, APP_RELEASE, APP_VERSION  # noqa: E402
 
 # 5. Connexion base documentaire : MongoDB si disponible, sinon SQLite local.
 # SIRIUS_DB=mongo force MongoDB ; SIRIUS_DB=local force le docstore SQLite ;
-# sinon un ping au démarrage choisit automatiquement (voir _lifespan).
+# sinon un ping au démarrage choisit automatiquement, sauf protection cloud activée.
 from local_docstore import DatabaseRouter, LocalDocStore  # noqa: E402
 mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
 db_name = os.environ.get('DB_NAME', 'sirius_db')
@@ -300,8 +311,17 @@ else:
     db = DatabaseRouter(client[db_name])
 
 
+def _mongodb_required() -> bool:
+    if _DB_MODE == "local":
+        return False
+    return _DB_MODE == "mongo" or (
+        os.getenv("SIRIUS_REQUIRE_CONFIGURED_MONGO", "").strip() == "1"
+        and bool(os.getenv("MONGO_URL", "").strip())
+    )
+
+
 async def _select_database_backend():
-    """Bascule sur le docstore SQLite local si MongoDB est injoignable."""
+    """Choisit SQLite uniquement lorsque le repli local est autorisé."""
     if _DB_MODE == "local":
         logger.info("[DB] Docstore SQLite local (forcé par SIRIUS_DB=local)")
         return
@@ -309,8 +329,8 @@ async def _select_database_backend():
         await asyncio.wait_for(client.admin.command("ping"), timeout=2.0)
         logger.info("[DB] MongoDB détecté : %s", _redact_mongo_url(mongo_url))
     except Exception:
-        if _DB_MODE == "mongo":
-            logger.error("[DB] SIRIUS_DB=mongo mais MongoDB est injoignable : %s", _redact_mongo_url(mongo_url))
+        if _mongodb_required():
+            logger.error("[DB] MongoDB obligatoire mais injoignable : %s", _redact_mongo_url(mongo_url))
             return
         db.use(LocalDocStore())
         logger.info("[DB] MongoDB absent → docstore SQLite local (aucun serveur requis)")
@@ -338,6 +358,7 @@ async def health_check():
     checks = {}
 
     checks["database"] = db.backend_name
+    checks["mongo_required"] = _mongodb_required()
     if db.backend_name == "mongodb":
         try:
             await asyncio.wait_for(client.admin.command("ping"), timeout=2.0)

@@ -53,6 +53,14 @@ sudo systemctl restart sirius
 
 Ne commitez jamais ces secrets. Le fichier appartient à `root`, mode `600`. Le script ajoute `SIRIUS_DATA_DIR=/var/lib/sirius`. Si `MONGO_URL` n’est pas défini, les données vivent en SQLite sur le VPS dans `/var/lib/sirius`.
 
+Le service Hetzner active `SIRIUS_REQUIRE_CONFIGURED_MONGO=1` par un fichier
+systemd géré par le déploiement. Si `MONGO_URL` est défini et MongoDB est
+injoignable au démarrage, le serveur conserve MongoDB au lieu de basculer
+silencieusement sur une base SQLite distincte : les opérations concernées
+échouent jusqu'au rétablissement de MongoDB. Le mode local explicite
+`SIRIUS_DB=local` et le repli automatique des installations locales sans cette
+protection restent inchangés. La sonde `/health` indique `mongo_required`.
+
 ## 5. Tester avant la bascule DNS
 
 Test local serveur :
@@ -101,13 +109,29 @@ Ajoutez les secrets GitHub :
 - `HETZNER_USER` : `deploy` recommandé, ou `root`
 - `HETZNER_SSH_KEY` : clé privée autorisée sur le serveur
 
+Configurer aussi `HETZNER_HOST_FINGERPRINT` avec l'empreinte SHA-256 de la clé
+SSH du VPS, vérifiée depuis la console Hetzner ou un autre canal de confiance :
+
+```bash
+ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub -E sha256
+```
+
+Sans cette valeur, les actions SSH et SCP ne vérifient pas l'identité du serveur.
+La surveillance ouvre une issue tant que cette empreinte n'est pas configurée.
+Ne pas considérer une empreinte obtenue uniquement par `ssh-keyscan` sur le
+réseau comme vérifiée. Après configuration, tester un déploiement et la
+surveillance ; une mauvaise empreinte doit bloquer la connexion.
+
 Pour l’utilisateur non-root `deploy`, `setup.sh` crée la règle sudoers limitée à :
 
 ```text
 /opt/sirius/deploy/hetzner/deploy.sh
 ```
 
-Le workflow `.github/workflows/deploy-hetzner.yml` ne fait rien si `HETZNER_HOST` est vide.
+Le workflow `.github/workflows/deploy-hetzner.yml` lance d'abord l'audit et les
+tests ; le déploiement est bloqué si l'audit échoue ou si un secret Hetzner est
+absent. Après publication, il vérifie aussi l'API locale, MongoDB et
+`mongo_required` ; un échec ne revient pas automatiquement à l'ancienne version.
 Il se déclenche aussi sur les changements frontend. Il compile avec
 `REACT_APP_BACKEND_URL=https://api.sirius-assistant.fr`, transfère le build par SSH,
 puis publie le commit exact. Les limites et la facturation GitHub Actions
@@ -257,6 +281,10 @@ Les étiquettes HACCP, leurs photos et toutes les données SQLite vivent dans
 `/var/lib/sirius`. Cette sauvegarde les copie chaque nuit (vers 3 h 30, heure de
 Paris), chiffrées avec restic, vers une Hetzner Storage Box : un autre serveur que le VPS.
 Elle complète les backups Hetzner du VPS, sans les remplacer.
+Elle ne sauvegarde pas MongoDB ou MongoDB Atlas : les comptes et les données de
+la base documentaire doivent être protégés séparément. Vérifier la méthode et
+les restaurations auprès de l'hébergeur MongoDB ; les clusters Atlas gratuits
+ne disposent pas des sauvegardes automatiques Atlas.
 
 1. Commander une **Storage Box BX11** dans la console Hetzner (environ 4 € par mois).
 2. Dans ses réglages, activer **SSH** et **l'accès externe**, puis définir un mot de passe.
@@ -269,9 +297,12 @@ sudo bash /opt/sirius/deploy/hetzner/prepare-backup.sh u123456
 
 Le script installe restic, crée une clé SSH dédiée et l'installe sur la Storage Box.
 Le mot de passe de la Storage Box est demandé une seule fois.
-Le script crée ensuite le dépôt chiffré, active `sirius-backup.timer` et lance une
-première sauvegarde. Il affiche alors le **mot de passe de chiffrement** : à noter
-hors du serveur, sinon la sauvegarde est illisible si le VPS est perdu.
+Le script affiche d'abord le **mot de passe de chiffrement** : le noter immédiatement
+hors du serveur, sinon la sauvegarde est illisible si le VPS est perdu. Il crée ensuite
+le dépôt chiffré, active `sirius-backup.timer` et lance une première sauvegarde.
+Si l'installation a échoué et que le mot de passe n'a pas été noté, le retrouver
+depuis la console sécurisée du VPS avec `sudo cat /etc/sirius/backup-password` ;
+ne jamais le partager dans une conversation ou le committer.
 
 Rétention : 30 jours, 12 semaines, 24 mois. Les bases SQLite sont copiées par l'API
 de sauvegarde SQLite et vérifiées avant l'envoi ; chaque sauvegarde relit aussi 5 % des données.
@@ -285,11 +316,74 @@ journalctl -u sirius-backup.service -n 50 --no-pager
 sudo bash -c 'set -a; . /etc/sirius/backup.env; restic snapshots'
 ```
 
-Restauration dans un dossier séparé, sans écraser la production :
+Restauration dans un nouveau dossier séparé, sans écraser la production :
 
 ```bash
-sudo bash -c 'set -a; . /etc/sirius/backup.env; restic restore latest --target /var/tmp/sirius-restore'
+RESTORE_DIR="$(sudo mktemp -d /var/tmp/sirius-restore.XXXXXX)"
+sudo bash -c 'set -a; . /etc/sirius/backup.env; restic restore latest --host sirius-hetzner --tag sirius --target "$1" --verify' _ "$RESTORE_DIR"
+sudo /opt/sirius/.venv/bin/python /opt/sirius/deploy/hetzner/sqlite_snapshot.py verify \
+  "$RESTORE_DIR/var/tmp/sirius-sqlite-snapshot"
 ```
 
-Les bases SQLite restaurées se trouvent sous `var/tmp/sirius-sqlite-snapshot/`,
-les fichiers (photos, documents) sous `var/lib/sirius/`.
+Le contrôle vérifie les fichiers de la copie SQLite (empreintes et intégrité des
+bases) ; il s'applique aux sauvegardes créées avec cette version du script. Les
+bases se trouvent sous `var/tmp/sirius-sqlite-snapshot/`, les fichiers (photos,
+documents) sous `var/lib/sirius/`. Vérifier aussi les photos et la sauvegarde
+MongoDB avant toute restauration réelle ; les instantanés des différents
+stockages ne sont pas pris atomiquement. Ne rien réinjecter en production sans
+arrêter le service, disposer d'une sauvegarde de l'état actuel et valider la
+procédure de restauration.
+
+## 12. Surveillance et alertes
+
+Le workflow GitHub Actions `SIRIUS monitoring` vérifie après chaque déploiement
+et environ toutes les 15 minutes le site publié, l'API, sa connexion à MongoDB et la protection
+contre une bascule inattendue vers SQLite sur le serveur. Par SSH avec l'utilisateur `deploy`,
+sans sudo, il contrôle les systèmes de fichiers des données et du site (alerte à
+85 % d'occupation ou à 1 Gio libre ou moins), ainsi que le minuteur de sauvegarde
+et le résultat et l'âge de la dernière exécution (au plus 36 heures). Une
+sauvegarde non configurée ou inaccessible est signalée comme un échec.
+
+Une issue distincte est ouverte et assignée au propriétaire pour chaque type de
+problème ; elle est fermée lorsque le contrôle correspondant réussit à nouveau.
+Activer les notifications GitHub et leur envoi par courriel : la création d'une
+issue ne garantit pas à elle seule la réception d'un message. Un échec de
+surveillance SSH peut aussi provoquer une alerte sans prouver une panne du
+serveur. GitHub peut retarder ou suspendre des tâches planifiées ; ces contrôles
+ne constituent pas une surveillance temps réel. Pour éviter un courriel d'échec
+toutes les 15 minutes tant que la Storage Box n'est pas installée, une alerte
+de sauvegarde seule ouvre une issue et un avertissement sans faire échouer le
+workflow : un workflow vert ne signifie donc pas que les sauvegardes sont saines.
+
+Le contrôle de sauvegarde vérifie seulement l'exécution du service sur le VPS :
+il ne garantit ni la présence ni la restaurabilité des données dans MongoDB.
+Après un redémarrage du serveur, systemd peut ne plus conserver l'heure du
+dernier passage ; l'alerte peut alors rester ouverte jusqu'à une nouvelle
+sauvegarde réussie. Toujours tester périodiquement une restauration isolée.
+
+### SMS facultatifs avec Twilio
+
+Les SMS ne sont **pas actifs** sans compte Twilio, expéditeur autorisé, quatre
+secrets et une activation explicite dans GitHub. Le service peut facturer les SMS, les essais et l'expéditeur ;
+vérifier les tarifs et les conditions du pays avant toute activation. Ajouter
+directement dans les secrets GitHub Actions, jamais dans le dépôt ou une
+conversation :
+
+- `SIRIUS_SMS_ACCOUNT_SID` : identifiant du compte Twilio (`AC...`) ;
+- `SIRIUS_SMS_AUTH_TOKEN` : jeton d'authentification Twilio ;
+- `SIRIUS_SMS_FROM` : numéro Twilio au format international ou identifiant
+  alphanumérique autorisé par Twilio pour la France ;
+- `SIRIUS_SMS_TO` : téléphone destinataire au format international, par exemple
+  `+33` suivi du numéro sans le zéro initial.
+
+Après avoir ajouté les quatre secrets, créer la variable GitHub Actions
+`SIRIUS_SMS_ENABLED` avec la valeur `1` pour activer les envois. Sans cette
+variable, aucun SMS n'est envoyé. **L'activation déclenche les SMS automatiquement**
+au prochain contrôle, y compris pour les alertes déjà ouvertes. Un seul SMS regroupe les
+nouvelles alertes d'un contrôle ; au maximum trois tentatives automatiques sont
+effectuées par alerte. En cas d'échec, une issue GitHub distincte reste ouverte.
+Après correction, lancer manuellement `SIRIUS monitoring` avec `test_sms` coché :
+cela envoie un vrai SMS potentiellement facturé et permet de retenter les
+alertes en attente. Un accusé d'acceptation Twilio ne garantit pas la réception
+par le téléphone ; une interruption entre l'envoi et l'enregistrement de son
+état peut provoquer un doublon. Les SMS ne remplacent pas les alertes GitHub.

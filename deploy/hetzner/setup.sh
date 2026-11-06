@@ -140,6 +140,9 @@ grep -q '^PLAYWRIGHT_BROWSERS_PATH=' "$ENV_FILE" || echo "PLAYWRIGHT_BROWSERS_PA
 
 echo "==> Service systemd"
 install -o root -g root -m 0644 "$APP_DIR/deploy/hetzner/sirius.service" /etc/systemd/system/sirius.service
+install -d -o root -g root -m 0755 /etc/systemd/system/sirius.service.d
+install -o root -g root -m 0644 "$APP_DIR/deploy/hetzner/sirius-database.conf" \
+  /etc/systemd/system/sirius.service.d/90-sirius-managed-database.conf
 systemctl daemon-reload
 systemctl enable sirius.service
 

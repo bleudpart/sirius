@@ -12,33 +12,41 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: deploy-hetzner-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  audit:
+    uses: ./.github/workflows/sirius-audit.yml
+    permissions:
+      contents: read
+      issues: write
+
   check-hetzner-secret:
     runs-on: ubuntu-latest
-    outputs:
-      has_host: ${{ steps.check.outputs.has_host }}
+    permissions: {}
     steps:
-      - name: Check Hetzner host secret
-        id: check
+      - name: Check Hetzner deployment secrets
         env:
           HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
+          HETZNER_USER: ${{ secrets.HETZNER_USER }}
+          HETZNER_SSH_KEY: ${{ secrets.HETZNER_SSH_KEY }}
         run: |
-          if [ -n "$HETZNER_HOST" ]; then
-            echo "has_host=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_host=false" >> "$GITHUB_OUTPUT"
-            echo "HETZNER_HOST is empty; deployment job will be skipped."
-          fi
+          for name in HETZNER_HOST HETZNER_USER HETZNER_SSH_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is empty; deployment cannot proceed."
+              exit 1
+            fi
+          done
 
   deploy:
-    needs: check-hetzner-secret
-    if: ${{ needs.check-hetzner-secret.outputs.has_host == 'true' }}
+    needs: [audit, check-hetzner-secret]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -61,6 +69,7 @@ jobs:
           host: ${{ secrets.HETZNER_HOST }}
           username: ${{ secrets.HETZNER_USER }}
           key: ${{ secrets.HETZNER_SSH_KEY }}
+          fingerprint: ${{ secrets.HETZNER_HOST_FINGERPRINT }}
           source: frontend-web.tar.gz
           target: /tmp/sirius-frontend-${{ github.sha }}
       - name: Deploy on Hetzner VPS
@@ -69,7 +78,13 @@ jobs:
           host: ${{ secrets.HETZNER_HOST }}
           username: ${{ secrets.HETZNER_USER }}
           key: ${{ secrets.HETZNER_SSH_KEY }}
+          fingerprint: ${{ secrets.HETZNER_HOST_FINGERPRINT }}
           command_timeout: 20m
           script: |
             set -eu
             sudo /opt/sirius/deploy/hetzner/deploy.sh /tmp/sirius-frontend-${{ github.sha }}/frontend-web.tar.gz "${{ github.sha }}"
+            if [ ! -f /etc/systemd/system/sirius.service.d/90-sirius-managed-database.conf ]; then
+              echo "Activation de la protection de la base cloud."
+              sudo /opt/sirius/deploy/hetzner/deploy.sh "" "${{ github.sha }}"
+            fi
+            python3 /opt/sirius/deploy/hetzner/monitor.py api-local

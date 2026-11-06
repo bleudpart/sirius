@@ -66,6 +66,14 @@ RESTIC_PASSWORD_FILE=$PASSWORD_FILE
 ENVFILE
 chmod 0600 "$BACKUP_ENV"
 
+if [[ "$NEW_PASSWORD" == 1 ]]; then
+  echo
+  echo "IMPORTANT : notez ce mot de passe de chiffrement dans un endroit sûr, hors du serveur."
+  echo "Sans lui, la sauvegarde est illisible si le serveur est perdu :"
+  cat "$PASSWORD_FILE"
+  echo
+fi
+
 set -a
 # shellcheck source=/dev/null
 source "$BACKUP_ENV"
@@ -83,11 +91,4 @@ echo "==> Première sauvegarde"
 systemctl start sirius-backup.service
 restic snapshots --host sirius-hetzner
 
-if [[ "$NEW_PASSWORD" == 1 ]]; then
-  echo
-  echo "IMPORTANT : notez ce mot de passe de chiffrement dans un endroit sûr, hors du serveur."
-  echo "Sans lui, la sauvegarde est illisible si le serveur est perdu :"
-  cat "$PASSWORD_FILE"
-  echo
-fi
 echo "Sauvegarde quotidienne active (vers 3 h 30, heure de Paris)."

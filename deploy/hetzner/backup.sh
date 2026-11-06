@@ -11,6 +11,15 @@ if [[ "$(id -u)" != 0 ]]; then
   echo "Exécuter en root." >&2
   exit 1
 fi
+exec 9>/run/lock/sirius-backup.lock
+if ! command -v flock >/dev/null 2>&1; then
+  echo "La commande flock est nécessaire pour protéger la sauvegarde." >&2
+  exit 1
+fi
+if ! flock -n 9; then
+  echo "Une sauvegarde ΣIRIUS est déjà en cours." >&2
+  exit 1
+fi
 if [[ ! -f "$BACKUP_ENV" ]]; then
   echo "$BACKUP_ENV absent : lancer d'abord prepare-backup.sh." >&2
   exit 1
@@ -26,32 +35,8 @@ rm -rf -- "$SNAPSHOT_DIR"
 install -d -m 0700 "$SNAPSHOT_DIR"
 trap 'rm -rf -- "$SNAPSHOT_DIR"' EXIT
 
-# Copie cohérente des bases SQLite pendant que le service tourne (API de sauvegarde SQLite).
-"$PYTHON" - "$DATA_DIR" "$SNAPSHOT_DIR" <<'PY'
-import sqlite3
-import sys
-from pathlib import Path
-
-source_root, target_root = Path(sys.argv[1]), Path(sys.argv[2])
-for path in source_root.rglob("*"):
-    if not path.is_file() or path.suffix not in {".sqlite3", ".sqlite", ".db"}:
-        continue
-    with path.open("rb") as handle:
-        if handle.read(16) != b"SQLite format 3\x00":
-            continue
-    target = target_root / path.relative_to(source_root)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    source = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=30)
-    destination = sqlite3.connect(target)
-    try:
-        source.backup(destination)
-        if destination.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
-            raise SystemExit(f"Copie SQLite corrompue : {path}")
-    finally:
-        destination.close()
-        source.close()
-    print(f"SQLite copiée : {path.relative_to(source_root)}")
-PY
+# Copie cohérente des bases SQLite pendant que le service tourne.
+"$PYTHON" "$APP_DIR/deploy/hetzner/sqlite_snapshot.py" create "$DATA_DIR" "$SNAPSHOT_DIR"
 
 cd /
 restic backup --host sirius-hetzner --tag sirius \

@@ -39,6 +39,11 @@ fi
 sudo -u sirius git reset --hard origin/master
 chown -R sirius:sirius "$APP_DIR"
 
+install -d -o root -g root -m 0755 /etc/systemd/system/sirius.service.d
+install -o root -g root -m 0644 "$APP_DIR/deploy/hetzner/sirius-database.conf" \
+  /etc/systemd/system/sirius.service.d/90-sirius-managed-database.conf
+systemctl daemon-reload
+
 if [[ ! -x "$VENV_DIR/bin/python" ]]; then
   echo "==> Création du venv"
   sudo -u sirius "$(UV_PYTHON_INSTALL_DIR=/opt/python uv python find 3.12)" -m venv "$VENV_DIR"

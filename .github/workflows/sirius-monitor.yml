@@ -1,0 +1,111 @@
+name: SIRIUS monitoring
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_sms:
+        description: "Envoyer un SMS de test (facturé par le prestataire)"
+        type: boolean
+        required: false
+        default: false
+  workflow_run:
+    workflows: ["Deploy Hetzner"]
+    types: [completed]
+    branches: [master]
+  schedule:
+    - cron: "*/15 * * * *"
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: sirius-monitor-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check public website
+        id: site
+        continue-on-error: true
+        run: python3 deploy/hetzner/monitor.py site
+      - name: Check public API and MongoDB
+        id: api
+        continue-on-error: true
+        run: python3 deploy/hetzner/monitor.py api
+      - name: Check SSH host fingerprint is configured
+        id: hostkey
+        continue-on-error: true
+        env:
+          HETZNER_HOST_FINGERPRINT: ${{ secrets.HETZNER_HOST_FINGERPRINT }}
+        run: |
+          if [ -z "$HETZNER_HOST_FINGERPRINT" ]; then
+            echo "::error::L'empreinte SSH vérifiée du serveur est absente."
+            exit 1
+          fi
+      - name: Check server disk space
+        id: disk
+        continue-on-error: true
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_USER }}
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          fingerprint: ${{ secrets.HETZNER_HOST_FINGERPRINT }}
+          timeout: 30s
+          command_timeout: 1m
+          script: python3 /opt/sirius/deploy/hetzner/monitor.py disk
+      - name: Check server backups
+        id: backup
+        continue-on-error: true
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_USER }}
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          fingerprint: ${{ secrets.HETZNER_HOST_FINGERPRINT }}
+          timeout: 30s
+          command_timeout: 1m
+          script: python3 /opt/sirius/deploy/hetzner/monitor.py backup
+      - name: Update alerts
+        if: ${{ !cancelled() }}
+        uses: actions/github-script@v7
+        env:
+          SITE_OUTCOME: ${{ steps.site.outcome }}
+          API_OUTCOME: ${{ steps.api.outcome }}
+          DISK_OUTCOME: ${{ steps.disk.outcome }}
+          BACKUP_OUTCOME: ${{ steps.backup.outcome }}
+          HOSTKEY_OUTCOME: ${{ steps.hostkey.outcome }}
+          SIRIUS_SMS_ENABLED: ${{ vars.SIRIUS_SMS_ENABLED }}
+          SIRIUS_SMS_ACCOUNT_SID: ${{ secrets.SIRIUS_SMS_ACCOUNT_SID }}
+          SIRIUS_SMS_AUTH_TOKEN: ${{ secrets.SIRIUS_SMS_AUTH_TOKEN }}
+          SIRIUS_SMS_FROM: ${{ secrets.SIRIUS_SMS_FROM }}
+          SIRIUS_SMS_TO: ${{ secrets.SIRIUS_SMS_TO }}
+          SIRIUS_SMS_TEST: ${{ github.event_name == 'workflow_dispatch' && inputs.test_sms }}
+        with:
+          script: |
+            const monitor = require('./deploy/hetzner/monitor-issues.cjs');
+            const sms = require('./deploy/hetzner/monitor-sms.cjs');
+            const state = await monitor.reconcile(github, context, {
+              site: process.env.SITE_OUTCOME,
+              api: process.env.API_OUTCOME,
+              disk: process.env.DISK_OUTCOME,
+              backup: process.env.BACKUP_OUTCOME,
+              hostkey: process.env.HOSTKEY_OUTCOME,
+            });
+            await sms.handleSms(github, context, state.activeAlerts, state.openIssues, process.env, {
+              test: process.env.SIRIUS_SMS_TEST === 'true',
+            });
+      - name: Report backup warning
+        if: ${{ !cancelled() && steps.backup.outcome != 'success' }}
+        run: echo "::warning::Sauvegarde en échec ou invérifiable ; consulter l'issue de surveillance."
+      - name: Report SSH identity warning
+        if: ${{ !cancelled() && steps.hostkey.outcome != 'success' }}
+        run: echo "::warning::Identité SSH non vérifiée ; consulter l'issue de surveillance."
+      - name: Fail when an availability check failed
+        if: ${{ !cancelled() && (steps.site.outcome != 'success' || steps.api.outcome != 'success' || steps.disk.outcome != 'success') }}
+        run: exit 1

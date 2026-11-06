@@ -2,18 +2,24 @@ name: SIRIUS audit and release guard
 
 on:
   workflow_dispatch:
+  workflow_call:
   schedule:
     - cron: "30 3 * * *"
     - cron: "0 4 * * 0"
   push:
     branches: [master]
+    paths-ignore:
+      - "backend/**"
+      - "frontend/**"
+      - "deploy/**"
+      - ".github/workflows/deploy-hetzner.yml"
 
 permissions:
   contents: read
   issues: write
 
 concurrency:
-  group: sirius-audit-${{ github.ref }}
+  group: sirius-audit-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -35,8 +41,14 @@ jobs:
       - name: Install backend dependencies
         run: python -m pip install -r requirements.txt
         working-directory: backend
+      - name: Install restic for backup and restore tests
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y restic
       - name: Backend syntax and focused tests
         run: |
+          python -m py_compile haccp_kitchen.py ../deploy/hetzner/sqlite_snapshot.py ../deploy/hetzner/monitor.py
+          python -m pytest tests/test_haccp_kitchen.py tests/test_backup_recovery.py tests/test_deploy_guard.py tests/test_monitor.py tests/test_database_failover.py tests/test_resilience.py -q
           python -m py_compile server.py sirius_brain.py proactive.py enterprise.py account_deletion.py auth_api.py local_memory.py live_work.py routers/files.py routes/pantheon_oracle.py routes/work_dossiers.py
           python -m py_compile document_scan_pdf.py routes/document_scans.py
           python -m py_compile chronos_store.py chronos_assistant.py routes/chronos.py
@@ -76,6 +88,8 @@ jobs:
       - name: Windows printer bridge tests (simulated)
         run: node --test scripts/haccp-printer.test.cjs scripts/native-automation.test.cjs
         working-directory: frontend
+      - name: Monitoring alert tests
+        run: node --test deploy/hetzner/monitor-issues.test.cjs deploy/hetzner/monitor-sms.test.cjs
       - name: Run SIRIUS audit
         run: python scripts/sirius_audit.py
       - name: Upload audit report
