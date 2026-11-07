@@ -126,7 +126,8 @@ test("insufficient audio is not added and an unavailable engine cannot start the
   api.status.mockResolvedValue({ ready: false, enrolled: false });
   await mount("B"); await consent(); await click("Commencer les enregistrements");
   expect(record).toHaveBeenCalledTimes(1);
-  expect(host.textContent).toContain("Moteur non disponible");
+  expect(host.textContent).toContain("Moteur de vérification vocale indisponible sur le serveur.");
+  expect(host.textContent).toContain("Le bouton maintenu reste disponible.");
 });
 
 test("the timer starts at actual microphone startup, and stop waits for the audio preview", async () => {
