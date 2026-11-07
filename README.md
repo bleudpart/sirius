@@ -2751,3 +2751,33 @@ Voir le [boilerplate et la spécification](integrations/whatsapp-workspace/READM
 webhooks Meta/Pub/Sub/Calendar vérifiés, liaison WhatsApp par preuve, OAuth
 Google partagé et chiffré, snapshots bornés, envois et événements confirmés.
 Aucun service externe activé par l'installation du code.
+
+## Maintenance automatique des dépendances et des API
+
+Le workflow [SIRIUS audit and release guard](.github/workflows/sirius-audit.yml)
+exécute les tests backend et frontend chaque jour et sur chaque Pull Request.
+Le workflow [SIRIUS maintenance](.github/workflows/sirius-maintenance.yml)
+relance ces tests le dimanche à 04 h UTC, vérifie en lecture seule l'API publique
+et MongoDB, et audite le verrou npm et les quatre fichiers `requirements*.txt`
+du backend. Pour le lancer manuellement : **Actions → SIRIUS maintenance →
+Run workflow**. Le rapport npm est conservé 30 jours ; les résultats Python
+figurent dans les résumés et journaux des jobs. Une vulnérabilité ou un audit
+impossible fait échouer le contrôle : une issue est ouverte sans doublon et sera
+fermée seulement après la réussite des deux audits.
+
+[Dependabot](.github/dependabot.yml) cherche chaque lundi à 05 h 10 UTC des
+versions npm, Python et GitHub Actions et prépare des Pull Requests avec les
+notes de version disponibles. Trois PR de version au maximum sont ouvertes par
+écosystème ; les PR de sécurité ont leur propre limite GitHub. Les mises à jour
+de sécurité exigent que **Dependency graph**, **Dependabot alerts** et
+**Dependabot security updates** soient activés dans les paramètres de sécurité
+du dépôt. GitHub peut suspendre les tâches planifiées d'un dépôt public après
+60 jours d'inactivité ; il faut alors les réactiver dans Actions.
+
+Le fichier [.npmrc](.npmrc) fournit à Dependabot le même réglage
+`legacy-peer-deps` que l'installation du frontend en CI. Les audits de
+vulnérabilités sont planifiés séparément des contrôles de PR : des alertes
+préexistantes ne doivent pas empêcher de tester une correction partielle.
+Aucune PR n'est fusionnée automatiquement. Avant toute fusion, examiner les
+changements, les avertissements de sécurité et les tests ; une fusion modifiant
+le backend ou le frontend déclenche ensuite le déploiement habituel sur Hetzner.

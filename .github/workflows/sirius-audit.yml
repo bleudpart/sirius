@@ -3,9 +3,9 @@ name: SIRIUS audit and release guard
 on:
   workflow_dispatch:
   workflow_call:
+  pull_request:
   schedule:
     - cron: "30 3 * * *"
-    - cron: "0 4 * * 0"
   push:
     branches: [master]
     paths-ignore:
@@ -16,7 +16,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 concurrency:
   group: sirius-audit-${{ github.workflow }}-${{ github.ref }}
@@ -25,8 +24,13 @@ concurrency:
 jobs:
   audit:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -89,7 +93,9 @@ jobs:
         run: node --test scripts/haccp-printer.test.cjs scripts/native-automation.test.cjs
         working-directory: frontend
       - name: Monitoring alert tests
-        run: node --test deploy/hetzner/monitor-deployment.test.cjs deploy/hetzner/monitor-issues.test.cjs deploy/hetzner/monitor-sms.test.cjs
+        run: node --test deploy/hetzner/monitor-deployment.test.cjs deploy/hetzner/monitor-issues.test.cjs deploy/hetzner/monitor-sms.test.cjs scripts/dependency-audit-alert.test.cjs
+      - name: Maintenance configuration tests
+        run: python -m unittest discover -s scripts -p test_maintenance_config.py
       - name: Website release retention test
         run: bash deploy/hetzner/cleanup-releases.test.sh
       - name: Run SIRIUS audit
@@ -100,8 +106,14 @@ jobs:
         with:
           name: sirius-audit-report
           path: audit-report.json
+  notify-failure:
+    if: ${{ always() && !cancelled() && github.event_name != 'pull_request' && needs.audit.result == 'failure' }}
+    needs: audit
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
       - name: Notify failure
-        if: failure()
         uses: actions/github-script@v7
         with:
           script: |

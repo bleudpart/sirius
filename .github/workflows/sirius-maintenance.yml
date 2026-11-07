@@ -1,0 +1,111 @@
+name: SIRIUS maintenance
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * 0"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sirius-maintenance-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  api-tests:
+    uses: ./.github/workflows/sirius-audit.yml
+    permissions:
+      contents: read
+      issues: write
+
+  api-health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Vérifier l'API publique et MongoDB
+        run: python3 deploy/hetzner/monitor.py api
+
+  dependency-npm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Auditer les dépendances npm
+        id: npm-audit
+        working-directory: frontend
+        shell: bash
+        run: |
+          set -o pipefail
+          npm audit --audit-level=low --json | tee "$RUNNER_TEMP/npm-audit.json"
+      - name: Conserver le rapport npm
+        if: ${{ !cancelled() && steps.npm-audit.outcome != 'skipped' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-audit-npm
+          path: ${{ runner.temp }}/npm-audit.json
+          if-no-files-found: error
+          retention-days: 30
+
+  dependency-python:
+    name: Audit Python (${{ matrix.manifest }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        manifest:
+          - backend/requirements.txt
+          - backend/requirements-local.txt
+          - backend/requirements-build.txt
+          - backend/requirements-voice-identity.txt
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Auditer les dépendances Python
+        uses: pypa/gh-action-pip-audit@v1.1.0
+        with:
+          inputs: ${{ matrix.manifest }}
+          internal-be-careful-extra-flags: --strict
+
+  notify-dependencies:
+    if: ${{ always() && !cancelled() && github.ref == 'refs/heads/master' }}
+    needs: [dependency-npm, dependency-python]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Signaler ou clôturer l'alerte de dépendances
+        uses: actions/github-script@v7
+        env:
+          NPM_OUTCOME: ${{ needs.dependency-npm.result }}
+          PYTHON_OUTCOME: ${{ needs.dependency-python.result }}
+        with:
+          script: |
+            const { reconcile } = require('./scripts/dependency-audit-alert.cjs');
+            await reconcile(github, context, {
+              npm: process.env.NPM_OUTCOME,
+              python: process.env.PYTHON_OUTCOME,
+            });
