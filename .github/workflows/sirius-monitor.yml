@@ -61,7 +61,7 @@ jobs:
       - name: Check server disk space
         id: disk
         continue-on-error: true
-        uses: appleboy/ssh-action@v1.2.2
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.HETZNER_HOST }}
           username: ${{ secrets.HETZNER_USER }}
@@ -73,7 +73,7 @@ jobs:
       - name: Check server backups
         id: backup
         continue-on-error: true
-        uses: appleboy/ssh-action@v1.2.2
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.HETZNER_HOST }}
           username: ${{ secrets.HETZNER_USER }}
