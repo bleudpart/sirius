@@ -1,4 +1,5 @@
 @echo off
+setlocal
 chcp 65001 >nul
 title SIRIUS - Compilation Windows
 color 0B
@@ -9,7 +10,7 @@ echo            S . I . R . I . U . S   -   BUILD WINDOWS
 echo  ============================================================
 echo.
 echo   Ce script compile SIRIUS en application Windows (.exe).
-echo   Prerequis : Node.js et Python 3.12 deja installes.
+echo   Prerequis : Node.js 22+ et Python 3.12 deja installes.
 echo   Astuce : CREER-INSTALLATEUR-SIRIUS.bat (racine du projet) installe
 echo   automatiquement Node.js et Python s'ils manquent.
 echo.
@@ -26,7 +27,7 @@ if not exist "package.json" (
     echo  puis relancez BUILD.bat depuis la.
     echo.
     pause
-    exit /b
+    exit /b 1
 )
 
 where node >nul 2>nul
@@ -35,7 +36,7 @@ if %errorlevel% neq 0 (
     echo  Telechargez la version LTS : https://nodejs.org
     echo.
     pause
-    exit /b
+    exit /b 1
 )
 
 where python >nul 2>nul
@@ -44,45 +45,42 @@ if %errorlevel% neq 0 (
     echo  Telechargez Python 3.12 : https://www.python.org/downloads/
     echo.
     pause
-    exit /b
+    exit /b 1
 )
 
-set "PM="
-where yarn >nul 2>nul && set "PM=yarn"
+rem Conserver le manifeste neutre pour les mises a jour du verrou npm.
+set "COREPACK_ENABLE_AUTO_PIN=0"
+set "YARN_CMD="
+set "YARN_VERSION="
+for /f "delims=" %%v in ('yarn --version 2^>nul') do set "YARN_VERSION=%%v"
+if "%YARN_VERSION%"=="1.22.22" set "YARN_CMD=yarn"
 
-if not defined PM (
-    echo  Yarn non detecte. Tentative via Corepack...
-    call corepack enable >nul 2>nul
-    call corepack prepare yarn@1.22.22 --activate >nul 2>nul
-    where yarn >nul 2>nul && set "PM=yarn"
+if not defined YARN_CMD (
+    echo  Yarn 1.22.22 non detecte. Tentative via npm...
+    call npx --yes yarn@1.22.22 --version >nul 2>nul
+    if not errorlevel 1 set "YARN_CMD=npx --yes yarn@1.22.22"
 )
 
-if not defined PM (
-    echo  Tentative via npm...
-    call npm install -g yarn >nul 2>nul
-    where yarn >nul 2>nul && set "PM=yarn"
+if defined YARN_CMD (
+    echo  Gestionnaire utilise : Yarn 1.22.22
+) else (
+    echo  Yarn indisponible : utilisation de npm et du verrou package-lock.json.
 )
 
-if not defined PM (
-    set "PM=npm"
-    echo  Yarn indisponible : utilisation de npm.
-)
-
-echo  Gestionnaire utilise : %PM%
 for /f "delims=" %%v in ('node -p "require('./package.json').version"') do set "SIRIUS_VERSION=%%v"
 echo.
 echo  [1/4] Installation des dependances (quelques minutes)...
 echo.
-if "%PM%"=="yarn" (
-    call yarn install
+if defined YARN_CMD (
+    call %YARN_CMD% install
 ) else (
-    call npm ci
+    call npm ci --legacy-peer-deps
 )
 if %errorlevel% neq 0 (
     echo.
     echo  [ERREUR] Installation des dependances echouee.
     pause
-    exit /b
+    exit /b 1
 )
 
 call python -m pip install -r "..\backend\requirements.txt" -r "..\backend\requirements-build.txt"
@@ -90,7 +88,7 @@ if %errorlevel% neq 0 (
     echo.
     echo  [ERREUR] Installation des dependances Python echouee.
     pause
-    exit /b
+    exit /b 1
 )
 
 rem Le backend embarque son propre Chromium (agent web) : le build s'arrete s'il manque.
@@ -99,14 +97,14 @@ if %errorlevel% neq 0 (
     echo.
     echo  [ERREUR] Installation de Chromium ^(agent web^) echouee.
     pause
-    exit /b
+    exit /b 1
 )
 
 echo.
 echo  [2/4] Compilation du HUD React...
 echo.
-if "%PM%"=="yarn" (
-    call yarn build
+if defined YARN_CMD (
+    call %YARN_CMD% build
 ) else (
     call npm run build
 )
@@ -114,14 +112,14 @@ if %errorlevel% neq 0 (
     echo.
     echo  [ERREUR] Compilation React echouee.
     pause
-    exit /b
+    exit /b 1
 )
 
 echo.
 echo  [3/4] Compilation du backend autonome...
 echo.
-if "%PM%"=="yarn" (
-    call yarn backend:build
+if defined YARN_CMD (
+    call %YARN_CMD% backend:build
 ) else (
     call npm run backend:build
 )
@@ -129,7 +127,7 @@ if %errorlevel% neq 0 (
     echo.
     echo  [ERREUR] Compilation du backend echouee.
     pause
-    exit /b
+    exit /b 1
 )
 
 echo.
@@ -141,14 +139,14 @@ if %errorlevel% neq 0 (
     echo  [ERREUR] Le paquet backend embarque est perime ou incomplet ^(frontend ou Chromium, voir ci-dessus^).
     echo  Le paquet est refuse pour eviter de distribuer un installeur defectueux.
     pause
-    exit /b
+    exit /b 1
 )
 
 echo.
 echo  [4/4] Generation de l'installeur Windows (.exe)...
 echo.
-if "%PM%"=="yarn" (
-    call yarn electron-builder --win nsis portable
+if defined YARN_CMD (
+    call %YARN_CMD% electron-builder --win nsis portable
 ) else (
     call npx electron-builder --win nsis portable
 )
@@ -156,7 +154,7 @@ if %errorlevel% neq 0 (
     echo.
     echo  [ERREUR] Generation de l'executable echouee.
     pause
-    exit /b
+    exit /b 1
 )
 
 echo.

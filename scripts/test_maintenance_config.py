@@ -1,3 +1,4 @@
+import json
 import unittest
 from pathlib import Path
 
@@ -69,7 +70,18 @@ class MaintenanceConfigurationTests(unittest.TestCase):
         notify = self.workflow["jobs"]["notify-failure"]
         self.assertIn("github.event_name != 'pull_request'", notify["if"])
         self.assertIn("always()", notify["if"])
-        self.assertIn("needs.audit.result == 'failure'", notify["if"])
+        self.assertIn("contains(needs.*.result, 'failure')", notify["if"])
+        self.assertEqual(set(notify["needs"]), {"audit", "windows-build"})
+
+        windows = self.workflow["jobs"]["windows-build"]
+        self.assertEqual(windows["runs-on"], "windows-latest")
+        self.assertEqual(windows["permissions"], {"contents": "read"})
+        self.assertTrue(any(
+            "test_windows_build_package_manager.py" in step.get("run", "")
+            for step in windows["steps"]
+        ))
+        yarn = next(step for step in windows["steps"] if "yarn@1.22.22" in step.get("run", ""))
+        self.assertEqual(yarn["env"]["COREPACK_ENABLE_AUTO_PIN"], "0")
 
     def test_dependency_alert_observes_both_scans(self):
         notify = self.maintenance["jobs"]["notify-dependencies"]
@@ -91,6 +103,14 @@ class MaintenanceConfigurationTests(unittest.TestCase):
             self.assertEqual(entry["schedule"]["interval"], "weekly")
             self.assertEqual(entry["open-pull-requests-limit"], "3")
         self.assertEqual((ROOT / ".npmrc").read_text(encoding="utf-8").strip(), "legacy-peer-deps=true")
+
+    def test_npm_manifest_and_lockfile_stay_in_sync(self):
+        manifest = json.loads((ROOT / "frontend" / "package.json").read_text(encoding="utf-8"))
+        lockfile = json.loads((ROOT / "frontend" / "package-lock.json").read_text(encoding="utf-8"))
+        self.assertNotIn("packageManager", manifest)
+        self.assertEqual(lockfile["lockfileVersion"], 3)
+        for key in ("dependencies", "devDependencies", "optionalDependencies"):
+            self.assertEqual(manifest.get(key, {}), lockfile["packages"][""].get(key, {}))
 
 
 if __name__ == "__main__":

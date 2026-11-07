@@ -148,7 +148,7 @@ Python sont déjà présents.
 ## C. Développement (lancer les sources)
 
 ### 1. Prérequis
-- Node.js 18+ et Yarn  (`npm install -g yarn`)
+- Node.js 22+ et npm (inclus avec Node.js)
 - Python 3.10+
 - MongoDB local **optionnel** : s'il est absent, ΣIRIUS utilise automatiquement
   une base SQLite locale (`sirius_docstore.db`). Variable `SIRIUS_DB=local` ou
@@ -185,7 +185,7 @@ les contrôles Omega sont réservés aux connexions locales directes.
 ### 3. Frontend (React)
 ```
 cd frontend
-yarn install
+npm ci --legacy-peer-deps
 ```
 Par défaut, le frontend utilise le backend local `http://127.0.0.1:8001`. Crée `frontend/.env` seulement pour le remplacer :
 ```
@@ -193,7 +193,7 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 ```
 Lancer en dev :
 ```
-yarn start
+npm start
 ```
 
 ### 4. Publier une mise à jour automatique

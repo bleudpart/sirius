@@ -106,9 +106,31 @@ jobs:
         with:
           name: sirius-audit-report
           path: audit-report.json
+  windows-build:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Test Windows package manager selection
+        run: python -m unittest discover -s scripts -p test_windows_build_package_manager.py
+      - name: Check real Yarn compatibility
+        working-directory: frontend
+        env:
+          COREPACK_ENABLE_AUTO_PIN: "0"
+        run: npx.cmd --yes yarn@1.22.22 config get registry
   notify-failure:
-    if: ${{ always() && !cancelled() && github.event_name != 'pull_request' && needs.audit.result == 'failure' }}
-    needs: audit
+    if: ${{ always() && !cancelled() && github.event_name != 'pull_request' && contains(needs.*.result, 'failure') }}
+    needs: [audit, windows-build]
     runs-on: ubuntu-latest
     permissions:
       issues: write

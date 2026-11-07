@@ -1577,8 +1577,11 @@ Validation ciblée depuis `frontend` :
 > restent dans ton dossier utilisateur Windows.
 
 **Prérequis pour compiler** (uniquement pour créer l'installateur) :
-- Node.js 18+ et Yarn (`npm install -g yarn`)
+- Node.js 22+ et npm (inclus avec Node.js)
 - Python 3.10+
+
+`frontend\BUILD.bat` utilise Yarn 1.22.22 s'il est disponible, sinon le lance
+avec `npx`, puis utilise npm en dernier recours. Il n'installe pas Yarn globalement.
 
 Le logo bleu nuit de référence est `frontend/public/icon-source.png`. Après
 une modification du logo, exécuter `frontend\scripts\generate-platform-icons.ps1`
@@ -1626,8 +1629,8 @@ uvicorn server:app --host 127.0.0.1 --port 8001 --no-proxy-headers
 **Frontend :**
 ```
 cd frontend
-yarn install
-yarn start
+npm ci --legacy-peer-deps
+npm start
 ```
 Le HUD s'ouvre sur `http://localhost:3000` et parle au backend local `127.0.0.1:8001`.
 
@@ -2755,7 +2758,8 @@ Aucun service externe activé par l'installation du code.
 ## Maintenance automatique des dépendances et des API
 
 Le workflow [SIRIUS audit and release guard](.github/workflows/sirius-audit.yml)
-exécute les tests backend et frontend chaque jour et sur chaque Pull Request.
+exécute les tests backend et frontend chaque jour et sur chaque Pull Request,
+ainsi que des vérifications du script de compilation Windows.
 Le workflow [SIRIUS maintenance](.github/workflows/sirius-maintenance.yml)
 relance ces tests le dimanche à 04 h UTC, vérifie en lecture seule l'API publique
 et MongoDB, et audite le verrou npm et les quatre fichiers `requirements*.txt`
@@ -2774,9 +2778,12 @@ de sécurité exigent que **Dependency graph**, **Dependabot alerts** et
 du dépôt. GitHub peut suspendre les tâches planifiées d'un dépôt public après
 60 jours d'inactivité ; il faut alors les réactiver dans Actions.
 
-Le fichier [.npmrc](.npmrc) fournit à Dependabot le même réglage
-`legacy-peer-deps` que l'installation du frontend en CI. Les audits de
-vulnérabilités sont planifiés séparément des contrôles de PR : des alertes
+Le frontend utilise `package-lock.json` comme référence pour npm et Dependabot.
+Le manifeste ne fixe pas `packageManager` à Yarn, afin que Dependabot inclue ce
+verrou dans les mises à jour. Le fichier [.npmrc](.npmrc) lui fournit le même
+réglage `legacy-peer-deps` que l'installation du frontend en CI. Le build
+Windows conserve Yarn 1.22.22 sans laisser Corepack modifier le manifeste.
+Les audits de vulnérabilités sont planifiés séparément des contrôles de PR : des alertes
 préexistantes ne doivent pas empêcher de tester une correction partielle.
 Aucune PR n'est fusionnée automatiquement. Avant toute fusion, examiner les
 changements, les avertissements de sécurité et les tests ; une fusion modifiant
