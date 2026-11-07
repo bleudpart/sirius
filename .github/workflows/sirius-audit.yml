@@ -36,7 +36,7 @@ jobs:
           python-version: "3.12"
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - name: Install frontend dependencies
@@ -89,13 +89,23 @@ jobs:
       - name: Frontend automated tests
         run: npm test -- --watchAll=false --runInBand
         working-directory: frontend
+      - name: Frontend production build
+        run: npm run build
+        working-directory: frontend
+        env:
+          CI: "true"
       - name: Windows printer bridge tests (simulated)
         run: node --test scripts/haccp-printer.test.cjs scripts/native-automation.test.cjs
         working-directory: frontend
+      - name: Frontend development server and proxy tests
+        run: node --test scripts/craco-dev-server.test.cjs
+        working-directory: frontend
       - name: Monitoring alert tests
-        run: node --test deploy/hetzner/monitor-deployment.test.cjs deploy/hetzner/monitor-issues.test.cjs deploy/hetzner/monitor-sms.test.cjs scripts/dependency-audit-alert.test.cjs
+        run: node --test deploy/hetzner/monitor-deployment.test.cjs deploy/hetzner/monitor-issues.test.cjs deploy/hetzner/monitor-sms.test.cjs scripts/dependency-audit-alert.test.cjs scripts/dependabot-auto-merge.test.cjs
       - name: Maintenance configuration tests
         run: python -m unittest discover -s scripts -p test_maintenance_config.py
+      - name: Windows release metadata and workflow tests
+        run: python -m unittest discover -s scripts -p test_windows_release.py
       - name: Website release retention test
         run: bash deploy/hetzner/cleanup-releases.test.sh
       - name: Run SIRIUS audit
@@ -123,14 +133,96 @@ jobs:
           node-version: "22"
       - name: Test Windows package manager selection
         run: python -m unittest discover -s scripts -p test_windows_build_package_manager.py
+      - name: Test Windows signing guards without certificates
+        run: |
+          node --test frontend\scripts\build-signed-windows.test.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Signing hook tests failed.' }
+          powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts\test_windows_code_signing.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Signing guard tests failed.' }
       - name: Check real Yarn compatibility
         working-directory: frontend
         env:
           COREPACK_ENABLE_AUTO_PIN: "0"
         run: npx.cmd --yes yarn@1.22.22 config get registry
+  integration-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Test Zapier integration
+        run: |
+          npm ci --ignore-scripts
+          npm test
+          npm run validate
+        working-directory: integrations/zapier
+      - name: Type-check Raycast integration
+        run: |
+          npm ci --ignore-scripts
+          npm run typecheck
+        working-directory: integrations/raycast
+  dependabot_files:
+    if: github.event_name == 'pull_request' && github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+    outputs:
+      app: ${{ steps.detect.outputs.app }}
+    steps:
+      - name: Detect application changes
+        id: detect
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+            core.setOutput("app", files.some(({ filename }) => /^(frontend|backend)\//.test(filename)));
+  electron-build:
+    needs: dependabot_files
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.actor == 'dependabot[bot]' &&
+      needs.dependabot_files.outputs.app == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install frontend dependencies
+        run: npm ci --legacy-peer-deps
+        working-directory: frontend
+      - name: Install backend build dependencies
+        run: python -m pip install -r requirements.txt -r requirements-local.txt -r requirements-build.txt -r requirements-voice-identity.txt
+        working-directory: backend
+      - name: Install Playwright Chromium
+        run: python -m playwright install chromium
+        working-directory: backend
+      - name: Build Windows installers
+        run: npm run electron:build
+        working-directory: frontend
   notify-failure:
     if: ${{ always() && !cancelled() && github.event_name != 'pull_request' && contains(needs.*.result, 'failure') }}
-    needs: [audit, windows-build]
+    needs: [audit, windows-build, integration-tests, dependabot_files, electron-build]
     runs-on: ubuntu-latest
     permissions:
       issues: write

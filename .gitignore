@@ -119,6 +119,8 @@ frontend/node_modules/electron/dist/electron
 backend/contacts_cache.json
 credentials.json
 *.key
+*.pfx
+*.p12
 *.vault
 .credentials
 frontend/node_modules/.cache/default-development/7.pack

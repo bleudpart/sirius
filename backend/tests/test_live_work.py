@@ -2,11 +2,10 @@ import asyncio
 from unittest.mock import AsyncMock
 from datetime import datetime, timezone
 
+import httpx
 import pytest
-from starlette.requests import Request
 
 from live_work import compare_sources, explain_changes
-from routes.work_dossiers import LiveSettingsIn
 from test_work_dossiers import app_client
 
 
@@ -169,11 +168,17 @@ def test_settings_can_revoke_consent_during_ai_without_restoring_old_result(app_
     did = setup_dossier(client, db)
     enable(client, did, True)
     update_stock(db, 1)
-    settings_route = next(r.endpoint for r in client.app.routes if r.path.endswith("/{dossier_id}/live-settings"))
 
     async def revoke(changes, keys):
-        request = Request({"type": "http", "headers": [(b"x-test-user", b"u1")]})
-        await asyncio.wait_for(settings_route(did, LiveSettingsIn(enabled=enabled, allow_ai=False), request), 1)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=client.app), base_url="http://testserver"
+        ) as concurrent_client:
+            response = await asyncio.wait_for(concurrent_client.put(
+                f"/api/work-dossiers/{did}/live-settings",
+                headers=OWNER,
+                json={"enabled": enabled, "allow_ai": False},
+            ), 1)
+            assert response.status_code == 200
         return {"status": "ready", "text": "Résultat périmé", "error": ""}
 
     monkeypatch.setattr("routes.work_dossiers.explain_changes", revoke)

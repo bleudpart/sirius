@@ -13,12 +13,15 @@
   "dependencies": { "zapier-platform-core": "19.2.1" },
   "devDependencies": {
     "nock": "^14.0.0",
-    "zapier-platform-cli": "19.2.1"
+    "zapier-platform-cli": "19.3.0"
   },
   "overrides": {
     "form-data": "4.0.6",
     "tmp": "0.2.7",
     "diff": "8.0.4",
-    "@simple-git/argv-parser": "2.0.1"
+    "@simple-git/argv-parser": "2.0.1",
+    "simple-git": "4.0.1",
+    "minimatch": "11.0.5",
+    "tar": "7.5.22"
   }
 }

@@ -18,6 +18,7 @@ class MaintenanceConfigurationTests(unittest.TestCase):
     def setUpClass(cls):
         cls.workflow = load_yaml(ROOT / ".github" / "workflows" / "sirius-audit.yml")
         cls.maintenance = load_yaml(ROOT / ".github" / "workflows" / "sirius-maintenance.yml")
+        cls.automerge = load_yaml(ROOT / ".github" / "workflows" / "dependabot-auto-merge.yml")
         cls.dependabot = load_yaml(ROOT / ".github" / "dependabot.yml")
 
     def test_scheduled_api_tests_and_pull_requests_are_enabled(self):
@@ -28,15 +29,18 @@ class MaintenanceConfigurationTests(unittest.TestCase):
         self.assertIn("30 3 * * *", [entry["cron"] for entry in events["schedule"]])
         maintenance_events = self.maintenance["on"]
         self.assertIn("workflow_dispatch", maintenance_events)
-        self.assertIn("0 4 * * 0", [entry["cron"] for entry in maintenance_events["schedule"]])
+        self.assertIn("30 3 * * *", [entry["cron"] for entry in maintenance_events["schedule"]])
 
         commands = "\n".join(step.get("run", "") for step in self.workflow["jobs"]["audit"]["steps"])
         self.assertIn("tests/test_haccp_kitchen.py", commands)
         self.assertIn("tests/test_server_hardening.py", commands)
+        self.assertIn("windows-build", self.workflow["jobs"])
+        self.assertIn("integration-tests", self.workflow["jobs"])
         jobs = self.maintenance["jobs"]
         self.assertEqual(jobs["api-tests"]["uses"], "./.github/workflows/sirius-audit.yml")
         health = jobs["api-health"]
         self.assertTrue(any("monitor.py api" in step.get("run", "") for step in health["steps"]))
+        self.assertIn("npm run build", commands)
 
     def test_dependency_audits_cover_all_manifests_without_blocking_pull_requests(self):
         self.assertNotIn("pull_request", self.maintenance["on"])
@@ -55,6 +59,14 @@ class MaintenanceConfigurationTests(unittest.TestCase):
             step.get("uses", "").startswith("pypa/gh-action-pip-audit@")
             for step in jobs["dependency-python"]["steps"]
         ))
+        npm_directories = {
+            entry["directory"]
+            for entry in jobs["dependency-npm"]["strategy"]["matrix"]["include"]
+        }
+        self.assertEqual(
+            npm_directories,
+            {"frontend", "integrations/zapier", "integrations/raycast"},
+        )
         self.assertTrue(any(
             "npm audit --audit-level=low" in step.get("run", "")
             for step in jobs["dependency-npm"]["steps"]
@@ -71,7 +83,10 @@ class MaintenanceConfigurationTests(unittest.TestCase):
         self.assertIn("github.event_name != 'pull_request'", notify["if"])
         self.assertIn("always()", notify["if"])
         self.assertIn("contains(needs.*.result, 'failure')", notify["if"])
-        self.assertEqual(set(notify["needs"]), {"audit", "windows-build"})
+        self.assertEqual(
+            set(notify["needs"]),
+            {"audit", "windows-build", "integration-tests", "dependabot_files", "electron-build"},
+        )
 
         windows = self.workflow["jobs"]["windows-build"]
         self.assertEqual(windows["runs-on"], "windows-latest")
@@ -82,6 +97,20 @@ class MaintenanceConfigurationTests(unittest.TestCase):
         ))
         yarn = next(step for step in windows["steps"] if "yarn@1.22.22" in step.get("run", ""))
         self.assertEqual(yarn["env"]["COREPACK_ENABLE_AUTO_PIN"], "0")
+
+    def test_dependabot_installer_build_detects_files_and_installs_all_runtime_dependencies(self):
+        detection = self.workflow["jobs"]["dependabot_files"]
+        self.assertEqual(detection["permissions"], {"pull-requests": "read"})
+        self.assertIn("pulls.listFiles", detection["steps"][0]["with"]["script"])
+        build = self.workflow["jobs"]["electron-build"]
+        self.assertEqual(build["needs"], "dependabot_files")
+        self.assertIn("needs.dependabot_files.outputs.app", build["if"])
+        self.assertNotIn("pull_request.title", build["if"])
+        install = next(step["run"] for step in build["steps"]
+                       if step.get("name") == "Install backend build dependencies")
+        for manifest in ("requirements.txt", "requirements-local.txt", "requirements-build.txt",
+                         "requirements-voice-identity.txt"):
+            self.assertIn(f"-r {manifest}", install)
 
     def test_dependency_alert_observes_both_scans(self):
         notify = self.maintenance["jobs"]["notify-dependencies"]
@@ -94,15 +123,47 @@ class MaintenanceConfigurationTests(unittest.TestCase):
         self.assertIn("needs.dependency-python.result", alert["env"]["PYTHON_OUTCOME"])
 
     def test_dependabot_covers_npm_python_and_actions(self):
-        updates = {entry["package-ecosystem"]: entry for entry in self.dependabot["updates"]}
-        self.assertEqual(set(updates), {"npm", "pip", "github-actions"})
-        self.assertEqual(updates["npm"]["directory"], "/frontend")
-        self.assertEqual(updates["pip"]["directory"], "/backend")
-        self.assertEqual(updates["github-actions"]["directory"], "/")
-        for entry in updates.values():
-            self.assertEqual(entry["schedule"]["interval"], "weekly")
+        updates = self.dependabot["updates"]
+        npm_updates = [entry for entry in updates if entry["package-ecosystem"] == "npm"]
+        self.assertEqual(
+            {entry["directory"] for entry in npm_updates},
+            {"/frontend", "/integrations/zapier", "/integrations/raycast"},
+        )
+        other_updates = {
+            entry["package-ecosystem"]: entry
+            for entry in updates
+            if entry["package-ecosystem"] != "npm"
+        }
+        self.assertEqual(set(other_updates), {"pip", "github-actions"})
+        self.assertEqual(other_updates["pip"]["directory"], "/backend")
+        self.assertEqual(other_updates["github-actions"]["directory"], "/")
+        for entry in updates:
+            self.assertEqual(entry["schedule"]["interval"], "daily")
+            self.assertEqual(entry["schedule"]["time"], "04:15")
             self.assertEqual(entry["open-pull-requests-limit"], "3")
         self.assertEqual((ROOT / ".npmrc").read_text(encoding="utf-8").strip(), "legacy-peer-deps=true")
+
+    def test_security_automerge_waits_for_successful_dependency_checks(self):
+        events = self.automerge["on"]
+        self.assertEqual(events["workflow_run"]["workflows"], ["SIRIUS audit and release guard"])
+        self.assertEqual(events["workflow_run"]["types"], ["completed"])
+        self.assertEqual(self.automerge["permissions"]["contents"], "read")
+        job = self.automerge["jobs"]["security-update"]
+        self.assertIn("conclusion == 'success'", job["if"])
+        self.assertIn("pull_request", job["if"])
+        self.assertEqual(job["permissions"]["actions"], "write")
+        self.assertEqual(job["permissions"]["contents"], "write")
+        script = next(step for step in job["steps"] if step.get("uses", "").startswith("actions/github-script@"))
+        self.assertIn("processDependabotRun", script["with"]["script"])
+        helper = (ROOT / "scripts" / "dependabot-auto-merge.cjs").read_text(encoding="utf-8")
+        for required in ("listJobsForWorkflowRun", "shouldMergeDependabotSecurityPr",
+                         "sha: run.head_sha", "dependency-graph/compare/{basehead}",
+                         "createWorkflowDispatch", 'workflow_id: "deploy-hetzner.yml"'):
+            self.assertIn(required, helper)
+        commands = "\n".join(
+            step.get("run", "") for step in self.workflow["jobs"]["audit"]["steps"]
+        )
+        self.assertIn("dependabot-auto-merge.test.cjs", commands)
 
     def test_npm_manifest_and_lockfile_stay_in_sync(self):
         manifest = json.loads((ROOT / "frontend" / "package.json").read_text(encoding="utf-8"))

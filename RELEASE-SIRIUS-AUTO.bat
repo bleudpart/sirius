@@ -34,6 +34,9 @@ if errorlevel 1 (
     exit /b 1
 )
 
+call npm run signing:check
+if errorlevel 1 goto fail
+
 echo [1/4] Incrementation automatique du numero de version...
 call npm run version:bump
 if errorlevel 1 goto fail
@@ -50,7 +53,7 @@ if errorlevel 1 goto fail
 
 echo.
 echo [4/4] Publication GitHub Releases...
-call npx electron-builder --win nsis portable --publish always
+call node scripts/build-signed-windows.cjs --publish always
 if errorlevel 1 goto fail
 
 echo.

@@ -1560,6 +1560,14 @@ Validation ciblée depuis `frontend` :
 
 ### Option A — Installer ΣIRIUS comme un logiciel Windows (recommandé)
 
+La chaîne de **compilation, signature et publication Windows dans GitHub Actions**
+est décrite dans [le guide de signature Windows](docs/windows-code-signing.md).
+Elle produit un installateur NSIS et un portable signés, vérifie aussi les
+exécutables et bibliothèques du backend PyInstaller, et ne publie qu'après
+validation des signatures, horodatages et métadonnées de mise à jour.
+Les builds locaux ordinaires restent utilisables sans certificat et ne doivent
+pas être confondus avec une release de production signée.
+
 1. Ouvre le dossier `frontend` et double-clique sur **`BUILD.bat`**.
    Le script :
    - compile le HUD React,
@@ -2461,9 +2469,21 @@ Liste complète des modules et dates : [MODULES_SIRIUS.txt](./MODULES_SIRIUS.txt
   [GitHub Releases](https://github.com/bleudpart/sirius/releases) au démarrage puis toutes les 4 h,
   télécharge en arrière-plan et propose le redémarrage (sinon installation à la fermeture).
   **Publier une nouvelle version :**
+  La voie de production recommandée est désormais le workflow
+  [Windows signed release](.github/workflows/windows-release.yml), déclenché
+  par un tag `vX.Y.Z` correspondant à la version du projet. Configurer d'abord
+  les secrets et l'environnement protégés selon
+  [le guide de signature Windows](docs/windows-code-signing.md).
+  Pour une publication locale :
   1. Configure le jeton GitHub : `set GH_TOKEN=ton_token_github`
+     et prépare le certificat dans le magasin Windows et les variables de
+     signature décrites dans le guide. Le CLI `gh` est également requis.
   2. Lance `RELEASE-SIRIUS-AUTO.bat` à la racine du projet, ou `npm run release:auto` depuis `frontend/`
-  3. Le script augmente automatiquement `version`, compile le HUD/backend, puis publie la release.
+  3. Le script augmente automatiquement `version`, compile le HUD/backend et
+     exige une signature valide avant publication. Le tag distant correspondant
+     doit déjà exister : les commandes locales ne créent plus implicitement un
+     tag pointant vers un ancien commit. Pour une nouvelle version, préférer
+     l'incrémentation, le commit puis le tag et laisser Actions construire.
      Pour une publication manuelle, utilise le nom exact de l'installateur indiqué
      dans `frontend\dist\latest.yml` et son fichier du même nom suivi de `.blockmap`.
      Vérifie la taille et le SHA-512 de l'installateur, publie les exécutables et
@@ -2761,22 +2781,24 @@ Le workflow [SIRIUS audit and release guard](.github/workflows/sirius-audit.yml)
 exécute les tests backend et frontend chaque jour et sur chaque Pull Request,
 ainsi que des vérifications du script de compilation Windows.
 Le workflow [SIRIUS maintenance](.github/workflows/sirius-maintenance.yml)
-relance ces tests le dimanche à 04 h UTC, vérifie en lecture seule l'API publique
-et MongoDB, et audite le verrou npm et les quatre fichiers `requirements*.txt`
-du backend. Pour le lancer manuellement : **Actions → SIRIUS maintenance →
+relance ces tests chaque jour à 03 h 30 UTC, vérifie en lecture seule l'API publique
+et MongoDB, et audite les verrous npm du frontend, de Zapier et de Raycast ainsi
+que les quatre fichiers `requirements*.txt` du backend. Pour le lancer
+manuellement : **Actions → SIRIUS maintenance →
 Run workflow**. Le rapport npm est conservé 30 jours ; les résultats Python
 figurent dans les résumés et journaux des jobs. Une vulnérabilité ou un audit
 impossible fait échouer le contrôle : une issue est ouverte sans doublon et sera
 fermée seulement après la réussite des deux audits.
 
-[Dependabot](.github/dependabot.yml) cherche chaque lundi à 05 h 10 UTC des
-versions npm, Python et GitHub Actions et prépare des Pull Requests avec les
-notes de version disponibles. Trois PR de version au maximum sont ouvertes par
-écosystème ; les PR de sécurité ont leur propre limite GitHub. Les mises à jour
+[Dependabot](.github/dependabot.yml) cherche chaque jour à 04 h 15 UTC des
+versions npm dans les trois projets JavaScript, Python et GitHub Actions et
+prépare des Pull Requests avec les notes de version disponibles. Trois PR de
+version au maximum sont ouvertes par répertoire ; les PR de sécurité ont leur
+propre limite GitHub. Les mises à jour
 de sécurité exigent que **Dependency graph**, **Dependabot alerts** et
 **Dependabot security updates** soient activés dans les paramètres de sécurité
-du dépôt. GitHub peut suspendre les tâches planifiées d'un dépôt public après
-60 jours d'inactivité ; il faut alors les réactiver dans Actions.
+du dépôt. Les alertes de sécurité sont déjà activées ; GitHub ouvre leurs PR dès
+qu'un correctif est disponible.
 
 Le frontend utilise `package-lock.json` comme référence pour npm et Dependabot.
 Le manifeste ne fixe pas `packageManager` à Yarn, afin que Dependabot inclue ce
@@ -2784,7 +2806,15 @@ verrou dans les mises à jour. Le fichier [.npmrc](.npmrc) lui fournit le même
 réglage `legacy-peer-deps` que l'installation du frontend en CI. Le build
 Windows conserve Yarn 1.22.22 sans laisser Corepack modifier le manifeste.
 Les audits de vulnérabilités sont planifiés séparément des contrôles de PR : des alertes
-préexistantes ne doivent pas empêcher de tester une correction partielle.
-Aucune PR n'est fusionnée automatiquement. Avant toute fusion, examiner les
-changements, les avertissements de sécurité et les tests ; une fusion modifiant
-le backend ou le frontend déclenche ensuite le déploiement habituel sur Hetzner.
+préexistantes ne doivent pas empêcher de tester une correction partielle. Les PR
+Dependabot ne sont fusionnées automatiquement que si la comparaison officielle
+des dépendances GitHub confirme la suppression d'au moins une vulnérabilité,
+sans nouvel avis sur une dépendance ajoutée. Le commit doit être signé et vérifié
+comme provenant de Dependabot, et la branche de base doit encore être celle
+testée. Les tests backend, frontend et intégrations doivent réussir ; les
+changements de dépendances backend ou frontend exigent aussi un build complet des
+installateurs Windows. Si les données de comparaison sont indisponibles ou si la
+base a changé, la PR reste ouverte. Les mises à jour ordinaires sans correctif
+de sécurité restent à examiner. Après une fusion concernant le site ou le backend,
+le workflow de déploiement Hetzner est déclenché explicitement ; le site y est
+construit avec Node 22, comme dans les tests.

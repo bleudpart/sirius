@@ -27,6 +27,9 @@ def test_deployment_requires_the_reusable_audit_and_valid_secrets():
     assert audit["concurrency"]["group"] != deploy["concurrency"]["group"]
     assert "${{ github.workflow }}" in audit["concurrency"]["group"]
     assert set(audit["on"]["push"]["paths-ignore"]) == set(deploy["on"]["push"]["paths"])
+    for job in (audit["jobs"]["audit"], deploy["jobs"]["deploy"]):
+        node = next(step for step in job["steps"] if step.get("uses", "").startswith("actions/setup-node@"))
+        assert node["with"]["node-version"] == "22"
 
     commands = next(
         step["run"] for step in audit["jobs"]["audit"]["steps"]

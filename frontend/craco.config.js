@@ -117,6 +117,15 @@ function makeDevServerV5Compatible(devServerConfig) {
     ...compatibleConfig
   } = devServerConfig;
 
+  if (
+    Array.isArray(compatibleConfig.allowedHosts) &&
+    compatibleConfig.allowedHosts.length === 1 &&
+    compatibleConfig.allowedHosts[0] === undefined
+  ) {
+    // CRA supplies no LAN hostname when the dev server binds to loopback.
+    compatibleConfig.allowedHosts = "auto";
+  }
+
   compatibleConfig.server =
     typeof https === "object"
       ? { type: "https", options: https }

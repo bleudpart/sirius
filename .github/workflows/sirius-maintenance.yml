@@ -3,7 +3,7 @@ name: SIRIUS maintenance
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 4 * * 0"
+    - cron: "30 3 * * *"
 
 permissions:
   contents: read
@@ -32,20 +32,31 @@ jobs:
         run: python3 deploy/hetzner/monitor.py api
 
   dependency-npm:
+    name: Audit npm (${{ matrix.directory }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - directory: frontend
+            artifact: frontend
+          - directory: integrations/zapier
+            artifact: zapier
+          - directory: integrations/raycast
+            artifact: raycast
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
       - name: Auditer les dépendances npm
         id: npm-audit
-        working-directory: frontend
+        working-directory: ${{ matrix.directory }}
         shell: bash
         run: |
           set -o pipefail
@@ -54,7 +65,7 @@ jobs:
         if: ${{ !cancelled() && steps.npm-audit.outcome != 'skipped' }}
         uses: actions/upload-artifact@v4
         with:
-          name: dependency-audit-npm
+          name: dependency-audit-npm-${{ matrix.artifact }}
           path: ${{ runner.temp }}/npm-audit.json
           if-no-files-found: error
           retention-days: 30
