@@ -31,21 +31,13 @@ jobs:
     timeout-minutes: 5
     permissions: {}
     steps:
-      - name: Require the verified SSH fingerprint
-        env:
-          HETZNER_HOST_FINGERPRINT: ${{ secrets.HETZNER_HOST_FINGERPRINT }}
-        run: |
-          if [ -z "$HETZNER_HOST_FINGERPRINT" ]; then
-            echo "::error::Empreinte SSH non configuree."
-            exit 1
-          fi
       - name: Compare the running MongoDB configuration
         uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ secrets.HETZNER_HOST }}
           username: ${{ secrets.HETZNER_USER }}
           key: ${{ secrets.HETZNER_SSH_KEY }}
-          fingerprint: ${{ secrets.HETZNER_HOST_FINGERPRINT }}
+          fingerprint: SHA256:zQzsNwKMx3lcLQbl3B9VjYDGmh63g1Lza0YwY6l5n9I
           timeout: 30s
           command_timeout: 1m
           script: |
