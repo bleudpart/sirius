@@ -8,8 +8,20 @@ const messages = {
 
 export function voiceIdentityGuidance(status) {
   if (status?.reason === "model_changed") return "Le modèle vocal a changé. Supprimez l'ancienne empreinte dans Outils → Ma voix, puis créez-en une nouvelle.";
-  if (["operator_disabled", "threshold_not_configured", "model_checksum_not_configured", "model_missing"].includes(status?.reason)) {
-    return "La protection vocale n'est pas activée ou configurée sur le serveur. L'exploitant doit terminer son installation ; utilisez le bouton micro maintenu en attendant.";
+  const setupMessages = {
+    operator_disabled: "La vérification de l'identité vocale est désactivée par défaut. L'exploitant doit l'activer après calibration.",
+    threshold_not_configured: "Le moteur est présent, mais son seuil doit être calibré avant activation.",
+    model_checksum_not_configured: "Le moteur vocal n'a pas d'empreinte SHA-256 configurée.",
+    model_missing: "Le modèle local de reconnaissance du locuteur est absent.",
+    model_unreadable: "Le modèle local de reconnaissance du locuteur est illisible.",
+    invalid_model: "Le modèle local de reconnaissance du locuteur est invalide.",
+    ffmpeg_missing: "Le décodeur audio FFmpeg requis par la reconnaissance vocale est absent.",
+    extractor_not_installed: "Le calculateur vocal sherpa-onnx n'est pas installé dans cet environnement.",
+    worker_missing: "Le processus vocal isolé est absent du paquet Windows.",
+    inference_unavailable: "Le moteur vocal n'a pas pu démarrer.",
+  };
+  if (setupMessages[status?.reason]) {
+    return `${setupMessages[status.reason]} Le bouton micro maintenu reste disponible.`;
   }
   if (status?.ready !== true) return "Moteur de vérification vocale indisponible sur le serveur. Le bouton maintenu reste disponible.";
   if (status.enrolled !== true) return messages.no_profile;

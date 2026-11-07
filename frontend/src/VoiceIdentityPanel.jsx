@@ -3,7 +3,7 @@ import { Capacitor } from "@capacitor/core";
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Headphones, Mic, Minus, RotateCcw, ShieldCheck, Square, Trash2, X } from "lucide-react";
 import { minimizeHoloWindow } from "./holoWindows";
 import { recordVoiceSample } from "./voiceProfileCapture";
-import { voiceIdentityStatus, enrollVoiceIdentity, deleteVoiceIdentity } from "./voiceIdentity";
+import { voiceIdentityStatus, voiceIdentityGuidance, enrollVoiceIdentity, deleteVoiceIdentity } from "./voiceIdentity";
 import "./VoiceProfilePanel.css";
 
 const defaultApi = { status: voiceIdentityStatus, enroll: enrollVoiceIdentity, remove: deleteVoiceIdentity };
@@ -189,7 +189,7 @@ export default function VoiceIdentityPanel({ account, onClose, onDismiss = onClo
       {status?.ready === false && <div className="voice-studio-card">
         <h3>{status.reason === "model_changed" ? "Votre profil doit être renouvelé" : "Le moteur n'est pas disponible"}</h3>
         <p>{status.reason === "model_changed" ? "Le modèle vocal a changé. Supprimez l'ancienne empreinte serveur, puis enregistrez de nouvelles références."
-          : "Moteur non disponible sur le serveur : l'écoute continue est bloquée. Utilisez le bouton micro maintenu."}</p>
+          : voiceIdentityGuidance(status)}</p>
       </div>}
       {account && !loading && !capturing && status?.ready !== true && <button type="button" className="voice-studio-link" disabled={busy} onClick={refresh}><RotateCcw size={16} aria-hidden="true" />Actualiser l'état du moteur</button>}
       {activeProfile ? <div className="voice-studio-card voice-studio-success">

@@ -82,6 +82,27 @@ hiddenimports.extend(
 frontend_build = project_dir / "frontend" / "build"
 if not (frontend_build / "index.html").is_file():
     raise SystemExit(f"Build React introuvable ({frontend_build}) : lancer 'npm run build' avant le build backend.")
+voice_assets_dir = backend_dir / "build" / "voice-identity-assets"
+voice_model = voice_assets_dir / "model" / "wespeaker_en_voxceleb_resnet34_LM.onnx"
+voice_ffmpeg_dir = voice_assets_dir / "ffmpeg"
+voice_ffmpeg = voice_ffmpeg_dir / "ffmpeg.exe"
+voice_notice = voice_assets_dir / "NOTICE.txt"
+voice_manifest = voice_assets_dir / "manifest.json"
+if sys.platform == "win32":
+    missing_voice_assets = [
+        path for path in (voice_model, voice_ffmpeg, voice_notice, voice_manifest)
+        if not path.is_file()
+    ]
+    if missing_voice_assets:
+        raise SystemExit(
+            "Actifs du moteur vocal manquants. Lancer "
+            "'python ../scripts/prepare_voice_identity_assets.py' avant le build : "
+            + ", ".join(str(path) for path in missing_voice_assets)
+        )
+    voice_dlls = sorted(voice_ffmpeg_dir.glob("*.dll"))
+    if not voice_dlls:
+        raise SystemExit("Bibliothèques FFmpeg LGPL manquantes dans " + str(voice_ffmpeg_dir))
+    binaries.extend((str(path), "voice-runtime/ffmpeg") for path in [voice_ffmpeg, *voice_dlls])
 # Fichier par fichier, sans les source maps (.map, ~17 Mo) : elles ne servent qu'aux outils de
 # développement. Le JavaScript embarqué reste identique octet pour octet au build React.
 datas = [
@@ -89,6 +110,13 @@ datas = [
     for path in sorted(frontend_build.rglob("*"))
     if path.is_file() and path.suffix != ".map"
 ]
+if sys.platform == "win32":
+    datas.extend([
+        (str(voice_model), "voice-runtime/model"),
+        (str(voice_notice), "voice-runtime"),
+        (str(voice_manifest), "voice-runtime"),
+        (str(voice_ffmpeg_dir / "LICENSE.txt"), "voice-runtime/ffmpeg"),
+    ])
 datas.extend(collect_data_files("fastembed"))
 datas.extend(collect_data_files("ezdxf"))
 static_dir = backend_dir / "static"

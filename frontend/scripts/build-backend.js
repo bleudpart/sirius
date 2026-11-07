@@ -13,6 +13,15 @@ if (!python) {
   process.exit(1);
 }
 
+if (process.platform === "win32") {
+  const assets = spawnSync(
+    python,
+    [path.resolve(root, "scripts", "prepare_voice_identity_assets.py")],
+    { cwd: root, stdio: "inherit" },
+  );
+  if (assets.error || assets.status !== 0) process.exit(assets.status || 1);
+}
+
 const args = [
   "-m", "PyInstaller", "--noconfirm", "--clean",
   "--distpath", "../backend/dist",

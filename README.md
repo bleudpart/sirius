@@ -31,12 +31,16 @@ du passage de l'onglet en arrière-plan, et peut être relancée manuellement.
 
 Sous Windows empaqueté, la vérification vocale utilise le processus isolé
 `sirius-voice-worker.exe`, livré avec le backend, et non l'exécutable serveur
-comme interpréteur Python. L'activation reste explicite : le modèle, son SHA256,
-le seuil et FFmpeg doivent être configurés dans le `.env` du dossier de données.
-Chaque compte doit ensuite enregistrer ses références avec consentement dans
-« Outils → Ma voix » ; aucune empreinte distante n'est transférée automatiquement.
-Les consignes de préparation concernent le microphone de l'ordinateur, du casque
-ou du téléphone et s'appliquent aux versions Windows et Android.
+comme interpréteur Python. Le modèle WeSpeaker épinglé, FFmpeg (build partagé LGPL)
+et leurs notices sont préparés et vérifiés au moment du build Windows ; ils ne
+sont pas conservés dans le dépôt. L'activation reste désactivée par défaut et
+nécessite un seuil calibré dans le `.env` du dossier de données. Chaque compte
+doit ensuite enregistrer ses références avec consentement dans « Outils → Ma voix ».
+Les enregistrements bruts ne sont pas persistés ; l'empreinte est conservée dans
+la base utilisée par le backend (stockage local ou MongoDB configuré).
+La calibration doit être réalisée avec des voix françaises et les microphones,
+bruits et conditions d'usage réels ; les tests logiciels ne constituent pas une
+preuve de précision biométrique. Voir [le guide Windows de vérification vocale](docs/voice-identity-windows.md).
 
 ### Compte sur la boutique
 

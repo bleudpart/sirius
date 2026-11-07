@@ -1,5 +1,5 @@
 import { API_BASE_URL } from "./lib/api";
-import { requireVoiceIdentity, verifyVoiceIdentity, enrollVoiceIdentity, deleteVoiceIdentity } from "./voiceIdentity";
+import { requireVoiceIdentity, verifyVoiceIdentity, enrollVoiceIdentity, deleteVoiceIdentity, voiceIdentityGuidance } from "./voiceIdentity";
 
 const originalFetch = global.fetch;
 beforeEach(() => { global.fetch = jest.fn(); });
@@ -40,9 +40,19 @@ test("only a literal boolean success verifies the utterance", async () => {
 
 test("disabled protection and expired session give distinct recovery actions", async () => {
   global.fetch.mockResolvedValue(response({ ready: false, enrolled: false, reason: "operator_disabled" }));
-  await expect(requireVoiceIdentity()).rejects.toThrow("terminer son installation");
+  await expect(requireVoiceIdentity()).rejects.toThrow("calibration");
   global.fetch.mockResolvedValue({ ...response({}, false), status: 401 });
   await expect(requireVoiceIdentity()).rejects.toThrow("Reconnectez-vous");
+});
+
+test.each([
+  ["threshold_not_configured", "calibré"],
+  ["model_missing", "modèle local"],
+  ["ffmpeg_missing", "FFmpeg"],
+  ["worker_missing", "processus vocal isolé"],
+])("voice setup reason %s tells the user what is missing", (reason, message) => {
+  expect(voiceIdentityGuidance({ ready: false, reason })).toContain(message);
+  expect(voiceIdentityGuidance({ ready: false, reason })).toContain("bouton micro maintenu");
 });
 
 test("a verification deadline is explained but voluntary cancellation stays an AbortError", async () => {

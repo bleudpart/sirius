@@ -75,7 +75,9 @@ class LocalSpeakerExtractor:
             return "model_unreadable"
         if not self.ffmpeg:
             return "ffmpeg_missing"
-        if importlib.util.find_spec("sherpa_onnx") is None:
+        # In a frozen build sherpa-onnx lives inside the dedicated worker executable,
+        # so the parent backend cannot discover it with find_spec().
+        if not getattr(sys, "frozen", False) and importlib.util.find_spec("sherpa_onnx") is None:
             return "extractor_not_installed"
         if getattr(sys, "frozen", False) and not Path(worker_command()[0]).is_file():
             return "worker_missing"

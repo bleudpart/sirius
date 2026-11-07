@@ -7,6 +7,7 @@ const HEALTH_URL = "http://127.0.0.1:8001/health";
 const HEALTH_TIMEOUT_MS = 120000;
 const HEALTH_POLL_MIN_MS = 120;
 const HEALTH_POLL_MAX_MS = 1200;
+const VOICE_MODEL_SHA256 = "e9848563da86f263117134dfd7ad63c92355b37de492b55e325400c9d9c39012";
 let backendProcess = null;
 
 function readHealth(timeoutMs = 1500) {
@@ -47,6 +48,9 @@ async function startBackend({ resourcesPath, userDataPath }) {
   if (await readHealth()) return { reused: true };
 
   const executable = path.join(resourcesPath, "backend", "sirius-backend.exe");
+  const voiceRuntime = path.join(resourcesPath, "backend", "_internal", "voice-runtime");
+  const voiceModelPath = path.join(voiceRuntime, "model", "wespeaker_en_voxceleb_resnet34_LM.onnx");
+  const ffmpegPath = path.join(voiceRuntime, "ffmpeg", "ffmpeg.exe");
   if (!fs.existsSync(executable)) {
     throw new Error(`Backend ΣIRIUS introuvable : ${executable}`);
   }
@@ -60,6 +64,9 @@ async function startBackend({ resourcesPath, userDataPath }) {
       SIRIUS_DATA_DIR: userDataPath,
       SIRIUS_BACKEND_PORT: "8001",
       SIRIUS_PACKAGED: "1",
+      SIRIUS_VOICE_IDENTITY_MODEL_PATH: voiceModelPath,
+      SIRIUS_VOICE_IDENTITY_MODEL_SHA256: VOICE_MODEL_SHA256,
+      SIRIUS_VOICE_IDENTITY_FFMPEG: ffmpegPath,
     },
     detached: false,
     windowsHide: true,

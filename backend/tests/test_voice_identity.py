@@ -290,6 +290,31 @@ def test_production_default_is_disabled(monkeypatch):
     assert asyncio.run(extractor.ready_reason()) == "operator_disabled"
 
 
+def test_frozen_backend_checks_the_worker_instead_of_parent_python_modules(monkeypatch, tmp_path):
+    import voice_identity
+
+    model = tmp_path / "model.onnx"
+    model.write_bytes(b"x" * 1048576)
+    worker = tmp_path / "sirius-voice-worker.exe"
+    worker.write_bytes(b"worker fixture")
+    ffmpeg = tmp_path / "ffmpeg.exe"
+    ffmpeg.write_bytes(b"decoder fixture")
+    monkeypatch.setenv("SIRIUS_VOICE_IDENTITY_ENABLED", "1")
+    monkeypatch.setenv("SIRIUS_VOICE_IDENTITY_THRESHOLD", "0.8")
+    monkeypatch.setenv("SIRIUS_VOICE_IDENTITY_MODEL_SHA256", "a" * 64)
+    monkeypatch.setenv("SIRIUS_VOICE_IDENTITY_MODEL_PATH", str(model))
+    monkeypatch.setattr(voice_identity.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(voice_identity.shutil, "which", lambda _: str(ffmpeg))
+    monkeypatch.setattr(voice_identity, "worker_command", lambda: [str(worker)])
+    monkeypatch.setattr(
+        voice_identity.importlib.util,
+        "find_spec",
+        lambda _: pytest.fail("The frozen backend must not inspect its worker's Python modules."),
+    )
+
+    assert LocalSpeakerExtractor().configuration_reason() is None
+
+
 def test_model_hash_is_checked_before_loading_native_runtime(api):
     _, db, _, _ = api
     model = Path(db._path).with_name("operator-test-model.onnx")

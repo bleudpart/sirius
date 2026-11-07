@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import sys
 from pathlib import Path
@@ -11,6 +12,11 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "frontend" / "build" / "static" / "js"
 PACKAGED = ROOT / "backend" / "dist" / "sirius-backend" / "_internal" / "frontend" / "build" / "static" / "js"
 PACKAGED_BROWSERS = ROOT / "backend" / "dist" / "sirius-backend" / "_internal" / "playwright-browsers"
+PACKAGED_VOICE_RUNTIME = (
+    ROOT / "backend" / "dist" / "sirius-backend" / "_internal" / "voice-runtime"
+)
+VOICE_MODEL_NAME = "wespeaker_en_voxceleb_resnet34_LM.onnx"
+VOICE_MODEL_SHA256 = "e9848563da86f263117134dfd7ad63c92355b37de492b55e325400c9d9c39012"
 VERSION_FILE = ROOT / "frontend" / "src" / "version.js"
 PACKAGE_FILE = ROOT / "frontend" / "package.json"
 REQUIRED_MARKERS = ("sirius-setup", "capture-interface")
@@ -59,6 +65,28 @@ def packaged_chromium(browsers: Path = PACKAGED_BROWSERS) -> Path:
     )
 
 
+def verify_packaged_voice_runtime(runtime: Path = PACKAGED_VOICE_RUNTIME) -> None:
+    model = runtime / "model" / VOICE_MODEL_NAME
+    ffmpeg = runtime / "ffmpeg" / "ffmpeg.exe"
+    notice = runtime / "NOTICE.txt"
+    license_file = runtime / "ffmpeg" / "LICENSE.txt"
+    manifest_path = runtime / "manifest.json"
+    missing = [path for path in (model, ffmpeg, notice, license_file, manifest_path) if not path.is_file()]
+    if missing:
+        raise RuntimeError(
+            "Runtime de vérification vocale incomplet : "
+            + ", ".join(str(path) for path in missing)
+        )
+    dlls = list((runtime / "ffmpeg").glob("*.dll"))
+    if not dlls:
+        raise RuntimeError("Les bibliothèques FFmpeg du runtime vocal sont absentes.")
+    if digest(model) != VOICE_MODEL_SHA256:
+        raise RuntimeError("Le SHA-256 du modèle vocal embarqué ne correspond pas à la version approuvée.")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if manifest.get("model_sha256") != VOICE_MODEL_SHA256:
+        raise RuntimeError("Le manifeste du runtime vocal ne valide pas le modèle attendu.")
+
+
 def main() -> int:
     source = newest_bundle(SOURCE)
     packaged = newest_bundle(PACKAGED)
@@ -87,6 +115,8 @@ def main() -> int:
     if sys.platform == "win32":
         chrome = packaged_chromium()
         print(f"Packaged Chromium verified: {chrome.relative_to(PACKAGED_BROWSERS).as_posix()} ({chrome.stat().st_size} bytes)")
+        verify_packaged_voice_runtime()
+        print("Packaged local voice-identity runtime verified.")
     return 0
 
 
