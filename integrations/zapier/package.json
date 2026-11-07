@@ -13,7 +13,7 @@
   "dependencies": { "zapier-platform-core": "19.2.1" },
   "devDependencies": {
     "nock": "^14.0.0",
-    "zapier-platform-cli": "19.2.1"
+    "zapier-platform-cli": "19.3.0"
   },
   "overrides": {
     "form-data": "4.0.6",
