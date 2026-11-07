@@ -19,7 +19,7 @@
   ],
   "scripts": { "build": "ray build", "typecheck": "tsc --noEmit", "dev": "ray develop" },
   "dependencies": { "@raycast/api": "2.9.0", "react": "19.2.0" },
-  "devDependencies": { "@types/node": "^22.0.0", "@types/react": "^19.0.0", "typescript": "^5.9.0" },
+  "devDependencies": { "@types/node": "^26.6.6", "@types/react": "^19.0.0", "typescript": "^5.9.0" },
   "engines": { "node": ">=22.22.2" },
   "overrides": { "minimatch": "11.0.5" }
 }
