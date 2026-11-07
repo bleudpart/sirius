@@ -32,17 +32,62 @@ jobs:
     permissions: {}
     steps:
       - name: Compare the running MongoDB configuration
-        uses: appleboy/ssh-action@v1.2.2
-        with:
-          host: ${{ secrets.HETZNER_HOST }}
-          username: ${{ secrets.HETZNER_USER }}
-          key: ${{ secrets.HETZNER_SSH_KEY }}
-          fingerprint: SHA256:zQzsNwKMx3lcLQbl3B9VjYDGmh63g1Lza0YwY6l5n9I
-          timeout: 30s
-          command_timeout: 1m
-          script: |
-            set -eu
-            PYTHONDONTWRITEBYTECODE=1 /opt/sirius/.venv/bin/python - <<'PY'
+        env:
+          HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
+          HETZNER_USER: ${{ secrets.HETZNER_USER }}
+          HETZNER_SSH_KEY: ${{ secrets.HETZNER_SSH_KEY }}
+        run: |
+            set -euo pipefail
+            if [ -z "$HETZNER_HOST" ] || [ -z "$HETZNER_USER" ] || [ -z "$HETZNER_SSH_KEY" ]; then
+              echo "RESULTAT=CONFIGURATION_SSH_ABSENTE"
+              exit 1
+            fi
+            umask 077
+            temporary="$(mktemp -d "$RUNNER_TEMP/sirius-mongo-XXXXXXXX")"
+            cleanup() {
+              rm -f -- "$temporary/key" "$temporary/scan" "$temporary/known_hosts"
+              rmdir -- "$temporary"
+            }
+            trap cleanup EXIT
+            printf '%s\n' "$HETZNER_SSH_KEY" > "$temporary/key"
+            unset HETZNER_SSH_KEY
+            if ! ssh-keyscan -T 15 -t ed25519 "$HETZNER_HOST" > "$temporary/scan" 2>/dev/null; then
+              echo "RESULTAT=LECTURE_CLE_SSH_IMPOSSIBLE"
+              exit 1
+            fi
+            python3 - "$temporary/scan" "$temporary/known_hosts" <<'KEYCHECK'
+            import base64
+            import binascii
+            import hashlib
+            import hmac
+            import sys
+            from pathlib import Path
+
+            expected = "SHA256:zQzsNwKMx3lcLQbl3B9VjYDGmh63g1Lza0YwY6l5n9I"
+            verified = []
+            for line in Path(sys.argv[1]).read_text().splitlines():
+                fields = line.split()
+                if len(fields) < 3 or fields[1] != "ssh-ed25519":
+                    continue
+                try:
+                    public_key = base64.b64decode(fields[2], validate=True)
+                except (ValueError, binascii.Error):
+                    print("RESULTAT=CLE_SSH_INVALIDE")
+                    sys.exit(2)
+                digest = base64.b64encode(hashlib.sha256(public_key).digest()).decode().rstrip("=")
+                if hmac.compare_digest("SHA256:" + digest, expected):
+                    verified.append(line)
+            if not verified:
+                print("RESULTAT=EMPREINTE_SSH_DIFFERENTE")
+                sys.exit(2)
+            Path(sys.argv[2]).write_text("\n".join(verified) + "\n")
+            KEYCHECK
+            ssh -i "$temporary/key" \
+              -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 \
+              -o HostKeyAlgorithms=ssh-ed25519 -o StrictHostKeyChecking=yes \
+              -o UserKnownHostsFile="$temporary/known_hosts" -o GlobalKnownHostsFile=/dev/null \
+              -- "$HETZNER_USER@$HETZNER_HOST" \
+              'PYTHONDONTWRITEBYTECODE=1 /opt/sirius/.venv/bin/python -' <<'PY'
             import hashlib
             import os
             import stat
