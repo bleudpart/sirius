@@ -25,7 +25,138 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  diagnostic-mongodb:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Require the verified SSH fingerprint
+        env:
+          HETZNER_HOST_FINGERPRINT: ${{ secrets.HETZNER_HOST_FINGERPRINT }}
+        run: |
+          if [ -z "$HETZNER_HOST_FINGERPRINT" ]; then
+            echo "::error::Empreinte SSH non configuree."
+            exit 1
+          fi
+      - name: Compare the running MongoDB configuration
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_USER }}
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          fingerprint: ${{ secrets.HETZNER_HOST_FINGERPRINT }}
+          timeout: 30s
+          command_timeout: 1m
+          script: |
+            set -eu
+            PYTHONDONTWRITEBYTECODE=1 /opt/sirius/.venv/bin/python - <<'PY'
+            import hashlib
+            import os
+            import stat
+            import subprocess
+            import sys
+            from pathlib import Path
+            from urllib.parse import urlsplit
+
+            from dotenv import load_dotenv
+
+            EXPECTED = "2ea4dd6061b14ae7de31a66e53981a1dc32f00bc57e8772f5e0f826bcf7577f1"
+            ROOT = Path("/opt/sirius/backend").resolve()
+            COMMAND_ENV = {"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"}
+
+            def main_pid():
+                result = subprocess.run(
+                    ["systemctl", "show", "sirius.service", "--property=MainPID", "--value"],
+                    capture_output=True, text=True, check=True, timeout=10, env=COMMAND_ENV,
+                )
+                pid = result.stdout.strip()
+                if not pid.isdecimal() or int(pid) <= 1:
+                    raise RuntimeError("service unavailable")
+                return pid
+
+            def started_at(pid):
+                proc_stat = Path(f"/proc/{pid}/stat").read_text()
+                fields = proc_stat.rsplit(") ", 1)[1].split()
+                boot = next(
+                    int(line.split()[1])
+                    for line in Path("/proc/stat").read_text().splitlines()
+                    if line.startswith("btime ")
+                )
+                return boot + int(fields[19]) / os.sysconf("SC_CLK_TCK")
+
+            def load_existing(path, override, started):
+                try:
+                    info = path.stat()
+                except FileNotFoundError:
+                    return
+                if not stat.S_ISREG(info.st_mode) or info.st_mtime > started:
+                    raise RuntimeError("dotenv changed after startup or is not a file")
+                load_dotenv(dotenv_path=path, override=override)
+
+            def configuration(initial, root, started):
+                os.environ.clear()
+                os.environ.update(initial)
+                load_existing(root / ".env", False, started)
+                configured = os.environ.get("SIRIUS_DATA_DIR", "").strip()
+                directory = Path(configured).expanduser().resolve() if configured else root
+                if not stat.S_ISDIR(directory.stat().st_mode):
+                    raise RuntimeError("data directory unavailable")
+                if directory != root:
+                    load_existing(directory / ".env", True, started)
+                url = urlsplit(os.environ.get("MONGO_URL", "mongodb://localhost:27017"))
+                if url.scheme not in ("mongodb", "mongodb+srv") or not url.hostname:
+                    raise ValueError("invalid MongoDB address")
+                hostname = url.hostname.lower()
+                database = os.environ.get("DB_NAME", "sirius_db")
+                fingerprint = hashlib.sha256((hostname + "\0" + database).encode()).hexdigest()
+                return hostname, fingerprint
+
+            def run():
+                pid = main_pid()
+                if Path(f"/proc/{pid}/cwd").resolve(strict=True) != ROOT:
+                    raise RuntimeError("unexpected backend directory")
+                initial = {}
+                for entry in Path(f"/proc/{pid}/environ").read_bytes().split(b"\0"):
+                    if b"=" in entry:
+                        key, value = entry.split(b"=", 1)
+                        initial[os.fsdecode(key)] = os.fsdecode(value)
+                hostname, fingerprint = configuration(initial, ROOT, started_at(pid))
+                if main_pid() != pid:
+                    raise RuntimeError("service restarted during check")
+                journal = subprocess.run(
+                    ["journalctl", "--no-pager", "--quiet", "--output=cat",
+                     "--grep", r"\[DB\] MongoDB détecté", f"_PID={pid}"],
+                    capture_output=True, text=True, timeout=10, env=COMMAND_ENV,
+                )
+                marker = "[DB] MongoDB détecté : "
+                records = [line.split(marker, 1)[1].strip()
+                           for line in journal.stdout.splitlines() if marker in line]
+                if journal.returncode != 0 or not records:
+                    journal_result = "NON_VERIFIE"
+                elif all(urlsplit(value).hostname == hostname for value in records):
+                    journal_result = "HOTE_IDENTIQUE"
+                else:
+                    raise RuntimeError("running service log does not match configuration")
+                if main_pid() != pid:
+                    raise RuntimeError("service restarted during check")
+                print("RESULTAT=CONFIGURATION_IDENTIQUE" if fingerprint == EXPECTED
+                      else "RESULTAT=CONFIGURATION_DIFFERENTE")
+                print(f"JOURNAL={journal_result}")
+
+            if __name__ == "__main__":
+                try:
+                    run()
+                except PermissionError:
+                    print("RESULTAT=ACCES_REFUSE")
+                    sys.exit(2)
+                except (OSError, ValueError, UnicodeError, LookupError, StopIteration,
+                        RuntimeError, subprocess.SubprocessError) as error:
+                    print(f"RESULTAT=INCONCLUSIF_{type(error).__name__}")
+                    sys.exit(2)
+            PY
   monitor:
+    if: ${{ github.event_name != 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
