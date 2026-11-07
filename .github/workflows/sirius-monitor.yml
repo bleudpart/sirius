@@ -33,7 +33,7 @@ jobs:
       - name: Check latest deployment
         id: deployment
         continue-on-error: true
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const { latestDeployment } = require('./deploy/hetzner/monitor-deployment.cjs');
@@ -84,7 +84,7 @@ jobs:
           script: python3 /opt/sirius/deploy/hetzner/monitor.py backup
       - name: Update alerts
         if: ${{ !cancelled() }}
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           SITE_OUTCOME: ${{ steps.site.outcome }}
           API_OUTCOME: ${{ steps.api.outcome }}

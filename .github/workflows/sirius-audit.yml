@@ -114,7 +114,7 @@ jobs:
       issues: write
     steps:
       - name: Notify failure
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const title = `SIRIUS audit failed (${context.sha.slice(0, 7)})`;
