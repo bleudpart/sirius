@@ -99,6 +99,7 @@ jobs:
             from dotenv import load_dotenv
 
             EXPECTED = "2ea4dd6061b14ae7de31a66e53981a1dc32f00bc57e8772f5e0f826bcf7577f1"
+            EXPECTED_HOST = "4d50cd778c40ddd57e50b20b008ec427a27331b2effe932bd5ef2f3f0fb5e8d6"
             ROOT = Path("/opt/sirius/backend").resolve()
             COMMAND_ENV = {"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"}
 
@@ -149,6 +150,22 @@ jobs:
                 fingerprint = hashlib.sha256((hostname + "\0" + database).encode()).hexdigest()
                 return hostname, fingerprint
 
+            def logged_hosts(pid):
+                journal = subprocess.run(
+                    ["journalctl", "--no-pager", "--quiet", "--output=cat",
+                     "--grep", r"\[DB\] MongoDB détecté", f"_PID={pid}"],
+                    capture_output=True, text=True, timeout=10, env=COMMAND_ENV,
+                )
+                marker = "[DB] MongoDB détecté : "
+                records = [line.split(marker, 1)[1].strip()
+                           for line in journal.stdout.splitlines() if marker in line]
+                if journal.returncode != 0 or not records:
+                    return []
+                hosts = [urlsplit(value).hostname for value in records]
+                if not all(hosts):
+                    raise ValueError("unparseable MongoDB host in log")
+                return [host.lower() for host in hosts]
+
             def run():
                 pid = main_pid()
                 if Path(f"/proc/{pid}/cwd").resolve(strict=True) != ROOT:
@@ -161,17 +178,10 @@ jobs:
                 hostname, fingerprint = configuration(initial, ROOT, started_at(pid))
                 if main_pid() != pid:
                     raise RuntimeError("service restarted during check")
-                journal = subprocess.run(
-                    ["journalctl", "--no-pager", "--quiet", "--output=cat",
-                     "--grep", r"\[DB\] MongoDB détecté", f"_PID={pid}"],
-                    capture_output=True, text=True, timeout=10, env=COMMAND_ENV,
-                )
-                marker = "[DB] MongoDB détecté : "
-                records = [line.split(marker, 1)[1].strip()
-                           for line in journal.stdout.splitlines() if marker in line]
-                if journal.returncode != 0 or not records:
+                hosts = logged_hosts(pid)
+                if not hosts:
                     journal_result = "NON_VERIFIE"
-                elif all(urlsplit(value).hostname == hostname for value in records):
+                elif all(host == hostname for host in hosts):
                     journal_result = "HOTE_IDENTIQUE"
                 else:
                     raise RuntimeError("running service log does not match configuration")
@@ -181,11 +191,28 @@ jobs:
                       else "RESULTAT=CONFIGURATION_DIFFERENTE")
                 print(f"JOURNAL={journal_result}")
 
+            def journal_fallback():
+                pid = main_pid()
+                hosts = logged_hosts(pid)
+                if main_pid() != pid:
+                    raise RuntimeError("service restarted during check")
+                if not hosts:
+                    print("JOURNAL=NON_VERIFIE")
+                elif all(hashlib.sha256(host.encode()).hexdigest() == EXPECTED_HOST for host in hosts):
+                    print("JOURNAL=CLUSTER_IDENTIQUE")
+                else:
+                    print("JOURNAL=CLUSTER_DIFFERENT")
+
             if __name__ == "__main__":
                 try:
                     run()
                 except PermissionError:
                     print("RESULTAT=ACCES_REFUSE")
+                    try:
+                        journal_fallback()
+                    except (OSError, ValueError, UnicodeError, LookupError, StopIteration,
+                            RuntimeError, subprocess.SubprocessError):
+                        print("JOURNAL=NON_VERIFIE")
                     sys.exit(2)
                 except (OSError, ValueError, UnicodeError, LookupError, StopIteration,
                         RuntimeError, subprocess.SubprocessError) as error:
