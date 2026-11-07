@@ -98,6 +98,27 @@ class MaintenanceConfigurationTests(unittest.TestCase):
         yarn = next(step for step in windows["steps"] if "yarn@1.22.22" in step.get("run", ""))
         self.assertEqual(yarn["env"]["COREPACK_ENABLE_AUTO_PIN"], "0")
 
+    def test_reusable_audit_callers_allow_all_nested_job_permissions(self):
+        levels = {"none": 0, "read": 1, "write": 2}
+        required = {}
+        for job in self.workflow["jobs"].values():
+            permissions = job.get("permissions", self.workflow.get("permissions", {}))
+            for name, value in permissions.items():
+                required[name] = max(required.get(name, 0), levels[value])
+
+        callers = []
+        for path in (ROOT / ".github" / "workflows").glob("*.yml"):
+            workflow = load_yaml(path)
+            for job_name, job in workflow["jobs"].items():
+                if job.get("uses") != "./.github/workflows/sirius-audit.yml":
+                    continue
+                callers.append((path.name, job_name))
+                permissions = job.get("permissions", workflow.get("permissions", {}))
+                for name, level in required.items():
+                    with self.subTest(workflow=path.name, job=job_name, permission=name):
+                        self.assertGreaterEqual(levels.get(permissions.get(name, "none"), 0), level)
+        self.assertTrue(callers)
+
     def test_dependabot_installer_build_detects_files_and_installs_all_runtime_dependencies(self):
         detection = self.workflow["jobs"]["dependabot_files"]
         self.assertEqual(detection["permissions"], {"pull-requests": "read"})

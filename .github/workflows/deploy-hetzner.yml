@@ -24,6 +24,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      pull-requests: read
 
   check-hetzner-secret:
     runs-on: ubuntu-latest

@@ -23,7 +23,9 @@ def test_deployment_requires_the_reusable_audit_and_valid_secrets():
     assert set(deploy["jobs"]["deploy"]["needs"]) == {"audit", "check-hetzner-secret"}
     assert "if" not in deploy["jobs"]["deploy"]
     assert deploy["jobs"]["deploy"]["permissions"] == {"contents": "read"}
-    assert deploy["jobs"]["audit"]["permissions"]["issues"] == "write"
+    assert deploy["jobs"]["audit"]["permissions"] == {
+        "contents": "read", "issues": "write", "pull-requests": "read",
+    }
     assert audit["concurrency"]["group"] != deploy["concurrency"]["group"]
     assert "${{ github.workflow }}" in audit["concurrency"]["group"]
     assert set(audit["on"]["push"]["paths-ignore"]) == set(deploy["on"]["push"]["paths"])
