@@ -36,6 +36,11 @@ class MaintenanceConfigurationTests(unittest.TestCase):
         self.assertIn("tests/test_server_hardening.py", commands)
         self.assertIn("windows-build", self.workflow["jobs"])
         self.assertIn("integration-tests", self.workflow["jobs"])
+        zapier = next(
+            step for step in self.workflow["jobs"]["integration-tests"]["steps"]
+            if step.get("name") == "Test Zapier integration"
+        )
+        self.assertIn("npm run validate -- --without-style", zapier["run"])
         jobs = self.maintenance["jobs"]
         self.assertEqual(jobs["api-tests"]["uses"], "./.github/workflows/sirius-audit.yml")
         health = jobs["api-health"]

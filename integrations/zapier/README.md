@@ -203,32 +203,33 @@ Exemple de REST hook :
 
 ## Installation et validation du connecteur
 
-Node 22+, npm ; versions SDK/CLI verrouillées dans le manifeste et le lockfile.
+Node 22.13 ou supérieur dans la série 22, ou 23.5 et supérieur ; npm.
+Le SDK et le CLI sont verrouillés dans le manifeste et le lockfile.
 
 ```powershell
 Set-Location integrations\zapier
 npm ci --ignore-scripts
 npm test
-npm run validate
+npm run validate -- --without-style
 npm audit --omit=dev
 ```
 
 L'audit des dépendances **d'exécution** est sans alerte lors de la validation.
-Les correctifs de `form-data`, `tmp`, `diff` et `@simple-git/argv-parser` sont
-verrouillés par `overrides`. L'audit **complet** du CLI 19.2.1 reste en alerte :
-30 signalements (4 modérés, 24 élevés, 2 critiques), dans l'outillage de
-développement, notamment la chaîne Yeoman et les archives. Plusieurs n'ont pas
-de correctif compatible annoncé par npm. Ne pas importer de template, dépôt ou
-archive non fiable avec ce CLI, ni le faire tourner dans un environnement
-contenant des secrets de production. Attendre/vérifier une version upstream
-corrigée avant publication générale ; ne pas appliquer `npm audit fix --force`,
-qui propose notamment une régression majeure du SDK. Ces alertes ne sont pas
-présentées comme corrigées par les tests fonctionnels.
+Le CLI 19.3.0 utilise, via `overrides`, Yeoman 6.0.1 pour corriger ses dépendances
+de développement vulnérables. Cette version est plus récente que celle exigée
+par le CLI : les tests couvrent la création de projet et la copie de fichiers.
+Réévaluer cet override lorsque Zapier publiera un CLI corrigé.
 
-`validate` confirme le schéma et les contrôles structurels ; les libellés
-français et l'absence de dropdown sur les identifiants génèrent des avertissements
-de publication Zapier. Une distribution catalogue exige encore la revue
-linguistique/branding et les contrôles de publication, distincts du schéma.
+L'audit **complet** peut encore signaler des dépendances de développement,
+notamment `glob`. Ne pas importer de template, dépôt ou archive non fiable avec
+ce CLI, ni le faire tourner dans un environnement contenant des secrets de
+production. Ne pas appliquer `npm audit fix --force`, qui propose une régression
+majeure du SDK. Les tests fonctionnels ne suppriment pas ces alertes.
+
+La validation avec `--without-style` contrôle le schéma localement sans envoyer
+la définition du connecteur à Zapier ; c'est celle exécutée en CI. Sans cette
+option, `validate` contacte Zapier pour les contrôles de publication. Une
+distribution catalogue exige aussi la revue linguistique et du branding.
 
 Les tests sont locaux et simulés : aucun hook réel ni publication Zapier.
 Après validation, opérations explicites **à effectuer vous-même** sur votre

@@ -160,7 +160,7 @@ jobs:
         run: |
           npm ci --ignore-scripts
           npm test
-          npm run validate
+          npm run validate -- --without-style
         working-directory: integrations/zapier
       - name: Type-check Raycast integration
         run: |
