@@ -4,13 +4,13 @@
   --store-lime: #c5a059;
   --store-line: rgba(197, 160, 89, .34);
   --store-paper: #03070d;
-  --store-panel: #091722;
+  --store-panel: #050709;
   --store-text: #edf4fc;
   --store-muted: #b0c2d8;
   --store-heading: "Palatino Linotype", "Book Antiqua", Palatino, serif;
-  --store-surface: linear-gradient(145deg, #091722, #040a10);
+  --store-surface: linear-gradient(145deg, #080a0c, #030405);
   color: var(--store-text);
-  background: radial-gradient(ellipse at 50% 25%, #16455422, transparent 55%),
+  background: radial-gradient(ellipse at 50% 25%, #c5a0590a, transparent 55%),
     linear-gradient(#5e91b407 1px, transparent 1px) 0 0 / 48px 48px,
     linear-gradient(90deg, #5e91b407 1px, transparent 1px) 0 0 / 48px 48px, #03070d;
   font-family: "Segoe UI", system-ui, sans-serif;
@@ -22,7 +22,8 @@
   .public-workflow, .public-why, .public-trial, .public-matrix, .public-purchase,
   .public-workflow-steps li, .public-core-preview, .public-order-summary,
   .public-matrix-actions li, .public-situations figure, .public-odysseia-card,
-  .public-odysseia-dialog, .public-subscription-success
+  .public-odysseia-dialog, .public-subscription-success, .public-update-card,
+  .public-testimonial, .public-why-grid article
 ),
 .public-legal-page .public-legal-content {
   border: 1px solid var(--store-line);
@@ -264,21 +265,21 @@
 
 .public-store {
   --store-paper: #010307;
-  --store-panel: #050d14;
+  --store-panel: #050709;
   --store-line: rgba(145, 230, 242, .24);
   --store-gold: #c5a059;
   --store-gold-strong: #d8b875;
   --store-cyan: #91e6f2;
   --store-text: #edf4fc;
   --store-muted: #b0c2d8;
-  --store-surface: linear-gradient(160deg, #08131d, #02070b);
+  --store-surface: linear-gradient(160deg, #07090b, #020304);
   --workspace-surface: var(--store-surface);
   --workspace-line: var(--store-line);
   --pantheon-surface: var(--store-surface);
   --workspace-shadow: 0 18px 42px #0009, 0 0 22px rgba(145, 230, 242, .08), inset 0 0 8px rgba(145, 230, 242, .04);
   --store-heading: "Segoe UI", system-ui, sans-serif;
   background:
-    radial-gradient(ellipse at 55% 8%, rgba(145, 230, 242, .045), transparent 44%),
+    radial-gradient(ellipse at 55% 8%, rgba(197, 160, 89, .025), transparent 44%),
     linear-gradient(rgba(94, 145, 187, .025) 1px, transparent 1px) 0 0 / 48px 48px,
     linear-gradient(90deg, rgba(94, 145, 187, .025) 1px, transparent 1px) 0 0 / 48px 48px,
     #010307;
@@ -386,7 +387,7 @@
 .public-store .public-plan.featured,
 .public-store .public-plan-pro {
   border-color: rgba(197, 160, 89, .65);
-  background: linear-gradient(150deg, #101b20, #040a10);
+  background: linear-gradient(150deg, #0b0d0f, #030405);
   box-shadow: 0 18px 40px #0007, 0 0 20px rgba(197, 160, 89, .09);
 }
 

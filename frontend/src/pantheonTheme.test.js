@@ -20,6 +20,14 @@ test("the final skin is loaded after both legacy skin and window geometry", () =
   expect(css).not.toContain("@import");
 });
 
+test("the shared module skin uses a near-black surface without blue panel highlights", () => {
+  const theme = root.nodes.find((node) => node.type === "rule"
+    && node.nodes.some(({ prop }) => prop === "--workspace-surface"));
+  expect(theme.nodes.find(({ prop }) => prop === "--workspace-surface").value)
+    .toBe("linear-gradient(145deg, #080a0c, #030405)");
+  expect(theme.nodes.find(({ prop }) => prop === "--pantheon-surface").value).not.toContain("#91e6f2");
+});
+
 test("the Electron home keeps the Android reference composition on desktop", () => {
   const desktop = electronRoot.nodes.find((node) => node.type === "atrule" && node.params === "(min-width: 600px)");
   expect(desktop.nodes.some((node) => node.selector?.includes(".electron-home-reference .workspace-shortcuts"))).toBe(true);

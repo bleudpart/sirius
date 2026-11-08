@@ -11,7 +11,7 @@ html[data-sirius-visual-theme="classic"][data-sirius-platform] {
   --workspace-line: rgba(197, 160, 89, .34);
   --workspace-font: "Segoe UI", system-ui, sans-serif;
   --pantheon-heading: "Palatino Linotype", "Book Antiqua", Palatino, serif;
-  --workspace-surface: linear-gradient(145deg, #091722, #040a10);
+  --workspace-surface: linear-gradient(145deg, #080a0c, #030405);
   --sirius-glow-frame: 0 0 18px rgba(145, 230, 242, 0.16);
   --sirius-glow-control: 0 0 9px rgba(145, 230, 242, 0.14);
   --sirius-glow-gold: 0 0 14px rgba(216, 184, 117, 0.28);
@@ -27,8 +27,8 @@ html[data-sirius-visual-theme="classic"][data-sirius-platform] {
     linear-gradient(#c5a05999, #c5a05999) right 7px bottom 7px / 17px 1px no-repeat,
     linear-gradient(#c5a05999, #c5a05999) right 7px bottom 7px / 1px 17px no-repeat;
   --pantheon-surface: var(--pantheon-corners),
-    radial-gradient(ellipse, #d8f8f844, #91e6f233 18%, #c5a05922 35%, transparent 72%) 32% top / 92px 2px no-repeat,
-    radial-gradient(ellipse, #d8f8f844, #91e6f233 18%, #c5a05922 35%, transparent 72%) 68% bottom / 92px 2px no-repeat,
+    radial-gradient(ellipse, #c5a05922, #c5a05911 18%, #c5a05908 35%, transparent 72%) 32% top / 92px 2px no-repeat,
+    radial-gradient(ellipse, #c5a05922, #c5a05911 18%, #c5a05908 35%, transparent 72%) 68% bottom / 92px 2px no-repeat,
     repeating-radial-gradient(circle at 50% 40%, transparent 0 39px, #c5a05908 40px, transparent 41px 70px),
     var(--workspace-surface);
 }
@@ -36,7 +36,7 @@ html[data-sirius-visual-theme="classic"][data-sirius-platform] {
 html[data-sirius-visual-theme="classic"][data-sirius-platform] :is(
   .sirius-root, .boot-screen, .auth-screen, .spectator-view
 ) {
-  background: radial-gradient(ellipse at 50% 40%, #16455422, transparent 55%),
+  background: radial-gradient(ellipse at 50% 40%, #c5a0590a, transparent 55%),
     linear-gradient(#5e91b407 1px, transparent 1px) 0 0 / 48px 48px,
     linear-gradient(90deg, #5e91b407 1px, transparent 1px) 0 0 / 48px 48px, #03070d !important;
 }

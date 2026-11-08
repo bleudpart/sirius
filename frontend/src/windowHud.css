@@ -19,9 +19,9 @@ html[data-sirius-visual-theme="classic"][data-sirius-platform] :is(
   --pantheon-heading: "Cinzel", "Palatino Linotype", "Book Antiqua", serif;
   --window-hud-title: #e2d7b8;
   --window-hud-control: rgba(3, 10, 16, 0.8);
-  --window-hud-card: rgba(18, 30, 38, 0.7);
+  --window-hud-card: rgba(8, 10, 12, 0.94);
   --window-hud-card-line: rgba(145, 230, 242, 0.18);
-  --workspace-surface: linear-gradient(160deg, #08131d, #02070b);
+  --workspace-surface: linear-gradient(160deg, #07090b, #020304);
   --workspace-shadow: 0 18px 40px rgba(0, 0, 0, 0.38), var(--sirius-glow-frame), inset 0 1px 0 rgba(214, 248, 255, 0.07);
   --pantheon-corners:
     linear-gradient(#d8b875c7, #d8b875c7) left 7px top 7px / 20px 1.5px no-repeat,
@@ -142,7 +142,7 @@ html[data-sirius-visual-theme="classic"][data-sirius-platform] .sd-social-btn {
   background: var(--window-hud-control);
 }
 
-/* Cartes internes : surface ardoise translucide et liseré cyan. */
+/* Cartes internes : fond noir et liseré cyan. */
 html[data-sirius-visual-theme="classic"][data-sirius-platform] :is(
   .prime-card, .zeus-card, .th-card, .th-form-card, .np-card, .media-module-card,
   .work-item, .prime-sugg, .oracle-day, .mm-row, .pantheon-tile, .connection-item,
