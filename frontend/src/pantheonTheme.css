@@ -11,7 +11,7 @@ html[data-sirius-visual-theme="classic"][data-sirius-platform] {
   --workspace-line: rgba(197, 160, 89, .34);
   --workspace-font: "Segoe UI", system-ui, sans-serif;
   --pantheon-heading: "Palatino Linotype", "Book Antiqua", Palatino, serif;
-  --workspace-surface: linear-gradient(145deg, #080a0c, #030405);
+  --workspace-surface: linear-gradient(145deg, #040506, #010101);
   --sirius-glow-frame: 0 0 18px rgba(145, 230, 242, 0.16);
   --sirius-glow-control: 0 0 9px rgba(145, 230, 242, 0.14);
   --sirius-glow-gold: 0 0 14px rgba(216, 184, 117, 0.28);

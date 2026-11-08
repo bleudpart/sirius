@@ -38,9 +38,9 @@ test("windows use cyan lines, golden corners and Cinzel titles from the home ref
 
 test("the final window skin uses near-black module and card backgrounds", () => {
   const theme = rules.find((rule) => rule.nodes.some((node) => node.prop === "--workspace-surface"));
-  expect(value(theme, "--workspace-surface")).toBe("linear-gradient(160deg, #07090b, #020304)");
-  expect(value(theme, "--window-hud-card")).toBe("rgba(8, 10, 12, 0.94)");
-  expect(value(theme, "--window-hud-control")).toBe("rgba(3, 10, 16, 0.8)");
+  expect(value(theme, "--workspace-surface")).toBe("linear-gradient(160deg, #040506, #010101)");
+  expect(value(theme, "--window-hud-card")).toBe("rgba(5, 6, 7, 0.94)");
+  expect(value(theme, "--window-hud-control")).toBe("rgba(3, 4, 5, 0.85)");
 });
 
 test("window controls become round cyan buttons without changing their 44 px geometry", () => {

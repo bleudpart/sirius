@@ -4,11 +4,11 @@
   --store-lime: #c5a059;
   --store-line: rgba(197, 160, 89, .34);
   --store-paper: #03070d;
-  --store-panel: #050709;
+  --store-panel: #030405;
   --store-text: #edf4fc;
   --store-muted: #b0c2d8;
   --store-heading: "Palatino Linotype", "Book Antiqua", Palatino, serif;
-  --store-surface: linear-gradient(145deg, #080a0c, #030405);
+  --store-surface: linear-gradient(145deg, #040506, #010101);
   color: var(--store-text);
   background: radial-gradient(ellipse at 50% 25%, #c5a0590a, transparent 55%),
     linear-gradient(#5e91b407 1px, transparent 1px) 0 0 / 48px 48px,
@@ -265,14 +265,14 @@
 
 .public-store {
   --store-paper: #010307;
-  --store-panel: #050709;
+  --store-panel: #030405;
   --store-line: rgba(145, 230, 242, .24);
   --store-gold: #c5a059;
   --store-gold-strong: #d8b875;
   --store-cyan: #91e6f2;
   --store-text: #edf4fc;
   --store-muted: #b0c2d8;
-  --store-surface: linear-gradient(160deg, #07090b, #020304);
+  --store-surface: linear-gradient(160deg, #040506, #010101);
   --workspace-surface: var(--store-surface);
   --workspace-line: var(--store-line);
   --pantheon-surface: var(--store-surface);

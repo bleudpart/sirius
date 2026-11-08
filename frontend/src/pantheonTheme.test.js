@@ -24,7 +24,7 @@ test("the shared module skin uses a near-black surface without blue panel highli
   const theme = root.nodes.find((node) => node.type === "rule"
     && node.nodes.some(({ prop }) => prop === "--workspace-surface"));
   expect(theme.nodes.find(({ prop }) => prop === "--workspace-surface").value)
-    .toBe("linear-gradient(145deg, #080a0c, #030405)");
+    .toBe("linear-gradient(145deg, #040506, #010101)");
   expect(theme.nodes.find(({ prop }) => prop === "--pantheon-surface").value).not.toContain("#91e6f2");
 });
 

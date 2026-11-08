@@ -39,8 +39,8 @@ test("public portraits preserve the full image and responsive four-to-five propo
 test("storefront and public password page use the dark HUD palette", () => {
   const storeSkin = rule(".public-store");
   expect(value(storeSkin, "--store-paper")).toBe("#010307");
-  expect(value(storeSkin, "--store-panel")).toBe("#050709");
-  expect(value(storeSkin, "--store-surface")).toBe("linear-gradient(160deg, #07090b, #020304)");
+  expect(value(storeSkin, "--store-panel")).toBe("#030405");
+  expect(value(storeSkin, "--store-surface")).toBe("linear-gradient(160deg, #040506, #010101)");
   expect(value(storeSkin, "--store-line")).toBe("rgba(145, 230, 242, .24)");
 
   const accountStyles = postcss.parse(read("PublicAccount.css"));

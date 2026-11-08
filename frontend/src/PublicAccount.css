@@ -1,6 +1,6 @@
 .public-account {
   --workspace-line: rgba(145, 230, 242, .24);
-  --workspace-surface: linear-gradient(160deg, #08131d, #02070b);
+  --workspace-surface: linear-gradient(160deg, #040506, #010101);
   --pantheon-surface: var(--workspace-surface);
   --workspace-shadow: 0 18px 42px #0009, 0 0 22px rgba(145, 230, 242, .08), inset 0 0 8px rgba(145, 230, 242, .04);
   min-height: 100vh;
@@ -21,7 +21,7 @@
   padding: 0 16px;
   border: 1px solid var(--workspace-line);
   border-radius: 999px;
-  background: #050d14;
+  background: #030405;
   color: #91e6f2;
   text-decoration: none;
 }
@@ -32,7 +32,7 @@
   padding: 16px 20px;
   border: 1px solid var(--workspace-line);
   border-radius: 12px;
-  background: linear-gradient(160deg, #08131d, #02070b);
+  background: linear-gradient(160deg, #040506, #010101);
   color: #b0c2d8;
   line-height: 1.6;
   text-align: center;
@@ -99,7 +99,7 @@
   padding: 24px;
   border: 1px solid var(--workspace-line);
   border-radius: 14px;
-  background: linear-gradient(160deg, #08131d, #02070b);
+  background: linear-gradient(160deg, #040506, #010101);
   line-height: 1.7;
 }
 
