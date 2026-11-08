@@ -74,6 +74,23 @@ test('missing outcomes are treated as failures, not successes', async () => {
   assert.equal(calls.filter(([action]) => action === 'create').length, 6);
 });
 
+test('blocked checks do not create or close alerts when the SSH host key is unverified', async () => {
+  const { github, calls } = harness([
+    { number: 10, title: checks.disk.title },
+    { number: 11, title: checks.backup.title },
+  ]);
+  const state = await reconcile(github, context, {
+    ...healthy, hostkey: 'failure', disk: 'blocked', backup: 'blocked',
+  });
+  assert.deepEqual(
+    calls.filter(([action, options]) => action === 'create').map(([, options]) => options.title),
+    [checks.hostkey.title],
+  );
+  assert.equal(calls.filter(([action]) => action === 'update').length, 0);
+  assert.equal(calls.filter(([action]) => action === 'comment').length, 0);
+  assert.deepEqual(state.activeAlerts.map(issue => issue.check), ['hostkey']);
+});
+
 test('opens a failed deployment alert and closes it only after a successful deployment', async () => {
   let state = harness();
   await reconcile(state.github, context, { ...healthy, deployment: 'failure' });

@@ -235,30 +235,42 @@ def test_monitoring_workflow_covers_all_categories_and_marks_failure():
     assert workflow["permissions"] == {"actions": "read", "contents": "read", "issues": "write"}
     steps = workflow["jobs"]["monitor"]["steps"]
     checks = {step["id"]: step for step in steps if "id" in step}
-    assert set(checks) == {"site", "api", "disk", "backup", "hostkey", "deployment", "disk_retry", "backup_retry"}
+    assert set(checks) == {"site", "api", "disk", "backup", "hostkey", "deployment"}
     assert all(step["continue-on-error"] == "true" for step in checks.values())
     assert checks["site"]["run"].endswith("monitor.py site")
     assert checks["api"]["run"].endswith("monitor.py api")
-    assert checks["disk"]["with"]["script"].endswith("monitor.py disk")
-    assert checks["backup"]["with"]["script"].endswith("monitor.py backup")
+    assert checks["hostkey"]["run"] == "bash deploy/hetzner/setup-ssh.sh"
     assert checks["hostkey"]["env"]["HETZNER_HOST_FINGERPRINT"] == "${{ secrets.HETZNER_HOST_FINGERPRINT }}"
+    assert all(checks["disk"]["env"][secret] == f"${{{{ secrets.{secret} }}}}"
+               for secret in ("HETZNER_HOST", "HETZNER_USER"))
+    assert all(checks["backup"]["env"][secret] == f"${{{{ secrets.{secret} }}}}"
+               for secret in ("HETZNER_HOST", "HETZNER_USER"))
+    assert "steps.hostkey.outcome == 'success'" in checks["disk"]["if"]
+    assert "steps.hostkey.outcome == 'success'" in checks["backup"]["if"]
+    assert checks["disk"]["run"].strip().endswith("monitor.py disk")
+    assert checks["backup"]["run"].strip().endswith("monitor.py backup")
+    for check in (checks["disk"], checks["backup"]):
+        assert "bash deploy/hetzner/retry-ssh.sh timeout 90s ssh" in check["run"]
+        for option in (
+            "IdentitiesOnly=yes", "StrictHostKeyChecking=yes",
+            "UserKnownHostsFile=$HETZNER_SSH_KNOWN_HOSTS_FILE",
+            "GlobalKnownHostsFile=/dev/null", "UpdateHostKeys=no",
+        ):
+            assert option in check["run"]
     assert "latestDeployment(github, context)" in checks["deployment"]["with"]["script"]
-    assert all(checks[name]["with"]["fingerprint"] == "${{ secrets.HETZNER_HOST_FINGERPRINT }}"
-               for name in ("disk", "backup", "disk_retry", "backup_retry"))
-    for name in ("disk", "backup"):
-        retry = checks[f"{name}_retry"]
-        assert retry["with"]["script"] == checks[name]["with"]["script"]
-        assert f"steps.{name}.outcome != 'success'" in retry["if"]
+    assert not any(step.get("uses", "").startswith(("appleboy/ssh-action@", "appleboy/scp-action@"))
+                   for step in steps)
     alerts = next(step for step in steps if step.get("name") == "Update alerts")
     assert alerts["env"]["SIRIUS_SMS_ENABLED"] == "${{ vars.SIRIUS_SMS_ENABLED }}"
     assert "workflow_dispatch" in alerts["env"]["SIRIUS_SMS_TEST"]
-    assert "steps.disk_retry.outcome" in alerts["env"]["DISK_OUTCOME"]
-    assert "steps.backup_retry.outcome" in alerts["env"]["BACKUP_OUTCOME"]
+    assert "'blocked'" in alerts["env"]["DISK_OUTCOME"]
+    assert "'blocked'" in alerts["env"]["BACKUP_OUTCOME"]
     assert alerts["env"]["DEPLOYMENT_OUTCOME"] == "${{ steps.deployment.outcome }}"
     assert alerts["env"]["DEPLOYMENT_STATUS"] == "${{ steps.deployment.outputs.outcome }}"
     assert "process.env.DEPLOYMENT_STATUS === 'pending'" in alerts["with"]["script"]
     assert workflow["on"]["workflow_dispatch"]["inputs"]["test_sms"]["default"] == "false"
     warning = next(step for step in steps if step.get("name") == "Report backup warning")
+    assert "steps.hostkey.outcome == 'success'" in warning["if"]
     assert "steps.backup.outcome != 'success'" in warning["if"]
     hostkey_warning = next(step for step in steps if step.get("name") == "Report SSH identity warning")
     assert "steps.hostkey.outcome != 'success'" in hostkey_warning["if"]
@@ -266,29 +278,9 @@ def test_monitoring_workflow_covers_all_categories_and_marks_failure():
     assert "steps.deployment.outcome != 'success'" in deployment_warning["if"]
     failure = next(step for step in steps if step.get("name") == "Fail when an availability check failed")
     assert "steps.backup.outcome" not in failure["if"]
-    assert all(f"steps.{name}.outcome" in failure["if"] for name in ("site", "api", "disk", "disk_retry"))
+    assert all(f"steps.{name}.outcome" in failure["if"] for name in ("site", "api", "disk", "hostkey"))
     audit_path = ROOT / ".github" / "workflows" / "sirius-audit.yml"
     audit = yaml.load(audit_path.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
     monitoring_tests = next(step["run"] for step in audit["jobs"]["audit"]["steps"]
                             if step.get("name") == "Monitoring alert tests")
     assert "monitor-deployment.test.cjs" in monitoring_tests
-
-
-@pytest.mark.parametrize("fingerprint, expected", [("", 1), ("SHA256:synthetic-fingerprint", 0)])
-def test_missing_host_fingerprint_warns_without_disclosing_the_value(fingerprint, expected):
-    bash = shutil.which("bash")
-    if not bash and os.name == "nt":
-        candidate = Path(r"C:\Program Files\Git\bin\bash.exe")
-        bash = str(candidate) if candidate.is_file() else None
-    if not bash:
-        pytest.skip("Bash requis pour tester le contrôle de l'empreinte")
-    path = ROOT / ".github" / "workflows" / "sirius-monitor.yml"
-    workflow = yaml.load(path.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
-    script = next(step["run"] for step in workflow["jobs"]["monitor"]["steps"]
-                  if step.get("id") == "hostkey")
-    environment = os.environ.copy()
-    environment["HETZNER_HOST_FINGERPRINT"] = fingerprint
-    result = subprocess.run([bash, "-c", script], env=environment, capture_output=True, text=True)
-    assert result.returncode == expected
-    if fingerprint:
-        assert fingerprint not in result.stdout + result.stderr

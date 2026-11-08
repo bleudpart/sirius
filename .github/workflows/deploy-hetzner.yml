@@ -35,8 +35,9 @@ jobs:
           HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
           HETZNER_USER: ${{ secrets.HETZNER_USER }}
           HETZNER_SSH_KEY: ${{ secrets.HETZNER_SSH_KEY }}
+          HETZNER_HOST_FINGERPRINT: ${{ secrets.HETZNER_HOST_FINGERPRINT }}
         run: |
-          for name in HETZNER_HOST HETZNER_USER HETZNER_SSH_KEY; do
+          for name in HETZNER_HOST HETZNER_USER HETZNER_SSH_KEY HETZNER_HOST_FINGERPRINT; do
             if [ -z "${!name}" ]; then
               echo "::error::$name is empty; deployment cannot proceed."
               exit 1
@@ -64,45 +65,58 @@ jobs:
           npm run build
           printf '%s\n' "$GITHUB_SHA" > build/deploy-sha.txt
           tar -czf ../frontend-web.tar.gz -C build .
+      - name: Configure pinned Hetzner SSH
+        env:
+          HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
+          HETZNER_USER: ${{ secrets.HETZNER_USER }}
+          HETZNER_SSH_KEY: ${{ secrets.HETZNER_SSH_KEY }}
+          HETZNER_HOST_FINGERPRINT: ${{ secrets.HETZNER_HOST_FINGERPRINT }}
+        run: bash deploy/hetzner/setup-ssh.sh
       - name: Transfer website
-        id: transfer
-        continue-on-error: true
-        uses: appleboy/scp-action@v1.0.0
-        with:
-          host: ${{ secrets.HETZNER_HOST }}
-          username: ${{ secrets.HETZNER_USER }}
-          key: ${{ secrets.HETZNER_SSH_KEY }}
-          fingerprint: ${{ secrets.HETZNER_HOST_FINGERPRINT }}
-          source: frontend-web.tar.gz
-          target: /tmp/sirius-frontend-${{ github.sha }}
-      # scp-action downloads its client on every run and that download sometimes fails
-      # (curl exit 22); the copy is idempotent, so it is retried once.
-      - name: Wait before retrying transfer
-        if: ${{ steps.transfer.outcome != 'success' }}
-        run: sleep 30
-      - name: Retry website transfer
-        if: ${{ steps.transfer.outcome != 'success' }}
-        uses: appleboy/scp-action@v1.0.0
-        with:
-          host: ${{ secrets.HETZNER_HOST }}
-          username: ${{ secrets.HETZNER_USER }}
-          key: ${{ secrets.HETZNER_SSH_KEY }}
-          fingerprint: ${{ secrets.HETZNER_HOST_FINGERPRINT }}
-          source: frontend-web.tar.gz
-          target: /tmp/sirius-frontend-${{ github.sha }}
+        env:
+          HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
+          HETZNER_USER: ${{ secrets.HETZNER_USER }}
+        run: |
+          set -euo pipefail
+          target="$HETZNER_USER@$HETZNER_HOST"
+          remote_dir="/tmp/sirius-frontend-$GITHUB_SHA"
+          ssh_options=(
+            -i "$HETZNER_SSH_IDENTITY_FILE"
+            -o BatchMode=yes
+            -o IdentitiesOnly=yes
+            -o StrictHostKeyChecking=yes
+            -o "UserKnownHostsFile=$HETZNER_SSH_KNOWN_HOSTS_FILE"
+            -o GlobalKnownHostsFile=/dev/null
+            -o UpdateHostKeys=no
+            -o ConnectTimeout=15
+          )
+          bash deploy/hetzner/retry-ssh.sh timeout 2m ssh "${ssh_options[@]}" "$target" "mkdir -p -- '$remote_dir'"
+          bash deploy/hetzner/retry-ssh.sh timeout 10m scp "${ssh_options[@]}" frontend-web.tar.gz "$target:$remote_dir/frontend-web.tar.gz"
       - name: Deploy on Hetzner VPS
-        uses: appleboy/ssh-action@v1.2.2
-        with:
-          host: ${{ secrets.HETZNER_HOST }}
-          username: ${{ secrets.HETZNER_USER }}
-          key: ${{ secrets.HETZNER_SSH_KEY }}
-          fingerprint: ${{ secrets.HETZNER_HOST_FINGERPRINT }}
-          command_timeout: 20m
-          script: |
-            set -eu
-            sudo /opt/sirius/deploy/hetzner/deploy.sh /tmp/sirius-frontend-${{ github.sha }}/frontend-web.tar.gz "${{ github.sha }}"
-            if [ ! -f /etc/systemd/system/sirius.service.d/90-sirius-managed-database.conf ]; then
-              echo "Activation de la protection de la base cloud."
-              sudo /opt/sirius/deploy/hetzner/deploy.sh "" "${{ github.sha }}"
-            fi
-            python3 /opt/sirius/deploy/hetzner/monitor.py api-local
+        env:
+          HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
+          HETZNER_USER: ${{ secrets.HETZNER_USER }}
+        run: |
+          set -euo pipefail
+          target="$HETZNER_USER@$HETZNER_HOST"
+          timeout 20m ssh \
+            -i "$HETZNER_SSH_IDENTITY_FILE" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o "UserKnownHostsFile=$HETZNER_SSH_KNOWN_HOSTS_FILE" \
+            -o GlobalKnownHostsFile=/dev/null \
+            -o UpdateHostKeys=no \
+            -o ConnectTimeout=15 \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=40 \
+            "$target" "bash -s -- '$GITHUB_SHA'" <<'REMOTE'
+          set -eu
+          sha="$1"
+          sudo /opt/sirius/deploy/hetzner/deploy.sh "/tmp/sirius-frontend-$sha/frontend-web.tar.gz" "$sha"
+          if [ ! -f /etc/systemd/system/sirius.service.d/90-sirius-managed-database.conf ]; then
+            echo "Activation de la protection de la base cloud."
+            sudo /opt/sirius/deploy/hetzner/deploy.sh "" "$sha"
+          fi
+          python3 /opt/sirius/deploy/hetzner/monitor.py api-local
+          REMOTE

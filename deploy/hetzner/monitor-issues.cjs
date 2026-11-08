@@ -19,7 +19,7 @@ const checks = {
   },
   hostkey: {
     title: 'SIRIUS surveillance : identité SSH du serveur',
-    description: "L'empreinte SSH vérifiée du serveur n'est pas configurée dans GitHub.",
+    description: "L'identité SSH du serveur n'a pas pu être vérifiée. Configurez les secrets SSH et l'empreinte SHA-256 vérifiée.",
   },
   deployment: {
     title: 'SIRIUS surveillance : déploiement',
@@ -38,6 +38,7 @@ async function reconcile(github, context, outcomes) {
 
   for (const [name, check] of Object.entries(checks)) {
     const existing = openIssues.filter(issue => !issue.pull_request && issue.title === check.title);
+    if (outcomes[name] === 'blocked') continue;
     if (name === 'deployment' && outcomes[name] === 'pending') {
       activeAlerts.push(...existing.map(issue => ({ ...issue, check: name })));
       continue;

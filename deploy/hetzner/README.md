@@ -116,11 +116,19 @@ SSH du VPS, vérifiée depuis la console Hetzner ou un autre canal de confiance 
 ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub -E sha256
 ```
 
-Sans cette valeur, les actions SSH et SCP ne vérifient pas l'identité du serveur.
-La surveillance ouvre une issue tant que cette empreinte n'est pas configurée.
-Ne pas considérer une empreinte obtenue uniquement par `ssh-keyscan` sur le
-réseau comme vérifiée. Après configuration, tester un déploiement et la
-surveillance ; une mauvaise empreinte doit bloquer la connexion.
+Dans le secret, copier uniquement la partie `SHA256:...`, sans le nombre de
+bits, le nom de la clé ni `(ED25519)`.
+
+Les workflows utilisent le client OpenSSH natif de GitHub Actions et refusent
+toute connexion si cette empreinte manque ou ne correspond pas à la clé reçue.
+`setup-ssh.sh` ne conserve dans `known_hosts` que la clé correspondant à
+l'empreinte configurée. `ssh-keyscan` sert uniquement à récupérer la clé à
+comparer ; ne pas considérer son résultat seul comme une valeur vérifiée.
+La lecture de la clé, les transferts et les contrôles distants sont réessayés
+une fois après 30 secondes en cas d'échec.
+La surveillance ouvre une issue si l'empreinte n'est pas configurée.
+Après configuration, tester un déploiement et la surveillance ; une mauvaise
+empreinte doit bloquer la connexion.
 
 Pour l’utilisateur non-root `deploy`, `setup.sh` crée la règle sudoers limitée à :
 
@@ -129,9 +137,10 @@ Pour l’utilisateur non-root `deploy`, `setup.sh` crée la règle sudoers limit
 ```
 
 Le workflow `.github/workflows/deploy-hetzner.yml` lance d'abord l'audit et les
-tests ; le déploiement est bloqué si l'audit échoue ou si un secret Hetzner est
-absent. Après publication, il vérifie aussi l'API locale, MongoDB et
-`mongo_required` ; un échec ne revient pas automatiquement à l'ancienne version.
+tests ; le déploiement est bloqué si l'audit échoue ou si un secret Hetzner,
+y compris l'empreinte vérifiée, est absent. Après publication, il vérifie aussi
+l'API locale, MongoDB et `mongo_required` ; un échec ne revient pas automatiquement
+à l'ancienne version.
 Il se déclenche aussi sur les changements frontend. Il compile avec
 `REACT_APP_BACKEND_URL=https://api.sirius-assistant.fr`, transfère le build par SSH,
 puis publie le commit exact. Les limites et la facturation GitHub Actions
