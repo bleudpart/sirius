@@ -49,8 +49,17 @@ def test_deployment_requires_the_reusable_audit_and_valid_secrets():
     )
     ssh_steps = [step for step in deploy["jobs"]["deploy"]["steps"]
                  if step.get("uses", "").startswith(("appleboy/ssh-action@", "appleboy/scp-action@"))]
-    assert len(ssh_steps) == 2
+    assert len(ssh_steps) == 3
     assert all(step["with"]["fingerprint"] == "${{ secrets.HETZNER_HOST_FINGERPRINT }}" for step in ssh_steps)
+    steps = deploy["jobs"]["deploy"]["steps"]
+    transfer = next(step for step in steps if step.get("id") == "transfer")
+    retry = next(step for step in steps if step.get("name") == "Retry website transfer")
+    assert transfer["continue-on-error"] == "true"
+    assert "continue-on-error" not in retry
+    assert retry["with"] == transfer["with"]
+    assert "steps.transfer.outcome != 'success'" in retry["if"]
+    deploy_step = next(step for step in steps if step.get("name") == "Deploy on Hetzner VPS")
+    assert "continue-on-error" not in deploy_step
     assert "90-sirius-managed-database.conf" in remote
     assert 'deploy.sh "" "${{ github.sha }}"' in remote
     assert remote.rstrip().endswith("monitor.py api-local")
