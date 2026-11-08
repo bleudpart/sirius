@@ -74,7 +74,7 @@ jobs:
           source: frontend-web.tar.gz
           target: /tmp/sirius-frontend-${{ github.sha }}
       - name: Deploy on Hetzner VPS
-        uses: appleboy/ssh-action@v1.2.2
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.HETZNER_HOST }}
           username: ${{ secrets.HETZNER_USER }}
