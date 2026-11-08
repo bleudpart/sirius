@@ -235,7 +235,7 @@ def test_monitoring_workflow_covers_all_categories_and_marks_failure():
     assert workflow["permissions"] == {"actions": "read", "contents": "read", "issues": "write"}
     steps = workflow["jobs"]["monitor"]["steps"]
     checks = {step["id"]: step for step in steps if "id" in step}
-    assert set(checks) == {"site", "api", "disk", "backup", "hostkey", "deployment"}
+    assert set(checks) == {"site", "api", "disk", "backup", "hostkey", "deployment", "disk_retry", "backup_retry"}
     assert all(step["continue-on-error"] == "true" for step in checks.values())
     assert checks["site"]["run"].endswith("monitor.py site")
     assert checks["api"]["run"].endswith("monitor.py api")
@@ -244,10 +244,16 @@ def test_monitoring_workflow_covers_all_categories_and_marks_failure():
     assert checks["hostkey"]["env"]["HETZNER_HOST_FINGERPRINT"] == "${{ secrets.HETZNER_HOST_FINGERPRINT }}"
     assert "latestDeployment(github, context)" in checks["deployment"]["with"]["script"]
     assert all(checks[name]["with"]["fingerprint"] == "${{ secrets.HETZNER_HOST_FINGERPRINT }}"
-               for name in ("disk", "backup"))
+               for name in ("disk", "backup", "disk_retry", "backup_retry"))
+    for name in ("disk", "backup"):
+        retry = checks[f"{name}_retry"]
+        assert retry["with"]["script"] == checks[name]["with"]["script"]
+        assert f"steps.{name}.outcome != 'success'" in retry["if"]
     alerts = next(step for step in steps if step.get("name") == "Update alerts")
     assert alerts["env"]["SIRIUS_SMS_ENABLED"] == "${{ vars.SIRIUS_SMS_ENABLED }}"
     assert "workflow_dispatch" in alerts["env"]["SIRIUS_SMS_TEST"]
+    assert "steps.disk_retry.outcome" in alerts["env"]["DISK_OUTCOME"]
+    assert "steps.backup_retry.outcome" in alerts["env"]["BACKUP_OUTCOME"]
     assert alerts["env"]["DEPLOYMENT_OUTCOME"] == "${{ steps.deployment.outcome }}"
     assert alerts["env"]["DEPLOYMENT_STATUS"] == "${{ steps.deployment.outputs.outcome }}"
     assert "process.env.DEPLOYMENT_STATUS === 'pending'" in alerts["with"]["script"]
@@ -260,7 +266,7 @@ def test_monitoring_workflow_covers_all_categories_and_marks_failure():
     assert "steps.deployment.outcome != 'success'" in deployment_warning["if"]
     failure = next(step for step in steps if step.get("name") == "Fail when an availability check failed")
     assert "steps.backup.outcome" not in failure["if"]
-    assert all(f"steps.{name}.outcome" in failure["if"] for name in ("site", "api", "disk"))
+    assert all(f"steps.{name}.outcome" in failure["if"] for name in ("site", "api", "disk", "disk_retry"))
     audit_path = ROOT / ".github" / "workflows" / "sirius-audit.yml"
     audit = yaml.load(audit_path.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
     monitoring_tests = next(step["run"] for step in audit["jobs"]["audit"]["steps"]
