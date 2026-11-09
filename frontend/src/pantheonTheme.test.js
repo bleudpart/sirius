@@ -77,6 +77,22 @@ test("the Electron home keeps the Android reference composition on desktop", () 
   expect(webMobileFooter.nodes.map(({ prop, value }) => [prop, value])).toContainEqual(["white-space", "normal"]);
 });
 
+test("the Electron toolbar has a reserved inset from the top of the window", () => {
+  const layout = electronRoot.nodes.find((node) => node.selector === ".sirius-root.electron-home-reference");
+  const desktop = electronRoot.nodes.find((node) => node.type === "atrule" && node.params === "(min-width: 600px)");
+  const rows = desktop.nodes.find((node) => node.selector === ".sirius-root.electron-home-reference");
+  const toolbar = desktop.nodes.find((node) => node.selector?.endsWith(".electron-home-reference .top-bar"));
+  const value = (rule, prop) => rule.nodes.find((node) => node.prop === prop).value;
+
+  expect(value(layout, "padding-top")).toBe("calc(env(safe-area-inset-top, 0px) + 12px)");
+  expect(value(toolbar, "align-self")).toBe("center");
+  const rowHeight = parseFloat(value(rows, "grid-template-rows"));
+  const toolbarHeight = parseFloat(value(toolbar, "height"));
+  const toolbarTop = 12 + (rowHeight - toolbarHeight) / 2;
+  expect(toolbarTop).toBe(16);
+  expect(12 + rowHeight - (toolbarTop + toolbarHeight)).toBeGreaterThanOrEqual(4);
+});
+
 test("the Electron home keeps the lower controls reachable when the HUD is scaled", () => {
   const desktop = electronRoot.nodes.find((node) => node.type === "atrule" && node.params === "(min-width: 600px)");
   const rule = (suffix) => desktop.nodes.find((node) => node.selector?.endsWith(suffix));
