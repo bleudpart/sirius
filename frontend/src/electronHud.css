@@ -207,6 +207,22 @@
     border-color: rgba(145, 230, 242, 0.52);
   }
 
+  .sirius-root.electron-home-reference .workspace-shortcuts button {
+    transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease, color 180ms ease;
+  }
+
+  .sirius-root.electron-home-reference .workspace-shortcuts button:is(:hover, :focus-visible) {
+    border-color: rgba(197, 160, 89, 0.72);
+    background: linear-gradient(120deg, rgba(197, 160, 89, 0.2), rgba(145, 230, 242, 0.2), rgba(197, 160, 89, 0.12));
+    color: #fff3d4;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 0 14px rgba(145, 230, 242, 0.22), 0 0 8px rgba(197, 160, 89, 0.2);
+  }
+
+  .sirius-root.electron-home-reference .workspace-shortcuts button:focus-visible {
+    outline: 2px solid rgba(197, 160, 89, 0.9);
+    outline-offset: 2px;
+  }
+
   html[data-sirius-visual-theme="classic"][data-sirius-platform="web"] .sirius-root.electron-home-reference .pantheon-composer {
     display: grid;
     width: 100%;
@@ -334,6 +350,24 @@
     color: #101923;
     box-shadow: var(--sirius-glow-gold-control, none);
     animation: none;
+  }
+}
+
+@media (min-width: 1440px) and (min-height: 700px) {
+  .sirius-root.electron-home-reference .sirius-identity {
+    padding-top: 18px;
+  }
+
+  html[data-sirius-visual-theme="classic"][data-sirius-platform="web"] .sirius-root.electron-home-reference .sirius-stage .reactor-wrap {
+    width: clamp(156px, 19.7vh, 211px);
+    height: clamp(156px, 19.7vh, 211px);
+  }
+
+  .sirius-root.electron-home-reference .sirius-stage::before {
+    width: min(78vh, 700px);
+    height: min(78vh, 700px);
+    background: radial-gradient(circle, rgba(216, 184, 117, 0.12), rgba(126, 231, 255, 0.065) 45%, transparent 72%);
+    filter: blur(20px);
   }
 }
 

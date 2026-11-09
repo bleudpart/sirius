@@ -93,6 +93,31 @@ test("the Electron toolbar has a reserved inset from the top of the window", () 
   expect(12 + rowHeight - (toolbarTop + toolbarHeight)).toBeGreaterThanOrEqual(4);
 });
 
+test("the wide Electron home has a brighter center and legible shortcut hover", () => {
+  const wide = electronRoot.nodes.find((node) => node.type === "atrule"
+    && node.params === "(min-width: 1440px) and (min-height: 700px)");
+  const rule = (suffix) => wide.nodes.find((node) => node.selector?.endsWith(suffix));
+  const value = (node, prop) => node.nodes.find((declaration) => declaration.prop === prop).value;
+  const identity = rule(".electron-home-reference .sirius-identity");
+  const reactor = rule(".electron-home-reference .sirius-stage .reactor-wrap");
+  const halo = rule(".electron-home-reference .sirius-stage::before");
+  const desktop = electronRoot.nodes.find((node) => node.type === "atrule" && node.params === "(min-width: 600px)");
+  const shortcuts = desktop.nodes.find((node) => node.selector?.endsWith(".electron-home-reference .workspace-shortcuts button")
+    && node.nodes.some((declaration) => declaration.prop === "transition"));
+  const hover = desktop.nodes.find((node) => node.selector?.endsWith(".electron-home-reference .workspace-shortcuts button:is(:hover, :focus-visible)"));
+  const focus = desktop.nodes.find((node) => node.selector?.endsWith(".electron-home-reference .workspace-shortcuts button:focus-visible"));
+
+  expect(value(identity, "padding-top")).toBe("18px");
+  expect(value(reactor, "width")).toBe("clamp(156px, 19.7vh, 211px)");
+  expect(value(reactor, "height")).toBe("clamp(156px, 19.7vh, 211px)");
+  expect(value(halo, "width")).toBe("min(78vh, 700px)");
+  expect(value(halo, "filter")).toBe("blur(20px)");
+  expect(value(hover, "border-color")).toBe("rgba(197, 160, 89, 0.72)");
+  expect(value(hover, "background")).toContain("linear-gradient");
+  expect(value(hover, "box-shadow")).toContain("rgba(145, 230, 242, 0.22)");
+  expect(value(focus, "outline")).toBe("2px solid rgba(197, 160, 89, 0.9)");
+});
+
 test("the Electron home keeps the lower controls reachable when the HUD is scaled", () => {
   const desktop = electronRoot.nodes.find((node) => node.type === "atrule" && node.params === "(min-width: 600px)");
   const rule = (suffix) => desktop.nodes.find((node) => node.selector?.endsWith(suffix));

@@ -89,6 +89,9 @@ propose une icône de sortie (symbole marche/arrêt) pour quitter ou fermer ΣIR
 affiche une coche de confirmation, le second confirme dans les trois secondes.
 Sur Windows installé et portable, la barre supérieure dispose d'un retrait supplémentaire de
 12 px, en respectant la zone de sécurité ; cet espace est réservé pour préserver le texte d'accueil.
+Sur grand écran, le texte d'accueil descend légèrement sous la barre ; l'orbe est agrandie d'environ
+12 % et son halo doré-cyan reste diffus. Les suggestions gagnent un reflet et un contour dorés/cyan
+au survol et au focus clavier.
 
 L'accueil regroupe l'état vocal et la saisie sans retirer le bouton d'arrêt.
 Le spectre vocal animé est intégré au champ du chat et reprend le cyan lumineux du thème.
