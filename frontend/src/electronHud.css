@@ -157,7 +157,8 @@
     top: 42%;
   }
 
-  .sirius-root.electron-home-reference .sirius-command-area {
+  /* Theme-qualified so the classic `.sirius-center .sirius-command-area { width: 100% }` rule cannot stretch the chat across wide screens. */
+  html[data-sirius-visual-theme="classic"][data-sirius-platform="web"] .sirius-root.electron-home-reference .sirius-command-area {
     order: 2;
     flex: 0 0 auto;
     width: min(920px, 100%);
@@ -414,7 +415,7 @@
     height: clamp(150px, 23vh, 220px);
   }
 
-  .sirius-root.electron-home-reference .sirius-command-area {
+  html[data-sirius-visual-theme="classic"][data-sirius-platform="web"] .sirius-root.electron-home-reference .sirius-command-area {
     width: calc(100% - 32px);
     padding-bottom: 12px;
   }

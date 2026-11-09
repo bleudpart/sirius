@@ -40,7 +40,9 @@ html[data-sirius-visual-theme="classic"][data-sirius-platform] :is(
     linear-gradient(#5e91b407 1px, transparent 1px) 0 0 / 48px 48px,
     linear-gradient(90deg, #5e91b407 1px, transparent 1px) 0 0 / 48px 48px, #03070d !important;
 }
-html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-root > :is(.city-backdrop, .vignette) { display: none; }
+/* The background above already draws the only grid: drifting grids and scanlines on top of it read as stacked images. */
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .sirius-root > :is(.city-backdrop, .vignette, .grid-bg, .scanline),
+html[data-sirius-visual-theme="classic"][data-sirius-platform] .boot-screen .boot-grid { display: none; }
 
 html[data-sirius-visual-theme="classic"][data-sirius-platform] :is(
   .sirius-module-window, .prime-screen, .zeus-screen, .eu-screen, .setup-screen, .holo-win,
