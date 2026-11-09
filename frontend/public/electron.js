@@ -12,6 +12,7 @@ const { setupAutoUpdater } = require("./electron/auto_update");
 const { captureRectangle } = require("./electron/capture_region");
 const { NativeAutomation, installNativeAutomation } = require("./electron/native_automation");
 const { installHaccpPrinter } = require("./electron/haccp_printer");
+const { refreshUiCacheOnBuildChange } = require("./electron/ui_cache");
 
 // SIRIUS — Application de bureau Windows (Electron)
 // Charge le HUD React compilé (dossier build) et accorde l'accès au micro.
@@ -189,6 +190,11 @@ app.whenReady().then(async () => {
     }
     // Mises à jour automatiques via GitHub Releases (jamais bloquant).
     setupAutoUpdater({ app, dialog, ipcMain });
+    await refreshUiCacheOnBuildChange({
+      session: session.defaultSession,
+      indexPath: path.join(process.resourcesPath, "backend", "_internal", "frontend", "build", "index.html"),
+      userDataPath: app.getPath("userData"),
+    }).catch(() => false);
   }
 
   // Active les raccourcis Couper/Copier/Coller/Tout sélectionner (Ctrl+X/C/V/A)

@@ -3322,13 +3322,17 @@ async def serve_react_app(full_path: str):
     if full_path.startswith("api/"):
         raise HTTPException(status_code=404, detail="Endpoint API non trouvé")
         
+    # Unhashed entry points must be revalidated, otherwise browsers and Electron reuse a stale
+    # index.html that keeps pointing at the previous build's hashed CSS/JS.
+    revalidate = {"Cache-Control": "no-cache"}
     requested_file = BUILD_DIR / full_path
     if full_path != "" and requested_file.exists() and requested_file.is_file():
-        return FileResponse(str(requested_file))
-        
+        headers = revalidate if requested_file.suffix in {".html", ".js", ".json"} else None
+        return FileResponse(str(requested_file), headers=headers)
+
     index_file = BUILD_DIR / "index.html"
     if index_file.exists():
-        return FileResponse(str(index_file))
+        return FileResponse(str(index_file), headers=revalidate)
         
     raise HTTPException(status_code=404, detail="Fichier index.html introuvable dans le build.")
 

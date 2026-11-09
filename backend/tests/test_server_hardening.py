@@ -236,3 +236,16 @@ def test_automatic_reload_remains_disabled_when_patch_mode_is_enabled(api_client
 
     assert response.status_code == 409
     assert "manuellement" in response.json()["detail"]
+
+
+def test_spa_entry_points_are_revalidated_but_hashed_assets_stay_cacheable(api_client, monkeypatch, tmp_path):
+    (tmp_path / "static" / "css").mkdir(parents=True)
+    (tmp_path / "index.html").write_text("<html></html>", encoding="utf-8")
+    (tmp_path / "sw.js").write_text("// sw", encoding="utf-8")
+    (tmp_path / "icon-192.png").write_bytes(b"png")
+    monkeypatch.setattr(server, "BUILD_DIR", tmp_path)
+
+    assert api_client.get("/").headers.get("cache-control") == "no-cache"
+    assert api_client.get("/une/route/spa").headers.get("cache-control") == "no-cache"
+    assert api_client.get("/sw.js").headers.get("cache-control") == "no-cache"
+    assert "cache-control" not in api_client.get("/icon-192.png").headers

@@ -1,6 +1,6 @@
 // © 2026 Daniel Partel – SIRIUS Assistant. Tous droits réservés. Toute reproduction, modification, distribution ou utilisation non autorisée est strictement interdite. Logiciel protégé par le droit d'auteur (Code de la propriété intellectuelle – France).
 // Service worker SIRIUS — installable (PWA) + hors ligne de base
-const CACHE = "sirius-v8";
+const CACHE = "sirius-v9";
 const SHELL = [
   "/",
   "/manifest.json",
@@ -36,13 +36,16 @@ self.addEventListener("fetch", (event) => {
   // Standalone legal pages must never replace the offline application shell.
   if (["/confidentialite.html", "/suppression-compte.html", "/aide-emails.html"].includes(new URL(req.url).pathname)) return;
 
-  // Navigation : réseau d'abord, sinon shell hors ligne
+  // Navigation : réseau d'abord, sinon shell hors ligne. `no-cache` revalide la page auprès du
+  // serveur : sans cela le cache HTTP pouvait resservir une ancienne page et ses anciens styles.
   if (req.mode === "navigate") {
     event.respondWith(
-      fetch(req)
+      fetch(req, { cache: "no-cache" })
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put("/", copy)).catch(() => {});
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put("/", copy)).catch(() => {});
+          }
           return res;
         })
         .catch(() => caches.match("/"))
@@ -54,8 +57,10 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     fetch(req)
       .then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+        }
         return res;
       })
       .catch(() => caches.match(req))
