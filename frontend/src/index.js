@@ -10,8 +10,7 @@ import MediaHudWindow from "@/MediaHudWindow";
 import FdeErrorBoundary from "@/FdeErrorBoundary";
 import { initFdeOmega } from "@/fdeOmega";
 import PublicStore from "@/PublicStore";
-import HaccpWorkspace from "@/HaccpWorkspace";
-import HaccpKitchenPage from "@/HaccpKitchenPage";
+import { HaccpCaptureWorkspace, HaccpKitchenPage } from "@/lazyModules";
 import "./siriusVisualTheme.css";
 import "./moduleWindowLayout.css";
 import "./pantheonTheme.css";
@@ -45,7 +44,7 @@ window.addEventListener("beforeunload", stopFdeOmega, { once: true });
 root.render(
   <QueryClientProvider client={queryClient}>
     <FdeErrorBoundary>
-      {isKitchen ? <HaccpKitchenPage /> : isHaccpCapture ? <AuthGate><HaccpWorkspace standalone /></AuthGate> : isPublicStore ? <PublicStore /> : (
+      {isKitchen ? <HaccpKitchenPage /> : isHaccpCapture ? <AuthGate><HaccpCaptureWorkspace standalone /></AuthGate> : isPublicStore ? <PublicStore /> : (
         <AuthGate>
           {isMediaHud ? <MediaHudWindow /> : <App />}
         </AuthGate>

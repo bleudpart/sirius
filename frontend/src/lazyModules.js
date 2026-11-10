@@ -35,6 +35,8 @@ export const FloorPlanPanel = wrap(() => import("@/FloorPlan"));
 export const Photo3DPanel = wrap(() => import("@/Photo3D"));
 export const EuropeanaViewer = wrap(() => import("@/EuropeanaViewer"));
 export const HaccpModule = wrap(() => import("@/HaccpModule"));
+export const HaccpCaptureWorkspace = wrap(() => import("@/HaccpWorkspace"));
+export const HaccpKitchenPage = wrap(() => import("@/HaccpKitchenPage"));
 export const KeysStatus = wrap(() => import("@/KeysStatus"));
 export const KeraunosPanel = wrap(() => import("@/KeraunosPanel"));
 export const AboutPanel = wrap(() => import("@/AboutPanel"));
