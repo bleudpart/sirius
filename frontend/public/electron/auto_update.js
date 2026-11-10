@@ -6,6 +6,13 @@
 const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
 
 function setupAutoUpdater({ app, dialog, ipcMain }) {
+  if (process.windowsStore === true) {
+    const state = { phase: "managed-externally", channel: "msix" };
+    ipcMain.handle("sirius-update-status", () => ({ ...state }));
+    ipcMain.handle("sirius-update-check", async () => ({ ok: true, ...state }));
+    return;
+  }
+
   let autoUpdater;
   try {
     ({ autoUpdater } = require("electron-updater"));

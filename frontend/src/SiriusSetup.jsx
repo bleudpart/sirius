@@ -342,6 +342,10 @@ export default function SiriusSetup({ initialProfile, initialKeys, initialTab = 
     setUpdateStatus("Vérification en cours...");
     const result = await window.siriusUpdates.check();
     if (!result?.ok) { setUpdateStatus("Vérification impossible pour le moment."); return; }
+    if (result.channel === "msix") {
+      setUpdateStatus("Les mises à jour sont gérées par le Microsoft Store ou votre administrateur.");
+      return;
+    }
     if (!result.available) { setUpdateStatus("ΣIRIUS est à jour."); return; }
     if (!window.siriusUpdates.status) {
       setUpdateStatus("Nouvelle version détectée. Téléchargement en cours...");

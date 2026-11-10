@@ -43,7 +43,19 @@ l'identité/chaîne adaptée, plutôt que l'empreinte fixe du mode PFX.
 
 La publication via Microsoft Store constitue une autre piste : le Store signe
 les packages qu'il accepte. Elle nécessite un compte approuvé et une adaptation
-de l'application ; ce dépôt ne génère pas encore de package Store.
+de l'application ; ce dépôt ne génère pas encore de package Store. Dans un
+paquet MSIX, ΣIRIUS désactive son installateur de mises à jour GitHub et indique
+que les mises à jour sont gérées par le Microsoft Store ou l'administrateur.
+Les installations Windows actuelles conservent leur mécanisme de mise à jour.
+
+Lors d'un essai local, MakeAppx a refusé les fichiers `_rels/*.rels` présents
+dans l'arborescence décompressée `docx/templates/default-docx-template`
+embarquée par PyInstaller. Dans une copie de préparation réservée au MSIX,
+cette arborescence a été exclue ; les fichiers `docx/templates/default.docx`,
+les XML `default-*.xml` et `backend/templates/template_haccp.docx` ont été
+conservés. La création de documents et l'export HACCP signé ont été testés
+isolément, sans impression physique. Il reste à valider ces fonctions dans un
+véritable paquet MSIX installé, avant toute publication.
 
 ## Arborescence des fichiers modifiés ou ajoutés
 

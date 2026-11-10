@@ -307,6 +307,26 @@ test("update check follows the download until the installer is ready", async () 
   }
 });
 
+test("update check explains that MSIX updates are managed externally", async () => {
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  window.siriusUpdates = {
+    check: jest.fn().mockResolvedValue({ ok: true, phase: "managed-externally", channel: "msix" }),
+    status: jest.fn(),
+  };
+  try {
+    await act(async () => root.render(<SiriusSetup initialProfile={{ name: "Local" }} onComplete={jest.fn()} onCancel={jest.fn()} />));
+    await act(async () => container.querySelector('[data-testid="setup-check-update"]').click());
+    expect(container.querySelector('[data-testid="setup-update-status"]').textContent)
+      .toBe("Les mises à jour sont gérées par le Microsoft Store ou votre administrateur.");
+    expect(container.querySelector('[data-testid="setup-update-progress"]')).toBeNull();
+    expect(window.siriusUpdates.status).not.toHaveBeenCalled();
+  } finally {
+    await act(async () => root.unmount());
+    delete window.siriusUpdates;
+  }
+});
+
 test("settings without account access preserves preferences and does not offer a dead account button", () => {
   const container = document.createElement("div");
   const root = createRoot(container);
