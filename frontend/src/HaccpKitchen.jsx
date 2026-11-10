@@ -39,7 +39,7 @@ export function kitchenReason(record) {
   if (/dlc[^.]*depass/.test(comment)) return "DLC dépassée";
   const unreadable = [record.nom_produit, record.numero_lot].some((value) => plain(value) === "illisible");
   if (unreadable || comment.includes("illisible")) return "Produit ou lot illisible";
-  if (record.type_operation !== "preparation" && (!record.dlc_ou_ddm || record.type_date === "inconnue")) return "Date pas lue";
+  if (record.type_operation !== "preparation" && (!record.dlc_ou_ddm || record.type_date === "inconnue")) return "Date à vérifier";
   const fields = [...new Set((record.champs_incertains || []).map((name) => FIELD_WORDS[name]).filter(Boolean))];
   if (fields.length) return `Mal lu : ${fields.slice(0, 2).join(", ")}`;
   if (record.allergenes_lecture === "partielle") return "Allergènes à vérifier";

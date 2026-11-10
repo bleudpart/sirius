@@ -55,6 +55,7 @@ test("an anomaly is saved and shown in orange with a single clear instruction", 
   await pickPhoto();
   expect(host.querySelector(".haccp-simple-result.is-warning")).not.toBeNull();
   expect(host.textContent).toContain("appeler le chef");
+  expect(host.querySelector(".haccp-simple-result .haccp-simple-reason").textContent).toBe("Date à vérifier");
 });
 
 test("the warning says why in a few words", async () => {
@@ -71,7 +72,8 @@ test("kitchenReason keeps the most important reason short", () => {
   const base = { conforme_reception: false, type_operation: "reception", type_date: "DLC", dlc_ou_ddm: "2026-11-20" };
   expect(kitchenReason({ ...base, conforme_reception: true })).toBe("");
   expect(kitchenReason({ ...base, numero_lot: "ILLISIBLE" })).toBe("Produit ou lot illisible");
-  expect(kitchenReason({ ...base, type_date: "inconnue" })).toBe("Date pas lue");
+  expect(kitchenReason({ ...base, type_date: "inconnue" })).toBe("Date à vérifier");
+  expect(kitchenReason({ ...base, dlc_ou_ddm: null })).toBe("Date à vérifier");
   expect(kitchenReason({ ...base, champs_incertains: ["numero_lot", "allergenes", "traces_allergenes"] })).toBe("Mal lu : lot, allergènes");
   expect(kitchenReason({ ...base, allergenes_lecture: "partielle" })).toBe("Allergènes à vérifier");
   expect(kitchenReason(base)).toBe("À vérifier");
@@ -84,7 +86,9 @@ test("the list shows the reason under a product to check", async () => {
     : reply(null));
   await act(async () => root.render(<HaccpKitchen establishmentName="Le Papillon" />));
   await act(async () => button("RETROUVER").click());
-  expect(host.querySelector(".haccp-simple-list .haccp-simple-reason").textContent).toBe("Date pas lue");
+  expect(host.querySelector(".haccp-simple-list .haccp-simple-reason").textContent).toBe("Date à vérifier");
+  await act(async () => button("Jambon").click());
+  expect(host.querySelector('[role="dialog"] .haccp-simple-reason').textContent).toContain("Date à vérifier");
 });
 
 test("a failed upload can be resent with the same capture id, so no duplicate is created", async () => {
