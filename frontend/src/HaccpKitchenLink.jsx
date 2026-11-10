@@ -47,13 +47,13 @@ export default function HaccpKitchenLink({ establishmentName = "" }) {
       <p>Restaurant : <strong>{link.restaurant_name}</strong></p>
       <ol>
         <li>Le cuisinier scanne ce QR code avec l’appareil photo de son téléphone ou de la tablette.</li>
-        <li>La page s’ouvre avec seulement PHOTO et RETROUVER.</li>
+        <li>La page s’ouvre avec PHOTO, RETROUVER et RELEVÉS.</li>
         <li>Menu du navigateur → « Ajouter à l’écran d’accueil ». C’est fait pour toujours.</li>
       </ol>
-      <p>Ce QR code permet seulement de photographier les étiquettes et de les revoir. Ne l’affichez pas à la vue des clients.</p>
+      <p>Ce QR code permet de photographier et revoir les étiquettes, de remplir et consulter les relevés et de demander leur impression. Ne l’affichez pas à la vue des clients.</p>
       <div className="haccp-actions">
         <button type="button" disabled={busy} onClick={() => run({ method: "DELETE" },
-          "Désactiver le QR code ? Les téléphones qui l’utilisent ne pourront plus envoyer de photos.")}>Désactiver</button>
+          "Désactiver le QR code ? Les téléphones qui l’utilisent ne pourront plus accéder à l’espace cuisine.")}>Désactiver</button>
         <button type="button" disabled={busy || !establishmentName.trim()} onClick={() => create(
           "Créer un nouveau QR code ? L’ancien ne marchera plus : il faudra rescanner sur chaque téléphone.")}>Nouveau QR code</button>
       </div>

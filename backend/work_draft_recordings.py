@@ -18,9 +18,15 @@ def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
 
 
-async def insert_once(db, collection_name, document):
+async def insert_once(db, collection_name, document, *, identity=None):
     collection = db[collection_name]
-    identity = {"user_id": document["user_id"], "id": document["id"]}
+    if identity is None:
+        identity = {"user_id": document["user_id"], "id": document["id"]}
+    if not identity or any(
+        key.startswith("$") or key == "_id" or isinstance(value, dict) or document.get(key) != value
+        for key, value in identity.items()
+    ):
+        raise ValueError("Une identité d'égalité correspondant au document est requise.")
     if isinstance(collection, LocalCollection):
         return await collection.insert_once(document, identity)
     try:

@@ -62,7 +62,7 @@ function useFocusSource(items, focusId) {
 }
 
 // ---------- 1. Traçabilité & étiquetage ----------
-function SectionTrace({ focusId, captureRequest }) {
+function SectionTrace({ focusId, captureRequest, onDirtyChange }) {
   const [items, setItems] = useState([]);
   useFocusSource(items, focusId);
   const [form, setForm] = useState({ produit: "", lot: "", fournisseur: "", dlc: "", temperature_reception: "", quantite: "" });
@@ -82,7 +82,7 @@ function SectionTrace({ focusId, captureRequest }) {
 
   return (
     <div className="hc-section" data-testid="haccp-section-trace">
-      <HaccpWorkspace captureRequest={captureRequest} />
+      <HaccpWorkspace captureRequest={captureRequest} onDirtyChange={onDirtyChange} />
       <div className="hc-form">
         <input className="cmd-input" placeholder="Produit *" value={form.produit} onChange={(e) => setForm({ ...form, produit: e.target.value })} data-testid="haccp-trace-produit" />
         <input className="cmd-input" placeholder="N° de lot" value={form.lot} onChange={(e) => setForm({ ...form, lot: e.target.value })} data-testid="haccp-trace-lot" />

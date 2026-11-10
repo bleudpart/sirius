@@ -64,8 +64,32 @@ test("QR code Cuisine creates a revocable kitchen link for the active establishm
   const [, options] = global.fetch.mock.calls.find(([url, opts]) => url.endsWith("/haccp/cuisine/lien") && opts?.method === "POST");
   expect(JSON.parse(options.body)).toEqual({ restaurant_name: "Le Papillon" });
   expect(host.querySelector('section[aria-label="QR code Cuisine"] svg')).not.toBeNull();
-  expect(host.textContent).toContain("seulement de photographier");
+  expect(host.textContent).toContain("remplir et consulter les relevés");
   expect(HACCP_CAPTURE_URL).toBe("https://sirius-assistant.fr/haccp");
+});
+
+test("workspace navigation asks before discarding an unfinished signed record", async () => {
+  const originalCrypto = global.crypto;
+  global.crypto = { randomUUID: () => "11111111-1111-4111-8111-111111111111" };
+  const base = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation(async (url, options) => url.endsWith("/haccp/releves/modeles")
+    ? reply({ modeles: [{ id: "temperature", titre: "Température", champs: [] }] })
+    : base(url, options));
+  const confirm = jest.spyOn(window, "confirm").mockReturnValue(false);
+  try {
+    await act(async () => root.render(<HaccpWorkspace />));
+    await click("RELEVÉS");
+    await click("Nouveau relevé");
+    await change(field("Nom de l'opérateur"), "Alex");
+    await act(async () => root.render(<HaccpWorkspace initialTab="registre" />));
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(field("Nom de l'opérateur").value).toBe("Alex");
+    confirm.mockReturnValue(true);
+    await click("Mode complet");
+    expect(field("Nom de l'opérateur")).toBeUndefined();
+  } finally {
+    global.crypto = originalCrypto;
+  }
 });
 
 test.each([

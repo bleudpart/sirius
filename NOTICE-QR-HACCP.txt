@@ -4,6 +4,12 @@
 ADRESSE OUVERTE PAR LE QR CODE
 https://sirius-assistant.fr/haccp
 
+Cette notice decrit le QR fixe /haccp, qui demande une connexion.
+Le QR cuisine cree par le chef dans ΣIRIUS est distinct : il ouvre
+l'espace PHOTO, RETROUVER et RELEVES sans compte pour la cuisine.
+Il donne acces aux releves de l'etablissement et aux demandes d'impression :
+ne pas l'afficher a la vue des clients et le desactiver en cas de perte.
+
 COMMENT UTILISER LE QR CODE
 1. Ouvrir l'appareil photo du telephone.
 2. Viser le grand QR code de l'affiche.

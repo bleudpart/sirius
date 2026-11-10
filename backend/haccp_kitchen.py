@@ -19,6 +19,14 @@ _ALLOWED = (
     ("GET", re.compile(r"^/api/haccp/registre/recherche$")),
     ("GET", re.compile(r"^/api/haccp/registre/\d+/photo$")),
     ("GET", re.compile(r"^/api/haccp/cuisine/session$")),
+    ("GET", re.compile(r"^/api/haccp/releves/modeles$")),
+    ("GET", re.compile(r"^/api/haccp/releves$")),
+    ("POST", re.compile(r"^/api/haccp/releves$")),
+    ("GET", re.compile(r"^/api/haccp/releves/[0-9a-fA-F-]{36}$")),
+    ("POST", re.compile(r"^/api/haccp/releves/[0-9a-fA-F-]{36}/impression$")),
+    ("GET", re.compile(r"^/api/haccp/releves/[0-9a-fA-F-]{36}/impression$")),
+    ("GET", re.compile(r"^/api/haccp/releves/impression/[0-9a-fA-F-]{36}$")),
+    ("POST", re.compile(r"^/api/haccp/releves/impression/[0-9a-fA-F-]{36}/annulation$")),
 )
 
 
@@ -54,7 +62,7 @@ async def resolve_kitchen(
 
     path = request.scope.get("path", "")
     if not any(request.method == method and pattern.match(path) for method, pattern in _ALLOWED):
-        raise HTTPException(403, "Ce QR code sert seulement à photographier et retrouver les étiquettes.")
+        raise HTTPException(403, "Ce QR code donne seulement accès à l'espace cuisine.")
     token = kitchen_token(request) or ""
     if not 20 <= len(token) <= 200:
         raise HTTPException(401, DISABLED)

@@ -1,0 +1,33 @@
+.haccp-releves { display: grid; gap: 14px; min-width: 0; }
+.haccp-releves h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 24px; }
+.haccp-releves h3, .haccp-releves p { margin: 0; }
+.haccp-releves label { display: grid; gap: 6px; font-size: 17px; font-weight: 700; }
+.haccp-releves input:not([type="checkbox"]), .haccp-releves select {
+  width: 100%; min-width: 0; min-height: 52px; padding: 10px 12px;
+  border: 1px solid var(--haccp-border); border-radius: 10px;
+  background: #07111b; color: var(--haccp-text); font-size: 17px;
+}
+.haccp-releve-form { display: grid; gap: 14px; }
+.haccp-releve-field { display: grid; gap: 8px; }
+.haccp-releve-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.haccp-ui .haccp-releve-actions button { flex: 1 1 180px; min-height: 58px; font-size: 17px; }
+.haccp-ui button.haccp-releve-back { justify-self: start; min-height: 54px; }
+.haccp-releve-signature { display: grid; gap: 8px; font-weight: 700; }
+.haccp-releve-signature canvas { width: 100%; height: 150px; border: 2px solid var(--haccp-border); border-radius: 10px; background: #fff; touch-action: none; }
+.haccp-releve-signature small, .haccp-releves small { color: var(--haccp-muted); font-weight: 400; }
+.haccp-releve-signature-image { max-width: 300px; width: 100%; border-radius: 8px; background: #fff; }
+.haccp-releve-error { padding: 10px; border: 1px solid #e87575; border-radius: 10px; background: #401b1b; }
+.haccp-releve-saved { padding: 10px; border: 1px solid #2fb36a; border-radius: 10px; background: #0f3b23; }
+.haccp-releve-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.haccp-ui .haccp-releve-list button { display: grid; gap: 3px; width: 100%; text-align: left; }
+.haccp-releves dl { display: grid; gap: 8px; margin: 0; }
+.haccp-releves dl div { padding: 8px; border: 1px solid var(--haccp-border); border-radius: 8px; }
+.haccp-releves dt { color: var(--haccp-muted); font-size: 14px; }
+.haccp-releves dd { margin: 0; overflow-wrap: anywhere; }
+.haccp-releve-photo { display: grid; gap: 8px; }
+.haccp-releve-photo img { width: 100%; max-height: 55vh; object-fit: contain; }
+.haccp-releve-photo-search { display: flex; flex-wrap: wrap; gap: 8px; }
+.haccp-releve-photo-search input { flex: 1 1 180px; }
+.haccp-releves details { padding: 12px; border: 1px solid var(--haccp-border); border-radius: 10px; }
+.haccp-releves summary { cursor: pointer; font-weight: 700; }
+.haccp-releves label.haccp-releve-check { display: flex; align-items: center; margin: 12px 0; }

@@ -84,6 +84,11 @@ def _configured_engine() -> Engine:
             "ON haccp_print_jobs(scope_key, status, accepted_at)",
         )
         connection.exec_driver_sql(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_haccp_releve_print_active "
+            "ON haccp_releve_print_jobs(scope_key, releve_id) "
+            "WHERE status IN ('pending', 'claimed')",
+        )
+        connection.exec_driver_sql(
             "CREATE UNIQUE INDEX IF NOT EXISTS uq_haccp_capture "
             "ON etiquettes_haccp(scope_key, capture_id)",
         )

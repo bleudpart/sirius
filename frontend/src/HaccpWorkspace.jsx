@@ -5,6 +5,7 @@ import HaccpKitchenLink from "./HaccpKitchenLink";
 import HaccpLabelCapture from "./HaccpLabelCapture";
 import HaccpPreparation from "./HaccpPreparation";
 import HaccpReceptions from "./HaccpReceptions";
+import { useHaccpRelevePrintRelay } from "./haccpRelevePrinter";
 import { downloadHaccpBlob } from "./haccpDocuments";
 import { API_BASE_URL } from "./lib/api";
 import { haccpFetch } from "./haccpRequest";
@@ -29,14 +30,27 @@ async function checked(response) {
   return response;
 }
 
-export default function HaccpWorkspace({ standalone = false, captureRequest = 0, initialTab = "simple" }) {
+export default function HaccpWorkspace({ standalone = false, captureRequest = 0, initialTab = "simple", onDirtyChange }) {
   const [tab, setTab] = useState(initialTab);
+  const currentTab = useRef(tab);
+  const relevesDirty = useRef(false);
+  currentTab.current = tab;
+  const changeTab = useCallback((next) => {
+    if (next !== currentTab.current && relevesDirty.current
+      && !window.confirm("Quitter cette saisie sans l'enregistrer ?")) return;
+    setTab(next);
+  }, []);
+  const reportRelevesDirty = useCallback((value) => {
+    relevesDirty.current = value;
+    onDirtyChange?.(value);
+  }, [onDirtyChange]);
+  const relevePrintRelay = useHaccpRelevePrintRelay(standalone ? "standalone" : null);
   useEffect(() => {
-    if (captureRequest > 0) setTab("simple");
-  }, [captureRequest]);
+    if (captureRequest > 0) changeTab("simple");
+  }, [captureRequest, changeTab]);
   useEffect(() => {
-    if (initialTab) setTab(initialTab);
-  }, [initialTab]);
+    if (initialTab) changeTab(initialTab);
+  }, [initialTab, changeTab]);
   const [filters, setFilters] = useState({ terme: "", categorie: "", date_debut: "", date_fin: "", non_conforme_seul: false });
   const [items, setItems] = useState([]);
   const [error, setError] = useState("");
@@ -312,14 +326,15 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0,
       <div className="haccp-emblem" aria-hidden="true"><ShieldCheck size={30} /></div>
       <div><p className="haccp-kicker">ΣIRIUS · HACCP</p><h2>ΣIRIUS · Étiquettes cuisine</h2><p>Réception, ouverture et préparation : gardez la trace.</p></div>
     </header>
+    {relevePrintRelay.error && <p role="alert">Relais Word arrêté : {relevePrintRelay.error} Vérifiez le papier, puis désactivez et réactivez le relais dans les relevés.</p>}
     <nav className="haccp-navigation" aria-label="Parcours des étiquettes">
-      <button type="button" aria-pressed={tab === "capture"} onClick={() => setTab("capture")}><Camera size={19} aria-hidden="true" />Réception / Ouverture</button>
-      <button type="button" aria-pressed={tab === "preparation"} onClick={() => setTab("preparation")}><Utensils size={19} aria-hidden="true" />Préparation / DLC</button>
-      <button type="button" aria-pressed={simple} onClick={() => setTab("simple")}><Camera size={19} aria-hidden="true" />Cuisine simplifiée</button>
-      <button type="button" aria-pressed={tab === "registre"} onClick={() => setTab("registre")}><ClipboardList size={19} aria-hidden="true" />Registre / Contrôle</button>
-      <button type="button" aria-pressed={tab === "receptions"} onClick={() => setTab("receptions")}><ClipboardList size={19} aria-hidden="true" />Réceptions / Lots</button>
-      <button type="button" aria-pressed={tab === "closing"} onClick={() => setTab("closing")}><ClipboardCheck size={19} aria-hidden="true" />Fin de service</button>
-      <button type="button" aria-pressed={tab === "qr"} onClick={() => setTab("qr")}><QrCode size={19} aria-hidden="true" />QR code Cuisine</button>
+      <button type="button" aria-pressed={tab === "capture"} onClick={() => changeTab("capture")}><Camera size={19} aria-hidden="true" />Réception / Ouverture</button>
+      <button type="button" aria-pressed={tab === "preparation"} onClick={() => changeTab("preparation")}><Utensils size={19} aria-hidden="true" />Préparation / DLC</button>
+      <button type="button" aria-pressed={simple} onClick={() => changeTab("simple")}><Camera size={19} aria-hidden="true" />Cuisine simplifiée</button>
+      <button type="button" aria-pressed={tab === "registre"} onClick={() => changeTab("registre")}><ClipboardList size={19} aria-hidden="true" />Registre / Contrôle</button>
+      <button type="button" aria-pressed={tab === "receptions"} onClick={() => changeTab("receptions")}><ClipboardList size={19} aria-hidden="true" />Réceptions / Lots</button>
+      <button type="button" aria-pressed={tab === "closing"} onClick={() => changeTab("closing")}><ClipboardCheck size={19} aria-hidden="true" />Fin de service</button>
+      <button type="button" aria-pressed={tab === "qr"} onClick={() => changeTab("qr")}><QrCode size={19} aria-hidden="true" />QR code Cuisine</button>
     </nav>
     {standalone && wakeLockStatus && <p className="haccp-wake-lock" role="status">{wakeLockStatus}</p>}
     </>}
@@ -366,6 +381,7 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0,
     {simple && <HaccpKitchen
       establishmentName={activeEstablishment}
       onCaptureSaved={refreshDossier}
+      onRelevesDirtyChange={reportRelevesDirty}
       onFullMode={() => setTab("capture")}
     />}
     {tab === "preparation" && <HaccpPreparation

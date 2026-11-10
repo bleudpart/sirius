@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowLeft, Camera, CheckCircle2, ImageIcon, LoaderCircle, RotateCcw, Search, Settings, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Camera, CheckCircle2, ClipboardList, ImageIcon, LoaderCircle, RotateCcw, Search, Settings, X } from "lucide-react";
+import HaccpReleves from "./HaccpReleves";
 import { API_BASE_URL } from "./lib/api";
 import { checkHaccpResponse, haccpFetch } from "./haccpRequest";
 import "./HaccpWorkspace.css";
@@ -47,9 +48,15 @@ export function kitchenReason(record) {
 }
 
 // Écran cuisine : photo → analyse → enregistrement automatique, sans formulaire ni confirmation.
-export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, onFullMode, kitchenToken = "" }) {
+export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, onFullMode, onRelevesDirtyChange, kitchenToken = "" }) {
   const auth = useMemo(() => kitchenToken ? { headers: { "X-Sirius-Cuisine": kitchenToken } } : {}, [kitchenToken]);
   const [view, setView] = useState("camera");
+  const [relevesDirty, setRelevesDirty] = useState(false);
+  const [relevesSaving, setRelevesSaving] = useState(false);
+  const reportRelevesDirty = useMemo(() => (value) => {
+    setRelevesDirty(value);
+    onRelevesDirtyChange?.(value);
+  }, [onRelevesDirtyChange]);
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [cameraAttempt, setCameraAttempt] = useState(0);
@@ -250,7 +257,12 @@ export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, o
       <button type="button" className="haccp-simple-find" onClick={openFind}>
         <Search size={40} aria-hidden="true" /><span>RETROUVER</span>
       </button>
+      <button type="button" className="haccp-simple-find" onClick={() => setView("releves")}>
+        <ClipboardList size={40} aria-hidden="true" /><span>RELEVÉS</span>
+      </button>
     </>}
+    {view === "releves" && <HaccpReleves establishmentName={establishmentName} kitchenToken={kitchenToken}
+      onBack={() => setView("camera")} onDirtyChange={reportRelevesDirty} onSavingChange={setRelevesSaving} />}
     {view === "find" && <>
       <button type="button" className="haccp-simple-back" onClick={() => { clearPhoto(); setView("camera"); }}>
         <ArrowLeft size={36} aria-hidden="true" /><Camera size={36} aria-hidden="true" /><span>PHOTO</span>
@@ -289,7 +301,10 @@ export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, o
         {!listBusy && !listError && items.length === 0 && <p>{term.trim() ? `Rien trouvé pour « ${term.trim()} ».` : "Rien depuis 30 jours."}</p>}
       </>}
     </>}
-    {onFullMode && <button type="button" className="haccp-simple-full" onClick={onFullMode}>
+    {onFullMode && <button type="button" className="haccp-simple-full" disabled={relevesSaving} onClick={() => {
+      if (view === "releves" && relevesDirty && !window.confirm("Quitter cette saisie sans l'enregistrer ?")) return;
+      onFullMode();
+    }}>
       <Settings size={16} aria-hidden="true" />Mode complet (chef)
     </button>}
   </section>;

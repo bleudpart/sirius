@@ -2468,6 +2468,8 @@ api_router.include_router(make_haccp_labels_router(
 ))
 from routers.haccp_printing import make_haccp_print_router
 api_router.include_router(make_haccp_print_router(_haccp_labels_scope, is_direct_local_request))
+from routers.haccp_releves import make_haccp_releves_router
+api_router.include_router(make_haccp_releves_router(db, _haccp_labels_scope, is_direct_local_request))
 
 # PLANS# : plans 2D cotés (style architecte) + export DXF AutoCAD
 from floorplan import make_floorplan_router

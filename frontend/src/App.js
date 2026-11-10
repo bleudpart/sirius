@@ -37,6 +37,7 @@ import MobileNavigation from "@/MobileNavigation";
 import { WorkspaceClock, WorkspaceNavigation, WorkspaceSummary } from "@/components/WorkspaceRails";
 import { useAuth } from "@/AuthGate";
 import { useHaccpPrinterRelay } from "./HaccpPrinter";
+import { useHaccpRelevePrintRelay } from "./haccpRelevePrinter";
 import useMailCache from "@/hooks/useMailCache";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
@@ -1068,6 +1069,7 @@ function App() {
   const auth = useAuth() || {};
   const authUser = auth.user;
   const haccpPrinterRelay = useHaccpPrinterRelay(authUser?.user_id || authUser?.id || authUser?.email);
+  const haccpRelevePrintRelay = useHaccpRelevePrintRelay(authUser?.user_id || authUser?.id || authUser?.email);
   const [showNativeAutomation, setShowNativeAutomation] = useState(false);
   useEffect(() => {
     updateWorkConversationContext(null);
@@ -7210,6 +7212,9 @@ function App() {
       </div>}
       {haccpPrinterRelay.error && <div role="alert" style={{ position: "fixed", bottom: 12, left: 12, zIndex: 10000, background: "#291313", padding: 12, maxWidth: 450 }}>
         Impression HACCP arrêtée : {haccpPrinterRelay.error} Vérifiez le poste puis rechargez ΣIRIUS. Aucun nouvel essai automatique.
+      </div>}
+      {haccpRelevePrintRelay.error && <div role="alert" style={{ position: "fixed", bottom: 12, right: 12, zIndex: 10000, background: "#291313", padding: 12, maxWidth: 450 }}>
+        Relais Word arrêté : {haccpRelevePrintRelay.error} Vérifiez le papier, puis désactivez et réactivez le relais dans les relevés.
       </div>}
       <GettingStarted
         key={gettingStartedKey(authUser)}

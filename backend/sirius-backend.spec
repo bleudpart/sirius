@@ -123,6 +123,11 @@ static_dir = backend_dir / "static"
 if static_dir.exists():
     datas.append((str(static_dir), "static"))
 
+haccp_template = backend_dir / "templates" / "template_haccp.docx"
+if not haccp_template.is_file():
+    raise SystemExit(f"Modèle Word HACCP introuvable : {haccp_template}")
+datas.append((str(haccp_template), "backend/templates"))
+
 # Never ship owner credentials: refuse to build if any project data entry contains a .env file.
 for source, _target in datas:
     source_path = Path(source)
