@@ -245,6 +245,11 @@ body:has(.haccp-standalone) {
 .haccp-simple-list small { color: var(--haccp-muted); font-size: 16px; }
 .haccp-simple-list .is-ok { color: #2fb36a; }
 .haccp-simple-list .is-warning { color: #f0a92e; }
+.haccp-simple-day { display: grid; gap: 8px; }
+.haccp-simple-day h3 { margin: 6px 2px 0; color: #dff1ff; font-size: 20px; font-weight: 800; }
+.haccp-simple-result .haccp-simple-reason { font-weight: 700; }
+.haccp-simple-list small.haccp-simple-reason { display: block; margin-top: 2px; color: #f0a92e; font-weight: 700; }
+.haccp-simple-photo .haccp-simple-reason { margin: 0; color: #f0a92e; font-weight: 700; }
 .haccp-simple-photo { display: grid; gap: 8px; padding: 12px; border: 2px solid var(--haccp-border); border-radius: 16px; background: #050b12; font-size: 20px; }
 .haccp-simple-photo img { width: 100%; max-height: 70vh; object-fit: contain; border-radius: 10px; }
 .haccp-simple-photo strong { font-size: 24px; }
