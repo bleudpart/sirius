@@ -26,12 +26,24 @@ from email_signature import (
     signature_lines,
 )
 from themis_pdf import build_doc_pdf, extract_piece
+from runtime_paths import data_dir
 
 NO_ID = {"_id": 0}
-FILES_DIR = os.path.join(os.path.dirname(__file__), "themis_files")
+FILES_DIR = str(data_dir() / "themis_files")
 os.makedirs(FILES_DIR, exist_ok=True)
 PIECE_EXTS = {"pdf", "png", "jpg", "jpeg", "webp"}
 PIECE_MIME = {"pdf": "application/pdf", "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp"}
+
+
+def _piece_file_path(piece_id, extension, *, files_dir=None):
+    filename = f"{piece_id}.{extension}"
+    if files_dir is not None:
+        return os.path.join(files_dir, filename)
+    path = os.path.join(FILES_DIR, filename)
+    legacy_path = os.path.join(os.path.dirname(__file__), "themis_files", filename)
+    if not os.path.isfile(path) and os.path.isfile(legacy_path):
+        return legacy_path
+    return path
 
 
 def now_iso():
@@ -296,7 +308,7 @@ def build_accounting_export_zip(
     payments,
     pieces,
     *,
-    files_dir=FILES_DIR,
+    files_dir=None,
     signature_name=None,
     signature_email=None,
 ):
@@ -370,7 +382,7 @@ def build_accounting_export_zip(
             ["Date", "Libellé", "Débit", "Crédit"],
             [lambda entry: entry[0], lambda entry: entry[1], lambda entry: entry[2], lambda entry: entry[3]]))
         for piece in pieces:
-            path = os.path.join(files_dir, f"{piece['id']}.{piece['ext']}")
+            path = _piece_file_path(piece["id"], piece["ext"], files_dir=files_dir)
             if os.path.isfile(path):
                 archive.write(path, f"pieces/{piece['id']}-{piece.get('filename') or 'fichier'}")
     return archive_buffer.getvalue()
@@ -967,7 +979,7 @@ def make_themis_router(db):
         p = await db.themis_pieces.find_one({"id": pid, "user_id": uid}, NO_ID)
         if not p:
             raise HTTPException(status_code=404, detail="Pièce introuvable")
-        path = os.path.join(FILES_DIR, f"{pid}.{p['ext']}")
+        path = _piece_file_path(pid, p["ext"])
         if not os.path.isfile(path):
             raise HTTPException(status_code=404, detail="Fichier introuvable sur le disque")
         return FileResponse(path, media_type=PIECE_MIME.get(p["ext"], "application/octet-stream"),
@@ -979,7 +991,7 @@ def make_themis_router(db):
         p = await db.themis_pieces.find_one({"id": pid, "user_id": uid}, NO_ID)
         if p:
             try:
-                os.remove(os.path.join(FILES_DIR, f"{pid}.{p['ext']}"))
+                os.remove(_piece_file_path(pid, p["ext"]))
             except OSError:
                 pass
         await db.themis_pieces.delete_one({"id": pid, "user_id": uid})

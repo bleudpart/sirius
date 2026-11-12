@@ -57,6 +57,16 @@ conservés. La création de documents et l'export HACCP signé ont été testés
 isolément, sans impression physique. Il reste à valider ces fonctions dans un
 véritable paquet MSIX installé, avant toute publication.
 
+Le dossier d'installation MSIX sous `WindowsApps` est protégé en écriture.
+Les pièces THÉMIS sont enregistrées dans `themis_files` sous le dossier de
+données utilisateur fourni par Electron (`SIRIUS_DATA_DIR`), et non dans
+`resources/backend/_internal`. Sans configuration, le mode source conserve
+son dossier `backend/themis_files`. Les anciennes pièces présentes à côté du
+code restent accessibles pour le téléchargement, l'export et la suppression,
+sans migration automatique ; une pièce du dossier de données est prioritaire.
+Un MSIX capturé avant ce correctif doit être reconstruit puis signé à nouveau :
+réinstaller ou resigner l'ancien paquet ne corrige pas son backend.
+
 ## Arborescence des fichiers modifiés ou ajoutés
 
 ```text

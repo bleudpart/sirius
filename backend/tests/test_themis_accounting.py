@@ -1,12 +1,20 @@
 import asyncio
+import io
+import os
+import runpy
+import zipfile
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pymupdf
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import auth_api
+import runtime_paths
+import themis_api
 from local_docstore import LocalDocStore
 from themis_api import Line, _tax_summary, make_themis_router
 from themis_pdf import build_doc_pdf
@@ -18,6 +26,96 @@ def _client(tmp_path, monkeypatch):
     app = FastAPI()
     app.include_router(make_themis_router(db), prefix="/api")
     return TestClient(app), db
+
+
+@pytest.mark.parametrize("configured", [False, True])
+def test_files_directory_uses_runtime_root_without_writing_to_installation(
+    tmp_path, monkeypatch, configured,
+):
+    backend_dir = Path(themis_api.__file__).resolve().parent
+    source_dir = tmp_path / "source"
+    monkeypatch.setattr(runtime_paths, "SOURCE_DIR", source_dir)
+    if configured:
+        root = tmp_path / "user-data"
+        monkeypatch.setenv("SIRIUS_DATA_DIR", str(root))
+    else:
+        root = source_dir
+        monkeypatch.delenv("SIRIUS_DATA_DIR", raising=False)
+    makedirs = os.makedirs
+
+    def guarded_makedirs(directory, *args, **kwargs):
+        if Path(directory).resolve().is_relative_to(backend_dir):
+            raise PermissionError("Read-only installation directory")
+        return makedirs(directory, *args, **kwargs)
+
+    monkeypatch.setattr(os, "makedirs", guarded_makedirs)
+    module = runpy.run_path(str(backend_dir / "themis_api.py"))
+
+    assert module["FILES_DIR"] == str(root / "themis_files")
+    assert (root / "themis_files").is_dir()
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+def test_piece_storage_upload_download_export_and_delete(tmp_path, monkeypatch, legacy):
+    files_dir = tmp_path / "user-data" / "themis_files"
+    files_dir.mkdir(parents=True)
+    legacy_dir = tmp_path / "installation" / "themis_files"
+    monkeypatch.setattr(themis_api, "FILES_DIR", str(files_dir))
+    monkeypatch.setattr(themis_api, "__file__", str(legacy_dir.parent / "themis_api.py"))
+    monkeypatch.setattr(themis_api, "extract_piece", AsyncMock(return_value={}))
+    client, db = _client(tmp_path, monkeypatch)
+    content = b"test attachment"
+    if legacy:
+        legacy_dir.mkdir(parents=True)
+        piece = {"id": "legacy-piece", "user_id": "test-user", "ext": "png", "filename": "piece.png"}
+        (legacy_dir / "legacy-piece.png").write_bytes(content)
+        asyncio.run(db.themis_pieces.insert_one(dict(piece)))
+    else:
+        response = client.post(
+            "/api/themis/pieces/upload",
+            files={"file": ("piece.png", content, "image/png")},
+        )
+        assert response.status_code == 200
+        piece = response.json()["piece"]
+        assert not legacy_dir.exists()
+    filename = f"{piece['id']}.png"
+    stored_path = (legacy_dir if legacy else files_dir) / filename
+    assert stored_path.read_bytes() == content
+
+    response = client.get(f"/api/themis/pieces/{piece['id']}/file")
+    assert response.status_code == 200
+    assert response.content == content
+    response = client.get("/api/themis/export")
+    assert response.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        assert archive.read(f"pieces/{piece['id']}-piece.png") == content
+    if legacy:
+        assert not (files_dir / filename).exists()
+        assert stored_path.read_bytes() == content
+
+    assert client.delete(f"/api/themis/pieces/{piece['id']}").status_code == 200
+    assert not stored_path.exists()
+
+
+def test_runtime_piece_has_priority_and_explicit_export_directory_is_isolated(tmp_path, monkeypatch):
+    files_dir = tmp_path / "user-data" / "themis_files"
+    legacy_dir = tmp_path / "installation" / "themis_files"
+    files_dir.mkdir(parents=True)
+    legacy_dir.mkdir(parents=True)
+    monkeypatch.setattr(themis_api, "FILES_DIR", str(files_dir))
+    monkeypatch.setattr(themis_api, "__file__", str(legacy_dir.parent / "themis_api.py"))
+    piece = {"id": "piece", "ext": "png", "filename": "piece.png"}
+    (files_dir / "piece.png").write_bytes(b"runtime")
+    (legacy_dir / "piece.png").write_bytes(b"legacy")
+
+    archive_bytes = themis_api.build_accounting_export_zip([], [], [], [], [piece])
+    with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
+        assert archive.read("pieces/piece-piece.png") == b"runtime"
+    archive_bytes = themis_api.build_accounting_export_zip(
+        [], [], [], [], [piece], files_dir=tmp_path / "explicit-export",
+    )
+    with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
+        assert not any(name.startswith("pieces/") for name in archive.namelist())
 
 
 def test_tax_calculation_uses_decimal_rounding_and_line_rates():
