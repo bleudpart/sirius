@@ -66,6 +66,9 @@ code restent accessibles pour le téléchargement, l'export et la suppression,
 sans migration automatique ; une pièce du dossier de données est prioritaire.
 Un MSIX capturé avant ce correctif doit être reconstruit puis signé à nouveau :
 réinstaller ou resigner l'ancien paquet ne corrige pas son backend.
+L'audit automatique exécute les tests de stockage THÉMIS, dont une simulation
+de dossier de code non modifiable. Cela ne remplace pas le test de démarrage
+du véritable MSIX installé dans la VM.
 
 ## Arborescence des fichiers modifiés ou ajoutés
 

@@ -71,7 +71,7 @@ jobs:
           python -m pytest tests/test_operational_work.py -q
           python -m pytest tests/test_work_conversation.py tests/test_work_invoice_batch.py tests/test_work_draft_recordings.py -q
           python -m pytest tests/test_chronos.py tests/test_chronos_assistant.py -q
-          python -m pytest tests/test_document_scans.py tests/test_email_signature.py -q
+          python -m pytest tests/test_document_scans.py tests/test_email_signature.py tests/test_themis_accounting.py -q
           python -m pytest tests/test_microphone_selection.py -q
           python -m pytest tests/test_live_work.py tests/test_speech_vocabulary.py -q
           python -m pytest tests/test_news_command_routing.py -q

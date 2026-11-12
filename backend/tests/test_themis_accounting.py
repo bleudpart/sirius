@@ -95,6 +95,8 @@ def test_piece_storage_upload_download_export_and_delete(tmp_path, monkeypatch, 
 
     assert client.delete(f"/api/themis/pieces/{piece['id']}").status_code == 200
     assert not stored_path.exists()
+    assert client.get(f"/api/themis/pieces/{piece['id']}/file").status_code == 404
+    assert asyncio.run(db.themis_pieces.find_one({"id": piece["id"]})) is None
 
 
 def test_runtime_piece_has_priority_and_explicit_export_directory_is_isolated(tmp_path, monkeypatch):
