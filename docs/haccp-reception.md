@@ -59,12 +59,47 @@ retrouves dans **DOCUMENTS RECUS** et leurs photos sont servies avec le jeton.
 Les noms des fichiers apparaissent aussi dans le dossier du mode chef.
 
 Les lots absents restent inconnus : une reference produit n'est pas un lot.
-Ces documents ne generent pas de stock, d'allergenes supposes ni d'ecritures
-comptables. Les etiquettes produit continuent d'alimenter les quatre projections
+Ces documents ne calculent pas le stock restant et ne generent ni allergenes
+supposes ni ecritures comptables. Les etiquettes produit continuent d'alimenter les quatre projections
 ci-dessous ; une facture multiproduits n'est jamais convertie en etiquette unique.
 Une nouvelle tentative avec le meme identifiant de capture ne rappelle pas
 Vision et ne duplique pas l'archive. Les PDF ne sont pas acceptes par ce
 parcours photo.
+
+### Registre simple des entrees, par etablissement / annee / mois
+
+**Entrees / Stocks** (chef) et **STOCK · ENTREES** (QR Cuisine) affichent le
+meme tableau : date, famille, produit, quantite, unite, lot et piece source.
+Les quantites positives et les unites explicitement lisibles sur les factures
+ou bons sont enregistrees avec leurs lignes, sans multiplication de
+conditionnements ni conversion d'unite. Les decimaux restent exacts dans le
+JSON archive et les nombres flottants ne sont pas acceptes. Une quantite ou
+unite invalide reste non lue avec une alerte ; les autres informations lisibles
+du document sont conservees.
+
+Ce registre est un historique des **entrees lues sur pieces**, pas un calcul
+du stock restant ni une confirmation de la livraison physique. Une facture
+et un bon peuvent decrire la meme livraison : aucun total automatique ne les
+additionne. Les avoirs ne sont pas des entrees. Les photos d'etiquettes
+figurent avec une quantite non lue : le poids net d'un emballage ne prouve
+pas le nombre d'emballages livres.
+
+La periode suit la date complete du document si lisible ; sinon la date de la
+photo en Europe/Paris, explicitement indiquee dans la colonne Date. Les photos
+d'etiquettes suivent leur date d'enregistrement en Europe/Paris. Les annees
+disponibles sont calculees a partir des archives du seul etablissement actif.
+Toutes les lignes du mois ou de l'annee restent consultables, par pages de
+25, sans la limite de 60 documents de la liste recente.
+
+`GET /api/haccp/receptions/entrees` accepte `restaurant_name`, `annee`, `mois`
+(facultatif), `offset` et `limit` (1 a 100). Le QR impose le restaurant lie
+au jeton. Le chef peut exporter toute la periode par
+`GET /api/haccp/receptions/entrees/export-csv` : CSV UTF-8 avec BOM, separateur
+point-virgule, decimaux francais, noms de familles lisibles et protection
+contre les formules de tableur. L'export reste interdit au QR Cuisine.
+Les anciens documents sans quantites restent inchanges et affichent
+« Non lue » ; aucune table de stock physique ni migration d'archives n'est
+ajoutee.
 
 ```mermaid
 flowchart TD

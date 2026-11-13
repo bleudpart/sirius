@@ -5,6 +5,7 @@ import HaccpKitchenLink from "./HaccpKitchenLink";
 import HaccpLabelCapture from "./HaccpLabelCapture";
 import HaccpPreparation from "./HaccpPreparation";
 import HaccpReceptions from "./HaccpReceptions";
+import HaccpEntries from "./HaccpEntries";
 import { useHaccpRelevePrintRelay } from "./haccpRelevePrinter";
 import { downloadHaccpBlob } from "./haccpDocuments";
 import { API_BASE_URL } from "./lib/api";
@@ -334,12 +335,13 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0,
       <button type="button" aria-pressed={simple} onClick={() => changeTab("simple")}><Camera size={19} aria-hidden="true" />Cuisine simplifiée</button>
       <button type="button" aria-pressed={tab === "registre"} onClick={() => changeTab("registre")}><ClipboardList size={19} aria-hidden="true" />Registre / Contrôle</button>
       <button type="button" aria-pressed={tab === "receptions"} onClick={() => changeTab("receptions")}><ClipboardList size={19} aria-hidden="true" />Réceptions / Lots</button>
+      <button type="button" aria-pressed={tab === "entrees"} onClick={() => changeTab("entrees")}><ClipboardList size={19} aria-hidden="true" />Entrées / Stocks</button>
       <button type="button" aria-pressed={tab === "closing"} onClick={() => changeTab("closing")}><ClipboardCheck size={19} aria-hidden="true" />Fin de service</button>
       <button type="button" aria-pressed={tab === "qr"} onClick={() => changeTab("qr")}><QrCode size={19} aria-hidden="true" />QR code Cuisine</button>
     </nav>
     {standalone && wakeLockStatus && <p className="haccp-wake-lock" role="status">{wakeLockStatus}</p>}
     </>}
-    {(tab === "capture" || tab === "preparation" || tab === "receptions" || tab === "qr"
+    {(tab === "capture" || tab === "preparation" || tab === "receptions" || tab === "qr" || tab === "entrees"
       || (simple && !establishmentLoading && !activeEstablishment)) && <section className="haccp-card haccp-establishment" aria-label="Dossier de l’établissement">
       <p className="haccp-kicker">Établissement actif</p>
       {establishmentLoading && <p role="status">Recherche de l’établissement…</p>}
@@ -391,6 +393,7 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0,
       sessionReady={sessionReady}
     />}
     {tab === "receptions" && <HaccpReceptions key={activeEstablishment} establishmentName={activeEstablishment} />}
+    {tab === "entrees" && <HaccpEntries key={activeEstablishment} establishmentName={activeEstablishment} />}
     {tab === "qr" && <HaccpKitchenLink establishmentName={activeEstablishment} />}
     {tab === "closing" && <section className="workspace-surface haccp-card haccp-closing" aria-label="Bilan HACCP de fin de service">
       <p className="haccp-kicker">Revue opérationnelle · Responsable</p>

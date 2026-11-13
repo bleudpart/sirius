@@ -52,7 +52,7 @@ jobs:
       - name: Backend syntax and focused tests
         run: |
           python -m py_compile haccp_kitchen.py ../deploy/hetzner/sqlite_snapshot.py ../deploy/hetzner/monitor.py
-          python -m pytest tests/test_haccp_kitchen.py tests/test_backup_recovery.py tests/test_deploy_guard.py tests/test_monitor.py tests/test_database_failover.py tests/test_resilience.py -q
+          python -m pytest tests/test_haccp_kitchen.py tests/test_haccp_entries.py tests/test_backup_recovery.py tests/test_deploy_guard.py tests/test_monitor.py tests/test_database_failover.py tests/test_resilience.py -q
           python -m py_compile server.py sirius_brain.py proactive.py enterprise.py account_deletion.py auth_api.py local_memory.py live_work.py routers/files.py routes/pantheon_oracle.py routes/work_dossiers.py
           python -m py_compile document_scan_pdf.py routes/document_scans.py
           python -m py_compile chronos_store.py chronos_assistant.py routes/chronos.py
@@ -76,7 +76,7 @@ jobs:
           python -m pytest tests/test_live_work.py tests/test_speech_vocabulary.py -q
           python -m pytest tests/test_news_command_routing.py -q
           python -m py_compile duerp.py safety_documentation.py haccp_sheet_documents.py alexa_integration.py tuya_integration.py
-          python -m py_compile haccp_database.py models/haccp.py models/haccp_printing.py schemas/haccp.py services/haccp_vision.py services/haccp_opening.py routers/haccp.py routers/haccp_printing.py
+          python -m py_compile haccp_database.py models/haccp.py models/haccp_printing.py schemas/haccp.py schemas/haccp_documents.py services/haccp_vision.py services/haccp_opening.py routers/haccp.py routers/haccp_printing.py routers/haccp_documents.py routers/haccp_entries.py
           python -m pytest tests/test_haccp_labels.py tests/test_haccp_printing.py -q
           python -m pytest tests/test_duerp.py tests/test_safety_documentation.py tests/test_haccp_sheet_documents.py tests/test_alexa_tuya.py tests/test_speech_elisions.py tests/test_version_consistency.py -q
           python -m py_compile models/haccp_reception.py schemas/haccp_reception.py services/haccp_reception.py routers/haccp_reception.py

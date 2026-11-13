@@ -22,6 +22,7 @@ _ALLOWED = (
     ("GET", re.compile(r"^/api/haccp/impression/etat$")),
     ("POST", re.compile(r"^/api/haccp/receptions/documents$")),
     ("GET", re.compile(r"^/api/haccp/receptions/documents$")),
+    ("GET", re.compile(r"^/api/haccp/receptions/entrees$")),
     ("GET", re.compile(r"^/api/haccp/receptions/documents/[0-9a-fA-F-]{36}/photo$")),
     ("GET", re.compile(r"^/api/haccp/registre/recherche$")),
     ("GET", re.compile(r"^/api/haccp/registre/\d+/photo$")),

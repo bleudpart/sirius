@@ -49,6 +49,23 @@ test("a photo is analysed and saved at once, without operator, rule or confirmat
   expect(button("PHOTO").disabled).toBe(false);
 });
 
+test("STOCK entries opens the same establishment register without leaving the QR kitchen", async () => {
+  global.fetch = jest.fn(async (url) => {
+    const params = new URL(url).searchParams;
+    const year = Number(params.get("annee"));
+    return reply({ restaurant_name: "Le Papillon", annee: year, mois: null, annees: [year],
+      total: 0, items: [], offset: 0, limit: 25 });
+  });
+  await act(async () => root.render(<HaccpKitchen establishmentName="Le Papillon" kitchenToken="qr-test" />));
+  await act(async () => button("STOCK").click());
+  expect(host.querySelector('[aria-label="Registre des entrées"]')).not.toBeNull();
+  expect(new URL(global.fetch.mock.calls[0][0]).searchParams.get("restaurant_name")).toBe("Le Papillon");
+  expect(global.fetch.mock.calls[0][1].headers["X-Sirius-Cuisine"]).toBe("qr-test");
+  expect(button("Exporter")).toBeUndefined();
+  await act(async () => button("Retour à PHOTO").click());
+  expect(host.querySelector(".haccp-simple-shoot")).not.toBeNull();
+});
+
 test("an anomaly is saved and shown in orange with a single clear instruction", async () => {
   global.fetch = jest.fn(async () => reply({ id: 5, nom_produit: "Crème", conforme_reception: false }));
   await act(async () => root.render(<HaccpKitchen establishmentName="Le Papillon" />));

@@ -68,6 +68,38 @@ test("QR code Cuisine creates a revocable kitchen link for the active establishm
   expect(HACCP_CAPTURE_URL).toBe("https://sirius-assistant.fr/haccp");
 });
 
+test("chef stock entries follow the active restaurant and preserve the scoped CSV export", async () => {
+  const base = global.fetch.getMockImplementation();
+  global.fetch.mockImplementation(async (url, options) => {
+    if (url.endsWith("/enterprise/sites")) return reply({ items: [
+      { id: "site-1", name: "Le Papillon", active: true }, { id: "site-2", name: "Chez TEST", active: true },
+    ] });
+    if (url.includes("/haccp/receptions/entrees?")) {
+      const params = new URL(url).searchParams, year = Number(params.get("annee"));
+      return reply({ restaurant_name: params.get("restaurant_name"), annee: year, mois: null,
+        annees: [year], offset: 0, limit: 25, total: 0, items: [] });
+    }
+    return base(url, options);
+  });
+  await act(async () => root.render(<HaccpWorkspace initialTab="capture" />));
+  await click("Entrées / Stocks");
+  expect(host.querySelector('[aria-label="Registre des entrées"]')).not.toBeNull();
+  const restaurant = host.querySelector('[aria-label="Dossier de l’établissement"] select');
+  expect(button("Exporter le tableau").disabled).toBe(true);
+  await act(async () => {
+    restaurant.value = "Le Papillon";
+    restaurant.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  expect(button("Exporter le tableau").disabled).toBe(false);
+  await act(async () => {
+    restaurant.value = "Chez TEST";
+    restaurant.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  const calls = global.fetch.mock.calls.filter(([url]) => url.includes("/haccp/receptions/entrees?"));
+  expect(new URL(calls[calls.length - 1][0]).searchParams.get("restaurant_name")).toBe("Chez TEST");
+  expect(host.querySelector('[aria-label="Registre des entrées"]').textContent).toContain("Chez TEST");
+});
+
 test("workspace navigation asks before discarding an unfinished signed record", async () => {
   const originalCrypto = global.crypto;
   global.crypto = { randomUUID: () => "11111111-1111-4111-8111-111111111111" };

@@ -3,6 +3,7 @@ import { AlertTriangle, ArrowLeft, Camera, CheckCircle2, ClipboardList, CookingP
 import HaccpLabelCapture from "./HaccpLabelCapture";
 import HaccpPreparation from "./HaccpPreparation";
 import HaccpReleves from "./HaccpReleves";
+import HaccpEntries, { formatReceivedQuantity, validReceivedQuantity } from "./HaccpEntries";
 import { API_BASE_URL } from "./lib/api";
 import { checkHaccpResponse, haccpFetch } from "./haccpRequest";
 import { HACCP_CATEGORIES, HACCP_CATEGORY_LABELS } from "./haccpCategories";
@@ -21,7 +22,9 @@ const validDocument = (record) => record && ["facture", "bon_livraison", "inconn
   && typeof record.restaurant_name === "string" && Array.isArray(record.lignes)
   && record.lignes.every((line) => line && (line.produit === null || typeof line.produit === "string")
     && (line.lot === null || typeof line.lot === "string")
-    && (line.categorie === undefined || HACCP_CATEGORIES.includes(line.categorie)))
+    && (line.categorie === undefined || HACCP_CATEGORIES.includes(line.categorie))
+    && (line.quantite === undefined || validReceivedQuantity(line.quantite))
+    && (line.unite == null || typeof line.unite === "string"))
   && Array.isArray(record.incertitudes) && record.incertitudes.every((value) => typeof value === "string");
 function DocumentDetails({ record }) {
   const groups = HACCP_CATEGORIES.map((category) => ({
@@ -33,7 +36,8 @@ function DocumentDetails({ record }) {
     {groups.map((group) => <div key={group.category}>
       <h4>{HACCP_CATEGORY_LABELS[group.category]}</h4>
       <ul>{group.lines.map((line, index) => <li key={index}>
-        {line.produit || "Produit non lu"} · Lot : {line.lot || "Absent ou illisible"}
+        {line.produit || "Produit non lu"} · Quantité : {formatReceivedQuantity(line.quantite)} {line.unite || ""}
+        {" · "}Lot : {line.lot || "Absent ou illisible"}
       </li>)}</ul>
     </div>)}
     {record.incertitudes.map((message, index) => <p className="haccp-simple-reason" key={index}>{message}</p>)}
@@ -328,6 +332,9 @@ export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, o
       <button type="button" className="haccp-simple-find" onClick={() => { clearPhoto(); setView("documents"); }}>
         <FileText size={40} aria-hidden="true" /><span>DOCUMENTS REÇUS</span>
       </button>
+      <button type="button" className="haccp-simple-find" onClick={() => setView("entrees")}>
+        <ClipboardList size={40} aria-hidden="true" /><span>STOCK · ENTRÉES</span>
+      </button>
     </>}
     {(view === "ouverture" || view === "preparation") && <>
       <button type="button" className="haccp-simple-back" onClick={() => setView("camera")}>
@@ -340,6 +347,8 @@ export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, o
     </>}
     {view === "releves" && <HaccpReleves establishmentName={establishmentName} kitchenToken={kitchenToken}
       onBack={() => setView("camera")} onDirtyChange={reportRelevesDirty} onSavingChange={setRelevesSaving} />}
+    {view === "entrees" && <HaccpEntries key={`${kitchenToken}:${establishmentName}`}
+      establishmentName={establishmentName} kitchenToken={kitchenToken} onBack={() => setView("camera")} />}
     {view === "documents" && <>
       <button type="button" className="haccp-simple-back" onClick={() => { clearPhoto(); setView("camera"); }}>
         <ArrowLeft size={36} aria-hidden="true" />PHOTO

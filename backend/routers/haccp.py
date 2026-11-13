@@ -658,4 +658,6 @@ def make_haccp_router(
     router.include_router(make_haccp_reception_router(resolve_scope))
     from routers.haccp_documents import make_haccp_documents_router
     router.include_router(make_haccp_documents_router(resolve_scope))
+    from routers.haccp_entries import make_haccp_entries_router
+    router.include_router(make_haccp_entries_router(resolve_scope))
     return router
