@@ -30,6 +30,7 @@ export default function HaccpLabelCapture({
   const [reason, setReason] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [hasRule, setHasRule] = useState(false);
+  const automaticOpening = mode === "ouverture" && (kitchenMode || !!kitchenToken);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(savedRecord);
   const [error, setError] = useState("");
@@ -135,12 +136,12 @@ export default function HaccpLabelCapture({
       setError("Choisissez une photo et indiquez l’opérateur.");
       return;
     }
-    if (mode === "ouverture" && hasRule && (!confirmed || !reason.trim() || !Number.isSafeInteger(Number(hours)) || Number(hours) <= 0)) {
+    if (!automaticOpening && mode === "ouverture" && hasRule && (!confirmed || !reason.trim() || !Number.isSafeInteger(Number(hours)) || Number(hours) <= 0)) {
       setError("Renseignez une durée en heures entières, sa justification et confirmez la règle.");
       return;
     }
     const operation = { type_operation: mode };
-    if (mode === "ouverture" && hasRule) {
+    if (mode === "ouverture" && hasRule && !automaticOpening) {
       Object.assign(operation, {
         duree_conservation_heures: Number(hours),
         justification_duree: reason.trim(), regle_confirmee: confirmed,
@@ -151,6 +152,7 @@ export default function HaccpLabelCapture({
     body.append("operateur", operator.trim());
     body.append("restaurant_name", establishmentName.trim());
     body.append("operation", JSON.stringify(operation));
+    if (automaticOpening) body.append("ouverture_automatique", "true");
     const snapshot = JSON.stringify({
       operation,
       operateur: operator.trim(),
@@ -283,7 +285,7 @@ export default function HaccpLabelCapture({
     captureBlocker = "Indiquez le restaurant actif avant la capture.";
   } else if (!operator.trim()) {
     captureBlocker = "Renseignez l’opérateur avant la capture.";
-  } else if (mode === "ouverture" && hasRule
+  } else if (!automaticOpening && mode === "ouverture" && hasRule
     && (!confirmed || !reason.trim() || !Number.isSafeInteger(Number(hours)) || Number(hours) <= 0)) {
     captureBlocker = "Renseignez la durée, sa justification et confirmez la règle avant la capture.";
   }
@@ -311,6 +313,7 @@ export default function HaccpLabelCapture({
           </label>}
           {mode === "ouverture" && <>
             <p>L’heure d’ouverture enregistrée sera celle du serveur à l’envoi. Scanner immédiatement après l’ouverture ; aucune durée J+3 n’est présumée.</p>
+            {automaticOpening ? <p>Photographiez aussi la consigne après ouverture. ΣIRIUS lit la durée et les conditions du fabricant et calcule la DLC automatiquement, sans dépasser la DLC d’origine. Consigne absente ou illisible : photo archivée, DLC non calculable, sans étiquette d’utilisation.</p> : <>
             <label className="haccp-check"><input type="checkbox" checked={hasRule} onChange={(e) => { setHasRule(e.target.checked); setConfirmed(false); }} /> Appliquer une durée fabricant/PMS validée pour ce produit et ses conditions de stockage</label>
             {hasRule ? <>
               <label>Durée après ouverture (heures entières)
@@ -321,6 +324,7 @@ export default function HaccpLabelCapture({
               </label>
               <label className="haccp-check"><input type="checkbox" checked={confirmed} required onChange={(e) => setConfirmed(e.target.checked)} /> Je confirme cette durée et ses conditions pour le produit photographié.</label>
             </> : <p role="status">Sans règle confirmée : ouverture archivée avec alerte, sans DLC secondaire ni étiquette d’utilisation.</p>}
+            </>}
           </>}
           <div className={`haccp-camera-stage${capturing || busy ? " is-capturing" : ""}${canCapture ? " is-ready" : ""}`}>
             <video ref={video} autoPlay playsInline muted aria-label="Aperçu en direct de la caméra arrière" />
@@ -343,6 +347,15 @@ export default function HaccpLabelCapture({
           {!cameraReady && <button type="button" disabled={busy || capturing} onClick={() => setCameraAttempt((attempt) => attempt + 1)}>
             <RotateCcw size={18} aria-hidden="true" />Réessayer l’accès caméra
           </button>}
+          {!cameraReady && automaticOpening && <label>Photographier ou choisir l’étiquette
+            <input type="file" accept="image/*" capture="environment" onChange={(event) => {
+              const selected = event.target.files?.[0];
+              event.target.value = "";
+              if (!selected) return;
+              captureId.current = null; submitted.current = null;
+              void save(null, selected);
+            }} />
+          </label>}
           {file && error && <button type="submit"><RotateCcw size={18} aria-hidden="true" />Réessayer la même photo sans doublon</button>}
         </fieldset>
       </form>}
@@ -396,7 +409,8 @@ export default function HaccpLabelCapture({
             <p>DLC exacte : {displayTime(result.dlc_secondaire, true)} (Europe/Paris)</p>
             <p>Conditions de conservation : {result.conditions_conservation}</p>
           </> : <p>Ouverture : {displayTime(result.date_ouverture)} · DLC secondaire : {displayTime(result.dlc_secondaire)} (Europe/Paris)</p>}
-          <p>Durée déclarée : {result.duree_conservation_heures ?? "Non renseignée"} h · Référence : {result.justification_duree || "Aucune"}</p>
+          <p>{!isPreparation && (kitchenMode || kitchenToken) ? "Consigne fabricant lue" : "Durée déclarée"} : {result.duree_conservation_heures ?? "Non renseignée"} h · Référence : {result.justification_duree || "Aucune"}</p>
+          {!isPreparation && (kitchenMode || kitchenToken) && result.temperature_stockage && <p>Après ouverture : {result.temperature_stockage} · Conditions à respecter, température réelle non mesurée.</p>}
           {result.dlc_secondaire && result.conforme_reception && <>
             <p>{isPreparation ? "Vérifiez le produit, le lot, la fabrication, la DLC et les conditions avant d’imprimer."
               : "Vérifiez la photo, le produit, le lot et les dates avant de valider."}</p>

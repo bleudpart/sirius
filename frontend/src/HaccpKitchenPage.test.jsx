@@ -52,6 +52,18 @@ test("a saved token restores the link when the home-screen icon opens /cuisine",
   expect(global.fetch.mock.calls[0][1].headers).toEqual({ "X-Sirius-Cuisine": TOKEN });
 });
 
+test("scanning a QR in an already open cuisine tab activates its token without login", async () => {
+  global.fetch = jest.fn(async () => reply({ restaurant_name: "TEST FICTIF" }));
+  await act(async () => root.render(<HaccpKitchenPage />));
+  expect(host.textContent).toContain("Scannez le QR");
+  await act(async () => {
+    window.history.replaceState(null, "", `/cuisine#k=${TOKEN}`);
+    window.dispatchEvent(new Event("hashchange"));
+  });
+  expect(host.textContent).toContain("OUVERTURE");
+  expect(global.fetch.mock.calls[0][1].headers).toEqual({ "X-Sirius-Cuisine": TOKEN });
+});
+
 test("a revoked QR code is forgotten and tells the cook to ask the chef", async () => {
   window.history.replaceState(null, "", `/cuisine#k=${TOKEN}`);
   global.fetch = jest.fn(async () => reply({ detail: "QR code cuisine désactivé. Demandez le nouveau QR code au chef." }, 401));

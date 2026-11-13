@@ -300,7 +300,7 @@ test("kitchen mode shows temporary accepted-print feedback and resets without re
     status: "accepted", transport: "windows", detail: "Transmis à Windows",
   });
   await act(async () => root.render(<HaccpLabelCapture kitchenMode />));
-  await enableRule();
+  await click("Ouverture produit");
   global.fetch.mockResolvedValueOnce(reply({ ...record, type_operation: "ouverture" }));
   await choosePhoto();
   expect(print).not.toHaveBeenCalled();

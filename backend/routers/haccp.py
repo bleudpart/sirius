@@ -1,4 +1,5 @@
 """Scan, preparations declarees, consultation privee et export du registre."""
+import asyncio
 import csv
 import io
 import logging
@@ -39,6 +40,7 @@ from services.haccp_images import IMAGE_FORMATS, MAX_IMAGE_BYTES, ImageValidatio
 from services.haccp_opening import (
     PARIS, calculer_ouverture, calculer_preparation, construire_etiquette, verifier_etiquette_imprimable,
 )
+from services.haccp_manufacturer import manufacturer_operation, read_manufacturer_instruction
 from services.haccp_vision import (
     VisionAnalysisError,
     VisionConfigurationError,
@@ -106,7 +108,8 @@ def _jpeg_bytes(content: bytes) -> bytes:
 def _reception_dossier(scope: str, restaurant_name: str) -> dict:
     directory, slug, existed = _ensure_reception_directory(scope, restaurant_name)
     filename_pattern = re.compile(
-        rf"{re.escape(slug)}_(?:reception|ouverture)_\d{{8}}_\d{{6}}_[a-f0-9]{{8}}\.jpg"
+        rf"{re.escape(slug)}_(?:(?:reception|ouverture)_\d{{8}}_\d{{6}}_[a-f0-9]{{8}}\.jpg"
+        rf"|(?:facture|bon_livraison|inconnu)_[0-9a-f-]{{36}}\.(?:jpg|png|webp))"
     )
     files = []
     for path in directory.iterdir():
@@ -349,6 +352,7 @@ def make_haccp_router(
         restaurant_name: Annotated[str, Form(max_length=160)] = "Restaurant",
         operation: Annotated[str, Form(max_length=2000)] = "{}",
         capture_id: Annotated[uuid.UUID | None, Form()] = None,
+        ouverture_automatique: Annotated[bool, Form()] = False,
         scope: str = Depends(resolve_scope),
         db: Session = Depends(get_db),
     ) -> EtiquetteResponse:
@@ -369,6 +373,9 @@ def make_haccp_router(
             raise HTTPException(422, "Operation invalide : fournissez une duree en heures entieres, "
                                 "une justification fabricant/PMS et la confirmation de la regle, "
                                 "ou archivez l'ouverture sans regle.") from error
+        automatic = capture.type_operation == "ouverture" and (kitchen is not None or ouverture_automatique)
+        if automatic:
+            capture = OperationCapture(type_operation="ouverture")
         maintenant = datetime.now(timezone.utc)
         content = await file.read(MAX_IMAGE_BYTES + 1)
         if not content:
@@ -382,6 +389,7 @@ def make_haccp_router(
                 files={"file": ("etiquette" + IMAGE_FORMATS[mime_type][1], content, mime_type)},
                 data={"operateur": operateur.strip(), "restaurant_name": restaurant_name.strip(),
                       "operation": capture.model_dump_json(),
+                      "ouverture_automatique": str(automatic).lower(),
                       **({"capture_id": str(capture_id)} if capture_id else {})},
             )
             return EtiquetteResponse.model_validate(response.json())
@@ -392,7 +400,7 @@ def make_haccp_router(
         digest = hashlib.sha256(
             content + json.dumps(
                 {"operation": capture.model_dump(), "operateur": operateur.strip(),
-                 "restaurant_slug": restaurant_slug},
+                 "restaurant_slug": restaurant_slug, **({"ouverture_automatique": True} if automatic else {})},
                 sort_keys=True, ensure_ascii=False,
             ).encode("utf-8"),
         ).hexdigest()
@@ -401,15 +409,33 @@ def make_haccp_router(
             previous = await run_in_threadpool(_existing_capture, db, scope, capture_key, digest, prefix)
             if previous is not None:
                 return await run_in_threadpool(_distribute_saved, db, scope, previous)
-            result = (
-                await vision_analyser(content, mime_type, scope, capture_key or uuid.uuid4().hex,
-                                      getattr(request.state, "haccp_actor", None))
-                if vision_analyser is not None else await analyser_etiquette_vision(content, mime_type)
+            label_read = (
+                vision_analyser(content, mime_type, scope, capture_key or uuid.uuid4().hex,
+                                getattr(request.state, "haccp_actor", None))
+                if vision_analyser is not None else analyser_etiquette_vision(content, mime_type)
             )
+            if automatic:
+                result, instruction = await asyncio.gather(
+                    label_read, read_manufacturer_instruction(content, mime_type),
+                )
+                capture = manufacturer_operation(instruction)
+                if capture.regle_confirmee and instruction.conditions:
+                    result = result.model_copy(update={"temperature_stockage": instruction.conditions})
+            else:
+                result = await label_read
             try:
                 result, limite = calculer_ouverture(result, capture, maintenant)
             except ValueError as error:
                 raise HTTPException(422, str(error)) from error
+            if automatic and not capture.regle_confirmee:
+                result = result.model_copy(update={
+                    "conforme_reception": False,
+                    "commentaire_anomalie": (
+                        "DLC non calculable : consigne fabricant apres ouverture absente, illisible "
+                        "ou non exploitable automatiquement. Aucune etiquette d'utilisation. "
+                        + (result.commentaire_anomalie or "")
+                    )[:500],
+                })
             directory, _, _ = await run_in_threadpool(_ensure_reception_directory, scope, restaurant_name)
             candidate_path = directory / _reception_filename(restaurant_slug, capture.type_operation, maintenant)
             stored_image = await run_in_threadpool(_jpeg_bytes, content)
@@ -630,4 +656,6 @@ def make_haccp_router(
             raise HTTPException(503, "L'etat de distribution de cette fiche est indisponible.") from error
 
     router.include_router(make_haccp_reception_router(resolve_scope))
+    from routers.haccp_documents import make_haccp_documents_router
+    router.include_router(make_haccp_documents_router(resolve_scope))
     return router

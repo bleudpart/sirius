@@ -51,6 +51,7 @@ export default function HaccpKitchenLink({ establishmentName = "" }) {
         <li>Menu du navigateur → « Ajouter à l’écran d’accueil ». C’est fait pour toujours.</li>
       </ol>
       <p>Ce QR code permet de photographier les réceptions, de créer les étiquettes d’ouverture et de préparation, de remplir les relevés et d’en demander l’impression sur le PC ΣIRIUS du restaurant (laissez-le allumé, ΣIRIUS ouvert). Ne l’affichez pas à la vue des clients.</p>
+      <p>Réception : étiquette, facture ou bon de livraison photographié et classé automatiquement dans l’établissement. Ouverture : DLC calculée depuis la consigne fabricant lisible, sans saisie de durée ; sans consigne exploitable, aucune étiquette d’utilisation. Seule la préparation nécessite une saisie.</p>
       <div className="haccp-actions">
         <button type="button" disabled={busy} onClick={() => run({ method: "DELETE" },
           "Désactiver le QR code ? Les téléphones qui l’utilisent ne pourront plus accéder à l’espace cuisine.")}>Désactiver</button>

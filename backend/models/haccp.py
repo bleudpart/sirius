@@ -52,3 +52,18 @@ class EtiquetteHaccp(Base):
     regle_confirmee: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     capture_id: Mapped[str | None] = mapped_column(String(36))
     capture_hash: Mapped[str | None] = mapped_column(String(64))
+
+
+class HaccpDeliveryDocument(Base):
+    __tablename__ = "haccp_delivery_documents"
+    __table_args__ = (Index("uq_haccp_document_capture", "scope_key", "capture_id", unique=True),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    scope_key: Mapped[str] = mapped_column(String(255), index=True)
+    restaurant_name: Mapped[str] = mapped_column(String(160), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime)
+    capture_id: Mapped[str] = mapped_column(String(36))
+    capture_hash: Mapped[str] = mapped_column(String(64))
+    image_path: Mapped[str] = mapped_column(String(512))
+    image_sha256: Mapped[str] = mapped_column(String(64))
+    document: Mapped[dict] = mapped_column(JSON)

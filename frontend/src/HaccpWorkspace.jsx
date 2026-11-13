@@ -9,12 +9,13 @@ import { useHaccpRelevePrintRelay } from "./haccpRelevePrinter";
 import { downloadHaccpBlob } from "./haccpDocuments";
 import { API_BASE_URL } from "./lib/api";
 import { haccpFetch } from "./haccpRequest";
+import { HACCP_CATEGORIES } from "./haccpCategories";
 import useScreenWakeLock from "./useScreenWakeLock";
 import "./HaccpWorkspace.css";
 
 const ROOT = `${API_BASE_URL}/haccp/registre`;
 export const HACCP_CAPTURE_URL = "https://sirius-assistant.fr/haccp";
-const CATEGORIES = ["Viandes", "Poissons", "Produits Laitiers", "Fruits & Légumes", "Épicerie", "Non classé"];
+const CATEGORIES = HACCP_CATEGORIES;
 const parisToday = () => {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit",

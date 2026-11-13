@@ -182,16 +182,8 @@ test("OUVERTURE creates an opening label with the QR token and prints through th
   expect(host.textContent).toContain("Cuisine · Ouverture d’un produit");
   expect(button("Réception")).toBeUndefined();
   expect([...host.querySelectorAll("label")].some((label) => label.textContent.startsWith("Opérateur"))).toBe(false);
-  const field = (text) => [...host.querySelectorAll("label")].find((label) => label.textContent.trim().startsWith(text))?.querySelector("input,textarea");
-  const type = async (input, value) => act(async () => {
-    const proto = input.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-    Object.getOwnPropertyDescriptor(proto, "value").set.call(input, value);
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-  await act(async () => field("Appliquer").click());
-  await type(field("Durée après"), "72");
-  await type(field("Justification"), "Notice fabricant");
-  await act(async () => field("Je confirme").click());
+  expect(host.querySelectorAll('input:not([type=file]),textarea')).toHaveLength(0);
+  expect(host.textContent).toContain("calcule la DLC automatiquement");
   const video = host.querySelector("video");
   Object.defineProperty(video, "videoWidth", { configurable: true, value: 1920 });
   Object.defineProperty(video, "videoHeight", { configurable: true, value: 1080 });
@@ -202,9 +194,8 @@ test("OUVERTURE creates an opening label with the QR token and prints through th
   const [scanUrl, scan] = global.fetch.mock.calls[0];
   expect(scanUrl).toMatch(/\/etiquettes\/scan$/);
   expect(scan.headers).toEqual(TOKEN_HEADER);
-  expect(JSON.parse(scan.body.get("operation"))).toEqual({
-    type_operation: "ouverture", duree_conservation_heures: 72, justification_duree: "Notice fabricant", regle_confirmee: true,
-  });
+  expect(JSON.parse(scan.body.get("operation"))).toEqual({ type_operation: "ouverture" });
+  expect(scan.body.get("ouverture_automatique")).toBe("true");
   await act(async () => button("J’ai vérifié le produit, le lot et la DLC").click());
   const [printUrl, print] = global.fetch.mock.calls[1];
   expect(printUrl).toMatch(/\/haccp\/impression\/demandes$/);
@@ -243,4 +234,57 @@ test("PRÉPARATION saves the preparation with the QR token and without an operat
   expect(host.textContent).toContain("J’ai vérifié");
   await act(async () => button("PHOTO").click());
   expect(button("OUVERTURE")).not.toBeUndefined();
+});
+
+test("invoice photo is archived with visible products and lots, then retrieved without account", async () => {
+  const document = {
+    id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", type_document: "facture", restaurant_name: "Le Papillon",
+    reference: "F-1", fournisseur: "Fournisseur TEST", created_at: "2026-11-13T18:00:00Z",
+    lignes: [{ produit: "Crème", lot: "L1", categorie: "Produits Laitiers" },
+      { produit: "Lait", lot: null, categorie: "Produits Laitiers" },
+      { produit: "Boeuf", lot: "B1", categorie: "Viandes" },
+      { produit: "Riz", lot: "R1", categorie: "Épicerie" },
+      { produit: "Article ambigu", lot: null, categorie: "Non classé" }],
+    incertitudes: ["Lot du lait absent"],
+  };
+  const onSaved = jest.fn();
+  global.fetch = jest.fn(async (url) => url.includes("?") ? reply([document]) : reply(document));
+  await act(async () => root.render(<HaccpKitchen kitchenToken="jeton-cuisine-0123456789"
+    establishmentName="Le Papillon" onCaptureSaved={onSaved} />));
+  await act(async () => button("Facture / Bon").click());
+  await pickPhoto();
+  const [url, options] = global.fetch.mock.calls[0];
+  expect(url).toMatch(/\/receptions\/documents$/);
+  expect(options.headers).toEqual(TOKEN_HEADER);
+  expect(options.body.get("restaurant_name")).toBe("Le Papillon");
+  expect(host.textContent).toContain("Document archivé dans le dossier");
+  expect(host.textContent).toContain("Crème");
+  expect(host.textContent).toContain("Absent ou illisible");
+  expect([...host.querySelectorAll("h4")].map((heading) => heading.textContent)).toEqual([
+    "Boucherie / Charcuterie", "Crémerie", "Épicerie", "Non classé",
+  ]);
+  expect(onSaved).not.toHaveBeenCalled();
+  await act(async () => button("DOCUMENTS REÇUS").click());
+  expect(global.fetch.mock.calls[1][0]).toContain("/receptions/documents?restaurant_name=Le+Papillon");
+  expect(host.textContent).toContain("Facture · F-1");
+  await act(async () => button("Facture · F-1").click());
+  expect(global.fetch.mock.calls[2][0]).toMatch(/\/receptions\/documents\/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\/photo$/);
+  expect(host.textContent).toContain("Lot du lait absent");
+  expect(host.querySelector("img").src).toContain("blob:photo");
+});
+
+test("a timed-out document upload retries the same photo and capture ID, not the label scanner", async () => {
+  global.fetch = jest.fn().mockRejectedValueOnce(new Error("Connexion coupée"))
+    .mockResolvedValue(reply({
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", type_document: "bon_livraison",
+      restaurant_name: "Le Papillon", lignes: [], incertitudes: ["Lecture partielle"],
+    }));
+  await act(async () => root.render(<HaccpKitchen kitchenToken="jeton-cuisine-0123456789" establishmentName="Le Papillon" />));
+  await act(async () => button("Facture / Bon").click());
+  await pickPhoto();
+  await act(async () => button("Étiquette produit").click());
+  await act(async () => button("Encore").click());
+  expect(global.fetch.mock.calls[0][0]).toBe(global.fetch.mock.calls[1][0]);
+  expect(global.fetch.mock.calls[0][1].body.get("capture_id")).toBe(global.fetch.mock.calls[1][1].body.get("capture_id"));
+  expect(host.textContent).toContain("Document archivé");
 });

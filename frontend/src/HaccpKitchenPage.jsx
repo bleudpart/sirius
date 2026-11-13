@@ -25,12 +25,17 @@ export function readKitchenToken() {
 }
 
 export default function HaccpKitchenPage() {
-  const [token] = useState(readKitchenToken);
+  const [token, setToken] = useState(readKitchenToken);
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState(() => token ? { status: "loading" } : { status: "missing" });
   const wakeLock = useScreenWakeLock(state.status === "ready");
   useEffect(() => {
-    if (!token) return undefined;
+    const update = () => setToken(readKitchenToken());
+    window.addEventListener("hashchange", update);
+    return () => window.removeEventListener("hashchange", update);
+  }, []);
+  useEffect(() => {
+    if (!token) { setState({ status: "missing" }); return undefined; }
     let active = true;
     setState({ status: "loading" });
     haccpFetch(`${API_BASE_URL}/haccp/cuisine/session`, { headers: { "X-Sirius-Cuisine": token } },
@@ -61,6 +66,7 @@ export default function HaccpKitchenPage() {
       </button>}
     </div>}
     {state.status === "ready" && <HaccpKitchen
+      key={token}
       kitchenToken={token}
       establishmentName={state.restaurant}
     />}

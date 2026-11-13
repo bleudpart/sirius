@@ -24,6 +24,48 @@ operateur competent dans le cadre du PMS.
 
 ## Architecture
 
+### Cuisine par QR : ouverture automatique et documents fournisseurs
+
+Dans l'espace Cuisine, seule la preparation/fabrication demande un formulaire.
+L'ouverture photographie l'etiquette, puis lit une consigne fabricant explicite
+apres ouverture, y compris ses conditions. Une duree numerique unique en heures
+ou jours permet le calcul automatique ; un jour vaut 24 heures ecoulees.
+La DLC secondaire ne depasse jamais la DLC d'origine. Le cuisinier ne saisit
+pas de duree et ne consulte pas le chef. Le texte fabricant lu et la duree
+calculee sont conserves dans les champs de regle du registre.
+
+Consigne absente, tronquee, conditionnelle ou non interpretable, stockage absent,
+lecture non conforme ou date d'origine inconnue : la photo est archivee, mais
+la DLC est non calculable et aucune etiquette d'utilisation n'est imprimable.
+L'IA ne choisit aucune duree a partir de connaissances generales. Le calcul
+ne mesure ni la temperature ni le respect des conditions. Le parcours manuel
+fabricant/PMS du mode chef reste disponible.
+
+Pour les factures et bons de livraison, choisir **Facture / Bon de livraison**
+puis photographier chaque page (JPEG/PNG/WebP). La route
+`POST /api/haccp/receptions/documents` classe l'original dans le dossier
+`uploads/<etablissement>/<scope-hache>/`, avec son SHA-256 et une lecture
+structuree (fournisseur, reference, date complete, produits et lots lisibles).
+Chaque ligne est classee separement dans les categories HACCP existantes :
+Viandes (boucherie/charcuterie), Poissons (poissonnerie), Produits Laitiers
+(cremerie), Fruits & Legumes et Epicerie. L'affichage regroupe ces lignes
+par famille dans le document. Une facture mixte n'est pas classee globalement
+selon le fournisseur. Produit ambigu, absent ou non alimentaire : Non classe.
+La categorie est conservee dans le JSON archive, sans deplacement de l'original
+ni modification des anciennes lectures.
+La table additive `haccp_delivery_documents` ne modifie aucune archive existante.
+Le QR impose l'etablissement et le scope du chef ; les documents peuvent etre
+retrouves dans **DOCUMENTS RECUS** et leurs photos sont servies avec le jeton.
+Les noms des fichiers apparaissent aussi dans le dossier du mode chef.
+
+Les lots absents restent inconnus : une reference produit n'est pas un lot.
+Ces documents ne generent pas de stock, d'allergenes supposes ni d'ecritures
+comptables. Les etiquettes produit continuent d'alimenter les quatre projections
+ci-dessous ; une facture multiproduits n'est jamais convertie en etiquette unique.
+Une nouvelle tentative avec le meme identifiant de capture ne rappelle pas
+Vision et ne duplique pas l'archive. Les PDF ne sont pas acceptes par ce
+parcours photo.
+
 ```mermaid
 flowchart TD
     PHOTO["Photo JPEG / PNG / WebP"] --> VISION["Vision + validation Pydantic"]
