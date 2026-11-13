@@ -163,3 +163,84 @@ test("a kitchen token is sent on scan, search and photo requests", async () => {
     expect(options.headers).toEqual({ "X-Sirius-Cuisine": "jeton-cuisine-0123456789" });
   }
 });
+
+const TOKEN_HEADER = { "X-Sirius-Cuisine": "jeton-cuisine-0123456789" };
+const opened = {
+  id: 9, type_operation: "ouverture", nom_produit: "Crème", numero_lot: "L9", conforme_reception: true,
+  type_date: "DLC", dlc_ou_ddm: "2099-12-31", date_ouverture: "2026-11-02T10:00:00Z",
+  dlc_secondaire: "2026-11-05T10:00:00Z", duree_conservation_heures: 72, justification_duree: "Notice fabricant",
+};
+
+test("OUVERTURE creates an opening label with the QR token and prints through the restaurant PC", async () => {
+  navigator.mediaDevices = { getUserMedia: jest.fn().mockResolvedValue({ getTracks: () => [{ stop: jest.fn() }] }) };
+  jest.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+  global.fetch = jest.fn(async (url) => url.endsWith("/impression/demandes")
+    ? reply({ id: "j1", label_id: 9, status: "pending", transport: "windows" })
+    : reply(opened));
+  await act(async () => root.render(<HaccpKitchen kitchenToken="jeton-cuisine-0123456789" establishmentName="Le Papillon" />));
+  await act(async () => button("OUVERTURE").click());
+  expect(host.textContent).toContain("Cuisine · Ouverture d’un produit");
+  expect(button("Réception")).toBeUndefined();
+  expect([...host.querySelectorAll("label")].some((label) => label.textContent.startsWith("Opérateur"))).toBe(false);
+  const field = (text) => [...host.querySelectorAll("label")].find((label) => label.textContent.trim().startsWith(text))?.querySelector("input,textarea");
+  const type = async (input, value) => act(async () => {
+    const proto = input.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(proto, "value").set.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => field("Appliquer").click());
+  await type(field("Durée après"), "72");
+  await type(field("Justification"), "Notice fabricant");
+  await act(async () => field("Je confirme").click());
+  const video = host.querySelector("video");
+  Object.defineProperty(video, "videoWidth", { configurable: true, value: 1920 });
+  Object.defineProperty(video, "videoHeight", { configurable: true, value: 1080 });
+  const canvas = host.querySelector("canvas.haccp-capture-canvas");
+  Object.defineProperty(canvas, "getContext", { configurable: true, value: () => ({ drawImage: jest.fn() }) });
+  Object.defineProperty(canvas, "toBlob", { configurable: true, value: (done) => done(new Blob(["p"], { type: "image/jpeg" })) });
+  await act(async () => button("Capturer l’étiquette").click());
+  const [scanUrl, scan] = global.fetch.mock.calls[0];
+  expect(scanUrl).toMatch(/\/etiquettes\/scan$/);
+  expect(scan.headers).toEqual(TOKEN_HEADER);
+  expect(JSON.parse(scan.body.get("operation"))).toEqual({
+    type_operation: "ouverture", duree_conservation_heures: 72, justification_duree: "Notice fabricant", regle_confirmee: true,
+  });
+  await act(async () => button("J’ai vérifié le produit, le lot et la DLC").click());
+  const [printUrl, print] = global.fetch.mock.calls[1];
+  expect(printUrl).toMatch(/\/haccp\/impression\/demandes$/);
+  expect(print.headers).toEqual({ "Content-Type": "application/json", ...TOKEN_HEADER });
+  expect(JSON.parse(print.body)).toEqual({ label_id: 9, reviewed: true });
+  expect(host.textContent).toContain("En attente du poste Windows");
+});
+
+test("PRÉPARATION saves the preparation with the QR token and without an operator field", async () => {
+  global.fetch = jest.fn(async () => reply({
+    id: 10, type_operation: "preparation", nom_produit: "Soupe", numero_lot: "PREP-1", conforme_reception: true,
+    date_fabrication: "2026-11-02T07:15:00Z", dlc_secondaire: "2026-11-05T07:15:00Z",
+    conditions_conservation: "0 à 3 °C", duree_conservation_heures: 72, justification_duree: "PMS",
+  }));
+  await act(async () => root.render(<HaccpKitchen kitchenToken="jeton-cuisine-0123456789" establishmentName="Le Papillon" />));
+  await act(async () => button("PRÉPARATION").click());
+  expect(host.querySelector('section[aria-label="Étiquette de préparation"]')).not.toBeNull();
+  expect([...host.querySelectorAll("label")].some((label) => label.textContent.startsWith("Opérateur"))).toBe(false);
+  expect(host.textContent).not.toContain("Configurer l’imprimante");
+  const field = (text) => [...host.querySelectorAll("label")].find((label) => label.textContent.trim().startsWith(text))?.querySelector("input,textarea");
+  const type = async (input, value) => act(async () => {
+    const proto = input.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(proto, "value").set.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await type(field("Nom du produit"), "Soupe");
+  await type(field("Date et heure"), "2026-11-02T08:15");
+  await type(field("Durée"), "72");
+  await type(field("Conditions"), "0 à 3 °C");
+  await type(field("Référence"), "PMS");
+  await act(async () => field("Je confirme").click());
+  await act(async () => button("Calculer la DLC").click());
+  const [url, options] = global.fetch.mock.calls[0];
+  expect(url).toMatch(/\/haccp\/preparations$/);
+  expect(options.headers).toEqual({ "Content-Type": "application/json", ...TOKEN_HEADER });
+  expect(host.textContent).toContain("J’ai vérifié");
+  await act(async () => button("PHOTO").click());
+  expect(button("OUVERTURE")).not.toBeUndefined();
+});

@@ -64,7 +64,7 @@ test("QR code Cuisine creates a revocable kitchen link for the active establishm
   const [, options] = global.fetch.mock.calls.find(([url, opts]) => url.endsWith("/haccp/cuisine/lien") && opts?.method === "POST");
   expect(JSON.parse(options.body)).toEqual({ restaurant_name: "Le Papillon" });
   expect(host.querySelector('section[aria-label="QR code Cuisine"] svg')).not.toBeNull();
-  expect(host.textContent).toContain("remplir et consulter les relevés");
+  expect(host.textContent).toContain("créer les étiquettes d’ouverture et de préparation");
   expect(HACCP_CAPTURE_URL).toBe("https://sirius-assistant.fr/haccp");
 });
 

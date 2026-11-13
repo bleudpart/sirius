@@ -20,8 +20,10 @@ export default function HaccpLabelCapture({
   sessionReady = true,
   onCaptureSaved = noop,
   onDistributionChange,
+  kitchenToken = "",
+  operations = ["reception", "ouverture"],
 }) {
-  const [mode, setMode] = useState("reception");
+  const [mode, setMode] = useState(operations[0]);
   const [operator, setOperator] = useState("Cuisine");
   const [file, setFile] = useState(null);
   const [hours, setHours] = useState("");
@@ -165,6 +167,7 @@ export default function HaccpLabelCapture({
     try {
       const record = await haccpFetch(`${API}/etiquettes/scan`, {
         method: "POST", credentials: "include", body,
+        ...(kitchenToken ? { headers: { "X-Sirius-Cuisine": kitchenToken } } : {}),
       }, async (response) => (await checkHaccpResponse(response)).json());
       if (mounted.current) {
         setResult(record); setFile(null); setConfirmed(false);
@@ -237,7 +240,8 @@ export default function HaccpLabelCapture({
     if (!result || pending.current) return;
     pending.current = true; setBusy(true); setError("");
     try {
-      const job = await printHaccpLabel(result.id, result.type_operation);
+      const job = kitchenToken ? await printHaccpLabel(result.id, result.type_operation, kitchenToken)
+        : await printHaccpLabel(result.id, result.type_operation);
       setPrintState(`${haccpPrintStatus(job.status, job.transport)}. ${job.detail || ""} Aucun doublon ne sera envoyé automatiquement.`);
       if (kitchenMode && job.status === "accepted") showKitchenPrintSuccess();
     } catch (failure) {
@@ -249,7 +253,7 @@ export default function HaccpLabelCapture({
   const checkPrintState = async () => {
     setError("");
     try {
-      const state = await haccpPrintRequest("/etat");
+      const state = await haccpPrintRequest("/etat", undefined, kitchenToken);
       const job = state.jobs.find((item) => item.label_id === result.id);
       setPrintState(job ? `${haccpPrintStatus(job.status, job.transport)}. ${job.detail || ""}`
         : "Aucune demande trouvée pour cette étiquette.");
@@ -293,18 +297,18 @@ export default function HaccpLabelCapture({
     <section aria-label={isPreparation ? "Préparation enregistrée" : kitchenMode ? "Cuisine simplifiée — capture HACCP" : "Capture des étiquettes ΣIRIUS"}
       className={`haccp-ui workspace-surface haccp-card haccp-capture${kitchenMode ? " haccp-kitchen" : ""}`}>
       {!kitchenMode && <p className="haccp-kicker">{savedRecord ? "Preuve archivée" : "Capture intelligente"}</p>}
-      <h3>{kitchenMode ? "Cuisine · Scanner une étiquette" : `ΣIRIUS · ${savedRecord ? "Vérifier l’étiquette archivée" : "Scanner une étiquette"}`}</h3>
+      <h3>{kitchenMode ? (operations.length === 1 && operations[0] === "ouverture" ? "Cuisine · Ouverture d’un produit" : "Cuisine · Scanner une étiquette") : `ΣIRIUS · ${savedRecord ? "Vérifier l’étiquette archivée" : "Scanner une étiquette"}`}</h3>
       {!savedRecord && !kitchenMode && <ol className="haccp-steps" aria-label="Étapes de capture"><li><span>1</span>Choisir l’action</li><li><span>2</span>Photographier</li><li><span>3</span>Vérifier et imprimer</li></ol>}
       {!savedRecord && <form onSubmit={save}>
         <fieldset disabled={busy || capturing || !!result || !sessionReady} className="haccp-capture-fields">
           <legend>Action</legend>
-          <div className="haccp-modes" role="group" aria-label="Type d’opération">
+          {operations.length > 1 && <div className="haccp-modes" role="group" aria-label="Type d’opération">
             <button type="button" aria-pressed={mode === "reception"} onClick={() => changeMode("reception")}><PackageCheck size={20} aria-hidden="true" />Réception</button>
             <button type="button" aria-pressed={mode === "ouverture"} onClick={() => changeMode("ouverture")}><Scissors size={20} aria-hidden="true" />Ouverture produit</button>
-          </div>
-          <label>Opérateur
+          </div>}
+          {!kitchenToken && <label>Opérateur
             <input value={operator} maxLength={100} required onChange={(e) => setOperator(e.target.value)} />
-          </label>
+          </label>}
           {mode === "ouverture" && <>
             <p>L’heure d’ouverture enregistrée sera celle du serveur à l’envoi. Scanner immédiatement après l’ouverture ; aucune durée J+3 n’est présumée.</p>
             <label className="haccp-check"><input type="checkbox" checked={hasRule} onChange={(e) => { setHasRule(e.target.checked); setConfirmed(false); }} /> Appliquer une durée fabricant/PMS validée pour ce produit et ses conditions de stockage</label>
@@ -402,7 +406,7 @@ export default function HaccpLabelCapture({
                 : "J’ai vérifié : valider et imprimer"}
             </button>
             {printState && <button disabled={busy} onClick={checkPrintState}>Voir l’état d’impression</button>}
-            {!kitchenMode && <details><summary>Secours manuel (risque de doublon)</summary><p>Uniquement si aucune demande n’a été envoyée au relais. Vérifiez le registre et le papier avant toute impression manuelle.</p><button disabled={busy || !!printState} onClick={print}>Imprimer l’étiquette {isPreparation ? "de préparation" : "d’ouverture"} manuellement</button></details>}
+            {!kitchenMode && !kitchenToken && <details><summary>Secours manuel (risque de doublon)</summary><p>Uniquement si aucune demande n’a été envoyée au relais. Vérifiez le registre et le papier avant toute impression manuelle.</p><button disabled={busy || !!printState} onClick={print}>Imprimer l’étiquette {isPreparation ? "de préparation" : "d’ouverture"} manuellement</button></details>}
           </>}
           {printState && <p role="status">{printState}</p>}
         </>}

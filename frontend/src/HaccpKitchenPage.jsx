@@ -63,7 +63,6 @@ export default function HaccpKitchenPage() {
     {state.status === "ready" && <HaccpKitchen
       kitchenToken={token}
       establishmentName={state.restaurant}
-      onFullMode={() => window.location.assign("/haccp")}
     />}
     {state.status === "ready" && wakeLock.status !== "active" && wakeLock.message
       && <p className="haccp-wake-lock" role="status">{wakeLock.message}</p>}

@@ -1,4 +1,5 @@
-"""QR code Cuisine : un lien révocable qui permet seulement de photographier et de retrouver les étiquettes."""
+"""QR code Cuisine : un lien révocable limité aux étiquettes (réception, ouverture, préparation,
+impression via le poste Windows) et aux relevés, sans compte cuisinier."""
 import hashlib
 import re
 import secrets
@@ -16,6 +17,9 @@ SITE_URL = "https://sirius-assistant.fr/cuisine"
 DISABLED = "QR code cuisine désactivé. Demandez le nouveau QR code au chef."
 _ALLOWED = (
     ("POST", re.compile(r"^/api/haccp/etiquettes/scan$")),
+    ("POST", re.compile(r"^/api/haccp/preparations$")),
+    ("POST", re.compile(r"^/api/haccp/impression/demandes$")),
+    ("GET", re.compile(r"^/api/haccp/impression/etat$")),
     ("GET", re.compile(r"^/api/haccp/registre/recherche$")),
     ("GET", re.compile(r"^/api/haccp/registre/\d+/photo$")),
     ("GET", re.compile(r"^/api/haccp/cuisine/session$")),

@@ -292,6 +292,9 @@ def make_haccp_router(
         body: PreparationCreate, request: Request,
         scope: str = Depends(resolve_scope), db: Session = Depends(get_db),
     ) -> EtiquetteResponse:
+        kitchen = getattr(request.state, "haccp_kitchen", None)
+        if kitchen is not None:
+            body = body.model_copy(update={"operateur": "Cuisine", "restaurant_name": kitchen["restaurant_name"]})
         _restaurant_slug(body.restaurant_name)
         if cloud_link.relay_allowed():
             response = await cloud_link.relay_haccp_registry(
@@ -366,8 +369,6 @@ def make_haccp_router(
             raise HTTPException(422, "Operation invalide : fournissez une duree en heures entieres, "
                                 "une justification fabricant/PMS et la confirmation de la regle, "
                                 "ou archivez l'ouverture sans regle.") from error
-        if kitchen is not None and capture.type_operation != "reception":
-            raise HTTPException(403, "Le QR code cuisine enregistre seulement les réceptions.")
         maintenant = datetime.now(timezone.utc)
         content = await file.read(MAX_IMAGE_BYTES + 1)
         if not content:

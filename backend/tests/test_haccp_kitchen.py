@@ -1,3 +1,6 @@
+import json
+import uuid
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -9,6 +12,7 @@ import access_gate
 import haccp_database
 import haccp_kitchen
 import routers.haccp as routes
+from routers.haccp_printing import make_haccp_print_router
 from tests.test_haccp_labels import extracted, picture
 
 
@@ -59,6 +63,7 @@ def kitchen(tmp_path, monkeypatch):
     app = FastAPI()
     app.include_router(haccp_kitchen.make_haccp_kitchen_router(scope, lambda: db), prefix="/api")
     app.include_router(routes.make_haccp_router(scope), prefix="/api")
+    app.include_router(make_haccp_print_router(scope, lambda request: True), prefix="/api")
     with TestClient(app) as client:
         yield SimpleNamespace(client=client, db=db, access=access, owner_scopes=owner_scopes)
     haccp_database.get_engine().dispose()
@@ -108,13 +113,48 @@ def test_le_qr_cuisine_photographie_et_retrouve_dans_le_registre_du_chef(kitchen
 def test_le_qr_cuisine_ne_donne_acces_a_rien_d_autre(kitchen):
     client = kitchen.client
     _, headers = create_link(client)
-    assert kitchen_scan(client, headers, '{"type_operation": "ouverture", "sans_regle": true}').status_code in {403, 422}
+    assert kitchen_scan(client, headers, '{"type_operation": "ouverture", "sans_regle": true}').status_code == 422
     assert client.get("/api/haccp/registre/export-csv", headers=headers).status_code == 403
+    assert client.get("/api/haccp/registre/1/etiquette", headers=headers).status_code == 403
+    assert client.post("/api/haccp/impression/poste", json={}, headers=headers).status_code == 403
+    assert client.post("/api/haccp/impression/prochaine", json={}, headers=headers).status_code == 403
+    assert client.post("/api/haccp/impression/android/demandes", json={}, headers=headers).status_code == 403
     assert client.get("/api/haccp/cuisine/lien", headers=headers).status_code == 403
     assert client.post("/api/haccp/cuisine/lien", json={"restaurant_name": "X"}, headers=headers).status_code == 403
     assert client.delete("/api/haccp/cuisine/lien", headers=headers).status_code == 403
     assert client.get("/api/haccp/cuisine/session", headers={haccp_kitchen.HEADER: "x" * 43}).status_code == 401
     assert client.get("/api/haccp/cuisine/session", headers=CHEF).status_code == 400
+
+
+RULE = {"duree_conservation_heures": 72, "justification_duree": "Notice fabricant", "regle_confirmee": True}
+
+
+def test_le_qr_cuisine_cree_ouverture_et_preparation_puis_demande_l_impression(kitchen):
+    client = kitchen.client
+    _, headers = create_link(client)
+    opened = kitchen_scan(client, headers, json.dumps({"type_operation": "ouverture", **RULE}))
+    assert opened.status_code == 201, opened.text
+    assert opened.json()["operateur"] == "Cuisine"
+    assert opened.json()["restaurant_name"] == "Chez Daniel"
+    assert opened.json()["dlc_secondaire"]
+
+    prepared = client.post("/api/haccp/preparations", headers=headers, json={
+        "capture_id": str(uuid.uuid4()), "nom_produit": "Sauce tomate", "operateur": "Pirate",
+        "restaurant_name": "Autre resto",
+        "date_fabrication": (datetime.now(timezone.utc).replace(microsecond=0) - timedelta(hours=1)).isoformat(),
+        "conditions_conservation": "0 à 3 °C, boîte fermée", **RULE,
+    })
+    assert prepared.status_code == 201, prepared.text
+    assert prepared.json()["operateur"] == "Cuisine"
+    assert prepared.json()["restaurant_name"] == "Chez Daniel"
+
+    # Sans poste Windows associé, la demande est refusée proprement, jamais en 403.
+    queued = client.post("/api/haccp/impression/demandes", headers=headers,
+                         json={"label_id": opened.json()["id"], "reviewed": True})
+    assert queued.status_code == 409
+    state = client.get("/api/haccp/impression/etat", headers=headers)
+    assert state.status_code == 200
+    assert state.json() == {"station": None, "jobs": []}
 
 
 def test_desactiver_ou_recreer_le_qr_coupe_l_ancien(kitchen):

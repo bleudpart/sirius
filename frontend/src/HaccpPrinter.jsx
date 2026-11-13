@@ -22,21 +22,26 @@ export function haccpPrintStatus(status, transport = "windows") {
   return labels[status];
 }
 
-export async function printHaccpLabel(labelId, operation = "ouverture") {
-  if (hasAndroidHaccpPrinter()) {
+export async function printHaccpLabel(labelId, operation = "ouverture", kitchenToken = "") {
+  if (!kitchenToken && hasAndroidHaccpPrinter()) {
     const config = await androidHaccpPrinter.getConfig();
     if (config.enabled) return printAndroidLabel(labelId, haccpPrintRequest, operation);
   }
-  return haccpPrintRequest("/demandes", { label_id: labelId, reviewed: true });
+  return haccpPrintRequest("/demandes", { label_id: labelId, reviewed: true }, kitchenToken);
 }
 
 const API = `${API_BASE_URL}/haccp/impression`;
 const RELAY_KEY = "sirius_haccp_print_relay_id";
 
-export async function haccpPrintRequest(path, body) {
+export async function haccpPrintRequest(path, body, kitchenToken = "") {
+  const headers = {
+    ...(body ? { "Content-Type": "application/json" } : {}),
+    ...(kitchenToken ? { "X-Sirius-Cuisine": kitchenToken } : {}),
+  };
   return haccpFetch(API + path, {
     credentials: "include",
-    ...(body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}),
+    ...(Object.keys(headers).length ? { headers } : {}),
+    ...(body ? { method: "POST", body: JSON.stringify(body) } : {}),
   }, async (response) => {
     const data = await response.json();
     if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : `Impression indisponible (${response.status}).`);

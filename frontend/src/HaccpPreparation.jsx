@@ -7,7 +7,7 @@ import "./HaccpWorkspace.css";
 
 const EMPTY = { product: "", lot: "", manufacturedAt: "", utcOffset: "", hours: "", conditions: "", reason: "", operator: "Cuisine" };
 
-export default function HaccpPreparation({ establishmentName, sessionReady }) {
+export default function HaccpPreparation({ establishmentName, sessionReady, kitchenToken = "" }) {
   const [draft, setDraft] = useState(EMPTY);
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -55,7 +55,7 @@ export default function HaccpPreparation({ establishmentName, sessionReady }) {
     try {
       if (!attempt.current) attempt.current = { id: crypto.randomUUID(), snapshot };
       const record = await haccpFetch(`${API_BASE_URL}/haccp/preparations`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json", ...(kitchenToken ? { "X-Sirius-Cuisine": kitchenToken } : {}) },
         body: JSON.stringify({ ...payload, capture_id: attempt.current.id }),
       }, async (response) => (await checkHaccpResponse(response)).json());
       if (!record || record.type_operation !== "preparation" || !Number.isSafeInteger(record.id) || record.id < 1
@@ -120,9 +120,9 @@ export default function HaccpPreparation({ establishmentName, sessionReady }) {
         <label>Référence de la règle PMS applicable à ce produit
           <textarea required maxLength={500} value={draft.reason} onChange={(event) => change("reason", event.target.value)} />
         </label>
-        <label>Opérateur
+        {!kitchenToken && <label>Opérateur
           <input required maxLength={100} value={draft.operator} onChange={(event) => change("operator", event.target.value)} />
-        </label>
+        </label>}
         <label className="haccp-check"><input type="checkbox" required checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
           Je confirme la fabrication saisie et la règle de conservation validée pour ce produit et ses conditions.
         </label>
@@ -132,11 +132,11 @@ export default function HaccpPreparation({ establishmentName, sessionReady }) {
       </fieldset>
     </form>}
     {error && <p role="alert">{error}</p>}
-    {result && <HaccpLabelCapture key={result.id} savedRecord={result} />}
+    {result && <HaccpLabelCapture key={result.id} savedRecord={result} kitchenToken={kitchenToken} />}
     {(result || attempt.current) && <>
       {!result && <p>Avant de repartir sur une nouvelle fiche après une erreur, vérifiez que la précédente n’est pas déjà au registre.</p>}
       <button type="button" disabled={busy} onClick={reset}>Nouvelle préparation</button>
     </>}
-    <details><summary>Configurer l’imprimante (une seule fois)</summary><HaccpPrinter /></details>
+    {!kitchenToken && <details><summary>Configurer l’imprimante (une seule fois)</summary><HaccpPrinter /></details>}
   </section>;
 }

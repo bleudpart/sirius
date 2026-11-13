@@ -38,7 +38,10 @@ test("the token from the QR code is remembered and opens the simple kitchen scre
   expect(localStorage.getItem(KITCHEN_STORAGE_KEY)).toBe(TOKEN);
   expect(host.textContent).toContain("PHOTO");
   expect(host.textContent).toContain("RETROUVER");
-  expect(host.textContent).toContain("Mode complet");
+  expect(host.textContent).toContain("OUVERTURE");
+  expect(host.textContent).toContain("PRÉPARATION");
+  // Le cuisinier ne doit jamais tomber sur la connexion chef (/haccp) depuis le QR code.
+  expect(host.textContent).not.toContain("Mode complet");
 });
 
 test("a saved token restores the link when the home-screen icon opens /cuisine", async () => {

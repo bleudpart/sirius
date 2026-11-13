@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowLeft, Camera, CheckCircle2, ClipboardList, ImageIcon, LoaderCircle, RotateCcw, Search, Settings, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Camera, CheckCircle2, ClipboardList, CookingPot, ImageIcon, LoaderCircle, RotateCcw, Scissors, Search, Settings, X } from "lucide-react";
+import HaccpLabelCapture from "./HaccpLabelCapture";
+import HaccpPreparation from "./HaccpPreparation";
 import HaccpReleves from "./HaccpReleves";
 import { API_BASE_URL } from "./lib/api";
 import { checkHaccpResponse, haccpFetch } from "./haccpRequest";
@@ -254,12 +256,27 @@ export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, o
         {pendingFile.current && <button type="button" className="haccp-simple-small" disabled={busy}
           onClick={() => void send(pendingFile.current)}><RotateCcw size={22} aria-hidden="true" />Encore</button>}
       </div>}
+      <button type="button" className="haccp-simple-find" onClick={() => setView("ouverture")}>
+        <Scissors size={40} aria-hidden="true" /><span>OUVERTURE</span>
+      </button>
+      <button type="button" className="haccp-simple-find" onClick={() => setView("preparation")}>
+        <CookingPot size={40} aria-hidden="true" /><span>PRÉPARATION</span>
+      </button>
       <button type="button" className="haccp-simple-find" onClick={openFind}>
         <Search size={40} aria-hidden="true" /><span>RETROUVER</span>
       </button>
       <button type="button" className="haccp-simple-find" onClick={() => setView("releves")}>
         <ClipboardList size={40} aria-hidden="true" /><span>RELEVÉS</span>
       </button>
+    </>}
+    {(view === "ouverture" || view === "preparation") && <>
+      <button type="button" className="haccp-simple-back" onClick={() => setView("camera")}>
+        <ArrowLeft size={36} aria-hidden="true" /><Camera size={36} aria-hidden="true" /><span>PHOTO</span>
+      </button>
+      {view === "ouverture"
+        ? <HaccpLabelCapture kitchenMode kitchenToken={kitchenToken} operations={["ouverture"]}
+          establishmentName={establishmentName} onCaptureSaved={onCaptureSaved} />
+        : <HaccpPreparation kitchenToken={kitchenToken} establishmentName={establishmentName} sessionReady />}
     </>}
     {view === "releves" && <HaccpReleves establishmentName={establishmentName} kitchenToken={kitchenToken}
       onBack={() => setView("camera")} onDirtyChange={reportRelevesDirty} onSavingChange={setRelevesSaving} />}
