@@ -3,81 +3,70 @@
 import os
 import secrets
 import socket
-import subprocess
 import sys
 from pathlib import Path
+
+import psutil
+
+
+# Le Microsoft Store interdit de lancer powershell.exe ou taskkill.exe : tout passe par psutil.
+def _protected_pids() -> set[int]:
+    """Le processus courant et ses parents (dont l'Electron qui l'a lancé) ne sont jamais tués."""
+    protected = {os.getpid()}
+    try:
+        protected.update(parent.pid for parent in psutil.Process(os.getpid()).parents())
+    except psutil.Error:
+        pass
+    return protected
 
 
 def _windows_sirius_processes() -> list[int]:
     """Retourne les PIDs des processus SIRIUS déjà en cours sur Windows."""
     if os.name != "nt":
         return []
-    command = (
-        "Get-CimInstance Win32_Process | Where-Object { "
-        "($_.Name -match 'sirius-backend') -or ($_.Name -match 'SIRIUS') -or "
-        "($_.CommandLine -match 'sirius-backend') -or ($_.CommandLine -match 'ΣIRIUS') } "
-        "| Select-Object -ExpandProperty ProcessId"
-    )
-    try:
-        result = subprocess.run(
-            ["powershell", "-NoProfile", "-NonInteractive", "-Command", command],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except (FileNotFoundError, OSError):
-        return []
-    if result.returncode != 0:
-        return []
+    protected = _protected_pids()
     ids = []
-    for line in result.stdout.splitlines():
-        cleaned = line.strip()
-        if not cleaned:
-            continue
+    for proc in psutil.process_iter(["pid", "name", "cmdline"]):
         try:
-            ids.append(int(cleaned))
-        except ValueError:
+            name = (proc.info.get("name") or "").lower()
+            cmdline = " ".join(proc.info.get("cmdline") or []).lower()
+        except psutil.Error:
             continue
+        if proc.pid in protected:
+            continue
+        if name.startswith("sirius-") or "sirius-backend" in cmdline:
+            ids.append(proc.pid)
     return ids
 
 
 def _send_terminate(pid: int) -> None:
     try:
-        subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], check=False, capture_output=True)
-    except OSError:
-        pass
+        proc = psutil.Process(pid)
+        targets = proc.children(recursive=True) + [proc]
+    except psutil.Error:
+        return
+    for target in targets:
+        try:
+            target.kill()
+        except psutil.Error:
+            pass
+    psutil.wait_procs(targets, timeout=5)
 
 
 def _windows_port_owner_pid(host: str, port: int) -> int | None:
     """Retourne le PID du processus qui possède actuellement le port TCP, si présent."""
     if os.name != "nt":
         return None
-    command = (
-        "Get-NetTCPConnection -LocalPort {port} -ErrorAction SilentlyContinue | "
-        "Where-Object {{ $_.State -ne 'Closed' }} | "
-        "Select-Object -ExpandProperty OwningProcess"
-    ).format(port=port)
     try:
-        result = subprocess.run(
-            ["powershell", "-NoProfile", "-NonInteractive", "-Command", command],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except (FileNotFoundError, OSError):
+        connections = psutil.net_connections(kind="tcp")
+    except psutil.Error:
         return None
-    if result.returncode != 0:
-        return None
-    for line in result.stdout.splitlines():
-        cleaned = line.strip()
-        if not cleaned:
+    protected = _protected_pids()
+    for conn in connections:
+        if not conn.laddr or conn.laddr.port != port or conn.status == psutil.CONN_CLOSE:
             continue
-        try:
-            pid = int(cleaned)
-        except ValueError:
-            continue
-        if pid and pid != os.getpid():
-            return pid
+        if conn.pid and conn.pid not in protected:
+            return conn.pid
     return None
 
 

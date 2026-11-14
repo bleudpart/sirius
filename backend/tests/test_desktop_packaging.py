@@ -1,5 +1,6 @@
 import os
 import re
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
@@ -103,3 +104,52 @@ def test_cleanup_stale_sirius_backends_kills_port_owner_even_when_name_is_unknow
     desktop_backend._cleanup_stale_sirius_processes(host="127.0.0.1", port=8001)
 
     assert killed == [333]
+
+
+def test_desktop_backend_never_launches_powershell_or_taskkill():
+    # Le Microsoft Store (WACK « Fichiers exécutables bloqués ») refuse ces lancements.
+    source = Path(desktop_backend.__file__).read_text(encoding="utf-8").lower()
+
+    assert "import subprocess" not in source
+    assert '"powershell' not in source
+    assert '"taskkill"' not in source
+
+
+class _FakeProc:
+    def __init__(self, pid, name, cmdline):
+        self.pid = pid
+        self.info = {"pid": pid, "name": name, "cmdline": cmdline}
+
+
+def test_sirius_processes_skip_self_and_parent_electron(monkeypatch):
+    monkeypatch.setattr(desktop_backend.os, "name", "nt")
+    monkeypatch.setattr(desktop_backend, "_protected_pids", lambda: {10, 20})
+    procs = [
+        _FakeProc(10, "sirius-backend.exe", ["sirius-backend.exe"]),
+        _FakeProc(20, "ΣIRIUS.exe", ["C:\\sirius\\ΣIRIUS.exe"]),
+        _FakeProc(30, "sirius-backend.exe", ["sirius-backend.exe"]),
+        _FakeProc(40, "Sirius-Voice-Worker.exe", []),
+        _FakeProc(50, "python.exe", ["python", "C:\\sirius-backend\\x.py"]),
+        _FakeProc(60, "ΣIRIUS.exe", ["C:\\sirius\\ΣIRIUS.exe", "--type=renderer"]),
+        _FakeProc(70, "notepad.exe", None),
+    ]
+    monkeypatch.setattr(desktop_backend.psutil, "process_iter", lambda attrs: iter(procs))
+
+    assert desktop_backend._windows_sirius_processes() == [30, 40, 50]
+
+
+def test_port_owner_ignores_other_ports_closed_and_protected(monkeypatch):
+    from types import SimpleNamespace as NS
+
+    monkeypatch.setattr(desktop_backend.os, "name", "nt")
+    monkeypatch.setattr(desktop_backend, "_protected_pids", lambda: {10})
+    conns = [
+        NS(laddr=NS(port=9000), status="LISTEN", pid=5),
+        NS(laddr=(), status="LISTEN", pid=6),
+        NS(laddr=NS(port=8001), status=desktop_backend.psutil.CONN_CLOSE, pid=7),
+        NS(laddr=NS(port=8001), status="LISTEN", pid=10),
+        NS(laddr=NS(port=8001), status="LISTEN", pid=42),
+    ]
+    monkeypatch.setattr(desktop_backend.psutil, "net_connections", lambda kind: conns)
+
+    assert desktop_backend._windows_port_owner_pid("127.0.0.1", 8001) == 42

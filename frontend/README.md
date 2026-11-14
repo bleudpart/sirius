@@ -36,8 +36,10 @@ La copie destinée à l'OCR est redimensionnée et redressée sans modifier la p
 originale. Une incohérence de longueur ou de clé SIRET/SIREN déclenche une alerte
 et demande une comparaison explicite avec la photo ; aucun chiffre n'est inventé.
 Ce contrôle ne vérifie pas l'existence du commerce dans un registre officiel.
-Sur Android, AAPT décompresse le modèle `.gz` dans l'APK : le lecteur demande
-donc le modèle `.traineddata` non compressé. Le navigateur et iOS gardent `.gz`.
+Le modèle `fra.traineddata` est servi non compressé sur toutes les plateformes :
+le Microsoft Store refuse les archives `.gz` dans le paquet et AAPT les décompresse
+dans l'APK. L'archive téléchargée et vérifiée reste en cache dans
+`node_modules/.cache/sirius-ocr/`.
 
 Les modèles PDF A4 classique et professionnel incluent sur chaque page la signature
 ΣIRIUS avec l'icône des e-mails et les coordonnées de signature du compte.

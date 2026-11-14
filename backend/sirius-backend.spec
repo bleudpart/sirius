@@ -47,7 +47,14 @@ def _bundled_chromium():
             f"presents : {', '.join(present) or 'aucun'}). L'agent web ne marcherait pas dans l'application "
             f'installee. Lancer : "{sys.executable}" -m playwright install chromium, puis relancer le build.'
         )
-    return [(str(entry), f"playwright-browsers/{entry.name}") for entry in found]
+    # Fichier par fichier, sans l'installeur setup.exe de Chromium : inutile à Playwright et refusé
+    # par le Microsoft Store (WACK « Utilisation des fichiers d'archives »).
+    return [
+        (str(path), (Path("playwright-browsers") / path.relative_to(entry.parent).parent).as_posix())
+        for entry in found
+        for path in sorted(entry.rglob("*"))
+        if path.is_file() and path.name.lower() != "setup.exe"
+    ]
 
 
 backend_dir = Path(SPECPATH)

@@ -16,6 +16,7 @@ def _install_chromium(tmp_path, revision, with_executable=True):
     (folder / "chrome-win64").mkdir(parents=True)
     if with_executable:
         (folder / "chrome-win64" / "chrome.exe").write_bytes(b"chrome")
+        (folder / "chrome-win64" / "setup.exe").write_bytes(b"installer")
 
 
 def _declare_playwright(monkeypatch, tmp_path, revision):
@@ -40,6 +41,15 @@ def _fake_project(tmp_path, with_frontend=True):
     """Projet minimal : backend/ (SPECPATH) et un build React avec ses source maps."""
     project = tmp_path / "project"
     (project / "backend").mkdir(parents=True)
+    voice = project / "backend" / "build" / "voice-identity-assets"
+    for relative in (
+        "model/wespeaker_en_voxceleb_resnet34_LM.onnx", "ffmpeg/ffmpeg.exe", "ffmpeg/avcodec.dll",
+        "ffmpeg/LICENSE.txt", "NOTICE.txt", "manifest.json",
+    ):
+        (voice / relative).parent.mkdir(parents=True, exist_ok=True)
+        (voice / relative).write_bytes(b"asset")
+    (project / "backend" / "templates").mkdir()
+    (project / "backend" / "templates" / "template_haccp.docx").write_bytes(b"docx")
     if with_frontend:
         js = project / "frontend" / "build" / "static" / "js"
         js.mkdir(parents=True)
@@ -89,7 +99,8 @@ def test_spec_prioritizes_coherent_system_visual_cpp_runtimes(monkeypatch, tmp_p
     names = ("msvcp140.dll", "msvcp140_1.dll", "vcruntime140.dll", "vcruntime140_1.dll")
     captured, runtime_dir = _run_spec(monkeypatch, tmp_path, names)
 
-    assert set(captured["binaries"]) == {(str(runtime_dir / name), ".") for name in names}
+    runtimes = {item for item in captured["binaries"] if item[1] == "."}
+    assert runtimes == {(str(runtime_dir / name), ".") for name in names}
 
 
 @pytest.mark.parametrize("missing", ["msvcp140.dll", "vcruntime140_1.dll"])
@@ -104,8 +115,11 @@ def test_spec_bundles_only_the_chromium_revision_playwright_expects(monkeypatch,
     captured, _ = _run_spec(monkeypatch, tmp_path, RUNTIMES, chromium=("1100", "1234"))
 
     cache = tmp_path / "ms-playwright"
-    assert (str(cache / "chromium-1234"), "playwright-browsers/chromium-1234") in captured["datas"]
+    chrome = cache / "chromium-1234" / "chrome-win64"
+    assert (str(chrome / "chrome.exe"), "playwright-browsers/chromium-1234/chrome-win64") in captured["datas"]
     assert not any("chromium-1100" in source for source, _target in captured["datas"])
+    # Installeur Chromium inutile à Playwright et refusé par le Microsoft Store.
+    assert not any(Path(source).name == "setup.exe" for source, _target in captured["datas"])
 
 
 def test_spec_refuses_to_build_without_chromium(monkeypatch, tmp_path):
@@ -129,7 +143,8 @@ def test_spec_accepts_any_installed_chromium_when_playwright_is_unreadable(monke
     captured, _ = _run_spec(monkeypatch, tmp_path, RUNTIMES, chromium=("1100",), playwright_revision=None)
 
     cache = tmp_path / "ms-playwright"
-    assert (str(cache / "chromium-1100"), "playwright-browsers/chromium-1100") in captured["datas"]
+    chrome = cache / "chromium-1100" / "chrome-win64" / "chrome.exe"
+    assert (str(chrome), "playwright-browsers/chromium-1100/chrome-win64") in captured["datas"]
 
 
 def test_spec_bundles_the_react_build_without_source_maps(monkeypatch, tmp_path):

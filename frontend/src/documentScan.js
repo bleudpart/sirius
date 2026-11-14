@@ -106,7 +106,7 @@ export function buildReceiptDraft({ kind, fields, seller, customer, description 
   ].filter((line) => line !== null).join("\n");
 }
 
-export async function readDocumentLocally(file, onProgress, { signal, timeoutMs = 90000, gzip = true } = {}) {
+export async function readDocumentLocally(file, onProgress, { signal, timeoutMs = 90000, gzip = false } = {}) {
   let worker;
   let finished = false;
   let rejectStopped;
