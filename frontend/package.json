@@ -1,6 +1,6 @@
 {
   "name": "sirius",
-  "version": "1.0.70",
+  "version": "1.0.71",
   "private": true,
   "license": "SEE LICENSE IN LICENSE",
   "author": "partel",
@@ -116,6 +116,7 @@
   "build": {
     "appId": "sh.techenclair.sirius",
     "productName": "ΣIRIUS",
+    "executableName": "SIRIUS",
     "beforePack": "scripts/before-pack.js",
     "publish": [
       {
@@ -161,7 +162,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "ΣIRIUS",
+      "shortcutName": "SIRIUS",
       "artifactName": "sirius-setup-${version}.exe",
       "uninstallDisplayName": "ΣIRIUS ${version}",
       "license": "../CONTRAT_LICENCE.txt",

@@ -1,0 +1,16 @@
+ΣIRIUS 1.0.71 - NOTE DE BUILD DE TEST MSIX
+=========================================
+
+Cette version de test corrige les noms de fichiers Windows du paquetage :
+l'executable, les raccourcis et le desinstalleur utilisent le nom interne
+ASCII "SIRIUS". Le nom affiche de l'application reste "ΣIRIUS".
+
+Cette correction vise la capture MSIX qui echouait dans MakeAppx avec
+l'erreur 0x8007007b sur des chemins de fichiers contenant le caractere Sigma.
+Elle ne change pas les fonctions de l'application.
+
+Installateur Windows attendu : sirius-setup-1.0.71.exe
+
+Pour les consignes fonctionnelles et HACCP, consulter le
+GUIDE-SIRIUS-1.0.70.txt. Cette note ne confirme pas a elle seule que
+l'installateur a ete construit, signe, installe ou publie.
