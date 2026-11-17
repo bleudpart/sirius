@@ -17,6 +17,7 @@ def _install_chromium(tmp_path, revision, with_executable=True):
     if with_executable:
         (folder / "chrome-win64" / "chrome.exe").write_bytes(b"chrome")
         (folder / "chrome-win64" / "setup.exe").write_bytes(b"installer")
+        (folder / "chrome-win64" / "elevation_service.exe").write_bytes(b"elevation helper")
 
 
 def _declare_playwright(monkeypatch, tmp_path, revision):
@@ -118,8 +119,11 @@ def test_spec_bundles_only_the_chromium_revision_playwright_expects(monkeypatch,
     chrome = cache / "chromium-1234" / "chrome-win64"
     assert (str(chrome / "chrome.exe"), "playwright-browsers/chromium-1234/chrome-win64") in captured["datas"]
     assert not any("chromium-1100" in source for source, _target in captured["datas"])
-    # Installeur Chromium inutile à Playwright et refusé par le Microsoft Store.
-    assert not any(Path(source).name == "setup.exe" for source, _target in captured["datas"])
+    # Les utilitaires d'installation/mise à jour Chromium sont inutiles à Playwright.
+    assert not any(
+        Path(source).name.lower() in {"setup.exe", "elevation_service.exe"}
+        for source, _target in captured["datas"]
+    )
 
 
 def test_spec_refuses_to_build_without_chromium(monkeypatch, tmp_path):

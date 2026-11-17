@@ -50,12 +50,28 @@ Les installations Windows actuelles conservent leur mécanisme de mise à jour.
 
 Lors d'un essai local, MakeAppx a refusé les fichiers `_rels/*.rels` présents
 dans l'arborescence décompressée `docx/templates/default-docx-template`
-embarquée par PyInstaller. Dans une copie de préparation réservée au MSIX,
-cette arborescence a été exclue ; les fichiers `docx/templates/default.docx`,
+embarquée par PyInstaller. `backend/sirius-backend.spec` exclut désormais
+cette arborescence de tous les builds, car python-docx ne l'utilise pas à
+l'exécution ; les fichiers `docx/templates/default.docx`,
 les XML `default-*.xml` et `backend/templates/template_haccp.docx` ont été
 conservés. La création de documents et l'export HACCP signé ont été testés
 isolément, sans impression physique. Il reste à valider ces fonctions dans un
 véritable paquet MSIX installé, avant toute publication.
+
+Le bundle Playwright exclut aussi `setup.exe` et `elevation_service.exe` de
+Chromium : ce sont des utilitaires d'installation/mise à jour, pas des
+composants lancés par le webagent. L'arrêt forcé du worker vocal Windows passe
+par psutil, sans lancer `taskkill.exe`.
+
+Une capture MSIX de test 1.0.71.0 a inclus le cache local
+`VFS\Local AppData\sirius-updater` et une dépendance
+`Microsoft.WindowsAppRuntime.1.4` absente des fichiers du paquet. Sur une copie
+de travail uniquement, leur retrait a permis de signer, installer et démarrer
+l'application. Cela ne valide pas tous les scénarios fonctionnels. Le nom
+visible de cette capture reste `SIRIUS` ; le manifeste du paquet Store doit
+afficher `ΣIRIUS`. Son WACK signale encore des références statiques aux API de
+lancement de processus et un avertissement DPI ; ces résultats doivent être
+réévalués sur le paquet final, sans téléverser ni soumettre celui-ci.
 
 Le dossier d'installation MSIX sous `WindowsApps` est protégé en écriture.
 Les pièces THÉMIS sont enregistrées dans `themis_files` sous le dossier de

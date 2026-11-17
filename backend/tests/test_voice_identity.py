@@ -325,24 +325,50 @@ def test_model_hash_is_checked_before_loading_native_runtime(api):
 
 def test_inference_timeout_kills_the_isolated_process(monkeypatch):
     import voice_identity
+
     extractor = LocalSpeakerExtractor()
     monkeypatch.setattr(extractor, "configuration_reason", lambda: None)
     process = AsyncMock()
     process.returncode = None
     process.pid = 2147483000
     process.kill = Mock()
-    killer = AsyncMock()
     future = object()
     monkeypatch.setattr(process, "communicate", lambda data: future)
     monkeypatch.setattr(voice_identity.asyncio, "create_subprocess_exec",
-                        AsyncMock(side_effect=[process, killer]))
+                        AsyncMock(return_value=process))
     monkeypatch.setattr(voice_identity.asyncio, "wait_for", AsyncMock(side_effect=asyncio.TimeoutError))
+    kill_tree = Mock()
+    monkeypatch.setattr(voice_identity, "_kill_windows_process_tree", kill_tree)
     if hasattr(voice_identity.os, "killpg"):
         monkeypatch.setattr(voice_identity.os, "killpg", lambda *args: None)
     with pytest.raises(asyncio.TimeoutError):
         asyncio.run(extractor.extract([b"owner"]))
     process.wait.assert_awaited_once()
     process.kill.assert_called_once()
+    if voice_identity.os.name == "nt":
+        kill_tree.assert_called_once_with(process.pid)
+
+
+def test_windows_timeout_kills_only_worker_process_tree_with_psutil(monkeypatch):
+    import voice_identity
+
+    root = Mock()
+    child = Mock()
+    root.children.return_value = [child]
+    waited = []
+    monkeypatch.setattr(voice_identity.psutil, "Process", lambda pid: root)
+    monkeypatch.setattr(
+        voice_identity.psutil,
+        "wait_procs",
+        lambda processes, timeout: waited.append((processes, timeout)),
+    )
+
+    voice_identity._kill_windows_process_tree(1234)
+
+    root.children.assert_called_once_with(recursive=True)
+    child.kill.assert_called_once_with()
+    root.kill.assert_called_once_with()
+    assert waited == [([child, root], 5)]
 
 
 def make_wav(seconds, *, channels=1, rate=22050, quiet=False):

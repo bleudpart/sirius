@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
+import psutil
 from fastapi import HTTPException
 from pymongo.errors import DuplicateKeyError
 
@@ -40,6 +41,23 @@ def worker_command():
         name = "sirius-voice-worker.exe" if os.name == "nt" else "sirius-voice-worker"
         return [str(Path(sys.executable).with_name(name))]
     return [sys.executable, str(Path(__file__).with_name("voice_identity_worker.py"))]
+
+
+def _kill_windows_process_tree(pid):
+    try:
+        root = psutil.Process(pid)
+    except psutil.Error:
+        return
+    try:
+        targets = root.children(recursive=True) + [root]
+    except psutil.Error:
+        targets = [root]
+    for target in targets:
+        try:
+            target.kill()
+        except psutil.Error:
+            pass
+    psutil.wait_procs(targets, timeout=5)
 
 
 class LocalSpeakerExtractor:
@@ -108,12 +126,8 @@ class LocalSpeakerExtractor:
         except (asyncio.TimeoutError, asyncio.CancelledError):
             if process.returncode is None:
                 if os.name == "nt":
-                    # Kill only this child and its decoder, never a process name.
-                    killer = await asyncio.create_subprocess_exec(
-                        "taskkill", "/PID", str(process.pid), "/T", "/F",
-                        stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
-                    )
-                    await killer.wait()
+                    # Terminate only this worker and its descendants without launching taskkill.exe.
+                    await asyncio.to_thread(_kill_windows_process_tree, process.pid)
                 else:
                     try:
                         os.killpg(process.pid, signal.SIGKILL)

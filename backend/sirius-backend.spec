@@ -47,13 +47,13 @@ def _bundled_chromium():
             f"presents : {', '.join(present) or 'aucun'}). L'agent web ne marcherait pas dans l'application "
             f'installee. Lancer : "{sys.executable}" -m playwright install chromium, puis relancer le build.'
         )
-    # Fichier par fichier, sans l'installeur setup.exe de Chromium : inutile à Playwright et refusé
-    # par le Microsoft Store (WACK « Utilisation des fichiers d'archives »).
+    # Fichier par fichier, sans les utilitaires d'installation/mise à jour : Playwright ne les lance
+    # pas et WACK signale leurs références aux API de création de processus.
     return [
         (str(path), (Path("playwright-browsers") / path.relative_to(entry.parent).parent).as_posix())
         for entry in found
         for path in sorted(entry.rglob("*"))
-        if path.is_file() and path.name.lower() != "setup.exe"
+        if path.is_file() and path.name.lower() not in {"setup.exe", "elevation_service.exe"}
     ]
 
 
@@ -179,6 +179,12 @@ analysis = Analysis(
     ],
     noarchive=False,
 )
+# python-docx livre aussi la source décompressée de default.docx (_rels/*.rels,
+# [Content_Types].xml) : inutile à l'exécution, et MakeAppx refuse ces noms dans un MSIX.
+analysis.datas = [
+    entry for entry in analysis.datas
+    if "docx/templates/default-docx-template/" not in entry[0].replace("\\", "/") + "/"
+]
 pyz = PYZ(analysis.pure)
 exe = EXE(
     pyz,
