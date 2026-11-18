@@ -9,6 +9,8 @@ import AuthGate from "@/AuthGate";
 import MediaHudWindow from "@/MediaHudWindow";
 import FdeErrorBoundary from "@/FdeErrorBoundary";
 import { initFdeOmega } from "@/fdeOmega";
+import { initLanguage } from "@/i18n/domTranslator";
+import LanguageSwitcher from "@/i18n/LanguageSwitcher";
 import PublicStore from "@/PublicStore";
 import { HaccpCaptureWorkspace, HaccpKitchenPage } from "@/lazyModules";
 import "./siriusVisualTheme.css";
@@ -38,12 +40,14 @@ if (isKitchen) document.querySelector('link[rel="manifest"]')?.setAttribute("hre
 const isPublicStore = ["sirius-assistant.fr", "www.sirius-assistant.fr"].includes(window.location.hostname)
   || ["/acheter", "/compte"].includes(window.location.pathname);
 const stopFdeOmega = initFdeOmega();
+initLanguage();
 window.addEventListener("beforeunload", stopFdeOmega, { once: true });
 // StrictMode retiré : il double l'exécution des effets en développement,
 // ce qui faisait parler chaque module deux fois (écho des voix de présentation).
 root.render(
   <QueryClientProvider client={queryClient}>
     <FdeErrorBoundary>
+      {(isKitchen || isHaccpCapture) && <LanguageSwitcher className="sirius-floating-language" />}
       {isKitchen ? <HaccpKitchenPage /> : isHaccpCapture ? <AuthGate><HaccpCaptureWorkspace standalone /></AuthGate> : isPublicStore ? <PublicStore /> : (
         <AuthGate>
           {isMediaHud ? <MediaHudWindow /> : <App />}

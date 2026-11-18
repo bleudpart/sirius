@@ -5492,6 +5492,16 @@ a.auth-submit { text-decoration: none; }
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+.top-bar .sirius-language-btn {
+  flex-direction: column;
+  gap: 1px;
+  padding: 0;
+}
+.top-bar .sirius-language-btn > svg {
+  flex: 0 0 15px;
+  width: 15px;
+  height: 15px;
+}
 @media (max-width: 1023px) {
   .top-bar-start { gap: 4px; }
   .top-settings { padding-left: 4px; }

@@ -1,0 +1,50 @@
+.sirius-language-code {
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.08em;
+}
+
+.sirius-floating-language {
+  position: fixed;
+  top: max(10px, env(safe-area-inset-top));
+  right: max(10px, env(safe-area-inset-right));
+  z-index: 14000;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 1px solid rgba(216, 184, 117, 0.55);
+  border-radius: 12px;
+  background: linear-gradient(145deg, #142033, #090f1b);
+  color: #f2d99a;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.sirius-floating-language:hover {
+  background: #19263a;
+  border-color: rgba(216, 184, 117, 0.8);
+}
+
+.sirius-floating-language:focus-visible {
+  outline: 2px solid #91e6f2;
+  outline-offset: 2px;
+}
+
+.sirius-floating-language .sirius-language-code {
+  font-size: 10px;
+}
+
+@media print {
+  .sirius-floating-language { display: none; }
+}
+
+/* L'espacement des lettres du HUD casse le rendu des ligatures tamoules. */
+html[data-sirius-language="ta"] body *:not(.sirius-language-code) {
+  letter-spacing: normal !important;
+}

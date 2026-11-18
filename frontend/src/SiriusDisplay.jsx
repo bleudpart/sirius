@@ -579,7 +579,7 @@ export default function SiriusDisplay({ item, history, onSelect, onClose, onInte
                   </p>
                 )}
                 {item.titre && <div className="sd-msg-title">{item.titre}</div>}
-                <p>{cleanTextForDisplay(item.contenu)}</p>
+                <p translate="no">{cleanTextForDisplay(item.contenu)}</p>
                 {item.suggestion && (
                   <ProactiveConversation key={item.suggestion.id} suggestion={item.suggestion}
                     onAction={onSuggestionAction} onSpeak={onSpeak} />

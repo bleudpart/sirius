@@ -161,7 +161,7 @@ export default function MemoryManager({ onClose }) {
                       <button className="mm-icon-btn ok" onClick={saveEdit} data-testid="mm-edit-save"><Check size={13} /></button>
                     </div>
                   ) : (
-                    <p className="mm-content">{m.content}</p>
+                    <p className="mm-content" translate="no">{m.content}</p>
                   )}
                   <div className="mm-meta">
                     <Badge cls={`t-${m.mtype}`}>{TYPE_LABELS[m.mtype] || m.mtype}</Badge>

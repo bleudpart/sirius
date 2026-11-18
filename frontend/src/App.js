@@ -94,6 +94,7 @@ import { AmbientEngine } from "@/ambientAudio";
 import { APP_RELEASE, APP_VERSION } from "@/version";
 import ProviderLogo from "@/components/ProviderLogo";
 import { parseMemorizeCommand } from "@/memoryCommand";
+import LanguageSwitcher from "@/i18n/LanguageSwitcher";
 
 /* executeIntent moved into the real App component (see later in the file) */
 
@@ -7579,6 +7580,7 @@ function App() {
             >
               <Settings2 size={18} strokeWidth={1.6} aria-hidden="true" />
             </button>
+            <LanguageSwitcher className="profile-btn top-settings-btn top-settings-control" />
           </div>
         </div>
         {isAndroidNative && (

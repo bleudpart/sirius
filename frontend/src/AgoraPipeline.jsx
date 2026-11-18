@@ -130,7 +130,7 @@ function AgoraCoach() {
         {history.map((m, i) => (
           <div key={i} className={`ag-msg ${m.role === "user" ? "me" : "prospect"}`} data-testid={`agora-coach-msg-${i}`}>
             <span className="ag-msg-who">{m.role === "user" ? "VOUS" : "PROSPECT"}</span>
-            <p>{m.content}</p>
+            <p translate="no">{m.content}</p>
           </div>
         ))}
         {busy && <div className="ag-coach-hint" data-testid="agora-coach-busy">Le prospect réfléchit…</div>}
