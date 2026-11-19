@@ -1,6 +1,5 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const { NtExecutable, NtExecutableResource } = require("resedit");
 
 const DPI_AWARE_NAMESPACE = "http://schemas.microsoft.com/SMI/2005/WindowsSettings";
 const DPI_AWARENESS_NAMESPACE = "http://schemas.microsoft.com/SMI/2016/WindowsSettings";
@@ -74,6 +73,7 @@ function patchManifestText(xml) {
 
 function patchDpiManifest(context) {
   if (context.electronPlatformName !== "win32") return;
+  const { NtExecutable, NtExecutableResource } = require("resedit");
   const executableName = context.packager.appInfo.productFilename;
   const executablePath = path.join(context.appOutDir, `${executableName}.exe`);
   const executable = NtExecutable.from(fs.readFileSync(executablePath), { ignoreCert: true });
