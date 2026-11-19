@@ -1,0 +1,14 @@
+ΣIRIUS 1.0.73 - NOTE DE BUILD DE TEST MSIX
+=========================================
+
+Cette version de validation règle le manifeste DPI de SIRIUS.exe sur
+Per-Monitor V2 et consolide ses paramètres windowsSettings avant signature.
+Les autres paramètres du manifeste Electron sont conservés.
+
+Le WACK doit confirmer la disparition de l'avertissement DPI sur le nouveau
+paquet. Le contrôle facultatif des exécutables bloqués peut encore relever
+les API de création de processus utilisées par Electron, Chromium et le
+backend local ; cette build ne retire aucune de ces fonctions.
+
+Cette note ne confirme pas à elle seule que le paquet a été construit, signé,
+installé, testé dans une VM ou publié.

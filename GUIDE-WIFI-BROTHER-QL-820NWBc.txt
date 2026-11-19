@@ -1,0 +1,18 @@
+CONNECTER MON IMPRIMANTE BROTHER SANS TOUCHER À LA BOX
+
+L’imprimante peut créer son propre Wi-Fi : c’est le mode Wi-Fi Direct.
+Je pourrai essayer cette solution quand j’aurai le temps.
+
+1. J’allume l’imprimante.
+2. Sur l’imprimante, je vais dans Menu > WLAN > WLAN (On/Off), puis j’active
+   le Wi-Fi. Ensuite : Menu > WLAN > Network Mode > Direct Mode.
+3. Sur mon téléphone, dans les réglages Wi-Fi, je choisis le réseau de
+   l’imprimante, dont le nom commence par DIRECT-. Je saisis son mot de passe.
+4. Je laisse les données mobiles (4G/5G) activées : le Wi-Fi de l’imprimante
+   ne donne pas accès à Internet.
+5. Dans ΣIRIUS Diagnostic, il faudra saisir l’adresse IP de l’imprimante,
+   enregistrer la configuration et lancer une étiquette TEST.
+
+Ce mode n’a pas encore été testé avec ΣIRIUS. Il faudra vérifier que le
+téléphone peut joindre à la fois l’imprimante et le serveur ΣIRIUS.
+Si j’ai besoin d’aide pour le mot de passe ou l’adresse IP, je demande.

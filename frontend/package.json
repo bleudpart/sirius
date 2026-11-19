@@ -1,6 +1,6 @@
 {
   "name": "sirius",
-  "version": "1.0.71",
+  "version": "1.0.73",
   "private": true,
   "license": "SEE LICENSE IN LICENSE",
   "author": "partel",
@@ -78,6 +78,7 @@
     "react-resizable-panels": "3.0.1",
     "react-router-dom": "7.18.5",
     "react-scripts": "5.0.1",
+    "resedit": "^1.7.2",
     "recharts": "3.6.0",
     "sonner": "2.0.3",
     "swr": "2.3.8",
@@ -114,6 +115,7 @@
     "release": "npm run signing:check && npm run build && npm run backend:build && node scripts/build-signed-windows.cjs --publish always"
   },
   "build": {
+    "afterPack": "scripts/patch-dpi-manifest.cjs",
     "appId": "sh.techenclair.sirius",
     "productName": "ΣIRIUS",
     "executableName": "SIRIUS",

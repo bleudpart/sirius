@@ -2,6 +2,7 @@ const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const patchDpiManifest = require("./patch-dpi-manifest.cjs");
 
 const signingScript = path.resolve(__dirname, "../../scripts/windows-code-signing.ps1");
 
@@ -29,14 +30,17 @@ function invokeSigning(action, target, env = process.env, run = spawnSync, repor
 
 // electron-builder merges these overrides with package.json "build" itself: repeating
 // package.json values here would merge "publish" into itself and fail schema validation.
-function signedConfig(env = process.env, sign = invokeSigning) {
+function signedConfig(env = process.env, sign = invokeSigning, patchManifest = patchDpiManifest) {
   checkEnvironment(env);
   return {
     forceCodeSigning: true,
     // The main executable is excluded: electron-builder edits its resources with resedit
     // (which rejects signed PE files) and then signs it through signtoolOptions.sign.
-    afterPack: async (context) => sign("Sign", context.appOutDir, env, undefined, undefined,
-      [`${context.packager.appInfo.productFilename}.exe`]),
+    afterPack: async (context) => {
+      patchManifest(context);
+      return sign("Sign", context.appOutDir, env, undefined, undefined,
+        [`${context.packager.appInfo.productFilename}.exe`]);
+    },
     win: {
       verifyUpdateCodeSignature: true,
       signtoolOptions: {

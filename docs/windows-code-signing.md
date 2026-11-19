@@ -71,7 +71,13 @@ l'application. Cela ne valide pas tous les scénarios fonctionnels. Le nom
 visible de cette capture reste `SIRIUS` ; le manifeste du paquet Store doit
 afficher `ΣIRIUS`. Son WACK signale encore des références statiques aux API de
 lancement de processus et un avertissement DPI ; ces résultats doivent être
-réévalués sur le paquet final, sans téléverser ni soumettre celui-ci.
+réévalués sur le paquet final, sans téléverser ni soumettre celui-ci. Le hook
+Windows `afterPack` règle maintenant le manifeste de `SIRIUS.exe` sur
+Per-Monitor V2 avant la signature. Le test WACK doit confirmer la disparition
+de l’avertissement DPI. Le contrôle facultatif des exécutables bloqués peut
+toujours relever les appels CreateProcess de Chromium, Electron et du backend
+embarqué, nécessaires au lancement local de ces composants ; ne pas masquer ni
+retirer ces références au prix d’une perte de fonctions.
 
 Le dossier d'installation MSIX sous `WindowsApps` est protégé en écriture.
 Les pièces THÉMIS sont enregistrées dans `themis_files` sous le dossier de

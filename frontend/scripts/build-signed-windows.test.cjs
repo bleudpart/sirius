@@ -18,8 +18,17 @@ test("signature obligatoire sans certificat ou sur une autre plateforme", () => 
 test("ne fournit que les surcharges de signature et laisse l'exe principal a electron-builder", async () => {
   const manifest = require("../package.json");
   const calls = [];
-  const config = signedConfig(env, (...args) => calls.push(args));
+  const patches = [];
+  const order = [];
+  const config = signedConfig(env, (...args) => {
+    order.push("sign");
+    calls.push(args);
+  }, (context) => {
+    order.push("patch");
+    patches.push(context);
+  });
   assert.equal(config.forceCodeSigning, true);
+  assert.equal(manifest.build.afterPack, "scripts/patch-dpi-manifest.cjs");
   // package.json "build" est fusionne par electron-builder : le repeter casse "publish".
   assert.equal(config.publish, undefined);
   assert.equal(config.win.target, undefined);
@@ -27,7 +36,14 @@ test("ne fournit que les surcharges de signature et laisse l'exe principal a ele
   assert.equal(config.win.verifyUpdateCodeSignature, true);
   assert.deepEqual(config.win.signtoolOptions.signingHashAlgorithms, ["sha256"]);
   assert.equal(config.win.signtoolOptions.publisherName, env.SIRIUS_SIGNING_PUBLISHER);
-  await config.afterPack({ appOutDir: "C:\\app\\win-unpacked", packager: { appInfo: { productFilename: "ΣIRIUS" } } });
+  const context = {
+    appOutDir: "C:\\app\\win-unpacked",
+    electronPlatformName: "win32",
+    packager: { appInfo: { productFilename: "ΣIRIUS" } },
+  };
+  await config.afterPack(context);
+  assert.deepEqual(patches, [context]);
+  assert.deepEqual(order, ["patch", "sign"]);
   await config.win.signtoolOptions.sign({ path: "C:\\app\\uninstall.exe" });
   assert.deepEqual(calls.map((call) => call.slice(0, 2)), [
     ["Sign", "C:\\app\\win-unpacked"], ["Sign", "C:\\app\\uninstall.exe"],
