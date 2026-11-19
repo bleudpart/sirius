@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertTriangle, Camera, ClipboardCheck, ClipboardList, QrCode, ShieldCheck, Search, Download, FileDown, Image, X, Utensils } from "lucide-react";
+import { AlertTriangle, Camera, ClipboardCheck, ClipboardList, House, QrCode, ShieldCheck, Search, Download, FileDown, Image, X, Utensils } from "lucide-react";
 import HaccpKitchen from "./HaccpKitchen";
 import HaccpKitchenLink from "./HaccpKitchenLink";
 import HaccpDlcSnap from "./HaccpDlcSnap";
@@ -54,6 +54,13 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0,
   useEffect(() => {
     if (initialTab) changeTab(initialTab);
   }, [initialTab, changeTab]);
+  useEffect(() => {
+    if (!standalone) return;
+    const hash = tab === "snap" ? "#dlc" : "";
+    if (window.location.hash !== hash && (hash || window.location.hash === "#dlc")) {
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${hash}`);
+    }
+  }, [standalone, tab]);
   const [filters, setFilters] = useState({ terme: "", categorie: "", date_debut: "", date_fin: "", non_conforme_seul: false });
   const [items, setItems] = useState([]);
   const [error, setError] = useState("");
@@ -323,8 +330,10 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0,
     }
   }
   const simple = tab === "simple";
-  return <section aria-label="Registre de réception, ouverture et préparation ΣIRIUS" className={`haccp-ui haccp-workspace${standalone ? " haccp-standalone" : ""}${simple ? " haccp-workspace-simple" : ""}`}>
-    {!simple && <>
+  // Écrans sans texte pour la cuisine : ni titre ni onglets écrits.
+  const iconOnly = simple || tab === "snap";
+  return <section aria-label="Registre de réception, ouverture et préparation ΣIRIUS" className={`haccp-ui haccp-workspace${standalone ? " haccp-standalone" : ""}${iconOnly ? " haccp-workspace-simple" : ""}`}>
+    {!iconOnly && <>
     <header className="haccp-heading">
       <div className="haccp-emblem" aria-hidden="true"><ShieldCheck size={30} /></div>
       <div><p className="haccp-kicker">ΣIRIUS · HACCP</p><h2>ΣIRIUS · Étiquettes cuisine</h2><p>Réception, ouverture et préparation : gardez la trace.</p></div>
@@ -382,6 +391,10 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0,
       sessionReady={sessionReady}
       onCaptureSaved={refreshDossier}
     />}
+    {tab === "snap" && <button type="button" className="dlc-snap-home" onClick={() => changeTab("simple")}
+      aria-label="Retour à l’écran cuisine" data-testid="dlc-snap-home">
+      <House size={30} aria-hidden="true" />
+    </button>}
     {tab === "snap" && !!activeEstablishment && <HaccpDlcSnap
       establishmentName={activeEstablishment}
       onCaptureSaved={refreshDossier}
@@ -392,6 +405,7 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0,
       onCaptureSaved={refreshDossier}
       onRelevesDirtyChange={reportRelevesDirty}
       onFullMode={() => setTab("capture")}
+      onDlcSnap={() => changeTab("snap")}
     />}
     {tab === "preparation" && <HaccpPreparation
       key={activeEstablishment}

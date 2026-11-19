@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowLeft, Camera, CheckCircle2, ClipboardList, CookingPot, FileText, ImageIcon, LoaderCircle, RotateCcw, Scissors, Search, Settings, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Camera, CheckCircle2, ClipboardList, CookingPot, FileText, ImageIcon, LoaderCircle, RotateCcw, Scissors, Search, Settings, Tag, X } from "lucide-react";
 import HaccpLabelCapture from "./HaccpLabelCapture";
 import HaccpPreparation from "./HaccpPreparation";
 import HaccpReleves from "./HaccpReleves";
@@ -80,7 +80,7 @@ export function kitchenReason(record) {
 }
 
 // Écran cuisine : photo → analyse → enregistrement automatique, sans formulaire ni confirmation.
-export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, onFullMode, onRelevesDirtyChange, kitchenToken = "" }) {
+export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, onFullMode, onDlcSnap, onRelevesDirtyChange, kitchenToken = "" }) {
   const auth = useMemo(() => kitchenToken ? { headers: { "X-Sirius-Cuisine": kitchenToken } } : {}, [kitchenToken]);
   const [view, setView] = useState("camera");
   const [source, setSource] = useState("etiquette");
@@ -296,6 +296,10 @@ export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, o
       <button type="button" className="haccp-simple-shoot" disabled={busy} onClick={takePhoto} aria-label="Prendre la photo">
         <Camera size={56} aria-hidden="true" /><span>PHOTO</span>
       </button>
+      {onDlcSnap && <button type="button" className="haccp-simple-dlc" disabled={busy} onClick={onDlcSnap}
+        aria-label="Photo étiquette DLC" data-testid="haccp-open-dlc-snap">
+        <Tag size={34} aria-hidden="true" /><Camera size={34} aria-hidden="true" />
+      </button>}
       {cameraError && <button type="button" className="haccp-simple-small" onClick={() => setCameraAttempt((n) => n + 1)}>
         <RotateCcw size={20} aria-hidden="true" />Caméra
       </button>}

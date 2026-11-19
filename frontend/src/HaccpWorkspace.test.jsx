@@ -308,6 +308,20 @@ test("the kitchen screen opens by default with only photo and find buttons, and 
   expect(host.querySelector(".haccp-simple")).not.toBeNull();
 });
 
+test("the DLC label photo opens from an icon without written tabs, keeps a pinnable #dlc link and returns home", async () => {
+  await act(async () => root.render(<HaccpWorkspace standalone />));
+  const open = host.querySelector('[data-testid="haccp-open-dlc-snap"]');
+  expect(open.textContent.trim()).toBe("");
+  await act(async () => open.click());
+  expect(host.querySelector(".haccp-navigation")).toBeNull();
+  expect(window.location.hash).toBe("#dlc");
+  const home = host.querySelector('[data-testid="dlc-snap-home"]');
+  expect(home.textContent.trim()).toBe("");
+  await act(async () => home.click());
+  expect(host.querySelector(".haccp-simple")).not.toBeNull();
+  expect(window.location.hash).toBe("");
+});
+
 test("preparation is accessible in the shared workspace and uses the active establishment dossier", async () => {
   await act(async () => root.render(<HaccpWorkspace standalone initialTab="capture" />));
   await click("Préparation / DLC");

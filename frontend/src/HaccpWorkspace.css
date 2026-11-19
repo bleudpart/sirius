@@ -234,6 +234,8 @@ body:has(.haccp-standalone) {
 .haccp-ui .haccp-simple-shoot, .haccp-ui .haccp-simple-find, .haccp-ui .haccp-simple-back { display: flex; align-items: center; justify-content: center; gap: 18px; width: 100%; border-radius: 18px; font-size: 30px; font-weight: 800; letter-spacing: .04em; cursor: pointer; }
 .haccp-ui .haccp-simple-shoot { min-height: 132px; padding: 18px; border: 0; background: #2fb36a; color: #04140a; box-shadow: 0 8px 24px rgba(47, 179, 106, .35); }
 .haccp-ui .haccp-simple-shoot:disabled { background: #4b5b52; color: #cfd8d2; box-shadow: none; }
+.haccp-ui .haccp-simple-dlc { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 88px; border: 2px solid var(--haccp-gold, #c5a059); border-radius: 18px; background: #081522; color: var(--haccp-gold, #c5a059); cursor: pointer; touch-action: manipulation; }
+.haccp-ui .haccp-simple-dlc:disabled { opacity: .5; }
 .haccp-ui .haccp-simple-find, .haccp-ui .haccp-simple-back { min-height: 96px; padding: 14px; border: 2px solid var(--haccp-border); background: #0d2236; color: #dff1ff; }
 .haccp-simple-result { display: flex; align-items: center; gap: 16px; padding: 18px; border-radius: 16px; font-size: 22px; }
 .haccp-simple-result strong { display: block; font-size: 26px; }

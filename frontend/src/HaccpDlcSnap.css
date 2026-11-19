@@ -38,3 +38,8 @@
 .dlc-snap-done time { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .haccp-ui .dlc-snap-error, .dlc-snap-error { border: 0; background: #c62828; color: #fff; }
 @media (prefers-reduced-motion: reduce) { .dlc-snap-spin { animation: none; } }
+.haccp-ui .dlc-snap-home {
+  justify-self: start; display: grid; place-items: center; width: 64px; height: 64px; padding: 0;
+  border: 2px solid var(--haccp-border, rgba(197, 160, 89, .34)); border-radius: 16px;
+  background: #081522; color: var(--haccp-gold, #c5a059); cursor: pointer; touch-action: manipulation;
+}

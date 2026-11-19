@@ -35,6 +35,7 @@ const queryClient = new QueryClient({
 const root = ReactDOM.createRoot(document.getElementById("root"));
 const isMediaHud = new URLSearchParams(window.location.search).has("mediaHud");
 const isHaccpCapture = /^\/haccp\/?$/.test(window.location.pathname);
+const haccpInitialTab = window.location.hash === "#dlc" ? "snap" : undefined;
 const isKitchen = /^\/cuisine\/?$/.test(window.location.pathname);
 if (isKitchen) document.querySelector('link[rel="manifest"]')?.setAttribute("href", "/manifest-cuisine.json");
 const isPublicStore = ["sirius-assistant.fr", "www.sirius-assistant.fr"].includes(window.location.hostname)
@@ -48,7 +49,7 @@ root.render(
   <QueryClientProvider client={queryClient}>
     <FdeErrorBoundary>
       {(isKitchen || isHaccpCapture) && <LanguageSwitcher className="sirius-floating-language" />}
-      {isKitchen ? <HaccpKitchenPage /> : isHaccpCapture ? <AuthGate><HaccpCaptureWorkspace standalone /></AuthGate> : isPublicStore ? <PublicStore /> : (
+      {isKitchen ? <HaccpKitchenPage /> : isHaccpCapture ? <AuthGate><HaccpCaptureWorkspace standalone initialTab={haccpInitialTab} /></AuthGate> : isPublicStore ? <PublicStore /> : (
         <AuthGate>
           {isMediaHud ? <MediaHudWindow /> : <App />}
         </AuthGate>
