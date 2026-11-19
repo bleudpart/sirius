@@ -1,5 +1,4 @@
-"""QR code Cuisine : un lien révocable limité aux étiquettes (réception, ouverture, préparation,
-impression via le poste Windows) et aux relevés, sans compte cuisinier."""
+"""QR code Cuisine : un lien révocable limité aux étiquettes et aux relevés, sans compte cuisinier."""
 import hashlib
 import re
 import secrets
@@ -18,7 +17,11 @@ DISABLED = "QR code cuisine désactivé. Demandez le nouveau QR code au chef."
 _ALLOWED = (
     ("POST", re.compile(r"^/api/haccp/etiquettes/scan$")),
     ("POST", re.compile(r"^/api/haccp/preparations$")),
+    ("GET", re.compile(r"^/api/haccp/preparations/liste$")),
+    ("PUT", re.compile(r"^/api/haccp/preparations/liste$")),
     ("POST", re.compile(r"^/api/haccp/impression/demandes$")),
+    ("POST", re.compile(r"^/api/haccp/impression/mobile/demandes$")),
+    ("POST", re.compile(r"^/api/haccp/impression/mobile/demandes/[0-9a-fA-F-]{36}/prise$")),
     ("GET", re.compile(r"^/api/haccp/impression/etat$")),
     ("POST", re.compile(r"^/api/haccp/receptions/documents$")),
     ("GET", re.compile(r"^/api/haccp/receptions/documents$")),

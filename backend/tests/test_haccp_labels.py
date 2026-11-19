@@ -887,7 +887,7 @@ def test_preparation_is_durable_scoped_photo_free_and_prints_all_required_fields
     assert label.status_code == 200
     assert "PREPARATION" in label.text and "Soupe &lt;b&gt;TEST&lt;/b&gt;" in label.text
     assert "<b>TEST</b>" not in label.text
-    for field in ("Fabrication", "DLC au plus tard", "Entre 0 et +3 C. Bac ferme.", "Restaurant test"):
+    for field in ("Fabrication", "DLC interne au plus tard", "Entre 0 et +3 C. Bac ferme.", "Restaurant test"):
         assert field in label.text
     for key in ("date_fabrication", "dlc_secondaire"):
         stamp = datetime.fromisoformat(record[key]).astimezone(PARIS).strftime("%d/%m/%Y %H:%M:%S %z")
@@ -902,6 +902,23 @@ def test_preparation_is_durable_scoped_photo_free_and_prints_all_required_fields
     assert prepare(client, payload).json() == record
     assert prepare(client, payload | {"nom_produit": "Autre soupe"}).status_code == 409
     assert len(get(client, "recherche").json()) == 1
+
+
+def test_preparation_retry_accepts_digest_from_before_shared_lists(api):
+    import hashlib
+
+    client, _ = api
+    payload = preparation_payload()
+    parsed = PreparationCreate(**payload)
+    legacy = parsed.model_dump(mode="json", exclude={"capture_id", "liste_version"})
+    digest = hashlib.sha256(json.dumps(legacy, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+    response = prepare(client, payload)
+    assert response.status_code == 201
+    with Session(haccp_database.get_engine()) as db:
+        db.get(EtiquetteHaccp, response.json()["id"]).capture_hash = digest
+        db.commit()
+    retry = prepare(client, payload)
+    assert retry.status_code == 201 and retry.json()["id"] == response.json()["id"]
 
 
 def test_concurrent_preparations_reuse_the_same_record(api):

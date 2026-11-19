@@ -45,6 +45,14 @@ class HaccpAndroidPrintTarget(Base):
     actor_id: Mapped[str] = mapped_column(String(255), nullable=False)
 
 
+class HaccpMobilePrintTarget(Base):
+    __tablename__ = "haccp_mobile_print_targets"
+
+    job_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    device_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    actor_id: Mapped[str] = mapped_column(String(255), nullable=False)
+
+
 class HaccpRelevePrintStation(Base):
     __tablename__ = "haccp_releve_print_stations"
 

@@ -123,6 +123,7 @@ class PreparationCreate(OperationEtiquette):
     restaurant_name: Annotated[str, StringConstraints(strict=True, min_length=1, max_length=160)]
     date_fabrication: datetime
     conditions_conservation: Annotated[str, StringConstraints(strict=True, min_length=1, max_length=500)]
+    liste_version: Annotated[int, Field(strict=True, gt=0, le=9_007_199_254_740_990)] | None = None
 
     @field_validator("date_fabrication", mode="before")
     @classmethod
@@ -151,6 +152,25 @@ class PreparationCreate(OperationEtiquette):
     @classmethod
     def conditions_sur_une_ligne(cls, value: str) -> str:
         return " ".join(value.split())
+
+
+class PreparationListUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    restaurant_name: Annotated[str, StringConstraints(strict=True, min_length=1, max_length=160)]
+    version: Annotated[int, Field(strict=True, ge=0, le=9_007_199_254_740_990)]
+    noms: Annotated[list[Texte255], Field(max_length=500)]
+    duree_heures: Annotated[int, Field(strict=True, gt=0, le=9_007_199_254_740_991)]
+    reference_pms: Annotated[str, StringConstraints(strict=True, min_length=1, max_length=500)]
+    regle_confirmee: StrictBool
+
+    @model_validator(mode="after")
+    def confirmer_liste(self) -> "PreparationListUpdate":
+        if not self.regle_confirmee:
+            raise ValueError("Confirmez que la regle PMS s'applique a chaque preparation de la liste.")
+        if len({nom.casefold() for nom in self.noms}) != len(self.noms):
+            raise ValueError("La liste contient des noms en double.")
+        return self
 
 
 Destination = Literal["traceabilite", "stock", "allergenes", "achats"]

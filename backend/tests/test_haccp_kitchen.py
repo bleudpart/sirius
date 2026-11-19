@@ -7,11 +7,13 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
 import access_gate
 import haccp_database
 import haccp_kitchen
 import routers.haccp as routes
+from models.haccp import EtiquetteHaccp
 from routers.haccp_printing import make_haccp_print_router
 from tests.test_haccp_labels import extracted, picture
 from schemas.haccp_documents import DeliveryDocument
@@ -165,6 +167,257 @@ def test_le_qr_cuisine_cree_ouverture_et_preparation_puis_demande_l_impression(k
     state = client.get("/api/haccp/impression/etat", headers=headers)
     assert state.status_code == 200
     assert state.json() == {"station": None, "jobs": []}
+
+
+def test_impression_mobile_qr_revue_anti_doublon_et_separation_du_relais(kitchen):
+    client = kitchen.client
+    _, headers = create_link(client)
+    opened = kitchen_scan(client, headers, json.dumps({"type_operation": "ouverture"})).json()
+    device = str(uuid.uuid4())
+    body = {"label_id": opened["id"], "reviewed": True, "device_id": device}
+    path = "/api/haccp/impression/mobile/demandes"
+    assert client.post(path, headers=CHEF, json=body).status_code == 403
+    assert client.post(path, headers=headers, json={**body, "reviewed": False}).status_code == 422
+    assert client.post(path, headers=headers, json={**body, "reviewed": "true"}).status_code == 422
+    prepared = client.post(path, headers=headers, json=body)
+    assert prepared.status_code == 200, prepared.text
+    first = prepared.json()
+    assert first["job"]["status"] == "pending" and first["job"]["transport"] == "mobile"
+    assert "@page{size:62mm 50mm;margin:0}" in first["html"]
+    assert "Saumon" in first["html"] and "LOT-42" in first["html"]
+    assert client.post(path, headers=headers, json=body).json() == first
+
+    other_device = str(uuid.uuid4())
+    other = client.post(path, headers=headers, json={**body, "device_id": other_device}).json()
+    assert other["job"]["id"] == first["job"]["id"] and "html" not in other
+    claim = f"{path}/{first['job']['id']}/prise"
+    assert client.post(claim, headers=headers, json={"device_id": other_device}).status_code == 404
+
+    assert client.post("/api/haccp/impression/poste", headers=CHEF, json={
+        "relay_id": device, "device_name": "PC test", "width_mm": 60, "height_mm": 50,
+    }).status_code == 200
+    assert client.post("/api/haccp/impression/prochaine", headers=CHEF, json={"relay_id": device}).json() == {"job": None}
+    taken = client.post(claim, headers=headers, json={"device_id": device}).json()
+    assert taken["job"]["status"] == "uncertain" and taken["job"]["accepted_at"] is None
+    assert taken["html"] == first["html"] and taken["valid_for_ms"] > 0
+    assert client.post(f"/api/haccp/impression/demandes/{first['job']['id']}/confirmation", headers=CHEF, json={
+        "relay_id": device, "status": "accepted",
+    }).status_code == 409
+    assert client.post(f"/api/haccp/impression/android/demandes/{first['job']['id']}/prise", headers=CHEF, json={
+        "device_id": device,
+    }).status_code == 404
+    repeated = client.post(claim, headers=headers, json={"device_id": device}).json()
+    assert repeated["job"] is None and repeated["state"]["status"] == "uncertain"
+    assert "html" not in client.post(path, headers=headers, json=body).json()
+    state = client.get("/api/haccp/impression/etat", headers=headers).json()
+    assert state["jobs"][0]["transport"] == "mobile"
+    existing = client.post("/api/haccp/impression/demandes", headers=headers, json={
+        "label_id": opened["id"], "reviewed": True,
+    }).json()
+    assert existing["transport"] == "mobile" and existing["status"] == "uncertain"
+    assert client.post("/api/haccp/impression/prochaine", headers=CHEF, json={"relay_id": device}).json() == {"job": None}
+
+
+def test_impression_mobile_limitee_au_qr_et_a_son_etablissement(kitchen):
+    client = kitchen.client
+    _, headers = create_link(client, "Premier restaurant")
+    opened = kitchen_scan(client, headers, json.dumps({"type_operation": "ouverture"})).json()
+    device = str(uuid.uuid4())
+    path = "/api/haccp/impression/mobile/demandes"
+    body = {"label_id": opened["id"], "reviewed": True, "device_id": device}
+    job = client.post(path, headers=headers, json=body).json()["job"]
+    other_link = client.post("/api/haccp/cuisine/lien", json={"restaurant_name": "Autre chef"},
+                             headers={"x-test-user": "autre"}).json()
+    other = {haccp_kitchen.HEADER: other_link["url"].split("#k=", 1)[1]}
+    claim = f"{path}/{job['id']}/prise"
+    assert client.post(path, headers=other, json=body).status_code == 404
+    assert client.post(claim, headers=other, json={"device_id": device}).status_code == 404
+    _, replacement = create_link(client, "Second restaurant")
+    assert client.post(claim, headers=headers, json={"device_id": device}).status_code == 401
+    assert client.post(path, headers=replacement, json=body).status_code == 404
+    assert client.post(claim, headers=replacement, json={"device_id": device}).status_code == 404
+    assert client.get(f"/api/haccp/registre/{opened['id']}/etiquette", headers=replacement).status_code == 403
+
+
+def test_impression_mobile_refuse_une_dlc_invalide_ou_devenue_depassee(kitchen, monkeypatch):
+    client = kitchen.client
+    _, headers = create_link(client)
+    path = "/api/haccp/impression/mobile/demandes"
+    device = str(uuid.uuid4())
+    monkeypatch.setattr(routes, "read_manufacturer_instruction", AsyncMock(return_value=ManufacturerInstruction()))
+    invalid = kitchen_scan(client, headers, json.dumps({"type_operation": "ouverture"})).json()
+    assert client.post(path, headers=headers, json={
+        "label_id": invalid["id"], "reviewed": True, "device_id": device,
+    }).status_code == 422
+    monkeypatch.setattr(routes, "read_manufacturer_instruction", AsyncMock(return_value=ManufacturerInstruction(
+        texte="Après ouverture, conserver au froid et consommer sous 48 heures.",
+        conditions="conserver au froid", lecture_complete=True,
+    )))
+    opened = kitchen_scan(client, headers, json.dumps({"type_operation": "ouverture"})).json()
+    job = client.post(path, headers=headers, json={
+        "label_id": opened["id"], "reviewed": True, "device_id": device,
+    }).json()["job"]
+    with Session(haccp_database.get_engine()) as db:
+        db.get(EtiquetteHaccp, opened["id"]).dlc_secondaire = datetime(2000, 1, 1)
+        db.commit()
+    result = client.post(f"{path}/{job['id']}/prise", headers=headers, json={"device_id": device}).json()
+    assert result["job"] is None and result["state"]["status"] == "cancelled"
+    assert "html" not in result
+
+
+def test_impression_mobile_echappe_le_texte_de_la_fiche(kitchen, monkeypatch):
+    client = kitchen.client
+    _, headers = create_link(client)
+    monkeypatch.setattr(routes, "analyser_etiquette_vision", AsyncMock(return_value=extracted(
+        nom_produit='<script>alert("x")</script>', numero_lot="<LOT>",
+    )))
+    opened = kitchen_scan(client, headers, json.dumps({"type_operation": "ouverture"})).json()
+    response = client.post("/api/haccp/impression/mobile/demandes", headers=headers, json={
+        "label_id": opened["id"], "reviewed": True, "device_id": str(uuid.uuid4()),
+    })
+    assert response.status_code == 200
+    assert "<script>" not in response.json()["html"]
+    assert "&lt;script&gt;" in response.json()["html"] and "&lt;LOT&gt;" in response.json()["html"]
+
+
+def test_impression_mobile_une_seule_prise_concurrente(kitchen):
+    from concurrent.futures import ThreadPoolExecutor
+
+    client = kitchen.client
+    _, headers = create_link(client)
+    opened = kitchen_scan(client, headers, json.dumps({"type_operation": "ouverture"})).json()
+    device = str(uuid.uuid4())
+    path = "/api/haccp/impression/mobile/demandes"
+    body = {"label_id": opened["id"], "reviewed": True, "device_id": device}
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        responses = list(pool.map(lambda _: client.post(path, headers=headers, json=body), range(2)))
+    assert [response.status_code for response in responses] == [200, 200]
+    jobs = [response.json()["job"] for response in responses]
+    assert jobs[0]["id"] == jobs[1]["id"]
+    claim = f"{path}/{jobs[0]['id']}/prise"
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        responses = list(pool.map(lambda _: client.post(claim, headers=headers, json={"device_id": device}), range(2)))
+    assert [response.status_code for response in responses] == [200, 200]
+    assert sum(response.json()["job"] is not None for response in responses) == 1
+
+
+def test_liste_preparations_partagee_isolee_et_regle_confirmee(kitchen):
+    client = kitchen.client
+    _, headers = create_link(client)
+    path = "/api/haccp/preparations/liste"
+    params = {"restaurant_name": "Chez Daniel"}
+    empty = {"version": 0, "noms": [], "duree_heures": None, "reference_pms": ""}
+    assert client.get(path, headers=headers, params=params).json() == empty
+    payload = {
+        **params, "version": 0, "noms": ["Pommes caramel", "Bac inox tranche de rumsteak"],
+        "duree_heures": 72, "reference_pms": "PMS en vigueur", "regle_confirmee": True,
+    }
+    assert client.put(path, headers=headers, json={**payload, "regle_confirmee": False}).status_code == 422
+    assert client.put(path, headers=headers, json={**payload, "duree_heures": 72.0}).status_code == 422
+    assert client.put(path, headers=headers, json={**payload, "noms": ["Sauce", "sauce"]}).status_code == 422
+    saved = client.put(path, headers=headers, json=payload)
+    assert saved.status_code == 200, saved.text
+    assert saved.json() == {"version": 1, "noms": payload["noms"], "duree_heures": 72, "reference_pms": "PMS en vigueur"}
+    assert client.get(path, headers=CHEF, params=params).json() == saved.json()
+    assert client.get(path, headers=headers, params={"restaurant_name": "Ailleurs"}).status_code == 403
+    assert client.put(path, headers=headers, json={**payload, "restaurant_name": "Ailleurs"}).status_code == 403
+    other_link = client.post("/api/haccp/cuisine/lien", json=params, headers={"x-test-user": "autre"}).json()
+    other = {haccp_kitchen.HEADER: other_link["url"].split("#k=", 1)[1]}
+    assert client.get(path, headers=other, params=params).json() == empty
+    assert client.put(path, headers=headers, json=payload).status_code == 409
+    _, replacement = create_link(client, "Autre restaurant")
+    assert client.get(path, headers=headers, params=params).status_code == 401
+    assert client.get(path, headers=replacement, params={"restaurant_name": "Autre restaurant"}).json() == empty
+
+
+def test_liste_preparations_ne_perd_pas_une_modification_concurrente(kitchen):
+    from concurrent.futures import ThreadPoolExecutor
+
+    client = kitchen.client
+    _, headers = create_link(client)
+    path = "/api/haccp/preparations/liste"
+    payload = {
+        "restaurant_name": "Chez Daniel", "version": 0, "noms": ["Soupe"],
+        "duree_heures": 72, "reference_pms": "PMS en vigueur", "regle_confirmee": True,
+    }
+    assert client.put(path, headers=headers, json=payload).status_code == 200
+    def modify(name):
+        return client.put(path, headers=headers, json={**payload, "version": 1, "noms": ["Soupe", name]})
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        responses = list(pool.map(modify, ("Sauce", "Salade")))
+    assert sorted(response.status_code for response in responses) == [200, 409]
+    saved = client.get(path, headers=headers, params={"restaurant_name": "Chez Daniel"}).json()
+    assert saved["version"] == 2 and saved["noms"] in (["Soupe", "Sauce"], ["Soupe", "Salade"])
+
+
+def test_preparation_refuse_une_liste_perimee_mais_retrouve_sa_capture(kitchen):
+    client = kitchen.client
+    _, headers = create_link(client)
+    path = "/api/haccp/preparations/liste"
+    saved_list = {
+        "restaurant_name": "Chez Daniel", "version": 0, "noms": ["Soupe"],
+        "duree_heures": 72, "reference_pms": "PMS en vigueur", "regle_confirmee": True,
+    }
+    assert client.put(path, headers=headers, json=saved_list).status_code == 200
+    fabrication = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(minutes=1)
+    preparation = {
+        "capture_id": str(uuid.uuid4()), "nom_produit": "Soupe", "operateur": "Cuisine",
+        "restaurant_name": "Chez Daniel", "date_fabrication": fabrication.isoformat(),
+        "duree_conservation_heures": 72, "conditions_conservation": "Voir le PMS",
+        "justification_duree": "PMS en vigueur", "regle_confirmee": True, "liste_version": 1,
+    }
+    first = client.post("/api/haccp/preparations", headers=headers, json=preparation)
+    assert first.status_code == 201, first.text
+    assert datetime.fromisoformat(first.json()["dlc_secondaire"].replace("Z", "+00:00")) == fabrication + timedelta(hours=72)
+    assert client.put(path, headers=headers, json={**saved_list, "version": 1, "duree_heures": 24}).status_code == 200
+    retry = client.post("/api/haccp/preparations", headers=headers, json=preparation)
+    assert retry.status_code == 201 and retry.json()["id"] == first.json()["id"]
+    stale = client.post("/api/haccp/preparations", headers=headers, json={**preparation, "capture_id": str(uuid.uuid4())})
+    assert stale.status_code == 412
+    wrong_rule = client.post("/api/haccp/preparations", headers=headers, json={
+        **preparation, "capture_id": str(uuid.uuid4()), "liste_version": 2,
+    })
+    assert wrong_rule.status_code == 412
+
+
+def test_preparation_verrouille_la_regle_pendant_son_enregistrement(kitchen, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    import sqlite3
+    from threading import Event
+
+    client = kitchen.client
+    _, headers = create_link(client)
+    path = "/api/haccp/preparations/liste"
+    saved_list = {
+        "restaurant_name": "Chez Daniel", "version": 0, "noms": ["Soupe"],
+        "duree_heures": 72, "reference_pms": "PMS en vigueur", "regle_confirmee": True,
+    }
+    assert client.put(path, headers=headers, json=saved_list).status_code == 200
+    fabrication = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(minutes=1)
+    body = {
+        "capture_id": str(uuid.uuid4()), "nom_produit": "Soupe", "operateur": "Cuisine",
+        "restaurant_name": "Chez Daniel", "date_fabrication": fabrication.isoformat(),
+        "duree_conservation_heures": 72, "conditions_conservation": "Voir le PMS",
+        "justification_duree": "PMS en vigueur", "regle_confirmee": True, "liste_version": 1,
+    }
+    locked, release = Event(), Event()
+    original = routes._save_record
+    def wait_before_save(*args, **kwargs):
+        locked.set()
+        assert release.wait(5)
+        return original(*args, **kwargs)
+    monkeypatch.setattr(routes, "_save_record", wait_before_save)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        preparation = pool.submit(client.post, "/api/haccp/preparations", headers=headers, json=body)
+        assert locked.wait(5)
+        try:
+            with sqlite3.connect(haccp_database.get_engine().url.database, timeout=0) as connection:
+                with pytest.raises(sqlite3.OperationalError, match="locked"):
+                    connection.execute("UPDATE haccp_preparation_lists SET duree_heures = 24")
+        finally:
+            release.set()
+        assert preparation.result(timeout=10).status_code == 201
+    assert client.put(path, headers=headers, json={**saved_list, "version": 1, "duree_heures": 24}).status_code == 200
 
 
 @pytest.mark.parametrize("text,hours", [

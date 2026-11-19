@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import HaccpPreparation from "./HaccpPreparation";
 import * as printer from "./HaccpPrinter";
 import { printHaccpDocument } from "./haccpDocuments";
+import { setLanguage } from "./i18n/domTranslator";
 
 jest.mock("./haccpDocuments", () => ({
   ...jest.requireActual("./haccpDocuments"),
@@ -35,22 +36,31 @@ beforeEach(() => {
   printHaccpDocument.mockClear();
 });
 afterEach(async () => {
-  await act(async () => root.unmount());
+  await act(async () => { await setLanguage("fr"); root.unmount(); });
   host.remove();
   global.fetch = oldFetch;
   global.crypto = oldCrypto;
+  localStorage.removeItem("sirius_cuisine_print_device_id");
   if (oldMediaDevices) Object.defineProperty(navigator, "mediaDevices", oldMediaDevices);
   else delete navigator.mediaDevices;
   jest.restoreAllMocks();
 });
-async function render(props = {}) {
-  await act(async () => root.render(<HaccpPreparation establishmentName="Le Papillon" sessionReady {...props} />));
+async function render(props = {}, list = { version: 0, noms: [], duree_heures: null, reference_pms: "" }) {
+  const fetch = global.fetch;
+  global.fetch = (url, options) => url.includes("/preparations/liste") && options?.method !== "PUT"
+    ? Promise.resolve(reply(list)) : fetch(url, options);
+  try {
+    await act(async () => root.render(<HaccpPreparation establishmentName="Le Papillon" sessionReady {...props} />));
+  } finally {
+    global.fetch = fetch;
+  }
 }
 async function change(input, value) {
   await act(async () => {
-    const prototype = input.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    const prototype = input.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype
+      : input.tagName === "SELECT" ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
     Object.getOwnPropertyDescriptor(prototype, "value").set.call(input, value);
-    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event(input.tagName === "SELECT" ? "change" : "input", { bubbles: true }));
   });
 }
 async function complete() {
@@ -79,6 +89,117 @@ test("preparation never starts the camera or guesses morning time, temperature o
   expect(global.fetch).not.toHaveBeenCalled();
 });
 
+test("a QR preparation uses mobile printing only after the user reviews it", async () => {
+  global.fetch = jest.fn(async (url) => url.endsWith("/mobile/demandes")
+    ? reply({ job: { id: "job", label_id: 8, status: "pending", transport: "mobile" } })
+    : reply(record));
+  await render({ kitchenToken: "qr-token", mobilePrinting: true });
+  await complete();
+  await submit();
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+  await click("J’ai vérifié");
+  expect(global.fetch.mock.calls[1][0]).toMatch(/\/impression\/mobile\/demandes$/);
+  expect(global.fetch.mock.calls[1][1].headers["X-Sirius-Cuisine"]).toBe("qr-token");
+  expect(JSON.parse(global.fetch.mock.calls[1][1].body).reviewed).toBe(true);
+});
+
+test("the shared list applies its confirmed PMS duration without guessing fabrication time", async () => {
+  const list = { version: 1, noms: ["Soupe TEST", "Sauce"], duree_heures: 72, reference_pms: "PMS en vigueur" };
+  await render({ kitchenToken: "qr-token" }, list);
+  await change(field("Préparation enregistrée"), "Soupe TEST");
+  expect(field("Nom du produit").value).toBe("Soupe TEST");
+  expect(field("Durée de conservation").value).toBe("72");
+  expect(field("Conditions").value).toBe("Voir les conditions du PMS en vigueur");
+  expect(field("Référence de la règle").value).toBe("PMS en vigueur");
+  expect(field("Date et heure").value).toBe("");
+  expect(field("Je confirme").checked).toBe(false);
+  expect(button("Calculer la DLC").disabled).toBe(true);
+
+  jest.useFakeTimers(); jest.setSystemTime(new Date("2026-11-02T07:15:00Z"));
+  await click("Fabrication maintenant");
+  expect(field("Date et heure").value).toBe("2026-11-02T08:15");
+  expect(field("Décalage UTC").value).toBe("+01:00");
+  await act(async () => field("Je confirme").click());
+  await submit();
+  const payload = JSON.parse(global.fetch.mock.calls[0][1].body);
+  expect(payload).toEqual(expect.objectContaining({
+    nom_produit: "Soupe TEST", date_fabrication: "2026-11-02T08:15:00+01:00",
+    duree_conservation_heures: 72, justification_duree: "PMS en vigueur", regle_confirmee: true, liste_version: 1,
+  }));
+  expect(host.textContent).toContain("DLC interne exacte");
+});
+
+test("editing a selected product clears its prefilled rule", async () => {
+  await render({}, { version: 1, noms: ["Soupe TEST"], duree_heures: 72, reference_pms: "PMS en vigueur" });
+  await change(field("Préparation enregistrée"), "Soupe TEST");
+  await change(field("Nom du produit"), "Autre produit");
+  expect(field("Durée de conservation").value).toBe("");
+  expect(field("Conditions").value).toBe("");
+  expect(field("Référence de la règle").value).toBe("");
+  expect(field("Je confirme").checked).toBe(false);
+});
+
+test("a stale shared rule is cleared and reloaded before another preparation", async () => {
+  const list = { version: 1, noms: ["Soupe TEST"], duree_heures: 72, reference_pms: "PMS en vigueur" };
+  await render({}, list);
+  global.fetch.mockResolvedValueOnce({ ...reply({ detail: "La liste des préparations a changé." }, false), status: 412 })
+    .mockResolvedValueOnce(reply({ ...list, version: 2, duree_heures: 24 }));
+  await change(field("Préparation enregistrée"), "Soupe TEST");
+  await change(field("Date et heure"), "2026-11-02T08:15");
+  await act(async () => field("Je confirme").click());
+  await submit();
+  expect(host.textContent).toContain("La liste des préparations a changé.");
+  expect(field("Durée de conservation").value).toBe("");
+  expect(field("Je confirme").checked).toBe(false);
+  await change(field("Préparation enregistrée"), "Soupe TEST");
+  expect(field("Durée de conservation").value).toBe("24");
+});
+
+test("the QR saves a list shared by the establishment only after confirming its common rule", async () => {
+  await render({ kitchenToken: "qr-token" });
+  const list = { version: 1, noms: ["Pommes caramel", "Bac inox rumsteak"], duree_heures: 72, reference_pms: "PMS en vigueur" };
+  global.fetch.mockResolvedValueOnce(reply(list));
+  await change(field("Liste des préparations"), list.noms.join("\n"));
+  await change(field("Durée commune"), "72");
+  await change(field("Référence PMS commune"), "PMS en vigueur");
+  expect(button("Enregistrer la liste").disabled).toBe(true);
+  await act(async () => host.querySelector(".haccp-preparation-list input[type=checkbox]").click());
+  await click("Enregistrer la liste");
+  const [url, options] = global.fetch.mock.calls[0];
+  expect(url).toMatch(/\/haccp\/preparations\/liste$/);
+  expect(options.method).toBe("PUT");
+  expect(options.headers["X-Sirius-Cuisine"]).toBe("qr-token");
+  expect(JSON.parse(options.body)).toEqual({
+    restaurant_name: "Le Papillon", version: 0, noms: list.noms, duree_heures: 72,
+    reference_pms: "PMS en vigueur", regle_confirmee: true,
+  });
+  expect(host.textContent).toContain("Liste enregistrée pour tous les téléphones");
+  expect([...field("Préparation enregistrée").options].map((option) => option.value)).toContain("Bac inox rumsteak");
+});
+
+test("a conflicting list edit is not silently discarded", async () => {
+  const list = { version: 1, noms: ["Soupe"], duree_heures: 72, reference_pms: "PMS en vigueur" };
+  await render({}, list);
+  global.fetch.mockResolvedValueOnce(reply({ detail: "La liste a changé sur un autre appareil." }, false));
+  await change(field("Liste des préparations"), "Soupe\nSauce");
+  await act(async () => host.querySelector(".haccp-preparation-list input[type=checkbox]").click());
+  await click("Enregistrer la liste");
+  expect(host.textContent).toContain("La liste a changé sur un autre appareil.");
+  expect(field("Liste des préparations").value).toBe("Soupe\nSauce");
+});
+
+test("language changes translate list controls and confirmation without changing product names", async () => {
+  await render({}, { version: 1, noms: ["Enregistrer"], duree_heures: 72, reference_pms: "PMS" });
+  await act(async () => { await setLanguage("en"); });
+  expect(host.querySelector('option[value="Enregistrer"]').textContent).toBe("Enregistrer");
+  expect(host.textContent).toContain("Select a preparation");
+  await change(host.querySelector(".haccp-preparation-list textarea"), "");
+  await act(async () => host.querySelector(".haccp-preparation-list input[type=checkbox]").click());
+  const confirm = jest.spyOn(window, "confirm").mockReturnValue(false);
+  await click("Save the list");
+  expect(confirm).toHaveBeenCalledWith("1 preparation(s) will be removed from this list. Continue?");
+});
+
 test.each([{ sessionReady: false }, { establishmentName: "" }])("dossier prerequisites gate preparation %p", async (props) => {
   await render(props);
   expect(host.querySelector("fieldset").disabled).toBe(true);
@@ -103,7 +224,7 @@ test("a confirmed preparation sends exact local fabrication and renders the serv
     regle_confirmee: true, capture_id: "9582f6d4-d5ba-4607-8772-051912e656cb",
   });
   expect(host.textContent).toContain("Fabrication : 02/11/2026 08:15:00");
-  expect(host.textContent).toContain("DLC exacte : 05/11/2026 08:15:00");
+  expect(host.textContent).toContain("DLC interne exacte : 05/11/2026 08:15:00");
   expect(host.textContent).toContain(record.conditions_conservation);
   expect(host.textContent).toContain("Déclaration archivée");
   expect(host.textContent).not.toContain("Illisible ou absente");

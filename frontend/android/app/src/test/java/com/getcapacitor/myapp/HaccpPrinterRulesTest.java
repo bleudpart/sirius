@@ -35,7 +35,7 @@ public class HaccpPrinterRulesTest {
         String body = HaccpPrinterRules.labelBody(true, "PREP-TEST", "02/11/2026 08:15:00 +0100",
             "05/11/2026 08:15:00 +0100", "Cuisine", "Entre 0 et +3 C, en bac ferme.");
         assertTrue(body.contains("Fabrication : 02/11/2026 08:15:00 +0100"));
-        assertTrue(body.contains("DLC : 05/11/2026 08:15:00 +0100"));
+        assertTrue(body.contains("DLC interne : 05/11/2026 08:15:00 +0100"));
         assertTrue(body.contains("Conservation : Entre 0 et +3 C, en bac ferme."));
         assertFalse(body.contains("Ouvert"));
     }

@@ -10,6 +10,7 @@ import { HACCP_CATEGORIES, HACCP_CATEGORY_LABELS } from "./haccpCategories";
 import "./HaccpWorkspace.css";
 
 const API = `${API_BASE_URL}/haccp`;
+const MOBILE_PRINT_SETTING = "sirius-cuisine-impression-mobile";
 const shortDate = (value) => value ? new Date(value).toLocaleString("fr-FR", {
   timeZone: "Europe/Paris", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
 }) : "";
@@ -82,6 +83,8 @@ export function kitchenReason(record) {
 // Écran cuisine : photo → analyse → enregistrement automatique, sans formulaire ni confirmation.
 export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, onFullMode, onRelevesDirtyChange, kitchenToken = "" }) {
   const auth = useMemo(() => kitchenToken ? { headers: { "X-Sirius-Cuisine": kitchenToken } } : {}, [kitchenToken]);
+  const [mobilePrinting, setMobilePrinting] = useState(false);
+  const [printerSettingMessage, setPrinterSettingMessage] = useState("");
   const [view, setView] = useState("camera");
   const [source, setSource] = useState("etiquette");
   const [documents, setDocuments] = useState([]);
@@ -118,6 +121,25 @@ export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, o
   const openingPhotoUrl = useRef(null);
   const listRequest = useRef(0);
   const section = useRef(null);
+
+  useEffect(() => {
+    if (!kitchenToken) return;
+    try {
+      setMobilePrinting(localStorage.getItem(MOBILE_PRINT_SETTING) === "mobile");
+    } catch (failure) {
+      setPrinterSettingMessage(`Réglage de l’imprimante inaccessible : ${failure.message}`);
+    }
+  }, [kitchenToken]);
+
+  const configureMobilePrinting = (enabled) => {
+    try {
+      localStorage.setItem(MOBILE_PRINT_SETTING, enabled ? "mobile" : "windows");
+      setMobilePrinting(enabled);
+      setPrinterSettingMessage("Réglage enregistré sur ce téléphone.");
+    } catch (failure) {
+      setPrinterSettingMessage(`Réglage non enregistré : ${failure.message}`);
+    }
+  };
 
   const clearPhoto = useCallback(() => {
     if (photoUrl.current) URL.revokeObjectURL(photoUrl.current);
@@ -333,6 +355,18 @@ export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, o
           <FileText size={26} aria-hidden="true" /><span>Facture / Bon de livraison</span>
         </button>
       </div>
+      {kitchenToken && <details className="haccp-mobile-setup">
+        <summary>Imprimante Brother Wi-Fi · réglage du téléphone</summary>
+        <p>Connectez le téléphone au même Wi-Fi que la Brother QL-820NWBc. Sur iPhone, utilisez AirPrint.
+          Sur Android, installez et activez une fois le <a href="https://play.google.com/store/apps/details?id=com.brother.printservice"
+            target="_blank" rel="noopener noreferrer">service d’impression Brother</a>.</p>
+        <label className="haccp-check"><input type="checkbox" checked={mobilePrinting}
+          onChange={(event) => configureMobilePrinting(event.target.checked)} />
+          Imprimer depuis ce téléphone, sans PC
+        </label>
+        <p>Rouleau DK-22205, bande continue 62 mm. Sélectionnez la Brother et vérifiez le format, la lisibilité et la coupe sur papier.</p>
+        {printerSettingMessage && <p role="status">{printerSettingMessage}</p>}
+      </details>}
       {source === "ouverture" && <p>Photographiez aussi la consigne après ouverture.</p>}
       {result?.type_document && <div className="haccp-simple-result" role="status">
         <FileText size={48} aria-hidden="true" /><div><p>Document archivé dans le dossier de l’établissement</p><DocumentDetails record={result} /></div>
@@ -384,7 +418,7 @@ export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, o
       </button>
     </>}
     {view === "camera" && openingResult && <>
-      <HaccpLabelCapture savedRecord={result} kitchenMode kitchenToken={kitchenToken} originalPhotoUrl={openingPreview}
+      <HaccpLabelCapture savedRecord={result} kitchenMode kitchenToken={kitchenToken} mobilePrinting={mobilePrinting} originalPhotoUrl={openingPreview}
         onScanAgain={() => {
           if (openingPhotoUrl.current) URL.revokeObjectURL(openingPhotoUrl.current);
           openingPhotoUrl.current = null; setOpeningPreview(""); setResult(null);
@@ -394,7 +428,7 @@ export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, o
       <button type="button" className="haccp-simple-back" onClick={() => setView("camera")}>
         <ArrowLeft size={36} aria-hidden="true" /><Camera size={36} aria-hidden="true" /><span>PHOTO</span>
       </button>
-      <HaccpPreparation kitchenToken={kitchenToken} establishmentName={establishmentName} sessionReady />
+      <HaccpPreparation kitchenToken={kitchenToken} mobilePrinting={mobilePrinting} establishmentName={establishmentName} sessionReady />
     </>}
     {view === "releves" && <HaccpReleves establishmentName={establishmentName} kitchenToken={kitchenToken}
       onBack={() => setView("camera")} onDirtyChange={reportRelevesDirty} onSavingChange={setRelevesSaving} />}

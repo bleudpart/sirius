@@ -45,7 +45,7 @@ final class HaccpPrinterRules {
             String operator, String storage) {
         String body = "Lot : " + text(lot, 128)
             + (preparation ? "\nFabrication : " : "\nOuvert : ") + text(recorded, 40)
-            + (preparation ? "\nDLC : " : "\nAu plus tard : ") + text(deadline, 40)
+            + (preparation ? "\nDLC interne : " : "\nAu plus tard : ") + text(deadline, 40)
             + "\nOperateur : " + text(operator, 100);
         return preparation ? body + "\nConservation : " + text(storage, 500) : body;
     }

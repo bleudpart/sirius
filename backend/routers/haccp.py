@@ -19,7 +19,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Path as PathParam, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from pydantic import ValidationError
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, func, or_, select, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
@@ -30,10 +30,11 @@ from haccp_activity import HaccpActivity, load_activity
 from haccp_closing import (
     ClosingPdfRequest, ClosingReport, generate_closing_pdf, load_closing_report,
 )
-from models.haccp import EtiquetteHaccp
+from models.haccp import EtiquetteHaccp, HaccpPreparationList
 from runtime_paths import data_dir
 from schemas.haccp import (
-    CategorieProduit, EtiquetteResponse, EtiquetteVisionOutput, OperationCapture, OperationEtiquette, PreparationCreate,
+    CategorieProduit, EtiquetteResponse, EtiquetteVisionOutput, OperationCapture, OperationEtiquette,
+    PreparationCreate, PreparationListUpdate,
 )
 from schemas.haccp_reception import ImageArchivee
 from services.haccp_images import IMAGE_FORMATS, MAX_IMAGE_BYTES, ImageValidationError, validate_source_image
@@ -290,6 +291,93 @@ def make_haccp_router(
             logger.exception("[HACCP] Ouverture du dossier de reception impossible")
             raise HTTPException(500, "Le dossier de réception n'a pas pu être ouvert.") from error
 
+    def preparation_list_restaurant(request: Request, restaurant_name: str) -> str:
+        restaurant = restaurant_name.strip()
+        _restaurant_slug(restaurant)
+        kitchen = getattr(request.state, "haccp_kitchen", None)
+        if kitchen is not None and restaurant != kitchen["restaurant_name"]:
+            raise HTTPException(403, "La liste demandee ne correspond pas a l'etablissement du QR Cuisine.")
+        return restaurant
+
+    def lock_preparation_list(db: Session, scope: str, body: PreparationCreate) -> None:
+        # L'UPDATE sans changement verrouille les ecritures SQLite jusqu'au commit de la preparation.
+        changed = db.execute(update(HaccpPreparationList).where(
+            HaccpPreparationList.scope_key == scope,
+            HaccpPreparationList.restaurant_name == body.restaurant_name,
+            HaccpPreparationList.version == body.liste_version,
+        ).values(version=HaccpPreparationList.version))
+        if changed.rowcount != 1:
+            db.rollback()
+            raise HTTPException(412, "La liste des préparations a changé. Rechargez-la et vérifiez la règle.")
+        row = db.get(HaccpPreparationList, (scope, body.restaurant_name))
+        if (row is None or body.nom_produit not in row.noms
+                or body.duree_conservation_heures != row.duree_heures
+                or body.justification_duree != row.reference_pms):
+            db.rollback()
+            raise HTTPException(412, "La préparation ou sa règle ne correspond plus à la liste. Rechargez-la.")
+
+    @router.get("/preparations/liste")
+    async def preparation_list(
+        request: Request,
+        restaurant_name: Annotated[str, Query(min_length=1, max_length=160)],
+        scope: str = Depends(resolve_scope), db: Session = Depends(get_db),
+    ) -> dict:
+        restaurant = preparation_list_restaurant(request, restaurant_name)
+        if cloud_link.relay_allowed():
+            response = await cloud_link.relay_haccp_registry(
+                "GET", "/preparations/liste", params={"restaurant_name": restaurant},
+            )
+            return response.json()
+        try:
+            row = db.get(HaccpPreparationList, (scope, restaurant))
+            return {
+                "version": row.version if row else 0,
+                "noms": row.noms if row else [],
+                "duree_heures": row.duree_heures if row else None,
+                "reference_pms": row.reference_pms if row else "",
+            }
+        except SQLAlchemyError as error:
+            logger.exception("[HACCP] Lecture de la liste des preparations impossible")
+            raise HTTPException(500, "La liste des préparations est indisponible.") from error
+
+    @router.put("/preparations/liste")
+    async def save_preparation_list(
+        body: PreparationListUpdate, request: Request,
+        scope: str = Depends(resolve_scope), db: Session = Depends(get_db),
+    ) -> dict:
+        restaurant = preparation_list_restaurant(request, body.restaurant_name)
+        if cloud_link.relay_allowed():
+            response = await cloud_link.relay_haccp_registry(
+                "PUT", "/preparations/liste", json=body.model_dump(mode="json"),
+            )
+            return response.json()
+        values = {
+            "noms": body.noms, "duree_heures": body.duree_heures, "reference_pms": body.reference_pms,
+            "version": body.version + 1, "updated_at": datetime.now(timezone.utc).replace(tzinfo=None),
+        }
+        try:
+            if body.version == 0:
+                db.add(HaccpPreparationList(scope_key=scope, restaurant_name=restaurant, **values))
+            else:
+                changed = db.execute(update(HaccpPreparationList).where(
+                    HaccpPreparationList.scope_key == scope,
+                    HaccpPreparationList.restaurant_name == restaurant,
+                    HaccpPreparationList.version == body.version,
+                ).values(**values))
+                if changed.rowcount != 1:
+                    db.rollback()
+                    raise HTTPException(409, "La liste a change sur un autre appareil. Copiez vos modifications puis rechargez.")
+            db.commit()
+        except IntegrityError as error:
+            db.rollback()
+            raise HTTPException(409, "La liste a change sur un autre appareil. Copiez vos modifications puis rechargez.") from error
+        except SQLAlchemyError as error:
+            db.rollback()
+            logger.exception("[HACCP] Enregistrement de la liste des preparations impossible")
+            raise HTTPException(500, "La liste des préparations n'a pas pu être enregistrée.") from error
+        return {"version": values["version"], "noms": body.noms,
+                "duree_heures": body.duree_heures, "reference_pms": body.reference_pms}
+
     @router.post("/preparations", response_model=EtiquetteResponse, status_code=201)
     async def preparation(
         body: PreparationCreate, request: Request,
@@ -306,13 +394,16 @@ def make_haccp_router(
             return EtiquetteResponse.model_validate(response.json())
         prefix = str(request.url_for("haccp_search")).removesuffix("/recherche")
         capture_key = str(body.capture_id)
-        digest = hashlib.sha256(json.dumps(
-            body.model_dump(mode="json", exclude={"capture_id"}), sort_keys=True, ensure_ascii=False,
-        ).encode("utf-8")).hexdigest()
+        hash_body = body.model_dump(mode="json", exclude={"capture_id"})
+        if hash_body["liste_version"] is None:
+            del hash_body["liste_version"]
+        digest = hashlib.sha256(json.dumps(hash_body, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
         try:
             previous = await run_in_threadpool(_existing_capture, db, scope, capture_key, digest, prefix)
             if previous is not None:
                 return previous
+            if body.liste_version is not None:
+                await run_in_threadpool(lock_preparation_list, db, scope, body)
             maintenant = datetime.now(timezone.utc)
             try:
                 limite = calculer_preparation(body, maintenant)

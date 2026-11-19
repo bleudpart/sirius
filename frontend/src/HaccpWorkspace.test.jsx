@@ -345,7 +345,7 @@ test("archived preparations reopen without requesting or inventing a photo", asy
   expect(dialog.querySelector("img")).toBeNull();
   expect(dialog.querySelector("video")).toBeNull();
   expect(dialog.textContent).toContain("Entre 0 et +3 °C, bac fermé.");
-  expect(dialog.textContent).toContain("DLC exacte");
+  expect(dialog.textContent).toContain("DLC interne exacte");
   expect(global.fetch).not.toHaveBeenCalled();
 });
 

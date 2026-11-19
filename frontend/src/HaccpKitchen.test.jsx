@@ -16,6 +16,7 @@ async function pickPhoto() {
   await act(async () => input.dispatchEvent(new Event("change", { bubbles: true })));
 }
 beforeEach(() => {
+  localStorage.removeItem("sirius-cuisine-impression-mobile");
   oldFetch = global.fetch;
   oldCrypto = global.crypto;
   oldImageCapture = window.ImageCapture;
@@ -28,7 +29,8 @@ beforeEach(() => {
 });
 afterEach(async () => {
   await act(async () => root.unmount());
-  host.remove(); global.fetch = oldFetch; global.crypto = oldCrypto; window.ImageCapture = oldImageCapture; jest.restoreAllMocks();
+  host.remove(); global.fetch = oldFetch; global.crypto = oldCrypto; window.ImageCapture = oldImageCapture;
+  localStorage.removeItem("sirius-cuisine-impression-mobile"); jest.restoreAllMocks();
 });
 
 test("a photo is analysed and saved at once, without operator, rule or confirmation", async () => {
@@ -245,7 +247,7 @@ test("the shared photo screen analyses an opening and prints after review", asyn
   expect(host.querySelector("video")).toBe(video);
   expect(button("Réception")).not.toBeUndefined();
   expect([...host.querySelectorAll("label")].some((label) => label.textContent.startsWith("Opérateur"))).toBe(false);
-  expect(host.querySelectorAll('input:not([type=file]),textarea')).toHaveLength(0);
+  expect(host.querySelectorAll('input:not([type=file]):not([type=checkbox]),textarea')).toHaveLength(0);
   expect(host.textContent).toContain("Photographiez aussi la consigne");
   Object.defineProperty(video, "videoWidth", { configurable: true, value: 1920 });
   Object.defineProperty(video, "videoHeight", { configurable: true, value: 1080 });
@@ -270,6 +272,28 @@ test("the shared photo screen analyses an opening and prints after review", asyn
   await act(async () => button("Scanner une autre étiquette").click());
   expect(host.querySelector(".haccp-simple-shoot")).not.toBeNull();
   expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:photo");
+});
+
+test("QR mobile printing is optional, remembered locally and used for openings", async () => {
+  global.fetch = jest.fn(async (url) => url.endsWith("/mobile/demandes")
+    ? reply({ job: { id: "job", label_id: 9, status: "pending", transport: "mobile" } })
+    : reply(opened));
+  const props = { kitchenToken: "jeton-cuisine-0123456789", establishmentName: "Le Papillon" };
+  await act(async () => root.render(<HaccpKitchen {...props} />));
+  const option = host.querySelector(".haccp-mobile-setup input");
+  expect(option.checked).toBe(false);
+  expect(host.textContent).toContain("AirPrint");
+  expect(host.textContent).toContain("DK-22205");
+  await act(async () => option.click());
+  expect(localStorage.getItem("sirius-cuisine-impression-mobile")).toBe("mobile");
+  await act(async () => root.render(<div />));
+  await act(async () => root.render(<HaccpKitchen {...props} />));
+  expect(host.querySelector(".haccp-mobile-setup input").checked).toBe(true);
+  await act(async () => button("Ouverture produit").click());
+  await pickPhoto();
+  await act(async () => button("J’ai vérifié le produit, le lot et la DLC").click());
+  expect(global.fetch.mock.calls[1][0]).toMatch(/\/impression\/mobile\/demandes$/);
+  expect(host.textContent).toContain("Aperçu réservé");
 });
 
 test("an opening without a readable rule keeps the product but cannot be printed", async () => {
@@ -304,13 +328,16 @@ test("an opening retry keeps the original operation and capture id after switchi
 });
 
 test("PRÉPARATION saves the preparation with the QR token and without an operator field", async () => {
-  global.fetch = jest.fn(async () => reply({
+  global.fetch = jest.fn(async (url) => url.includes("/preparations/liste")
+    ? reply({ version: 0, noms: [], duree_heures: null, reference_pms: "" }) : reply({
     id: 10, type_operation: "preparation", nom_produit: "Soupe", numero_lot: "PREP-1", conforme_reception: true,
     date_fabrication: "2026-11-02T07:15:00Z", dlc_secondaire: "2026-11-05T07:15:00Z",
     conditions_conservation: "0 à 3 °C", duree_conservation_heures: 72, justification_duree: "PMS",
   }));
   await act(async () => root.render(<HaccpKitchen kitchenToken="jeton-cuisine-0123456789" establishmentName="Le Papillon" />));
   await act(async () => button("PRÉPARATION").click());
+  expect(global.fetch.mock.calls[0][1].headers).toEqual(TOKEN_HEADER);
+  global.fetch.mockClear();
   expect(host.querySelector('section[aria-label="Étiquette de préparation"]')).not.toBeNull();
   expect([...host.querySelectorAll("label")].some((label) => label.textContent.startsWith("Opérateur"))).toBe(false);
   expect(host.textContent).not.toContain("Configurer l’imprimante");

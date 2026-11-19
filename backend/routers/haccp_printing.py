@@ -15,9 +15,11 @@ from sqlalchemy.orm import Session
 import cloud_link
 from haccp_database import get_db
 from models.haccp import EtiquetteHaccp
-from models.haccp_printing import HaccpAndroidPrintTarget, HaccpPrintJob, HaccpPrintStation
+from models.haccp_printing import HaccpAndroidPrintTarget, HaccpMobilePrintTarget, HaccpPrintJob, HaccpPrintStation
 from routers.haccp import _response
-from services.haccp_opening import PARIS, construire_fragment_impression, verifier_etiquette_imprimable
+from services.haccp_opening import (
+    PARIS, construire_etiquette_mobile, construire_fragment_impression, verifier_etiquette_imprimable,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -46,19 +48,23 @@ class PrintAcknowledgement(ClaimRequest):
     detail: Annotated[str, StringConstraints(max_length=500)] | None = None
 
 
-class AndroidIdentity(BaseModel):
+class DeviceIdentity(BaseModel):
     model_config = ConfigDict(extra="forbid")
     device_id: uuid.UUID
 
 
-class AndroidPrintRequest(AndroidIdentity):
+class AndroidPrintRequest(DeviceIdentity):
     label_id: Annotated[int, Field(strict=True, gt=0)]
     reviewed: StrictBool
 
 
-class AndroidAcknowledgement(AndroidIdentity):
+class AndroidAcknowledgement(DeviceIdentity):
     status: Literal["accepted", "uncertain"]
     detail: Annotated[str, StringConstraints(max_length=500)] | None = None
+
+
+class MobilePrintRequest(PrintRequest):
+    device_id: uuid.UUID
 
 
 def _actor(request: Request, scope: str) -> str:
@@ -99,10 +105,15 @@ def _now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
-def _valid_label(db: Session, scope: str, label_id: int) -> EtiquetteHaccp:
-    row = db.scalar(select(EtiquetteHaccp).where(
+def _valid_label(
+    db: Session, scope: str, label_id: int, restaurant_name: str | None = None,
+) -> EtiquetteHaccp:
+    statement = select(EtiquetteHaccp).where(
         EtiquetteHaccp.id == label_id, EtiquetteHaccp.scope_key == scope,
-    ))
+    )
+    if restaurant_name is not None:
+        statement = statement.where(EtiquetteHaccp.restaurant_name == restaurant_name)
+    row = db.scalar(statement)
     if row is None:
         raise HTTPException(404, "Etiquette introuvable.")
     try:
@@ -126,6 +137,14 @@ def _job_response(job: HaccpPrintJob, transport: str = "windows") -> dict[str, o
             "transport": transport,
             "created_at": job.created_at.replace(tzinfo=timezone.utc).isoformat(),
             "accepted_at": job.accepted_at.replace(tzinfo=timezone.utc).isoformat() if job.accepted_at else None}
+
+
+def _job_transport(db: Session, job: HaccpPrintJob) -> str:
+    if db.get(HaccpMobilePrintTarget, job.id):
+        return "mobile"
+    if db.get(HaccpAndroidPrintTarget, job.id):
+        return "android"
+    return "windows"
 
 
 def make_haccp_print_router(
@@ -167,7 +186,7 @@ def make_haccp_print_router(
                     "height_mm": station.height_mm,
                     "online": station.last_seen >= _now() - timedelta(seconds=30),
                 },
-                "jobs": [_job_response(job, "android" if db.get(HaccpAndroidPrintTarget, job.id) else "windows") for job in jobs],
+                "jobs": [_job_response(job, _job_transport(db, job)) for job in jobs],
             }
 
     @router.post("/poste")
@@ -208,7 +227,7 @@ def make_haccp_print_router(
                 HaccpPrintJob.scope_key == scope, HaccpPrintJob.label_id == row.id,
             ))
             if existing is not None:
-                return _job_response(existing, "android" if db.get(HaccpAndroidPrintTarget, existing.id) else "windows")
+                return _job_response(existing, _job_transport(db, existing))
             station = _station(db, scope)
             if station.last_seen < _now() - timedelta(seconds=30):
                 raise HTTPException(409, "Le poste d'impression est hors ligne. Ouvrez ΣIRIUS sur le PC.")
@@ -226,7 +245,7 @@ def make_haccp_print_router(
                 ))
                 if existing is None:
                     raise
-                return _job_response(existing, "android" if db.get(HaccpAndroidPrintTarget, existing.id) else "windows")
+                return _job_response(existing, _job_transport(db, existing))
             return _job_response(job)
 
     @router.post("/prochaine")
@@ -246,6 +265,9 @@ def make_haccp_print_router(
                 HaccpPrintJob.status == "pending",
                 ~select(HaccpAndroidPrintTarget.job_id).where(
                     HaccpAndroidPrintTarget.job_id == HaccpPrintJob.id,
+                ).exists(),
+                ~select(HaccpMobilePrintTarget.job_id).where(
+                    HaccpMobilePrintTarget.job_id == HaccpPrintJob.id,
                 ).exists(),
             ).order_by(HaccpPrintJob.created_at, HaccpPrintJob.id).limit(1))
             if job is None:
@@ -284,8 +306,8 @@ def make_haccp_print_router(
             ))
             if job is None:
                 raise HTTPException(404, "Demande d'impression introuvable.")
-            if db.get(HaccpAndroidPrintTarget, job.id) is not None:
-                raise HTTPException(409, "Cette demande est reservee au telephone Android, pas au spouleur Windows.")
+            if _job_transport(db, job) != "windows":
+                raise HTTPException(409, "Cette demande est reservee au telephone, pas au spouleur Windows.")
             if job.status in {"accepted", "uncertain"}:
                 return _job_response(job)
             if job.status != "claimed":
@@ -299,6 +321,109 @@ def make_haccp_print_router(
             db.commit()
             db.refresh(job)
             return _job_response(job)
+
+    def mobile_kitchen(request: Request, scope: str) -> tuple[str, str]:
+        if cloud_link.relay_allowed():
+            raise HTTPException(409, "Ouvrez le QR Cuisine sur le site ΣIRIUS, sans relais PC.")
+        kitchen = getattr(request.state, "haccp_kitchen", None)
+        if kitchen is None:
+            raise HTTPException(403, "Impression mobile reservee au QR Cuisine.")
+        return _actor(request, scope), kitchen["restaurant_name"]
+
+    def mobile_response(
+        db: Session, job: HaccpPrintJob, row: EtiquetteHaccp, actor: str, device_id: uuid.UUID,
+    ) -> dict:
+        target = db.get(HaccpMobilePrintTarget, job.id)
+        response = {"job": _job_response(job, _job_transport(db, job))}
+        if (target is not None and target.actor_id == actor and target.device_id == str(device_id)
+                and job.status == "pending"):
+            response["html"] = construire_etiquette_mobile(_response(row, "/api/haccp/registre"))
+        return response
+
+    @router.post("/mobile/demandes")
+    async def mobile_enqueue(
+        body: MobilePrintRequest, request: Request,
+        scope: str = Depends(resolve_scope), db: Session = Depends(get_db),
+    ) -> dict:
+        actor, restaurant = mobile_kitchen(request, scope)
+        if not body.reviewed:
+            raise HTTPException(422, "Relisez le produit, les dates et les conditions avant impression.")
+        with database_errors(db):
+            row = _valid_label(db, scope, body.label_id, restaurant)
+            existing = db.scalar(select(HaccpPrintJob).where(
+                HaccpPrintJob.scope_key == scope, HaccpPrintJob.label_id == row.id,
+            ))
+            if existing is not None:
+                return mobile_response(db, existing, row, actor, body.device_id)
+            job = HaccpPrintJob(
+                id=str(uuid.uuid4()), scope_key=scope, label_id=row.id,
+                relay_id=str(body.device_id), status="pending", created_at=_now(),
+            )
+            db.add(job)
+            db.add(HaccpMobilePrintTarget(job_id=job.id, device_id=str(body.device_id), actor_id=actor))
+            try:
+                db.commit()
+            except IntegrityError:
+                db.rollback()
+                existing = db.scalar(select(HaccpPrintJob).where(
+                    HaccpPrintJob.scope_key == scope, HaccpPrintJob.label_id == row.id,
+                ))
+                if existing is None:
+                    raise
+                return mobile_response(db, existing, row, actor, body.device_id)
+            return mobile_response(db, job, row, actor, body.device_id)
+
+    @router.post("/mobile/demandes/{job_id}/prise")
+    async def mobile_claim(
+        job_id: uuid.UUID, body: DeviceIdentity, request: Request,
+        scope: str = Depends(resolve_scope), db: Session = Depends(get_db),
+    ) -> dict:
+        actor, restaurant = mobile_kitchen(request, scope)
+        with database_errors(db):
+            job = db.scalar(select(HaccpPrintJob).join(
+                HaccpMobilePrintTarget, HaccpMobilePrintTarget.job_id == HaccpPrintJob.id,
+            ).join(
+                EtiquetteHaccp, EtiquetteHaccp.id == HaccpPrintJob.label_id,
+            ).where(
+                HaccpPrintJob.id == str(job_id), HaccpPrintJob.scope_key == scope,
+                EtiquetteHaccp.scope_key == scope, EtiquetteHaccp.restaurant_name == restaurant,
+                HaccpMobilePrintTarget.device_id == str(body.device_id),
+                HaccpMobilePrintTarget.actor_id == actor,
+            ))
+            if job is None:
+                raise HTTPException(404, "Demande mobile introuvable pour ce telephone.")
+            if job.status != "pending":
+                return {"job": None, "state": _job_response(job, "mobile")}
+            try:
+                row = _valid_label(db, scope, job.label_id, restaurant)
+                record = _response(row, "/api/haccp/registre")
+                now = _now().replace(tzinfo=timezone.utc)
+                try:
+                    verifier_etiquette_imprimable(record, now)
+                except ValueError as error:
+                    raise HTTPException(422, str(error)) from error
+                valid_for_ms = int((record.dlc_secondaire - now).total_seconds() * 1000)
+                if valid_for_ms <= 0:
+                    raise HTTPException(422, "DLC depassee : impression d'utilisation refusee.")
+                html = construire_etiquette_mobile(record)
+            except HTTPException as error:
+                db.execute(update(HaccpPrintJob).where(
+                    HaccpPrintJob.id == job.id, HaccpPrintJob.status == "pending",
+                ).values(status="cancelled", detail=str(error.detail)))
+                db.commit()
+                db.refresh(job)
+                return {"job": None, "state": _job_response(job, "mobile")}
+            changed = db.execute(update(HaccpPrintJob).where(
+                HaccpPrintJob.id == job.id, HaccpPrintJob.status == "pending",
+            ).values(
+                status="uncertain", claimed_at=_now(),
+                detail="Apercu pret sur le telephone ; sortie papier non confirmee. Verifiez avant toute reimpression.",
+            ))
+            db.commit()
+            db.refresh(job)
+            if changed.rowcount != 1:
+                return {"job": None, "state": _job_response(job, "mobile")}
+            return {"job": _job_response(job, "mobile"), "html": html, "valid_for_ms": valid_for_ms}
 
     def android_only(request: Request, scope: str) -> str:
         if cloud_link.relay_allowed():
@@ -331,8 +456,7 @@ def make_haccp_print_router(
                 HaccpPrintJob.scope_key == scope, HaccpPrintJob.label_id == row.id,
             ))
             if existing is not None:
-                target = db.get(HaccpAndroidPrintTarget, existing.id)
-                return _job_response(existing, "android" if target else "windows")
+                return _job_response(existing, _job_transport(db, existing))
             job = HaccpPrintJob(
                 id=str(uuid.uuid4()), scope_key=scope, label_id=row.id,
                 relay_id=str(body.device_id), status="pending", created_at=_now(),
@@ -348,12 +472,12 @@ def make_haccp_print_router(
                 ))
                 if existing is None:
                     raise
-                return _job_response(existing, "android" if db.get(HaccpAndroidPrintTarget, existing.id) else "windows")
+                return _job_response(existing, _job_transport(db, existing))
             return _job_response(job, "android")
 
     @router.post("/android/demandes/{job_id}/prise")
     async def android_claim(
-        job_id: uuid.UUID, body: AndroidIdentity, request: Request,
+        job_id: uuid.UUID, body: DeviceIdentity, request: Request,
         scope: str = Depends(resolve_scope), db: Session = Depends(get_db),
     ) -> dict:
         actor = android_only(request, scope)

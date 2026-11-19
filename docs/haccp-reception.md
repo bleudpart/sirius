@@ -322,6 +322,51 @@ memes donnees et UUID ; consulter le registre avant toute autre tentative.
 Les confirmations et l'anti-doublon d'impression Windows / Android existants
 sont reutilises. Aucune impression n'est declenchee par la distribution.
 
+### Brother depuis le QR Cuisine
+
+Sur chaque telephone, ouvrir le QR Cuisine puis activer une fois
+« Imprimer depuis ce telephone, sans PC » dans le reglage Brother. Le choix
+reste local au navigateur ; sans activation, le relais Windows existant reste
+utilise. Le telephone et la QL-820NWBc doivent pouvoir communiquer sur le
+meme Wi-Fi, sans isolation entre appareils. Sur iPhone, choisir la Brother
+par AirPrint ; sur Android, installer et activer le service d'impression
+Brother officiel.
+
+Pour une ouverture ou preparation valide, relire la fiche, demander l'apercu,
+puis cliquer sur « Imprimer sur la Brother ». Le document demande une
+etiquette de 62 × 50 mm sur bande continue DK-22205. Si le texte depasse
+l'apercu, aucune impression n'est lancee. Le dialogue systeme peut cependant
+ignorer ce format : verifier son apercu, la taille, la lisibilite, la coupe et
+la sortie papier sur les deux telephones avant utilisation.
+
+Le navigateur ne prouve ni l'envoi ni la sortie papier : la demande reste
+`uncertain`, sans confirmation `accepted`, et n'est pas recomptee comme une
+impression confirmee. En cas d'annulation, d'erreur ou de perte de connexion,
+verifier le papier et le registre avant toute autre action ; aucune
+reimpression automatique n'est effectuee. Le QR reste limite a son
+etablissement et le relais Windows ne traite pas cette demande mobile.
+
+### Liste partagee des preparations
+
+Depuis la page Etiquettes, dans **Preparation**, le chef connecte ou un
+telephone utilisant le QR Cuisine peut creer et modifier la liste de son
+etablissement, une preparation par ligne. Avant de l'enregistrer, il
+confirme que la duree commune et la reference PMS indiquees sont valides
+pour chaque produit, y compris les ajouts. La liste est partagee entre les
+telephones du meme etablissement, jamais pre-remplie pour les autres.
+Une version evite qu'une modification concurrente soit ecrasee sans avertir ;
+la suppression de noms demande confirmation. Une preparation choisie depuis
+une ancienne version est refusee si la liste a change entre-temps : il faut
+recharger et verifier la regle avant de l'enregistrer.
+
+Le choix d'une preparation renseigne la duree et la reference confirmees.
+Il n'invente aucune temperature : l'etiquette indique de consulter les
+conditions du PMS en vigueur. L'operateur indique l'heure reelle de
+fabrication, ou choisit « Fabrication maintenant » uniquement si c'est
+effectivement le cas, puis confirme la regle. Une duree de 72 heures
+represente exactement 72 heures ecoulees, pas trois fins de journee. La DLC
+interne calculee est ensuite affichee pour verification avant impression.
+
 ## Exemple complet, sans reseau ni imprimante
 
 Depuis `backend` avec l'environnement Python du projet :

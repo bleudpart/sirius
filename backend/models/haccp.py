@@ -67,3 +67,15 @@ class HaccpDeliveryDocument(Base):
     image_path: Mapped[str] = mapped_column(String(512))
     image_sha256: Mapped[str] = mapped_column(String(64))
     document: Mapped[dict] = mapped_column(JSON)
+
+
+class HaccpPreparationList(Base):
+    __tablename__ = "haccp_preparation_lists"
+
+    scope_key: Mapped[str] = mapped_column(String(255), primary_key=True)
+    restaurant_name: Mapped[str] = mapped_column(String(160), primary_key=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    noms: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    duree_heures: Mapped[int] = mapped_column(Integer, nullable=False)
+    reference_pms: Mapped[str] = mapped_column(String(500), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)

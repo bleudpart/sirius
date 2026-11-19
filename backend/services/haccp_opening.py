@@ -94,7 +94,7 @@ def _article_etiquette(record: EtiquetteResponse) -> str:
         ("Lot", record.numero_lot),
         ("Fabrication" if preparation else "Ouverture enregistree",
          horodatage(record.date_fabrication if preparation else record.date_ouverture)),
-        ("DLC au plus tard" if preparation else "DLC secondaire au plus tard", horodatage(record.dlc_secondaire)),
+        ("DLC interne au plus tard" if preparation else "DLC secondaire au plus tard", horodatage(record.dlc_secondaire)),
         ("Operateur", record.operateur),
         ("Conditions de conservation" if preparation else "Consigne de stockage d'origine",
          _conditions_stockage(record)),
@@ -132,7 +132,7 @@ def construire_fragment_impression(record: EtiquetteResponse) -> str:
     fields = [
         ("Lot", record.numero_lot),
         ("Fabrication" if preparation else "Ouvert", stamp(record.date_fabrication if preparation else record.date_ouverture)),
-        ("DLC" if preparation else "Au plus tard", stamp(record.dlc_secondaire)),
+        ("DLC interne" if preparation else "Au plus tard", stamp(record.dlc_secondaire)),
         ("Operateur", record.operateur),
     ]
     if preparation:
@@ -148,4 +148,16 @@ def construire_fragment_impression(record: EtiquetteResponse) -> str:
         "<footer>Europe/Paris · Respecter les consignes fabricant/PMS."
         + (" Regle declaree conservee au registre." if preparation else " Regle et original conserves au registre.")
         + "</footer></article>"
+    )
+
+
+def construire_etiquette_mobile(record: EtiquetteResponse) -> str:
+    return (
+        '<!doctype html><html lang="fr"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        '<title>ΣIRIUS — Étiquette</title>'
+        '<style>@page{size:62mm 50mm;margin:0}'
+        'html,body{width:62mm;margin:0}article{width:58.9mm;margin:0 auto;break-inside:avoid}'
+        '</style></head><body>'
+        + construire_fragment_impression(record) + "</body></html>"
     )

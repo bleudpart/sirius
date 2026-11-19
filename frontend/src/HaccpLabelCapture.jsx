@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Camera, PackageCheck, Scissors, Printer, RotateCcw, ScanLine, LoaderCircle } from "lucide-react";
 import { API_BASE_URL } from "./lib/api";
 import { printHaccpDocument } from "./haccpDocuments";
-import HaccpPrinter, { haccpPrintRequest, haccpPrintStatus, printHaccpLabel } from "./HaccpPrinter";
+import HaccpPrinter, { haccpPrintRequest, haccpPrintStatus, MobileHaccpLabelPrinter, printHaccpLabel } from "./HaccpPrinter";
 import { checkHaccpResponse, haccpFetch } from "./haccpRequest";
 import HaccpReceptionStatus from "./HaccpReceptionStatus";
 import "./HaccpWorkspace.css";
@@ -23,6 +23,8 @@ export default function HaccpLabelCapture({
   onScanAgain,
   originalPhotoUrl = "",
   kitchenToken = "",
+  mobilePrinting = false,
+  onPrintBusyChange,
   operations = ["reception", "ouverture"],
 }) {
   const [mode, setMode] = useState(operations[0]);
@@ -412,7 +414,7 @@ export default function HaccpLabelCapture({
         {(result.type_operation === "ouverture" || isPreparation) && <>
           {isPreparation ? <>
             <p>Fabrication : {displayTime(result.date_fabrication, true)}</p>
-            <p>DLC exacte : {displayTime(result.dlc_secondaire, true)} (Europe/Paris)</p>
+            <p>DLC interne exacte : {displayTime(result.dlc_secondaire, true)} (Europe/Paris)</p>
             <p>Conditions de conservation : {result.conditions_conservation}</p>
           </> : <p>Ouverture : {displayTime(result.date_ouverture)} · DLC secondaire : {displayTime(result.dlc_secondaire)} (Europe/Paris)</p>}
           <p>{!isPreparation && (kitchenMode || kitchenToken) ? "Consigne fabricant lue" : "Durée déclarée"} : {result.duree_conservation_heures ?? "Non renseignée"} h · Référence : {result.justification_duree || "Aucune"}</p>
@@ -420,12 +422,18 @@ export default function HaccpLabelCapture({
           {result.dlc_secondaire && result.conforme_reception && <>
             <p>{isPreparation ? "Vérifiez le produit, le lot, la fabrication, la DLC et les conditions avant d’imprimer."
               : "Vérifiez la photo, le produit, le lot et les dates avant de valider."}</p>
-            <button className={`haccp-primary${kitchenMode ? " haccp-kitchen-print" : ""}`} disabled={busy || !!printState} onClick={queuePrint}>
-              <Printer size={20} aria-hidden="true" />{kitchenMode
-                ? "J’ai vérifié le produit, le lot et la DLC — imprimer"
-                : "J’ai vérifié : valider et imprimer"}
-            </button>
-            {printState && <button disabled={busy} onClick={checkPrintState}>Voir l’état d’impression</button>}
+            {kitchenToken && mobilePrinting ? <MobileHaccpLabelPrinter labelId={result.id} kitchenToken={kitchenToken}
+              busy={busy} onBusyChange={(value) => { setBusy(value); onPrintBusyChange?.(value); }}
+              className={`haccp-primary${kitchenMode ? " haccp-kitchen-print" : ""}`}
+              label={kitchenMode ? "J’ai vérifié le produit, le lot et la DLC — préparer"
+                : "J’ai vérifié : préparer l’impression"} /> : <>
+              <button className={`haccp-primary${kitchenMode ? " haccp-kitchen-print" : ""}`} disabled={busy || !!printState} onClick={queuePrint}>
+                <Printer size={20} aria-hidden="true" />{kitchenMode
+                  ? "J’ai vérifié le produit, le lot et la DLC — imprimer"
+                  : "J’ai vérifié : valider et imprimer"}
+              </button>
+              {printState && <button disabled={busy} onClick={checkPrintState}>Voir l’état d’impression</button>}
+            </>}
             {!kitchenMode && !kitchenToken && <details><summary>Secours manuel (risque de doublon)</summary><p>Uniquement si aucune demande n’a été envoyée au relais. Vérifiez le registre et le papier avant toute impression manuelle.</p><button disabled={busy || !!printState} onClick={print}>Imprimer l’étiquette {isPreparation ? "de préparation" : "d’ouverture"} manuellement</button></details>}
           </>}
           {printState && <p role="status">{printState}</p>}
