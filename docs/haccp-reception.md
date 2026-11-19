@@ -338,6 +338,9 @@ etiquette de 62 × 50 mm sur bande continue DK-22205. Si le texte depasse
 l'apercu, aucune impression n'est lancee. Le dialogue systeme peut cependant
 ignorer ce format : verifier son apercu, la taille, la lisibilite, la coupe et
 la sortie papier sur les deux telephones avant utilisation.
+Le [service d'impression Android de Brother](https://support.brother.com/g/b/faqend.aspx?c=us&lang=en&prod=lpql820nwbeus&faqid=faqp00100485_000)
+liste notamment 62 × 1 000, 62 × 29 et 62 × 100 mm, mais pas 62 × 50 mm.
+La dimension et la coupe de l'etiquette demandee ne sont donc pas garanties.
 
 Le navigateur ne prouve ni l'envoi ni la sortie papier : la demande reste
 `uncertain`, sans confirmation `accepted`, et n'est pas recomptee comme une

@@ -4932,5 +4932,6 @@
   "Vérifiez le papier avant toute nouvelle demande.": "Check the paper before making another request.",
   "Aucune impression n’a été lancée depuis ce téléphone.": "No print was started from this phone.",
   "Confirmation de l'appareil absente. Verifiez le papier, sans reemission automatique.": "Device confirmation missing. Check the paper; do not resend automatically.",
-  "Apercu pret sur le telephone ; sortie papier non confirmee. Verifiez avant toute reimpression.": "Preview ready on the phone; paper output not confirmed. Check before reprinting."
+  "Apercu pret sur le telephone ; sortie papier non confirmee. Verifiez avant toute reimpression.": "Preview ready on the phone; paper output not confirmed. Check before reprinting.",
+  "Sur Android, le service Brother ne liste pas le format 62 × 50 mm : vérifiez la taille et la coupe sur papier.": "On Android, the Brother service does not list the 62 × 50 mm size: check the size and cut on paper."
 }

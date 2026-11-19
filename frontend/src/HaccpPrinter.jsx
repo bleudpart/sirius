@@ -222,6 +222,7 @@ export function MobileHaccpLabelPrinter({ labelId, kitchenToken, busy, onBusyCha
     </button>}
     {preview && <>
       <p>Aperçu 62 × 50 mm · Choisissez la Brother et vérifiez que tout tient sur une seule étiquette.</p>
+      <p className="haccp-notice">Sur Android, le service Brother ne liste pas le format 62 × 50 mm : vérifiez la taille et la coupe sur papier.</p>
       <div className="haccp-mobile-preview">
         <iframe ref={frame} title="Aperçu de l’étiquette Brother" srcDoc={preview.html}
           sandbox="allow-same-origin allow-modals" onLoad={previewLoaded} />

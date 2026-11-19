@@ -163,6 +163,7 @@ test("QR mobile shows translated overflow and paper-check warnings", async () =>
   const warning = host.querySelector('[role="alert"]').textContent;
   expect(warning).toContain("லேபிள் மிக நீளமானது");
   expect(warning).toContain("மீண்டும் கோருவதற்கு முன் காகிதத்தைச் சரிபார்க்கவும்");
+  expect(host.textContent).toContain("Android-இல் Brother சேவை 62 × 50 mm அளவைப் பட்டியலிடவில்லை");
 });
 
 test("QR mobile refuses printing after expiry", async () => {

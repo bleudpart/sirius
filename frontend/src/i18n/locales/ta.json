@@ -4932,5 +4932,6 @@
   "Vérifiez le papier avant toute nouvelle demande.": "மீண்டும் கோருவதற்கு முன் காகிதத்தைச் சரிபார்க்கவும்.",
   "Aucune impression n’a été lancée depuis ce téléphone.": "இந்தத் தொலைபேசியிலிருந்து அச்சிடுதல் தொடங்கப்படவில்லை.",
   "Confirmation de l'appareil absente. Verifiez le papier, sans reemission automatique.": "சாதன உறுதிப்படுத்தல் இல்லை. காகிதத்தைச் சரிபார்க்கவும்; தானாக மீண்டும் அனுப்ப வேண்டாம்.",
-  "Apercu pret sur le telephone ; sortie papier non confirmee. Verifiez avant toute reimpression.": "தொலைபேசியில் முன்னோட்டம் தயார்; காகித அச்சு உறுதிசெய்யப்படவில்லை. மீண்டும் அச்சிடுவதற்கு முன் சரிபார்க்கவும்."
+  "Apercu pret sur le telephone ; sortie papier non confirmee. Verifiez avant toute reimpression.": "தொலைபேசியில் முன்னோட்டம் தயார்; காகித அச்சு உறுதிசெய்யப்படவில்லை. மீண்டும் அச்சிடுவதற்கு முன் சரிபார்க்கவும்.",
+  "Sur Android, le service Brother ne liste pas le format 62 × 50 mm : vérifiez la taille et la coupe sur papier.": "Android-இல் Brother சேவை 62 × 50 mm அளவைப் பட்டியலிடவில்லை: காகிதத்தின் அளவையும் வெட்டையும் சரிபார்க்கவும்."
 }
