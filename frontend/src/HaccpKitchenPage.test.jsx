@@ -38,7 +38,7 @@ test("the token from the QR code is remembered and opens the simple kitchen scre
   expect(localStorage.getItem(KITCHEN_STORAGE_KEY)).toBe(TOKEN);
   expect(host.textContent).toContain("PHOTO");
   expect(host.textContent).toContain("RETROUVER");
-  expect(host.textContent).toContain("OUVERTURE");
+  expect(host.textContent).toContain("Ouverture produit");
   expect(host.textContent).toContain("PRÉPARATION");
   // Le cuisinier ne doit jamais tomber sur la connexion chef (/haccp) depuis le QR code.
   expect(host.textContent).not.toContain("Mode complet");
@@ -60,7 +60,7 @@ test("scanning a QR in an already open cuisine tab activates its token without l
     window.history.replaceState(null, "", `/cuisine#k=${TOKEN}`);
     window.dispatchEvent(new Event("hashchange"));
   });
-  expect(host.textContent).toContain("OUVERTURE");
+  expect(host.textContent).toContain("Ouverture produit");
   expect(global.fetch.mock.calls[0][1].headers).toEqual({ "X-Sirius-Cuisine": TOKEN });
 });
 

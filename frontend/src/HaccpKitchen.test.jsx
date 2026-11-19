@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import HaccpKitchen, { dayLabel, kitchenReason } from "./HaccpKitchen";
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
-let host, root, oldFetch, oldCrypto;
+let host, root, oldFetch, oldCrypto, oldImageCapture;
 const button = (text) => [...host.querySelectorAll("button")].find((item) => item.textContent.includes(text) || item.getAttribute("aria-label") === text);
 const reply = (value, ok = true, status = ok ? 200 : 500) => ({
   ok, status, json: async () => value,
@@ -18,6 +18,7 @@ async function pickPhoto() {
 beforeEach(() => {
   oldFetch = global.fetch;
   oldCrypto = global.crypto;
+  oldImageCapture = window.ImageCapture;
   delete navigator.mediaDevices;
   global.crypto = { randomUUID: jest.fn()
     .mockReturnValueOnce("11111111-1111-4111-8111-111111111111")
@@ -27,7 +28,7 @@ beforeEach(() => {
 });
 afterEach(async () => {
   await act(async () => root.unmount());
-  host.remove(); global.fetch = oldFetch; global.crypto = oldCrypto; jest.restoreAllMocks();
+  host.remove(); global.fetch = oldFetch; global.crypto = oldCrypto; window.ImageCapture = oldImageCapture; jest.restoreAllMocks();
 });
 
 test("a photo is analysed and saved at once, without operator, rule or confirmation", async () => {
@@ -40,6 +41,7 @@ test("a photo is analysed and saved at once, without operator, rule or confirmat
   expect(url).toMatch(/\/haccp\/etiquettes\/scan$/);
   expect(options.method).toBe("POST");
   expect(options.body.get("operateur")).toBe("Cuisine");
+  expect(options.body.get("operateur_compte")).toBe("true");
   expect(options.body.get("restaurant_name")).toBe("Le Papillon");
   expect(JSON.parse(options.body.get("operation"))).toEqual({ type_operation: "reception" });
   expect(host.textContent).toContain("Enregistré");
@@ -47,6 +49,49 @@ test("a photo is analysed and saved at once, without operator, rule or confirmat
   expect(host.textContent).toContain("12/11/2026");
   expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ id: 4 }));
   expect(button("PHOTO").disabled).toBe(false);
+});
+
+test("the camera uses a still photo when supported instead of a video frame", async () => {
+  const track = { stop: jest.fn() };
+  navigator.mediaDevices = { getUserMedia: jest.fn().mockResolvedValue({
+    getTracks: () => [track], getVideoTracks: () => [track],
+  }) };
+  jest.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+  const takePhoto = jest.fn().mockResolvedValue(new Blob(["full-resolution"], { type: "image/jpeg" }));
+  window.ImageCapture = jest.fn(() => ({ takePhoto }));
+  global.fetch = jest.fn(async () => reply({ id: 4, nom_produit: "Saumon", conforme_reception: true }));
+  await act(async () => root.render(<HaccpKitchen establishmentName="Le Papillon" />));
+  const video = host.querySelector("video");
+  Object.defineProperty(video, "videoWidth", { configurable: true, value: 1920 });
+  Object.defineProperty(video, "videoHeight", { configurable: true, value: 1080 });
+  await act(async () => button("PHOTO").click());
+  expect(navigator.mediaDevices.getUserMedia.mock.calls[0][0].video.width.ideal).toBe(3840);
+  expect(window.ImageCapture).toHaveBeenCalledWith(track);
+  expect(takePhoto).toHaveBeenCalledWith({ imageWidth: 3840, imageHeight: 2160 });
+  expect(global.fetch.mock.calls[0][1].body.get("file").size).toBe("full-resolution".length);
+  expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(1);
+});
+
+test("if still capture fails, the user is told and the video frame is sent instead", async () => {
+  const track = { stop: jest.fn() };
+  navigator.mediaDevices = { getUserMedia: jest.fn().mockResolvedValue({
+    getTracks: () => [track], getVideoTracks: () => [track],
+  }) };
+  jest.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+  const warning = jest.spyOn(console, "warn").mockImplementation(() => {});
+  window.ImageCapture = jest.fn(() => ({ takePhoto: jest.fn().mockRejectedValue(new Error("not supported")) }));
+  global.fetch = jest.fn(async () => reply({ id: 4, nom_produit: "Saumon", conforme_reception: true }));
+  await act(async () => root.render(<HaccpKitchen establishmentName="Le Papillon" />));
+  const video = host.querySelector("video");
+  Object.defineProperty(video, "videoWidth", { configurable: true, value: 1920 });
+  Object.defineProperty(video, "videoHeight", { configurable: true, value: 1080 });
+  const canvas = host.querySelector(".haccp-simple-camera canvas");
+  Object.defineProperty(canvas, "getContext", { configurable: true, value: () => ({ drawImage: jest.fn() }) });
+  Object.defineProperty(canvas, "toBlob", { configurable: true, value: (done) => done(new Blob(["frame"], { type: "image/jpeg" })) });
+  await act(async () => button("PHOTO").click());
+  expect(warning).toHaveBeenCalled();
+  expect(host.textContent).toContain("Photo haute résolution indisponible");
+  expect(global.fetch.mock.calls[0][1].body.get("file").size).toBe("frame".length);
 });
 
 test("STOCK entries opens the same establishment register without leaving the QR kitchen", async () => {
@@ -188,37 +233,74 @@ const opened = {
   dlc_secondaire: "2026-11-05T10:00:00Z", duree_conservation_heures: 72, justification_duree: "Notice fabricant",
 };
 
-test("OUVERTURE creates an opening label with the QR token and prints through the restaurant PC", async () => {
+test("the shared photo screen analyses an opening and prints after review", async () => {
   navigator.mediaDevices = { getUserMedia: jest.fn().mockResolvedValue({ getTracks: () => [{ stop: jest.fn() }] }) };
   jest.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
   global.fetch = jest.fn(async (url) => url.endsWith("/impression/demandes")
     ? reply({ id: "j1", label_id: 9, status: "pending", transport: "windows" })
     : reply(opened));
   await act(async () => root.render(<HaccpKitchen kitchenToken="jeton-cuisine-0123456789" establishmentName="Le Papillon" />));
-  await act(async () => button("OUVERTURE").click());
-  expect(host.textContent).toContain("Cuisine · Ouverture d’un produit");
-  expect(button("Réception")).toBeUndefined();
+  const video = host.querySelector("video");
+  await act(async () => button("Ouverture produit").click());
+  expect(host.querySelector("video")).toBe(video);
+  expect(button("Réception")).not.toBeUndefined();
   expect([...host.querySelectorAll("label")].some((label) => label.textContent.startsWith("Opérateur"))).toBe(false);
   expect(host.querySelectorAll('input:not([type=file]),textarea')).toHaveLength(0);
-  expect(host.textContent).toContain("calcule la DLC automatiquement");
-  const video = host.querySelector("video");
+  expect(host.textContent).toContain("Photographiez aussi la consigne");
   Object.defineProperty(video, "videoWidth", { configurable: true, value: 1920 });
   Object.defineProperty(video, "videoHeight", { configurable: true, value: 1080 });
-  const canvas = host.querySelector("canvas.haccp-capture-canvas");
+  const canvas = host.querySelector(".haccp-simple-camera canvas");
   Object.defineProperty(canvas, "getContext", { configurable: true, value: () => ({ drawImage: jest.fn() }) });
   Object.defineProperty(canvas, "toBlob", { configurable: true, value: (done) => done(new Blob(["p"], { type: "image/jpeg" })) });
-  await act(async () => button("Capturer l’étiquette").click());
+  await act(async () => button("PHOTO").click());
   const [scanUrl, scan] = global.fetch.mock.calls[0];
   expect(scanUrl).toMatch(/\/etiquettes\/scan$/);
   expect(scan.headers).toEqual(TOKEN_HEADER);
+  expect(scan.body.get("operateur_compte")).toBeNull();
   expect(JSON.parse(scan.body.get("operation"))).toEqual({ type_operation: "ouverture" });
   expect(scan.body.get("ouverture_automatique")).toBe("true");
+  expect(host.querySelector('img[alt="Photo originale à relire avant validation"]').src).toContain("blob:photo");
+  expect(host.textContent).toContain("Crème");
   await act(async () => button("J’ai vérifié le produit, le lot et la DLC").click());
   const [printUrl, print] = global.fetch.mock.calls[1];
   expect(printUrl).toMatch(/\/haccp\/impression\/demandes$/);
   expect(print.headers).toEqual({ "Content-Type": "application/json", ...TOKEN_HEADER });
   expect(JSON.parse(print.body)).toEqual({ label_id: 9, reviewed: true });
   expect(host.textContent).toContain("En attente du poste Windows");
+  await act(async () => button("Scanner une autre étiquette").click());
+  expect(host.querySelector(".haccp-simple-shoot")).not.toBeNull();
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:photo");
+});
+
+test("an opening without a readable rule keeps the product but cannot be printed", async () => {
+  global.fetch = jest.fn(async () => reply({
+    ...opened, conforme_reception: false, dlc_secondaire: null,
+    commentaire_anomalie: "Consigne fabricant illisible.",
+  }));
+  await act(async () => root.render(<HaccpKitchen establishmentName="Le Papillon" />));
+  await act(async () => button("Ouverture produit").click());
+  await pickPhoto();
+  expect(global.fetch.mock.calls[0][1].body.get("ouverture_automatique")).toBe("true");
+  expect(global.fetch.mock.calls[0][1].body.get("operateur_compte")).toBe("true");
+  expect(host.textContent).toContain("Crème");
+  expect(host.textContent).toContain("Consigne fabricant illisible.");
+  expect(button("J’ai vérifié")).toBeUndefined();
+  await act(async () => button("Scanner une autre étiquette").click());
+  expect(host.querySelector(".haccp-simple-shoot")).not.toBeNull();
+});
+
+test("an opening retry keeps the original operation and capture id after switching modes", async () => {
+  global.fetch = jest.fn().mockRejectedValueOnce(new Error("Connexion coupée")).mockResolvedValueOnce(reply(opened));
+  await act(async () => root.render(<HaccpKitchen establishmentName="Le Papillon" />));
+  await act(async () => button("Ouverture produit").click());
+  await pickPhoto();
+  await act(async () => button("Réception").click());
+  await act(async () => button("Encore").click());
+  const [first, second] = global.fetch.mock.calls.map(([, options]) => options.body);
+  expect(second.get("capture_id")).toBe(first.get("capture_id"));
+  expect(JSON.parse(second.get("operation"))).toEqual({ type_operation: "ouverture" });
+  expect(second.get("ouverture_automatique")).toBe("true");
+  expect(host.textContent).toContain("Crème");
 });
 
 test("PRÉPARATION saves the preparation with the QR token and without an operator field", async () => {
@@ -250,7 +332,7 @@ test("PRÉPARATION saves the preparation with the QR token and without an operat
   expect(options.headers).toEqual({ "Content-Type": "application/json", ...TOKEN_HEADER });
   expect(host.textContent).toContain("J’ai vérifié");
   await act(async () => button("PHOTO").click());
-  expect(button("OUVERTURE")).not.toBeUndefined();
+  expect(button("Ouverture produit")).not.toBeUndefined();
 });
 
 test("invoice photo is archived with visible products and lots, then retrieved without account", async () => {
@@ -299,7 +381,7 @@ test("a timed-out document upload retries the same photo and capture ID, not the
   await act(async () => root.render(<HaccpKitchen kitchenToken="jeton-cuisine-0123456789" establishmentName="Le Papillon" />));
   await act(async () => button("Facture / Bon").click());
   await pickPhoto();
-  await act(async () => button("Étiquette produit").click());
+  await act(async () => button("Réception").click());
   await act(async () => button("Encore").click());
   expect(global.fetch.mock.calls[0][0]).toBe(global.fetch.mock.calls[1][0]);
   expect(global.fetch.mock.calls[0][1].body.get("capture_id")).toBe(global.fetch.mock.calls[1][1].body.get("capture_id"));

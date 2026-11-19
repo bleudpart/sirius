@@ -227,15 +227,15 @@ body:has(.haccp-standalone) {
 /* Écran cuisine simplifié : gros pictogrammes, très peu de texte. */
 .haccp-workspace-simple { gap: 14px; }
 .haccp-simple { display: grid; gap: 14px; }
+.haccp-simple-modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.haccp-ui .haccp-simple-modes button { min-height: 76px; padding: 8px 4px; flex-direction: column; gap: 4px; line-height: 1.2; text-align: center; }
 .haccp-simple-camera { position: relative; overflow: hidden; min-height: min(52vh, 520px); border: 2px solid var(--haccp-border); border-radius: 16px; background: #02070d; }
-.haccp-simple-camera video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.haccp-simple-camera video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .haccp-simple-camera.is-busy video { filter: brightness(.45); }
 .haccp-simple-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; margin: 0; padding: 16px; color: #fff; font-size: 26px; font-weight: 700; text-align: center; }
 .haccp-ui .haccp-simple-shoot, .haccp-ui .haccp-simple-find, .haccp-ui .haccp-simple-back { display: flex; align-items: center; justify-content: center; gap: 18px; width: 100%; border-radius: 18px; font-size: 30px; font-weight: 800; letter-spacing: .04em; cursor: pointer; }
 .haccp-ui .haccp-simple-shoot { min-height: 132px; padding: 18px; border: 0; background: #2fb36a; color: #04140a; box-shadow: 0 8px 24px rgba(47, 179, 106, .35); }
 .haccp-ui .haccp-simple-shoot:disabled { background: #4b5b52; color: #cfd8d2; box-shadow: none; }
-.haccp-ui .haccp-simple-dlc { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 88px; border: 2px solid var(--haccp-gold, #c5a059); border-radius: 18px; background: #081522; color: var(--haccp-gold, #c5a059); cursor: pointer; touch-action: manipulation; }
-.haccp-ui .haccp-simple-dlc:disabled { opacity: .5; }
 .haccp-ui .haccp-simple-find, .haccp-ui .haccp-simple-back { min-height: 96px; padding: 14px; border: 2px solid var(--haccp-border); background: #0d2236; color: #dff1ff; }
 .haccp-simple-result { display: flex; align-items: center; gap: 16px; padding: 18px; border-radius: 16px; font-size: 22px; }
 .haccp-simple-result strong { display: block; font-size: 26px; }
@@ -270,6 +270,6 @@ body:has(.haccp-standalone) {
 @media (max-width: 600px) {
   .haccp-workspace.haccp-workspace-simple { padding: 6px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; gap: 10px; }
   .haccp-simple { gap: 10px; }
-  .haccp-simple-camera { min-height: min(64vh, 640px); border-width: 1px; border-radius: 12px; }
-  .haccp-ui .haccp-simple-shoot { min-height: 112px; }
+  .haccp-simple-camera { min-height: min(42vh, 420px); border-width: 1px; border-radius: 12px; }
+  .haccp-ui .haccp-simple-shoot { min-height: 90px; }
 }

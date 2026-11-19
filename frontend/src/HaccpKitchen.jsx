@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowLeft, Camera, CheckCircle2, ClipboardList, CookingPot, FileText, ImageIcon, LoaderCircle, RotateCcw, Scissors, Search, Settings, Tag, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Camera, CheckCircle2, ClipboardList, CookingPot, FileText, ImageIcon, LoaderCircle, PackageCheck, RotateCcw, Scissors, Search, Settings, X } from "lucide-react";
 import HaccpLabelCapture from "./HaccpLabelCapture";
 import HaccpPreparation from "./HaccpPreparation";
 import HaccpReleves from "./HaccpReleves";
@@ -80,7 +80,7 @@ export function kitchenReason(record) {
 }
 
 // Écran cuisine : photo → analyse → enregistrement automatique, sans formulaire ni confirmation.
-export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, onFullMode, onDlcSnap, onRelevesDirtyChange, kitchenToken = "" }) {
+export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, onFullMode, onRelevesDirtyChange, kitchenToken = "" }) {
   const auth = useMemo(() => kitchenToken ? { headers: { "X-Sirius-Cuisine": kitchenToken } } : {}, [kitchenToken]);
   const [view, setView] = useState("camera");
   const [source, setSource] = useState("etiquette");
@@ -93,15 +93,18 @@ export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, o
   }, [onRelevesDirtyChange]);
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState("");
+  const [cameraNotice, setCameraNotice] = useState("");
   const [cameraAttempt, setCameraAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
+  const openingResult = result?.type_operation === "ouverture";
   const [error, setError] = useState("");
   const [items, setItems] = useState([]);
   const [term, setTerm] = useState("");
   const [listBusy, setListBusy] = useState(false);
   const [listError, setListError] = useState("");
   const [photo, setPhoto] = useState(null);
+  const [openingPreview, setOpeningPreview] = useState("");
   const video = useRef(null);
   const canvas = useRef(null);
   const fileInput = useRef(null);
@@ -109,8 +112,10 @@ export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, o
   const pendingSource = useRef(null);
   const captureId = useRef(null);
   const pending = useRef(false);
+  const takingPhoto = useRef(false);
   const mounted = useRef(true);
   const photoUrl = useRef(null);
+  const openingPhotoUrl = useRef(null);
   const listRequest = useRef(0);
   const section = useRef(null);
 
@@ -124,11 +129,12 @@ export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, o
     return () => {
       mounted.current = false;
       if (photoUrl.current) URL.revokeObjectURL(photoUrl.current);
+      if (openingPhotoUrl.current) URL.revokeObjectURL(openingPhotoUrl.current);
     };
   }, []);
 
   useEffect(() => {
-    if (view !== "camera") return undefined;
+    if (view !== "camera" || openingResult) return undefined;
     let active = true;
     let cameraStream = null;
     const activeVideo = video.current;
@@ -140,7 +146,7 @@ export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, o
       }
       try {
         cameraStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false,
+          video: { facingMode: "environment", width: { ideal: 3840 }, height: { ideal: 2160 } }, audio: false,
         });
         if (!active) { cameraStream.getTracks().forEach((track) => track.stop()); return; }
         if (activeVideo) { activeVideo.srcObject = cameraStream; await activeVideo.play(); }
@@ -155,7 +161,7 @@ export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, o
       cameraStream?.getTracks().forEach((track) => track.stop());
       if (activeVideo) activeVideo.srcObject = null;
     };
-  }, [view, cameraAttempt]);
+  }, [view, cameraAttempt, openingResult]);
 
   const send = async (file) => {
     if (pending.current) return;
@@ -168,13 +174,23 @@ export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, o
     body.append("file", file);
     body.append("operateur", "Cuisine");
     body.append("restaurant_name", establishmentName.trim());
-    body.append("operation", JSON.stringify({ type_operation: "reception" }));
+    body.append("operation", JSON.stringify({ type_operation: pendingSource.current === "ouverture" ? "ouverture" : "reception" }));
+    if (pendingSource.current === "ouverture") body.append("ouverture_automatique", "true");
+    if (!kitchenToken && pendingSource.current !== "document") body.append("operateur_compte", "true");
     body.append("capture_id", captureId.current);
+    let previewUrl = null;
     try {
       const document = pendingSource.current === "document";
+      if (pendingSource.current === "ouverture") previewUrl = URL.createObjectURL(file);
       const record = await haccpFetch(`${API}/${document ? "receptions/documents" : "etiquettes/scan"}`, { ...auth, method: "POST", body },
         async (response) => (await checkHaccpResponse(response)).json());
       if (document && !validDocument(record)) throw new Error("Réponse documentaire invalide. Vérifiez les documents reçus avant de refaire la photo.");
+      if (mounted.current && record.type_operation === "ouverture" && previewUrl) {
+        if (openingPhotoUrl.current) URL.revokeObjectURL(openingPhotoUrl.current);
+        openingPhotoUrl.current = previewUrl;
+        previewUrl = null;
+        setOpeningPreview(openingPhotoUrl.current);
+      }
       pendingFile.current = null; captureId.current = null; pendingSource.current = null;
       if (mounted.current) setResult(record);
       if (!document) {
@@ -183,27 +199,52 @@ export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, o
     } catch (failure) {
       if (mounted.current) setError(failure.message || "Envoi impossible.");
     } finally {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
       pending.current = false;
       if (mounted.current) setBusy(false);
     }
   };
 
   const takePhoto = async () => {
-    if (pending.current) return;
+    if (pending.current || takingPhoto.current) return;
     if (!cameraReady) { fileInput.current?.click(); return; }
+    takingPhoto.current = true;
+    setBusy(true); setCameraNotice("");
     try {
       const activeVideo = video.current;
       const activeCanvas = canvas.current;
       if (!activeVideo?.videoWidth || !activeCanvas) throw new Error("Caméra pas prête. Réessayez.");
-      activeCanvas.width = activeVideo.videoWidth;
-      activeCanvas.height = activeVideo.videoHeight;
-      activeCanvas.getContext("2d").drawImage(activeVideo, 0, 0, activeCanvas.width, activeCanvas.height);
-      const blob = await new Promise((resolve, reject) => activeCanvas.toBlob(
-        (image) => image ? resolve(image) : reject(new Error("Photo ratée. Réessayez.")), "image/jpeg", 0.94));
+      const track = activeVideo.srcObject?.getVideoTracks?.()[0];
+      let blob;
+      if (track && typeof window.ImageCapture === "function") {
+        try {
+          blob = await new window.ImageCapture(track).takePhoto({ imageWidth: 3840, imageHeight: 2160 });
+          if (!blob?.size || !["image/jpeg", "image/png", "image/webp"].includes(blob.type)) {
+            throw new Error("Format de photo non pris en charge.");
+          }
+        } catch (failure) {
+          blob = null;
+          console.warn("[HACCP] Photo haute résolution indisponible :", failure);
+          if (mounted.current) setCameraNotice("Photo haute résolution indisponible : utilisation de l’aperçu.");
+        }
+      }
+      if (!blob) {
+        activeCanvas.width = activeVideo.videoWidth;
+        activeCanvas.height = activeVideo.videoHeight;
+        const context = activeCanvas.getContext("2d");
+        if (!context) throw new Error("Capture de la caméra indisponible.");
+        context.drawImage(activeVideo, 0, 0, activeCanvas.width, activeCanvas.height);
+        blob = await new Promise((resolve, reject) => activeCanvas.toBlob(
+          (image) => image ? resolve(image) : reject(new Error("Photo ratée. Réessayez.")), "image/jpeg", 0.94));
+      }
       captureId.current = null; pendingSource.current = null;
-      await send(new File([blob], "etiquette.jpg", { type: "image/jpeg" }));
+      const extension = blob.type === "image/png" ? "png" : blob.type === "image/webp" ? "webp" : "jpg";
+      await send(new File([blob], `etiquette.${extension}`, { type: blob.type }));
     } catch (failure) {
-      setError(failure.message);
+      if (mounted.current) setError(failure.message);
+    } finally {
+      takingPhoto.current = false;
+      if (mounted.current) setBusy(false);
     }
   };
   const pickFile = (event) => {
@@ -280,12 +321,38 @@ export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, o
 
   const ok = result?.conforme_reception;
   return <section ref={section} className="haccp-ui haccp-simple" aria-label="Cuisine — photo des étiquettes">
-    {view === "camera" && <>
-      <div className="haccp-modes" role="group" aria-label="Document de réception">
-        <button type="button" disabled={busy} aria-pressed={source === "etiquette"} onClick={() => setSource("etiquette")}>Étiquette produit</button>
-        <button type="button" disabled={busy} aria-pressed={source === "document"} onClick={() => setSource("document")}>Facture / Bon de livraison</button>
+    {view === "camera" && !openingResult && <>
+      <div className="haccp-simple-modes" role="group" aria-label="Type d’opération">
+        <button type="button" disabled={busy} aria-pressed={source === "etiquette"} onClick={() => { setSource("etiquette"); setResult(null); }}>
+          <PackageCheck size={26} aria-hidden="true" /><span>Réception</span>
+        </button>
+        <button type="button" disabled={busy} aria-pressed={source === "ouverture"} onClick={() => { setSource("ouverture"); setResult(null); }}>
+          <Scissors size={26} aria-hidden="true" /><span>Ouverture produit</span>
+        </button>
+        <button type="button" disabled={busy} aria-pressed={source === "document"} onClick={() => { setSource("document"); setResult(null); }}>
+          <FileText size={26} aria-hidden="true" /><span>Facture / Bon de livraison</span>
+        </button>
       </div>
-      <p>{source === "document" ? "Photographiez chaque page lisiblement. ΣIRIUS classe la photo dans l’établissement et répartit les produits et lots visibles par famille : épicerie, crémerie, boucherie…" : "Réception : photo de l’étiquette → analyse et classement automatiques."}</p>
+      {source === "ouverture" && <p>Photographiez aussi la consigne après ouverture.</p>}
+      {result?.type_document && <div className="haccp-simple-result" role="status">
+        <FileText size={48} aria-hidden="true" /><div><p>Document archivé dans le dossier de l’établissement</p><DocumentDetails record={result} /></div>
+      </div>}
+      {result && !result.type_document && <div className={`haccp-simple-result ${ok ? "is-ok" : "is-warning"}`} role="status">
+        {ok ? <CheckCircle2 size={64} aria-hidden="true" /> : <AlertTriangle size={64} aria-hidden="true" />}
+        <div>
+          <strong>{ok ? "OK ✔ Enregistré" : "⚠ Enregistré — appeler le chef"}</strong>
+          {!ok && <p className="haccp-simple-reason">{kitchenReason(result)}</p>}
+          <p translate="no">{result.nom_produit}</p>
+          {result.numero_lot && <p><span>Lot</span> : <span translate="no">{result.numero_lot}</span></p>}
+          {result.dlc_ou_ddm && <p>{result.type_date || "Date"} : <span translate="no">{result.dlc_ou_ddm}</span></p>}
+        </div>
+      </div>}
+      {error && <div className="haccp-simple-result is-error" role="alert">
+        <X size={56} aria-hidden="true" />
+        <div><strong>Pas enregistré</strong><p>{error}</p></div>
+        {pendingFile.current && <button type="button" className="haccp-simple-small" disabled={busy}
+          onClick={() => void send(pendingFile.current)}><RotateCcw size={22} aria-hidden="true" />Encore</button>}
+      </div>}
       <div className={`haccp-simple-camera${busy ? " is-busy" : ""}`}>
         <video ref={video} autoPlay playsInline muted aria-label="Caméra" />
         <canvas ref={canvas} hidden />
@@ -296,58 +363,38 @@ export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, o
       <button type="button" className="haccp-simple-shoot" disabled={busy} onClick={takePhoto} aria-label="Prendre la photo">
         <Camera size={56} aria-hidden="true" /><span>PHOTO</span>
       </button>
-      {onDlcSnap && <button type="button" className="haccp-simple-dlc" disabled={busy} onClick={onDlcSnap}
-        aria-label="Photo étiquette DLC" data-testid="haccp-open-dlc-snap">
-        <Tag size={34} aria-hidden="true" /><Camera size={34} aria-hidden="true" />
-      </button>}
       {cameraError && <button type="button" className="haccp-simple-small" onClick={() => setCameraAttempt((n) => n + 1)}>
         <RotateCcw size={20} aria-hidden="true" />Caméra
       </button>}
-      {result?.type_document && <div className="haccp-simple-result" role="status">
-        <FileText size={48} aria-hidden="true" /><div><p>Document archivé dans le dossier de l’établissement</p><DocumentDetails record={result} /></div>
-      </div>}
-      {result && !result.type_document && <div className={`haccp-simple-result ${ok ? "is-ok" : "is-warning"}`} role="status">
-        {ok ? <CheckCircle2 size={64} aria-hidden="true" /> : <AlertTriangle size={64} aria-hidden="true" />}
-        <div>
-          <strong>{ok ? "OK ✔ Enregistré" : "⚠ Enregistré — appeler le chef"}</strong>
-          {!ok && <p className="haccp-simple-reason">{kitchenReason(result)}</p>}
-          <p>{result.nom_produit}</p>
-          {result.dlc_ou_ddm && <p>{result.type_date || "Date"} : {result.dlc_ou_ddm}</p>}
-        </div>
-      </div>}
-      {error && <div className="haccp-simple-result is-error" role="alert">
-        <X size={56} aria-hidden="true" />
-        <div><strong>Pas enregistré</strong><p>{error}</p></div>
-        {pendingFile.current && <button type="button" className="haccp-simple-small" disabled={busy}
-          onClick={() => void send(pendingFile.current)}><RotateCcw size={22} aria-hidden="true" />Encore</button>}
-      </div>}
-      <button type="button" className="haccp-simple-find" onClick={() => setView("ouverture")}>
-        <Scissors size={40} aria-hidden="true" /><span>OUVERTURE</span>
-      </button>
-      <button type="button" className="haccp-simple-find" onClick={() => setView("preparation")}>
+      {cameraNotice && <p role="status">{cameraNotice}</p>}
+      <button type="button" className="haccp-simple-find" disabled={busy} onClick={() => setView("preparation")}>
         <CookingPot size={40} aria-hidden="true" /><span>PRÉPARATION</span>
       </button>
-      <button type="button" className="haccp-simple-find" onClick={openFind}>
+      <button type="button" className="haccp-simple-find" disabled={busy} onClick={openFind}>
         <Search size={40} aria-hidden="true" /><span>RETROUVER</span>
       </button>
-      <button type="button" className="haccp-simple-find" onClick={() => setView("releves")}>
+      <button type="button" className="haccp-simple-find" disabled={busy} onClick={() => setView("releves")}>
         <ClipboardList size={40} aria-hidden="true" /><span>RELEVÉS</span>
       </button>
-      <button type="button" className="haccp-simple-find" onClick={() => { clearPhoto(); setView("documents"); }}>
+      <button type="button" className="haccp-simple-find" disabled={busy} onClick={() => { clearPhoto(); setView("documents"); }}>
         <FileText size={40} aria-hidden="true" /><span>DOCUMENTS REÇUS</span>
       </button>
-      <button type="button" className="haccp-simple-find" onClick={() => setView("entrees")}>
+      <button type="button" className="haccp-simple-find" disabled={busy} onClick={() => setView("entrees")}>
         <ClipboardList size={40} aria-hidden="true" /><span>STOCK · ENTRÉES</span>
       </button>
     </>}
-    {(view === "ouverture" || view === "preparation") && <>
+    {view === "camera" && openingResult && <>
+      <HaccpLabelCapture savedRecord={result} kitchenMode kitchenToken={kitchenToken} originalPhotoUrl={openingPreview}
+        onScanAgain={() => {
+          if (openingPhotoUrl.current) URL.revokeObjectURL(openingPhotoUrl.current);
+          openingPhotoUrl.current = null; setOpeningPreview(""); setResult(null);
+        }} />
+    </>}
+    {view === "preparation" && <>
       <button type="button" className="haccp-simple-back" onClick={() => setView("camera")}>
         <ArrowLeft size={36} aria-hidden="true" /><Camera size={36} aria-hidden="true" /><span>PHOTO</span>
       </button>
-      {view === "ouverture"
-        ? <HaccpLabelCapture kitchenMode kitchenToken={kitchenToken} operations={["ouverture"]}
-          establishmentName={establishmentName} onCaptureSaved={onCaptureSaved} />
-        : <HaccpPreparation kitchenToken={kitchenToken} establishmentName={establishmentName} sessionReady />}
+      <HaccpPreparation kitchenToken={kitchenToken} establishmentName={establishmentName} sessionReady />
     </>}
     {view === "releves" && <HaccpReleves establishmentName={establishmentName} kitchenToken={kitchenToken}
       onBack={() => setView("camera")} onDirtyChange={reportRelevesDirty} onSavingChange={setRelevesSaving} />}
@@ -408,7 +455,7 @@ export default function HaccpKitchen({ establishmentName = "", onCaptureSaved, o
         {!listBusy && !listError && items.length === 0 && <p>{term.trim() ? `Rien trouvé pour « ${term.trim()} ».` : "Rien depuis 30 jours."}</p>}
       </>}
     </>}
-    {onFullMode && <button type="button" className="haccp-simple-full" disabled={relevesSaving} onClick={() => {
+    {onFullMode && <button type="button" className="haccp-simple-full" disabled={busy || relevesSaving} onClick={() => {
       if (view === "releves" && relevesDirty && !window.confirm("Quitter cette saisie sans l'enregistrer ?")) return;
       onFullMode();
     }}>

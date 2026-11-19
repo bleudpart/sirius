@@ -405,7 +405,6 @@ export default function HaccpWorkspace({ standalone = false, captureRequest = 0,
       onCaptureSaved={refreshDossier}
       onRelevesDirtyChange={reportRelevesDirty}
       onFullMode={() => setTab("capture")}
-      onDlcSnap={() => changeTab("snap")}
     />}
     {tab === "preparation" && <HaccpPreparation
       key={activeEstablishment}

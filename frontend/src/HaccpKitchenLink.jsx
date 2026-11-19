@@ -47,7 +47,7 @@ export default function HaccpKitchenLink({ establishmentName = "" }) {
       <p>Restaurant : <strong>{link.restaurant_name}</strong></p>
       <ol>
         <li>Le cuisinier scanne ce QR code avec l’appareil photo de son téléphone ou de la tablette.</li>
-        <li>La page s’ouvre avec PHOTO, OUVERTURE, PRÉPARATION, RETROUVER et RELEVÉS, sans compte ni mot de passe.</li>
+        <li>Sur le même écran photo, choisissez réception, ouverture ou facture / bon de livraison. Les préparations et relevés restent accessibles sans compte ni mot de passe.</li>
         <li>Menu du navigateur → « Ajouter à l’écran d’accueil ». C’est fait pour toujours.</li>
       </ol>
       <p>Ce QR code permet de photographier les réceptions, de créer les étiquettes d’ouverture et de préparation, de remplir les relevés et d’en demander l’impression sur le PC ΣIRIUS du restaurant (laissez-le allumé, ΣIRIUS ouvert). Ne l’affichez pas à la vue des clients.</p>

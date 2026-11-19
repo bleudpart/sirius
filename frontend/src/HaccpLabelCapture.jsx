@@ -20,6 +20,8 @@ export default function HaccpLabelCapture({
   sessionReady = true,
   onCaptureSaved = noop,
   onDistributionChange,
+  onScanAgain,
+  originalPhotoUrl = "",
   kitchenToken = "",
   operations = ["reception", "ouverture"],
 }) {
@@ -263,6 +265,10 @@ export default function HaccpLabelCapture({
     } catch (failure) { setError(failure.message); }
   };
   const resetCapture = () => {
+    if (onScanAgain) {
+      onScanAgain();
+      return;
+    }
     setResult(null); setError(""); setPrintState(""); setPrintSuccess(false); setConfirmed(false); setFile(null);
     captureId.current = null; submitted.current = null;
     if (previewRef.current) URL.revokeObjectURL(previewRef.current);
@@ -365,7 +371,7 @@ export default function HaccpLabelCapture({
         ? "Après le scan, vérifiez le produit, le lot et la date avant de confirmer l’impression. La température n’est pas mesurée."
         : "Analyse OpenAI, archivage sur le serveur. Aucun contrôle physique ou de température n’est certifié."}</p>
       {!kitchenMode && !savedRecord && !result && <details><summary>Configurer l’imprimante (une seule fois)</summary><HaccpPrinter /></details>}
-      {preview && <img src={preview} alt="Photo originale à relire avant validation" style={{ maxWidth: "100%", maxHeight: 500, objectFit: "contain" }} />}
+      {(preview || originalPhotoUrl) && <img src={preview || originalPhotoUrl} alt="Photo originale à relire avant validation" style={{ maxWidth: "100%", maxHeight: 500, objectFit: "contain" }} />}
       {cameraError && <p role="alert">{cameraError}</p>}
       {error && <p role="alert">{error}</p>}
       {printSuccess && <p className="haccp-print-success" role="status">
@@ -425,7 +431,7 @@ export default function HaccpLabelCapture({
           {printState && <p role="status">{printState}</p>}
         </>}
       </div>}
-      {result && !savedRecord && !printSuccess && <button type="button" disabled={busy} onClick={resetCapture}><Camera size={20} aria-hidden="true" />Scanner une autre étiquette</button>}
+      {result && (!savedRecord || onScanAgain) && !printSuccess && <button type="button" disabled={busy} onClick={resetCapture}><Camera size={20} aria-hidden="true" />Scanner une autre étiquette</button>}
     </section>
   );
 }
