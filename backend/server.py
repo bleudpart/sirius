@@ -2446,6 +2446,7 @@ async def _haccp_labels_scope(request: Request) -> str:
         return await haccp_kitchen.resolve_kitchen(request, db, _haccp_user_scope)
     user = await require_user(request, db)
     request.state.haccp_actor = user["user_id"]
+    request.state.haccp_actor_name = (user.get("name") or user.get("email") or "").strip()[:100]
     return await _haccp_user_scope(user)
 
 

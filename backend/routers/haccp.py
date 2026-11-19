@@ -353,6 +353,7 @@ def make_haccp_router(
         operation: Annotated[str, Form(max_length=2000)] = "{}",
         capture_id: Annotated[uuid.UUID | None, Form()] = None,
         ouverture_automatique: Annotated[bool, Form()] = False,
+        operateur_compte: Annotated[bool, Form()] = False,
         scope: str = Depends(resolve_scope),
         db: Session = Depends(get_db),
     ) -> EtiquetteResponse:
@@ -362,6 +363,10 @@ def make_haccp_router(
         kitchen = getattr(request.state, "haccp_kitchen", None)
         if kitchen is not None:
             operateur, restaurant_name = "Cuisine", kitchen["restaurant_name"]
+        elif operateur_compte:
+            # L'operateur vient du compte authentifie, jamais du formulaire.
+            operateur = (getattr(request.state, "haccp_actor_name", "")
+                         or str(getattr(request.state, "haccp_actor", "") or "")[:100] or operateur)
         if not operateur.strip():
             raise HTTPException(422, "Le nom de l'operateur ne peut pas etre vide.")
         if not restaurant_name.strip():

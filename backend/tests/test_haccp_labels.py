@@ -138,6 +138,8 @@ def api(tmp_path, monkeypatch):
         uid = request.headers.get("x-test-user")
         if not uid:
             raise HTTPException(401, "Authentification requise.")
+        request.state.haccp_actor = uid
+        request.state.haccp_actor_name = request.headers.get("x-test-name", "")
         if request.headers.get("x-test-company"):
             return "company:" + request.headers["x-test-company"]
         return "user:" + uid
@@ -201,6 +203,23 @@ def test_scan_archives_jpeg_and_persists_metadata(api):
     assert_jpeg(photo.content)
     assert photo.headers["content-type"] == "image/jpeg"
     assert get(client, "recherche").json()[0]["id"] == record["id"]
+
+
+def test_scan_can_take_operator_from_authenticated_account(api):
+    client, _ = api
+    response = client.post(
+        "/api/haccp/etiquettes/scan", files={"file": ("photo.jpg", picture("JPEG"), "image/jpeg")},
+        data={"restaurant_name": "Restaurant", "operateur": "Usurpateur", "operateur_compte": "true"},
+        headers={"x-test-user": "one", "x-test-name": "Ravi Kumar"},
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["operateur"] == "Ravi Kumar"
+    anonymous_name = client.post(
+        "/api/haccp/etiquettes/scan", files={"file": ("photo.png", picture(), "image/png")},
+        data={"restaurant_name": "Restaurant", "operateur": "Usurpateur", "operateur_compte": "true"},
+        headers={"x-test-user": "two"},
+    )
+    assert anonymous_name.json()["operateur"] == "two"
 
 
 def test_restaurant_dossier_is_created_resumed_and_refreshed_after_scan(api):

@@ -1,0 +1,40 @@
+.dlc-snap {
+  display: grid; justify-items: center; gap: 20px;
+  width: 100%; max-width: 520px; margin: 0 auto; padding: 16px 12px calc(16px + env(safe-area-inset-bottom));
+  box-sizing: border-box; -webkit-tap-highlight-color: transparent;
+}
+.dlc-snap-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; overflow: hidden; }
+.haccp-ui .dlc-snap button > svg, .dlc-snap svg { color: inherit; }
+.haccp-ui .dlc-snap button, .dlc-snap button {
+  display: grid; place-items: center; gap: 8px; padding: 0; cursor: pointer;
+  touch-action: manipulation; user-select: none; -webkit-user-select: none;
+}
+.dlc-snap-big {
+  width: min(78vw, 300px); aspect-ratio: 1; border-radius: 50%;
+  display: grid; place-items: center; box-sizing: border-box;
+}
+.haccp-ui .dlc-snap-camera, .dlc-snap-camera {
+  border: 2px solid var(--haccp-gold, #c5a059); background: radial-gradient(circle, #102637, #081522);
+  color: var(--haccp-gold, #c5a059); box-shadow: 0 0 0 10px rgba(197, 160, 89, .08);
+}
+.dlc-snap-wait { color: var(--workspace-cyan, #91e6f2); border: 2px solid rgba(145, 230, 242, .35); }
+.dlc-snap-spin { animation: dlc-snap-spin 1s linear infinite; }
+@keyframes dlc-snap-spin { to { transform: rotate(360deg); } }
+.dlc-snap-preview {
+  width: 100%; max-height: 58vh; object-fit: contain; border-radius: 12px;
+  border: 1px solid var(--haccp-border, rgba(197, 160, 89, .34)); background: #000;
+}
+.dlc-snap-alert { color: #ff8a80; }
+.dlc-snap-actions { display: flex; align-items: center; justify-content: center; gap: 28px; width: 100%; }
+.dlc-snap-round { border-radius: 50%; aspect-ratio: 1; }
+.haccp-ui .dlc-snap-retake, .dlc-snap-retake {
+  width: 76px; border: 2px solid var(--haccp-border, rgba(197, 160, 89, .34)); background: #081522; color: var(--haccp-text, #edf4fc);
+}
+.haccp-ui .dlc-snap-ok, .dlc-snap-ok {
+  width: 148px; border: 0; background: #1fa34a; color: #fff; box-shadow: 0 8px 24px rgba(31, 163, 74, .45);
+}
+.haccp-ui .dlc-snap-ok:hover:not(:disabled), .dlc-snap-ok:active { background: #22b553; }
+.haccp-ui .dlc-snap-done, .dlc-snap-done { border: 0; background: #1fa34a; color: #fff; }
+.dlc-snap-done time { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.haccp-ui .dlc-snap-error, .dlc-snap-error { border: 0; background: #c62828; color: #fff; }
+@media (prefers-reduced-motion: reduce) { .dlc-snap-spin { animation: none; } }
