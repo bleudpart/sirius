@@ -2476,7 +2476,6 @@
   "Impression HACCP arrêtée :": "HACCP அச்சிடுதல் நிறுத்தப்பட்டது:",
   "Impression sur le PC Windows relié au même compte et sur son imprimante par défaut.": "அதே கணக்குடன் இணைக்கப்பட்ட Windows PC-யில், அதன் இயல்புநிலை அச்சுப்பொறியில் அச்சிடுதல்.",
   "Impression via le SDK officiel Brother, sous sa": "அதிகாரப்பூர்வ Brother SDK வழியாக அச்சிடுதல், அதன்",
-  "Imprimante Android Wi-Fi · Brother QL-820NWB": "Android Wi-Fi அச்சுப்பொறி · Brother QL-820NWB",
   "Imprimante d’étiquettes": "லேபிள் அச்சுப்பொறி",
   "Imprimante Windows": "Windows அச்சுப்பொறி",
   "Imprimante ΣIRIUS": "ΣIRIUS அச்சுப்பொறி",
@@ -3008,7 +3007,6 @@
   "MODE RESTREINT": "கட்டுப்படுத்தப்பட்ட பயன்முறை",
   "MODE TV": "TV பயன்முறை",
   "Mode TV : ouvrez la fenêtre spectateur puis diffusez-la sur votre télé (Cast d'onglet Chrome, Miracast ou câble HDMI). Le diagramme s'y met à jour en temps réel.": "TV பயன்முறை: பார்வையாளர் சாளரத்தைத் திறந்து உங்கள் டிவியில் ஒளிபரப்புங்கள் (Chrome தாவல் Cast, Miracast அல்லது HDMI கேபிள்). வரைபடம் அங்கே நிகழ்நேரத்தில் புதுப்பிக்கப்படும்.",
-  "Modèle : QL-820NWB uniquement · rouleau continu DK-22205 · largeur 62 mm · coupe 50 mm (zone imprimable 58,9 mm).": "மாடல்: QL-820NWB மட்டும் · DK-22205 தொடர் சுருள் · அகலம் 62 mm · வெட்டு 50 mm (அச்சிடக்கூடிய பகுதி 58,9 mm).",
   "Modèle CSV vierge": "வெற்று CSV மாதிரி",
   "Modèle d'assistant à configurer côté Vapi": "Vapi பக்கத்தில் அமைக்க வேண்டிய உதவியாளர் மாதிரி",
   "Modèle papier A4": "A4 காகித மாதிரி",
@@ -4874,5 +4872,7 @@
   "Prendre une photo": "புகைப்படம் எடுக்கவும்",
   "Reprendre la photo": "மீண்டும் புகைப்படம் எடுக்கவும்",
   "Valider et envoyer": "உறுதிசெய்து அனுப்பவும்",
-  "Retour à l’écran cuisine": "சமையலறை திரைக்குத் திரும்பு"
+  "Retour à l’écran cuisine": "சமையலறை திரைக்குத் திரும்பு",
+  "Imprimante Android Wi-Fi · Brother QL-820NWBc": "Android Wi-Fi அச்சுப்பொறி · Brother QL-820NWBc",
+  "Modèle : QL-820NWBc (ou QL-820NWB) uniquement · rouleau continu DK-22205 · largeur 62 mm · coupe 50 mm (zone imprimable 58,9 mm).": "மாடல்: QL-820NWBc (QL-820NWB) மட்டும் · DK-22205 தொடர் சுருள் · அகலம் 62 mm · வெட்டு 50 mm (அச்சிடக்கூடிய பகுதி 58,9 mm)."
 }

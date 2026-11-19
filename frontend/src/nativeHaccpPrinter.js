@@ -13,7 +13,7 @@ export function validateAndroidPrinter(config) {
     throw new Error("Indiquez une IPv4 privée LAN (10.x, 172.16–31.x ou 192.168.x), sans URL.");
   }
   if (config.model !== "QL-820NWB" || config.roll !== "DK-22205" || config.widthMm !== 62 || config.heightMm !== 50) {
-    throw new Error("Seuls Brother QL-820NWB, rouleau DK-22205 et format 62 × 50 mm sont pris en charge.");
+    throw new Error("Seuls Brother QL-820NWBc / QL-820NWB, rouleau DK-22205 et format 62 × 50 mm sont pris en charge.");
   }
   return config;
 }

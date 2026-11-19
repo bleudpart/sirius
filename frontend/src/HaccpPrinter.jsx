@@ -153,13 +153,13 @@ function AndroidHaccpPrinter() {
     finally { setBusy(false); }
   };
   return <section aria-label="Imprimante ΣIRIUS">
-    <h4>Imprimante Android Wi-Fi · Brother QL-820NWB</h4>
+    <h4>Imprimante Android Wi-Fi · Brother QL-820NWBc</h4>
     {!available ? <p role="alert">Pont Brother absent de cette application. Une nouvelle compilation Android est nécessaire ; le site web ne peut pas imprimer directement.</p> : <>
       <form onSubmit={save}><fieldset disabled={busy} style={{ display: "grid", gap: 8 }}>
         <legend>Impression directe depuis ce téléphone, sans PC</legend>
         <label>Adresse IPv4 LAN de l’imprimante<input required inputMode="decimal" placeholder="192.168.1.50" value={config.ip}
           onChange={(e) => setConfig({ ...config, ip: e.target.value })} /></label>
-        <p>Modèle : QL-820NWB uniquement · rouleau continu DK-22205 · largeur 62 mm · coupe 50 mm (zone imprimable 58,9 mm).</p>
+        <p>Modèle : QL-820NWBc (ou QL-820NWB) uniquement · rouleau continu DK-22205 · largeur 62 mm · coupe 50 mm (zone imprimable 58,9 mm).</p>
         <label><input type="checkbox" checked={config.enabled} onChange={(e) => setConfig({ ...config, enabled: e.target.checked })} /> Utiliser l’impression Android directe après validation d’une ouverture ou préparation</label>
         <button type="submit">Enregistrer l’imprimante Android</button>
       </fieldset></form>

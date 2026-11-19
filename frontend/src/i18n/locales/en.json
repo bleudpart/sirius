@@ -2476,7 +2476,6 @@
   "Impression HACCP arrêtée :": "HACCP printing stopped:",
   "Impression sur le PC Windows relié au même compte et sur son imprimante par défaut.": "Printing on the Windows PC linked to the same account, on its default printer.",
   "Impression via le SDK officiel Brother, sous sa": "Printing via the official Brother SDK, under its",
-  "Imprimante Android Wi-Fi · Brother QL-820NWB": "Android Wi-Fi printer · Brother QL-820NWB",
   "Imprimante d’étiquettes": "Label printer",
   "Imprimante Windows": "Windows printer",
   "Imprimante ΣIRIUS": "ΣIRIUS printer",
@@ -3008,7 +3007,6 @@
   "MODE RESTREINT": "RESTRICTED MODE",
   "MODE TV": "TV MODE",
   "Mode TV : ouvrez la fenêtre spectateur puis diffusez-la sur votre télé (Cast d'onglet Chrome, Miracast ou câble HDMI). Le diagramme s'y met à jour en temps réel.": "TV mode: open the viewer window, then cast it to your TV (Chrome tab cast, Miracast or HDMI cable). The diagram updates there in real time.",
-  "Modèle : QL-820NWB uniquement · rouleau continu DK-22205 · largeur 62 mm · coupe 50 mm (zone imprimable 58,9 mm).": "Model: QL-820NWB only · DK-22205 continuous roll · 62 mm wide · 50 mm cut (58.9 mm printable area).",
   "Modèle CSV vierge": "Blank CSV template",
   "Modèle d'assistant à configurer côté Vapi": "Assistant model to configure on the Vapi side",
   "Modèle papier A4": "A4 paper template",
@@ -4874,5 +4872,7 @@
   "Prendre une photo": "Take a photo",
   "Reprendre la photo": "Retake the photo",
   "Valider et envoyer": "Confirm and send",
-  "Retour à l’écran cuisine": "Back to the kitchen screen"
+  "Retour à l’écran cuisine": "Back to the kitchen screen",
+  "Imprimante Android Wi-Fi · Brother QL-820NWBc": "Android Wi-Fi printer · Brother QL-820NWBc",
+  "Modèle : QL-820NWBc (ou QL-820NWB) uniquement · rouleau continu DK-22205 · largeur 62 mm · coupe 50 mm (zone imprimable 58,9 mm).": "Model: QL-820NWBc (or QL-820NWB) only · DK-22205 continuous roll · 62 mm wide · 50 mm cut (58.9 mm printable area)."
 }

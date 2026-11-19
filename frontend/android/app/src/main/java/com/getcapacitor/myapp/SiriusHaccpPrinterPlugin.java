@@ -112,7 +112,7 @@ public class SiriusHaccpPrinterPlugin extends Plugin {
             }
             if (!"QL-820NWB".equals(call.getString("model")) || !"DK-22205".equals(call.getString("roll"))
                     || call.getInt("widthMm", 0) != 62 || call.getInt("heightMm", 0) != 50) {
-                throw new IllegalArgumentException("Uniquement Brother QL-820NWB, DK-22205, 62 x 50 mm.");
+                throw new IllegalArgumentException("Uniquement Brother QL-820NWBc / QL-820NWB, DK-22205, 62 x 50 mm.");
             }
             if (!prefs.edit().putString("ip", ip).putBoolean("enabled", call.getBoolean("enabled", false)).commit()) {
                 throw new IllegalStateException("Configuration non sauvegardee.");
@@ -138,7 +138,7 @@ public class SiriusHaccpPrinterPlugin extends Plugin {
             boolean preparation = !test && "preparation".equals(job.getString("operation"));
             if (test) {
                 header = "SIRIUS · TEST — HORS REGISTRE";
-                product = "TEST BROTHER QL-820NWB";
+                product = "TEST BROTHER QL-820NWBc";
                 body = "DK-22205 · 62 x 50 mm\nVerifier marges, lisibilite et coupe.\nAUCUNE DENREE — NE PAS COLLER";
             } else {
                 Iterator<String> keys = job.keys();
@@ -254,7 +254,7 @@ public class SiriusHaccpPrinterPlugin extends Plugin {
                 throw new IllegalStateException("Etat Brother inaccessible : " + state.getError().getCode());
             }
             if (state.getPrinterStatus().getModel() != PrinterModel.QL_820NWB) {
-                throw new IllegalStateException("Modele physique non autorise : Brother QL-820NWB requis.");
+                throw new IllegalStateException("Modele physique non autorise : Brother QL-820NWBc / QL-820NWB requis.");
             }
             if (state.getPrinterStatus().getErrorCode() != PrinterStatus.ErrorCode.NoError) {
                 throw new IllegalStateException("Etat imprimante : " + state.getPrinterStatus().getErrorCode());
