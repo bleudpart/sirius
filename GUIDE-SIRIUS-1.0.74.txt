@@ -1,0 +1,15 @@
+ΣIRIUS 1.0.74 - NOTE DE VERSION
+==============================
+
+Cette version regroupe dans l'installateur Windows, la version portable et
+l'APK Android les évolutions publiées sur le site depuis l'installateur 1.0.73 :
+
+- choix de la langue de l'interface : français, anglais ou tamoul ;
+- photo d'étiquette DLC sur mobile, accessible par des icônes ;
+- capture photo HACCP simplifiée ;
+- préparations HACCP partagées et impression d'étiquettes depuis le QR Cuisine ;
+- Brother QL-820NWBc affichée dans le réglage d'impression Android ;
+- avertissement sur la limite Brother du format 62 x 50 mm.
+
+Cette note ne confirme pas à elle seule que les fichiers ont été construits,
+installés, testés ou publiés.
