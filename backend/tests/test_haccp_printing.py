@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -15,7 +16,7 @@ import haccp_database
 import routers.haccp_printing as printing_routes
 from haccp_activity import read_activity
 from models.haccp import EtiquetteHaccp
-from models.haccp_printing import HaccpPrintJob, HaccpPrintStation
+from models.haccp_printing import HaccpPrintJob, HaccpPrintRelayCredential, HaccpPrintStation
 from routers.haccp_printing import make_haccp_print_router
 from schemas.haccp import EtiquetteVisionOutput
 
@@ -36,7 +37,12 @@ def api(tmp_path, monkeypatch):
         return "user:" + user
 
     app = FastAPI()
-    app.include_router(make_haccp_print_router(scope, lambda request: request.headers.get("x-local") == "yes"), prefix="/api")
+    async def relay_owner_scope(owner_user_id: str) -> str:
+        return "user:" + owner_user_id
+
+    app.include_router(make_haccp_print_router(
+        scope, lambda request: request.headers.get("x-local") == "yes", relay_owner_scope,
+    ), prefix="/api")
     with Session(haccp_database.get_engine()) as db:
         row = EtiquetteHaccp(
             **EtiquetteVisionOutput(nom_produit="Saumon", numero_lot="LOT42", dlc_ou_ddm="2099-12-31", type_date="DLC").model_dump(),
@@ -74,6 +80,12 @@ def queue(client, label_id):
     return request(client, "/demandes", {"label_id": label_id, "reviewed": True})
 
 
+def relay_request(client, path, token, body=None):
+    headers = {"x-sirius-print-relay": token}
+    url = "/api/haccp/impression/relais" + path
+    return client.post(url, json=body, headers=headers) if body is not None else client.get(url, headers=headers)
+
+
 def test_full_flow_is_durable_and_claim_is_never_delivered_twice(api):
     client, label_id = api
     relay = configure(client)
@@ -98,6 +110,56 @@ def test_full_flow_is_durable_and_claim_is_never_delivered_twice(api):
     haccp_database._configured_engine.cache_clear()
     assert queue(client, label_id).json()["status"] == "accepted"
     assert request(client, "/prochaine", {"relay_id": relay}).json()["job"] is None
+
+
+def test_linux_relay_pairing_scopes_token_and_preserves_no_retry_flow(api):
+    client, label_id = api
+    relay = str(uuid.uuid4())
+    paired = request(client, "/relais/associer", {
+        "relay_id": relay, "device_name": "Brother_QL_820NWBc",
+        "width_mm": 62, "height_mm": 50,
+    })
+    assert paired.status_code == 200, paired.text
+    token = paired.json()["token"]
+    assert token and paired.json()["relay_id"] == relay
+    with Session(haccp_database.get_engine()) as db:
+        credential = db.query(HaccpPrintRelayCredential).one()
+        assert credential.token_hash == hashlib.sha256(token.encode()).hexdigest()
+        assert token not in credential.token_hash
+
+    assert relay_request(client, "/config", "invalid").status_code == 401
+    config = relay_request(client, "/config", token)
+    assert config.json() == {
+        "relay_id": relay, "device_name": "Brother_QL_820NWBc",
+        "width_mm": 62, "height_mm": 50,
+    }
+    assert request(client, "/prochaine", {"relay_id": relay}).status_code == 409
+    job = queue(client, label_id).json()
+    assert job["transport"] == "linux"
+    claimed = relay_request(client, "/prochaine", token, {}).json()["job"]
+    assert claimed["id"] == job["id"] and claimed["widthMm"] == 62
+    assert relay_request(client, "/prochaine", token, {}).json() == {"job": None}
+
+    confirmed = relay_request(client, f"/demandes/{job['id']}/confirmation", token, {"status": "uncertain"})
+    assert confirmed.status_code == 200
+    assert confirmed.json()["status"] == "uncertain"
+    assert confirmed.json()["transport"] == "linux"
+    assert relay_request(client, "/prochaine", token, {}).json() == {"job": None}
+
+
+def test_linux_relay_replacement_requires_explicit_confirmation(api):
+    client, _label_id = api
+    first = str(uuid.uuid4())
+    first_token = request(client, "/relais/associer", {
+        "relay_id": first, "device_name": "Brother", "width_mm": 62, "height_mm": 50,
+    }).json()["token"]
+    second = str(uuid.uuid4())
+    body = {"relay_id": second, "device_name": "Brother", "width_mm": 62, "height_mm": 50}
+    assert request(client, "/relais/associer", body).status_code == 409
+    replaced = request(client, "/relais/associer", {**body, "replace_existing": True})
+    assert replaced.status_code == 200
+    assert relay_request(client, "/config", first_token).status_code == 401
+    assert relay_request(client, "/config", replaced.json()["token"]).status_code == 200
 
 
 def test_authentication_scope_and_station_identity(api):

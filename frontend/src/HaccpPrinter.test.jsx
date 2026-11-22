@@ -50,12 +50,25 @@ test("server refusal leaves the local station disabled and reports the cause", a
   expect(host.querySelector('[role="alert"]').textContent).toContain("Compte Cloud non relié");
 });
 
-test("mobile explains that the Windows relay must be configured and never touches desktop APIs", async () => {
+test("web exposes the Linux pairing form without touching the Windows bridge", async () => {
   delete window.siriusHaccpPrinter;
   await act(async () => root.render(<HaccpPrinter />));
-  expect(host.textContent).toContain("application Windows");
+  expect(host.textContent).toContain("Relais Raspberry Pi (Linux)");
   expect(button("Détecter")).toBeUndefined();
   expect(global.fetch).not.toHaveBeenCalled();
+});
+
+test("Linux pairing registers the station and shows its one-time scoped token", async () => {
+  delete window.siriusHaccpPrinter;
+  const token = "A".repeat(43);
+  global.fetch.mockResolvedValue(reply({ configured: true, relay_id: "ed10a199-a945-4dd5-9851-e90ad5436d51", token }));
+  await act(async () => root.render(<HaccpPrinter />));
+  await act(async () => host.querySelector("form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+  expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual({
+    relay_id: "ed10a199-a945-4dd5-9851-e90ad5436d51",
+    device_name: "Brother_QL_820NWBc", width_mm: 62, height_mm: 50, replace_existing: false,
+  });
+  expect(host.querySelector('input[readonly]').value).toBe(token);
 });
 
 function Relay() {

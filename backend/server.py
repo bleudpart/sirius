@@ -2462,13 +2462,26 @@ async def _haccp_user_scope(user: dict) -> str:
     return f"user:{user['user_id']}"
 
 
+async def _haccp_relay_owner_scope(owner_user_id: str) -> str:
+    from access_gate import access_status
+
+    owner = await db.users.find_one({"user_id": owner_user_id})
+    if not owner or owner.get("disabled"):
+        raise HTTPException(401, "Compte du chef indisponible.")
+    if not (await access_status(db, owner)).get("allowed"):
+        raise HTTPException(402, "Abonnement ΣIRIUS du chef inactif.")
+    return await _haccp_user_scope(owner)
+
+
 from haccp_kitchen import make_haccp_kitchen_router
 api_router.include_router(make_haccp_kitchen_router(_haccp_labels_scope, lambda: db))
 api_router.include_router(make_haccp_labels_router(
     _haccp_labels_scope, vision_analyser=tri_cortex_services.analyse_label, on_received=tri_cortex_services.received,
 ))
 from routers.haccp_printing import make_haccp_print_router
-api_router.include_router(make_haccp_print_router(_haccp_labels_scope, is_direct_local_request))
+api_router.include_router(make_haccp_print_router(
+    _haccp_labels_scope, is_direct_local_request, _haccp_relay_owner_scope,
+))
 from routers.haccp_releves import make_haccp_releves_router
 api_router.include_router(make_haccp_releves_router(db, _haccp_labels_scope, is_direct_local_request))
 

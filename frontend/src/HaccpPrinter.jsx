@@ -11,6 +11,13 @@ export function haccpPrintStatus(status, transport = "windows") {
     cancelled: "Impression annulée — vérifiez la fiche",
     uncertain: "Impression incertaine — vérifiez le papier, ne relancez pas automatiquement",
   };
+  if (transport === "linux") {
+    Object.assign(labels, {
+      pending: "En attente du relais Raspberry Pi",
+      claimed: "Pris en charge par le Raspberry Pi",
+      accepted: "Transmis à CUPS — vérifiez la sortie papier",
+    });
+  }
   if (transport === "android") {
     Object.assign(labels, {
       pending: "En attente de prise en charge par le téléphone Android",
@@ -302,7 +309,65 @@ export function useHaccpPrinterRelay(accountKey) {
 
 export default function HaccpPrinter() {
   if (isAndroidHaccp()) return <AndroidHaccpPrinter />;
-  return <WindowsHaccpPrinter />;
+  return window.siriusHaccpPrinter ? <WindowsHaccpPrinter /> : <LinuxHaccpPrinter />;
+}
+
+function LinuxHaccpPrinter() {
+  const [config, setConfig] = useState({
+    deviceName: "Brother_QL_820NWBc", widthMm: 62, heightMm: 50, replaceExisting: false,
+  });
+  const [token, setToken] = useState("");
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const pair = async (event) => {
+    event.preventDefault();
+    setBusy(true); setError(""); setMessage(""); setToken("");
+    try {
+      const result = await haccpPrintRequest("/relais/associer", {
+        relay_id: relayId(), device_name: config.deviceName.trim(),
+        width_mm: Number(config.widthMm), height_mm: Number(config.heightMm),
+        replace_existing: config.replaceExisting,
+      });
+      if (typeof result.token !== "string" || !result.token) {
+        throw new Error("Le serveur n’a pas remis l’autorisation du relais. Ne configurez pas le Raspberry.");
+      }
+      setToken(result.token);
+      setMessage("Relais associé. Cette autorisation ne sera affichée qu’une fois.");
+    } catch (failure) { setError(failure.message); }
+    finally { setBusy(false); }
+  };
+  const copyToken = async () => {
+    try {
+      await navigator.clipboard.writeText(token);
+      setMessage("Autorisation copiée. Collez-la uniquement dans le terminal SSH du Raspberry.");
+    } catch (failure) { setError(`Copie impossible : ${failure.message}`); }
+  };
+  return <section aria-label="Relais d’impression Linux">
+    <h4>Relais Raspberry Pi (Linux)</h4>
+    <p>Associez le Raspberry au compte chef. Le jeton dédié ne permet que l’accès à cette file d’impression ; il ne remplace pas votre mot de passe.</p>
+    <form onSubmit={pair}><fieldset disabled={busy} style={{ display: "grid", gap: 8 }}>
+      <legend>Configuration de la Brother sur le Raspberry Pi</legend>
+      <label>Nom de la file CUPS sur le Raspberry
+        <input required maxLength={255} value={config.deviceName} onChange={(e) => setConfig({ ...config, deviceName: e.target.value })} />
+      </label>
+      <label>Largeur d’étiquette (mm)<input type="number" min="20" max="150" step="1" required value={config.widthMm} onChange={(e) => setConfig({ ...config, widthMm: e.target.value })} /></label>
+      <label>Hauteur d’étiquette (mm)<input type="number" min="20" max="300" step="1" required value={config.heightMm} onChange={(e) => setConfig({ ...config, heightMm: e.target.value })} /></label>
+      <label><input type="checkbox" checked={config.replaceExisting} onChange={(e) => setConfig({ ...config, replaceExisting: e.target.checked })} />
+        Remplacer explicitement un autre poste d’impression associé</label>
+      <button type="submit">Associer le Raspberry et créer son autorisation</button>
+    </fieldset></form>
+    {token && <div role="group" aria-label="Autorisation du relais">
+      <label>Jeton à saisir une seule fois sur le Raspberry
+        <input type="password" readOnly value={token} autoComplete="new-password" />
+      </label>
+      <button type="button" onClick={copyToken}>Copier le jeton</button>
+      <p>Ne partagez pas ce jeton dans le chat. Il est lié à ce poste et sera remplacé lors d’un nouvel appairage.</p>
+    </div>}
+    <p>Le nom CUPS doit correspondre exactement à celui créé sur le Pi. La Brother doit être configurée sur le même réseau ; faites un test papier avant utilisation.</p>
+    {error && <p role="alert">{error}</p>}
+    {message && <p role="status">{message}</p>}
+  </section>;
 }
 
 function AndroidHaccpPrinter() {

@@ -130,6 +130,8 @@ def test_le_qr_cuisine_ne_donne_acces_a_rien_d_autre(kitchen):
     assert client.post("/api/haccp/impression/poste", json={}, headers=headers).status_code == 403
     assert client.post("/api/haccp/impression/prochaine", json={}, headers=headers).status_code == 403
     assert client.post("/api/haccp/impression/android/demandes", json={}, headers=headers).status_code == 403
+    assert client.post("/api/haccp/impression/relais/associer", json={}, headers=headers).status_code == 403
+    assert client.get("/api/haccp/impression/relais/config", headers=headers).status_code == 401
     assert client.get("/api/haccp/cuisine/lien", headers=headers).status_code == 403
     assert client.post("/api/haccp/cuisine/lien", json={"restaurant_name": "X"}, headers=headers).status_code == 403
     assert client.delete("/api/haccp/cuisine/lien", headers=headers).status_code == 403
@@ -160,7 +162,7 @@ def test_le_qr_cuisine_cree_ouverture_et_preparation_puis_demande_l_impression(k
     assert prepared.json()["operateur"] == "Cuisine"
     assert prepared.json()["restaurant_name"] == "Chez Daniel"
 
-    # Sans poste Windows associé, la demande est refusée proprement, jamais en 403.
+    # Sans poste d'impression associé, la demande est refusée proprement, jamais en 403.
     queued = client.post("/api/haccp/impression/demandes", headers=headers,
                          json={"label_id": opened.json()["id"], "reviewed": True})
     assert queued.status_code == 409

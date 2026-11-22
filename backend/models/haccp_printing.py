@@ -18,6 +18,16 @@ class HaccpPrintStation(Base):
     last_seen: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
 
+class HaccpPrintRelayCredential(Base):
+    __tablename__ = "haccp_print_relay_credentials"
+
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    scope_key: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    relay_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    owner_user_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
 class HaccpPrintJob(Base):
     __tablename__ = "haccp_print_jobs"
     __table_args__ = (

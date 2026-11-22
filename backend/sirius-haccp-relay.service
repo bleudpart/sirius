@@ -1,0 +1,21 @@
+[Unit]
+Description=Relais d'impression HACCP SIRIUS
+After=network-online.target cups.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sirius
+SupplementaryGroups=lp
+Environment=HOME=/home/sirius
+ExecStart=/usr/bin/python3 /opt/sirius/haccp_linux_relay.py --run
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/sirius/.config/sirius /home/sirius/.local/share/sirius
+
+[Install]
+WantedBy=multi-user.target

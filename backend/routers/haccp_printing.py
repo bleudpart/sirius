@@ -1,5 +1,7 @@
 """File privee interrogee en sortie par le poste Windows, sans port entrant."""
+import hashlib
 import logging
+import secrets
 import uuid
 from collections.abc import Awaitable, Callable, Generator
 from contextlib import contextmanager
@@ -8,14 +10,17 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StringConstraints
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 import cloud_link
 from haccp_database import get_db
 from models.haccp import EtiquetteHaccp
-from models.haccp_printing import HaccpAndroidPrintTarget, HaccpMobilePrintTarget, HaccpPrintJob, HaccpPrintStation
+from models.haccp_printing import (
+    HaccpAndroidPrintTarget, HaccpMobilePrintTarget, HaccpPrintJob,
+    HaccpPrintRelayCredential, HaccpPrintStation,
+)
 from routers.haccp import _response
 from services.haccp_opening import (
     PARIS, construire_etiquette_mobile, construire_fragment_impression, verifier_etiquette_imprimable,
@@ -32,6 +37,10 @@ class StationConfig(BaseModel):
     height_mm: Annotated[int, Field(strict=True, ge=20, le=300)]
 
 
+class RelayStationConfig(StationConfig):
+    replace_existing: StrictBool = False
+
+
 class ClaimRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     relay_id: uuid.UUID
@@ -44,6 +53,12 @@ class PrintRequest(BaseModel):
 
 
 class PrintAcknowledgement(ClaimRequest):
+    status: Literal["accepted", "uncertain"]
+    detail: Annotated[str, StringConstraints(max_length=500)] | None = None
+
+
+class RelayAcknowledgement(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     status: Literal["accepted", "uncertain"]
     detail: Annotated[str, StringConstraints(max_length=500)] | None = None
 
@@ -126,7 +141,7 @@ def _valid_label(
 def _station(db: Session, scope: str, relay_id: str | None = None) -> HaccpPrintStation:
     station = db.get(HaccpPrintStation, scope)
     if station is None:
-        raise HTTPException(409, "Configurez d'abord l'imprimante dans ΣIRIUS Windows.")
+        raise HTTPException(409, "Configurez d'abord un poste d'impression ΣIRIUS.")
     if relay_id is not None and station.relay_id != relay_id:
         raise HTTPException(409, "Un autre poste est configure pour ce registre. Utilisez le poste associe.")
     return station
@@ -144,12 +159,18 @@ def _job_transport(db: Session, job: HaccpPrintJob) -> str:
         return "mobile"
     if db.get(HaccpAndroidPrintTarget, job.id):
         return "android"
+    if db.scalar(select(HaccpPrintRelayCredential.token_hash).where(
+        HaccpPrintRelayCredential.scope_key == job.scope_key,
+        HaccpPrintRelayCredential.relay_id == job.relay_id,
+    )) is not None:
+        return "linux"
     return "windows"
 
 
 def make_haccp_print_router(
     resolve_scope: Callable[[Request], Awaitable[str]],
     is_direct_local: Callable[[Request], bool],
+    resolve_relay_owner_scope: Callable[[str], Awaitable[str]] | None = None,
 ) -> APIRouter:
     router = APIRouter(prefix="/haccp/impression", tags=["haccp-impression"])
 
@@ -161,6 +182,89 @@ def make_haccp_print_router(
         if not cloud_link.linked():
             raise HTTPException(409, "Reliez d'abord le PC a votre compte ΣIRIUS Cloud.")
         return await cloud_link.relay_haccp_print(path, body.model_dump(mode="json") if body else None)
+
+    async def authenticate_relay(request: Request, db: Session) -> tuple[HaccpPrintRelayCredential, HaccpPrintStation]:
+        token = request.headers.get("x-sirius-print-relay", "").strip()
+        if not token or resolve_relay_owner_scope is None:
+            raise HTTPException(401, "Autorisation du relais Linux absente ou invalide.")
+        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        credential = db.get(HaccpPrintRelayCredential, token_hash)
+        if credential is None:
+            raise HTTPException(401, "Autorisation du relais Linux absente ou invalide.")
+        try:
+            owner_scope = await resolve_relay_owner_scope(credential.owner_user_id)
+        except HTTPException as error:
+            raise HTTPException(error.status_code, "Autorisation du relais Linux révoquée ou compte indisponible.") from error
+        if owner_scope != credential.scope_key:
+            raise HTTPException(401, "Autorisation du relais Linux révoquée ou compte indisponible.")
+        return credential, _station(db, credential.scope_key, credential.relay_id)
+
+    def claim_job(db: Session, scope: str, relay_id: str, transport: str = "windows") -> dict:
+        station = _station(db, scope, relay_id)
+        paired = db.scalar(select(HaccpPrintRelayCredential.token_hash).where(
+            HaccpPrintRelayCredential.scope_key == scope,
+            HaccpPrintRelayCredential.relay_id == relay_id,
+        )) is not None
+        if (transport == "linux") != paired:
+            raise HTTPException(409, "Le transport ne correspond pas au relais associé.")
+        station.last_seen = _now()
+        db.commit()
+        job = db.scalar(select(HaccpPrintJob).where(
+            HaccpPrintJob.scope_key == scope, HaccpPrintJob.relay_id == station.relay_id,
+            HaccpPrintJob.status == "pending",
+            ~select(HaccpAndroidPrintTarget.job_id).where(
+                HaccpAndroidPrintTarget.job_id == HaccpPrintJob.id,
+            ).exists(),
+            ~select(HaccpMobilePrintTarget.job_id).where(
+                HaccpMobilePrintTarget.job_id == HaccpPrintJob.id,
+            ).exists(),
+        ).order_by(HaccpPrintJob.created_at, HaccpPrintJob.id).limit(1))
+        if job is None:
+            return {"job": None}
+        updated = db.execute(update(HaccpPrintJob).where(
+            HaccpPrintJob.id == job.id, HaccpPrintJob.status == "pending",
+        ).values(status="claimed", claimed_at=_now()))
+        db.commit()
+        if updated.rowcount != 1:
+            return {"job": None}
+        try:
+            row = _valid_label(db, scope, job.label_id)
+        except HTTPException as error:
+            job.status = "cancelled"
+            job.detail = str(error.detail)
+            db.commit()
+            return {"job": None}
+        return {"job": {
+            "id": job.id, "html": construire_fragment_impression(_response(row, "/api/haccp/registre")),
+            "widthMm": station.width_mm, "heightMm": station.height_mm,
+        }}
+
+    def acknowledge_job(
+        db: Session, scope: str, relay_id: str, job_id: uuid.UUID, status: str,
+        transport: str = "windows",
+    ) -> dict:
+        _station(db, scope, relay_id)
+        job = db.scalar(select(HaccpPrintJob).where(
+            HaccpPrintJob.id == str(job_id), HaccpPrintJob.scope_key == scope,
+            HaccpPrintJob.relay_id == relay_id,
+        ))
+        if job is None:
+            raise HTTPException(404, "Demande d'impression introuvable.")
+        if _job_transport(db, job) != transport:
+            raise HTTPException(409, "Cette demande est reservee a un autre transport d'impression.")
+        if job.status in {"accepted", "uncertain"}:
+            return _job_response(job, transport)
+        if job.status != "claimed":
+            raise HTTPException(409, "Cette demande n'a pas ete prise en charge par le poste.")
+        detail = ("Acceptee par le spouleur ; sortie papier a verifier."
+                  if status == "accepted" else "Impression incertaine. Verifiez le papier et le poste ; aucun nouvel essai automatique.")
+        db.execute(update(HaccpPrintJob).where(
+            HaccpPrintJob.id == job.id, HaccpPrintJob.status == "claimed",
+        ).values(status=status, detail=detail,
+                 accepted_at=_now() if status == "accepted" else None))
+        db.commit()
+        db.refresh(job)
+        return _job_response(job, transport)
 
     @router.get("/etat")
     async def state(
@@ -211,6 +315,76 @@ def make_haccp_print_router(
             db.commit()
             return {"configured": True}
 
+    @router.post("/relais/associer")
+    async def pair_relay(
+        body: RelayStationConfig, request: Request,
+        scope: str = Depends(resolve_scope), db: Session = Depends(get_db),
+    ) -> dict:
+        forwarded = await proxy(request, "/relais/associer", body)
+        if forwarded is not None:
+            return forwarded
+        if getattr(request.state, "haccp_kitchen", None) is not None:
+            raise HTTPException(403, "Associez un relais depuis le compte du chef.")
+        owner_user_id = getattr(request.state, "haccp_actor", None)
+        if not owner_user_id:
+            raise HTTPException(403, "Identite du chef requise pour associer le relais.")
+        with database_errors(db):
+            station = db.get(HaccpPrintStation, scope)
+            if station is not None and station.relay_id != str(body.relay_id) and not body.replace_existing:
+                raise HTTPException(409, "Un autre poste est associe. Confirmez explicitement son remplacement.")
+            if station is not None and station.relay_id != str(body.relay_id):
+                db.execute(update(HaccpPrintJob).where(
+                    HaccpPrintJob.scope_key == scope, HaccpPrintJob.relay_id == station.relay_id,
+                    HaccpPrintJob.status == "pending",
+                ).values(status="cancelled", detail="Poste remplacé ; demande non transmise."))
+                db.execute(update(HaccpPrintJob).where(
+                    HaccpPrintJob.scope_key == scope, HaccpPrintJob.relay_id == station.relay_id,
+                    HaccpPrintJob.status == "claimed",
+                ).values(status="uncertain", detail="Poste remplacé pendant l'impression. Vérifiez le papier ; aucun nouvel essai automatique."))
+            if station is None:
+                station = HaccpPrintStation(scope_key=scope, relay_id=str(body.relay_id))
+                db.add(station)
+            station.relay_id = str(body.relay_id)
+            station.device_name = body.device_name
+            station.width_mm = body.width_mm
+            station.height_mm = body.height_mm
+            station.last_seen = _now() - timedelta(minutes=5)
+            db.execute(delete(HaccpPrintRelayCredential).where(HaccpPrintRelayCredential.scope_key == scope))
+            token = secrets.token_urlsafe(32)
+            db.add(HaccpPrintRelayCredential(
+                token_hash=hashlib.sha256(token.encode("utf-8")).hexdigest(),
+                scope_key=scope, relay_id=str(body.relay_id), owner_user_id=str(owner_user_id),
+                created_at=_now(),
+            ))
+            db.commit()
+            return {"configured": True, "relay_id": str(body.relay_id), "token": token}
+
+    @router.get("/relais/config")
+    async def relay_config(request: Request, db: Session = Depends(get_db)) -> dict:
+        with database_errors(db):
+            _credential, station = await authenticate_relay(request, db)
+            station.last_seen = _now()
+            db.commit()
+            return {
+                "relay_id": station.relay_id, "device_name": station.device_name,
+                "width_mm": station.width_mm, "height_mm": station.height_mm,
+            }
+
+    @router.post("/relais/prochaine")
+    async def relay_claim(request: Request, db: Session = Depends(get_db)) -> dict:
+        with database_errors(db):
+            credential, _station_row = await authenticate_relay(request, db)
+            return claim_job(db, credential.scope_key, credential.relay_id, "linux")
+
+    @router.post("/relais/demandes/{job_id}/confirmation")
+    async def relay_acknowledge(
+        job_id: uuid.UUID, body: RelayAcknowledgement, request: Request,
+        db: Session = Depends(get_db),
+    ) -> dict:
+        with database_errors(db):
+            credential, _station_row = await authenticate_relay(request, db)
+            return acknowledge_job(db, credential.scope_key, credential.relay_id, job_id, body.status, "linux")
+
     @router.post("/demandes")
     async def enqueue(
         body: PrintRequest, request: Request,
@@ -230,7 +404,7 @@ def make_haccp_print_router(
                 return _job_response(existing, _job_transport(db, existing))
             station = _station(db, scope)
             if station.last_seen < _now() - timedelta(seconds=30):
-                raise HTTPException(409, "Le poste d'impression est hors ligne. Ouvrez ΣIRIUS sur le PC.")
+                raise HTTPException(409, "Le relais d'impression est hors ligne. Vérifiez qu'il est allumé et connecté.")
             job = HaccpPrintJob(
                 id=str(uuid.uuid4()), scope_key=scope, label_id=row.id, relay_id=station.relay_id,
                 status="pending", created_at=_now(),
@@ -246,7 +420,7 @@ def make_haccp_print_router(
                 if existing is None:
                     raise
                 return _job_response(existing, _job_transport(db, existing))
-            return _job_response(job)
+            return _job_response(job, _job_transport(db, job))
 
     @router.post("/prochaine")
     async def claim(
@@ -257,38 +431,7 @@ def make_haccp_print_router(
         if forwarded is not None:
             return forwarded
         with database_errors(db):
-            station = _station(db, scope, str(body.relay_id))
-            station.last_seen = _now()
-            db.commit()
-            job = db.scalar(select(HaccpPrintJob).where(
-                HaccpPrintJob.scope_key == scope, HaccpPrintJob.relay_id == station.relay_id,
-                HaccpPrintJob.status == "pending",
-                ~select(HaccpAndroidPrintTarget.job_id).where(
-                    HaccpAndroidPrintTarget.job_id == HaccpPrintJob.id,
-                ).exists(),
-                ~select(HaccpMobilePrintTarget.job_id).where(
-                    HaccpMobilePrintTarget.job_id == HaccpPrintJob.id,
-                ).exists(),
-            ).order_by(HaccpPrintJob.created_at, HaccpPrintJob.id).limit(1))
-            if job is None:
-                return {"job": None}
-            updated = db.execute(update(HaccpPrintJob).where(
-                HaccpPrintJob.id == job.id, HaccpPrintJob.status == "pending",
-            ).values(status="claimed", claimed_at=_now()))
-            db.commit()
-            if updated.rowcount != 1:
-                return {"job": None}
-            try:
-                row = _valid_label(db, scope, job.label_id)
-            except HTTPException as error:
-                job.status = "cancelled"
-                job.detail = str(error.detail)
-                db.commit()
-                return {"job": None}
-            return {"job": {
-                "id": job.id, "html": construire_fragment_impression(_response(row, "/api/haccp/registre")),
-                "widthMm": station.width_mm, "heightMm": station.height_mm,
-            }}
+            return claim_job(db, scope, str(body.relay_id))
 
     @router.post("/demandes/{job_id}/confirmation")
     async def acknowledge(
@@ -299,28 +442,7 @@ def make_haccp_print_router(
         if forwarded is not None:
             return forwarded
         with database_errors(db):
-            _station(db, scope, str(body.relay_id))
-            job = db.scalar(select(HaccpPrintJob).where(
-                HaccpPrintJob.id == str(job_id), HaccpPrintJob.scope_key == scope,
-                HaccpPrintJob.relay_id == str(body.relay_id),
-            ))
-            if job is None:
-                raise HTTPException(404, "Demande d'impression introuvable.")
-            if _job_transport(db, job) != "windows":
-                raise HTTPException(409, "Cette demande est reservee au telephone, pas au spouleur Windows.")
-            if job.status in {"accepted", "uncertain"}:
-                return _job_response(job)
-            if job.status != "claimed":
-                raise HTTPException(409, "Cette demande n'a pas ete prise en charge par le poste.")
-            detail = ("Acceptee par le spouleur Windows ; sortie papier a verifier."
-                      if body.status == "accepted" else "Impression incertaine. Verifiez le papier et le poste ; aucun nouvel essai automatique.")
-            db.execute(update(HaccpPrintJob).where(
-                HaccpPrintJob.id == job.id, HaccpPrintJob.status == "claimed",
-            ).values(status=body.status, detail=detail,
-                     accepted_at=_now() if body.status == "accepted" else None))
-            db.commit()
-            db.refresh(job)
-            return _job_response(job)
+            return acknowledge_job(db, scope, str(body.relay_id), job_id, body.status)
 
     def mobile_kitchen(request: Request, scope: str) -> tuple[str, str]:
         if cloud_link.relay_allowed():

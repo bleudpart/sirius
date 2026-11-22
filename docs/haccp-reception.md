@@ -349,6 +349,27 @@ verifier le papier et le registre avant toute autre action ; aucune
 reimpression automatique n'est effectuee. Le QR reste limite a son
 etablissement et le relais Windows ne traite pas cette demande mobile.
 
+#### Relais Raspberry Pi (Linux)
+
+Le chef peut associer un relais Linux depuis le site ΣIRIUS. L'association
+emet un jeton aleatoire limite a la file d'impression de cet etablissement ;
+seul son hash est conserve sur le serveur et le mot de passe du compte n'est
+jamais copie sur le Pi. Le jeton est affiche une seule fois. Un nouvel
+appairage le revoque ; le remplacement d'un autre poste exige une confirmation
+explicite. Les demandes en attente de l'ancien poste sont annulees et celles
+deja prises en charge deviennent incertaines.
+
+Sur Raspberry Pi OS, executer `backend/install_haccp_linux_relay.sh`, ajouter
+la Brother dans CUPS avec le pilote disponible pour le modele, puis saisir le
+jeton avec le programme `haccp_linux_relay.py --configure` (la saisie est
+masquee). Le service `sirius-haccp-relay.service` interroge ensuite ΣIRIUS par
+HTTPS ; il n'ouvre aucun port entrant. Le journal local conserve les travaux
+soumis et classe une interruption comme incertaine, sans les reimprimer.
+
+La file CUPS, le pilote Brother, la taille 62 × 50 mm, la coupe et la reprise
+apres coupure de courant doivent etre verifies avec l'imprimante reelle avant
+utilisation. Un retour positif de CUPS ne prouve pas la sortie papier.
+
 ### Liste partagee des preparations
 
 Depuis la page Etiquettes, dans **Preparation**, le chef connecte ou un
