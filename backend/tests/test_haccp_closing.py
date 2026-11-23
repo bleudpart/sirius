@@ -217,6 +217,8 @@ def test_real_chat_and_sse_closing_report_bypass_models_and_quotas(store, monkey
     monkeypatch.setattr(server.usage_quota, "consume", no_model)
     monkeypatch.setattr(server.cloud_link, "should_relay_chat", lambda keys: True)
     monkeypatch.setattr(server.cloud_link, "relay_json", no_model)
+    report_day = closing.closing_report_day
+    monkeypatch.setattr(closing, "closing_report_day", lambda text, today=None: report_day(text, today or DAY))
     label(conforme_reception=False, commentaire_anomalie="Vérifier le lot.")
     app = FastAPI()
     app.include_router(server.api_router)

@@ -42,6 +42,7 @@ export default function HaccpLabelCapture({
   const [cameraError, setCameraError] = useState("");
   const [printState, setPrintState] = useState("");
   const [noStation, setNoStation] = useState(false);
+  const [printQueued, setPrintQueued] = useState(false);
   const [printSuccess, setPrintSuccess] = useState(false);
   const [preview, setPreview] = useState(null);
   const [cameraReady, setCameraReady] = useState(false);
@@ -124,12 +125,12 @@ export default function HaccpLabelCapture({
   }, [cameraAttempt, savedRecord]);
 
   const changeMode = (next) => {
-    setMode(next); setConfirmed(false); setResult(null); setError(""); setPrintState(""); setNoStation(false);
+    setMode(next); setConfirmed(false); setResult(null); setError(""); setPrintState(""); setPrintQueued(false); setNoStation(false);
   };
   const save = async (event, selectedFile = file) => {
     event?.preventDefault();
     if (pending.current) return;
-    setError(""); setResult(null); setPrintState(""); setNoStation(false);
+    setError(""); setResult(null); setPrintState(""); setPrintQueued(false); setNoStation(false);
     if (!sessionReady) {
       setError("Ouvrez ou reprenez le dossier de l’établissement avant le scan.");
       return;
@@ -217,7 +218,7 @@ export default function HaccpLabelCapture({
         throw new Error("Capture vide ou supérieure à 20 Mo. Réessayez en cadrant plus près.");
       }
       const selectedFile = new File([blob], "etiquette.jpg", { type: "image/jpeg" });
-      setFile(selectedFile); setResult(null); setPrintState(""); setNoStation(false);
+      setFile(selectedFile); setResult(null); setPrintState(""); setPrintQueued(false); setNoStation(false);
       captureId.current = null; submitted.current = null;
       if (previewRef.current) URL.revokeObjectURL(previewRef.current);
       previewRef.current = URL.createObjectURL(selectedFile);
@@ -250,6 +251,7 @@ export default function HaccpLabelCapture({
     try {
       const job = kitchenToken ? await printHaccpLabel(result.id, result.type_operation, kitchenToken)
         : await printHaccpLabel(result.id, result.type_operation);
+      setPrintQueued(true);
       setPrintState(`${haccpPrintStatus(job.status, job.transport)}. ${job.detail || ""} Aucun doublon ne sera envoyé automatiquement.`);
       if (kitchenMode && job.status === "accepted") showKitchenPrintSuccess();
     } catch (failure) {
@@ -278,7 +280,7 @@ export default function HaccpLabelCapture({
       onScanAgain();
       return;
     }
-    setResult(null); setError(""); setPrintState(""); setNoStation(false); setPrintSuccess(false); setConfirmed(false); setFile(null);
+    setResult(null); setError(""); setPrintState(""); setPrintQueued(false); setNoStation(false); setPrintSuccess(false); setConfirmed(false); setFile(null);
     captureId.current = null; submitted.current = null;
     if (previewRef.current) URL.revokeObjectURL(previewRef.current);
     previewRef.current = null; setPreview(null);
@@ -457,7 +459,7 @@ export default function HaccpLabelCapture({
               </button>
               {printState && <button disabled={busy} onClick={checkPrintState}>Voir l’état d’impression</button>}
             </>}
-            {!kitchenMode && !kitchenToken && <details><summary>Secours manuel (risque de doublon)</summary><p>Uniquement si aucune demande n’a été envoyée au relais. Vérifiez le registre et le papier avant toute impression manuelle.</p><button disabled={busy || (!autoPrint && !!printState)} onClick={print}>Imprimer l’étiquette {isPreparation ? "de préparation" : "d’ouverture"} manuellement</button></details>}
+            {!kitchenMode && !kitchenToken && <details><summary>Secours manuel (risque de doublon)</summary><p>Uniquement si aucune demande n’a été envoyée au relais. Vérifiez le registre et le papier avant toute impression manuelle.</p><button disabled={busy || (autoPrint ? printQueued : !!printState)} onClick={print}>Imprimer l’étiquette {isPreparation ? "de préparation" : "d’ouverture"} manuellement</button></details>}
           </>}
           {printState && <p role="status">{printState}</p>}
         </>}

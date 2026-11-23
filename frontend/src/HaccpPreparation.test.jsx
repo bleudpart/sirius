@@ -271,6 +271,26 @@ test("without a print station the label stays saved and browser printing is offe
   expect(printHaccpDocument).toHaveBeenCalledWith("<html>PREPARATION TEST</html>", expect.anything(), expect.any(Function));
 });
 
+test("browsing the mise en place list with the keyboard prints nothing until Enter", async () => {
+  await render({}, { version: 1, noms: ["Soupe TEST", "Sauce"], duree_heures: 72, reference_pms: "PMS en vigueur" });
+  const select = field("Mise en place de la carte");
+  await act(async () => select.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })));
+  await change(select, "Sauce");
+  expect(global.fetch).not.toHaveBeenCalled();
+  expect(field("Nom du produit").value).toBe("Sauce");
+  await act(async () => select.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+  expect(JSON.parse(global.fetch.mock.calls[0][1].body).nom_produit).toBe("Sauce");
+});
+
+test("the manual fallback is locked once the automatic request is queued", async () => {
+  await render();
+  await complete();
+  await submit();
+  expect(print).toHaveBeenCalledTimes(1);
+  expect(button("Imprimer l’étiquette de préparation manuellement").disabled).toBe(true);
+});
+
 test("browser print remains a fallback when the automatic request fails", async () => {
   print.mockRejectedValueOnce(new Error("Relais absent"));
   await render();

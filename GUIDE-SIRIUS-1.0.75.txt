@@ -1,0 +1,17 @@
+ΣIRIUS 1.0.75 - NOTE DE VERSION
+==============================
+
+Cette version regroupe dans l'installateur Windows, la version portable et
+l'APK Android les évolutions publiées sur le site depuis l'installateur 1.0.74 :
+
+- liste « Mise en place de la carte » avec durée prudente par produit ;
+- DLC calculée automatiquement à l'heure du choix du produit ;
+- quantité facultative imprimée sur l'étiquette de préparation ;
+- étiquette générée et impression lancée sans confirmation ;
+- message clair quand aucune imprimante n'est reliée à ΣIRIUS ;
+- au clavier, parcourir la liste n'imprime rien : Entrée valide le produit ;
+- secours manuel verrouillé une fois la demande d'impression acceptée ;
+- écran de démarrage plus court, au style du HUD.
+
+Cette note ne confirme pas à elle seule que les fichiers ont été construits,
+installés, testés ou publiés.
