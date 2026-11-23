@@ -3,12 +3,9 @@ import { createRoot } from "react-dom/client";
 import { BootScreen } from "./HudPanels";
 import { APP_RELEASE, APP_VERSION } from "@/version";
 import { speakCinematic, cancelSpeech } from "@/voice";
-import { generateBootPresentation } from "@/bootPresentation";
 import { readAccountSetup } from "@/accountSetup";
 
-jest.mock("@/bootPresentation", () => ({ generateBootPresentation: jest.fn() }));
 jest.mock("@/accountSetup", () => ({ readAccountSetup: jest.fn() }));
-
 jest.mock("@/voice", () => ({
   speakCinematic: jest.fn(),
   cancelSpeech: jest.fn(),
@@ -24,26 +21,28 @@ let container;
 let root;
 let originalFetch;
 let originalRecognition;
-const render = async (element, { paced = true } = {}) => {
-  await act(async () => root.render(element));
-  if (paced) {
-    for (let i = 0; i < 4; i += 1) {
-      await act(async () => jest.advanceTimersByTime(700));
-    }
-  }
+const flush = async (ms = 0) => {
+  await act(async () => {
+    jest.advanceTimersByTime(ms);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
 };
-const tap = () => act(() => container.querySelector('[data-testid="boot-screen"]').click());
+const render = async (element) => {
+  await act(async () => root.render(element));
+  await flush();
+};
+const voice = () => speakCinematic.mock.calls[0][1];
 
 beforeEach(() => {
   jest.useFakeTimers();
-  jest.setSystemTime(new Date(2026, 0, 5, 10));
+  jest.setSystemTime(new Date(2026, 0, 5, 20));
   jest.clearAllMocks();
   originalFetch = global.fetch;
   originalRecognition = window.SpeechRecognition;
   window.SpeechRecognition = jest.fn();
   global.fetch = jest.fn().mockResolvedValue({ ok: true });
   readAccountSetup.mockResolvedValue({ services: [] });
-  generateBootPresentation.mockResolvedValue("Je suis Sirius. Je vous aide à consulter et comprendre les informations disponibles.");
   delete window.__siriusBootSpoken;
   container = document.createElement("div");
   root = createRoot(container);
@@ -58,290 +57,127 @@ afterEach(() => {
   else window.SpeechRecognition = originalRecognition;
 });
 
-test.each([true, false])("boot greets only the first name when the server responds: %s", async connected => {
-  await render(<BootScreen userName="  daniel partel  " onDone={jest.fn()}
-    probeBrain={() => Promise.resolve(connected)} />);
-  if (!connected) {
-    for (let i = 0; i < 12; i += 1) await flush(2000);
-  }
-  expect(container.querySelector("h1").textContent).toBe("Bienvenue, Daniel.");
-  expect(speakCinematic.mock.calls[0][0]).toContain("Je suis ΣIRIUS. Bonjour Daniel");
-  expect(speakCinematic.mock.calls[0][0]).not.toMatch(/partel/i);
-});
-
-test.each([
-  [4, "Bonsoir"],
-  [5, "Bonjour"],
-  [16, "Bonjour"],
-  [17, "Bonsoir"],
-  [22, "Bonsoir"],
-])("the boot introduces itself before the local greeting at %i h", async (hour, greeting) => {
-  jest.setSystemTime(new Date(2026, 0, 5, hour));
-  await render(<BootScreen userName="Daniel" onDone={jest.fn()} />);
-  const [message, callbacks] = speakCinematic.mock.calls[0];
-  const introduction = `Je suis ΣIRIUS. ${greeting} Daniel.`;
-  expect(message).toContain(introduction);
-  act(() => callbacks.onend());
-  expect(container.querySelector('[data-testid="boot-ready"]').textContent).toContain(introduction);
-});
-
-test("the greeting is selected after checks and stays in sync while narration plays", async () => {
-  jest.setSystemTime(new Date(2026, 0, 5, 16, 59, 58));
-  await render(<BootScreen userName="Daniel" onDone={jest.fn()} />);
-  const [message, callbacks] = speakCinematic.mock.calls[0];
-  expect(message).toContain("Je suis ΣIRIUS. Bonsoir Daniel.");
-  jest.setSystemTime(new Date(2026, 0, 6, 9));
-  act(() => callbacks.onend());
-  expect(container.querySelector('[data-testid="boot-ready"]').textContent)
-    .toContain("Je suis ΣIRIUS. Bonsoir Daniel.");
-});
-
-test("an offline boot introduces itself before the evening greeting", async () => {
-  jest.setSystemTime(new Date(2026, 0, 5, 20));
-  await render(<BootScreen userName="Daniel" onDone={jest.fn()} probeBrain={() => Promise.resolve(false)} />);
-  for (let i = 0; i < 12; i += 1) await flush(2000);
-  expect(speakCinematic.mock.calls[0][0])
-    .toContain("Je suis ΣIRIUS. Bonsoir Daniel, le serveur ne répond pas encore.");
-});
-
-test("opens the HUD when loading and narration both finish", async () => {
-  const onDone = jest.fn();
-  await render(<BootScreen connected onDone={onDone} />);
-  const { onstart, onend } = speakCinematic.mock.calls[0][1];
-  act(() => onstart());
-  act(() => jest.advanceTimersByTime(5000));
-  expect(onDone).not.toHaveBeenCalled();
-  act(() => onend());
-  act(() => jest.advanceTimersByTime(500));
-  expect(onDone).toHaveBeenCalledTimes(1);
-  expect(cancelSpeech).toHaveBeenCalled();
-  act(() => jest.advanceTimersByTime(30000));
-  expect(onDone).toHaveBeenCalledTimes(1);
-});
-
-test("a narration that never starts reports the unavailable voice and releases the HUD", async () => {
-  const onDone = jest.fn();
-  await render(<BootScreen connected onDone={onDone} />);
-  act(() => jest.advanceTimersByTime(5000));
-  act(() => jest.advanceTimersByTime(10000));
-  expect(container.textContent).toContain("voix indisponible");
-  act(() => jest.advanceTimersByTime(500));
-  expect(onDone).toHaveBeenCalledTimes(1);
-});
-
-test("the expanded module catalogue holds the boot until it is collapsed", async () => {
-  const onDone = jest.fn();
-  await render(<BootScreen onDone={onDone} />);
-  const catalogue = container.querySelector('[data-testid="boot-modules"]');
-  await act(async () => {
-    catalogue.open = true;
-    catalogue.dispatchEvent(new Event("toggle"));
-  });
-  act(() => speakCinematic.mock.calls[0][1].onstart());
-  act(() => speakCinematic.mock.calls[0][1].onend());
-  act(() => jest.advanceTimersByTime(1000));
-  expect(onDone).not.toHaveBeenCalled();
-  await act(async () => {
-    catalogue.open = false;
-    catalogue.dispatchEvent(new Event("toggle"));
-  });
-  act(() => jest.advanceTimersByTime(1000));
-  expect(onDone).toHaveBeenCalledTimes(1);
-});
-
-test("repeated taps while closing finish only once", async () => {
-  const onDone = jest.fn();
-  await render(<BootScreen connected onDone={onDone} />);
-  act(() => speakCinematic.mock.calls[0][1].onstart());
-  act(() => speakCinematic.mock.calls[0][1].onend());
-  tap();
-  tap();
-  act(() => jest.advanceTimersByTime(500));
-  expect(onDone).toHaveBeenCalledTimes(1);
-});
-
-test("unmount cancels the pending handoff", async () => {
-  const onDone = jest.fn();
-  await render(<BootScreen connected onDone={onDone} />);
-  act(() => speakCinematic.mock.calls[0][1].onstart());
-  act(() => speakCinematic.mock.calls[0][1].onend());
-  tap();
-  act(() => root.unmount());
-  root = createRoot(container);
-  act(() => jest.advanceTimersByTime(500));
-  expect(onDone).not.toHaveBeenCalled();
-});
-
-test("opening a module and automatic completion cannot hand off twice", async () => {
-  const onDone = jest.fn();
-  const onOpenModule = jest.fn();
-  await render(<BootScreen connected onDone={onDone} onOpenModule={onOpenModule} />);
-  act(() => jest.advanceTimersByTime(5000));
-  act(() => container.querySelector('[data-testid="boot-module-argus"]').click());
-  act(() => speakCinematic.mock.calls[0][1].onend());
-  act(() => jest.advanceTimersByTime(500));
-  expect(onDone).toHaveBeenCalledTimes(1);
-  expect(onOpenModule).toHaveBeenCalledWith("argus");
-});
-
-const flush = async (ms) => {
-  let remaining = ms;
-  do {
-    const step = Math.min(remaining, 700);
-    await act(async () => {
-      jest.advanceTimersByTime(step);
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-    remaining -= step;
-  } while (remaining > 0);
-};
-
-test("four truthful checks are paced over 2.8 seconds without delaying network probes", async () => {
-  const probeBrain = jest.fn().mockResolvedValue(true);
-  await render(<BootScreen onDone={jest.fn()} probeBrain={probeBrain} />, { paced: false });
-  const progress = container.querySelector('[role="progressbar"]');
-  expect(probeBrain).toHaveBeenCalledTimes(1);
-  expect(readAccountSetup).toHaveBeenCalledTimes(1);
-  expect(progress.getAttribute("aria-valuenow")).toBe("0");
-  expect(speakCinematic).not.toHaveBeenCalled();
-  await flush(700);
-  expect(progress.getAttribute("aria-valuenow")).toBe("25");
-  await flush(1400);
-  expect(progress.getAttribute("aria-valuenow")).toBe("75");
-  expect(speakCinematic).not.toHaveBeenCalled();
-  await flush(700);
-  expect(progress.getAttribute("aria-valuenow")).toBe("100");
+test("uses the HUD heading and announces synchronised systems with one short sentence", async () => {
+  await render(<BootScreen userName="daniel partel" onDone={jest.fn()} />);
+  expect(container.querySelector(".boot-kicker").textContent).toBe("Je suis ΣIRIUS");
+  expect(container.querySelector("h1").textContent).toBe("Bonsoir, Daniel");
+  expect(container.querySelector('[data-testid="boot-phase"]').textContent)
+    .toBe("Systèmes synchronisés · cœur réactif en ligne");
+  expect(container.querySelector('[role="progressbar"]').getAttribute("aria-valuenow")).toBe("100");
   expect(speakCinematic).toHaveBeenCalledTimes(1);
-  expect(container.querySelector('[role="log"]').textContent).toContain("CONNEXION ÉTABLIE");
-});
-
-test("presentation follows the boot reference while keeping the animated core and real progress", async () => {
-  await render(<BootScreen connected userName="Daniel" onDone={jest.fn()} />);
-  expect(container.querySelector('[data-testid="boot-screen"]').className).toContain("boot-reference");
-  expect(container.querySelector("h1").textContent).toBe("Bienvenue, Daniel.");
-  expect(container.querySelector('[aria-label="Initialisation de ΣIRIUS"]').className).toContain("boot-status-reference");
-  expect(container.querySelector('[data-testid="boot-reactor"]')).not.toBeNull();
-  expect(container.querySelector(".boot-signature")).toBeNull();
-  expect(container.querySelector(".boot-tagline")).toBeNull();
-  expect(container.querySelector(".boot-acronym")).toBeNull();
-  expect(container.querySelector(".boot-status h2").textContent).toBe("Initialisation de ΣIRIUS…");
-  expect(container.querySelector(".boot-check-details summary").textContent).toBe("Détails des vérifications");
-  expect(container.querySelector(".boot-check-details [role='log']")).not.toBeNull();
+  expect(speakCinematic.mock.calls[0][0])
+    .toBe("Bonsoir Daniel. Systèmes synchronisés. Cœur réactif en ligne. Je suis prêt.");
+  expect(container.querySelector('[data-testid="boot-modules"]')).toBeNull();
   const copyright = container.querySelector('[data-testid="boot-copyright"]');
-  expect(copyright.textContent).toContain("COPYRIGHT © 2026 ΣIRIUS par Daniel Partel");
   expect(copyright.querySelector(".footer-version-badge").textContent).toBe(`v${APP_VERSION}`);
   expect(copyright.querySelector(".footer-version-badge").title).toBe(APP_RELEASE);
-  expect(container.querySelector(".boot-welcome-sub")).toBeNull();
-  expect(container.textContent).not.toContain("Votre assistant intelligent");
-  expect(container.textContent).not.toContain("Votre espace prend vie");
-  expect(container.textContent).not.toContain("VOTRE INTELLIGENCE · VOTRE UNIVERS");
-  expect(container.textContent).not.toContain("Une intelligence à votre écoute");
-  expect(container.querySelectorAll(".boot-acro-item")).toHaveLength(0);
-  const catalogue = container.querySelector('[data-testid="boot-modules"]');
-  expect(catalogue.tagName).toBe("DETAILS");
-  expect(catalogue.querySelector("summary").textContent).toBe("L’univers de ΣIRIUS");
-  const progress = container.querySelector('[role="progressbar"]');
-  expect(progress.getAttribute("aria-valuenow")).toBe("100");
 });
 
-test("progress waits for real server and service responses rather than elapsed time", async () => {
+test("opens the HUD as soon as the greeting ends, without cutting it", async () => {
+  const onDone = jest.fn();
+  await render(<BootScreen onDone={onDone} />);
+  act(() => voice().onstart());
+  await flush(4000);
+  expect(onDone).not.toHaveBeenCalled();
+  act(() => voice().onend());
+  await flush(500);
+  expect(onDone).toHaveBeenCalledTimes(1);
+  expect(cancelSpeech).not.toHaveBeenCalled();
+});
+
+test("a voice that does not start does not hold the boot", async () => {
+  const onDone = jest.fn();
+  await render(<BootScreen onDone={onDone} />);
+  await flush(2500);
+  await flush(500);
+  expect(onDone).toHaveBeenCalledTimes(1);
+});
+
+test("without voice the boot stays visible briefly, then opens the HUD", async () => {
+  window.__siriusBootSpoken = true;
+  const onDone = jest.fn();
+  await render(<BootScreen onDone={onDone} />);
+  expect(speakCinematic).not.toHaveBeenCalled();
+  await flush(1000);
+  expect(container.querySelector('[data-testid="boot-screen"]').className).not.toContain("closing");
+  await flush(200);
+  await flush(500);
+  expect(onDone).toHaveBeenCalledTimes(1);
+});
+
+test("progress follows real server and service responses", async () => {
   let finishBrain;
   let finishServices;
   const brain = new Promise((resolve) => { finishBrain = resolve; });
   const services = new Promise((resolve) => { finishServices = resolve; });
-  await render(<BootScreen connected onDone={jest.fn()} probeBrain={() => brain} probeServices={() => services} />);
+  await render(<BootScreen onDone={jest.fn()} probeBrain={() => brain} probeServices={() => services} />);
   const progress = container.querySelector('[role="progressbar"]');
-  const initial = progress.getAttribute("aria-valuenow");
-  await flush(10000);
-  expect(progress.getAttribute("aria-valuenow")).toBe(initial);
-  expect(speakCinematic).not.toHaveBeenCalled();
+  expect(progress.getAttribute("aria-valuenow")).toBe("50");
+  expect(container.querySelector('[data-testid="boot-phase"]').textContent).toBe("Synchronisation des systèmes…");
   await act(async () => finishBrain(true));
-  expect(Number(progress.getAttribute("aria-valuenow"))).toBeLessThan(100);
-  await act(async () => finishServices({ services: [{ id: "chat", label: "Réponses IA", state: "not_configured" }] }));
-  await flush(5000);
+  expect(progress.getAttribute("aria-valuenow")).toBe("75");
+  expect(speakCinematic).not.toHaveBeenCalled();
+  await act(async () => finishServices({ services: [] }));
   expect(progress.getAttribute("aria-valuenow")).toBe("100");
-  expect(container.textContent).toContain("Réponses IA : non configuré");
-  expect(speakCinematic.mock.calls[0][0]).toContain("Je suis ΣIRIUS. Bonjour. Connexion établie. Je suis prêt à vous accompagner.");
-  expect(speakCinematic.mock.calls[0][0]).not.toContain("Réponses IA.");
-  expect(generateBootPresentation).not.toHaveBeenCalled();
-  expect(container.querySelector('[role="log"]').textContent).toContain("REÇUE");
+  expect(speakCinematic).toHaveBeenCalledTimes(1);
 });
 
-test("the real welcome message appears progressively at a readable pace", async () => {
-  await render(<BootScreen connected onDone={jest.fn()} />);
-  const ready = container.querySelector('[data-testid="boot-ready"]');
-  const fullMessage = "Je suis ΣIRIUS. Bonjour. Connexion établie. Je suis prêt à vous accompagner.";
-  const narrated = speakCinematic.mock.calls[0][0];
-  const offset = narrated.length - fullMessage.length;
-  expect(ready.textContent).toBe("");
-  await flush(1000);
-  expect(ready.textContent).toBe("");
-  act(() => speakCinematic.mock.calls[0][1].onstart());
-  await flush(320);
-  expect(ready.textContent).toBe("");
-  act(() => speakCinematic.mock.calls[0][1].onprogress(0.5));
-  expect(ready.textContent).toBe("");
-  const fraction = (offset + Math.floor(fullMessage.length / 2)) / narrated.length;
-  act(() => speakCinematic.mock.calls[0][1].onprogress(fraction));
-  const revealed = fullMessage.slice(0, Math.floor(narrated.length * fraction) - offset);
-  expect(ready.textContent).toBe(revealed);
-  await flush(1000);
-  expect(ready.textContent).toBe(revealed);
-  act(() => speakCinematic.mock.calls[0][1].onprogress(0.2));
-  expect(ready.textContent).toBe(revealed);
-  act(() => speakCinematic.mock.calls[0][1].onend());
-  expect(ready.textContent).toBe(fullMessage);
+test("open details hold the boot until they are closed", async () => {
+  window.__siriusBootSpoken = true;
+  const onDone = jest.fn();
+  await render(<BootScreen onDone={onDone} />);
+  const details = container.querySelector(".boot-check-details");
+  act(() => {
+    details.open = true;
+    details.dispatchEvent(new Event("toggle"));
+  });
+  await flush(5000);
+  expect(onDone).not.toHaveBeenCalled();
+  act(() => {
+    details.open = false;
+    details.dispatchEvent(new Event("toggle"));
+  });
+  await flush(1200);
+  await flush(500);
+  expect(onDone).toHaveBeenCalledTimes(1);
 });
 
-test("missing microphone API is reported in both displayed and spoken final script", async () => {
-  delete window.SpeechRecognition;
-  await render(<BootScreen onDone={jest.fn()} />);
-  const [message, callbacks] = speakCinematic.mock.calls[0];
-  expect(message).toContain("L'interface vocale est indisponible.");
-  act(() => callbacks.onend());
-  expect(message.endsWith(container.querySelector('[data-testid="boot-ready"]').textContent)).toBe(true);
-  expect(container.querySelector('[data-testid="boot-ready"]').textContent).toContain("L'interface vocale est indisponible.");
+test("a tap opens the HUD once and stops an unfinished greeting", async () => {
+  const onDone = jest.fn();
+  await render(<BootScreen onDone={onDone} />);
+  act(() => voice().onstart());
+  act(() => container.querySelector('[data-testid="boot-screen"]').click());
+  act(() => container.querySelector('[data-testid="boot-screen"]').click());
+  await flush(500);
+  expect(onDone).toHaveBeenCalledTimes(1);
+  expect(cancelSpeech).toHaveBeenCalledTimes(1);
 });
 
-test("a voice error reveals the current personalized script rather than the initial checking message", async () => {
-  await render(<BootScreen userName="Daniel" onDone={jest.fn()} />);
-  const [message] = speakCinematic.mock.calls[0];
-  act(() => window.dispatchEvent(new CustomEvent("sirius-voice-error")));
-  const displayed = container.querySelector('[data-testid="boot-ready"]').textContent;
-  expect(message.endsWith(displayed)).toBe(true);
-  expect(displayed).toContain("Bonjour Daniel.");
-});
-
-test("a failed service check is a completed failure, never a successful service", async () => {
+test("a failed service check is reported, never announced as ready", async () => {
   const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
   try {
     readAccountSetup.mockRejectedValue(new Error("Services HTTP 503"));
     await render(<BootScreen onDone={jest.fn()} />);
-    expect(container.querySelector('[role="progressbar"]').getAttribute("aria-valuenow")).toBe("100");
     expect(container.textContent).toContain("Services HTTP 503");
-    expect(container.textContent).toContain("Configuration des services");
-    expect(container.textContent).toContain("INDISPONIBLE");
     expect(container.textContent).toContain("Revérifier les services");
-    expect(speakCinematic.mock.calls[0][0]).toContain("Je suis ΣIRIUS. Bonjour, la configuration des services");
-    expect(speakCinematic.mock.calls[0][0]).toContain("la configuration des services n'a pas pu être vérifiée");
-    expect(speakCinematic.mock.calls[0][0]).not.toContain("prêt à être utilisé");
+    expect(container.querySelector('[data-testid="boot-phase"]').textContent).toBe("Services non vérifiés");
+    expect(speakCinematic.mock.calls[0][0]).toBe("Bonsoir. La configuration des services n'a pas pu être vérifiée.");
   } finally {
     warn.mockRestore();
   }
 });
 
-test("retries the brain, then explains the failure instead of opening a dead HUD", async () => {
+test("an unreachable brain keeps the boot open until retry succeeds", async () => {
   const onDone = jest.fn();
   const probeBrain = jest.fn().mockResolvedValue(false);
   await render(<BootScreen onDone={onDone} probeBrain={probeBrain} />);
   for (let i = 0; i < 12; i += 1) await flush(2000);
   expect(probeBrain.mock.calls.length).toBeGreaterThan(5);
-  const alert = container.querySelector('[data-testid="boot-brain-alert"]');
-  expect(alert.textContent).toContain("n'arrive pas à joindre son cerveau");
-  expect(speakCinematic.mock.calls[0][0]).toContain("le serveur ne répond pas encore");
-  act(() => speakCinematic.mock.calls[0][1].onend());
-  await flush(31000);
+  expect(container.querySelector('[data-testid="boot-brain-alert"]').textContent)
+    .toContain("n'arrive pas à joindre son cerveau");
+  expect(speakCinematic.mock.calls[0][0]).toContain("Le serveur ne répond pas encore");
+  act(() => voice().onend());
+  await flush(30000);
   expect(onDone).not.toHaveBeenCalled();
 
   probeBrain.mockResolvedValue(true);
@@ -349,14 +185,12 @@ test("retries the brain, then explains the failure instead of opening a dead HUD
     container.querySelector('[data-testid="boot-brain-retry"]').click();
     await Promise.resolve();
   });
-  await flush(10);
+  await flush();
+  await flush();
   expect(container.querySelector('[data-testid="boot-brain-alert"]')).toBeNull();
-  await flush(5000);
-  expect(container.querySelector('[data-testid="boot-ready"]').textContent)
-    .toBe("Je suis ΣIRIUS. Bonjour. Connexion établie. Je suis prêt à vous accompagner.");
-  expect(container.querySelector('[data-testid="boot-screen"]').className).toContain("closing");
   await flush(500);
   expect(onDone).toHaveBeenCalledTimes(1);
+  expect(speakCinematic).toHaveBeenCalledTimes(1);
 });
 
 test("the user can continue without the brain", async () => {
@@ -364,76 +198,16 @@ test("the user can continue without the brain", async () => {
   await render(<BootScreen onDone={onDone} probeBrain={() => Promise.resolve(false)} />);
   for (let i = 0; i < 12; i += 1) await flush(2000);
   act(() => container.querySelector('[data-testid="boot-brain-continue"]').click());
-  act(() => jest.advanceTimersByTime(500));
-  expect(onDone).toHaveBeenCalledTimes(1);
-});
-
-test("a brain that answers late is announced as ready", async () => {
-  const probeBrain = jest.fn().mockResolvedValueOnce(false).mockResolvedValue(true);
-  await render(<BootScreen onDone={jest.fn()} probeBrain={probeBrain} />);
-  await flush(0);
-  expect(speakCinematic).not.toHaveBeenCalled();
-  tap();
-  expect(speakCinematic).not.toHaveBeenCalled();
-  await flush(2000);
-  await flush(700);
-  expect(speakCinematic.mock.calls[0][0]).toContain("Je suis ΣIRIUS. Bonjour. Connexion établie. Je suis prêt à vous accompagner.");
-});
-
-test("an offline screen does not label completed speech as a stuck reader", async () => {
-  const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
-  try {
-    await render(<BootScreen onDone={jest.fn()} probeBrain={() => Promise.resolve(false)} />);
-    for (let i = 0; i < 12; i += 1) await flush(2000);
-    act(() => speakCinematic.mock.calls[0][1].onend());
-    await flush(150000);
-    expect(warn).not.toHaveBeenCalled();
-    expect(container.textContent).not.toContain("voix indisponible");
-    expect(container.querySelector('[data-testid="boot-brain-alert"]')).not.toBeNull();
-  } finally {
-    warn.mockRestore();
-  }
-});
-
-test("reads the complete status window in order with a natural voice, without an AI introduction", async () => {
-  const onDone = jest.fn();
-  await render(<BootScreen connected userName="Daniel" onDone={onDone} />);
-  const [message, callbacks] = speakCinematic.mock.calls[0];
-  expect(message).toBe("Initialisation de votre espace. Interface ΣIRIUS : Initialisée. Connexion au serveur : Connexion établie. Configuration des services : Reçue. Interface vocale : API disponibles. Je suis ΣIRIUS. Bonjour Daniel. Connexion établie. Je suis prêt à vous accompagner.");
-  expect(callbacks.natural).toBe(true);
-  expect(message).not.toContain("fournisseur non testé");
-  expect(message).not.toContain("Interface Sirius.");
-  expect(message.indexOf("Interface ΣIRIUS")).toBeLessThan(message.indexOf("Bonjour Daniel"));
-  expect(generateBootPresentation).not.toHaveBeenCalled();
-  act(() => callbacks.onstart());
-  act(() => jest.advanceTimersByTime(21000));
-  tap();
-  expect(onDone).not.toHaveBeenCalled();
-  expect(cancelSpeech).not.toHaveBeenCalled();
-  expect(container.textContent).not.toContain("voix indisponible");
-  expect(container.textContent).toContain("Bienvenue, Daniel.");
-  act(() => callbacks.onend());
-  act(() => jest.advanceTimersByTime(500));
-  expect(onDone).toHaveBeenCalledTimes(1);
-});
-
-test("details remain readable after the short welcome until they are closed", async () => {
-  const onDone = jest.fn();
-  await render(<BootScreen userName="Daniel" onDone={onDone} />);
-  const details = container.querySelector(".boot-check-details");
-  act(() => {
-    details.open = true;
-    details.dispatchEvent(new Event("toggle"));
-  });
-  act(() => speakCinematic.mock.calls[0][1].onend());
-  await flush(1000);
-  expect(onDone).not.toHaveBeenCalled();
-  expect(details.textContent).toContain("modèle et services externes non testés");
-  await flush(2000);
-  act(() => {
-    details.open = false;
-    details.dispatchEvent(new Event("toggle"));
-  });
   await flush(500);
   expect(onDone).toHaveBeenCalledTimes(1);
+});
+
+test("unmount cancels the pending handoff", async () => {
+  const onDone = jest.fn();
+  await render(<BootScreen onDone={onDone} />);
+  act(() => container.querySelector('[data-testid="boot-screen"]').click());
+  act(() => root.unmount());
+  root = createRoot(container);
+  await flush(500);
+  expect(onDone).not.toHaveBeenCalled();
 });

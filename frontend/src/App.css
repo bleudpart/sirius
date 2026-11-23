@@ -2097,6 +2097,8 @@ a.auth-submit { text-decoration: none; }
 .boot-brain-actions button + button { border-color: rgba(145, 230, 242, 0.45); background: transparent; color: #bfeff6; }
 .sirius-root.is-booting > :not(.boot-screen) { visibility: hidden; pointer-events: none; }
 .sirius-root.is-booting > .boot-screen { z-index: 100001; }
+/* Les coins dorés du HUD encadrent déjà l'écran de démarrage. */
+.sirius-root.is-booting > .corner { visibility: visible; z-index: 100002; }
 /* Grille alignée sur celle du tableau de bord (.grid-bg, même valeurs) : l'ancienne version
    ici avait une opacité de ligne plus faible (0.07 c'était déjà correct en fait) mais un
    quadrillage plus petit (40px) — remis à 44px/0.06 pour un rendu identique au HUD. */

@@ -514,7 +514,8 @@ test("boot reference keeps diagnostics expandable without changing the animated 
     && rule.selector.includes(".boot-reference .boot-status"));
   expect(shortScreen.nodes.find(({ prop }) => prop === "margin-bottom").value).toBe("0");
   expect(css).toContain(".boot-check-details:not([open]) .boot-display");
-  expect(css).toContain("font: 400 clamp(21px, 5vw, 28px)/1.35 Georgia, serif");
+  expect(css).not.toContain(".boot-reference .boot-status h2");
+  expect(css).toContain(".boot-reference .boot-phase");
   const screen = read("components/HudPanels.jsx");
   expect(screen).toContain("<CoreRings />");
   expect(screen).toContain('<ReactorCore status="thinking" volume={0.35} color="#91e6f2" eco={false} />');

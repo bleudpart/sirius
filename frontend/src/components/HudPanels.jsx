@@ -9,7 +9,6 @@ import { CoreRings, ReactorCore } from "@/components/ReactorVisuals";
 import { LiveClock, LiveDate, useLiveStats } from "@/liveStats";
 import { getLocalDateKey, getTimeOfDayGreeting } from "@/dateTime";
 import { speakCinematic, cancelSpeech, cleanTextForDisplay } from "@/voice";
-import { WORK_MODULES } from "@/workModules";
 import { API_BASE_URL } from "@/lib/api";
 import { readAccountSetup } from "@/accountSetup";
 import { APP_RELEASE, APP_VERSION } from "@/version";
@@ -494,7 +493,13 @@ export function CentralCard({ card, weather, onClose }) {
   );
 }
 
-export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeBrainOnce, probeServices = readAccountSetup }) {
+// L'écran reste visible au moins ce délai pour ne pas clignoter quand tout répond aussitôt.
+const BOOT_MIN_VISIBLE_MS = 1200;
+// Une voix qui ne démarre pas vite (lecture automatique bloquée, synthèse lente) n'est pas attendue.
+const BOOT_VOICE_START_MS = 2500;
+const BOOT_VOICE_CAP_MS = 7000;
+
+export function BootScreen({ onDone, userName, probeBrain = probeBrainOnce, probeServices = readAccountSetup }) {
   const firstName = (userName || "").trim().split(/\s+/)[0];
   const welcomeName = firstName.charAt(0).toLocaleUpperCase("fr-FR") + firstName.slice(1);
   // État du cerveau (serveur) : null = recherche en cours, true = joint, false = injoignable.
@@ -544,8 +549,7 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
     setBrainRun((n) => n + 1);
   };
 
-  // Chaque ligne annonce l'état réellement constaté : afficher « OK » sans vérifier
-  // ferait mentir l'écran de démarrage (la liaison peut échouer pendant qu'il défile).
+  // Chaque ligne annonce l'état réellement constaté, dès qu'il est connu.
   const checks = useMemo(() => {
     // La voix passe par le serveur (/tts lu en Audio) ; la synthèse du navigateur n'est
     // qu'un secours, absente de la WebView Android.
@@ -563,60 +567,9 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
       { label: "Interface vocale", state: speech && recog, success: "API disponibles", scope: "API audio et micro présentes ; permissions, capture et sortie audible non vérifiées par ce contrôle." },
     ];
   }, [brain, servicesDone, services, servicesError]);
-
-  const [verifiedCount, setVerifiedCount] = useState(0);
-  useEffect(() => {
-    setVerifiedCount(0);
-  }, [brainRun]);
-  useEffect(() => {
-    if (verifiedCount >= checks.length || checks[verifiedCount].state === null) return undefined;
-    const timer = setTimeout(() => setVerifiedCount((count) => count + 1), 700);
-    return () => clearTimeout(timer);
-  }, [checks, verifiedCount]);
-  const lines = useMemo(() => checks.map((c, index) => ({
-    label: c.label,
-    status: index >= verifiedCount ? index === verifiedCount ? "VÉRIFICATION…" : "EN ATTENTE"
-      : c.state ? c.success.toUpperCase() : "INDISPONIBLE",
-    tone: index >= verifiedCount ? "pending" : c.state ? "ok" : "fail",
-  })), [checks, verifiedCount]);
-  const progress = Math.round(verifiedCount / checks.length * 100);
-  const [closing, setClosing] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const [catalogueOpen, setCatalogueOpen] = useState(false);
-  const loaded = verifiedCount === checks.length && checks.every(({ state }) => state !== null);
-  const [bootGreeting, setBootGreeting] = useState(null);
-  useEffect(() => {
-    if (loaded && bootGreeting === null) setBootGreeting(getTimeOfDayGreeting());
-  }, [loaded, bootGreeting]);
-  const [speechDone, setSpeechDone] = useState(false);
-  const [speechUnavailable, setSpeechUnavailable] = useState(false);
-  const [speechPlaying, setSpeechPlaying] = useState(false);
-  const closeTimerRef = useRef(null);
-  const closingRef = useRef(false);
-  const speechStartedRef = useRef(false);
-  const speechFinishedRef = useRef(false);
-  const textTimerRef = useRef(null);
-  const audioProgressRef = useRef(false);
-  const introSpeechRef = useRef("");
-  const finishText = () => {
-    clearInterval(textTimerRef.current);
-    textTimerRef.current = null;
-    setReadyTextLength(introSpeechRef.current.length);
-  };
-  useEffect(() => {
-    const reportVoiceError = () => {
-      speechFinishedRef.current = true;
-      setSpeechPlaying(false);
-      setSpeechUnavailable(true);
-      setSpeechDone(true);
-      finishText();
-    };
-    window.addEventListener("sirius-voice-error", reportVoiceError);
-    return () => window.removeEventListener("sirius-voice-error", reportVoiceError);
-  }, []);
-  // On attend le verdict du cerveau avant d'annoncer l'état à voix haute ; un « Réessayer »
-  // ultérieur ne relance pas la présentation.
-  const narrationReady = loaded && bootGreeting !== null;
+  const resolved = checks.filter(({ state }) => state !== null).length;
+  const progress = Math.round(resolved / checks.length * 100);
+  const loaded = resolved === checks.length;
   useEffect(() => {
     if (brain === null) return;
     window.__siriusStartupDiagnostic = {
@@ -624,186 +577,107 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
       checks: checks.map(({ label, state, success, scope }) => ({ label, state, success, scope })),
     };
   }, [brain, checks]);
-  const padRef = useRef(null);
-  const greeting = `${bootGreeting ?? getTimeOfDayGreeting()}${welcomeName ? ` ${welcomeName}` : ""}`;
-  const introduction = `Je suis ΣIRIUS. ${greeting}`;
-  const readyMessage = brain === true && services !== null
-    ? `${introduction}. Connexion établie. Je suis prêt à vous accompagner.`
-    : `${introduction}, ${brain === false
-      ? "le serveur ne répond pas encore. Vous pouvez réessayer la connexion."
-      : "la configuration des services n'a pas pu être vérifiée."}`;
-  const [readyTextLength, setReadyTextLength] = useState(0);
-  const voiceWarnings = checks.filter(({ state, label }) =>
-    state === false && label === "Interface vocale").map(() => "L'interface vocale est indisponible.");
-  const narrationPrefix = [
-    "Initialisation de votre espace.",
-    ...checks.map(({ label, state, success }) => `${label} : ${state === null ? "en cours" : state ? success : "indisponible"}.`),
-  ].join(" ");
-  const welcomeSpeech = [readyMessage, ...voiceWarnings].join(" ");
-  const introSpeech = `${narrationPrefix} ${welcomeSpeech}`;
-  const welcomeOffset = narrationPrefix.length + 1;
-  introSpeechRef.current = introSpeech;
-  const readyTextComplete = readyTextLength >= introSpeech.length;
-  useEffect(() => {
-    setReadyTextLength(0);
-    return () => clearInterval(textTimerRef.current);
-  }, [introSpeech]);
-  const playIntroSpeech = () => {
-    speechFinishedRef.current = false;
-    setSpeechDone(false);
-    setSpeechUnavailable(false);
-    try {
-      const pad = padRef.current;
-      if (pad) {
-        pad.ctx.resume().catch(() => {});
-        pad.master.gain.cancelScheduledValues(pad.ctx.currentTime);
-        pad.master.gain.linearRampToValueAtTime(0.045, pad.ctx.currentTime + 0.25);
-      }
-    } catch (e) {}
-    speakCinematic(introSpeech, {
-      natural: true,
-      onstart: () => {
-        speechStartedRef.current = true;
-        setSpeechPlaying(true);
-        audioProgressRef.current = false;
-        clearInterval(textTimerRef.current);
-        // Estimation jusqu'au premier événement de progression fourni par le lecteur.
-        textTimerRef.current = setInterval(() => {
-          if (!audioProgressRef.current) {
-            setReadyTextLength((length) => Math.min(introSpeech.length - 1, length + 1));
-          }
-        }, 65);
-      },
-      onprogress: (fraction) => {
-        if (!Number.isFinite(fraction) || speechFinishedRef.current || closingRef.current) return;
-        audioProgressRef.current = true;
-        const nextLength = Math.floor(introSpeech.length * Math.max(0, Math.min(1, fraction)));
-        setReadyTextLength((length) => Math.max(length, nextLength));
-      },
-      onend: () => {
-        finishText();
-        speechFinishedRef.current = true;
-        setSpeechPlaying(false);
-        setSpeechDone(true);
-      },
-    });
-  };
 
-  // Fondu de sortie de la nappe sonore
-  const stopPad = () => {
-    const pad = padRef.current;
-    padRef.current = null;
-    if (!pad) return;
-    try {
-      pad.master.gain.linearRampToValueAtTime(0, pad.ctx.currentTime + 0.6);
-      setTimeout(() => { try { pad.ctx.close(); } catch (e) {} }, 700);
-    } catch (e) { try { pad.ctx.close(); } catch (err) {} }
-  };
-  const closeBoot = (moduleId) => {
+  const [timeGreeting] = useState(getTimeOfDayGreeting);
+  const ready = brain === true && services !== null;
+  const spokenGreeting = `${timeGreeting}${welcomeName ? ` ${welcomeName}` : ""}`;
+  const welcomeSpeech = ready
+    ? `${spokenGreeting}. Systèmes synchronisés. Cœur réactif en ligne. Je suis prêt.`
+    : brain === false
+      ? `${spokenGreeting}. Le serveur ne répond pas encore. Vous pouvez réessayer la connexion.`
+      : `${spokenGreeting}. La configuration des services n'a pas pu être vérifiée.`;
+  const phaseTone = !loaded ? "pending" : ready ? "ok" : "fail";
+  const phase = !loaded ? "Synchronisation des systèmes…"
+    : ready ? "Systèmes synchronisés · cœur réactif en ligne"
+      : brain === false ? "Serveur injoignable" : "Services non vérifiés";
+
+  const [closing, setClosing] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [voiceSettled, setVoiceSettled] = useState(false);
+  const mountedAtRef = useRef(Date.now());
+  const closeTimerRef = useRef(null);
+  const closingRef = useRef(false);
+  const speechRequestedRef = useRef(false);
+  const voiceStartedRef = useRef(false);
+  const voiceDoneRef = useRef(false);
+  const closeBoot = () => {
     if (closingRef.current) return;
     closingRef.current = true;
-    cancelSpeech();
-    clearInterval(textTimerRef.current);
+    if (speechRequestedRef.current && !voiceDoneRef.current) cancelSpeech();
     setClosing(true);
-    stopPad();
-    closeTimerRef.current = setTimeout(() => {
-      onDone();
-      if (moduleId && onOpenModule) onOpenModule(moduleId);
-    }, 500);
+    closeTimerRef.current = setTimeout(onDone, 500);
   };
-  useEffect(() => () => {
-    clearTimeout(closeTimerRef.current);
-    clearInterval(textTimerRef.current);
-    cancelSpeech();
+  useEffect(() => {
+    const reportVoiceError = () => {
+      voiceDoneRef.current = true;
+      setVoiceSettled(true);
+    };
+    window.addEventListener("sirius-voice-error", reportVoiceError);
+    return () => {
+      window.removeEventListener("sirius-voice-error", reportVoiceError);
+      clearTimeout(closeTimerRef.current);
+      if (speechRequestedRef.current && !voiceDoneRef.current && !closingRef.current) cancelSpeech();
+    };
   }, []);
-
+  // Une seule phrase d'accueil par chargement ; un « Réessayer » ne la relance pas.
   useEffect(() => {
-    if (!narrationReady) return undefined;
-    // Même script que la fenêtre de vérification, une seule fois par chargement.
-    if (!window.__siriusBootSpoken) {
-      window.__siriusBootSpoken = true;
-      playIntroSpeech();
-    } else {
-      speechFinishedRef.current = true;
-      setSpeechDone(true);
-      finishText();
+    if (!loaded || speechRequestedRef.current) return;
+    speechRequestedRef.current = true;
+    if (window.__siriusBootSpoken) {
+      voiceDoneRef.current = true;
+      setVoiceSettled(true);
+      return;
     }
-    // Nappe sonore cinématique discrète sous la voix (Web Audio, gratuite)
-    try {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      const ctx = new Ctx();
-      ctx.resume().catch(() => {});
-      const master = ctx.createGain();
-      master.gain.setValueAtTime(0, ctx.currentTime);
-      master.connect(ctx.destination);
-      [[55, "sine", 0.6], [110.4, "triangle", 0.35], [220.8, "sine", 0.12]].forEach(([f, type, lvl]) => {
-        const o = ctx.createOscillator();
-        o.type = type;
-        o.frequency.value = f;
-        const g = ctx.createGain();
-        g.gain.value = lvl;
-        o.connect(g); g.connect(master);
-        o.start();
-      });
-      padRef.current = { ctx, master };
-    } catch (e) {}
-    // Un lecteur bloqué doit laisser accès au HUD, sans tronquer une narration normale.
-    const hardStop = setTimeout(() => {
-      if (speechFinishedRef.current || closingRef.current) return;
-      console.warn("La narration de démarrage n'a pas terminé dans le délai de sécurité.");
-      setSpeechUnavailable(true);
-      setSpeechPlaying(false);
-      setSpeechDone(true);
-      finishText();
-    }, Math.max(30000, Math.min(90000, introSpeech.length * 100 + 10000)));
-    return () => { clearTimeout(hardStop); stopPad(); };
-  }, [lines.length, onDone, narrationReady]); // eslint-disable-line react-hooks/exhaustive-deps
+    window.__siriusBootSpoken = true;
+    speakCinematic(welcomeSpeech, {
+      natural: true,
+      onstart: () => { voiceStartedRef.current = true; },
+      onend: () => {
+        voiceDoneRef.current = true;
+        setVoiceSettled(true);
+      },
+    });
+  }, [loaded]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!loaded || voiceSettled) return undefined;
+    const startTimer = setTimeout(() => {
+      if (!voiceStartedRef.current) setVoiceSettled(true);
+    }, BOOT_VOICE_START_MS);
+    const capTimer = setTimeout(() => setVoiceSettled(true), BOOT_VOICE_CAP_MS);
+    return () => { clearTimeout(startTimer); clearTimeout(capTimer); };
+  }, [loaded, voiceSettled]);
+  useEffect(() => {
+    if (!loaded || !voiceSettled || brain === false || detailsOpen) return undefined;
+    const wait = Math.max(0, mountedAtRef.current + BOOT_MIN_VISIBLE_MS - Date.now());
+    const timer = setTimeout(closeBoot, wait);
+    return () => clearTimeout(timer);
+  }, [loaded, voiceSettled, brain, detailsOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Une voix qui ne démarre pas ne doit pas immobiliser le HUD.
-  useEffect(() => {
-    if (!loaded || speechDone) return;
-    const t = setTimeout(() => {
-      if (!speechStartedRef.current) {
-        console.warn("La voix de démarrage n'a pas pu démarrer.");
-        setSpeechUnavailable(true);
-        setSpeechDone(true);
-        finishText();
-      }
-    }, 10000);
-    return () => clearTimeout(t);
-  }, [loaded, speechDone]);
-  useEffect(() => {
-    if (loaded && readyTextComplete && speechDone && brain !== false && !detailsOpen && !catalogueOpen) closeBoot();
-  }, [loaded, readyTextComplete, speechDone, brain, detailsOpen, catalogueOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-
     <div className={`boot-screen boot-reference ${closing ? "closing" : ""}`} data-testid="boot-screen" onClick={() => {
-      if (closingRef.current || !narrationReady) return;
-      if (!speechStartedRef.current && !speechDone) { playIntroSpeech(); return; }
-      if (speechDone) closeBoot();
+      if (loaded) closeBoot();
     }}>
       <div className="boot-grid" />
       <div className="boot-scan" />
       <div className="boot-center">
-        <h1 className="boot-welcome">Bienvenue{welcomeName ? `, ${welcomeName}` : ""}.</h1>
+        <div className="boot-identity">
+          <p className="boot-kicker">Je suis ΣIRIUS</p>
+          <h1 className="boot-welcome">{timeGreeting}{welcomeName ? `, ${welcomeName}` : ""}</h1>
+        </div>
         <div className="boot-reactor" data-testid="boot-reactor">
           <CoreRings />
           <ReactorCore status="thinking" volume={0.35} color="#91e6f2" eco={false} />
         </div>
       </div>
       <section className="boot-status boot-status-reference" aria-label="Initialisation de ΣIRIUS">
-        <h2>Initialisation de ΣIRIUS…</h2>
+        <p className={`boot-phase boot-phase-${phaseTone}`} data-testid="boot-phase" role="status">
+          <span className="boot-phase-led" aria-hidden="true" />
+          {phase}
+        </p>
         <div className="boot-bar" role="progressbar" aria-label="Chargement de ΣIRIUS"
           aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
           <div className="boot-bar-fill" style={{ width: `${progress}%` }} />
         </div>
-        <div className="boot-pct">{progress}% — {speechUnavailable
-          ? "voix indisponible — ouverture du HUD"
-          : speechPlaying
-            ? "accueil vocal…"
-            : speechDone && !speechStartedRef.current
-              ? "ouverture du HUD…"
-              : "touchez pour activer la voix"}</div>
         <details className="boot-check-details" onClick={(event) => event.stopPropagation()}
           onToggle={(event) => setDetailsOpen(event.currentTarget.open)}>
           <summary>Détails des vérifications</summary>
@@ -821,64 +695,6 @@ export function BootScreen({ onDone, userName, onOpenModule, probeBrain = probeB
                 : state === "not_configured" ? "non configuré"
                   : state === "restricted" ? "accès restreint" : "état non reconnu"}</li>
           ))}</ul>}
-          <div className="boot-log boot-display" role="log" aria-label="Résultats des contrôles de démarrage" aria-live="polite" aria-relevant="additions text">
-            {lines.map((l, index) => (
-              <div key={l.label} className={`boot-line boot-line-${l.tone}`}
-                style={{ animationDelay: `${index * 0.35}s` }}>
-                <span className="boot-line-label">{l.label}</span>
-                <span className="boot-line-state">{l.status}</span>
-              </div>
-            ))}
-            {loaded && <p className={`boot-ready ${readyTextComplete ? "boot-ready-complete" : ""}`}
-              data-testid="boot-ready" aria-live="off">
-              {welcomeSpeech.slice(0, Math.max(0, readyTextLength - welcomeOffset))}
-            </p>}
-          </div>
-        </details>
-        <details className="boot-modules" data-testid="boot-modules" onClick={(event) => event.stopPropagation()}
-          onToggle={(event) => setCatalogueOpen(event.currentTarget.open)}>
-          <summary className="boot-modules-title">L’univers de ΣIRIUS</summary>
-          {[
-            ["argus", "ARGUS", "Surveillance & réparation"],
-            ["atlas", "ATLAS", "Carte & navigation"],
-            ["oracle", "ORACLE", "Informations & synthèses"],
-            ["heracles", "HERACLES", "Investigation"],
-            ["hephaistos", "HÉPHAÏSTOS", "Outils & maintenance"],
-            ["themis", "THÉMIS", "Gestion d'entreprise"],
-            ["solon", "SOLON", "Conseil juridique"],
-            ["promethee", "PROMÉTHÉE", "Gestion de projet"],
-            ...WORK_MODULES.map(({ id, label, description }) => [id, label, description]),
-            ["calliope", "CALLIOPE", "Bibliothèque audio"],
-            ["pythagore", "PYTHAGORE", "Mathématiques & géométrie"],
-            ["agora", "HERMÈS AGORA", "Expert en vente"],
-            ["nummarius", "PORTUS NUMMARIUS", "Bourse & marchés"],
-            ["keraunos", "KERAUNOS", "Commandes domotiques"],
-            ["locus", "LOCUS", "Géolocalisation"],
-            ["pantheon", "PANTHÉON", "Cœur du système"],
-            ["cortex", "CORTEX", "Intelligence centrale"],
-            ["odysseia", "ODYSSEIA", "Accéder à la bibliothèque des mythes anciens"],
-          ].map(([id, name, role], i) => (
-            <div
-              className="boot-module"
-              key={id}
-              role="button"
-              tabIndex={0}
-              style={{ animationDelay: `${Math.min(i * 0.02, 0.3)}s` }}
-              data-testid={`boot-module-${id}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                closeBoot(id);
-              }}
-              onKeyDown={(e) => {
-                if (e.key !== "Enter" && e.key !== " ") return;
-                e.preventDefault();
-                e.currentTarget.click();
-              }}
-            >
-              <span className="boot-module-name font-divine">{name}</span>
-              <span className="boot-module-role">{role}</span>
-            </div>
-          ))}
         </details>
         {servicesError && <div className="boot-service-error" onClick={(event) => event.stopPropagation()}>
           <p role="alert">{servicesError}</p>

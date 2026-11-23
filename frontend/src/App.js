@@ -7269,20 +7269,7 @@ function App() {
       <span className="corner bl" />
       <span className="corner br" />
 
-      {booting && <BootScreen userName={userName} connected={connected} onDone={finishBoot} onOpenModule={(id) => {
-        if (WORK_MODULES.some((module) => module.id === id)) { setActiveWorkModule(id); return; }
-        const openers = { argus: setShowArgus, atlas: setShowAtlas, oracle: setShowOracle, heracles: setShowHeracles, hephaistos: setShowHephaistos, keraunos: setShowKeraunos, locus: setShowLocus, pantheon: setShowPantheon, cortex: setShowCortex, themis: setShowThemis, nummarius: setShowNummarius, odysseia: setShowOdysseia };
-        if (id === "solon") { setShowSolon(true); return; }
-        if (id === "calliope") { setShowCalliope(true); return; }
-        if (id === "pythagore") { setShowPythagore(true); return; }
-        if (id === "promethee") { setShowPromethee(true); return; }
-        if (id === "agora") {
-          setMythosFocus("HERMÈS AGORA#");
-          setShowMythosGallery(true);
-          return;
-        }
-        openers[id] && openers[id](true);
-      }} />}
+      {booting && <BootScreen userName={userName} connected={connected} onDone={finishBoot} />}
       {showSetup && firstRunWizard && !booting && (
         <FirstRunWizard
           userName={auth.user?.name || profile?.name || ""}
