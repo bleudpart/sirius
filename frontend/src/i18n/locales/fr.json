@@ -4918,5 +4918,8 @@
   "Heure de fabrication :": "Heure de fabrication :",
   "maintenant": "maintenant",
   "Durée prudente automatique ΣIRIUS (ANSES, GBPH) selon le nom du produit": "Durée prudente automatique ΣIRIUS (ANSES, GBPH) selon le nom du produit",
-  "durée calculée selon le nom du produit": "durée calculée selon le nom du produit"
+  "durée calculée selon le nom du produit": "durée calculée selon le nom du produit",
+  "Aucune imprimante reliée à ΣIRIUS pour l’instant. L’étiquette est enregistrée : demandez au chef de relier la Brother.": "Aucune imprimante reliée à ΣIRIUS pour l’instant. L’étiquette est enregistrée : demandez au chef de relier la Brother.",
+  "Aucune imprimante reliée à ΣIRIUS pour l’instant. L’étiquette est enregistrée : imprimez-la avec le navigateur, ou reliez la Brother dans « Configurer l’imprimante ».": "Aucune imprimante reliée à ΣIRIUS pour l’instant. L’étiquette est enregistrée : imprimez-la avec le navigateur, ou reliez la Brother dans « Configurer l’imprimante ».",
+  "Imprimer avec le navigateur": "Imprimer avec le navigateur"
 }

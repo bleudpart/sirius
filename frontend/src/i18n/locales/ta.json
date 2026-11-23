@@ -4952,5 +4952,8 @@
   "Heure de fabrication :": "தயாரிப்பு நேரம்:",
   "maintenant": "இப்போது",
   "Durée prudente automatique ΣIRIUS (ANSES, GBPH) selon le nom du produit": "பொருளின் பெயரின்படி ΣIRIUS தானியங்கி பாதுகாப்பான காலம் (ANSES, GBPH)",
-  "durée calculée selon le nom du produit": "பொருளின் பெயரின்படி கணக்கிடப்பட்ட காலம்"
+  "durée calculée selon le nom du produit": "பொருளின் பெயரின்படி கணக்கிடப்பட்ட காலம்",
+  "Aucune imprimante reliée à ΣIRIUS pour l’instant. L’étiquette est enregistrée : demandez au chef de relier la Brother.": "ΣIRIUS உடன் இன்னும் அச்சுப்பொறி இணைக்கப்படவில்லை. லேபிள் சேமிக்கப்பட்டது: Brother ஐ இணைக்க சமையல்காரத் தலைவரிடம் கேளுங்கள்.",
+  "Aucune imprimante reliée à ΣIRIUS pour l’instant. L’étiquette est enregistrée : imprimez-la avec le navigateur, ou reliez la Brother dans « Configurer l’imprimante ».": "ΣIRIUS உடன் இன்னும் அச்சுப்பொறி இணைக்கப்படவில்லை. லேபிள் சேமிக்கப்பட்டது: உலாவி மூலம் அச்சிடுங்கள், அல்லது « அச்சுப்பொறியை அமைக்கவும் » இல் Brother ஐ இணைக்கவும்.",
+  "Imprimer avec le navigateur": "உலாவி மூலம் அச்சிடு"
 }

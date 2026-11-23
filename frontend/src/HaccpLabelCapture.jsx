@@ -41,6 +41,7 @@ export default function HaccpLabelCapture({
   const [error, setError] = useState("");
   const [cameraError, setCameraError] = useState("");
   const [printState, setPrintState] = useState("");
+  const [noStation, setNoStation] = useState(false);
   const [printSuccess, setPrintSuccess] = useState(false);
   const [preview, setPreview] = useState(null);
   const [cameraReady, setCameraReady] = useState(false);
@@ -123,12 +124,12 @@ export default function HaccpLabelCapture({
   }, [cameraAttempt, savedRecord]);
 
   const changeMode = (next) => {
-    setMode(next); setConfirmed(false); setResult(null); setError(""); setPrintState("");
+    setMode(next); setConfirmed(false); setResult(null); setError(""); setPrintState(""); setNoStation(false);
   };
   const save = async (event, selectedFile = file) => {
     event?.preventDefault();
     if (pending.current) return;
-    setError(""); setResult(null); setPrintState("");
+    setError(""); setResult(null); setPrintState(""); setNoStation(false);
     if (!sessionReady) {
       setError("Ouvrez ou reprenez le dossier de l’établissement avant le scan.");
       return;
@@ -216,7 +217,7 @@ export default function HaccpLabelCapture({
         throw new Error("Capture vide ou supérieure à 20 Mo. Réessayez en cadrant plus près.");
       }
       const selectedFile = new File([blob], "etiquette.jpg", { type: "image/jpeg" });
-      setFile(selectedFile); setResult(null); setPrintState("");
+      setFile(selectedFile); setResult(null); setPrintState(""); setNoStation(false);
       captureId.current = null; submitted.current = null;
       if (previewRef.current) URL.revokeObjectURL(previewRef.current);
       previewRef.current = URL.createObjectURL(selectedFile);
@@ -252,8 +253,13 @@ export default function HaccpLabelCapture({
       setPrintState(`${haccpPrintStatus(job.status, job.transport)}. ${job.detail || ""} Aucun doublon ne sera envoyé automatiquement.`);
       if (kitchenMode && job.status === "accepted") showKitchenPrintSuccess();
     } catch (failure) {
-      setError(failure.message);
-      setPrintState("Demande non confirmée. Consultez l’état et vérifiez le papier avant toute autre impression.");
+      // Sans poste configuré, le serveur refuse avant de créer la demande : aucun doublon possible.
+      if (/^Configurez d.abord un poste d.impression/.test(failure.message)) {
+        setNoStation(true);
+      } else {
+        setError(failure.message);
+        setPrintState("Demande non confirmée. Consultez l’état et vérifiez le papier avant toute autre impression.");
+      }
     }
     finally { pending.current = false; setBusy(false); }
   };
@@ -272,7 +278,7 @@ export default function HaccpLabelCapture({
       onScanAgain();
       return;
     }
-    setResult(null); setError(""); setPrintState(""); setPrintSuccess(false); setConfirmed(false); setFile(null);
+    setResult(null); setError(""); setPrintState(""); setNoStation(false); setPrintSuccess(false); setConfirmed(false); setFile(null);
     captureId.current = null; submitted.current = null;
     if (previewRef.current) URL.revokeObjectURL(previewRef.current);
     previewRef.current = null; setPreview(null);
@@ -429,9 +435,16 @@ export default function HaccpLabelCapture({
           <p>{!isPreparation && (kitchenMode || kitchenToken) ? "Consigne fabricant lue" : "Durée déclarée"} : {result.duree_conservation_heures ?? "Non renseignée"} h · Référence : {result.justification_duree || "Aucune"}</p>
           {!isPreparation && (kitchenMode || kitchenToken) && result.temperature_stockage && <p>Après ouverture : {result.temperature_stockage} · Conditions à respecter, température réelle non mesurée.</p>}
           {result.dlc_secondaire && result.conforme_reception && <>
-            <p>{autoPrint ? "Impression lancée automatiquement."
+            {noStation ? <>
+              <p role="status">{kitchenToken
+                ? "Aucune imprimante reliée à ΣIRIUS pour l’instant. L’étiquette est enregistrée : demandez au chef de relier la Brother."
+                : "Aucune imprimante reliée à ΣIRIUS pour l’instant. L’étiquette est enregistrée : imprimez-la avec le navigateur, ou reliez la Brother dans « Configurer l’imprimante »."}</p>
+              {!kitchenToken && <button type="button" className="haccp-primary" disabled={busy} onClick={print}>
+                <Printer size={20} aria-hidden="true" />Imprimer avec le navigateur
+              </button>}
+            </> : <p>{autoPrint ? "Impression lancée automatiquement."
               : isPreparation ? "Vérifiez le produit, le lot, la fabrication, la DLC et les conditions avant d’imprimer."
-              : "Vérifiez la photo, le produit, le lot et les dates avant de valider."}</p>
+              : "Vérifiez la photo, le produit, le lot et les dates avant de valider."}</p>}
             {kitchenToken && mobilePrinting ? <MobileHaccpLabelPrinter labelId={result.id} kitchenToken={kitchenToken}
               busy={busy} onBusyChange={(value) => { setBusy(value); onPrintBusyChange?.(value); }} autoStart={mobileAutoPrint}
               className={`haccp-primary${kitchenMode ? " haccp-kitchen-print" : ""}`}

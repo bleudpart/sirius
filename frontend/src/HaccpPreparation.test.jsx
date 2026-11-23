@@ -258,6 +258,19 @@ test("a manual preparation sends exact local fabrication, renders the server dea
   expect(printHaccpDocument).not.toHaveBeenCalled();
 });
 
+test("without a print station the label stays saved and browser printing is offered", async () => {
+  print.mockRejectedValueOnce(new Error("Configurez d'abord un poste d'impression ΣIRIUS."));
+  await render();
+  await complete();
+  await submit();
+  expect(host.textContent).toContain("Aucune imprimante reliée à ΣIRIUS");
+  expect(host.textContent).not.toContain("Configurez d'abord");
+  expect(host.textContent).not.toContain("Demande non confirmée");
+  global.fetch.mockResolvedValueOnce({ ok: true, text: async () => "<html>PREPARATION TEST</html>" });
+  await click("Imprimer avec le navigateur");
+  expect(printHaccpDocument).toHaveBeenCalledWith("<html>PREPARATION TEST</html>", expect.anything(), expect.any(Function));
+});
+
 test("browser print remains a fallback when the automatic request fails", async () => {
   print.mockRejectedValueOnce(new Error("Relais absent"));
   await render();
