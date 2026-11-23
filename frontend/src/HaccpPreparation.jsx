@@ -69,6 +69,7 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
   const [listError, setListError] = useState("");
   const [listReload, setListReload] = useState(0);
   const [selected, setSelected] = useState("");
+  const [newProduct, setNewProduct] = useState("");
   const attempt = useRef(null);
   const pending = useRef(false);
   const savingList = useRef(false);
@@ -160,22 +161,8 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
     }
   };
 
-  const saveList = async () => {
-    if (savingList.current || !list) return;
-    const names = listNames;
-    const regles = Object.fromEntries(names.map((name) => {
-      const rule = ruleFor(name);
-      return [name, { heures: Number(rule.hours), conditions: rule.conditions.trim() }];
-    }));
-    const invalid = Object.values(regles).some((rule) => !Number.isSafeInteger(rule.heures) || rule.heures <= 0 || !rule.conditions);
-    if (!listConfirmed || invalid || !listReference.trim()) {
-      setListError("Indiquez une durée et des conditions pour chaque produit, la référence PMS, puis confirmez.");
-      return;
-    }
+  const persistList = async (names, regles, reference) => {
     const hours = names.length ? Math.min(...Object.values(regles).map((rule) => rule.heures)) : (list.duree_heures || 24);
-    const removed = list.noms.filter((name) => !names.includes(name));
-    const removalMessage = "produit(s) seront retirés de la mise en place. Continuer ?";
-    if (removed.length && !window.confirm(`${removed.length} ${translateString(removalMessage) || removalMessage}`)) return;
     savingList.current = true; setListBusy(true); setListError(""); setListMessage("");
     try {
       const value = await haccpFetch(`${API_BASE_URL}/haccp/preparations/liste`, {
@@ -183,12 +170,12 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
         headers: { "Content-Type": "application/json", ...(kitchenToken ? { "X-Sirius-Cuisine": kitchenToken } : {}) },
         body: JSON.stringify({
           restaurant_name: establishmentName.trim(), version: list.version, noms: names,
-          duree_heures: hours, reference_pms: listReference.trim(), regles, regle_confirmee: true,
+          duree_heures: hours, reference_pms: reference, regles, regle_confirmee: true,
         }),
       }, async (response) => (await checkHaccpResponse(response)).json());
       if (!validPreparationList(value) || value.version !== list.version + 1
           || JSON.stringify(value.noms) !== JSON.stringify(names) || value.duree_heures !== hours
-          || value.reference_pms !== listReference.trim()
+          || value.reference_pms !== reference
           || names.some((name) => value.regles?.[name]?.heures !== regles[name].heures
             || value.regles[name].conditions !== regles[name].conditions)) {
         throw new Error("Réponse de liste invalide. Rechargez avant toute autre modification.");
@@ -202,12 +189,62 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
         }
         setListMessage("Liste enregistrée pour tous les téléphones de cet établissement.");
       }
+      return true;
     } catch (failure) {
       if (mounted.current) setListError(failure.message);
+      return false;
     } finally {
       savingList.current = false;
       if (mounted.current) setListBusy(false);
     }
+  };
+
+  const savedRules = () => Object.fromEntries(list.noms.map((name) => {
+    const rule = savedRule(list, name);
+    return [name, { heures: rule.hours, conditions: rule.conditions }];
+  }));
+  const savedReference = () => list.reference_pms || SUGGESTED_REFERENCE;
+
+  const addProduct = async () => {
+    const name = newProduct.trim();
+    if (savingList.current || !list || !name) return;
+    if (list.noms.some((existing) => existing.toLocaleLowerCase("fr") === name.toLocaleLowerCase("fr"))) {
+      setListError("Ce produit est déjà dans la mise en place.");
+      return;
+    }
+    const suggestion = suggestPreparationRule(name);
+    const regles = { ...savedRules(), [name]: { heures: suggestion.hours, conditions: suggestion.conditions } };
+    if (await persistList([...list.noms, name], regles, savedReference()) && mounted.current) {
+      setNewProduct("");
+      setListMessage(`${name} ajouté : ${suggestion.hours} h après fabrication.`);
+    }
+  };
+
+  const removeProduct = async (name) => {
+    if (savingList.current || !list) return;
+    const regles = savedRules();
+    delete regles[name];
+    if (await persistList(list.noms.filter((existing) => existing !== name), regles, savedReference()) && mounted.current) {
+      setListMessage(`${name} retiré de la mise en place.`);
+    }
+  };
+
+  const saveList = async () => {
+    if (savingList.current || !list) return;
+    const names = listNames;
+    const regles = Object.fromEntries(names.map((name) => {
+      const rule = ruleFor(name);
+      return [name, { heures: Number(rule.hours), conditions: rule.conditions.trim() }];
+    }));
+    const invalid = Object.values(regles).some((rule) => !Number.isSafeInteger(rule.heures) || rule.heures <= 0 || !rule.conditions);
+    if (!listConfirmed || invalid || !listReference.trim()) {
+      setListError("Indiquez une durée et des conditions pour chaque produit, la référence PMS, puis confirmez.");
+      return;
+    }
+    const removed = list.noms.filter((name) => !names.includes(name));
+    const removalMessage = "produit(s) seront retirés de la mise en place. Continuer ?";
+    if (removed.length && !window.confirm(`${removed.length} ${translateString(removalMessage) || removalMessage}`)) return;
+    await persistList(names, regles, listReference.trim());
   };
 
   const ready = (values, isConfirmed) => sessionReady && establishmentName.trim() && values.product.trim()
@@ -364,7 +401,26 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
         setListReload((current) => current + 1);
       }}>Recharger la liste</button>}
       {list && <details className="haccp-preparation-list">
-        <summary>Modifier la mise en place de la carte</summary>
+        <summary>Modifier la mise en place de la carte</summary>
+        <fieldset className="haccp-capture-fields" disabled={listBusy}>
+          <label>Ajouter un produit à la mise en place
+            <input maxLength={255} value={newProduct} onChange={(event) => setNewProduct(event.target.value)}
+              onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addProduct(); } }} />
+          </label>
+          <button type="button" className="haccp-primary" disabled={listBusy || !newProduct.trim()} onClick={addProduct}>
+            Ajouter avec sa durée automatique
+          </button>
+          {list.noms.length > 0 && <ul className="haccp-preparation-rules" aria-label="Produits enregistrés">
+            {[...list.noms].sort((a, b) => a.localeCompare(b, "fr")).map((name) => <li key={name} className="haccp-preparation-rule">
+              <span translate="no">{name}</span>
+              <span>{savedRule(list, name).hours} h</span>
+              <button type="button" aria-label={`Retirer ${name}`} onClick={() => removeProduct(name)}>Retirer</button>
+            </li>)}
+          </ul>}
+        </fieldset>
+        {listMessage && <p role="status">{listMessage}</p>}
+        <details>
+        <summary>Modification complète de la liste</summary>
         <p>Un produit de mise en place par ligne. ΣIRIUS propose une durée prudente pour chaque produit d’après son nom :
           24 h pour l’œuf cru, la mayonnaise, le poisson cru ou le fromage frais entamé ; 48 h pour la volaille, la viande,
           les crudités et les produits entamés ; 72 h pour les plats et sauces cuits. En cas de doute, la durée la plus
@@ -398,7 +454,7 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
             {listBusy ? "Enregistrement de la liste…" : "Enregistrer la liste"}
           </button>
         </fieldset>
-        {listMessage && <p role="status">{listMessage}</p>}
+        </details>
       </details>}
     </>}
     {!kitchenToken && <details><summary>Configurer l’imprimante (une seule fois)</summary><HaccpPrinter /></details>}

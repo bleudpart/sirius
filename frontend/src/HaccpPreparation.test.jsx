@@ -364,3 +364,32 @@ test("the next product clears its time, duration and conditions instead of reusi
   expect(field("Je confirme").checked).toBe(false);
   expect(button("Calculer la DLC").disabled).toBe(true);
 });
+
+test("adding or removing a mise en place product saves it at once with its automatic duration", async () => {
+  const list = { version: 1, noms: ["Soupe"], duree_heures: 72, reference_pms: "PMS en vigueur",
+    regles: { Soupe: { heures: 72, conditions: "Entre 0 et +3 °C." } } };
+  await render({ kitchenToken: "qr-token" }, list);
+  global.fetch.mockImplementationOnce(async (url, options) => {
+    const sent = JSON.parse(options.body);
+    return reply({ version: 2, noms: sent.noms, duree_heures: sent.duree_heures, reference_pms: sent.reference_pms, regles: sent.regles });
+  });
+  await change(field("Ajouter un produit"), "Sauce mayonnaise");
+  await click("Ajouter avec sa durée automatique");
+  const added = JSON.parse(global.fetch.mock.calls[0][1].body);
+  expect(added).toEqual(expect.objectContaining({
+    version: 1, noms: ["Soupe", "Sauce mayonnaise"], duree_heures: 24, reference_pms: "PMS en vigueur", regle_confirmee: true,
+  }));
+  expect(added.regles["Sauce mayonnaise"].heures).toBe(24);
+  expect(added.regles.Soupe).toEqual({ heures: 72, conditions: "Entre 0 et +3 °C." });
+  expect(host.textContent).toContain("Sauce mayonnaise ajouté : 24 h");
+
+  global.fetch.mockImplementationOnce(async (url, options) => {
+    const sent = JSON.parse(options.body);
+    return reply({ version: 3, noms: sent.noms, duree_heures: sent.duree_heures, reference_pms: sent.reference_pms, regles: sent.regles });
+  });
+  await act(async () => host.querySelector('[aria-label="Retirer Soupe"]').click());
+  const removed = JSON.parse(global.fetch.mock.calls[1][1].body);
+  expect(removed).toEqual(expect.objectContaining({ version: 2, noms: ["Sauce mayonnaise"], duree_heures: 24 }));
+  expect(removed.regles.Soupe).toBeUndefined();
+  expect(host.querySelector('[aria-label="Retirer Soupe"]')).toBeNull();
+});

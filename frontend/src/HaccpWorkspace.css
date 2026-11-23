@@ -163,6 +163,8 @@ body:has(.haccp-standalone) {
 .haccp-preparation-list { margin-top: 16px; }
 .haccp-preparation-list summary { cursor: pointer; color: var(--haccp-gold); font-weight: 700; }
 .haccp-preparation-rules { display: grid; gap: 6px; max-height: 420px; overflow-y: auto; }
+ul.haccp-preparation-rules { list-style: none; margin: 0; padding: 0; }
+ul.haccp-preparation-rules .haccp-preparation-rule { grid-template-columns: minmax(0, 1fr) 56px auto; }
 .haccp-preparation-rule { display: grid; grid-template-columns: minmax(120px, 1fr) 72px minmax(160px, 2fr); gap: 8px; align-items: center; }
 @media (max-width: 640px) {
   .haccp-preparation-rule { grid-template-columns: 1fr 72px; }
