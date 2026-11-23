@@ -55,6 +55,7 @@ def _configured_engine() -> Engine:
             "date_ouverture": "DATETIME",
             "date_fabrication": "DATETIME",
             "conditions_conservation": "VARCHAR(500)",
+            "quantite_preparation": "VARCHAR(60)",
             "restaurant_name": "VARCHAR(160)",
             "dlc_secondaire": "DATETIME",
             "duree_conservation_heures": "INTEGER",

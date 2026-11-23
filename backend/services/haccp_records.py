@@ -20,7 +20,7 @@ def record_response(row: EtiquetteHaccp, photo_prefix: str, *, db: Session | Non
         **{name: getattr(row, name) for name in OperationEtiquette.model_fields},
         date_ouverture=row.date_ouverture, dlc_secondaire=row.dlc_secondaire,
         date_fabrication=row.date_fabrication, conditions_conservation=row.conditions_conservation,
-        restaurant_name=row.restaurant_name,
+        quantite=row.quantite_preparation, restaurant_name=row.restaurant_name,
         chemin_photo=row.image_path or None,
         chemin_donnees=f"haccp.sqlite3#etiquettes_haccp/{row.id}",
         donnees_url=f"{photo_prefix}/{row.id}/donnees",
@@ -45,7 +45,7 @@ def save_record(
     operation: OperationEtiquette, maintenant: datetime, limite: datetime | None,
     capture_id: str | None, capture_hash: str,
     *, date_fabrication: datetime | None = None, conditions_conservation: str | None = None,
-    restaurant_name: str | None = None, raw_image: ImageArchivee | None = None,
+    restaurant_name: str | None = None, raw_image: ImageArchivee | None = None, quantite: str | None = None,
     reception_source_id: int | None = None,
 ) -> EtiquetteResponse:
     values = result.model_dump()
@@ -57,6 +57,7 @@ def save_record(
         date_ouverture=maintenant.replace(tzinfo=None) if operation.type_operation == "ouverture" else None,
         date_fabrication=date_fabrication.replace(tzinfo=None) if date_fabrication else None,
         conditions_conservation=conditions_conservation, restaurant_name=restaurant_name,
+        quantite_preparation=quantite,
         dlc_secondaire=limite.replace(tzinfo=None) if limite else None,
         capture_id=capture_id, capture_hash=capture_hash,
         created_at=maintenant.replace(tzinfo=None),

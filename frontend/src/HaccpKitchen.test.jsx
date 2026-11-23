@@ -352,7 +352,6 @@ test("PRÉPARATION saves the preparation with the QR token and without an operat
   await type(field("Durée"), "72");
   await type(field("Conditions"), "0 à 3 °C");
   await type(field("Référence"), "PMS");
-  await act(async () => field("Je confirme").click());
   await act(async () => button("Calculer la DLC").click());
   const [url, options] = global.fetch.mock.calls[0];
   expect(url).toMatch(/\/haccp\/preparations$/);

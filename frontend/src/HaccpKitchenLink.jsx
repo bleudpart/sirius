@@ -12,6 +12,7 @@ export default function HaccpKitchenLink({ establishmentName = "" }) {
   const [link, setLink] = useState(null);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -26,11 +27,19 @@ export default function HaccpKitchenLink({ establishmentName = "" }) {
     setBusy(true); setError("");
     try {
       const next = await haccpFetch(API, options, read);
-      if (mounted.current) setLink(next);
+      if (mounted.current) { setLink(next); setCopied(false); }
     } catch (failure) {
       if (mounted.current) setError(failure.message);
     } finally {
       if (mounted.current) setBusy(false);
+    }
+  };
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(link.url);
+      setCopied(true);
+    } catch {
+      setError("Copie impossible : sélectionnez le lien et copiez-le à la main.");
     }
   };
   const create = (confirmText) => run({
@@ -44,6 +53,10 @@ export default function HaccpKitchenLink({ establishmentName = "" }) {
     {busy && !link && <p role="status"><LoaderCircle className="haccp-loading" size={28} aria-hidden="true" /></p>}
     {link?.active && <>
       <div className="haccp-qr-code"><QRCodeSVG value={link.url} size={240} marginSize={4} /></div>
+      <p className="haccp-qr-link">Lien de la page : <a href={link.url} target="_blank" rel="noreferrer">{link.url}</a></p>
+      <div className="haccp-actions">
+        <button type="button" onClick={copyLink}>{copied ? "Lien copié" : "Copier le lien"}</button>
+      </div>
       <p>Restaurant : <strong>{link.restaurant_name}</strong></p>
       <ol>
         <li>Le cuisinier scanne ce QR code avec l’appareil photo de son téléphone ou de la tablette.</li>

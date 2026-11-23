@@ -186,6 +186,7 @@ ul.haccp-preparation-rules .haccp-preparation-rule { grid-template-columns: minm
 .haccp-qr { text-align: center; }
 .haccp-qr-code { display: inline-block; padding: 18px; margin: 12px 0 20px; background: white; border-radius: 16px; }
 .haccp-qr-code svg { display: block; max-width: 100%; height: auto; }
+.haccp-qr-link { overflow-wrap: anywhere; user-select: all; }
 .haccp-ui a { color: #f2d99a; text-underline-offset: 4px; }
 .haccp-proof { display: grid; gap: 18px; padding-top: 20px; border-top: 1px solid var(--haccp-border); }
 .haccp-proof > button { justify-self: end; }

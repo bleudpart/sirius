@@ -123,6 +123,7 @@ class PreparationCreate(OperationEtiquette):
     restaurant_name: Annotated[str, StringConstraints(strict=True, min_length=1, max_length=160)]
     date_fabrication: datetime
     conditions_conservation: Annotated[str, StringConstraints(strict=True, min_length=1, max_length=500)]
+    quantite: Annotated[str, StringConstraints(strict=True, min_length=1, max_length=60)] | None = None
     liste_version: Annotated[int, Field(strict=True, gt=0, le=9_007_199_254_740_990)] | None = None
 
     @field_validator("date_fabrication", mode="before")
@@ -225,6 +226,7 @@ class EtiquetteResponse(EtiquetteVisionOutput, OperationEtiquette):
     date_ouverture: datetime | None = None
     date_fabrication: datetime | None = None
     conditions_conservation: str | None = None
+    quantite: str | None = None
     restaurant_name: str | None = None
     dlc_secondaire: datetime | None = None
     chemin_photo: str | None = None

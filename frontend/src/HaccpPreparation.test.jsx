@@ -10,7 +10,7 @@ jest.mock("./haccpDocuments", () => ({
   printHaccpDocument: jest.fn(),
 }));
 global.IS_REACT_ACT_ENVIRONMENT = true;
-let host, root, oldFetch, oldCrypto, oldMediaDevices, getUserMedia;
+let host, root, oldFetch, oldCrypto, oldMediaDevices, getUserMedia, print;
 const button = (text) => [...host.querySelectorAll("button")].find((item) => item.textContent.includes(text));
 const field = (text) => [...host.querySelectorAll("label")].find((item) => item.textContent.trim().startsWith(text))?.querySelector("input,textarea,select");
 const reply = (data, ok = true) => ({ ok, status: ok ? 201 : 422, json: async () => data });
@@ -30,6 +30,7 @@ beforeEach(() => {
   oldMediaDevices = Object.getOwnPropertyDescriptor(navigator, "mediaDevices");
   getUserMedia = jest.fn();
   Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia } });
+  print = jest.spyOn(printer, "printHaccpLabel").mockResolvedValue({ status: "pending", transport: "windows" });
   host = document.createElement("div");
   document.body.appendChild(host);
   root = createRoot(host);
@@ -43,6 +44,7 @@ afterEach(async () => {
   localStorage.removeItem("sirius_cuisine_print_device_id");
   if (oldMediaDevices) Object.defineProperty(navigator, "mediaDevices", oldMediaDevices);
   else delete navigator.mediaDevices;
+  jest.useRealTimers();
   jest.restoreAllMocks();
 });
 async function render(props = {}, list = { version: 0, noms: [], duree_heures: null, reference_pms: "" }) {
@@ -69,7 +71,6 @@ async function complete() {
   await change(field("Durée"), "72");
   await change(field("Conditions"), "Entre 0 et +3 °C, en bac fermé.");
   await change(field("Référence"), "PMS test");
-  await act(async () => field("Je confirme").click());
 }
 async function submit() {
   await act(async () => host.querySelector("form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
@@ -77,33 +78,37 @@ async function submit() {
 async function click(text) {
   await act(async () => button(text).click());
 }
+const listReply = (version) => async (url, options) => {
+  const sent = JSON.parse(options.body);
+  return reply({ version, noms: sent.noms, duree_heures: sent.duree_heures, reference_pms: sent.reference_pms, regles: sent.regles });
+};
 
-test("preparation never starts the camera or guesses morning time, temperature or J+3", async () => {
+test("preparation never starts the camera or sends anything before a product is chosen", async () => {
   await render();
-  for (const name of ["Nom du produit", "Date et heure", "Durée", "Conditions", "Référence"]) {
+  for (const name of ["Quantité", "Nom du produit", "Date et heure", "Durée", "Conditions", "Référence"]) {
     expect(field(name).value).toBe("");
   }
   expect(button("Calculer la DLC").disabled).toBe(true);
+  expect(host.textContent).not.toContain("Je confirme");
   expect(host.querySelector("video")).toBeNull();
   expect(getUserMedia).not.toHaveBeenCalled();
   expect(global.fetch).not.toHaveBeenCalled();
 });
 
-test("a QR preparation uses mobile printing only after the user reviews it", async () => {
+test("a QR preparation starts mobile printing automatically", async () => {
   global.fetch = jest.fn(async (url) => url.endsWith("/mobile/demandes")
     ? reply({ job: { id: "job", label_id: 8, status: "pending", transport: "mobile" } })
     : reply(record));
   await render({ kitchenToken: "qr-token", mobilePrinting: true });
   await complete();
   await submit();
-  expect(global.fetch).toHaveBeenCalledTimes(1);
-  await click("J’ai vérifié");
   expect(global.fetch.mock.calls[1][0]).toMatch(/\/impression\/mobile\/demandes$/);
   expect(global.fetch.mock.calls[1][1].headers["X-Sirius-Cuisine"]).toBe("qr-token");
   expect(JSON.parse(global.fetch.mock.calls[1][1].body).reviewed).toBe(true);
+  expect(print).not.toHaveBeenCalled();
 });
 
-test("choosing a mise en place product confirms it, calculates the DLC and generates the label", async () => {
+test("choosing a mise en place product calculates the DLC and prints the label without confirmation", async () => {
   const list = { version: 1, noms: ["Soupe TEST", "Sauce"], duree_heures: 72, reference_pms: "PMS en vigueur" };
   await render({ kitchenToken: "qr-token" }, list);
   jest.useFakeTimers(); jest.setSystemTime(new Date("2026-11-02T07:15:00Z"));
@@ -116,18 +121,42 @@ test("choosing a mise en place product confirms it, calculates the DLC and gener
     duree_conservation_heures: 72, conditions_conservation: "Voir les conditions du PMS en vigueur",
     justification_duree: "PMS en vigueur", regle_confirmee: true, liste_version: 1,
   }));
+  expect(payload.quantite).toBeUndefined();
   expect(host.textContent).toContain("DLC interne exacte");
-  expect(button("J’ai vérifié")).toBeTruthy();
+  expect(host.textContent).toContain("Impression lancée automatiquement.");
+  expect(print).toHaveBeenCalledTimes(1);
+  expect(print).toHaveBeenCalledWith(8, "preparation", "qr-token");
 });
 
-test("a product typed by hand still needs its rule and an explicit confirmation", async () => {
+test("the quantity typed before the product is archived and shown on the result", async () => {
+  global.fetch.mockResolvedValueOnce(reply({ ...record, nom_produit: "Oeuf dur cuit", quantite: "19 pièces" }));
+  await render({}, { version: 1, noms: ["Oeuf dur cuit"], duree_heures: 72, reference_pms: "PMS en vigueur" });
+  await change(field("Quantité"), "  19 pièces ");
+  await change(field("Mise en place de la carte"), "Oeuf dur cuit");
+  expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual(expect.objectContaining({
+    nom_produit: "Oeuf dur cuit", quantite: "19 pièces", liste_version: 1,
+  }));
+  expect(host.textContent).toContain("Quantité : 19 pièces");
+  await click("Nouvelle préparation");
+  expect(field("Quantité").value).toBe("");
+});
+
+test("a product typed by hand gets its prudent rule and the current time automatically", async () => {
   await render({}, { version: 1, noms: ["Soupe TEST"], duree_heures: 72, reference_pms: "PMS en vigueur" });
-  await change(field("Nom du produit"), "Autre produit");
-  await change(field("Date et heure"), "2026-11-02T08:15");
-  expect(field("Durée de conservation").value).toBe("");
-  expect(field("Je confirme").checked).toBe(false);
-  expect(button("Calculer la DLC").disabled).toBe(true);
-  expect(global.fetch).not.toHaveBeenCalled();
+  await change(field("Nom du produit"), "Sauce mayonnaise");
+  expect(field("Durée de conservation").value).toBe("24");
+  expect(field("Référence").value).toContain("automatique");
+  expect(button("Calculer la DLC").disabled).toBe(false);
+  jest.useFakeTimers(); jest.setSystemTime(new Date("2026-11-02T07:15:00Z"));
+  await submit();
+  jest.useRealTimers();
+  const payload = JSON.parse(global.fetch.mock.calls[0][1].body);
+  expect(payload).toEqual(expect.objectContaining({
+    nom_produit: "Sauce mayonnaise", date_fabrication: "2026-11-02T08:15:00+01:00",
+    duree_conservation_heures: 24, regle_confirmee: true,
+  }));
+  expect(payload.liste_version).toBeUndefined();
+  expect(print).toHaveBeenCalledWith(8, "preparation");
 });
 
 test("a stale shared rule is cleared and reloaded before another preparation", async () => {
@@ -138,14 +167,13 @@ test("a stale shared rule is cleared and reloaded before another preparation", a
   await change(field("Mise en place de la carte"), "Soupe TEST");
   expect(host.textContent).toContain("La liste des préparations a changé.");
   expect(field("Durée de conservation").value).toBe("");
-  expect(field("Je confirme").checked).toBe(false);
   await change(field("Mise en place de la carte"), "Soupe TEST");
   expect(JSON.parse(global.fetch.mock.calls[2][1].body)).toEqual(expect.objectContaining({
     duree_conservation_heures: 24, liste_version: 2,
   }));
 });
 
-test("the QR saves a list with prudent per-product durations only after confirmation", async () => {
+test("the QR saves a list with prudent per-product durations without confirmation", async () => {
   await render({ kitchenToken: "qr-token" });
   const noms = ["Pommes caramel", "Sauce mayonnaise", "Bac inox rumsteak"];
   const regles = {
@@ -158,13 +186,8 @@ test("the QR saves a list with prudent per-product durations only after confirma
   await change(host.querySelector('[aria-label="Heures de conservation : Pommes caramel"]'), "48");
   expect(field("Référence PMS commune").value).toContain("ΣIRIUS");
   await change(field("Référence PMS commune"), "PMS en vigueur");
-  expect(button("Enregistrer la liste").disabled).toBe(true);
   await click("Recalculer toutes les durées");
-  await act(async () => host.querySelector(".haccp-preparation-list input[type=checkbox]").click());
-  global.fetch.mockImplementationOnce(async (url, options) => {
-    const sent = JSON.parse(options.body);
-    return reply({ version: 1, noms: sent.noms, duree_heures: sent.duree_heures, reference_pms: sent.reference_pms, regles: sent.regles });
-  });
+  global.fetch.mockImplementationOnce(listReply(1));
   await click("Enregistrer la liste");
   const [url, options] = global.fetch.mock.calls[0];
   expect(url).toMatch(/\/haccp\/preparations\/liste$/);
@@ -187,22 +210,17 @@ test("a conflicting list edit is not silently discarded", async () => {
   await render({}, list);
   global.fetch.mockResolvedValueOnce(reply({ detail: "La liste a changé sur un autre appareil." }, false));
   await change(field("Produits de la mise en place"), "Soupe\nSauce");
-  await act(async () => host.querySelector(".haccp-preparation-list input[type=checkbox]").click());
   await click("Enregistrer la liste");
   expect(host.textContent).toContain("La liste a changé sur un autre appareil.");
   expect(field("Produits de la mise en place").value).toBe("Soupe\nSauce");
 });
 
-test("language changes translate list controls and confirmation without changing product names", async () => {
+test("language changes translate list controls without changing product names", async () => {
   await render({}, { version: 1, noms: ["Enregistrer"], duree_heures: 72, reference_pms: "PMS" });
   await act(async () => { await setLanguage("en"); });
   expect(host.querySelector('option[value="Enregistrer"]').textContent).toBe("Enregistrer");
   expect(host.textContent).toContain("Select a mise en place item");
-  await change(host.querySelector(".haccp-preparation-list textarea"), "");
-  await act(async () => host.querySelector(".haccp-preparation-list input[type=checkbox]").click());
-  const confirm = jest.spyOn(window, "confirm").mockReturnValue(false);
-  await click("Save the list");
-  expect(confirm).toHaveBeenCalledWith("1 item(s) will be removed from the mise en place. Continue?");
+  expect(button("Save the list")).toBeTruthy();
 });
 
 test.each([{ sessionReady: false }, { establishmentName: "" }])("dossier prerequisites gate preparation %p", async (props) => {
@@ -213,7 +231,7 @@ test.each([{ sessionReady: false }, { establishmentName: "" }])("dossier prerequ
   expect(global.fetch).not.toHaveBeenCalled();
 });
 
-test("a confirmed preparation sends exact local fabrication and renders the server deadline without printing", async () => {
+test("a manual preparation sends exact local fabrication, renders the server deadline and prints it", async () => {
   await render();
   await complete();
   expect(button("Calculer la DLC").disabled).toBe(false);
@@ -235,40 +253,21 @@ test("a confirmed preparation sends exact local fabrication and renders the serv
   expect(host.textContent).not.toContain("Illisible ou absente");
   expect(global.fetch).toHaveBeenCalledTimes(1);
   expect(getUserMedia).not.toHaveBeenCalled();
+  expect(print).toHaveBeenCalledTimes(1);
+  expect(print).toHaveBeenCalledWith(8, "preparation");
   expect(printHaccpDocument).not.toHaveBeenCalled();
 });
 
-test.each([
-  ["Nom du produit", "Autre préparation"], ["Date et heure", "2026-11-02T09:00"],
-  ["Durée", "24"], ["Conditions", "Autres conditions validées"], ["Référence", "Autre PMS"],
-])("editing %s invalidates rule confirmation", async (name, value) => {
-  await render();
-  await complete();
-  await change(field(name), value);
-  expect(field("Je confirme").checked).toBe(false);
-  expect(button("Calculer la DLC").disabled).toBe(true);
-  await submit();
-  expect(global.fetch).not.toHaveBeenCalled();
-});
-
-test("browser print uses only the saved preparation HTML after explicit action", async () => {
+test("browser print remains a fallback when the automatic request fails", async () => {
+  print.mockRejectedValueOnce(new Error("Relais absent"));
   await render();
   await complete();
   await submit();
+  expect(host.textContent).toContain("Relais absent");
   global.fetch.mockResolvedValueOnce({ ok: true, text: async () => "<html>PREPARATION TEST</html>" });
   await click("Imprimer l’étiquette de préparation manuellement");
   expect(global.fetch.mock.calls[1][0]).toMatch(/\/registre\/8\/etiquette$/);
   expect(printHaccpDocument).toHaveBeenCalledWith("<html>PREPARATION TEST</html>", expect.anything(), expect.any(Function));
-});
-
-test("direct printing carries the preparation type and waits for human review", async () => {
-  const print = jest.spyOn(printer, "printHaccpLabel").mockResolvedValue({ status: "pending", transport: "windows" });
-  await render();
-  await complete();
-  await submit();
-  expect(print).not.toHaveBeenCalled();
-  await click("J’ai vérifié : valider et imprimer");
-  expect(print).toHaveBeenCalledWith(8, "preparation");
 });
 
 test("a lost response retries the same UUID and never starts a second submission while pending", async () => {
@@ -279,6 +278,7 @@ test("a lost response retries the same UUID and never starts a second submission
   await complete();
   await submit();
   expect(host.textContent).toContain("Connexion perdue");
+  expect(print).not.toHaveBeenCalled();
   await act(async () => {
     host.querySelector("form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     host.querySelector("form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
@@ -288,6 +288,7 @@ test("a lost response retries the same UUID and never starts a second submission
   expect(global.fetch.mock.calls[0][1].body).toBe(global.fetch.mock.calls[1][1].body);
   await act(async () => resolve(reply(record)));
   expect(host.textContent).toContain("Préparation enregistrée");
+  expect(print).toHaveBeenCalledTimes(1);
 });
 
 test("changing an uncertain submission cannot silently generate a second label", async () => {
@@ -296,14 +297,12 @@ test("changing an uncertain submission cannot silently generate a second label",
   await complete();
   await submit();
   await change(field("Nom du produit"), "Autre produit");
-  await act(async () => field("Je confirme").click());
   await submit();
   expect(global.fetch).toHaveBeenCalledTimes(1);
   expect(host.textContent).toContain("Une tentative existe déjà");
   await click("Nouvelle préparation");
   expect(field("Nom du produit").value).toBe("");
   expect(field("Durée").value).toBe("");
-  expect(field("Je confirme").checked).toBe(false);
 });
 
 test("validation errors explain ambiguous fabrication times instead of hiding the server detail", async () => {
@@ -313,6 +312,7 @@ test("validation errors explain ambiguous fabrication times instead of hiding th
   await submit();
   expect(host.textContent).toContain("Heure ambigue en Europe/Paris.");
   expect(printHaccpDocument).not.toHaveBeenCalled();
+  expect(print).not.toHaveBeenCalled();
 });
 
 test("a rejected fabrication can be corrected without losing the product or making an uncertain duplicate", async () => {
@@ -321,24 +321,17 @@ test("a rejected fabrication can be corrected without losing the product or maki
   await complete();
   await submit();
   await change(field("Date et heure"), "2026-11-02T08:00");
-  await act(async () => field("Je confirme").click());
   await submit();
   expect(global.fetch).toHaveBeenCalledTimes(2);
   expect(JSON.parse(global.fetch.mock.calls[1][1].body).date_fabrication).toBe("2026-11-02T08:00");
   expect(host.textContent).toContain("Préparation enregistrée");
 });
 
-test("a repeated autumn time carries the selected UTC offset and must be reconfirmed", async () => {
+test("a repeated autumn time carries the selected UTC offset", async () => {
   await render();
   await complete();
   await change(field("Date et heure"), "2026-10-25T02:30");
-  await act(async () => {
-    const select = field("Décalage UTC");
-    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(select, "+02:00");
-    select.dispatchEvent(new Event("change", { bubbles: true }));
-  });
-  expect(field("Je confirme").checked).toBe(false);
-  await act(async () => field("Je confirme").click());
+  await change(field("Décalage UTC"), "+02:00");
   await submit();
   expect(JSON.parse(global.fetch.mock.calls[0][1].body).date_fabrication).toBe("2026-10-25T02:30+02:00");
 });
@@ -349,7 +342,7 @@ test("malformed results never become printable preparations", async () => {
   await complete();
   await submit();
   expect(host.textContent).toContain("Réponse de préparation invalide");
-  expect(button("J’ai vérifié")).toBeUndefined();
+  expect(print).not.toHaveBeenCalled();
   expect(printHaccpDocument).not.toHaveBeenCalled();
 });
 
@@ -361,7 +354,6 @@ test("the next product clears its time, duration and conditions instead of reusi
   for (const name of ["Nom du produit", "Date et heure", "Durée", "Conditions", "Référence"]) {
     expect(field(name).value).toBe("");
   }
-  expect(field("Je confirme").checked).toBe(false);
   expect(button("Calculer la DLC").disabled).toBe(true);
 });
 
@@ -369,10 +361,8 @@ test("adding or removing a mise en place product saves it at once with its autom
   const list = { version: 1, noms: ["Soupe"], duree_heures: 72, reference_pms: "PMS en vigueur",
     regles: { Soupe: { heures: 72, conditions: "Entre 0 et +3 °C." } } };
   await render({ kitchenToken: "qr-token" }, list);
-  global.fetch.mockImplementationOnce(async (url, options) => {
-    const sent = JSON.parse(options.body);
-    return reply({ version: 2, noms: sent.noms, duree_heures: sent.duree_heures, reference_pms: sent.reference_pms, regles: sent.regles });
-  });
+  const confirm = jest.spyOn(window, "confirm");
+  global.fetch.mockImplementationOnce(listReply(2));
   await change(field("Ajouter un produit"), "Sauce mayonnaise");
   await click("Ajouter avec sa durée automatique");
   const added = JSON.parse(global.fetch.mock.calls[0][1].body);
@@ -383,13 +373,11 @@ test("adding or removing a mise en place product saves it at once with its autom
   expect(added.regles.Soupe).toEqual({ heures: 72, conditions: "Entre 0 et +3 °C." });
   expect(host.textContent).toContain("Sauce mayonnaise ajouté : 24 h");
 
-  global.fetch.mockImplementationOnce(async (url, options) => {
-    const sent = JSON.parse(options.body);
-    return reply({ version: 3, noms: sent.noms, duree_heures: sent.duree_heures, reference_pms: sent.reference_pms, regles: sent.regles });
-  });
+  global.fetch.mockImplementationOnce(listReply(3));
   await act(async () => host.querySelector('[aria-label="Retirer Soupe"]').click());
   const removed = JSON.parse(global.fetch.mock.calls[1][1].body);
   expect(removed).toEqual(expect.objectContaining({ version: 2, noms: ["Sauce mayonnaise"], duree_heures: 24 }));
   expect(removed.regles.Soupe).toBeUndefined();
   expect(host.querySelector('[aria-label="Retirer Soupe"]')).toBeNull();
+  expect(confirm).not.toHaveBeenCalled();
 });

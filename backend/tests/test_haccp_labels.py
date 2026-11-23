@@ -910,7 +910,7 @@ def test_preparation_retry_accepts_digest_from_before_shared_lists(api):
     client, _ = api
     payload = preparation_payload()
     parsed = PreparationCreate(**payload)
-    legacy = parsed.model_dump(mode="json", exclude={"capture_id", "liste_version"})
+    legacy = parsed.model_dump(mode="json", exclude={"capture_id", "liste_version", "quantite"})
     digest = hashlib.sha256(json.dumps(legacy, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
     response = prepare(client, payload)
     assert response.status_code == 201
@@ -959,3 +959,17 @@ def test_preparation_database_failure_is_explicit(api, monkeypatch):
     assert response.status_code == 500
     assert "archivee" in response.json()["detail"]
     assert get(client, "recherche").json() == []
+
+
+def test_preparation_quantity_is_archived_and_printed(api):
+    client, _ = api
+    response = prepare(client, preparation_payload(nom_produit="Oeufs durs cuits", quantite="19 pieces"))
+    assert response.status_code == 201, response.text
+    record = response.json()
+    assert record["quantite"] == "19 pieces"
+    label = get(client, f"{record['id']}/etiquette")
+    assert "Quantite" in label.text and "19 pieces" in label.text
+    without = prepare(client, preparation_payload(capture_id="0f5b54a8-1d6e-4ad1-9f86-7b1f1f6f1c01"))
+    assert without.status_code == 201 and without.json()["quantite"] is None
+    assert prepare(client, preparation_payload(
+        capture_id="0f5b54a8-1d6e-4ad1-9f86-7b1f1f6f1c02", quantite="x" * 61)).status_code == 422

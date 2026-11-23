@@ -98,6 +98,7 @@ def _article_etiquette(record: EtiquetteResponse) -> str:
         ("Operateur", record.operateur),
         ("Conditions de conservation" if preparation else "Consigne de stockage d'origine",
          _conditions_stockage(record)),
+        *([("Quantite", record.quantite)] if preparation and record.quantite else []),
         ("Duree declaree (heures)", str(record.duree_conservation_heures)),
         ("Reference fabricant / PMS", record.justification_duree or ""),
     ]
@@ -136,6 +137,8 @@ def construire_fragment_impression(record: EtiquetteResponse) -> str:
         ("Operateur", record.operateur),
     ]
     if preparation:
+        if record.quantite:
+            fields.insert(0, ("Quantite", record.quantite))
         fields.append(("Conservation", _conditions_stockage(record)))
     rows = "".join(f"<div><b>{escape(label)} :</b> {escape(value)}</div>" for label, value in fields)
     return (

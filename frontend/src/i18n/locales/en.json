@@ -4939,5 +4939,18 @@
   "Modifier la mise en place de la carte": "Edit the menu mise en place",
   "Produits de la mise en place": "Mise en place items",
   "produit(s) seront retirés de la mise en place. Continuer ?": "item(s) will be removed from the mise en place. Continue?",
-  "Réponse de la mise en place invalide.": "Invalid mise en place response."
+  "Réponse de la mise en place invalide.": "Invalid mise en place response.",
+  "Lien de la page :": "Page link:",
+  "Copier le lien": "Copy link",
+  "Lien copié": "Link copied",
+  "Copie impossible : sélectionnez le lien et copiez-le à la main.": "Copy failed: select the link and copy it manually.",
+  "Quantité (facultatif, à taper avant le produit, ex. 19 pièces)": "Quantity (optional, type it before the product, e.g. 19 pieces)",
+  "ex. 19 pièces": "e.g. 19 pieces",
+  "Tapez la quantité si besoin, puis choisissez ou tapez le produit : ΣIRIUS prend l’heure actuelle, calcule la DLC selon sa durée prudente et lance l’étiquette.": "Type the quantity if needed, then choose or type the product: ΣIRIUS uses the current time, calculates the use-by date from its prudent duration and starts the label.",
+  "Impression lancée automatiquement.": "Printing started automatically.",
+  "Quantité :": "Quantity:",
+  "Heure de fabrication :": "Production time:",
+  "maintenant": "now",
+  "Durée prudente automatique ΣIRIUS (ANSES, GBPH) selon le nom du produit": "Automatic prudent ΣIRIUS duration (ANSES, GBPH) based on the product name",
+  "durée calculée selon le nom du produit": "duration calculated from the product name"
 }

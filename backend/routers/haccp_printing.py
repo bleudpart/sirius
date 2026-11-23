@@ -98,7 +98,8 @@ def _android_payload(row: EtiquetteHaccp, job_id: str) -> dict:
         return value.astimezone(PARIS).strftime("%d/%m/%Y %H:%M:%S %z" if preparation else "%d/%m/%Y %H:%M") if value else ""
     return {
         "id": job_id, "labelId": row.id,
-        "product": record.nom_produit, "lot": record.numero_lot,
+        "product": f"{record.nom_produit} - {record.quantite}" if preparation and record.quantite else record.nom_produit,
+        "lot": record.numero_lot,
         **({"operation": "preparation", "prepared": stamp(record.date_fabrication),
             "storage": record.conditions_conservation} if preparation else {"opened": stamp(record.date_ouverture)}),
         "deadline": stamp(record.dlc_secondaire),

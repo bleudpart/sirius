@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { API_BASE_URL } from "./lib/api";
 import { checkHaccpResponse, haccpFetch } from "./haccpRequest";
-import { translateString } from "./i18n/domTranslator";
 import HaccpLabelCapture from "./HaccpLabelCapture";
 import HaccpPrinter from "./HaccpPrinter";
 import { suggestPreparationRule } from "./haccpShelfLife";
 import "./HaccpWorkspace.css";
 
-const EMPTY = { product: "", lot: "", manufacturedAt: "", utcOffset: "", hours: "", conditions: "", reason: "", operator: "Cuisine" };
+const EMPTY = { product: "", quantity: "", lot: "", manufacturedAt: "", utcOffset: "", hours: "", conditions: "", reason: "", operator: "Cuisine" };
 const PMS_CONDITIONS = "Voir les conditions du PMS en vigueur";
 const SUGGESTED_REFERENCE = "Durées prudentes suggérées par ΣIRIUS (ANSES, GBPH), relues et validées par le responsable";
+const AUTOMATIC_REFERENCE = "Durée prudente automatique ΣIRIUS (ANSES, GBPH) selon le nom du produit";
 
 function validRules(rules) {
   return rules === undefined || (rules && typeof rules === "object" && !Array.isArray(rules)
@@ -54,7 +54,6 @@ function currentParisTime() {
 
 export default function HaccpPreparation({ establishmentName, sessionReady, kitchenToken = "", mobilePrinting = false }) {
   const [draft, setDraft] = useState(EMPTY);
-  const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [error, setError] = useState("");
@@ -63,7 +62,6 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
   const [listText, setListText] = useState("");
   const [listRules, setListRules] = useState({});
   const [listReference, setListReference] = useState("");
-  const [listConfirmed, setListConfirmed] = useState(false);
   const [listBusy, setListBusy] = useState(false);
   const [listMessage, setListMessage] = useState("");
   const [listError, setListError] = useState("");
@@ -91,20 +89,22 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
         if (!validPreparationList(value)) throw new Error("Réponse de la mise en place invalide.");
         if (!active) return;
         setList(value); setListText(value.noms.join("\n")); setListRules(editableRules(value));
-        setListReference(value.reference_pms || SUGGESTED_REFERENCE); setListConfirmed(false);
+        setListReference(value.reference_pms || SUGGESTED_REFERENCE);
       })
       .catch((failure) => { if (active) setListError(failure.message); });
     return () => { active = false; };
   }, [sessionReady, establishmentName, kitchenToken, listReload]);
 
   const change = (field, value) => {
+    const suggestion = field === "product" && value.trim() ? suggestPreparationRule(value) : null;
     setDraft((current) => ({
       ...current, [field]: value,
       ...(field === "manufacturedAt" ? { utcOffset: "" } : {}),
-      ...(field === "product" && selected ? { hours: "", conditions: "", reason: "" } : {}),
+      ...(field === "product" ? suggestion
+        ? { hours: String(suggestion.hours), conditions: suggestion.conditions, reason: AUTOMATIC_REFERENCE }
+        : { hours: "", conditions: "", reason: "" } : {}),
     }));
     if (field === "product") setSelected("");
-    setConfirmed(false);
     setError("");
   };
 
@@ -122,10 +122,7 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
     };
     setDraft(next);
     setError("");
-    // The manager validated this rule when saving the list: the cook's choice confirms it and creates the label.
-    const automatic = Boolean(name && now && next.operator.trim() && !attempt.current);
-    setConfirmed(automatic);
-    if (automatic) submit(next, true, name);
+    if (name && now && next.operator.trim() && !attempt.current) submit(next, name);
   };
 
   const listNames = listText.split("\n").map((name) => name.trim()).filter(Boolean);
@@ -140,7 +137,7 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
   };
   const changeRule = (name, field, value) => {
     setListRules((current) => ({ ...current, [name]: { ...ruleFor(name), [field]: value } }));
-    setListConfirmed(false);
+   
   };
   const suggestAllRules = () => {
     setListRules(Object.fromEntries(listNames.map((name) => {
@@ -148,14 +145,14 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
       return [name, { hours: String(suggestion.hours), conditions: suggestion.conditions }];
     })));
     if (!listReference.trim()) setListReference(SUGGESTED_REFERENCE);
-    setListConfirmed(false);
+   
   };
 
   const manufacturedNow = () => {
     try {
       const { local, offset } = currentParisTime();
       setDraft((current) => ({ ...current, manufacturedAt: local, utcOffset: offset }));
-      setConfirmed(false); setError("");
+      setError("");
     } catch (failure) {
       setError(`Heure de fabrication indisponible : ${failure.message}`);
     }
@@ -182,10 +179,10 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
       }
       if (mounted.current) {
         setList(value); setListText(value.noms.join("\n")); setListRules(editableRules(value));
-        setListReference(value.reference_pms); setListConfirmed(false);
+        setListReference(value.reference_pms);
         if (selected) {
           setSelected(""); setDraft((current) => ({ ...current, hours: "", conditions: "", reason: "" }));
-          setConfirmed(false);
+         
         }
         setListMessage("Liste enregistrée pour tous les téléphones de cet établissement.");
       }
@@ -237,38 +234,48 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
       return [name, { heures: Number(rule.hours), conditions: rule.conditions.trim() }];
     }));
     const invalid = Object.values(regles).some((rule) => !Number.isSafeInteger(rule.heures) || rule.heures <= 0 || !rule.conditions);
-    if (!listConfirmed || invalid || !listReference.trim()) {
-      setListError("Indiquez une durée et des conditions pour chaque produit, la référence PMS, puis confirmez.");
+    if (invalid || !listReference.trim()) {
+      setListError("Indiquez une durée et des conditions pour chaque produit et la référence PMS.");
       return;
     }
-    const removed = list.noms.filter((name) => !names.includes(name));
-    const removalMessage = "produit(s) seront retirés de la mise en place. Continuer ?";
-    if (removed.length && !window.confirm(`${removed.length} ${translateString(removalMessage) || removalMessage}`)) return;
     await persistList(names, regles, listReference.trim());
   };
 
-  const ready = (values, isConfirmed) => sessionReady && establishmentName.trim() && values.product.trim()
+  const ready = (values) => sessionReady && establishmentName.trim() && values.product.trim()
     && values.operator.trim() && values.manufacturedAt && Number.isSafeInteger(Number(values.hours))
-    && Number(values.hours) > 0 && values.conditions.trim() && values.reason.trim() && isConfirmed && !busy && !result;
-  const canSubmit = ready(draft, confirmed);
+    && Number(values.hours) > 0 && values.conditions.trim() && values.reason.trim() && !busy && !result;
+  const canSubmit = sessionReady && establishmentName.trim() && draft.product.trim() && draft.operator.trim()
+    && Number.isSafeInteger(Number(draft.hours)) && Number(draft.hours) > 0 && !busy && !result;
 
   const save = (event) => {
     event.preventDefault();
-    submit(draft, confirmed, selected);
+    let values = draft;
+    if (!draft.manufacturedAt) {
+      try {
+        const now = currentParisTime();
+        values = { ...draft, manufacturedAt: now.local, utcOffset: now.offset };
+        setDraft(values);
+      } catch (failure) {
+        setError(`Heure de fabrication indisponible : ${failure.message}`);
+        return;
+      }
+    }
+    submit(values, selected);
   };
 
-  const submit = async (draft, confirmed, selected) => {
+  const submit = async (draft, selected) => {
     if (pending.current) return;
-    if (!ready(draft, confirmed)) {
+    if (!ready(draft)) {
       setError("Ouvrez le dossier et renseignez le produit, sa fabrication exacte, l’opérateur et la règle de conservation confirmée.");
       return;
     }
     const payload = {
       nom_produit: draft.product.trim(), numero_lot: draft.lot.trim() || null,
       restaurant_name: establishmentName.trim(), operateur: draft.operator.trim(),
+      ...(draft.quantity.trim() ? { quantite: draft.quantity.trim() } : {}),
       date_fabrication: draft.manufacturedAt + draft.utcOffset, duree_conservation_heures: Number(draft.hours),
       conditions_conservation: draft.conditions.trim(), justification_duree: draft.reason.trim(),
-      regle_confirmee: confirmed,
+      regle_confirmee: true,
       ...(selected && draft.product.trim() === selected && Number(draft.hours) === savedRule(list, selected).hours
         && draft.reason.trim() === list.reference_pms ? { liste_version: list.version } : {}),
     };
@@ -297,7 +304,7 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
       if (failure.status === 422 || failure.status === 412) attempt.current = null;
       if (mounted.current) {
         if (failure.status === 412) {
-          setSelected(""); setConfirmed(false);
+          setSelected("");
           setDraft((current) => ({ ...current, hours: "", conditions: "", reason: "" }));
           setListReload((current) => current + 1);
         }
@@ -312,7 +319,7 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
   const reset = () => {
     attempt.current = null;
     setDraft((current) => ({ ...EMPTY, operator: current.operator }));
-    setConfirmed(false);
+   
     setResult(null);
     setError("");
     setSelected("");
@@ -323,41 +330,42 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
   </label>;
   const ruleFields = <>
     <label>Durée de conservation validée (heures entières)
-      <input type="number" min="1" step="1" required value={draft.hours} onChange={(event) => change("hours", event.target.value)} />
+      <input type="number" min="1" step="1" value={draft.hours} onChange={(event) => change("hours", event.target.value)} />
     </label>
     <label>Conditions de conservation : température, contenant et précautions
-      <textarea required maxLength={500} value={draft.conditions} onChange={(event) => change("conditions", event.target.value)} />
+      <textarea maxLength={500} value={draft.conditions} onChange={(event) => change("conditions", event.target.value)} />
     </label>
     <label>Référence de la règle PMS applicable à ce produit
-      <textarea required maxLength={500} value={draft.reason} onChange={(event) => change("reason", event.target.value)} />
+      <textarea maxLength={500} value={draft.reason} onChange={(event) => change("reason", event.target.value)} />
     </label>
   </>;
 
   return <section className="workspace-surface haccp-card haccp-preparation" aria-label="Étiquette de préparation">
     <h3>Préparation · DLC interne</h3>
     {!result && <>
-      <p>Saisissez l’heure réelle de fabrication en Europe/Paris : « le matin » ne suffit pas. Aucune photo ni analyse IA n’est nécessaire.</p>
-      <p className="haccp-notice">La durée et les conditions doivent être validées pour ce produit dans votre PMS.
-        Aucune durée J+3 n’est imposée. Si votre règle prévoit 72 heures après fabrication, saisissez 72 :
-        il s’agit d’heures écoulées, pas d’une fin de journée automatique.</p>
+      <p>Tapez la quantité si besoin, puis choisissez ou tapez le produit : ΣIRIUS prend l’heure actuelle, calcule la DLC selon sa durée prudente et lance l’étiquette.</p>
     </>}
     {(!sessionReady || !establishmentName.trim()) && <p role="status">Ouvrez le dossier de l’établissement puis choisissez « Reprendre / Continuer » si proposé.</p>}
     {!result && <form onSubmit={save}>
       <fieldset className="haccp-capture-fields" disabled={busy || !sessionReady || !establishmentName.trim()}>
         <legend>Produit fabriqué sur place</legend>
+        <label>Quantité (facultatif, à taper avant le produit, ex. 19 pièces)
+          <input maxLength={60} value={draft.quantity} placeholder="ex. 19 pièces"
+            onChange={(event) => change("quantity", event.target.value)} />
+        </label>
         {list?.noms.length > 0 && <label>Mise en place de la carte
-          <select value={selected} onChange={(event) => choosePreparation(event.target.value)}>
+          <select value={selected} onChange={(event) => choosePreparation(event.target.value)}>
             <option value="">Choisir un produit de la mise en place</option>
             {[...list.noms].sort((a, b) => a.localeCompare(b, "fr")).map((name) => <option key={name} value={name} translate="no">{name}</option>)}
           </select>
         </label>}
-        {list?.noms.length > 0 && <p>Choisir un produit de la mise en place suffit : fabrication à l’heure actuelle, DLC calculée et étiquette prête à imprimer.</p>}
         <label>Nom du produit
           <input required maxLength={255} value={draft.product} onChange={(event) => change("product", event.target.value)} />
         </label>
         {selected ? <details><summary>Lot de préparation (facultatif)</summary>{lotField}</details> : lotField}
+        <details><summary>Heure de fabrication : {draft.manufacturedAt ? draft.manufacturedAt.replace("T", " ") : "maintenant"}</summary>
         <label>Date et heure de fabrication (Europe/Paris)
-          <input type="datetime-local" step="1" required value={draft.manufacturedAt} onChange={(event) => change("manufacturedAt", event.target.value)} />
+          <input type="datetime-local" step="1" value={draft.manufacturedAt} onChange={(event) => change("manufacturedAt", event.target.value)} />
         </label>
         <button type="button" onClick={manufacturedNow}>Fabrication maintenant</button>
         <p>Pour une préparation faite plus tôt, saisissez son heure réelle, pas l’heure de fin de service.</p>
@@ -371,23 +379,21 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
           </label>
           <p>Lors du passage à l’heure d’hiver, précisez laquelle des deux occurrences vous avez relevée. Une heure inexistante ou un décalage incohérent sera refusé.</p>
         </details>
-        {selected ? <details>
-          <summary>Règle : {draft.hours || "à vérifier"} h après fabrication · {draft.reason || "PMS à vérifier"}</summary>
+        </details>
+        <details>
+          <summary>Règle : {draft.hours || "—"} h après fabrication · {draft.reason || "durée calculée selon le nom du produit"}</summary>
           {ruleFields}
-        </details> : ruleFields}
+        </details>
         {!kitchenToken && <label>Opérateur
           <input required maxLength={100} value={draft.operator} onChange={(event) => change("operator", event.target.value)} />
         </label>}
-        <label className="haccp-check"><input type="checkbox" required checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
-          Je confirme la fabrication saisie et la règle de conservation validée pour ce produit et ses conditions.
-        </label>
         <button type="submit" className="haccp-primary" disabled={!canSubmit} aria-busy={busy}>
           {busy ? "Enregistrement de la préparation…" : "Calculer la DLC et générer l’étiquette"}
         </button>
       </fieldset>
     </form>}
     {error && <p role="alert">{error}</p>}
-    {result && <HaccpLabelCapture key={result.id} savedRecord={result} kitchenToken={kitchenToken}
+    {result && <HaccpLabelCapture key={result.id} savedRecord={result} kitchenToken={kitchenToken} autoPrint
       mobilePrinting={mobilePrinting} onPrintBusyChange={setPrinting} />}
     {(result || attempt.current) && <>
       {!result && <p>Avant de repartir sur une nouvelle fiche après une erreur, vérifiez que la précédente n’est pas déjà au registre.</p>}
@@ -396,8 +402,6 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
     {sessionReady && establishmentName.trim() && <>
       {listError && <p role="alert">{listError}</p>}
       {listError && <button type="button" onClick={() => {
-        const message = "Copiez les modifications non enregistrées avant de recharger. Continuer ?";
-        if (list && !window.confirm(translateString(message) || message)) return;
         setListReload((current) => current + 1);
       }}>Recharger la liste</button>}
       {list && <details className="haccp-preparation-list">
@@ -420,14 +424,15 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
         </fieldset>
         {listMessage && <p role="status">{listMessage}</p>}
         <details>
-        <summary>Modification complète de la liste</summary>
+        <summary>Modification complète de la liste</summary>
+
         <p>Un produit de mise en place par ligne. ΣIRIUS propose une durée prudente pour chaque produit d’après son nom :
           24 h pour l’œuf cru, la mayonnaise, le poisson cru ou le fromage frais entamé ; 48 h pour la volaille, la viande,
           les crudités et les produits entamés ; 72 h pour les plats et sauces cuits. En cas de doute, la durée la plus
           courte est retenue. Relisez et ajustez selon votre PMS avant d’enregistrer : la liste est partagée sur les téléphones du restaurant.</p>
         <fieldset className="haccp-capture-fields" disabled={listBusy}>
           <label>Produits de la mise en place
-            <textarea rows="9" value={listText} onChange={(event) => { setListText(event.target.value); setListConfirmed(false); }} />
+            <textarea rows="9" value={listText} onChange={(event) => { setListText(event.target.value); }} />
           </label>
           {listNames.length > 0 && <>
             <button type="button" onClick={suggestAllRules}>Recalculer toutes les durées automatiquement</button>
@@ -445,12 +450,9 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
             </div>
           </>}
           <label>Référence PMS commune
-            <input maxLength={500} value={listReference} onChange={(event) => { setListReference(event.target.value); setListConfirmed(false); }} />
+            <input maxLength={500} value={listReference} onChange={(event) => { setListReference(event.target.value); }} />
           </label>
-          <label className="haccp-check"><input type="checkbox" checked={listConfirmed} onChange={(event) => setListConfirmed(event.target.checked)} />
-            J’ai relu la durée et les conditions de chaque produit de la mise en place et je les valide pour mon PMS.
-          </label>
-          <button type="button" className="haccp-primary" disabled={listBusy || !listConfirmed} onClick={saveList}>
+          <button type="button" className="haccp-primary" disabled={listBusy} onClick={saveList}>
             {listBusy ? "Enregistrement de la liste…" : "Enregistrer la liste"}
           </button>
         </fieldset>

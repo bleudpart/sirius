@@ -236,7 +236,7 @@ CSV_COLUMNS = [
     "categorie", "date_reception", "temperature_conforme", "chemin_photo", "chemin_donnees",
     "date_fabrication", "conditions_conservation", "restaurant_name",
     "origines", "poids_net", "traces_allergenes", "mentions_traces", "allergenes_lecture",
-    "champs_incertains", "chemin_image_brute", "empreinte_image_brute", "reception_source_id",
+    "champs_incertains", "chemin_image_brute", "empreinte_image_brute", "reception_source_id", "quantite",
 ]
 
 
@@ -400,8 +400,9 @@ def make_haccp_router(
         prefix = str(request.url_for("haccp_search")).removesuffix("/recherche")
         capture_key = str(body.capture_id)
         hash_body = body.model_dump(mode="json", exclude={"capture_id"})
-        if hash_body["liste_version"] is None:
-            del hash_body["liste_version"]
+        for optional in ("liste_version", "quantite"):
+            if hash_body[optional] is None:
+                del hash_body[optional]
         digest = hashlib.sha256(json.dumps(hash_body, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
         try:
             previous = await run_in_threadpool(_existing_capture, db, scope, capture_key, digest, prefix)
@@ -430,6 +431,7 @@ def make_haccp_router(
                     operation, maintenant, limite, capture_key, digest,
                     date_fabrication=body.date_fabrication,
                     conditions_conservation=body.conditions_conservation, restaurant_name=body.restaurant_name,
+                    quantite=body.quantite,
                 )
             except IntegrityError:
                 previous = await run_in_threadpool(_existing_capture, db, scope, capture_key, digest, prefix)

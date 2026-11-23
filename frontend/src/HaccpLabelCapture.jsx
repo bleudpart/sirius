@@ -25,6 +25,7 @@ export default function HaccpLabelCapture({
   kitchenToken = "",
   mobilePrinting = false,
   onPrintBusyChange,
+  autoPrint = false,
   operations = ["reception", "ouverture"],
 }) {
   const [mode, setMode] = useState(operations[0]);
@@ -276,6 +277,13 @@ export default function HaccpLabelCapture({
     if (previewRef.current) URL.revokeObjectURL(previewRef.current);
     previewRef.current = null; setPreview(null);
   };
+  const autoPrintStarted = useRef(false);
+  const mobileAutoPrint = autoPrint && !!kitchenToken && mobilePrinting;
+  useEffect(() => {
+    if (!autoPrint || mobileAutoPrint || autoPrintStarted.current || !result?.dlc_secondaire || !result.conforme_reception) return;
+    autoPrintStarted.current = true;
+    queuePrint();
+  });
   const showKitchenPrintSuccess = () => {
     setPrintSuccess(true);
     if (resetTimer.current) clearTimeout(resetTimer.current);
@@ -413,6 +421,7 @@ export default function HaccpLabelCapture({
           && <HaccpReceptionStatus key={result.id} record={result} onDistributionChange={onDistributionChange} />}
         {(result.type_operation === "ouverture" || isPreparation) && <>
           {isPreparation ? <>
+            {result.quantite && <p>Quantité : {result.quantite}</p>}
             <p>Fabrication : {displayTime(result.date_fabrication, true)}</p>
             <p>DLC interne exacte : {displayTime(result.dlc_secondaire, true)} (Europe/Paris)</p>
             <p>Conditions de conservation : {result.conditions_conservation}</p>
@@ -420,10 +429,11 @@ export default function HaccpLabelCapture({
           <p>{!isPreparation && (kitchenMode || kitchenToken) ? "Consigne fabricant lue" : "Durée déclarée"} : {result.duree_conservation_heures ?? "Non renseignée"} h · Référence : {result.justification_duree || "Aucune"}</p>
           {!isPreparation && (kitchenMode || kitchenToken) && result.temperature_stockage && <p>Après ouverture : {result.temperature_stockage} · Conditions à respecter, température réelle non mesurée.</p>}
           {result.dlc_secondaire && result.conforme_reception && <>
-            <p>{isPreparation ? "Vérifiez le produit, le lot, la fabrication, la DLC et les conditions avant d’imprimer."
+            <p>{autoPrint ? "Impression lancée automatiquement."
+              : isPreparation ? "Vérifiez le produit, le lot, la fabrication, la DLC et les conditions avant d’imprimer."
               : "Vérifiez la photo, le produit, le lot et les dates avant de valider."}</p>
             {kitchenToken && mobilePrinting ? <MobileHaccpLabelPrinter labelId={result.id} kitchenToken={kitchenToken}
-              busy={busy} onBusyChange={(value) => { setBusy(value); onPrintBusyChange?.(value); }}
+              busy={busy} onBusyChange={(value) => { setBusy(value); onPrintBusyChange?.(value); }} autoStart={mobileAutoPrint}
               className={`haccp-primary${kitchenMode ? " haccp-kitchen-print" : ""}`}
               label={kitchenMode ? "J’ai vérifié le produit, le lot et la DLC — préparer"
                 : "J’ai vérifié : préparer l’impression"} /> : <>
@@ -434,7 +444,7 @@ export default function HaccpLabelCapture({
               </button>
               {printState && <button disabled={busy} onClick={checkPrintState}>Voir l’état d’impression</button>}
             </>}
-            {!kitchenMode && !kitchenToken && <details><summary>Secours manuel (risque de doublon)</summary><p>Uniquement si aucune demande n’a été envoyée au relais. Vérifiez le registre et le papier avant toute impression manuelle.</p><button disabled={busy || !!printState} onClick={print}>Imprimer l’étiquette {isPreparation ? "de préparation" : "d’ouverture"} manuellement</button></details>}
+            {!kitchenMode && !kitchenToken && <details><summary>Secours manuel (risque de doublon)</summary><p>Uniquement si aucune demande n’a été envoyée au relais. Vérifiez le registre et le papier avant toute impression manuelle.</p><button disabled={busy || (!autoPrint && !!printState)} onClick={print}>Imprimer l’étiquette {isPreparation ? "de préparation" : "d’ouverture"} manuellement</button></details>}
           </>}
           {printState && <p role="status">{printState}</p>}
         </>}

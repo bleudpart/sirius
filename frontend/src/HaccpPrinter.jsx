@@ -94,7 +94,7 @@ function checkMobilePreview(frame) {
   }
 }
 
-export function MobileHaccpLabelPrinter({ labelId, kitchenToken, busy, onBusyChange, className, label }) {
+export function MobileHaccpLabelPrinter({ labelId, kitchenToken, busy, onBusyChange, className, label, autoStart = false }) {
   const [preview, setPreview] = useState(null);
   const [ready, setReady] = useState(false);
   const [attempted, setAttempted] = useState(false);
@@ -117,6 +117,13 @@ export function MobileHaccpLabelPrinter({ labelId, kitchenToken, busy, onBusyCha
       if (timer.current) clearTimeout(timer.current);
     };
   }, []);
+
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (!autoStart || autoStarted.current) return;
+    autoStarted.current = true;
+    prepare();
+  });
 
   const prepare = async () => {
     if (pending.current || busy) return;
