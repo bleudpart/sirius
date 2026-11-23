@@ -110,11 +110,21 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
   const choosePreparation = (name) => {
     setSelected(name);
     const rule = savedRule(list, name);
-    setDraft((current) => ({
-      ...current, product: name, hours: name ? String(rule.hours) : "",
+    let now = null;
+    if (name) {
+      try { now = currentParisTime(); } catch (failure) { now = null; }
+    }
+    const next = {
+      ...draft, product: name, hours: name ? String(rule.hours) : "",
       conditions: name ? rule.conditions : "", reason: name ? list.reference_pms : "",
-    }));
-    setConfirmed(false); setError("");
+      ...(now ? { manufacturedAt: now.local, utcOffset: now.offset } : {}),
+    };
+    setDraft(next);
+    setError("");
+    // The manager validated this rule when saving the list: the cook's choice confirms it and creates the label.
+    const automatic = Boolean(name && now && next.operator.trim() && !attempt.current);
+    setConfirmed(automatic);
+    if (automatic) submit(next, true, name);
   };
 
   const listNames = listText.split("\n").map((name) => name.trim()).filter(Boolean);
@@ -200,14 +210,19 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
     }
   };
 
-  const canSubmit = sessionReady && establishmentName.trim() && draft.product.trim() && draft.operator.trim()
-    && draft.manufacturedAt && Number.isSafeInteger(Number(draft.hours)) && Number(draft.hours) > 0
-    && draft.conditions.trim() && draft.reason.trim() && confirmed && !busy && !result;
+  const ready = (values, isConfirmed) => sessionReady && establishmentName.trim() && values.product.trim()
+    && values.operator.trim() && values.manufacturedAt && Number.isSafeInteger(Number(values.hours))
+    && Number(values.hours) > 0 && values.conditions.trim() && values.reason.trim() && isConfirmed && !busy && !result;
+  const canSubmit = ready(draft, confirmed);
 
-  const save = async (event) => {
+  const save = (event) => {
     event.preventDefault();
+    submit(draft, confirmed, selected);
+  };
+
+  const submit = async (draft, confirmed, selected) => {
     if (pending.current) return;
-    if (!canSubmit) {
+    if (!ready(draft, confirmed)) {
       setError("Ouvrez le dossier et renseignez le produit, sa fabrication exacte, l’opérateur et la règle de conservation confirmée.");
       return;
     }
@@ -299,6 +314,7 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
             {[...list.noms].sort((a, b) => a.localeCompare(b, "fr")).map((name) => <option key={name} value={name} translate="no">{name}</option>)}
           </select>
         </label>}
+        {list?.noms.length > 0 && <p>Choisir un produit de la mise en place suffit : fabrication à l’heure actuelle, DLC calculée et étiquette prête à imprimer.</p>}
         <label>Nom du produit
           <input required maxLength={255} value={draft.product} onChange={(event) => change("product", event.target.value)} />
         </label>

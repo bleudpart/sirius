@@ -103,40 +103,31 @@ test("a QR preparation uses mobile printing only after the user reviews it", asy
   expect(JSON.parse(global.fetch.mock.calls[1][1].body).reviewed).toBe(true);
 });
 
-test("the shared list applies its confirmed PMS duration without guessing fabrication time", async () => {
+test("choosing a mise en place product confirms it, calculates the DLC and generates the label", async () => {
   const list = { version: 1, noms: ["Soupe TEST", "Sauce"], duree_heures: 72, reference_pms: "PMS en vigueur" };
   await render({ kitchenToken: "qr-token" }, list);
-  await change(field("Mise en place de la carte"), "Soupe TEST");
-  expect(field("Nom du produit").value).toBe("Soupe TEST");
-  expect(field("Durée de conservation").value).toBe("72");
-  expect(field("Conditions").value).toBe("Voir les conditions du PMS en vigueur");
-  expect(field("Référence de la règle").value).toBe("PMS en vigueur");
-  expect(field("Date et heure").value).toBe("");
-  expect(field("Je confirme").checked).toBe(false);
-  expect(button("Calculer la DLC").disabled).toBe(true);
-
   jest.useFakeTimers(); jest.setSystemTime(new Date("2026-11-02T07:15:00Z"));
-  await click("Fabrication maintenant");
-  expect(field("Date et heure").value).toBe("2026-11-02T08:15");
-  expect(field("Décalage UTC").value).toBe("+01:00");
-  await act(async () => field("Je confirme").click());
-  await submit();
+  await change(field("Mise en place de la carte"), "Soupe TEST");
+  jest.useRealTimers();
+  expect(global.fetch).toHaveBeenCalledTimes(1);
   const payload = JSON.parse(global.fetch.mock.calls[0][1].body);
   expect(payload).toEqual(expect.objectContaining({
     nom_produit: "Soupe TEST", date_fabrication: "2026-11-02T08:15:00+01:00",
-    duree_conservation_heures: 72, justification_duree: "PMS en vigueur", regle_confirmee: true, liste_version: 1,
+    duree_conservation_heures: 72, conditions_conservation: "Voir les conditions du PMS en vigueur",
+    justification_duree: "PMS en vigueur", regle_confirmee: true, liste_version: 1,
   }));
   expect(host.textContent).toContain("DLC interne exacte");
+  expect(button("J’ai vérifié")).toBeTruthy();
 });
 
-test("editing a selected product clears its prefilled rule", async () => {
+test("a product typed by hand still needs its rule and an explicit confirmation", async () => {
   await render({}, { version: 1, noms: ["Soupe TEST"], duree_heures: 72, reference_pms: "PMS en vigueur" });
-  await change(field("Mise en place de la carte"), "Soupe TEST");
   await change(field("Nom du produit"), "Autre produit");
+  await change(field("Date et heure"), "2026-11-02T08:15");
   expect(field("Durée de conservation").value).toBe("");
-  expect(field("Conditions").value).toBe("");
-  expect(field("Référence de la règle").value).toBe("");
   expect(field("Je confirme").checked).toBe(false);
+  expect(button("Calculer la DLC").disabled).toBe(true);
+  expect(global.fetch).not.toHaveBeenCalled();
 });
 
 test("a stale shared rule is cleared and reloaded before another preparation", async () => {
@@ -145,14 +136,13 @@ test("a stale shared rule is cleared and reloaded before another preparation", a
   global.fetch.mockResolvedValueOnce({ ...reply({ detail: "La liste des préparations a changé." }, false), status: 412 })
     .mockResolvedValueOnce(reply({ ...list, version: 2, duree_heures: 24 }));
   await change(field("Mise en place de la carte"), "Soupe TEST");
-  await change(field("Date et heure"), "2026-11-02T08:15");
-  await act(async () => field("Je confirme").click());
-  await submit();
   expect(host.textContent).toContain("La liste des préparations a changé.");
   expect(field("Durée de conservation").value).toBe("");
   expect(field("Je confirme").checked).toBe(false);
   await change(field("Mise en place de la carte"), "Soupe TEST");
-  expect(field("Durée de conservation").value).toBe("24");
+  expect(JSON.parse(global.fetch.mock.calls[2][1].body)).toEqual(expect.objectContaining({
+    duree_conservation_heures: 24, liste_version: 2,
+  }));
 });
 
 test("the QR saves a list with prudent per-product durations only after confirmation", async () => {
@@ -185,15 +175,10 @@ test("the QR saves a list with prudent per-product durations only after confirma
     reference_pms: "PMS en vigueur", regles, regle_confirmee: true,
   });
   expect(host.textContent).toContain("Liste enregistrée pour tous les téléphones");
-  await change(field("Mise en place de la carte"), "Sauce mayonnaise");
-  expect(field("Durée de conservation").value).toBe("24");
-  expect(field("Conditions").value).toContain("ANSES");
-  await change(field("Date et heure"), "2026-11-02T08:15");
-  await act(async () => field("Je confirme").click());
   global.fetch.mockResolvedValueOnce(reply(record));
-  await submit();
+  await change(field("Mise en place de la carte"), "Sauce mayonnaise");
   expect(JSON.parse(global.fetch.mock.calls[1][1].body)).toEqual(expect.objectContaining({
-    duree_conservation_heures: 24, liste_version: 1,
+    duree_conservation_heures: 24, conditions_conservation: expect.stringContaining("ANSES"), liste_version: 1,
   }));
 });
 
