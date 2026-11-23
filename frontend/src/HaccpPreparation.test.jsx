@@ -155,26 +155,46 @@ test("a stale shared rule is cleared and reloaded before another preparation", a
   expect(field("Durée de conservation").value).toBe("24");
 });
 
-test("the QR saves a list shared by the establishment only after confirming its common rule", async () => {
+test("the QR saves a list with prudent per-product durations only after confirmation", async () => {
   await render({ kitchenToken: "qr-token" });
-  const list = { version: 1, noms: ["Pommes caramel", "Bac inox rumsteak"], duree_heures: 72, reference_pms: "PMS en vigueur" };
-  global.fetch.mockResolvedValueOnce(reply(list));
-  await change(field("Liste des préparations"), list.noms.join("\n"));
-  await change(field("Durée commune"), "72");
+  const noms = ["Pommes caramel", "Sauce mayonnaise", "Bac inox rumsteak"];
+  const regles = {
+    "Pommes caramel": { heures: 72, conditions: expect.stringContaining("cuite") },
+    "Sauce mayonnaise": { heures: 24, conditions: expect.stringContaining("ANSES") },
+    "Bac inox rumsteak": { heures: 48, conditions: expect.stringContaining("Viande") },
+  };
+  await change(field("Liste des préparations"), noms.join("\n"));
+  expect(host.querySelector('[aria-label="Heures de conservation : Sauce mayonnaise"]').value).toBe("24");
+  await change(host.querySelector('[aria-label="Heures de conservation : Pommes caramel"]'), "48");
+  expect(field("Référence PMS commune").value).toContain("ΣIRIUS");
   await change(field("Référence PMS commune"), "PMS en vigueur");
   expect(button("Enregistrer la liste").disabled).toBe(true);
+  await click("Recalculer toutes les durées");
   await act(async () => host.querySelector(".haccp-preparation-list input[type=checkbox]").click());
+  global.fetch.mockImplementationOnce(async (url, options) => {
+    const sent = JSON.parse(options.body);
+    return reply({ version: 1, noms: sent.noms, duree_heures: sent.duree_heures, reference_pms: sent.reference_pms, regles: sent.regles });
+  });
   await click("Enregistrer la liste");
   const [url, options] = global.fetch.mock.calls[0];
   expect(url).toMatch(/\/haccp\/preparations\/liste$/);
   expect(options.method).toBe("PUT");
   expect(options.headers["X-Sirius-Cuisine"]).toBe("qr-token");
   expect(JSON.parse(options.body)).toEqual({
-    restaurant_name: "Le Papillon", version: 0, noms: list.noms, duree_heures: 72,
-    reference_pms: "PMS en vigueur", regle_confirmee: true,
+    restaurant_name: "Le Papillon", version: 0, noms, duree_heures: 24,
+    reference_pms: "PMS en vigueur", regles, regle_confirmee: true,
   });
   expect(host.textContent).toContain("Liste enregistrée pour tous les téléphones");
-  expect([...field("Préparation enregistrée").options].map((option) => option.value)).toContain("Bac inox rumsteak");
+  await change(field("Préparation enregistrée"), "Sauce mayonnaise");
+  expect(field("Durée de conservation").value).toBe("24");
+  expect(field("Conditions").value).toContain("ANSES");
+  await change(field("Date et heure"), "2026-11-02T08:15");
+  await act(async () => field("Je confirme").click());
+  global.fetch.mockResolvedValueOnce(reply(record));
+  await submit();
+  expect(JSON.parse(global.fetch.mock.calls[1][1].body)).toEqual(expect.objectContaining({
+    duree_conservation_heures: 24, liste_version: 1,
+  }));
 });
 
 test("a conflicting list edit is not silently discarded", async () => {

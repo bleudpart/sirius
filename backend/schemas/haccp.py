@@ -154,6 +154,13 @@ class PreparationCreate(OperationEtiquette):
         return " ".join(value.split())
 
 
+class PreparationRule(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    heures: Annotated[int, Field(strict=True, gt=0, le=8760)]
+    conditions: Annotated[str, StringConstraints(strict=True, min_length=1, max_length=500)]
+
+
 class PreparationListUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
@@ -162,6 +169,7 @@ class PreparationListUpdate(BaseModel):
     noms: Annotated[list[Texte255], Field(max_length=500)]
     duree_heures: Annotated[int, Field(strict=True, gt=0, le=9_007_199_254_740_991)]
     reference_pms: Annotated[str, StringConstraints(strict=True, min_length=1, max_length=500)]
+    regles: Annotated[dict[str, PreparationRule], Field(max_length=500)] = Field(default_factory=dict)
     regle_confirmee: StrictBool
 
     @model_validator(mode="after")
@@ -170,6 +178,8 @@ class PreparationListUpdate(BaseModel):
             raise ValueError("Confirmez que la regle PMS s'applique a chaque preparation de la liste.")
         if len({nom.casefold() for nom in self.noms}) != len(self.noms):
             raise ValueError("La liste contient des noms en double.")
+        if not set(self.regles) <= set(self.noms):
+            raise ValueError("Chaque regle doit correspondre a une preparation de la liste.")
         return self
 
 

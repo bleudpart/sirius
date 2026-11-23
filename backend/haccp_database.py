@@ -76,6 +76,9 @@ def _configured_engine() -> Engine:
         for name, definition in additions.items():
             if name not in columns:
                 connection.exec_driver_sql(f"ALTER TABLE etiquettes_haccp ADD COLUMN {name} {definition}")
+        list_columns = {column["name"] for column in inspect(connection).get_columns("haccp_preparation_lists")}
+        if "regles" not in list_columns:
+            connection.exec_driver_sql("ALTER TABLE haccp_preparation_lists ADD COLUMN regles JSON")
         print_columns = {column["name"] for column in inspect(connection).get_columns("haccp_print_jobs")}
         if "accepted_at" not in print_columns:
             connection.exec_driver_sql("ALTER TABLE haccp_print_jobs ADD COLUMN accepted_at DATETIME")

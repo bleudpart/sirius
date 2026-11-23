@@ -78,4 +78,5 @@ class HaccpPreparationList(Base):
     noms: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     duree_heures: Mapped[int] = mapped_column(Integer, nullable=False)
     reference_pms: Mapped[str] = mapped_column(String(500), nullable=False)
+    regles: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)

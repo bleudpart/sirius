@@ -308,7 +308,7 @@ def test_liste_preparations_partagee_isolee_et_regle_confirmee(kitchen):
     _, headers = create_link(client)
     path = "/api/haccp/preparations/liste"
     params = {"restaurant_name": "Chez Daniel"}
-    empty = {"version": 0, "noms": [], "duree_heures": None, "reference_pms": ""}
+    empty = {"version": 0, "noms": [], "duree_heures": None, "reference_pms": "", "regles": {}}
     assert client.get(path, headers=headers, params=params).json() == empty
     payload = {
         **params, "version": 0, "noms": ["Pommes caramel", "Bac inox tranche de rumsteak"],
@@ -319,7 +319,8 @@ def test_liste_preparations_partagee_isolee_et_regle_confirmee(kitchen):
     assert client.put(path, headers=headers, json={**payload, "noms": ["Sauce", "sauce"]}).status_code == 422
     saved = client.put(path, headers=headers, json=payload)
     assert saved.status_code == 200, saved.text
-    assert saved.json() == {"version": 1, "noms": payload["noms"], "duree_heures": 72, "reference_pms": "PMS en vigueur"}
+    assert saved.json() == {"version": 1, "noms": payload["noms"], "duree_heures": 72,
+                            "reference_pms": "PMS en vigueur", "regles": {}}
     assert client.get(path, headers=CHEF, params=params).json() == saved.json()
     assert client.get(path, headers=headers, params={"restaurant_name": "Ailleurs"}).status_code == 403
     assert client.put(path, headers=headers, json={**payload, "restaurant_name": "Ailleurs"}).status_code == 403
@@ -380,6 +381,42 @@ def test_preparation_refuse_une_liste_perimee_mais_retrouve_sa_capture(kitchen):
         **preparation, "capture_id": str(uuid.uuid4()), "liste_version": 2,
     })
     assert wrong_rule.status_code == 412
+
+
+def test_liste_preparations_applique_une_duree_par_produit(kitchen):
+    client = kitchen.client
+    _, headers = create_link(client)
+    path = "/api/haccp/preparations/liste"
+    rule = {"heures": 24, "conditions": "0 a 3 C, bac ferme"}
+    saved_list = {
+        "restaurant_name": "Chez Daniel", "version": 0, "noms": ["Soupe", "Mayonnaise maison"],
+        "duree_heures": 72, "reference_pms": "PMS en vigueur", "regle_confirmee": True,
+        "regles": {"Mayonnaise maison": rule},
+    }
+    assert client.put(path, headers=headers, json={
+        **saved_list, "regles": {"Inconnue": rule},
+    }).status_code == 422
+    assert client.put(path, headers=headers, json={
+        **saved_list, "regles": {"Mayonnaise maison": {**rule, "heures": 0}},
+    }).status_code == 422
+    saved = client.put(path, headers=headers, json=saved_list)
+    assert saved.status_code == 200, saved.text
+    assert client.get(path, headers=headers, params={"restaurant_name": "Chez Daniel"}).json()["regles"] == {
+        "Mayonnaise maison": rule,
+    }
+    fabrication = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(minutes=1)
+    def prepare(name, hours):
+        return client.post("/api/haccp/preparations", headers=headers, json={
+            "capture_id": str(uuid.uuid4()), "nom_produit": name, "operateur": "Cuisine",
+            "restaurant_name": "Chez Daniel", "date_fabrication": fabrication.isoformat(),
+            "duree_conservation_heures": hours, "conditions_conservation": "0 a 3 C",
+            "justification_duree": "PMS en vigueur", "regle_confirmee": True, "liste_version": 1,
+        })
+    assert prepare("Mayonnaise maison", 72).status_code == 412
+    created = prepare("Mayonnaise maison", 24)
+    assert created.status_code == 201, created.text
+    assert datetime.fromisoformat(created.json()["dlc_secondaire"].replace("Z", "+00:00")) == fabrication + timedelta(hours=24)
+    assert prepare("Soupe", 72).status_code == 201
 
 
 def test_preparation_verrouille_la_regle_pendant_son_enregistrement(kitchen, monkeypatch):

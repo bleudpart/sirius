@@ -162,6 +162,12 @@ body:has(.haccp-standalone) {
 .haccp-mobile-setup a { color: #a7e9f2; }
 .haccp-preparation-list { margin-top: 16px; }
 .haccp-preparation-list summary { cursor: pointer; color: var(--haccp-gold); font-weight: 700; }
+.haccp-preparation-rules { display: grid; gap: 6px; max-height: 420px; overflow-y: auto; }
+.haccp-preparation-rule { display: grid; grid-template-columns: minmax(120px, 1fr) 72px minmax(160px, 2fr); gap: 8px; align-items: center; }
+@media (max-width: 640px) {
+  .haccp-preparation-rule { grid-template-columns: 1fr 72px; }
+  .haccp-preparation-rule input:last-child { grid-column: 1 / -1; }
+}
 .haccp-ui .haccp-print-success { padding: 18px; border: 1px solid #6fc58a; border-radius: 12px; background: rgba(58, 150, 83, .2); color: #b7f4c8; font-size: 20px; font-weight: 700; text-align: center; }
 .haccp-ui [role="alert"] { color: #ffd1c6; padding: 14px; border: 1px solid #bb786b; border-radius: 10px; background: rgba(187, 120, 107, .1); }
 .haccp-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: 16px; margin: 20px 0; }

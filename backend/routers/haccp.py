@@ -310,8 +310,10 @@ def make_haccp_router(
             db.rollback()
             raise HTTPException(412, "La liste des préparations a changé. Rechargez-la et vérifiez la règle.")
         row = db.get(HaccpPreparationList, (scope, body.restaurant_name))
+        rule = (row.regles or {}).get(body.nom_produit) if row is not None else None
+        hours = rule["heures"] if rule else (row.duree_heures if row is not None else None)
         if (row is None or body.nom_produit not in row.noms
-                or body.duree_conservation_heures != row.duree_heures
+                or body.duree_conservation_heures != hours
                 or body.justification_duree != row.reference_pms):
             db.rollback()
             raise HTTPException(412, "La préparation ou sa règle ne correspond plus à la liste. Rechargez-la.")
@@ -335,6 +337,7 @@ def make_haccp_router(
                 "noms": row.noms if row else [],
                 "duree_heures": row.duree_heures if row else None,
                 "reference_pms": row.reference_pms if row else "",
+                "regles": (row.regles or {}) if row else {},
             }
         except SQLAlchemyError as error:
             logger.exception("[HACCP] Lecture de la liste des preparations impossible")
@@ -351,8 +354,10 @@ def make_haccp_router(
                 "PUT", "/preparations/liste", json=body.model_dump(mode="json"),
             )
             return response.json()
+        regles = {name: rule.model_dump() for name, rule in body.regles.items()}
         values = {
             "noms": body.noms, "duree_heures": body.duree_heures, "reference_pms": body.reference_pms,
+            "regles": regles,
             "version": body.version + 1, "updated_at": datetime.now(timezone.utc).replace(tzinfo=None),
         }
         try:
@@ -376,7 +381,7 @@ def make_haccp_router(
             logger.exception("[HACCP] Enregistrement de la liste des preparations impossible")
             raise HTTPException(500, "La liste des préparations n'a pas pu être enregistrée.") from error
         return {"version": values["version"], "noms": body.noms,
-                "duree_heures": body.duree_heures, "reference_pms": body.reference_pms}
+                "duree_heures": body.duree_heures, "reference_pms": body.reference_pms, "regles": regles}
 
     @router.post("/preparations", response_model=EtiquetteResponse, status_code=201)
     async def preparation(

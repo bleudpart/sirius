@@ -4,17 +4,37 @@ import { checkHaccpResponse, haccpFetch } from "./haccpRequest";
 import { translateString } from "./i18n/domTranslator";
 import HaccpLabelCapture from "./HaccpLabelCapture";
 import HaccpPrinter from "./HaccpPrinter";
+import { suggestPreparationRule } from "./haccpShelfLife";
 import "./HaccpWorkspace.css";
 
 const EMPTY = { product: "", lot: "", manufacturedAt: "", utcOffset: "", hours: "", conditions: "", reason: "", operator: "Cuisine" };
+const PMS_CONDITIONS = "Voir les conditions du PMS en vigueur";
+const SUGGESTED_REFERENCE = "Durées prudentes suggérées par ΣIRIUS (ANSES, GBPH), relues et validées par le responsable";
+
+function validRules(rules) {
+  return rules === undefined || (rules && typeof rules === "object" && !Array.isArray(rules)
+    && Object.values(rules).every((rule) => rule && Number.isSafeInteger(rule.heures) && rule.heures > 0
+      && typeof rule.conditions === "string" && rule.conditions.trim()));
+}
 
 function validPreparationList(value) {
   return value && Number.isSafeInteger(value.version) && value.version >= 0
     && Array.isArray(value.noms) && value.noms.every((name) => typeof name === "string" && name.trim())
-    && typeof value.reference_pms === "string"
+    && typeof value.reference_pms === "string" && validRules(value.regles)
     && (value.version === 0
       ? value.noms.length === 0 && value.duree_heures === null
       : Number.isSafeInteger(value.duree_heures) && value.duree_heures > 0 && value.reference_pms.trim());
+}
+
+function savedRule(list, name) {
+  const rule = list?.regles?.[name];
+  if (rule) return { hours: rule.heures, conditions: rule.conditions };
+  return { hours: list?.duree_heures, conditions: PMS_CONDITIONS };
+}
+
+function editableRules(list) {
+  return Object.fromEntries(Object.entries(list.regles || {})
+    .map(([name, rule]) => [name, { hours: String(rule.heures), conditions: rule.conditions }]));
 }
 
 function currentParisTime() {
@@ -41,7 +61,7 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
   const [result, setResult] = useState(null);
   const [list, setList] = useState(null);
   const [listText, setListText] = useState("");
-  const [listHours, setListHours] = useState("");
+  const [listRules, setListRules] = useState({});
   const [listReference, setListReference] = useState("");
   const [listConfirmed, setListConfirmed] = useState(false);
   const [listBusy, setListBusy] = useState(false);
@@ -69,9 +89,8 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
       .then((value) => {
         if (!validPreparationList(value)) throw new Error("Réponse de la liste des préparations invalide.");
         if (!active) return;
-        setList(value); setListText(value.noms.join("\n"));
-        setListHours(value.duree_heures === null ? "" : String(value.duree_heures));
-        setListReference(value.reference_pms); setListConfirmed(false);
+        setList(value); setListText(value.noms.join("\n")); setListRules(editableRules(value));
+        setListReference(value.reference_pms || SUGGESTED_REFERENCE); setListConfirmed(false);
       })
       .catch((failure) => { if (active) setListError(failure.message); });
     return () => { active = false; };
@@ -90,11 +109,35 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
 
   const choosePreparation = (name) => {
     setSelected(name);
+    const rule = savedRule(list, name);
     setDraft((current) => ({
-      ...current, product: name, hours: name ? String(list.duree_heures) : "",
-      conditions: name ? "Voir les conditions du PMS en vigueur" : "", reason: name ? list.reference_pms : "",
+      ...current, product: name, hours: name ? String(rule.hours) : "",
+      conditions: name ? rule.conditions : "", reason: name ? list.reference_pms : "",
     }));
     setConfirmed(false); setError("");
+  };
+
+  const listNames = listText.split("\n").map((name) => name.trim()).filter(Boolean);
+  const ruleFor = (name) => {
+    if (listRules[name]) return listRules[name];
+    if (list?.noms.includes(name) && list.duree_heures) {
+      const rule = savedRule(list, name);
+      return { hours: String(rule.hours), conditions: rule.conditions };
+    }
+    const suggestion = suggestPreparationRule(name);
+    return { hours: String(suggestion.hours), conditions: suggestion.conditions };
+  };
+  const changeRule = (name, field, value) => {
+    setListRules((current) => ({ ...current, [name]: { ...ruleFor(name), [field]: value } }));
+    setListConfirmed(false);
+  };
+  const suggestAllRules = () => {
+    setListRules(Object.fromEntries(listNames.map((name) => {
+      const suggestion = suggestPreparationRule(name);
+      return [name, { hours: String(suggestion.hours), conditions: suggestion.conditions }];
+    })));
+    if (!listReference.trim()) setListReference(SUGGESTED_REFERENCE);
+    setListConfirmed(false);
   };
 
   const manufacturedNow = () => {
@@ -109,12 +152,17 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
 
   const saveList = async () => {
     if (savingList.current || !list) return;
-    const names = listText.split("\n").map((name) => name.trim()).filter(Boolean);
-    const hours = Number(listHours);
-    if (!listConfirmed || !Number.isSafeInteger(hours) || hours <= 0 || !listReference.trim()) {
-      setListError("Indiquez la durée et la référence PMS, puis confirmez la règle pour chaque produit.");
+    const names = listNames;
+    const regles = Object.fromEntries(names.map((name) => {
+      const rule = ruleFor(name);
+      return [name, { heures: Number(rule.hours), conditions: rule.conditions.trim() }];
+    }));
+    const invalid = Object.values(regles).some((rule) => !Number.isSafeInteger(rule.heures) || rule.heures <= 0 || !rule.conditions);
+    if (!listConfirmed || invalid || !listReference.trim()) {
+      setListError("Indiquez une durée et des conditions pour chaque produit, la référence PMS, puis confirmez.");
       return;
     }
+    const hours = names.length ? Math.min(...Object.values(regles).map((rule) => rule.heures)) : (list.duree_heures || 24);
     const removed = list.noms.filter((name) => !names.includes(name));
     const removalMessage = "préparation(s) seront retirées de cette liste. Continuer ?";
     if (removed.length && !window.confirm(`${removed.length} ${translateString(removalMessage) || removalMessage}`)) return;
@@ -125,16 +173,18 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
         headers: { "Content-Type": "application/json", ...(kitchenToken ? { "X-Sirius-Cuisine": kitchenToken } : {}) },
         body: JSON.stringify({
           restaurant_name: establishmentName.trim(), version: list.version, noms: names,
-          duree_heures: hours, reference_pms: listReference.trim(), regle_confirmee: true,
+          duree_heures: hours, reference_pms: listReference.trim(), regles, regle_confirmee: true,
         }),
       }, async (response) => (await checkHaccpResponse(response)).json());
       if (!validPreparationList(value) || value.version !== list.version + 1
           || JSON.stringify(value.noms) !== JSON.stringify(names) || value.duree_heures !== hours
-          || value.reference_pms !== listReference.trim()) {
+          || value.reference_pms !== listReference.trim()
+          || names.some((name) => value.regles?.[name]?.heures !== regles[name].heures
+            || value.regles[name].conditions !== regles[name].conditions)) {
         throw new Error("Réponse de liste invalide. Rechargez avant toute autre modification.");
       }
       if (mounted.current) {
-        setList(value); setListText(value.noms.join("\n")); setListHours(String(value.duree_heures));
+        setList(value); setListText(value.noms.join("\n")); setListRules(editableRules(value));
         setListReference(value.reference_pms); setListConfirmed(false);
         if (selected) {
           setSelected(""); setDraft((current) => ({ ...current, hours: "", conditions: "", reason: "" }));
@@ -167,7 +217,7 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
       date_fabrication: draft.manufacturedAt + draft.utcOffset, duree_conservation_heures: Number(draft.hours),
       conditions_conservation: draft.conditions.trim(), justification_duree: draft.reason.trim(),
       regle_confirmee: confirmed,
-      ...(selected && draft.product.trim() === selected && Number(draft.hours) === list.duree_heures
+      ...(selected && draft.product.trim() === selected && Number(draft.hours) === savedRule(list, selected).hours
         && draft.reason.trim() === list.reference_pms ? { liste_version: list.version } : {}),
     };
     const snapshot = JSON.stringify(payload);
@@ -299,20 +349,34 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
       }}>Recharger la liste</button>}
       {list && <details className="haccp-preparation-list">
         <summary>Modifier la liste des préparations</summary>
-        <p>Une préparation par ligne. La règle ci-dessous doit être validée pour chaque produit et sera partagée sur les téléphones du restaurant.</p>
+        <p>Une préparation par ligne. ΣIRIUS propose une durée prudente pour chaque produit d’après son nom :
+          24 h pour l’œuf cru, la mayonnaise, le poisson cru ou le fromage frais entamé ; 48 h pour la volaille, la viande,
+          les crudités et les produits entamés ; 72 h pour les plats et sauces cuits. En cas de doute, la durée la plus
+          courte est retenue. Relisez et ajustez selon votre PMS avant d’enregistrer : la liste est partagée sur les téléphones du restaurant.</p>
         <fieldset className="haccp-capture-fields" disabled={listBusy}>
           <label>Liste des préparations
             <textarea rows="9" value={listText} onChange={(event) => { setListText(event.target.value); setListConfirmed(false); }} />
           </label>
-          <label>Durée commune validée (heures)
-            <input type="number" min="1" step="1" value={listHours}
-              onChange={(event) => { setListHours(event.target.value); setListConfirmed(false); }} />
-          </label>
+          {listNames.length > 0 && <>
+            <button type="button" onClick={suggestAllRules}>Recalculer toutes les durées automatiquement</button>
+            <div className="haccp-preparation-rules">
+              {listNames.map((name) => {
+                const rule = ruleFor(name);
+                return <div key={name} className="haccp-preparation-rule">
+                  <span translate="no">{name}</span>
+                  <input type="number" min="1" step="1" aria-label={`Heures de conservation : ${name}`} value={rule.hours}
+                    onChange={(event) => changeRule(name, "hours", event.target.value)} />
+                  <input maxLength={500} aria-label={`Conditions de conservation : ${name}`} value={rule.conditions}
+                    onChange={(event) => changeRule(name, "conditions", event.target.value)} />
+                </div>;
+              })}
+            </div>
+          </>}
           <label>Référence PMS commune
             <input maxLength={500} value={listReference} onChange={(event) => { setListReference(event.target.value); setListConfirmed(false); }} />
           </label>
           <label className="haccp-check"><input type="checkbox" checked={listConfirmed} onChange={(event) => setListConfirmed(event.target.checked)} />
-            Je confirme que cette règle est validée pour chaque préparation de la liste.
+            J’ai relu la durée et les conditions de chaque préparation et je les valide pour mon PMS.
           </label>
           <button type="button" className="haccp-primary" disabled={listBusy || !listConfirmed} onClick={saveList}>
             {listBusy ? "Enregistrement de la liste…" : "Enregistrer la liste"}
