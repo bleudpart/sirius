@@ -87,7 +87,7 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
       headers: kitchenToken ? { "X-Sirius-Cuisine": kitchenToken } : {},
     }, async (response) => (await checkHaccpResponse(response)).json())
       .then((value) => {
-        if (!validPreparationList(value)) throw new Error("Réponse de la liste des préparations invalide.");
+        if (!validPreparationList(value)) throw new Error("Réponse de la mise en place invalide.");
         if (!active) return;
         setList(value); setListText(value.noms.join("\n")); setListRules(editableRules(value));
         setListReference(value.reference_pms || SUGGESTED_REFERENCE); setListConfirmed(false);
@@ -164,7 +164,7 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
     }
     const hours = names.length ? Math.min(...Object.values(regles).map((rule) => rule.heures)) : (list.duree_heures || 24);
     const removed = list.noms.filter((name) => !names.includes(name));
-    const removalMessage = "préparation(s) seront retirées de cette liste. Continuer ?";
+    const removalMessage = "produit(s) seront retirés de la mise en place. Continuer ?";
     if (removed.length && !window.confirm(`${removed.length} ${translateString(removalMessage) || removalMessage}`)) return;
     savingList.current = true; setListBusy(true); setListError(""); setListMessage("");
     try {
@@ -293,9 +293,9 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
     {!result && <form onSubmit={save}>
       <fieldset className="haccp-capture-fields" disabled={busy || !sessionReady || !establishmentName.trim()}>
         <legend>Produit fabriqué sur place</legend>
-        {list?.noms.length > 0 && <label>Préparation enregistrée
-          <select value={selected} onChange={(event) => choosePreparation(event.target.value)}>
-            <option value="">Choisir une préparation</option>
+        {list?.noms.length > 0 && <label>Mise en place de la carte
+          <select value={selected} onChange={(event) => choosePreparation(event.target.value)}>
+            <option value="">Choisir un produit de la mise en place</option>
             {[...list.noms].sort((a, b) => a.localeCompare(b, "fr")).map((name) => <option key={name} value={name} translate="no">{name}</option>)}
           </select>
         </label>}
@@ -348,13 +348,13 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
         setListReload((current) => current + 1);
       }}>Recharger la liste</button>}
       {list && <details className="haccp-preparation-list">
-        <summary>Modifier la liste des préparations</summary>
-        <p>Une préparation par ligne. ΣIRIUS propose une durée prudente pour chaque produit d’après son nom :
+        <summary>Modifier la mise en place de la carte</summary>
+        <p>Un produit de mise en place par ligne. ΣIRIUS propose une durée prudente pour chaque produit d’après son nom :
           24 h pour l’œuf cru, la mayonnaise, le poisson cru ou le fromage frais entamé ; 48 h pour la volaille, la viande,
           les crudités et les produits entamés ; 72 h pour les plats et sauces cuits. En cas de doute, la durée la plus
           courte est retenue. Relisez et ajustez selon votre PMS avant d’enregistrer : la liste est partagée sur les téléphones du restaurant.</p>
         <fieldset className="haccp-capture-fields" disabled={listBusy}>
-          <label>Liste des préparations
+          <label>Produits de la mise en place
             <textarea rows="9" value={listText} onChange={(event) => { setListText(event.target.value); setListConfirmed(false); }} />
           </label>
           {listNames.length > 0 && <>
@@ -376,7 +376,7 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
             <input maxLength={500} value={listReference} onChange={(event) => { setListReference(event.target.value); setListConfirmed(false); }} />
           </label>
           <label className="haccp-check"><input type="checkbox" checked={listConfirmed} onChange={(event) => setListConfirmed(event.target.checked)} />
-            J’ai relu la durée et les conditions de chaque préparation et je les valide pour mon PMS.
+            J’ai relu la durée et les conditions de chaque produit de la mise en place et je les valide pour mon PMS.
           </label>
           <button type="button" className="haccp-primary" disabled={listBusy || !listConfirmed} onClick={saveList}>
             {listBusy ? "Enregistrement de la liste…" : "Enregistrer la liste"}

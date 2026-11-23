@@ -106,7 +106,7 @@ test("a QR preparation uses mobile printing only after the user reviews it", asy
 test("the shared list applies its confirmed PMS duration without guessing fabrication time", async () => {
   const list = { version: 1, noms: ["Soupe TEST", "Sauce"], duree_heures: 72, reference_pms: "PMS en vigueur" };
   await render({ kitchenToken: "qr-token" }, list);
-  await change(field("Préparation enregistrée"), "Soupe TEST");
+  await change(field("Mise en place de la carte"), "Soupe TEST");
   expect(field("Nom du produit").value).toBe("Soupe TEST");
   expect(field("Durée de conservation").value).toBe("72");
   expect(field("Conditions").value).toBe("Voir les conditions du PMS en vigueur");
@@ -131,7 +131,7 @@ test("the shared list applies its confirmed PMS duration without guessing fabric
 
 test("editing a selected product clears its prefilled rule", async () => {
   await render({}, { version: 1, noms: ["Soupe TEST"], duree_heures: 72, reference_pms: "PMS en vigueur" });
-  await change(field("Préparation enregistrée"), "Soupe TEST");
+  await change(field("Mise en place de la carte"), "Soupe TEST");
   await change(field("Nom du produit"), "Autre produit");
   expect(field("Durée de conservation").value).toBe("");
   expect(field("Conditions").value).toBe("");
@@ -144,14 +144,14 @@ test("a stale shared rule is cleared and reloaded before another preparation", a
   await render({}, list);
   global.fetch.mockResolvedValueOnce({ ...reply({ detail: "La liste des préparations a changé." }, false), status: 412 })
     .mockResolvedValueOnce(reply({ ...list, version: 2, duree_heures: 24 }));
-  await change(field("Préparation enregistrée"), "Soupe TEST");
+  await change(field("Mise en place de la carte"), "Soupe TEST");
   await change(field("Date et heure"), "2026-11-02T08:15");
   await act(async () => field("Je confirme").click());
   await submit();
   expect(host.textContent).toContain("La liste des préparations a changé.");
   expect(field("Durée de conservation").value).toBe("");
   expect(field("Je confirme").checked).toBe(false);
-  await change(field("Préparation enregistrée"), "Soupe TEST");
+  await change(field("Mise en place de la carte"), "Soupe TEST");
   expect(field("Durée de conservation").value).toBe("24");
 });
 
@@ -163,7 +163,7 @@ test("the QR saves a list with prudent per-product durations only after confirma
     "Sauce mayonnaise": { heures: 24, conditions: expect.stringContaining("ANSES") },
     "Bac inox rumsteak": { heures: 48, conditions: expect.stringContaining("Viande") },
   };
-  await change(field("Liste des préparations"), noms.join("\n"));
+  await change(field("Produits de la mise en place"), noms.join("\n"));
   expect(host.querySelector('[aria-label="Heures de conservation : Sauce mayonnaise"]').value).toBe("24");
   await change(host.querySelector('[aria-label="Heures de conservation : Pommes caramel"]'), "48");
   expect(field("Référence PMS commune").value).toContain("ΣIRIUS");
@@ -185,7 +185,7 @@ test("the QR saves a list with prudent per-product durations only after confirma
     reference_pms: "PMS en vigueur", regles, regle_confirmee: true,
   });
   expect(host.textContent).toContain("Liste enregistrée pour tous les téléphones");
-  await change(field("Préparation enregistrée"), "Sauce mayonnaise");
+  await change(field("Mise en place de la carte"), "Sauce mayonnaise");
   expect(field("Durée de conservation").value).toBe("24");
   expect(field("Conditions").value).toContain("ANSES");
   await change(field("Date et heure"), "2026-11-02T08:15");
@@ -201,23 +201,23 @@ test("a conflicting list edit is not silently discarded", async () => {
   const list = { version: 1, noms: ["Soupe"], duree_heures: 72, reference_pms: "PMS en vigueur" };
   await render({}, list);
   global.fetch.mockResolvedValueOnce(reply({ detail: "La liste a changé sur un autre appareil." }, false));
-  await change(field("Liste des préparations"), "Soupe\nSauce");
+  await change(field("Produits de la mise en place"), "Soupe\nSauce");
   await act(async () => host.querySelector(".haccp-preparation-list input[type=checkbox]").click());
   await click("Enregistrer la liste");
   expect(host.textContent).toContain("La liste a changé sur un autre appareil.");
-  expect(field("Liste des préparations").value).toBe("Soupe\nSauce");
+  expect(field("Produits de la mise en place").value).toBe("Soupe\nSauce");
 });
 
 test("language changes translate list controls and confirmation without changing product names", async () => {
   await render({}, { version: 1, noms: ["Enregistrer"], duree_heures: 72, reference_pms: "PMS" });
   await act(async () => { await setLanguage("en"); });
   expect(host.querySelector('option[value="Enregistrer"]').textContent).toBe("Enregistrer");
-  expect(host.textContent).toContain("Select a preparation");
+  expect(host.textContent).toContain("Select a mise en place item");
   await change(host.querySelector(".haccp-preparation-list textarea"), "");
   await act(async () => host.querySelector(".haccp-preparation-list input[type=checkbox]").click());
   const confirm = jest.spyOn(window, "confirm").mockReturnValue(false);
   await click("Save the list");
-  expect(confirm).toHaveBeenCalledWith("1 preparation(s) will be removed from this list. Continue?");
+  expect(confirm).toHaveBeenCalledWith("1 item(s) will be removed from the mise en place. Continue?");
 });
 
 test.each([{ sessionReady: false }, { establishmentName: "" }])("dossier prerequisites gate preparation %p", async (props) => {
