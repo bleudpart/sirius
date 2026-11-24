@@ -34,6 +34,7 @@ export const MODULE_ALIASES = {
   workflows: "ariane orchestration parcours etapes actions multi agent sous agents delegation equipe ia",
   "native-automation": "automatisation windows hooks natifs raccourci global dossier surveille",
   pricing: "plutos tarifs prix fournisseurs comparaison",
+  "supplier-orders": "commandes clients portail multi fournisseurs commandes fournisseurs",
   dossiers: "mnemosyne dossiers archives clients",
   "dossiers-pro": "dossiers intelligents propositions priorites travail journee sirius",
   "sport-coach": "asclepios sport bien etre fitness entrainement musculation prise de masse coach sportif seance",

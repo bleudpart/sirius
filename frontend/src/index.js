@@ -12,7 +12,7 @@ import { initFdeOmega } from "@/fdeOmega";
 import { initLanguage } from "@/i18n/domTranslator";
 import LanguageSwitcher from "@/i18n/LanguageSwitcher";
 import PublicStore from "@/PublicStore";
-import { HaccpCaptureWorkspace, HaccpKitchenPage } from "@/lazyModules";
+import { HaccpCaptureWorkspace, HaccpKitchenPage, SupplierOrderPortal, SupplierOrdersManager } from "@/lazyModules";
 import "./siriusVisualTheme.css";
 import "./moduleWindowLayout.css";
 import "./pantheonTheme.css";
@@ -37,6 +37,8 @@ const isMediaHud = new URLSearchParams(window.location.search).has("mediaHud");
 const isHaccpCapture = /^\/haccp\/?$/.test(window.location.pathname);
 const haccpInitialTab = window.location.hash === "#dlc" ? "snap" : undefined;
 const isKitchen = /^\/cuisine\/?$/.test(window.location.pathname);
+const isSupplierPortal = /^\/commandes\/?$/.test(window.location.pathname);
+const isSupplierManagement = /^\/commandes\/gestion\/?$/.test(window.location.pathname);
 if (isKitchen) document.querySelector('link[rel="manifest"]')?.setAttribute("href", "/manifest-cuisine.json");
 const isPublicStore = ["sirius-assistant.fr", "www.sirius-assistant.fr"].includes(window.location.hostname)
   || ["/acheter", "/compte"].includes(window.location.pathname);
@@ -49,7 +51,7 @@ root.render(
   <QueryClientProvider client={queryClient}>
     <FdeErrorBoundary>
       {(isKitchen || isHaccpCapture) && <LanguageSwitcher className="sirius-floating-language" />}
-      {isKitchen ? <HaccpKitchenPage /> : isHaccpCapture ? <AuthGate><HaccpCaptureWorkspace standalone initialTab={haccpInitialTab} /></AuthGate> : isPublicStore ? <PublicStore /> : (
+      {isSupplierPortal ? <SupplierOrderPortal /> : isSupplierManagement ? <AuthGate><SupplierOrdersManager /></AuthGate> : isKitchen ? <HaccpKitchenPage /> : isHaccpCapture ? <AuthGate><HaccpCaptureWorkspace standalone initialTab={haccpInitialTab} /></AuthGate> : isPublicStore ? <PublicStore /> : (
         <AuthGate>
           {isMediaHud ? <MediaHudWindow /> : <App />}
         </AuthGate>

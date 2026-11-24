@@ -6,6 +6,10 @@ import { createModuleRegistry } from "./moduleRegistry";
 import { createWindowController } from "./windowController";
 import { findModuleForCommand, MODULE_ALIASES } from "./moduleCommandRouting";
 
+jest.mock("./lazyModules", () => ({
+  SupplierOrdersManager: () => <section aria-label="Gestion des commandes fournisseurs" />,
+}));
+
 const WORK_IDS = ["workflows", "pricing", "dossiers", "audit", "documents", "planning"];
 
 const buildRegistry = (openWorkModule = jest.fn()) => createModuleRegistry({
@@ -117,6 +121,7 @@ test.each(WORK_MODULES)("clicking the $label icon opens its matching panel", (mo
     act(() => button.click());
     expect(button.classList.contains("selected")).toBe(true);
     expect(container.querySelector(".oracle-title").textContent).toContain(workModuleName(module.label));
+    if (module.id === "pricing") expect(container.querySelector('[aria-label="Gestion des commandes fournisseurs"]')).not.toBeNull();
     expect(new URL(container.querySelector(".work-portrait img").src).pathname).toBe(module.image);
     act(() => container.querySelector(".setup-close").click());
     expect(onClose).toHaveBeenCalledTimes(1);

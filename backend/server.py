@@ -2506,6 +2506,8 @@ api_router.include_router(make_auth_router(db))
 api_router.include_router(make_admin_router(db))
 from enterprise import make_enterprise_router
 api_router.include_router(make_enterprise_router(db))
+from supplier_orders import make_supplier_orders_router
+api_router.include_router(make_supplier_orders_router(db, _rate_ok))
 from microsoft_graph import make_microsoft_router
 api_router.include_router(make_microsoft_router(db))
 from personal_mail import make_personal_mail_router

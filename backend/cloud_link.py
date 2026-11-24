@@ -197,6 +197,19 @@ async def relay_haccp_registry(method: str, path: str, **kwargs) -> httpx.Respon
     return response
 
 
+async def relay_supplier_orders(method: str, path: str = "", **kwargs) -> dict:
+    response = await _send(method, "/api/supplier-orders" + path, **kwargs)
+    if not response.is_success:
+        raise HTTPException(response.status_code, _detail(response, "Le portail de commande Cloud est indisponible."))
+    try:
+        data = response.json()
+    except ValueError as error:
+        raise HTTPException(502, "Réponse du portail de commande illisible.") from error
+    if not isinstance(data, dict):
+        raise HTTPException(502, "Réponse du portail de commande invalide.")
+    return data
+
+
 async def relay_cortex(method: str, path: str = "", **kwargs) -> dict:
     response = await _send(method, "/api/cortex/tri" + path, **kwargs)
     if not response.is_success:

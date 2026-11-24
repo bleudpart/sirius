@@ -28,6 +28,9 @@ ROLE_PERMISSIONS = {
     "viewer": {"haccp", "documents", "audit"},
 }
 BACKUP_COLLECTIONS = (
+    "b2b_suppliers",
+    "b2b_clients",
+    "b2b_orders",
     "enterprise_companies",
     "enterprise_members",
     "enterprise_sites",

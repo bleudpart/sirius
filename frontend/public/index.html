@@ -4,7 +4,7 @@
     <head>
         <meta charset="utf-8" />
         <script id="haccp-asset-base">
-          if (window.location.pathname === "/haccp/" && /^https?:$/.test(window.location.protocol)) {
+          if ((window.location.pathname === "/haccp/" || /^\/commandes(?:\/gestion)?\/?$/.test(window.location.pathname)) && /^https?:$/.test(window.location.protocol)) {
             const base = document.createElement("base");
             base.href = "/";
             document.head.appendChild(base);

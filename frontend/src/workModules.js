@@ -1,7 +1,7 @@
 // Les noms historiques de ces six portraits ont été inversés par paires.
 export const WORK_MODULES = [
   { id: "workflows", label: "ARIANE", description: "Parcours et actions", icon: "Workflow", image: "/api/mythos/img/thot.jpg" },
-  { id: "pricing", label: "PLUTOS", description: "Prix et fournisseurs", icon: "Tags", image: "/api/mythos/img/nemesis.jpg" },
+  { id: "pricing", label: "PLUTOS", description: "Prix, fournisseurs et commandes clients", icon: "Tags", image: "/api/mythos/img/nemesis.jpg" },
   { id: "dossiers", label: "MNÉMOSYNE", description: "Dossiers et archives", icon: "FolderOpen", image: "/api/mythos/img/chronos.jpg" },
   { id: "audit", label: "NÉMÉSIS", description: "Audit et traçabilité", icon: "ScrollText", image: "/api/mythos/img/plutos.jpg" },
   { id: "documents", label: "THOT", description: "Lecture et classement", icon: "FileText", image: "/api/mythos/img/ariane.jpg" },

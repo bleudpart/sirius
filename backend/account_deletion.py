@@ -44,6 +44,7 @@ PERSONAL_COLLECTIONS = (
     "microsoft_oauth",
 )
 REVIEW_COLLECTIONS = (
+    "b2b_suppliers", "b2b_clients", "b2b_orders",
     "themis_docs", "themis_clients", "themis_items", "themis_stock_movements",
     "themis_orders", "themis_payments", "themis_pieces",
     "payment_transactions", "user_licenses", "enterprise_members", "enterprise_audit",

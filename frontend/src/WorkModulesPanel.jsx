@@ -10,6 +10,7 @@ import ArianeMarketRuns from "./ArianeMarketRuns";
 import ArianeActions from "./ArianeActions";
 import WorkInbox from "./WorkInbox";
 import FinanceWorkspace from "./FinanceWorkspace";
+import { SupplierOrdersManager } from "./lazyModules";
 
 const ICONS = { CalendarDays, FileText, FolderOpen, ScrollText, Tags, Workflow };
 const FIELDS = {
@@ -130,6 +131,7 @@ function WorkModulesWorkspace({ storageKey, user, initialModule, onClose, onOpen
           {error && <p className="work-error" role="alert">{error}</p>}
           {loaded.error && <p className="work-error" role="alert">{loaded.error}</p>}
           {notice && <p className="work-notice" role="status">{notice}</p>}
+          {active === "pricing" && <SupplierOrdersManager embedded />}
           {active === "planning" && <><ChronosAgenda /><FinanceWorkspace key={`${storageKey}-finance-routines`} routinesOnly /></>}
           {(active === "planning" || active === "workflows") && <WorkInbox key={`${storageKey}-${active}-inbox`} onSelectDossier={onOpenDossier} />}
           <div className="work-backup">
@@ -180,7 +182,7 @@ function WorkModulesWorkspace({ storageKey, user, initialModule, onClose, onOpen
                 <button className="work-add" type="submit"><Plus size={16} /> Ajouter</button>
               </form>
               {active === "workflows" && <div className="work-shortcuts"><span>Ouvrir un outil existant :</span><button type="button" onClick={() => onOpenExisting("promethee")}>PROMÉTHÉE</button><button type="button" onClick={() => onOpenExisting("themis")}>THÉMIS</button><button type="button" onClick={() => onOpenExisting("plans")}>PLANS</button></div>}
-              <div className="work-section-head"><h2>{module.description}</h2><span>{sortedItems.length} entrée(s)</span></div>
+              <div className="work-section-head"><h2>{active === "pricing" ? "Liste manuelle locale (hors portail clients)" : module.description}</h2><span>{sortedItems.length} entrée(s)</span></div>
               {sortedItems.length === 0 && <p className="work-empty">Aucune entrée pour le moment.</p>}
               <div className="work-list">{sortedItems.map((item) => <article className="work-item" key={item.id}>
                 <div className="work-item-head"><strong>{item.title}</strong><button type="button" title="Supprimer" aria-label={`Supprimer ${item.title}`} onClick={() => setPendingDelete(item)}><Trash2 size={15} /></button></div>
