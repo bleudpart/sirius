@@ -118,12 +118,14 @@ test("a mise en place product can be corrected before saving and printing", asyn
   await change(field("Mise en place de la carte"), "Sauce mayonnaise");
   expect(global.fetch).not.toHaveBeenCalled();
   expect(field("Nom du produit").value).toBe("Sauce mayonnaise");
+  expect(field("Date et heure").value).toBe("2026-11-02T08:15");
   expect(field("Durée de conservation").value).toBe("24");
   expect(host.textContent).toContain("Vérifiez le produit choisi");
   await change(field("Mise en place de la carte"), "Soupe TEST");
   jest.useRealTimers();
   expect(global.fetch).not.toHaveBeenCalled();
   expect(field("Nom du produit").value).toBe("Soupe TEST");
+  expect(field("Date et heure").value).toBe("2026-11-02T08:15");
   expect(field("Durée de conservation").value).toBe("72");
   await submit();
   expect(global.fetch).toHaveBeenCalledTimes(1);
