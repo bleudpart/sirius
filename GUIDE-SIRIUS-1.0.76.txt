@@ -1,0 +1,15 @@
+ΣIRIUS 1.0.76 - NOTE DE VERSION
+==============================
+
+Cette version regroupe dans l'installateur Windows, la version portable et
+l'APK Android les évolutions publiées sur le site depuis l'installateur 1.0.75 :
+
+- HACCP : le produit choisi peut être vérifié et corrigé avant l'impression ;
+- HACCP : la date et l'heure de fabrication restent préremplies ;
+- PLUTOS : portail de commandes multi-fournisseurs en mode essai, sans envoi
+  réel d'e-mail ni paiement ;
+- PLUTOS : invitation privée pour un portail d'essai indépendant, avec espace
+  séparé et liens de gestion et de secours propres au commercial.
+
+Cette note ne confirme pas à elle seule que les fichiers ont été construits,
+installés, testés ou publiés.
