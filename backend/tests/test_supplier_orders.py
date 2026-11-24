@@ -289,6 +289,73 @@ def test_private_manager_link_shares_only_its_workspace_and_is_revocable(api):
     assert len(client.get("/api/supplier-orders", headers=manage()).json()["clients"]) == 1
 
 
+def test_independent_trial_is_isolated_and_does_not_depend_on_the_creating_account(api, monkeypatch):
+    client, db = api
+    own = supplier(client)
+    created = client.post("/api/supplier-orders/independent-portals", headers=manage())
+    assert created.status_code == 200
+    setup = created.json()["url"].split("#activation=")[1]
+    headers = {orders.SETUP_HEADER: setup}
+    activated = client.post("/api/public/supplier-orders/independent/activate", headers=headers)
+    assert activated.status_code == 200
+    assert client.post("/api/public/supplier-orders/independent/activate", headers=headers).status_code == 409
+    link = activated.json()["url"].split("#k=")[1]
+    recovery = activated.json()["recovery_url"].split("#recuperation=")[1]
+    manager = {orders.MANAGER_HEADER: link}
+    workspace = client.get("/api/supplier-orders", headers=manager).json()
+    assert workspace["independent"] is True
+    assert workspace["suppliers"] == [] and workspace["clients"] == [] and workspace["orders"] == []
+    friend_supplier = client.post("/api/supplier-orders/suppliers", headers=manager, json={"name": "Essai ami"})
+    assert friend_supplier.status_code == 200
+    supplier_row = friend_supplier.json()
+    saved = client.put(f"/api/supplier-orders/suppliers/{supplier_row['id']}/catalog", headers=manager, json={
+        "version": supplier_row["version"],
+        "products": [{"reference": "LAIT", "name": "Lait essai", "unit": "litre", "price": "1.25"}],
+    })
+    assert saved.status_code == 200
+    supplier_row.update(saved.json())
+    assert [row["id"] for row in client.get("/api/supplier-orders", headers=manage()).json()["suppliers"]] == [own["id"]]
+    assert client.put(f"/api/supplier-orders/suppliers/{own['id']}/catalog", headers=manager,
+                      json={"version": own["version"], "products": []}).status_code == 409
+    customer = client.post("/api/supplier-orders/clients", headers=manager, json={"name": "Client ami"}).json()
+    customer_headers = {orders.HEADER: customer["url"].split("#k=")[1]}
+    asyncio.run(db.users.update_one({"user_id": "one"}, {"$set": {"disabled": True}}))
+    monkeypatch.setattr(orders, "access_status", AsyncMock(return_value={"allowed": False}))
+    assert client.get("/api/supplier-orders", headers=manager).status_code == 200
+    assert client.get("/api/public/supplier-orders/catalog", headers=customer_headers).status_code == 200
+    order = client.post("/api/public/supplier-orders/orders", headers=customer_headers,
+                        json=cart(client, customer_headers, [supplier_row]))
+    assert order.status_code == 200 and order.json()["status"] == "test_not_sent"
+    assert client.post("/api/supplier-orders/manager-links", headers=manager, json={"name": "Autre"}).status_code == 403
+    stored = asyncio.run(db.b2b_independent_access.find_one({"generation": 0}))
+    assert link not in str(stored) and recovery not in str(stored) and setup not in str(stored)
+    portal = asyncio.run(db.b2b_independent_portals.find_one({}))
+    assert setup not in str(portal) and "user_id" not in portal
+
+    rotated = client.post("/api/supplier-orders/independent-portal/rotate", headers=manager).json()
+    new_manager = {orders.MANAGER_HEADER: rotated["url"].split("#k=")[1]}
+    assert client.get("/api/supplier-orders", headers=manager).status_code == 401
+    assert client.get("/api/supplier-orders", headers=new_manager).status_code == 200
+    recovered = client.post("/api/public/supplier-orders/independent/recover",
+                            headers={orders.RECOVERY_HEADER: recovery})
+    assert recovered.status_code == 200
+    assert client.get("/api/supplier-orders", headers=new_manager).status_code == 401
+    assert client.get("/api/supplier-orders", headers={
+        orders.MANAGER_HEADER: recovered.json()["url"].split("#k=")[1],
+    }).status_code == 200
+
+
+def test_independent_invitation_is_claimed_once_even_concurrently(api):
+    client, _db = api
+    created = client.post("/api/supplier-orders/independent-portals", headers=manage()).json()
+    headers = {orders.SETUP_HEADER: created["url"].split("#activation=")[1]}
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        responses = list(pool.map(lambda _: client.post(
+            "/api/public/supplier-orders/independent/activate", headers=headers,
+        ), range(4)))
+    assert sorted(response.status_code for response in responses) == [200, 409, 409, 409]
+
+
 def test_restoring_a_backup_cannot_reactivate_a_revoked_manager_link(api, tmp_path, monkeypatch):
     client, db = api
     monkeypatch.setenv("SIRIUS_DATA_DIR", str(tmp_path))

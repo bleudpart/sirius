@@ -1,12 +1,15 @@
 import { API_BASE_URL } from "./lib/api";
 import { decimalToScaled, parseDecimalInput } from "./companyFinance";
 
-export async function supplierOrdersRequest(path = "", { token, managerToken, body, method = "GET", signal } = {}) {
-  const response = await fetch(`${API_BASE_URL}${token ? "/public" : ""}/supplier-orders${path}`, {
-    method, signal, credentials: token || managerToken ? "omit" : "include",
+export async function supplierOrdersRequest(path = "", { token, managerToken, setupToken, recoveryToken, body, method = "GET", signal } = {}) {
+  const anonymous = token || managerToken || setupToken || recoveryToken;
+  const response = await fetch(`${API_BASE_URL}${token || setupToken || recoveryToken ? "/public" : ""}/supplier-orders${path}`, {
+    method, signal, credentials: anonymous ? "omit" : "include",
     headers: {
       ...(token ? { "X-Sirius-Order-Client": token } : {}),
       ...(managerToken ? { "X-Order-Manager": managerToken } : {}),
+      ...(setupToken ? { "X-Order-Setup": setupToken } : {}),
+      ...(recoveryToken ? { "X-Order-Recovery": recoveryToken } : {}),
       ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
     },
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),

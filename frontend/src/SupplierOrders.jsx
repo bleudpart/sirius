@@ -98,6 +98,8 @@ export default function SupplierOrdersManager({ embedded = false, managerToken =
   const [editing, setEditing] = useState("");
   const [link, setLink] = useState("");
   const [managerLink, setManagerLink] = useState(null);
+  const [invitationLink, setInvitationLink] = useState("");
+  const [replacementLink, setReplacementLink] = useState("");
   const [revoke, setRevoke] = useState("");
   const [revokeManager, setRevokeManager] = useState("");
   const [error, setError] = useState("");
@@ -147,6 +149,18 @@ export default function SupplierOrdersManager({ embedded = false, managerToken =
       setManagerLink(created); await load();
     });
   };
+  if (replacementLink) return <main className="b2b b2b-page">
+    <h1>Nouveau lien de gestion</h1>
+    <p className="b2b-notice">L’ancien lien est désactivé. Conservez ce nouveau lien en lieu sûr. Votre lien de secours reste valable.</p>
+    {error && <p className="b2b-error" role="alert">{error}</p>}
+    {notice && <p role="status">{notice}</p>}
+    <label>Nouveau lien privé<input readOnly value={replacementLink} onFocus={(e) => e.target.select()} /></label>
+    <button type="button" onClick={() => run(async () => {
+      if (!navigator.clipboard?.writeText) throw new Error("Copie indisponible : sélectionnez et copiez le lien.");
+      await navigator.clipboard.writeText(replacementLink); setNotice("Lien copié.");
+    })}>Copier le nouveau lien</button>
+    <a href={replacementLink}>Ouvrir mon espace d’essai</a>
+  </main>;
   return <section className={`b2b ${embedded ? "b2b-embedded" : "b2b-page"}`} aria-label="Gestion des commandes fournisseurs">
     <header className="b2b-header">
       <div><p className="b2b-eyebrow">{managerToken ? "ESPACE COMMERCIAL" : "ΣIRIUS · ESPACE COMMERCIAL"}</p><h1>{managerToken ? (data?.portal_name || DEFAULT_PORTAL_NAME) : "Commandes multi-fournisseurs"}</h1></div>
@@ -173,9 +187,29 @@ export default function SupplierOrdersManager({ embedded = false, managerToken =
             <button type="submit">Enregistrer le nom</button>
           </form>
         </section>
-        {managerToken ? <p className="b2b-notice">Les fournisseurs, clients et commandes sont partagés avec le titulaire du compte qui a créé ce lien. Il peut aussi les consulter et les modifier.</p> :
+        {managerToken ? data.independent ? <section className="b2b-card">
+          <p>Votre espace d’essai est indépendant du compte qui a créé l’invitation. L’hébergeur conserve un accès technique aux données.</p>
+          <button type="button" onClick={() => run(async () => {
+            const result = await request("/independent-portal/rotate", { method: "POST" });
+            setReplacementLink(result.url);
+          })}>Remplacer mon lien de gestion</button>
+        </section> : <p className="b2b-notice">Les fournisseurs, clients et commandes sont partagés avec le titulaire du compte qui a créé ce lien. Il peut aussi les consulter et les modifier.</p> :
           <section className="b2b-card">
-            <h2>Accès privé du commercial</h2>
+            <h2>Portail d’essai indépendant</h2>
+            <p>Créez une invitation à usage unique pour le commercial. Son espace commence vide, reste séparé de ce module et ne dépend pas de votre compte.</p>
+            <button type="button" onClick={() => run(async () => {
+              const created = await request("/independent-portals", { method: "POST" });
+              setInvitationLink(created.url);
+            })}>Créer une invitation pour son essai</button>
+            {invitationLink && <div className="b2b-link">
+              <label>Invitation privée à transmettre au commercial (affichée une seule fois)<input readOnly value={invitationLink} onFocus={(e) => e.target.select()} /></label>
+              <p>Ne l’activez pas vous-même : le commercial doit l’ouvrir une seule fois pour créer ses propres liens privés.</p>
+              <button type="button" onClick={() => run(async () => {
+                if (!navigator.clipboard?.writeText) throw new Error("Copie automatique indisponible : sélectionnez et copiez l’invitation.");
+                await navigator.clipboard.writeText(invitationLink); setNotice("Invitation copiée.");
+              })}>Copier l’invitation</button>
+            </div>}
+            <h2>Accès commercial partagé existant</h2>
             <p>Ce lien donne accès aux mêmes fournisseurs, clients et commandes que ce module. Transmettez-le seulement au commercial, avec son accord. Toute personne possédant le lien pourra gérer ces données.</p>
             <form className="b2b-fields" onSubmit={addManager}>
               <label>Nom de l’accès commercial<input required maxLength={160} value={managerName} onChange={(e) => setManagerName(e.target.value)} /></label>
@@ -259,8 +293,78 @@ export default function SupplierOrdersManager({ embedded = false, managerToken =
   </section>;
 }
 
+function IndependentAccess({ setupToken = "", recoveryToken = "" }) {
+  const [links, setLinks] = useState(null);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [savedLinks, setSavedLinks] = useState(false);
+  const submit = async () => {
+    if (busy) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      setLinks(await api(`/independent/${setupToken ? "activate" : "recover"}`, {
+        method: "POST", setupToken, recoveryToken,
+      }));
+    } catch (cause) {
+      setError(`${cause.message || "Opération impossible."} ${setupToken ? "Si l’activation a été interrompue sans afficher vos liens, demandez une nouvelle invitation." : "Réessayez avec votre lien de secours."}`);
+    } finally { setBusy(false); }
+  };
+  const copy = async (value) => {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("Copie indisponible : sélectionnez et copiez le lien.");
+      await navigator.clipboard.writeText(value);
+      setError(""); setNotice("Lien copié.");
+    } catch (cause) { setError(cause.message || "Copie impossible."); }
+  };
+  return <main className="b2b b2b-page">
+    <h1>{setupToken ? "Activer mon espace d’essai" : "Retrouver mon espace d’essai"}</h1>
+    <p className="b2b-notice">{TEST_NOTICE} Cet essai n’est pas une mise en service définitive.</p>
+    {setupToken && <section className="b2b-card" aria-label="Présentation de l’essai">
+      <h2>Bienvenue dans ton portail d’essai</h2>
+      <p>Voici une première version pour découvrir ton projet de commandes et décider ensemble de la suite.</p>
+      <ol>
+        <li>Active ton essai, puis conserve tes deux liens privés de gestion et de secours.</li>
+        <li>Ajoute tes fournisseurs et leurs grilles lorsque tu les auras reçues.</li>
+        <li>Crée un lien client pour tester un panier avec plusieurs fournisseurs.</li>
+      </ol>
+      <p>Les commandes sont seulement simulées : aucun e-mail n’est envoyé et aucun paiement n’est demandé.</p>
+      <p>Ton espace est séparé du compte qui a créé l’invitation. Il est hébergé provisoirement sur sirius-assistant.fr ; l’administrateur de l’hébergement peut accéder aux données.</p>
+    </section>}
+    {error && <p className="b2b-error" role="alert">{error}</p>}
+    {notice && <p role="status">{notice}</p>}
+    {!links ? <>
+      <p>{setupToken ? "L’invitation ne peut être utilisée qu’une fois. Après activation, conservez vos liens privés de gestion et de secours." : "Cette opération remplacera votre lien de gestion actuel."}</p>
+      <button type="button" disabled={busy} onClick={submit}>{setupToken ? "Activer mon essai" : "Créer un nouveau lien de gestion"}</button>
+    </> : <>
+      <p>Conservez ces liens en lieu sûr. Toute personne qui les possède peut accéder à votre espace.</p>
+      <label>Lien privé de gestion<input readOnly value={links.url} onFocus={(e) => e.target.select()} /></label>
+      <button type="button" onClick={() => copy(links.url)}>Copier le lien de gestion</button>
+      {links.recovery_url && <>
+        <label>Lien privé de secours<input readOnly value={links.recovery_url} onFocus={(e) => e.target.select()} /></label>
+        <button type="button" onClick={() => copy(links.recovery_url)}>Copier le lien de secours</button>
+      </>}
+      {links.recovery_url && <p>Si les deux liens sont perdus, l’accès ne pourra pas être récupéré automatiquement.</p>}
+      {links.recovery_url && <p>Copiez les deux liens avant d’ouvrir votre espace : le lien de secours ne sera plus affiché.</p>}
+      {links.recovery_url && <label className="b2b-confirm"><input type="checkbox" checked={savedLinks}
+        onChange={(e) => setSavedLinks(e.target.checked)} /> J’ai enregistré mes deux liens.</label>}
+      {(!links.recovery_url || savedLinks) && <a href={links.url}>Ouvrir mon espace d’essai</a>}
+    </>}
+  </main>;
+}
+
 export function FriendSupplierManager() {
-  const token = new URLSearchParams(window.location.hash.slice(1)).get("k") || "";
+  const [hash, setHash] = useState(() => window.location.hash);
+  useEffect(() => {
+    const changed = () => setHash(window.location.hash);
+    window.addEventListener("hashchange", changed);
+    return () => window.removeEventListener("hashchange", changed);
+  }, []);
+  const params = new URLSearchParams(hash.slice(1));
+  const setupToken = params.get("activation") || "";
+  const recoveryToken = params.get("recuperation") || "";
+  if (setupToken || recoveryToken) return <IndependentAccess key={setupToken || recoveryToken} setupToken={setupToken} recoveryToken={recoveryToken} />;
+  const token = params.get("k") || "";
   if (!token) return <main className="b2b b2b-page">
     <h1>{DEFAULT_PORTAL_NAME}</h1>
     <p className="b2b-notice">Ouvrez le lien commercial privé qui vous a été transmis pour accéder à votre gestion.</p>

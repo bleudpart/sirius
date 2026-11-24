@@ -23,6 +23,8 @@ from work_draft_recordings import digest, insert_once, now_iso
 logger = logging.getLogger(__name__)
 HEADER = "X-Sirius-Order-Client"
 MANAGER_HEADER = "X-Order-Manager"
+SETUP_HEADER = "X-Order-Setup"
+RECOVERY_HEADER = "X-Order-Recovery"
 PORTAL_URL = "https://sirius-assistant.fr/commandes"
 MANAGER_PORTAL_URL = "https://sirius-assistant.fr/portail/gestion"
 DEFAULT_PORTAL_NAME = "Portail de commandes"
@@ -208,6 +210,11 @@ def make_supplier_orders_router(db, rate_ok):
     router = APIRouter(tags=["supplier-orders"], dependencies=[Depends(storage_errors)])
 
     async def linked_owner(link, invalid_detail):
+        if link["scope_key"].startswith("portal:"):
+            owner = await db.b2b_independent_access.find_one({"scope_key": link["scope_key"], "generation": 0})
+            if not owner:
+                raise HTTPException(401, invalid_detail)
+            return {"user_id": link["scope_key"]}
         owner = await db.users.find_one({"user_id": link["user_id"]})
         if not owner or owner.get("disabled"):
             raise HTTPException(401, invalid_detail)
@@ -230,6 +237,16 @@ def make_supplier_orders_router(db, rate_ok):
             detail = "Lien commercial absent, révoqué ou invalide."
             if not 30 <= len(token) <= 100:
                 raise HTTPException(401, detail)
+            independent = await db.b2b_independent_access.find_one({"token_hash": token_hash(token)})
+            if independent:
+                newer = await db.b2b_independent_access.find_one({
+                    "scope_key": independent["scope_key"], "generation": {"$gt": independent["generation"]},
+                })
+                if newer:
+                    raise HTTPException(401, detail)
+                request.state.b2b_external_manager = True
+                request.state.b2b_independent_access = independent
+                return {"user_id": independent["scope_key"]}, independent["scope_key"]
             link = await db.b2b_manager_links.find_one({"token_hash": token_hash(token), "active": True}, {"_id": 0})
             if not link:
                 raise HTTPException(401, detail)
@@ -272,6 +289,30 @@ def make_supplier_orders_router(db, rate_ok):
         if getattr(request.state, "b2b_external_manager", False):
             raise HTTPException(403, "La gestion des liens commerciaux est réservée au compte associé.")
 
+    def private_token(request, header, label):
+        ip = request.client.host if request.client else "unknown"
+        if not rate_ok(f"b2b-{label}:{ip}", limit=60):
+            raise HTTPException(429, "Trop de requêtes. Patientez une minute.")
+        token = request.headers.get(header, "")
+        if not 30 <= len(token) <= 100:
+            raise HTTPException(401, "Lien privé absent ou invalide.")
+        return token
+
+    async def next_independent_access(scope, generation, recovery_hash=None):
+        token = secrets.token_urlsafe(32)
+        row = {
+            "scope_key": scope, "user_id": scope, "generation": generation,
+            "token_hash": token_hash(token), "created_at": now_iso(),
+        }
+        if recovery_hash is not None:
+            row["recovery_hash"] = recovery_hash
+        _saved, created = await insert_once(
+            db, "b2b_independent_access", row, identity={"scope_key": scope, "generation": generation},
+        )
+        if not created:
+            raise HTTPException(409, "Ce lien a déjà été utilisé ou remplacé.")
+        return f"{MANAGER_PORTAL_URL}#k={token}"
+
     async def client_identity(request: Request, response: Response):
         response.headers["Cache-Control"] = "no-store"
         response.headers["Referrer-Policy"] = "no-referrer"
@@ -300,12 +341,59 @@ def make_supplier_orders_router(db, rate_ok):
             "clients": [public_client(row) for row in clients[:1000]],
             "orders": [receipt(row) for row in orders[:100]], "orders_truncated": len(orders) > 100,
             "clients_truncated": len(clients) > 1000, "portal_name": await portal_name(scope),
+            "independent": bool(getattr(request.state, "b2b_independent_access", None)),
         }
         if not getattr(request.state, "b2b_external_manager", False):
             links = await db.b2b_manager_links.find({"scope_key": scope}, {"_id": 0}).sort("created_at", -1).to_list(101)
             result["manager_links"] = [public_manager_link(row) for row in links[:100]]
             result["manager_links_truncated"] = len(links) > 100
         return result
+
+    @router.post("/supplier-orders/independent-portals")
+    async def create_independent_portal(request: Request, identity=Depends(manager)):
+        require_account_manager(request)
+        forwarded = await proxy(request, "/independent-portals")
+        if forwarded is not None:
+            return forwarded
+        user, _scope = identity
+        if not rate_ok(f"b2b-create-independent:{user['user_id']}", limit=10):
+            raise HTTPException(429, "Trop de créations. Patientez une minute.")
+        token = secrets.token_urlsafe(32)
+        scope = f"portal:{uuid.uuid4()}"
+        await db.b2b_independent_portals.insert_one({
+            "scope_key": scope, "setup_hash": token_hash(token), "created_at": now_iso(),
+        })
+        return {"url": f"{MANAGER_PORTAL_URL}#activation={token}"}
+
+    @router.post("/public/supplier-orders/independent/activate")
+    async def activate_independent_portal(request: Request, response: Response):
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        token = private_token(request, SETUP_HEADER, "setup")
+        portal = await db.b2b_independent_portals.find_one({"setup_hash": token_hash(token)})
+        if not portal:
+            raise HTTPException(401, "Lien d'activation absent ou invalide.")
+        recovery = secrets.token_urlsafe(32)
+        url = await next_independent_access(portal["scope_key"], 0, token_hash(recovery))
+        return {"url": url, "recovery_url": f"{MANAGER_PORTAL_URL}#recuperation={recovery}"}
+
+    @router.post("/public/supplier-orders/independent/recover")
+    async def recover_independent_portal(request: Request, response: Response):
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        token = private_token(request, RECOVERY_HEADER, "recovery")
+        original = await db.b2b_independent_access.find_one({"recovery_hash": token_hash(token), "generation": 0})
+        if not original:
+            raise HTTPException(401, "Lien de secours absent ou invalide.")
+        rows = await db.b2b_independent_access.find({"scope_key": original["scope_key"]}).sort("generation", -1).to_list(1)
+        return {"url": await next_independent_access(original["scope_key"], rows[0]["generation"] + 1)}
+
+    @router.post("/supplier-orders/independent-portal/rotate")
+    async def rotate_independent_portal(request: Request, identity=Depends(manager)):
+        access = getattr(request.state, "b2b_independent_access", None)
+        if not access:
+            raise HTTPException(403, "Accès réservé au portail indépendant.")
+        return {"url": await next_independent_access(access["scope_key"], access["generation"] + 1)}
 
     @router.put("/supplier-orders/settings")
     async def save_settings(body: PortalSettingsInput, request: Request, identity=Depends(manager)):

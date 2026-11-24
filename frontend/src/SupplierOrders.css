@@ -51,6 +51,8 @@
 .b2b-product strong, .b2b li { overflow-wrap: anywhere; }
 .b2b-checkout { display: grid; gap: 14px; margin-top: 24px; }
 .b2b-link { display: grid; gap: 12px; padding-block: 20px; }
+.b2b label.b2b-confirm { display: flex; align-items: center; gap: 10px; margin-block: 16px; }
+.b2b .b2b-confirm input { width: auto; min-height: 0; }
 .b2b details { border-top: 1px solid var(--b2b-border); padding-block: 14px; }
 .b2b summary { cursor: pointer; min-height: 44px; }
 .b2b li { margin-block: 9px; }

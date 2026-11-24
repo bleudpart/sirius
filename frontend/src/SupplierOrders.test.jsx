@@ -200,6 +200,83 @@ test("the owner creates and revokes a separate private management link", async (
   expect(host.textContent).toContain("Commercial — Révoqué");
 });
 
+test("PLUTOS creates an invitation for an empty independent trial", async () => {
+  const invitation = "https://sirius-assistant.fr/portail/gestion#activation=test-invitation";
+  global.fetch = jest.fn(async (path, options) => path.endsWith("/independent-portals")
+    ? reply({ url: invitation }) : reply({ suppliers: [], clients: [], orders: [], manager_links: [] }));
+  await render(<SupplierOrdersManager />);
+  await click("Créer une invitation pour son essai");
+  expect(field("Invitation privée").value).toBe(invitation);
+  expect(host.textContent).toContain("Son espace commence vide");
+  expect(host.textContent).toContain("Ne l’activez pas vous-même");
+});
+
+test("the invited commercial activates a trial and receives private management and recovery links", async () => {
+  const links = {
+    url: "https://sirius-assistant.fr/portail/gestion#k=manager-token",
+    recovery_url: "https://sirius-assistant.fr/portail/gestion#recuperation=recovery-token",
+  };
+  global.fetch = jest.fn(async (path) => path.endsWith("/activate") ? reply(links)
+    : reply({ suppliers: [], clients: [], orders: [], independent: true }));
+  window.history.replaceState(null, "", "/portail/gestion#activation=setup-token");
+  await render(<FriendSupplierManager />);
+  expect(host.textContent).toContain("Cet essai n’est pas une mise en service définitive");
+  expect(host.textContent).toContain("une première version pour découvrir ton projet");
+  expect(host.textContent).toContain("aucun e-mail n’est envoyé et aucun paiement n’est demandé");
+  expect(host.textContent).toContain("l’administrateur de l’hébergement peut accéder aux données");
+  expect(global.fetch).not.toHaveBeenCalled();
+  await click("Activer mon essai");
+  expect(global.fetch.mock.calls[0][0]).toContain("/public/supplier-orders/independent/activate");
+  expect(global.fetch.mock.calls[0][1].credentials).toBe("omit");
+  expect(global.fetch.mock.calls[0][1].headers["X-Order-Setup"]).toBe("setup-token");
+  expect(field("Lien privé de gestion").value).toBe(links.url);
+  expect(field("Lien privé de secours").value).toBe(links.recovery_url);
+  expect(host.querySelector("a")).toBeNull();
+  await act(async () => host.querySelector('input[type="checkbox"]').click());
+  expect(host.textContent).toContain("Ouvrir mon espace d’essai");
+  await act(async () => {
+    window.history.replaceState(null, "", "/portail/gestion#k=manager-token");
+    window.dispatchEvent(new Event("hashchange"));
+  });
+  expect(host.textContent).toContain("indépendant du compte");
+  expect(global.fetch.mock.calls[1][1].headers["X-Order-Manager"]).toBe("manager-token");
+});
+
+test("the private recovery link replaces the manager access without a ΣIRIUS session", async () => {
+  const link = "https://sirius-assistant.fr/portail/gestion#k=recovered-manager";
+  global.fetch = jest.fn(async () => reply({ url: link }));
+  window.history.replaceState(null, "", "/portail/gestion#recuperation=recovery-token");
+  await render(<FriendSupplierManager />);
+  await click("Créer un nouveau lien de gestion");
+  expect(global.fetch.mock.calls[0][0]).toContain("/public/supplier-orders/independent/recover");
+  expect(global.fetch.mock.calls[0][1].credentials).toBe("omit");
+  expect(global.fetch.mock.calls[0][1].headers["X-Order-Recovery"]).toBe("recovery-token");
+  expect(field("Lien privé de gestion").value).toBe(link);
+});
+
+test("the independent commercial can replace the management link without using an account", async () => {
+  const newLink = "https://sirius-assistant.fr/portail/gestion#k=new-manager-token";
+  global.fetch = jest.fn(async (path, options) => {
+    expect(options.credentials).toBe("omit");
+    if (path.endsWith("/rotate")) return reply({ url: newLink });
+    return reply({ suppliers: [], clients: [], orders: [], independent: true });
+  });
+  window.history.replaceState(null, "", "/portail/gestion#k=old-manager-token");
+  await render(<FriendSupplierManager />);
+  expect(host.textContent).toContain("indépendant du compte");
+  expect(host.textContent).not.toContain("partagés avec le titulaire");
+  await click("Remplacer mon lien de gestion");
+  expect(field("Nouveau lien privé").value).toBe(newLink);
+  expect(host.textContent).toContain("L’ancien lien est désactivé");
+  await act(async () => {
+    window.history.replaceState(null, "", "/portail/gestion#k=new-manager-token");
+    window.dispatchEvent(new Event("hashchange"));
+  });
+  expect(host.textContent).toContain("indépendant du compte");
+  expect(host.textContent).not.toContain("L’ancien lien est désactivé");
+  expect(global.fetch.mock.calls.at(-1)[1].headers["X-Order-Manager"]).toBe("new-manager-token");
+});
+
 test("the commercial uses only its private link, sees a neutral portal, and can name it", async () => {
   const workspace = { suppliers: [], clients: [], orders: [], portal_name: "Portail de commandes" };
   global.fetch = jest.fn(async (path, options) => {

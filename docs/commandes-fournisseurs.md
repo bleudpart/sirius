@@ -12,9 +12,8 @@ d'e-mail n'est pas encore implémenté dans cette version.
 - Gestion associée : ouvrir « Commandes clients — portail multi-fournisseurs »
   dans ΣIRIUS, ou [la gestion web](https://sirius-assistant.fr/commandes/gestion)
   avec le compte ΣIRIUS associé. L'espace se trouve aussi dans PLUTOS.
-- Commercial : ouvrir son lien de gestion privé, sans compte ΣIRIUS. Il peut
-  gérer les fournisseurs, les grilles, les liens clients et les commandes,
-  mais pas créer ou révoquer d'autres liens commerciaux.
+- Commercial : activer son espace d'essai indépendant depuis une invitation
+  privée, puis utiliser son propre lien de gestion, sans compte ΣIRIUS.
 - Client : ouvrir le lien privé créé dans la gestion, sans compte ΣIRIUS.
 
 Avec une entreprise configurée, seuls ses administrateurs et gestionnaires
@@ -22,9 +21,34 @@ accèdent à sa gestion. Sans entreprise, l'espace est propre au compte connect�
 Les données de ces espaces ne sont pas mélangées. Depuis l'application Windows
 en mode relais Cloud, la gestion utilise le compte Cloud lié au poste.
 
-## Portail du commercial
+## Portail d'essai indépendant du commercial
 
-Avec l'accord du commercial, créer son lien depuis « Accès privé du commercial »
+Dans la gestion ΣIRIUS ou le module PLUTOS, choisir « Créer une invitation pour
+son essai » et transmettre le lien en privé au commercial. **Ne pas activer
+l'invitation à sa place** : elle ne fonctionne qu'une fois. L'essai commence
+avec un espace vide ; les données existantes de ΣIRIUS ne sont ni copiées ni
+supprimées. Le module PLUTOS reste disponible avec ses propres données.
+
+Le commercial ouvre l'invitation et active lui-même son essai. Il reçoit alors
+un lien de gestion et un lien de secours, à enregistrer tous les deux en lieu
+sûr avant d'ouvrir son espace. Toute personne possédant l'un de ces liens peut
+gérer l'espace ; ils ne doivent pas être publiés. Le lien de secours permet de
+remplacer un lien de gestion perdu ; remplacer le lien invalide l'ancien. Si les
+deux sont perdus, l'accès ne peut pas être récupéré automatiquement. Si
+l'activation est interrompue sans afficher les liens, demander une nouvelle
+invitation pour recommencer avec un espace vide.
+Une note d'accueil lui explique le principe, les étapes de l'essai et le fait
+qu'aucun e-mail ni paiement réel n'est effectué.
+
+Le portail d'essai fonctionne indépendamment du compte ou de la licence ΣIRIUS
+qui a créé l'invitation. Les fournisseurs, clients et commandes de l'essai ne
+sont pas visibles dans le module ΣIRIUS. Il reste hébergé provisoirement sur
+`sirius-assistant.fr` : l'administrateur technique de l'hébergement peut accéder
+aux données. L'activation est un essai, pas une mise en service définitive.
+
+## Ancien accès commercial partagé
+
+Avec l'accord du commercial, créer son lien depuis « Accès commercial partagé existant »
 dans la gestion associée. Le lien est affiché une seule fois : le conserver et
 le transmettre en privé. **Toute personne qui le possède peut gérer les données
 du portail**, sans mot de passe ; ne pas le publier. Le compte associé peut le
@@ -41,6 +65,8 @@ Les interfaces du commercial et des clients sont présentées sans marque ΣIRIU
 **L'adresse reste provisoirement sur `sirius-assistant.fr`** : aucun domaine
 personnalisé n'a encore été choisi ou configuré. Le portail dépend du même
 hébergement et du compte associé ; il n'est pas techniquement autonome.
+Les anciens liens partagés existants ne sont pas modifiés automatiquement ; ils
+continuent à partager les données et peuvent être révoqués dans la gestion.
 
 ## Préparer les fournisseurs et importer les grilles
 
@@ -72,7 +98,8 @@ toutes les grilles de l'espace** : les tarifs individualisés par client ne sont
 pas encore gérés. Le lien est un secret d'accès, affiché une seule fois ;
 le serveur n'en conserve que l'empreinte. Un lien perdu peut être révoqué puis
 remplacé par un nouvel accès. La révocation ne supprime pas les commandes.
-L'accès dépend aussi du compte du commercial et de ses droits actuels.
+Pour l'ancien espace partagé, l'accès dépend aussi du compte ΣIRIUS associé et
+de ses droits actuels ; le portail indépendant n'en dépend pas.
 
 Le client indique les quantités, son contact et l'adresse de livraison, vérifie
 le panier, puis valide la commande **d'essai**. Les commandes des autres clients
@@ -98,3 +125,5 @@ une restauration ne réactive donc pas un lien révoqué. Lors d'une restauratio
 sur une nouvelle base, il faut créer de nouveaux liens commerciaux.
 Toutes ces collections, dont `b2b_manager_links`, font partie de l'examen manuel
 préalable à la suppression d'un compte.
+Les espaces indépendants et leurs accès ne sont pas inclus dans les sauvegardes
+entreprise ΣIRIUS ; leur conservation dépend des sauvegardes de l'hébergement.
