@@ -108,21 +108,7 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
     setError("");
   };
 
-  // Les flèches et lettres sur une liste fermée déclenchent « change » : parcourir au clavier ne doit rien imprimer.
-  const keyboardChoice = useRef(false);
-  const chooseKey = (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      keyboardChoice.current = false;
-      if (selected) choosePreparation(selected);
-      return;
-    }
-    keyboardChoice.current = !["Tab", "Shift", "Escape"].includes(event.key);
-  };
-
   const choosePreparation = (name) => {
-    const fromKeyboard = keyboardChoice.current;
-    keyboardChoice.current = false;
     setSelected(name);
     const rule = savedRule(list, name);
     let now = null;
@@ -136,7 +122,6 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
     };
     setDraft(next);
     setError("");
-    if (!fromKeyboard && name && now && next.operator.trim() && !attempt.current) submit(next, name);
   };
 
   const listNames = listText.split("\n").map((name) => name.trim()).filter(Boolean);
@@ -357,7 +342,7 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
   return <section className="workspace-surface haccp-card haccp-preparation" aria-label="Étiquette de préparation">
     <h3>Préparation · DLC interne</h3>
     {!result && <>
-      <p>Tapez la quantité si besoin, puis choisissez ou tapez le produit : ΣIRIUS prend l’heure actuelle, calcule la DLC selon sa durée prudente et lance l’étiquette.</p>
+      <p>Vérifiez le produit choisi, puis appuyez sur « Calculer la DLC et générer l’étiquette ».</p>
     </>}
     {(!sessionReady || !establishmentName.trim()) && <p role="status">Ouvrez le dossier de l’établissement puis choisissez « Reprendre / Continuer » si proposé.</p>}
     {!result && <form onSubmit={save}>
@@ -368,8 +353,7 @@ export default function HaccpPreparation({ establishmentName, sessionReady, kitc
             onChange={(event) => change("quantity", event.target.value)} />
         </label>
         {list?.noms.length > 0 && <label>Mise en place de la carte
-          <select value={selected} onKeyDown={chooseKey} onPointerDown={() => { keyboardChoice.current = false; }}
-            onChange={(event) => choosePreparation(event.target.value)}>
+          <select value={selected} onChange={(event) => choosePreparation(event.target.value)}>
             <option value="">Choisir un produit de la mise en place</option>
             {[...list.noms].sort((a, b) => a.localeCompare(b, "fr")).map((name) => <option key={name} value={name} translate="no">{name}</option>)}
           </select>

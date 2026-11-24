@@ -108,12 +108,24 @@ test("a QR preparation starts mobile printing automatically", async () => {
   expect(print).not.toHaveBeenCalled();
 });
 
-test("choosing a mise en place product calculates the DLC and prints the label without confirmation", async () => {
-  const list = { version: 1, noms: ["Soupe TEST", "Sauce"], duree_heures: 72, reference_pms: "PMS en vigueur" };
+test("a mise en place product can be corrected before saving and printing", async () => {
+  const list = {
+    version: 1, noms: ["Soupe TEST", "Sauce mayonnaise"], duree_heures: 72, reference_pms: "PMS en vigueur",
+    regles: { "Sauce mayonnaise": { heures: 24, conditions: "Bac fermé, au froid." } },
+  };
   await render({ kitchenToken: "qr-token" }, list);
   jest.useFakeTimers(); jest.setSystemTime(new Date("2026-11-02T07:15:00Z"));
+  await change(field("Mise en place de la carte"), "Sauce mayonnaise");
+  expect(global.fetch).not.toHaveBeenCalled();
+  expect(field("Nom du produit").value).toBe("Sauce mayonnaise");
+  expect(field("Durée de conservation").value).toBe("24");
+  expect(host.textContent).toContain("Vérifiez le produit choisi");
   await change(field("Mise en place de la carte"), "Soupe TEST");
   jest.useRealTimers();
+  expect(global.fetch).not.toHaveBeenCalled();
+  expect(field("Nom du produit").value).toBe("Soupe TEST");
+  expect(field("Durée de conservation").value).toBe("72");
+  await submit();
   expect(global.fetch).toHaveBeenCalledTimes(1);
   const payload = JSON.parse(global.fetch.mock.calls[0][1].body);
   expect(payload).toEqual(expect.objectContaining({
@@ -133,6 +145,8 @@ test("the quantity typed before the product is archived and shown on the result"
   await render({}, { version: 1, noms: ["Oeuf dur cuit"], duree_heures: 72, reference_pms: "PMS en vigueur" });
   await change(field("Quantité"), "  19 pièces ");
   await change(field("Mise en place de la carte"), "Oeuf dur cuit");
+  expect(global.fetch).not.toHaveBeenCalled();
+  await submit();
   expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual(expect.objectContaining({
     nom_produit: "Oeuf dur cuit", quantite: "19 pièces", liste_version: 1,
   }));
@@ -165,9 +179,12 @@ test("a stale shared rule is cleared and reloaded before another preparation", a
   global.fetch.mockResolvedValueOnce({ ...reply({ detail: "La liste des préparations a changé." }, false), status: 412 })
     .mockResolvedValueOnce(reply({ ...list, version: 2, duree_heures: 24 }));
   await change(field("Mise en place de la carte"), "Soupe TEST");
+  expect(global.fetch).not.toHaveBeenCalled();
+  await submit();
   expect(host.textContent).toContain("La liste des préparations a changé.");
   expect(field("Durée de conservation").value).toBe("");
   await change(field("Mise en place de la carte"), "Soupe TEST");
+  await submit();
   expect(JSON.parse(global.fetch.mock.calls[2][1].body)).toEqual(expect.objectContaining({
     duree_conservation_heures: 24, liste_version: 2,
   }));
@@ -200,6 +217,8 @@ test("the QR saves a list with prudent per-product durations without confirmatio
   expect(host.textContent).toContain("Liste enregistrée pour tous les téléphones");
   global.fetch.mockResolvedValueOnce(reply(record));
   await change(field("Mise en place de la carte"), "Sauce mayonnaise");
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+  await submit();
   expect(JSON.parse(global.fetch.mock.calls[1][1].body)).toEqual(expect.objectContaining({
     duree_conservation_heures: 24, conditions_conservation: expect.stringContaining("ANSES"), liste_version: 1,
   }));
@@ -271,7 +290,7 @@ test("without a print station the label stays saved and browser printing is offe
   expect(printHaccpDocument).toHaveBeenCalledWith("<html>PREPARATION TEST</html>", expect.anything(), expect.any(Function));
 });
 
-test("browsing the mise en place list with the keyboard prints nothing until Enter", async () => {
+test("keyboard selection never saves until the submit button is activated", async () => {
   await render({}, { version: 1, noms: ["Soupe TEST", "Sauce"], duree_heures: 72, reference_pms: "PMS en vigueur" });
   const select = field("Mise en place de la carte");
   await act(async () => select.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })));
@@ -279,6 +298,8 @@ test("browsing the mise en place list with the keyboard prints nothing until Ent
   expect(global.fetch).not.toHaveBeenCalled();
   expect(field("Nom du produit").value).toBe("Sauce");
   await act(async () => select.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
+  expect(global.fetch).not.toHaveBeenCalled();
+  await submit();
   expect(global.fetch).toHaveBeenCalledTimes(1);
   expect(JSON.parse(global.fetch.mock.calls[0][1].body).nom_produit).toBe("Sauce");
 });

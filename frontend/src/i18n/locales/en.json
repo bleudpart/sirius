@@ -4946,7 +4946,7 @@
   "Copie impossible : sélectionnez le lien et copiez-le à la main.": "Copy failed: select the link and copy it manually.",
   "Quantité (facultatif, à taper avant le produit, ex. 19 pièces)": "Quantity (optional, type it before the product, e.g. 19 pieces)",
   "ex. 19 pièces": "e.g. 19 pieces",
-  "Tapez la quantité si besoin, puis choisissez ou tapez le produit : ΣIRIUS prend l’heure actuelle, calcule la DLC selon sa durée prudente et lance l’étiquette.": "Type the quantity if needed, then choose or type the product: ΣIRIUS uses the current time, calculates the use-by date from its prudent duration and starts the label.",
+  "Vérifiez le produit choisi, puis appuyez sur « Calculer la DLC et générer l’étiquette ».": "Check the selected product, then press “Calculate the use-by date and generate the label.”",
   "Impression lancée automatiquement.": "Printing started automatically.",
   "Quantité :": "Quantity:",
   "Heure de fabrication :": "Production time:",
