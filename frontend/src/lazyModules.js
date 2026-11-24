@@ -39,6 +39,7 @@ export const HaccpCaptureWorkspace = wrap(() => import("@/HaccpWorkspace"));
 export const HaccpKitchenPage = wrap(() => import("@/HaccpKitchenPage"));
 export const SupplierOrdersManager = wrap(() => import("@/SupplierOrders"));
 export const SupplierOrderPortal = wrap(() => import("@/SupplierOrders").then((m) => ({ default: m.SupplierOrderPortal })));
+export const FriendSupplierManager = wrap(() => import("@/SupplierOrders").then((m) => ({ default: m.FriendSupplierManager })));
 export const KeysStatus = wrap(() => import("@/KeysStatus"));
 export const KeraunosPanel = wrap(() => import("@/KeraunosPanel"));
 export const AboutPanel = wrap(() => import("@/AboutPanel"));

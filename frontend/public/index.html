@@ -4,7 +4,7 @@
     <head>
         <meta charset="utf-8" />
         <script id="haccp-asset-base">
-          if ((window.location.pathname === "/haccp/" || /^\/commandes(?:\/gestion)?\/?$/.test(window.location.pathname)) && /^https?:$/.test(window.location.protocol)) {
+          if ((window.location.pathname === "/haccp/" || /^\/commandes(?:\/gestion)?\/?$/.test(window.location.pathname) || /^\/portail\/gestion\/?$/.test(window.location.pathname)) && /^https?:$/.test(window.location.protocol)) {
             const base = document.createElement("base");
             base.href = "/";
             document.head.appendChild(base);
@@ -28,10 +28,10 @@
         <script>window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"&&e.message&&e.message.includes("PerformanceServerTiming")){e.stopImmediatePropagation();e.preventDefault()}},true);</script>
     </head>
     <body>
-        <noscript>Vous devez activer JavaScript pour utiliser ΣIRIUS.</noscript>
+        <noscript>Vous devez activer JavaScript pour utiliser cette application.</noscript>
         <div id="root"></div>
         <script>
-          if ("serviceWorker" in navigator) {
+          if ("serviceWorker" in navigator && !/^\/(?:commandes\/?|portail\/gestion\/?)$/.test(window.location.pathname)) {
             window.addEventListener("load", function () {
               navigator.serviceWorker.register("%PUBLIC_URL%/sw.js").catch(function () {});
             });

@@ -31,6 +31,7 @@ BACKUP_COLLECTIONS = (
     "b2b_suppliers",
     "b2b_clients",
     "b2b_orders",
+    "b2b_portal_settings",
     "enterprise_companies",
     "enterprise_members",
     "enterprise_sites",

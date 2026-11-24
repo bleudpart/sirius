@@ -7,18 +7,40 @@ Le serveur enregistre une commande avec une partie distincte par fournisseur.
 faire l'objet d'une activation et d'une validation supplémentaires ; le transport
 d'e-mail n'est pas encore implémenté dans cette version.
 
-## Les deux accès
+## Les accès
 
-- Gestion : ouvrir « Commandes clients — portail multi-fournisseurs » dans ΣIRIUS,
-  ou [la gestion web](https://sirius-assistant.fr/commandes/gestion), connecté
-  au compte du commercial. L'espace se trouve aussi dans PLUTOS.
-- Client : ouvrir le lien privé créé dans la gestion. Il pointe vers
-  `/commandes#k=...`, sans compte ΣIRIUS pour le client.
+- Gestion associée : ouvrir « Commandes clients — portail multi-fournisseurs »
+  dans ΣIRIUS, ou [la gestion web](https://sirius-assistant.fr/commandes/gestion)
+  avec le compte ΣIRIUS associé. L'espace se trouve aussi dans PLUTOS.
+- Commercial : ouvrir son lien de gestion privé, sans compte ΣIRIUS. Il peut
+  gérer les fournisseurs, les grilles, les liens clients et les commandes,
+  mais pas créer ou révoquer d'autres liens commerciaux.
+- Client : ouvrir le lien privé créé dans la gestion, sans compte ΣIRIUS.
 
 Avec une entreprise configurée, seuls ses administrateurs et gestionnaires
 accèdent à sa gestion. Sans entreprise, l'espace est propre au compte connecté.
 Les données de ces espaces ne sont pas mélangées. Depuis l'application Windows
 en mode relais Cloud, la gestion utilise le compte Cloud lié au poste.
+
+## Portail du commercial
+
+Avec l'accord du commercial, créer son lien depuis « Accès privé du commercial »
+dans la gestion associée. Le lien est affiché une seule fois : le conserver et
+le transmettre en privé. **Toute personne qui le possède peut gérer les données
+du portail**, sans mot de passe ; ne pas le publier. Le compte associé peut le
+révoquer sans supprimer les données, puis en créer un nouveau si nécessaire.
+Le serveur ne conserve que l'empreinte du secret.
+
+Le commercial et le compte associé voient les mêmes fournisseurs, clients et
+commandes : les modifications de l'un sont visibles par l'autre. Le lien cesse
+de fonctionner si le compte associé est désactivé, perd ses droits ou son accès.
+Le commercial et la gestion associée peuvent renseigner ensemble le nom du
+portail ; ce nom apparaît dans l'espace commercial et sur le portail client.
+
+Les interfaces du commercial et des clients sont présentées sans marque ΣIRIUS.
+**L'adresse reste provisoirement sur `sirius-assistant.fr`** : aucun domaine
+personnalisé n'a encore été choisi ou configuré. Le portail dépend du même
+hébergement et du compte associé ; il n'est pas techniquement autonome.
 
 ## Préparer les fournisseurs et importer les grilles
 
@@ -70,5 +92,9 @@ ses produits. Le téléchargement **n'envoie pas le message**. Éviter de l'envo
 manuellement comme une commande réelle.
 
 Les données utilisent le docstore MongoDB ou SQLite existant. Les collections
-`b2b_suppliers`, `b2b_clients` et `b2b_orders` font partie des sauvegardes entreprise
-et de l'examen manuel préalable à la suppression d'un compte.
+`b2b_suppliers`, `b2b_clients`, `b2b_orders` et `b2b_portal_settings` font partie
+des sauvegardes entreprise. Les liens commerciaux ne sont pas inclus ni restaurés :
+une restauration ne réactive donc pas un lien révoqué. Lors d'une restauration
+sur une nouvelle base, il faut créer de nouveaux liens commerciaux.
+Toutes ces collections, dont `b2b_manager_links`, font partie de l'examen manuel
+préalable à la suppression d'un compte.

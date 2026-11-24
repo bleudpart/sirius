@@ -1,8 +1,11 @@
 import asyncio
+import json
 import uuid
+import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from email import policy
 from email.parser import BytesParser
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -10,6 +13,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
 
 import supplier_orders as orders
+from auth_api import make_auth_router
+from enterprise import _backup_company, _restore_company_archive
 from local_docstore import DatabaseRouter, LocalDocStore
 
 
@@ -30,6 +35,7 @@ def api(tmp_path, monkeypatch):
     monkeypatch.setattr(orders, "require_user", auth)
     app = FastAPI()
     app.include_router(orders.make_supplier_orders_router(db, lambda *_args, **_kwargs: True), prefix="/api")
+    app.include_router(make_auth_router(db), prefix="/api")
     with TestClient(app) as client:
         yield client, db
 
@@ -237,6 +243,134 @@ def test_company_catalogs_are_isolated_and_shared_only_with_their_managers(api):
     assert len(shared["clients"]) == 1
 
 
+def test_private_manager_link_shares_only_its_workspace_and_is_revocable(api):
+    client, db = api
+    own = supplier(client)
+    other = supplier(client, "Autre", user="two")
+    created = client.post("/api/supplier-orders/manager-links", headers=manage(), json={"name": "Commercial"})
+    assert created.status_code == 200
+    link = created.json()
+    token = link["url"].split("#k=")[1]
+    headers = {orders.MANAGER_HEADER: token}
+    stored = asyncio.run(db.b2b_manager_links.find_one({"id": link["link"]["id"]}))
+    assert stored["token_hash"] == orders.token_hash(token)
+    assert token not in str(stored)
+
+    friend = client.get("/api/supplier-orders", headers=headers)
+    assert friend.status_code == 200
+    assert friend.headers["cache-control"] == "no-store"
+    assert [row["id"] for row in friend.json()["suppliers"]] == [own["id"]]
+    assert "manager_links" not in friend.json()
+    assert client.get("/api/auth/me", headers=headers).status_code == 401
+    assert client.get("/api/supplier-orders", headers={**manage(), orders.MANAGER_HEADER: "invalid"}).status_code == 401
+    assert client.post("/api/supplier-orders/manager-links", headers=headers, json={"name": "Autre"}).status_code == 403
+    path = f"/api/supplier-orders/manager-links/{link['link']['id']}"
+    assert client.delete(path, headers=headers).status_code == 403
+    assert client.delete(path, headers=manage("two")).status_code == 404
+    assert client.put(f"/api/supplier-orders/suppliers/{other['id']}/catalog", headers=headers,
+                      json={"version": other["version"], "products": []}).status_code == 409
+
+    added = client.post("/api/supplier-orders/clients", headers=headers, json={"name": "Client partagé"})
+    assert added.status_code == 200
+    assert client.put("/api/supplier-orders/settings", headers=headers,
+                      json={"name": "Le projet commercial"}).json()["portal_name"] == "Le projet commercial"
+    workspace = client.get("/api/supplier-orders", headers=manage()).json()
+    assert workspace["portal_name"] == "Le projet commercial"
+    assert workspace["clients"][0]["name"] == "Client partagé"
+    assert workspace["manager_links"] == [link["link"]]
+    assert client.get("/api/supplier-orders", headers=manage("two")).json()["portal_name"] == orders.DEFAULT_PORTAL_NAME
+    client_token = added.json()["url"].split("#k=")[1]
+    customer = client.get("/api/public/supplier-orders/catalog", headers={orders.HEADER: client_token})
+    assert customer.json()["portal_name"] == "Le projet commercial"
+    assert client.get("/api/supplier-orders", headers={orders.HEADER: client_token}).status_code == 401
+
+    assert client.delete(path, headers=manage()).status_code == 200
+    assert client.get("/api/supplier-orders", headers=headers).status_code == 401
+    assert len(client.get("/api/supplier-orders", headers=manage()).json()["clients"]) == 1
+
+
+def test_restoring_a_backup_cannot_reactivate_a_revoked_manager_link(api, tmp_path, monkeypatch):
+    client, db = api
+    monkeypatch.setenv("SIRIUS_DATA_DIR", str(tmp_path))
+    company = {"id": "company", "name": "Essai"}
+    asyncio.run(db.enterprise_companies.insert_one(company))
+    asyncio.run(db.enterprise_members.insert_one({"company_id": "company", "user_id": "one", "role": "manager"}))
+    created = client.post("/api/supplier-orders/manager-links", headers=manage(), json={"name": "Commercial"}).json()
+    headers = {orders.MANAGER_HEADER: created["url"].split("#k=")[1]}
+    second = client.post("/api/supplier-orders/manager-links", headers=manage(), json={"name": "Autre"}).json()
+    second_headers = {orders.MANAGER_HEADER: second["url"].split("#k=")[1]}
+    assert client.put("/api/supplier-orders/settings", headers=manage(), json={"name": "Avant restauration"}).status_code == 200
+    old_link = asyncio.run(db.b2b_manager_links.find_one({"id": created["link"]["id"]}, {"_id": 0}))
+    backup = asyncio.run(_backup_company(db, company, {"email": "admin@example.test"}))
+    with zipfile.ZipFile(backup, "a") as archive:
+        assert "mongo/b2b_manager_links.json" not in archive.namelist()
+        archive.writestr("mongo/b2b_manager_links.json", json.dumps([old_link]))
+    assert client.delete(f"/api/supplier-orders/manager-links/{created['link']['id']}", headers=manage()).status_code == 200
+    assert client.put("/api/supplier-orders/settings", headers=manage(), json={"name": "Après sauvegarde"}).status_code == 200
+    asyncio.run(_restore_company_archive(db, "company", backup.read_bytes()))
+    assert client.get("/api/supplier-orders", headers=headers).status_code == 401
+    assert client.get("/api/supplier-orders", headers=second_headers).status_code == 200
+    assert client.get("/api/supplier-orders", headers=manage()).json()["portal_name"] == "Avant restauration"
+    assert client.put("/api/supplier-orders/settings", headers=manage(), json={"name": "Après restauration"}).status_code == 200
+    assert client.get("/api/supplier-orders", headers=manage()).json()["portal_name"] == "Après restauration"
+
+
+def test_restored_mongo_portal_name_can_be_updated_without_a_duplicate(api):
+    _client, db = api
+
+    class RestoredSettings:
+        def __init__(self):
+            self.rows = [{"_id": "restored-id", "scope_key": "user:one", "user_id": "one", "name": "Avant"}]
+
+        async def find_one(self, query, *_args):
+            return next((row.copy() for row in self.rows if all(row.get(k) == v for k, v in query.items())), None)
+
+        async def update_one(self, query, update):
+            row = next((row for row in self.rows if all(row.get(k) == v for k, v in query.items())), None)
+            if row:
+                row.update(update["$set"])
+            return SimpleNamespace(matched_count=int(row is not None))
+
+        async def insert_one(self, document):
+            self.rows.append(document)
+
+    class DatabaseWithRestoredSettings:
+        def __init__(self):
+            self.b2b_portal_settings = RestoredSettings()
+
+        def __getattr__(self, name):
+            return getattr(db, name)
+
+        def __getitem__(self, name):
+            return self.b2b_portal_settings if name == "b2b_portal_settings" else db[name]
+
+    restored = DatabaseWithRestoredSettings()
+    app = FastAPI()
+    app.include_router(orders.make_supplier_orders_router(restored, lambda *_args, **_kwargs: True), prefix="/api")
+    with TestClient(app) as client:
+        response = client.put("/api/supplier-orders/settings", headers=manage(), json={"name": "Après"})
+        assert response.status_code == 200
+        assert client.get("/api/supplier-orders", headers=manage()).json()["portal_name"] == "Après"
+    assert len(restored.b2b_portal_settings.rows) == 1
+
+
+def test_manager_link_rechecks_owner_license_membership_and_account(api, monkeypatch):
+    client, db = api
+    link = client.post("/api/supplier-orders/manager-links", headers=manage(), json={"name": "Commercial"}).json()
+    headers = {orders.MANAGER_HEADER: link["url"].split("#k=")[1]}
+    monkeypatch.setattr(orders, "access_status", AsyncMock(return_value={"allowed": False}))
+    assert client.get("/api/supplier-orders", headers=headers).status_code == 402
+    monkeypatch.setattr(orders, "access_status", AsyncMock(return_value={"allowed": True}))
+    asyncio.run(db.users.update_one({"user_id": "one"}, {"$set": {"disabled": True}}))
+    assert client.get("/api/supplier-orders", headers=headers).status_code == 401
+    asyncio.run(db.users.update_one({"user_id": "one"}, {"$set": {"disabled": False}}))
+    asyncio.run(db.enterprise_companies.insert_one({"id": "company"}))
+    asyncio.run(db.enterprise_members.insert_one({"company_id": "company", "user_id": "one", "role": "viewer"}))
+    assert client.get("/api/supplier-orders", headers=headers).status_code == 403
+    asyncio.run(db.enterprise_members.update_one({"user_id": "one"}, {"$set": {"role": "manager"}}))
+    assert client.get("/api/supplier-orders", headers=headers).status_code == 401
+
+
 def test_packaged_management_proxies_to_same_cloud_portal(api, monkeypatch):
     client, _db = api
     monkeypatch.setattr(orders.cloud_link, "relay_allowed", lambda: True)
@@ -245,5 +379,8 @@ def test_packaged_management_proxies_to_same_cloud_portal(api, monkeypatch):
     monkeypatch.setattr(orders.cloud_link, "relay_supplier_orders", relay)
     assert client.get("/api/supplier-orders", headers=manage()).json()["mode"] == "test"
     relay.assert_awaited_once_with("GET", "")
+    relay.reset_mock()
+    assert client.get("/api/supplier-orders", headers={orders.MANAGER_HEADER: "a" * 40}).status_code == 403
+    relay.assert_not_awaited()
     monkeypatch.setattr(orders, "is_direct_local_request", lambda _request: False)
     assert client.get("/api/supplier-orders", headers=manage()).status_code == 403

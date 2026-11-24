@@ -15,7 +15,7 @@ const LOCAL_BACKEND = /^(https?:\/\/)?(?:127\.0\.0\.1|localhost)(?::\d+)?$/i.tes
 export const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 
-// Toutes les requêtes vers notre backend portent les cookies de session
+// Les requêtes backend authentifiées portent la session, sauf demande explicitement anonyme.
 const SIRIUS_FETCH_PATCH_FLAG = "__siriusApiFetchPatched";
 export const ACCESS_BLOCKED_EVENT = "sirius:access-blocked";
 let localSessionBootstrap = null;
@@ -62,7 +62,9 @@ if (!window[SIRIUS_FETCH_PATCH_FLAG]) {
       : resolvedUrl === url
         ? input
         : new Request(resolvedUrl, input);
-    const requestOptions = isBackendRequest
+    const anonymous = options.credentials === "omit"
+      || (options.credentials === undefined && resolvedInput instanceof Request && resolvedInput.credentials === "omit");
+    const requestOptions = isBackendRequest && !anonymous
       ? { ...options, credentials: "include" }
       : options;
     const applyNativeSession = () => {
@@ -90,10 +92,11 @@ if (!window[SIRIUS_FETCH_PATCH_FLAG]) {
       if (!headers.has("Authorization")) headers.set("Authorization", `Bearer ${siriusAccessToken}`);
       requestOptions.headers = headers;
     };
-    applyHeaders();
+    if (!anonymous) applyHeaders();
     const retryInput = resolvedInput instanceof Request ? resolvedInput.clone() : resolvedInput;
     const response = await nativeFetch(resolvedInput, requestOptions);
 
+    if (anonymous) return response;
     if (isBackendRequest && response.status === 402) {
       window.dispatchEvent(new CustomEvent(ACCESS_BLOCKED_EVENT));
     }

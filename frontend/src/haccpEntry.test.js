@@ -18,7 +18,7 @@ function assetBase(url) {
   return { elements, url: new URL(elements[0]?.href || ".", url) };
 }
 
-test.each(["/haccp", "/haccp/", "/commandes", "/commandes/", "/commandes/gestion", "/commandes/gestion/"])("standalone assets resolve at the root for %s", (pathname) => {
+test.each(["/haccp", "/haccp/", "/commandes", "/commandes/", "/commandes/gestion", "/commandes/gestion/", "/portail/gestion", "/portail/gestion/"])("standalone assets resolve at the root for %s", (pathname) => {
   const base = assetBase(`https://sirius-assistant.fr${pathname}?test=1`).url;
   expect(new URL("./static/js/main.js", base).pathname).toBe("/static/js/main.js");
   expect(new URL("./manifest.json", base).pathname).toBe("/manifest.json");

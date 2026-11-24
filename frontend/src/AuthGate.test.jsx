@@ -83,3 +83,41 @@ test("a queued deletion request does not log out or claim account erasure", asyn
     global.fetch = originalFetch;
   }
 });
+
+test("private portal requests omit the ΣIRIUS session and never bootstrap it on rejection", async () => {
+  const originalFetch = window.fetch;
+  const originalFlag = window.__siriusApiFetchPatched;
+  const nativeFetch = jest.fn()
+    .mockResolvedValueOnce({ ok: false, status: 401 })
+    .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ access_token: "account-token" }) })
+    .mockResolvedValueOnce({ ok: true, status: 200 })
+    .mockResolvedValueOnce({ ok: false, status: 401 })
+    .mockResolvedValueOnce({ ok: false, status: 401 });
+  window.fetch = nativeFetch;
+  delete window.__siriusApiFetchPatched;
+  try {
+    jest.isolateModules(() => { require("./AuthGate"); });
+    await window.fetch("http://127.0.0.1:8001/api/protected");
+    expect(nativeFetch).toHaveBeenCalledTimes(3);
+    expect(nativeFetch.mock.calls[2][1].headers.get("Authorization")).toBe("Bearer account-token");
+    await window.fetch("http://127.0.0.1:8001/api/supplier-orders", {
+      credentials: "omit", headers: { "X-Order-Manager": "private-link-token" },
+    });
+    expect(nativeFetch).toHaveBeenCalledTimes(4);
+    expect(nativeFetch.mock.calls[3][1]).toEqual({
+      credentials: "omit", headers: { "X-Order-Manager": "private-link-token" },
+    });
+    const request = new Request("http://127.0.0.1:8001/api/supplier-orders", {
+      credentials: "omit", headers: { "X-Order-Manager": "private-link-token" },
+    });
+    await window.fetch(request);
+    expect(nativeFetch).toHaveBeenCalledTimes(5);
+    expect(nativeFetch.mock.calls[4][0].credentials).toBe("omit");
+    expect(nativeFetch.mock.calls[4][0].headers.get("Authorization")).toBeNull();
+    expect(nativeFetch.mock.calls[4][1]).toEqual({});
+  } finally {
+    window.fetch = originalFetch;
+    if (originalFlag === undefined) delete window.__siriusApiFetchPatched;
+    else window.__siriusApiFetchPatched = originalFlag;
+  }
+});

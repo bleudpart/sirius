@@ -48,7 +48,7 @@ class FakeDb:
         self.enterprise_members = FakeCollection([])
         self.enterprise_sites = FakeCollection([])
         self.enterprise_audit = FakeCollection([])
-        for name in ("b2b_suppliers", "b2b_clients", "b2b_orders"):
+        for name in ("b2b_suppliers", "b2b_clients", "b2b_orders", "b2b_portal_settings"):
             setattr(self, name, FakeCollection([]))
         self.haccp_trace = FakeCollection([{"id": "trace_1", "company_id": "company_test", "produit": "Lait"}])
         for collection in ("haccp_equip", "haccp_temp", "haccp_pms", "haccp_nc", "haccp_clean", "haccp_clean_log", "haccp_allerg", "haccp_docs", "haccp_controls", "haccp_duerp", "haccp_safety", "haccp_sheets", "user_files"):

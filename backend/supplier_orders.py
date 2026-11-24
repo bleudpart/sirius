@@ -22,7 +22,10 @@ from work_draft_recordings import digest, insert_once, now_iso
 
 logger = logging.getLogger(__name__)
 HEADER = "X-Sirius-Order-Client"
+MANAGER_HEADER = "X-Order-Manager"
 PORTAL_URL = "https://sirius-assistant.fr/commandes"
+MANAGER_PORTAL_URL = "https://sirius-assistant.fr/portail/gestion"
+DEFAULT_PORTAL_NAME = "Portail de commandes"
 Name = Annotated[str, StringConstraints(
     min_length=1, max_length=160, pattern=r"^[^\x00-\x1f\x7f]+$",
 )]
@@ -64,6 +67,14 @@ class CatalogInput(Input):
 class ClientInput(Input):
     name: Name
     email: Email = ""
+
+
+class PortalSettingsInput(Input):
+    name: Name
+
+
+class ManagerLinkInput(Input):
+    name: Name
 
 
 class CatalogCsvInput(Input):
@@ -149,6 +160,10 @@ def public_client(row):
     return {key: row[key] for key in ("id", "name", "email", "active", "created_at")}
 
 
+def public_manager_link(row):
+    return {key: row[key] for key in ("id", "name", "active", "created_at")}
+
+
 def receipt(order):
     return {
         key: order[key] for key in (
@@ -192,7 +207,35 @@ def make_supplier_orders_router(db, rate_ok):
 
     router = APIRouter(tags=["supplier-orders"], dependencies=[Depends(storage_errors)])
 
-    async def manager(request: Request):
+    async def linked_owner(link, invalid_detail):
+        owner = await db.users.find_one({"user_id": link["user_id"]})
+        if not owner or owner.get("disabled"):
+            raise HTTPException(401, invalid_detail)
+        if not (await access_status(db, owner)).get("allowed"):
+            raise HTTPException(402, "Le portail de ce commercial est temporairement indisponible.")
+        if await owner_scope(db, owner) != link["scope_key"]:
+            raise HTTPException(401, invalid_detail)
+        return owner
+
+    async def manager(request: Request, response: Response):
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        token = request.headers.get(MANAGER_HEADER)
+        if token is not None:
+            if cloud_link.relay_allowed():
+                raise HTTPException(403, "Le lien commercial s'utilise sur le portail web.")
+            ip = request.client.host if request.client else "unknown"
+            if not rate_ok(f"b2b-manager:{ip}", limit=60):
+                raise HTTPException(429, "Trop de requêtes. Patientez une minute.")
+            detail = "Lien commercial absent, révoqué ou invalide."
+            if not 30 <= len(token) <= 100:
+                raise HTTPException(401, detail)
+            link = await db.b2b_manager_links.find_one({"token_hash": token_hash(token), "active": True}, {"_id": 0})
+            if not link:
+                raise HTTPException(401, detail)
+            owner = await linked_owner(link, detail)
+            request.state.b2b_external_manager = True
+            return owner, link["scope_key"]
         user = await require_user(request, db)
         if cloud_link.relay_allowed():
             if not is_direct_local_request(request):
@@ -221,6 +264,14 @@ def make_supplier_orders_router(db, rate_ok):
         } for row in rows if row.get("products")]
         return {"suppliers": visible, "version": digest(visible)}
 
+    async def portal_name(scope):
+        settings = await db.b2b_portal_settings.find_one({"scope_key": scope}, {"_id": 0})
+        return settings["name"] if settings else DEFAULT_PORTAL_NAME
+
+    def require_account_manager(request: Request):
+        if getattr(request.state, "b2b_external_manager", False):
+            raise HTTPException(403, "La gestion des liens commerciaux est réservée au compte associé.")
+
     async def client_identity(request: Request, response: Response):
         response.headers["Cache-Control"] = "no-store"
         response.headers["Referrer-Policy"] = "no-referrer"
@@ -233,13 +284,7 @@ def make_supplier_orders_router(db, rate_ok):
         client = await db.b2b_clients.find_one({"token_hash": token_hash(token), "active": True}, {"_id": 0})
         if not client:
             raise HTTPException(401, "Lien client absent, révoqué ou invalide.")
-        owner = await db.users.find_one({"user_id": client["user_id"]})
-        if not owner or owner.get("disabled"):
-            raise HTTPException(401, "Accès client indisponible.")
-        if not (await access_status(db, owner)).get("allowed"):
-            raise HTTPException(402, "Le portail de ce commercial est temporairement indisponible.")
-        if await owner_scope(db, owner) != client["scope_key"]:
-            raise HTTPException(401, "Accès client indisponible.")
+        await linked_owner(client, "Accès client indisponible.")
         return client
 
     @router.get("/supplier-orders")
@@ -250,12 +295,65 @@ def make_supplier_orders_router(db, rate_ok):
         _user, scope = identity
         clients = await db.b2b_clients.find({"scope_key": scope}, {"_id": 0}).sort("created_at", -1).to_list(1001)
         orders = await db.b2b_orders.find({"scope_key": scope}, {"_id": 0}).sort("created_at", -1).to_list(101)
-        return {
+        result = {
             "mode": "test", "suppliers": await suppliers(scope),
             "clients": [public_client(row) for row in clients[:1000]],
             "orders": [receipt(row) for row in orders[:100]], "orders_truncated": len(orders) > 100,
-            "clients_truncated": len(clients) > 1000,
+            "clients_truncated": len(clients) > 1000, "portal_name": await portal_name(scope),
         }
+        if not getattr(request.state, "b2b_external_manager", False):
+            links = await db.b2b_manager_links.find({"scope_key": scope}, {"_id": 0}).sort("created_at", -1).to_list(101)
+            result["manager_links"] = [public_manager_link(row) for row in links[:100]]
+            result["manager_links_truncated"] = len(links) > 100
+        return result
+
+    @router.put("/supplier-orders/settings")
+    async def save_settings(body: PortalSettingsInput, request: Request, identity=Depends(manager)):
+        forwarded = await proxy(request, "/settings", body)
+        if forwarded is not None:
+            return forwarded
+        user, scope = identity
+        result = await db.b2b_portal_settings.update_one({"scope_key": scope}, {"$set": {"name": body.name}})
+        if not result.matched_count:
+            row = {**scope_fields(scope, user["user_id"]), "name": body.name}
+            _saved, created = await insert_once(db, "b2b_portal_settings", row, identity={"scope_key": scope})
+            if created:
+                return {"portal_name": body.name}
+            result = await db.b2b_portal_settings.update_one({"scope_key": scope}, {"$set": {"name": body.name}})
+            if not result.matched_count:
+                raise HTTPException(409, "Le nom du portail a changé. Rechargez avant de réessayer.")
+        return {"portal_name": body.name}
+
+    @router.post("/supplier-orders/manager-links")
+    async def add_manager_link(body: ManagerLinkInput, request: Request, identity=Depends(manager)):
+        require_account_manager(request)
+        forwarded = await proxy(request, "/manager-links", body)
+        if forwarded is not None:
+            return forwarded
+        user, scope = identity
+        if await db.b2b_manager_links.count_documents({"scope_key": scope}) >= 100:
+            raise HTTPException(409, "Limite de 100 accès commerciaux atteinte.")
+        token = secrets.token_urlsafe(32)
+        row = {
+            **scope_fields(scope, user["user_id"]), "id": str(uuid.uuid4()), "name": body.name,
+            "active": True, "token_hash": token_hash(token), "created_at": now_iso(),
+        }
+        await db.b2b_manager_links.insert_one(dict(row))
+        return {"link": public_manager_link(row), "url": f"{MANAGER_PORTAL_URL}#k={token}"}
+
+    @router.delete("/supplier-orders/manager-links/{link_id}")
+    async def revoke_manager_link(link_id: uuid.UUID, request: Request, identity=Depends(manager)):
+        require_account_manager(request)
+        forwarded = await proxy(request, f"/manager-links/{link_id}")
+        if forwarded is not None:
+            return forwarded
+        _user, scope = identity
+        result = await db.b2b_manager_links.update_one(
+            {"scope_key": scope, "id": str(link_id)}, {"$set": {"active": False}},
+        )
+        if not result.matched_count:
+            raise HTTPException(404, "Accès commercial introuvable.")
+        return {"active": False}
 
     @router.post("/supplier-orders/suppliers")
     async def add_supplier(body: SupplierInput, request: Request, identity=Depends(manager)):
@@ -355,7 +453,7 @@ def make_supplier_orders_router(db, rate_ok):
     async def client_catalog(client=Depends(client_identity)):
         return {
             "client_id": client["id"], "client_name": client["name"], "mode": "test",
-            **await catalog(client["scope_key"]),
+            "portal_name": await portal_name(client["scope_key"]), **await catalog(client["scope_key"]),
         }
 
     @router.post("/public/supplier-orders/orders")

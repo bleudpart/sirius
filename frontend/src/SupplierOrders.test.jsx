@@ -1,11 +1,11 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import SupplierOrdersManager, { SupplierOrderPortal } from "./SupplierOrders";
+import SupplierOrdersManager, { FriendSupplierManager, SupplierOrderPortal } from "./SupplierOrders";
 import { orderDecimal, supplierCart } from "./supplierOrdersApi";
 import { createModuleRegistry } from "./moduleRegistry";
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
-let host, root, oldFetch, oldCrypto;
+let host, root, oldFetch, oldCrypto, oldTitle;
 const uuid = "e9c1bde8-6ec5-4731-a930-b5e9d7e8558a";
 const suppliers = [
   { id: "supplier-a", name: "Laiterie", email: "", version: "v1", price_basis: "HT", products: [
@@ -48,7 +48,7 @@ async function fillCart() {
   await change(field("Adresse"), "Adresse essai");
 }
 beforeEach(() => {
-  oldFetch = global.fetch; oldCrypto = global.crypto;
+  oldFetch = global.fetch; oldCrypto = global.crypto; oldTitle = document.title;
   global.crypto = { randomUUID: () => uuid };
   sessionStorage.clear();
   window.history.replaceState(null, "", "/commandes#k=secret-client-token");
@@ -56,7 +56,7 @@ beforeEach(() => {
 });
 afterEach(async () => {
   await act(async () => root.unmount());
-  host.remove(); global.fetch = oldFetch; global.crypto = oldCrypto;
+  host.remove(); global.fetch = oldFetch; global.crypto = oldCrypto; document.title = oldTitle;
   jest.restoreAllMocks(); sessionStorage.clear();
 });
 
@@ -162,7 +162,7 @@ test("management can start empty and save a new supplier grid without any real s
     return reply(workspace);
   });
   await render(<SupplierOrdersManager />);
-  expect(host.textContent).toContain("Les grilles pourront être complétées ou importées demain");
+  expect(host.textContent).toContain("Les grilles pourront être complétées ou importées plus tard");
   await change(field("Nom du fournisseur"), "Fournisseur essai");
   await submit("Ajouter le fournisseur");
   await click("Ajouter un produit");
@@ -175,6 +175,69 @@ test("management can start empty and save a new supplier grid without any real s
     products: [{ reference: "REF", name: "Lait essai", unit: "litre", price: "1.2345" }],
   });
   expect(host.textContent).toContain("Grille enregistrée pour le portail");
+});
+
+test("the owner creates and revokes a separate private management link", async () => {
+  const workspace = { suppliers: [], clients: [], orders: [], manager_links: [], portal_name: "Portail de commandes" };
+  const link = { id: "manager-1", name: "Commercial", active: true, created_at: "2026-11-24T18:00:00Z" };
+  const url = "https://sirius-assistant.fr/portail/gestion#k=private-manager-token";
+  global.fetch = jest.fn(async (path, options) => {
+    if (options.method === "POST" && path.endsWith("/manager-links")) {
+      workspace.manager_links = [link]; return reply({ link, url });
+    }
+    if (options.method === "DELETE") {
+      workspace.manager_links = [{ ...link, active: false }]; return reply({ active: false });
+    }
+    return reply(workspace);
+  });
+  await render(<SupplierOrdersManager />);
+  await submit("Créer le lien commercial");
+  expect(field("Lien commercial privé").value).toBe(url);
+  expect(host.textContent).toContain("Toute personne possédant le lien pourra gérer ces données");
+  await click("Révoquer l’accès commercial de Commercial");
+  await click("Confirmer la révocation commerciale");
+  expect(field("Lien commercial privé")).toBeUndefined();
+  expect(host.textContent).toContain("Commercial — Révoqué");
+});
+
+test("the commercial uses only its private link, sees a neutral portal, and can name it", async () => {
+  const workspace = { suppliers: [], clients: [], orders: [], portal_name: "Portail de commandes" };
+  global.fetch = jest.fn(async (path, options) => {
+    expect(options.credentials).toBe("omit");
+    expect(options.headers["X-Order-Manager"]).toBe("secret-commercial");
+    if (options.method === "PUT" && path.endsWith("/settings")) {
+      workspace.portal_name = JSON.parse(options.body).name;
+      return reply({ portal_name: workspace.portal_name });
+    }
+    return reply(workspace);
+  });
+  window.history.replaceState(null, "", "/portail/gestion#k=secret-commercial");
+  await render(<FriendSupplierManager />);
+  expect(host.textContent).not.toContain("ΣIRIUS");
+  expect(button("Créer le lien commercial")).toBeUndefined();
+  expect(host.textContent).toContain("partagés avec le titulaire du compte qui a créé ce lien");
+  expect(host.textContent).toContain("Il peut aussi les consulter et les modifier");
+  await change(field("Nom du portail"), "Le projet commercial");
+  await submit("Enregistrer le nom");
+  expect(host.querySelector("h1").textContent).toBe("Le projet commercial");
+  expect(document.title).toBe("Le projet commercial");
+});
+
+test("the client sees the chosen portal name without a commercial or account login", async () => {
+  global.fetch = jest.fn(async () => reply({ ...catalog, portal_name: "Le projet commercial" }));
+  await render();
+  expect(host.textContent).toContain("Le projet commercial");
+  expect(host.textContent).not.toContain("ΣIRIUS");
+  expect(document.title).toBe("Le projet commercial");
+  expect(global.fetch.mock.calls[0][1].credentials).toBe("omit");
+});
+
+test("the commercial portal does not use a signed-in account when its private link is missing", async () => {
+  global.fetch = jest.fn();
+  window.history.replaceState(null, "", "/portail/gestion");
+  await render(<FriendSupplierManager />);
+  expect(host.textContent).toContain("Ouvrez le lien commercial privé");
+  expect(global.fetch).not.toHaveBeenCalled();
 });
 
 test("decimal cart calculations remain exact, including large amounts and invalid precision", () => {
