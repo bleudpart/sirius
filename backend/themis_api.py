@@ -349,8 +349,8 @@ def build_accounting_export_zip(
             "L'archive contient les tableaux CSV prêts à importer et les pièces jointes disponibles.\n"
             "Les fichiers CSV sont conservés sans ligne de signature afin de préserver leur importabilité.\n\n"
             f"{signature_line} · THÉMIS\n"
-            f"{email_line}\n"
-            f"{copyright_line}\n",
+            + (f"{email_line}\n" if email_line else "")
+            + f"{copyright_line}\n",
         )
         brand_image = signature_image(WORKSPACE_LOGO)
         if brand_image:

@@ -31,9 +31,10 @@ def build_scan_pdf(record: dict, *, signature_name: str | None = None, signature
     styles.add(ParagraphStyle(name="ScanSignature", fontName="Helvetica", fontSize=7.5, leading=10))
     width = A4[0] - 80
     signature_line, _, copyright_line, email = signature_lines(signature_name, signature_email)
+    email_part = f'<br/>{escape(email)}' if email else ""
     signature = Paragraph(
         f'<font color="#a67b2e"><b>{escape(signature_line.replace("Message envoyé", "Document préparé", 1))}</b></font>'
-        f'<br/>{escape(email)}<br/><font color="#5b6670">{escape(copyright_line)}</font>',
+        f'{email_part}<br/><font color="#5b6670">{escape(copyright_line)}</font>',
         styles["ScanSignature"],
     )
     logo_data = signature_image(EMAIL_LOGO)

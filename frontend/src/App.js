@@ -179,8 +179,9 @@ const signaturePreviewText = (user) => {
   const preferences = user?.preferences || {};
   const name = preferences.signature_name || user?.name || "M. Daniel Partel";
   const accountEmail = user?.email && !user.email.toLowerCase().endsWith("@sirius.local") ? user.email : "";
-  const email = preferences.signature_email || accountEmail || "danielsirius.pro2026@gmail.com";
-  return `\n\n—\nMessage envoyé par ΣIRIUS, assistant de ${name}\nE-mail : ${email}\n© 2026 ΣIRIUS par ${name} — Tous droits réservés.`;
+  const email = preferences.signature_email || accountEmail;
+  const emailLine = email ? `\nE-mail : ${email}` : "";
+  return `\n\n—\nMessage envoyé par ΣIRIUS, assistant de ${name}${emailLine}\n© 2026 ΣIRIUS par ${name} — Tous droits réservés.`;
 };
 const todayStr = () => getLocalDateKey();
 

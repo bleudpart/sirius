@@ -238,7 +238,14 @@ export default function FirstRunWizard({ userName = "", userEmail = "", keys = {
         {step === 1 && (
           <section className="fw-body" data-testid="fw-mic">
             <h2><Mic size={18} /> Le micro</h2>
-            <p>Appuyez sur le bouton, puis dites « Bonjour ΣIRIUS ».</p>
+            <p className="fw-mic-why" data-testid="fw-mic-why">
+              ΣIRIUS a besoin du micro pour entendre vos commandes vocales et vos dictées.
+              Vous pouvez couper le micro à tout moment.
+            </p>
+            <p>
+              Appuyez sur le bouton, puis dites « Bonjour ΣIRIUS ».
+              Si votre appareil demande l'accès au micro, choisissez <strong>Autoriser</strong>.
+            </p>
             <button type="button" className="fw-primary" onClick={testMic}
               disabled={mic.state === "recording" || mic.state === "transcribing"} data-testid="fw-mic-test">
               {mic.state === "recording" ? "Je vous écoute…" : mic.state === "transcribing" ? "Transcription…" : "Tester le micro"}
@@ -274,6 +281,11 @@ export default function FirstRunWizard({ userName = "", userEmail = "", keys = {
               <li className={voiceTest === "heard" ? "ok" : "ko"}>Voix : {voiceTest === "heard" ? "audible, confirmée par vous" : voiceTest === "failed" ? "non entendue" : "non vérifiée"}</li>
               <li className={mic.state === "ok" ? "ok" : "ko"}>Micro : {mic.state === "ok" ? "testé" : "non testé"}</li>
             </ul>
+            {mic.state !== "ok" && (
+              <p className="fw-status ko" data-testid="fw-mic-reminder">
+                Sans micro, ΣIRIUS ne peut pas vous entendre. Vous pourrez l'autoriser plus tard dans Réglages, onglet Voix.
+              </p>
+            )}
             <label className="setup-label" htmlFor="fw-name">Comment dois-je vous appeler ?</label>
             <input id="fw-name" className="setup-input" value={name} onChange={(e) => setName(e.target.value)} data-testid="fw-name" />
             <div className="fw-actions">

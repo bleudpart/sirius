@@ -113,8 +113,13 @@ def test_profile_signature_identity_is_independent_of_login_email():
     assert len(attachments) == 1
 
 
-def test_internal_local_account_email_uses_public_signature_default():
+def test_internal_local_account_email_is_not_replaced_by_the_owner_address():
     identity = signature_identity({"name": "Daniel Partel", "email": "daniel@sirius.local"})
 
     assert identity["signature_name"] == "M. Daniel Partel"
-    assert identity["signature_email"] == "danielsirius.pro2026@gmail.com"
+    assert identity["signature_email"] == ""
+    message = append_signature_text("Bonjour.", **identity)
+    body, _ = graph_signature("Bonjour.", **identity)
+    assert "E-mail :" not in message
+    assert "mailto:" not in body["content"]
+    assert "danielsirius.pro2026@gmail.com" not in message + body["content"]

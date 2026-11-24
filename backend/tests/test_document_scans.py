@@ -74,7 +74,7 @@ def test_pdf_is_a4_and_preserves_fiscal_identifiers_without_inventing_vat(scan_a
     assert "12,40 EUR" in text
     assert "Non identifié" in text
     assert "Document préparé par" in text
-    assert "danielsirius.pro2026@gmail.com" in text
+    assert "danielsirius.pro2026@gmail.com" not in text
     assert reader.pages[0].images
     assert float(reader.pages[0].mediabox.width) == pytest.approx(595.276, abs=0.01)
     assert float(reader.pages[0].mediabox.height) == pytest.approx(841.89, abs=0.01)

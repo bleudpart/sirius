@@ -275,7 +275,7 @@ export function ProfilePanel({ user, access = null, onClose, onUpdate, onLogout 
   const [signatureName, setSignatureName] = useState((user.preferences || {}).signature_name || (user.name === "Daniel Partel" ? "M. Daniel Partel" : user.name) || "");
   const defaultSignatureEmail = user.email && !user.email.toLowerCase().endsWith("@sirius.local")
     ? user.email
-    : "danielsirius.pro2026@gmail.com";
+    : "";
   const [signatureEmail, setSignatureEmail] = useState((user.preferences || {}).signature_email || defaultSignatureEmail);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);

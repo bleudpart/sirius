@@ -122,6 +122,16 @@ test("a denied microphone explains how to fix it and can be skipped", async () =
   expect($("fw-next-mic").textContent).toBe("Passer");
 });
 
+test("the setup explains why the microphone is needed and reminds a skipped test", async () => {
+  global.fetch = jest.fn(() => json(200, setup()));
+  await render({});
+  act(() => $("fw-next-brain").click());
+  expect($("fw-mic-why").textContent).toContain("besoin du micro");
+  expect($("fw-mic").textContent).toContain("Autoriser");
+  act(() => $("fw-next-mic").click());
+  expect($("fw-mic-reminder").textContent).toContain("ne peut pas vous entendre");
+});
+
 test("expert mode hands over to the full settings screen", async () => {
   global.fetch = jest.fn(() => json(200, setup()));
   const onExpert = jest.fn();
