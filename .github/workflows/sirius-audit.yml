@@ -109,6 +109,7 @@ jobs:
         run: python -m unittest discover -s scripts -p test_windows_release.py
       - name: Microsoft Store MSIX packaging tests
         run: python -m unittest discover -s scripts -p test_build_store_msix.py
+      - name: Website release retention test
         run: bash deploy/hetzner/cleanup-releases.test.sh
       - name: Run SIRIUS audit
         run: python scripts/sirius_audit.py
