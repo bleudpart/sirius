@@ -42,11 +42,39 @@ Les profils à certificats éphémères demandent aussi une vérification de
 l'identité/chaîne adaptée, plutôt que l'empreinte fixe du mode PFX.
 
 La publication via Microsoft Store constitue une autre piste : le Store signe
-les packages qu'il accepte. Elle nécessite un compte approuvé et une adaptation
-de l'application ; ce dépôt ne génère pas encore de package Store. Dans un
+les packages qu'il accepte. ΣIRIUS y est publié (ID `9N8X1F9QN3RZ`). Dans un
 paquet MSIX, ΣIRIUS désactive son installateur de mises à jour GitHub et indique
 que les mises à jour sont gérées par le Microsoft Store ou l'administrateur.
 Les installations Windows actuelles conservent leur mécanisme de mise à jour.
+
+### Envoyer une version au Microsoft Store
+
+`frontend/store-msix/` contient le modèle du paquet Store : manifeste avec
+l'identité réservée `DanielPartel.IRIUS`, icônes et `Resources.pri`. Ne pas
+modifier son `Version="0.0.0.0"` : le script le remplace par la version npm.
+
+Après `npm run electron:build` et les tests de la version :
+
+```powershell
+# Construit frontend\dist\SIRIUS-<version>.0-store.msix sans l'envoyer
+powershell -ExecutionPolicy Bypass -File scripts\store-release.ps1 -NoSubmit
+# Construit puis envoie en certification
+powershell -ExecutionPolicy Bypass -File scripts\store-release.ps1
+```
+
+`scripts/build_store_msix.py` refuse un `SIRIUS.exe` dont la version diffère de
+`frontend/package.json`, exclut `resources/elevate.exe`, puis vérifie chaque
+fichier du paquet et son identité. L'envoi utilise `msstore publish` : la
+nouvelle soumission reprend la fiche et les options de la dernière soumission
+publiée (publication automatique après certification). Une soumission déjà en
+certification bloque l'envoi suivant.
+
+`msstore` exige une application Microsoft Entra avec le rôle Gestionnaire :
+Partner Center → Paramètres du compte → Locataires (associer ou créer un
+Microsoft Entra ID), puis Gestion des utilisateurs → Applications Microsoft
+Entra. Configurer ensuite une fois `msstore reconfigure --tenantId … --sellerId …
+--clientId … --clientSecret …`, en tapant le secret localement, jamais dans un
+fichier du dépôt. Tester le paquet dans une VM avant l'envoi.
 
 Lors d'un essai local, MakeAppx a refusé les fichiers `_rels/*.rels` présents
 dans l'arborescence décompressée `docx/templates/default-docx-template`
