@@ -2715,6 +2715,10 @@ Liste complète des modules et dates : [MODULES_SIRIUS.txt](./MODULES_SIRIUS.txt
   Ne versionne jamais le keystore ni ses mots de passe. Pour une application
   déjà publiée, utilise sa clé d'upload existante, pas une nouvelle clé.
   La signature ne remplace pas les validations et exigences de la Play Console.
+  Depuis la racine, `powershell -ExecutionPolicy Bypass -File frontend\scripts\build-play-aab.ps1`
+  demande la clé et les mots de passe localement, puis construit `frontend/dist/SIRIUS-<version>.aab`.
+  Le script lit l'empreinte SHA-1 du certificat du paquet signé, indépendamment
+  de la langue de Java ; la comparer au certificat de clé d'importation dans Play Console.
   L'image de présentation de la fiche Play Store est
   `frontend/public/play-feature-1024x500.png` (1 024 × 500, PNG RGB sans transparence).
   Pour la régénérer depuis le logo commun :

@@ -1,4 +1,4 @@
-# Construit l'AAB signé pour Google Play (fr.sirius_assistant.app).
+﻿# Construit l'AAB signé pour Google Play (fr.sirius_assistant.app).
 # Les secrets sont saisis en masqué et ne restent que dans ce processus.
 $ErrorActionPreference = "Stop"
 $frontend = Split-Path -Parent $PSScriptRoot
@@ -34,10 +34,13 @@ try {
   Pop-Location
   $target = Join-Path $frontend "dist\SIRIUS-$version.aab"
   Copy-Item "android\app\build\outputs\bundle\release\app-release.aab" $target -Force
-  Write-Host "`nAAB prêt : $target" -ForegroundColor Green
   $keytool = Join-Path $env:JAVA_HOME "bin\keytool.exe"
-  $sha1 = & $keytool -list -v -keystore $env:SIRIUS_ANDROID_KEYSTORE -alias $env:SIRIUS_ANDROID_KEY_ALIAS -storepass:env SIRIUS_ANDROID_STORE_PASSWORD 2>$null | Select-String "SHA1:"
-  Write-Host "Empreinte de la clé utilisée -> $($sha1.Line.Trim())"
+  $certificate = & $keytool '-J-Duser.language=en' '-J-Duser.country=US' -printcert -jarfile $target
+  if ($LASTEXITCODE) { throw "Échec de la lecture du certificat de signature de l'AAB." }
+  $sha1 = @($certificate | Select-String '^\s*SHA1:\s*(?:[0-9A-F]{2}:){19}[0-9A-F]{2}\s*$')
+  if ($sha1.Count -ne 1) { throw "Empreinte SHA-1 unique introuvable dans le certificat de l'AAB." }
+  Write-Host "`nAAB prêt : $target" -ForegroundColor Green
+  Write-Host "Empreinte de la clé utilisée -> $($sha1[0].Line.Trim())"
   Write-Host "Elle doit être identique à Play Console > Test et publication > Intégrité de l'appli > Certificat de la clé d'importation (SHA-1)."
   Write-Host "Envoyez-le dans Play Console > ΣIRIUS > Tests internes > Créer une release."
 } finally {
