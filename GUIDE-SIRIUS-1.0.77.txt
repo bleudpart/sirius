@@ -1,0 +1,14 @@
+ΣIRIUS 1.0.77 - NOTE DE VERSION
+==============================
+
+Cette version regroupe dans l'installateur Windows, la version portable et
+l'APK Android les évolutions publiées sur le site depuis l'installateur 1.0.76 :
+
+- Android : affichage plus fluide, avec un réacteur central et une onde vocale
+  allégés sur les téléphones ;
+- Premier lancement : l'usage du micro est expliqué avant l'autorisation ;
+- Signatures d'e-mail : plus d'adresse de secours ajoutée quand le compte n'a
+  pas d'adresse joignable.
+
+Cette note ne confirme pas à elle seule que les fichiers ont été construits,
+installés, testés ou publiés.
