@@ -219,8 +219,9 @@
   }
 
   @keyframes android-core-breathe {
-    0%, 100% { filter: brightness(0.9); transform: translate(-50%, -50%) scale(0.9); }
-    50% { filter: brightness(1.2); transform: translate(-50%, -50%) scale(1.12); }
+    /* Opacité plutôt que filter : la pulsation reste composée par le GPU sans repeindre. */
+    0%, 100% { opacity: 0.75; transform: translate(-50%, -50%) scale(0.9); }
+    50% { opacity: 1; transform: translate(-50%, -50%) scale(1.12); }
   }
 
   .sirius-root.android-home-reference .sirius-command-area {

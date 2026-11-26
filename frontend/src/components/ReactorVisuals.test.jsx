@@ -73,6 +73,18 @@ test("mobile uses the same inexpensive drawing path as explicit economy mode", (
   expect(ctx.stroke).toHaveBeenCalledTimes(mobileStrokes);
 });
 
+test("mobile draws the reactor and waveform without costly shadow blur", () => {
+  mobile = true;
+  const blurs = [];
+  const record = () => blurs.push(ctx.shadowBlur || 0);
+  ctx.stroke.mockImplementation(record);
+  ctx.fill.mockImplementation(record);
+  render();
+  act(() => root.render(<Waveform status="speaking" color="#91e6f2" theme={{ cyan: "#91e6f2", gold: "#d8b875", background: "#061321" }} />));
+  expect(blurs.length).toBeGreaterThan(0);
+  expect(blurs.every((value) => value === 0)).toBe(true);
+});
+
 test("desktop keeps the richer visuals and resize to mobile switches to light rendering", () => {
   render();
   expect(ctx.lineTo).toHaveBeenCalled();

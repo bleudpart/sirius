@@ -316,7 +316,7 @@ export function ReactorCore({ status, volume, color, eco }) {
       core.addColorStop(0.6, `rgba(${r},${g},${b},0.85)`);
       core.addColorStop(1, `rgba(${r},${g},${b},0)`);
       ctx.save();
-      if (!s.eco) {
+      if (!light) {
         ctx.shadowBlur = blur + 14;
         ctx.shadowColor = `rgba(${r},${g},${b},1)`;
       }
@@ -395,7 +395,10 @@ export function Waveform({ status, color, theme, reference = false }) {
     const palette = getHUDStyleVariables(theme);
     const cyan = palette["--workspace-cyan"];
     const cyanLight = palette["--sirius-cyan-light"];
-    const DPR = Math.min(window.devicePixelRatio || 1, 2);
+    const isMobile = isMobileViewport();
+    // Mobile : flous d'ombre et haute densité de pixels saccadent les téléphones modestes.
+    const DPR = Math.min(window.devicePixelRatio || 1, isMobile ? 1 : 2);
+    const glow = isMobile ? 0 : 1;
     let raf, t = 0;
     const resize = () => {
       const r = canvas.getBoundingClientRect();
@@ -407,7 +410,6 @@ export function Waveform({ status, color, theme, reference = false }) {
     const resizeObserver = new ResizeObserver(resize);
     resizeObserver.observe(canvas);
     let lastWave = 0;
-    const isMobile = isMobileViewport();
     const draw = (ts) => {
       if ((ts && ts - lastWave < 33) || document.documentElement.classList.contains("sirius-dragging")
           || (isMobile && document.querySelector(MOBILE_COVER_SELECTOR))) {
@@ -456,7 +458,7 @@ export function Waveform({ status, color, theme, reference = false }) {
       ctx.globalAlpha = reference ? 0.9 : 0.85;
       ctx.lineCap = reference ? "round" : "butt";
       ctx.lineWidth = (reference ? 1.2 : 1.3) * DPR;
-      ctx.shadowBlur = reference ? 6 : 10;
+      ctx.shadowBlur = (reference ? 6 : 10) * glow;
       ctx.shadowColor = cyanLight;
       ctx.stroke();
       // Onde fluide en surimpression
@@ -471,7 +473,7 @@ export function Waveform({ status, color, theme, reference = false }) {
       ctx.strokeStyle = grad;
       ctx.globalAlpha = reference ? 0.3 : 0.9;
       ctx.lineWidth = (reference ? 0.75 : 1.6) * DPR;
-      ctx.shadowBlur = reference ? 4 : 12;
+      ctx.shadowBlur = (reference ? 4 : 12) * glow;
       ctx.shadowColor = cyan;
       ctx.stroke();
       // Ligne d'horizon lumineuse
@@ -481,7 +483,7 @@ export function Waveform({ status, color, theme, reference = false }) {
       ctx.strokeStyle = grad;
       ctx.globalAlpha = reference ? 0.25 : 0.55;
       ctx.lineWidth = (reference ? 0.7 : 1) * DPR;
-      ctx.shadowBlur = reference ? 3 : 8;
+      ctx.shadowBlur = (reference ? 3 : 8) * glow;
       ctx.shadowColor = cyanLight;
       ctx.stroke();
       // Particules émises par l'onde quand Sirius parle (ou fort niveau micro)
@@ -499,7 +501,7 @@ export function Waveform({ status, color, theme, reference = false }) {
           });
         }
       }
-      ctx.shadowBlur = reference ? 4 : 8;
+      ctx.shadowBlur = (reference ? 4 : 8) * glow;
       particlesRef.current = particlesRef.current.filter((p) => {
         p.x += p.vx; p.y += p.vy; p.vy *= 0.985; p.life -= p.decay;
         if (p.life <= 0) return false;
