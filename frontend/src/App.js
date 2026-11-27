@@ -2,7 +2,7 @@
 
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { Mic, MicOff, Clock, Cpu, Wifi, MapPin, Calendar, X, Check, Leaf, Settings2, Brain, Music, Repeat, RotateCcw, BarChart3, Workflow, Ruler, FolderOpen, Code2, Database, Sparkles, Eye, Landmark, Library, Orbit, Monitor, ShieldCheck, Radar, ShieldAlert, Camera, Crop, ImageDown, Fingerprint, Zap, Package, Clapperboard, Grip, Radio, Wrench, FileCode, History, Maximize, Minimize, KeyRound, Home as HomeIcon, BadgeInfo, Globe2, Hammer, TrendingUp, Newspaper, Scale, Flame, BookOpen, Sigma, AlarmClock, Power, Boxes, Link2, Building2, Activity, Mail, UserRound } from "lucide-react";
+import { Mic, MicOff, Clock, Cpu, Wifi, MapPin, Calendar, X, Check, Leaf, Settings2, Brain, Music, Repeat, RotateCcw, BarChart3, Workflow, Ruler, FolderOpen, Code2, Database, Sparkles, Eye, Landmark, Library, Orbit, Monitor, ShieldCheck, Radar, ShieldAlert, Camera, Crop, ImageDown, Fingerprint, Zap, Package, Clapperboard, Grip, Radio, Wrench, FileCode, History, Maximize, Minimize, KeyRound, Home as HomeIcon, BadgeInfo, CircleHelp, Globe2, Hammer, TrendingUp, Newspaper, Scale, Flame, BookOpen, Sigma, AlarmClock, Power, Boxes, Link2, Building2, Activity, Mail, UserRound } from "lucide-react";
 import {
   ArchitectPanel, SpectatorView, FilesPanel, DevCompanion, ZeusCortex, SiriusPrime, OracleDivin,
   PantheonSystem, NexusCeleste, SiriusDisplay, EuropeanaViewer, HaccpModule, KeysStatus, KeraunosPanel,
@@ -7719,7 +7719,19 @@ function App() {
             </ConfirmButton>
           )}
         </div>
-    </header>
+      </header>
+      {!booting && (
+        <button
+          type="button"
+          className="sirius-help-fab"
+          data-testid="sirius-help-btn"
+          aria-label="Aide sur cet écran"
+          title="Aide sur cet écran"
+          onClick={() => processCommand("Aide-moi pour cet écran")}
+        >
+          <CircleHelp size={20} strokeWidth={1.8} aria-hidden="true" />
+        </button>
+      )}
       <ModulesMenu open={showModulesMenu} onClose={closeModulesMenu} items={moduleItems} />
       <SiriusInfoWheel
         open={showInfoWheel}

@@ -311,6 +311,28 @@ test("Android capsule exposes a confirmed quit action through the native plugin"
   expect(CapacitorApp.exitApp).toHaveBeenCalledTimes(1);
 });
 
+test("the dedicated help button requests screen-aware support without using the mic", async () => {
+  jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
+  await mount();
+  const help = host.querySelector('[data-testid="sirius-help-btn"]');
+  expect(help).not.toBeNull();
+  expect(help.getAttribute("aria-label")).toBe("Aide sur cet écran");
+  expect(host.querySelector('[data-testid="sirius-top-mic-btn"]')).not.toBeNull();
+
+  await act(async () => {
+    help.click();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  const request = global.fetch.mock.calls.find(([url]) => String(url).endsWith("/chat/stream"));
+  expect(request).toBeDefined();
+  const payload = JSON.parse(request[1].body);
+  expect(payload.text).toBe("Aide-moi pour cet écran");
+  expect(payload.environment.screen).toMatchObject({ platform: "android", section: "home" });
+});
+
 test("Android quit failures are reported instead of silently failing", async () => {
   jest.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
   CapacitorApp.exitApp.mockRejectedValueOnce(new Error("Native exit unavailable"));

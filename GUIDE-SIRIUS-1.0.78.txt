@@ -1,0 +1,10 @@
+ΣIRIUS 1.0.78 - NOTE DE VERSION
+==============================
+
+Cette version ajoute un bouton d'aide sur le bord gauche du HUD.
+Il permet de demander une aide adaptée à l'écran ouvert.
+L'auto-support couvre la navigation, la voix, la mémoire, les fichiers,
+les clés, l'abonnement, les modules entreprise et HACCP.
+
+Cette note ne confirme pas à elle seule que les fichiers ont été construits,
+installés, testés ou publiés.
