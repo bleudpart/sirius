@@ -81,6 +81,7 @@ import { initReadAloud, parseReadPanelCommand, readPanelAloud } from "@/readAlou
 import { detectMailProvider, extractContactQuery, extractEmailRecipientQuery, isContactCommand, isSendEmailCommand, isVoiceNo, isVoiceYes, voiceNumberChoice } from "@/emailComposeVoice";
 import { chooseBestVoiceTranscript, extractVoiceCommand, normalizeVoiceTranscript, removeVoiceWakeWord, startsWithVoiceWakeWord } from "@/voiceCorrections";
 import { initHoloWindows, minimizeAll, resetHoloWindowLayout } from "@/holoWindows";
+import { activeScreenContext } from "@/screenContext";
 import { ConfirmButton } from "@/ConfirmButton";
 import { applyVisualTheme, getHUDStyleVariables, loadVisualTheme, renderHUD } from "@/theme";
 import { SiriusInfoHub, SiriusInfoWheel } from "@/hud/SiriusHudPanels";
@@ -1695,6 +1696,7 @@ function App() {
         proactive_message: display?.suggestion ? display.contenu : "",
         activity: cmdTimesRef.current?.length >= 3 ? "intense" : "exploration",
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Paris",
+        screen: activeScreenContext(),
         ...(contextAtRequest.work_dossier_id
           ? { work_dossier_id: contextAtRequest.work_dossier_id }
           : contextAtRequest.work_session_context ? {} : { work_context_clear: true }),

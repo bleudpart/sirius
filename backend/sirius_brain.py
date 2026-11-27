@@ -1186,7 +1186,7 @@ def _response_token_budget(prompt: str, mode: str) -> int:
 async def _kimi_answer(prompt, history, profile, memory, mode, mood, key, environment, research, targeted_research,
                        research_prompt=None):
     research_prompt = research_prompt or prompt
-    system_prompt = build_system_prompt(profile, memory, mode, mood, environment)
+    system_prompt = build_system_prompt(profile, memory, mode, mood, environment, prompt=prompt, history=history)
     if research:
         system_prompt += "\n\nSOURCES WEB COLLECTÉES :\n" + research
     if needs_targeted_guidance(research_prompt):
@@ -1498,7 +1498,8 @@ def could_become_ignored_marker(text) -> bool:
     return IGNORED_INPUT_MARKER.startswith(stripped) or stripped.startswith(IGNORED_INPUT_MARKER)
 
 
-def build_system_prompt(profile=None, memory=None, mode="normal", mood=None, environment=None):
+def build_system_prompt(profile=None, memory=None, mode="normal", mood=None, environment=None,
+                        prompt=None, history=None):
     """Construit le prompt système en tenant compte du profil, de la mémoire, du mode et de l'humeur."""
     base = SIRIUS_CORE_PROMPT + module_catalog_text()
     environment = environment or {}
@@ -1577,6 +1578,10 @@ def build_system_prompt(profile=None, memory=None, mode="normal", mood=None, env
             + "\nRègles mémoire : appuie-toi sur ces faits sans les répéter inutilement ; "
             "si l'utilisateur contredit un fait, la nouvelle information prime et tu la retiens."
         )
+
+    if prompt:
+        from self_support import prompt_section
+        base += prompt_section(prompt, environment, history)
 
     return base
 
@@ -1731,7 +1736,8 @@ async def ask_sirius(prompt, history=None, profile=None, memory=None, mode="norm
             logger.warning("[ΣIRIUS:PROFOND] Kimi indisponible, repli vers le fournisseur rapide : %r", error)
 
     if not file_snippets and not web_snippets and groq_key:
-        sys_prompt = build_system_prompt(profile=profile, memory=memory, mode=mode, mood=mood, environment=environment)
+        sys_prompt = build_system_prompt(profile=profile, memory=memory, mode=mode, mood=mood, environment=environment,
+                                         prompt=prompt, history=history)
         if research:
             sys_prompt += "\n\nSOURCES WEB COLLECTÉES :\n" + research
         if needs_targeted_guidance(research_prompt):
@@ -1849,7 +1855,8 @@ async def ask_sirius_stream(prompt, history=None, profile=None, memory=None, mod
             yield f"C'est mémorisé instantanément : {fact}."
         return
 
-    sys_prompt = build_system_prompt(profile=profile, memory=memory, mode=mode, mood=mood, environment=environment)
+    sys_prompt = build_system_prompt(profile=profile, memory=memory, mode=mode, mood=mood, environment=environment,
+                                     prompt=prompt, history=history)
     plain_instruction = (
         "\n\nRéponds directement en langage naturel, sans JSON, sans habillage, sans listes à puces "
         "sauf si explicitement demandé — uniquement le texte de ta réponse, prêt à être lu à voix haute."
